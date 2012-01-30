@@ -382,6 +382,24 @@ public class AllocBlock {
 		return freebits;
 	}
 
+	int releaseCommitWrites(final RWWriteCacheService cache) {
+		int freebits = 0;
+		
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = m_transients[i];
+				// check all addresses set in m_transients NOT set in m_live
+				chkbits &= ~m_live[i];
+				
+				final int startBit = i * 32;
+				
+				freebits += clearCacheBits(cache, startBit, chkbits);
+			}
+		}
+		
+		return freebits;
+	}
+
 	public String show() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("AllocBlock, baseAddress: " + RWStore.convertAddr(m_addr) + " bits: ");

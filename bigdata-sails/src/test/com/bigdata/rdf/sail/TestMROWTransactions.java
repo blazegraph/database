@@ -9,213 +9,45 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CAT;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PseudoRandom;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
-/**
- * TestCase to test single writer/mutiple transaction committed readers with
- * SAIL interface.
- * 
- * @author Martyn Cutcher
- * 
- */
 public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
-	/**
-     * 
-     */
-	public TestMROWTransactions() {
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+	
+    TestMROWTransactions() {
 	}
 
-	/**
-	 * @param arg0
-	 */
-	public TestMROWTransactions(String arg0) {
+    TestMROWTransactions(String arg0) {
 		super(arg0);
 	}
 
-	@Override
-	public Properties getProperties() {
-
-		Properties props = super.getProperties();
-
-		props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
-		props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-		props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-		props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
-		props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
-//		props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
-
-		// ensure using RWStore
-		props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
-		// props.setProperty(Options.CREATE_TEMP_FILE, "false");
-		// props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
-
-		return props;
-
-	}
-	
-	protected Properties getProperties(int retention) {
-		final Properties props = getProperties();
-		props.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
-
-		return props;
-	}
-
-    protected void setUp() throws Exception {
-        super.setUp();
+	void domultiple_csem_transaction_onethread(final int retention) throws Exception {
+    	domultiple_csem_transaction_onethread(retention, 2000, 50);
     }
     
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-    
-	private URI uri(String s) {
-		return new URIImpl(BD.NAMESPACE + s);
-	}
-
-//	private BNode bnode(String id) {
-//		return new BNodeImpl(id);
-//	}
-//
-//	private Statement stmt(Resource s, URI p, Value o) {
-//		return new StatementImpl(s, p, o);
-//	}
-//
-//	private Statement stmt(Resource s, URI p, Value o, Resource c) {
-//		return new ContextStatementImpl(s, p, o, c);
-//	}
-
-//	public void test_multiple_transaction() throws Exception {
-//
-//		final int nthreads = 10; // 
-//		final int nuris = 2000; // 
-//		final int npreds = 50; // 
-//		final Random r = new Random();
-//
-//		ExecutorService writers = Executors.newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
-//		ExecutorService readers = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory.defaultThreadFactory());
-//
-//		final BigdataSail sail = getSail();
-//		final URI[] subs = new URI[nuris];
-//		for (int i = 0; i < nuris; i++) {
-//			subs[i] = uri("uri:" + i);
-//		}
-//		final URI[] preds = new URI[npreds];
-//		for (int i = 0; i < npreds; i++) {
-//			preds[i] = uri("pred:" + i);
-//		}
-//		final AtomicInteger writes = new AtomicInteger();
-//		final AtomicInteger reads = new AtomicInteger();
-//		try {
-//			sail.initialize();
-//			final BigdataSailRepository repo = new BigdataSailRepository(sail);
-//
-//			// Writer task adds nwrites statements then commits
-//			class Writer implements Callable<Long> {
-//				final int nwrites;
-//
-//				Writer(final int nwrites) {
-//					this.nwrites = nwrites;
-//				}
-//
-//				public Long call() throws Exception {
-//					final RepositoryConnection tx1 = repo.getReadWriteConnection();
-//					try {
-//						tx1.setAutoCommit(false);
-//
-//						for (int i = 0; i < nwrites; i++) {
-//							tx1.add(stmt(subs[r.nextInt(500)], preds[r.nextInt(20)], subs[r.nextInt(500)]));
-//							writes.incrementAndGet();
-//						}
-//						tx1.commit();
-//
-//					} finally {
-//						tx1.close();
-//					}
-//
-//					return null;
-//				}
-//
-//			}
-//
-//			// ReaderTask makes nreads and closes
-//			class Reader implements Callable<Long> {
-//				final int nreads;
-//
-//				Reader(final int nwrites) {
-//					this.nreads = nwrites;
-//				}
-//
-//				public Long call() throws Exception {
-//					final RepositoryConnection tx1 = repo.getReadOnlyConnection();
-//					try {
-//
-//						for (int i = 0; i < nreads; i++) {
-//							RepositoryResult<Statement> stats = tx1.getStatements(subs[r.nextInt(500)], null, null, true);
-//							while (stats.hasNext()) {
-//								stats.next();
-//								reads.incrementAndGet();
-//							}
-//						}
-//
-//					} finally {
-//						tx1.close();
-//					}
-//
-//					return null;
-//				}
-//
-//			}
-//
-//			// let's schedule a few writers and readers
-//			for (int i = 0; i < 500; i++) {
-//				writers.submit(new Writer(500));
-//				for (int rdrs = 0; rdrs < 20; rdrs++) {
-//					readers.submit(new Reader(50));
-//				}
-//			}
-//
-//			Thread.sleep(60 * 1000);
-//			writers.shutdownNow();
-//			readers.shutdownNow();
-//			writers.awaitTermination(5, TimeUnit.SECONDS);
-//			readers.awaitTermination(5, TimeUnit.SECONDS);
-//			System.out.println("Statements written: " + writes.get() + ", read: " + reads.get());
-//		} finally {
-//
-//			sail.__tearDownUnitTest();
-//
-//		}
-//
-//	}
-
-	// similar to test_multiple_transactions but uses direct AbsractTripleStore
-	// manipulations rather than RepositoryConnections
-	public void test_multiple_csem_transaction_nohistory() throws Exception {
-		domultiple_csem_transaction(0);
-	}
-	
-	public void test_multiple_csem_transaction_withHistory() throws Exception {
-		domultiple_csem_transaction(60);
-	}
-	
-	public void domultiple_csem_transaction(final int retention) throws Exception {
+	void domultiple_csem_transaction(final int retention) throws Exception {
 
 		/**
 		 *  The most likely problem is related to the session protection in the
@@ -228,11 +60,13 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		 *  has been freed and is no longer protected from recycling when an
 		 *  attempt is made to read from it.
 		 */
-		final int nthreads = 5; // up count to increase chance startup condition
+		final int nthreads = 2; // up count to increase chance startup condition
 								// decrement to increase chance of idle (no sessions)
 		final int nuris = 2000; // number of unique subject/objects
 		final int npreds = 50; // 
-		final Random r = new Random();
+//		final PseudoRandom r = new PseudoRandom(2000);
+//		r.next(1500);
+		final Random r = new Random(2000);
 
 		final CAT writes = new CAT();
 		final CAT reads = new CAT();
@@ -266,7 +100,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 				public Long call() throws Exception {
                     try {
                         final boolean isQuads = origStore.isQuads();
-                        Thread.sleep(r.nextInt(2000) + 500);
+                        // Thread.sleep(r.nextInt(2000) + 500);
                         try {
 
                             for (int i = 0; i < nwrites; i++) {
@@ -321,6 +155,8 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 .getIndexManager()).newTx(ITx.READ_COMMITTED);
 
                         try {
+                        	txLog.info("Reading with tx: " + txId);
+                        	
                             final AbstractTripleStore readstore = (AbstractTripleStore) origStore
                                     .getIndexManager().getResourceLocator()
                                     .locate(origStore.getNamespace(), txId);
@@ -329,15 +165,26 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 final BigdataStatementIterator stats = readstore
                                         .getStatements(subs[r.nextInt(nuris)],
                                                 null, null);
-                                while (stats.hasNext()) {
-                                    stats.next();
-                                    reads.increment();
+                                try {
+	                                while (stats.hasNext()) {
+	                                    stats.next();
+	                                    reads.increment();
+	                                }
+                                } finally {
+                                	stats.close();
                                 }
                             }
 
+                        	txLog.info("Finished with tx: " + txId);
                         } catch (IllegalStateException ise) {
+                        	txLog.info("IllegalStateException tx: " + txId);
                         	failex.compareAndSet(null, ise);
+                        } catch (Exception e) {
+                        	txLog.info("UnexpectedException tx: " + txId);
+                        	failex.compareAndSet(null, e);
+                        	throw e;
                         } finally {
+                        	txLog.info("Aborting tx: " + txId);
                             ((Journal) origStore.getIndexManager()).abort(txId);
                         }
                     } catch (Throwable ise) {
@@ -371,7 +218,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
                 // let's schedule a few writers and readers (more than needed)
                 // writers.submit(new Writer(5000000/* nwrite */));
-                for (int i = 0; i < 5000; i++) {
+                for (int i = 0; i < 1000; i++) {
                     writers.submit(new Writer(500/* nwrite */));
                     for (int rdrs = 0; rdrs < 20; rdrs++) {
                         readers.submit(new Reader(60/* nread */));
@@ -379,7 +226,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 }
 
                 // let the writers run riot for a time, checking for failure
-                for (int i = 0; i < 60; i++) {
+                for (int i = 0; i < 600; i++) {
                 	Thread.sleep(1000);
                 	if (failex.get() != null)
                 		break;
@@ -418,26 +265,10 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 	}
 
-	public void test_multiple_csem_transaction_onethread_nohistory() throws Exception {
-		domultiple_csem_transaction_onethread(0);
-	}
-	
-	public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
-		domultiple_csem_transaction_onethread(60);
-	}
-	
-// Open a read committed transaction
-    //do reads
-    //do write without closing read
-    //commit write
-    //close read
-    //repeat
-    public void domultiple_csem_transaction_onethread(final int retention) throws Exception {
+	void domultiple_csem_transaction_onethread(final int retention, final int nuris, final int npreds) throws Exception {
 
-        final int nuris = 2000; // 2000; // number of unique subject/objects
-        final int npreds = 50; // 50; //
-        final Random r = new Random();
-
+	    final PseudoRandom r = new PseudoRandom(20000 /*10000*/);
+	    
         final CAT writes = new CAT();
         final CAT reads = new CAT();
         final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(
@@ -456,7 +287,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             for (int i = 0; i < nuris; i++) {
                 subs[i] = uri("uri:" + i);
             }
-            final URI[] preds = new URI[npreds];
+            final URI[] preds = new URI[npreds + 20];
             for (int i = 0; i < npreds; i++) {
                 preds[i] = uri("pred:" + i);
             }
@@ -474,17 +305,21 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                             .locate(origStore.getNamespace(), txId);
                     for (int i = 0; i < nreads; i++) {
                         final BigdataStatementIterator stats = readstore
-                        .getStatements(subs[nuris/2 + loop], null,
-                                null);
-//                        .getStatements(subs[r.nextInt(nuris)], null,
+//                        .getStatements(subs[nuris/2 + loop], null,
 //                                null);
-                        while (stats.hasNext()) {
-                            stats.next();
-                            reads.increment();
+                        .getStatements(subs[r.nextInt(nuris)], null,
+                                null);
+                        try {
+	                        while (stats.hasNext()) {
+	                            stats.next();
+	                            reads.increment();
+	                        }
+                        } finally {
+                        	stats.close();
                         }
                     }
 
-                    Thread.sleep(r.nextInt(1000) + 500);
+                    // Thread.sleep(r.nextInt(1000) + 500);
                     try {
 
                         for (int i = 0; i < nwrites; i++) {
@@ -503,6 +338,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
                     } finally {
                         origStore.commit();
+                    	System.err.println("Commit: " + loop);
                         if (log.isInfoEnabled()) {
                             log.info("Commit");
                         }
@@ -523,4 +359,44 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         }
 
     }
+    
+	protected URI uri(String s) {
+		return new URIImpl(BD.NAMESPACE + s);
+	}
+
+	@Override
+	public Properties getProperties() {
+
+		Properties props = super.getProperties();
+
+		props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+		props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+		props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+		props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+		props.setProperty(BigdataSail.Options.JUSTIFY, "false");
+		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+//		props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
+
+		// ensure using RWStore
+		props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+		props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
+		props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
+		// props.setProperty(Options.CREATE_TEMP_FILE, "false");
+		// props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
+		
+		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "500");
+		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "10");
+
+		return props;
+
+	}
+	
+	protected Properties getProperties(int retention) {
+		final Properties props = getProperties();
+		props.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+
+		return props;
+	}
+
 }

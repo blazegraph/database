@@ -683,4 +683,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		}
 	}
 
+	public boolean isCommitted(long addr) {
+		return m_store.isCommitted(decodeAddr(addr));
+	}
+
+	public boolean inWriteCache(long addr) {
+		return m_store.inWriteCache(decodeAddr(addr));		
+	}
 }

@@ -105,7 +105,7 @@ public class FixedAllocator implements Allocator {
      * 2 to enable the values 1 & 2 to be special cased (this aspect is now
      * historical).
      */
-	public long getPhysicalAddress(int offset) {
+	public long getPhysicalAddress(int offset, final boolean nocheck) {
 	  	offset -= 3;
 
 		final int allocBlockRange = 32 * m_bitSize;
@@ -122,7 +122,7 @@ public class FixedAllocator implements Allocator {
 		 * be recycled after the next commit
 		 */
 		final long paddr = RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
-		if (RWStore.tstBit(block.m_transients, bit)) {		
+		if (nocheck || RWStore.tstBit(block.m_transients, bit)) {			
 			return paddr;
 		} else {
 			if (RWStore.tstBit(block.m_commit, bit)) {
@@ -277,6 +277,9 @@ public class FixedAllocator implements Allocator {
                     	 */
                     	assert m_sessionFrees.intValue() == 0;
                     	// assert block.releaseSession(m_store.m_writeCache) == 0;
+                    	
+                    	// clear out writes - FIXME is releaseSession okay
+                    	block.releaseCommitWrites(m_store.m_writeCache);
                     	
                         block.m_transients = block.m_live.clone();
                     }
@@ -1032,5 +1035,9 @@ public class FixedAllocator implements Allocator {
 		}
 
 		return freeBits;
+	}
+
+	public long getPhysicalAddress(final int offset) {
+		return getPhysicalAddress(offset, false); // do NOT override address checks
 	}
 }
