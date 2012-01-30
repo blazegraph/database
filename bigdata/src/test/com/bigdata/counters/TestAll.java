@@ -64,7 +64,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestCounters.class);
 
         suite.addTestSuite(TestHistoryInstrument.class);
-
+        
         suite.addTest(com.bigdata.counters.store.TestAll.suite());
 
         suite.addTest(com.bigdata.counters.query.TestAll.suite());
@@ -74,6 +74,8 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.counters.osx.TestAll.suite());
 
         suite.addTest(com.bigdata.counters.striped.TestAll.suite());
+
+        suite.addTest(com.bigdata.counters.ganglia.TestAll.suite());
 
         return suite;
         

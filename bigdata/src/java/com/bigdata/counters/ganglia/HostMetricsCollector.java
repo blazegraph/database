@@ -1,6 +1,7 @@
 package com.bigdata.counters.ganglia;
 
 import java.util.Iterator;
+import java.util.regex.Pattern;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -32,6 +33,20 @@ import com.bigdata.ganglia.IGangliaMetricsReporter;
  */
 public class HostMetricsCollector implements IGangliaMetricsCollector {
 
+    /**
+     * Match anything which does NOT include <code>.service.</code> in the
+     * counter path.
+     * 
+     * @see <a href="http://www.regular-expressions.info/lookaround.html">
+     *      Regular Expressions Info </a>
+     */
+    static final Pattern filter; 
+    static {
+
+        filter = Pattern.compile("^(?!.*/service/).*$");
+        
+    }
+
 	private final AbstractStatisticsCollector statisticsCollector;
 
 	public HostMetricsCollector(
@@ -41,13 +56,13 @@ public class HostMetricsCollector implements IGangliaMetricsCollector {
 			throw new IllegalArgumentException();
 
 		this.statisticsCollector = statisticsCollector;
-
+		
 	}
 
 	@Override
 	public void collect(final IGangliaMetricsReporter reporter) {
 
-//		Log.warn(statisticsCollector.getCounters().toString());
+//		log.warn(statisticsCollector.getCounters().toString());
 
 		// Common base path which is NOT included in the generated metric name.
 		final String basePrefix = ICounterSet.pathSeparator
@@ -58,16 +73,8 @@ public class HostMetricsCollector implements IGangliaMetricsCollector {
 		final CounterSet serviceCounters = (CounterSet) statisticsCollector
 				.getCounters().getPath(basePrefix);
 
-		/*
-		 * TODO Visits all counters. More efficient to skip over the service(s).
-		 * This could be done using a regex or by visiting all counters under
-		 * each of the well known host metric groups (Info, CPU, Memory,
-		 * PhysicalDisk, etc). [However, it is also more risky since we could
-		 * miss something that way.]
-		 */
 		@SuppressWarnings("rawtypes")
-		final Iterator<ICounter> itr = serviceCounters
-				.getCounters(null/* filter */);
+        final Iterator<ICounter> itr = serviceCounters.getCounters(filter);
 
 		while (itr.hasNext()) {
 
@@ -87,5 +94,5 @@ public class HostMetricsCollector implements IGangliaMetricsCollector {
 		}
 
 	}
-
+	
 }
