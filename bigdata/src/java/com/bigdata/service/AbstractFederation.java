@@ -1716,7 +1716,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * {@link ILoadBalancerService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class ReportTask implements Runnable {
 
@@ -1930,7 +1929,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Sends events to the {@link ILoadBalancerService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * 
      * FIXME should discard events if too many build up on the client.
      */
