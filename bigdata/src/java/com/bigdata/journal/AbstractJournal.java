@@ -4340,49 +4340,49 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * https://sourceforge.net/apps/trac/bigdata/ticket/440
      */
-//    /**
-//     * Remove all commit records between the two provided keys.
-//     * 
-//     * This is called from the RWStore when it checks for deferredFrees against
-//     * the CommitRecordIndex where the CommitRecords reference the deleteBlocks
-//     * that have been deferred.
-//     * 
-//     * Once processed the records for the effected range muct be removed as they
-//     * reference invalid states.
-//     * 
-//     * @param fromKey
-//     * @param toKey
-//     */
-//    public int removeCommitRecordEntries(final byte[] fromKey,
-//            final byte[] toKey) {
-//
-//        // Use the LIVE indeex!
-//        final CommitRecordIndex cri = _commitRecordIndex;
-//
-//        @SuppressWarnings("unchecked")
-//        final ITupleIterator<CommitRecordIndex.Entry> commitRecords = cri
-//                .rangeIterator(fromKey, toKey, 0/* capacity */,
-//                        IRangeQuery.DEFAULT | IRangeQuery.CURSOR, null/* filter */);
-//
-//        int removed = 0;
-//        
-//        while (commitRecords.hasNext()) {
-//
-//            final ITuple<CommitRecordIndex.Entry> t = commitRecords.next();
-//            
-//            // Delete the associated ICommitRecord.
-//            delete(t.getObject().addr);
-//            
-//            // Remove the entry for the commit record from the commit record
-//            // index.
-//            commitRecords.remove();
-//            
-//            removed++;
-//            
-//        }
-//        
-//        return removed;
-//        
-//    }
+    /**
+     * Remove all commit records between the two provided keys.
+     * 
+     * This is called from the RWStore when it checks for deferredFrees against
+     * the CommitRecordIndex where the CommitRecords reference the deleteBlocks
+     * that have been deferred.
+     * 
+     * Once processed the records for the effected range muct be removed as they
+     * reference invalid states.
+     * 
+     * @param fromKey
+     * @param toKey
+     */
+    public int removeCommitRecordEntries(final byte[] fromKey,
+            final byte[] toKey) {
+
+        // Use the LIVE indeex!
+        final CommitRecordIndex cri = _commitRecordIndex;
+
+        @SuppressWarnings("unchecked")
+        final ITupleIterator<CommitRecordIndex.Entry> commitRecords = cri
+                .rangeIterator(fromKey, toKey, 0/* capacity */,
+                        IRangeQuery.DEFAULT | IRangeQuery.CURSOR, null/* filter */);
+
+        int removed = 0;
+        
+        while (commitRecords.hasNext()) {
+
+            final ITuple<CommitRecordIndex.Entry> t = commitRecords.next();
+            
+            // Delete the associated ICommitRecord.
+            delete(t.getObject().addr);
+            
+            // Remove the entry for the commit record from the commit record
+            // index.
+            commitRecords.remove();
+            
+            removed++;
+            
+        }
+        
+        return removed;
+        
+    }
 
 }

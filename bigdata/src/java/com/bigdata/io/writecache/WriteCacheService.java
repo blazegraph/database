@@ -2062,7 +2062,14 @@ abstract public class WriteCacheService implements IWriteCache {
         return ret.toString();
     }
 
-    /**
+
+	public boolean isPresent(long addr) {
+		// System.out.println("Checking address: " + addr);
+		
+		return recordMap.get(addr) != null;
+	}
+	
+	/**
      * Performance counters for the {@link WriteCacheService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
