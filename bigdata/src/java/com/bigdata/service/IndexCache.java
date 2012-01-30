@@ -14,9 +14,9 @@ import com.bigdata.service.ndx.IScaleOutClientIndex;
  */
 public class IndexCache extends AbstractIndexCache<IScaleOutClientIndex>{
     
-    private final AbstractScaleOutFederation fed;
+    private final AbstractScaleOutFederation<?> fed;
     
-    public IndexCache(final AbstractScaleOutFederation fed, final int capacity,
+    public IndexCache(final AbstractScaleOutFederation<?> fed, final int capacity,
             final long timeout) {
 
         super(capacity, timeout);
@@ -36,7 +36,7 @@ public class IndexCache extends AbstractIndexCache<IScaleOutClientIndex>{
         // No such index.
         if (mdi == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + name + " @ " + timestamp
                         + " : is not registered");
 
@@ -49,7 +49,7 @@ public class IndexCache extends AbstractIndexCache<IScaleOutClientIndex>{
         
     }
  
-    protected void dropIndexFromCache(String name) {
+    protected void dropIndexFromCache(final String name) {
 
         // drop the index from the cache.
         super.dropIndexFromCache(name);

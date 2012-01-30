@@ -32,8 +32,6 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 
     protected static final Logger log = Logger.getLogger(AbstractIndexCache.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-    
     /**
      * A canonicalizing cache for the client's {@link IIndex} proxy objects. The
      * keys are {@link NT} objects which represent both the name of the index
@@ -99,7 +97,7 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
      */
     public T getIndex(final String name, final long timestamp) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + " @ " + timestamp);
 
         final NT nt = new NT(name, timestamp);
@@ -128,7 +126,7 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 
                 if ((ndx = newView(name, timestamp)) == null) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("name=" + name + " @ "
                                 + timestamp + " : no such index.");
 
@@ -140,13 +138,13 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
 //                indexCache.put(nt, ndx, false/* dirty */);
                 indexCache.put(nt, ndx);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("name=" + name + " @ "
                             + timestamp + " : index exists.");
 
             } else {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("name=" + name + " @ "
                             + timestamp + " : cache hit.");
 
@@ -212,7 +210,7 @@ abstract public class AbstractIndexCache<T extends IRangeQuery> {
                     if (timestamp == ITx.UNISOLATED
                             || timestamp == ITx.READ_COMMITTED) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("dropped from cache: "
                                     + name + " @ " + timestamp);
 

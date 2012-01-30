@@ -34,10 +34,11 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.ndx.RawDataServiceTupleIterator;
 
 import cutthecrap.utils.striterators.IFilter;
@@ -55,14 +56,10 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
     protected static final Logger log = Logger
             .getLogger(CacheOnceMetadataIndex.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     /**
      * The federation.
      */
-    protected final AbstractScaleOutFederation fed;
+    protected final AbstractScaleOutFederation<?> fed;
 
     /**
      * Name of the scale-out index.
@@ -84,16 +81,34 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
      */
     private final MetadataIndex mdi;
 
+    @Override
+	public String toString() {
+		
+		return super.toString() + "{name=" + name + ",timestamp="
+				+ TimestampUtility.toString(timestamp) + "}";
+		
+    }
+    
     /**
      * Caches the index partition locators.
      * 
      * @param name
      *            The name of the scale-out index.
      */
-    public CacheOnceMetadataIndex(AbstractScaleOutFederation fed, String name,
-            long timestamp, MetadataIndexMetadata mdmd) {
+	public CacheOnceMetadataIndex(final AbstractScaleOutFederation<?> fed,
+			final String name, final long timestamp,
+			final MetadataIndexMetadata mdmd) {
 
-        this.fed = fed;
+		if(fed == null)
+			throw new IllegalArgumentException();
+
+		if(name == null)
+			throw new IllegalArgumentException();
+		
+		if(mdmd == null)
+			throw new IllegalArgumentException();
+		
+		this.fed = fed;
 
         this.name = name;
 
@@ -122,7 +137,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
      * Note: This assumes that the metadata index is NOT partitioned and DOES
      * NOT support delete markers.
      */
-    protected void cacheLocators(byte[] fromKey, byte[] toKey) {
+    protected void cacheLocators(final byte[] fromKey, final byte[] toKey) {
 
         long n = 0;
 
@@ -140,7 +155,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
         /*
          * Read the locators from the remote metadata service.
          */
-        final ITupleIterator itr = new RawDataServiceTupleIterator(fed
+        final ITupleIterator<?> itr = new RawDataServiceTupleIterator(fed
                 .getMetadataService(),//
                 MetadataService.getMetadataIndexName(name), //
                 timestamp,//
@@ -154,7 +169,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
 
         while (itr.hasNext()) {
 
-            final ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
 
             final byte[] key = tuple.getKey();
 
@@ -166,7 +181,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
 
         }
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("Copied " + n + " locator records: name=" + name);
 
@@ -178,7 +193,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
      * @throws UnsupportedOperationException
      *             stale locators should not occur for read-historical views!
      */
-    public void staleLocator(PartitionLocator locator) {
+    public void staleLocator(final PartitionLocator locator) {
 
         throw new UnsupportedOperationException();
 
@@ -186,69 +201,71 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
 
     final public MetadataIndexMetadata getIndexMetadata() {
 
-        return mdmd;
+		return mdmd;
 
-    }
+	}
 
-    final public IndexMetadata getScaleOutIndexMetadata() {
+	final public IndexMetadata getScaleOutIndexMetadata() {
 
-        return getIndexMetadata().getManagedIndexMetadata();
+		return getIndexMetadata().getManagedIndexMetadata();
 
-    }
+	}
 
-    public PartitionLocator get(byte[] key) {
+	public PartitionLocator get(final byte[] key) {
 
-        return mdi.get(key);
+		return mdi.get(key);
 
-    }
+	}
 
-    public PartitionLocator find(byte[] key) {
+	public PartitionLocator find(final byte[] key) {
 
-        return mdi.find(key);
+		return mdi.find(key);
 
-    }
+	}
 
-    public long rangeCount() {
-        
-        return mdi.rangeCount();
+	public long rangeCount() {
 
-    }
+		return mdi.rangeCount();
 
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+	}
 
-        return mdi.rangeCount(fromKey, toKey);
+	public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
-    }
+		return mdi.rangeCount(fromKey, toKey);
 
-    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+	}
 
-        return mdi.rangeCountExact(fromKey, toKey);
+	public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
-    }
+		return mdi.rangeCountExact(fromKey, toKey);
 
-    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+	}
 
-        return mdi.rangeCountExactWithDeleted(fromKey, toKey);
+	public long rangeCountExactWithDeleted(final byte[] fromKey,
+			final byte[] toKey) {
 
-    }
+		return mdi.rangeCountExactWithDeleted(fromKey, toKey);
 
-    public ITupleIterator rangeIterator() {
+	}
 
-        return mdi.rangeIterator();
+	public ITupleIterator rangeIterator() {
 
-    }
+		return mdi.rangeIterator();
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilter filter) {
+	}
 
-        return mdi.rangeIterator(fromKey, toKey, capacity, flags, filter);
+	public ITupleIterator rangeIterator(final byte[] fromKey,
+			final byte[] toKey, final int capacity, final int flags,
+			final IFilter filter) {
 
-    }
+		return mdi.rangeIterator(fromKey, toKey, capacity, flags, filter);
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+	}
 
-        return mdi.rangeIterator(fromKey, toKey);
+	public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
 
-    }
+		return mdi.rangeIterator(fromKey, toKey);
+
+	}
 
 }

@@ -37,8 +37,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.mdi.PartitionLocator;
 
 import cutthecrap.utils.striterators.IFilter;
 
@@ -80,8 +80,9 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
      * @return The cached partition metadata -or- <code>null</code> iff there
      *         is no such scale-out index.
      */
-    public CachingMetadataIndex(AbstractScaleOutFederation fed, String name,
-            long timestamp, MetadataIndexMetadata mdmd) {
+	public CachingMetadataIndex(final AbstractScaleOutFederation<?> fed,
+			final String name, final long timestamp,
+			final MetadataIndexMetadata mdmd) {
 
         super(fed, name, timestamp, mdmd);
         
@@ -109,7 +110,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
         }
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(locator.toString());
         
         final Lock lock = readWriteLock.writeLock();
@@ -137,7 +138,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
         
     }
 
-    public PartitionLocator get(byte[] key) {
+    public PartitionLocator get(final byte[] key) {
 
         final Lock lock = readWriteLock.readLock();
 
@@ -155,7 +156,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
     }
 
-    public PartitionLocator find(byte[] key) {
+    public PartitionLocator find(final byte[] key) {
 
         final Lock lock = readWriteLock.readLock();
         
@@ -191,7 +192,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
     }
 
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readWriteLock.readLock();
         
@@ -209,7 +210,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
     }
 
-    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+    public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readWriteLock.readLock();
         
@@ -233,7 +234,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
 
     }
 
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 IRangeQuery.DEFAULT, null/*filter*/);
@@ -246,8 +247,8 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
      * the iterator. The class may have to be refactored in order to permit the
      * behavior to be gated by an {@link UnisolatedReadWriteIndex}.
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilter filter) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey,
+            final int capacity, final int flags, final IFilter filter) {
 
         final Lock lock = readWriteLock.readLock();
         
