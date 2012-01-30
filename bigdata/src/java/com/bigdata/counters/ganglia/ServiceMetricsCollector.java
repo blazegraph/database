@@ -53,7 +53,14 @@ public class ServiceMetricsCollector implements IGangliaMetricsCollector {
 				+ AbstractStatisticsCollector.fullyQualifiedHostName
 				+ ICounterSet.pathSeparator;
 
-		// Total path prefix for all metrics to be reported.
+        /*
+         * Total path prefix for all metrics to be reported.
+         * 
+         * Note: This includes the path components:
+         * "/host/service/serviceIface/serviceUUID/"
+         * 
+         * Thus it will NOT report per-host metrics.
+         */
 		final String pathPrefix = basePrefix
 				+ statisticsCollector.getProcessName();
 
