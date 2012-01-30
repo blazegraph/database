@@ -381,6 +381,13 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     final private GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(this); 
 
+    public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+        // TODO Perhaps only allowed for UNISOLATED on a TemporaryStore? 
+        return globalRowStoreHelper.get(timestamp);
+        
+    }
+    
     public BigdataFileSystem getGlobalFileSystem() {
 
         assertOpen();

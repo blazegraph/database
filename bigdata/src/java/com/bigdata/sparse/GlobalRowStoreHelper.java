@@ -32,12 +32,8 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.keys.CollatorEnum;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -165,7 +161,7 @@ public class GlobalRowStoreHelper {
             log.info(TimestampUtility.toString(timestamp));
 
         final IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
-                timestamp);
+                TimestampUtility.asHistoricalRead(timestamp));
 
         if (ndx == null) {
 

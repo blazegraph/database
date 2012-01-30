@@ -1296,6 +1296,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         final List<String> namespaces = new LinkedList<String>();
 
         // scan the relation schema in the global row store.
+        @SuppressWarnings("unchecked")
         final Iterator<ITPS> itr = (Iterator<ITPS>) getIndexManager()
                 .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
 

@@ -210,9 +210,13 @@ public class JournalDelegate implements IJournal {
 		return delegate.getGlobalFileSystem();
 	}
 
-	public SparseRowStore getGlobalRowStore() {
-		return delegate.getGlobalRowStore();
-	}
+    public SparseRowStore getGlobalRowStore() {
+        return delegate.getGlobalRowStore();
+    }
+
+    public SparseRowStore getGlobalRowStore(final long timestamp) {
+        return delegate.getGlobalRowStore(timestamp);
+    }
 
 	public IIndex getIndex(String name, long timestamp) {
 		return delegate.getIndex(name, timestamp);

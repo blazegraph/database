@@ -2376,7 +2376,38 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
             
         }
-        
+
+        public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+            if (!TimestampUtility.isReadOnly(timestamp)) {
+
+                // A request for a mutable view.
+                return getGlobalRowStore();
+
+            }
+            
+            /*
+             * Note: This goes around getIndex(name,timestamp) on this method
+             * and uses that method on the delegate. This is because of the
+             * restriction on access to declared indices. It's Ok to go around
+             * like this since you do not need a lock for a read-only view.
+             */
+            
+//            return new GlobalRowStoreHelper(this).getReadCommitted();
+
+            final IIndex ndx = delegate.getIndex(
+                    GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX, timestamp);
+
+            if (ndx != null) {
+
+                return new SparseRowStore(ndx);
+
+            }
+            
+            return null;
+            
+        }
+
         /**
          * Returns an {@link ITx#READ_COMMITTED} view if the file system exists
          * -or- an {@link ITx#UNISOLATED} view IFF the {@link AbstractTask}
@@ -2795,6 +2826,38 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
+        public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+            /*
+             * Note: This goes around getIndex(name,timestamp) on this method
+             * and uses that method on the delegate. This is because of the
+             * restriction on access to declared indices. It's Ok to go around
+             * like this since you do not need a lock for a read-only view.
+             */
+            
+//            return new GlobalRowStoreHelper(this).getReadCommitted();
+
+            if (!TimestampUtility.isReadOnly(timestamp)) {
+
+                throw new IllegalArgumentException(
+                        "Only read-only views are supported: timestamp="
+                                + TimestampUtility.toString(timestamp));
+                
+            }
+            
+            final IIndex ndx = delegate.getIndex(
+                    GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX, timestamp);
+
+            if (ndx != null) {
+
+                return new SparseRowStore(ndx);
+
+            }
+            
+            return null;
+            
+        }
+
         /**
          * Returns an {@link ITx#READ_COMMITTED} view iff the file system exists
          * and <code>null</code> otherwise.
@@ -3073,6 +3136,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public SparseRowStore getGlobalRowStore() {
             return delegate.getGlobalRowStore();
+        }
+
+        public SparseRowStore getGlobalRowStore(final long timestamp) {
+            return delegate.getGlobalRowStore(timestamp);
         }
 
         public IIndex getIndex(String name, long timestamp) {

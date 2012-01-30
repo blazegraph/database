@@ -55,6 +55,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.NT;
 
@@ -131,6 +132,11 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
     /**
      * Cache for recently materialized properties from the GRS.
+     * <p>
+     * Note: Due to the manner in which the property sets are materialized from
+     * the {@link GlobalRowStoreHelper}, items in this cache can not cause
+     * references to indices or other persistence capable / high cost resources
+     * to remain strongly reachable.
      */
     final /*private*/ transient ConcurrentWeakValueCache<NT, Map<String,Object>> propertyCache;
 
@@ -198,8 +204,29 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         this.resourceCache = new ConcurrentWeakValueCacheWithTimeout<NT, T>(
                 cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
-        this.propertyCache = new ConcurrentWeakValueCacheWithTimeout<NT, Map<String, Object>>(
-                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
+        /*
+         * Configure the property sets cache.
+         * 
+         * Note: This cache capacity is set to a multiple of the specififed
+         * capacity. While the property sets in this cache can not cause indices
+         * or relations to be retained, a cache hit significantly decreases the
+         * cost of materializing a relation or index view. Therefore a larger
+         * cache capacity can have a big payoff with relatively little heap
+         * overhead. For the same reason, we also boost the cacheTimeout.
+         */
+        {
+
+            final int propertyCacheCapacity = Math.max(cacheCapacity,
+                    cacheCapacity * 10);
+
+            final long propertyCacheTimeout = TimeUnit.MILLISECONDS
+                    .toNanos(cacheTimeout) * 10;
+            
+            this.propertyCache = new ConcurrentWeakValueCacheWithTimeout<NT, Map<String, Object>>(
+                    propertyCacheCapacity,
+                    propertyCacheTimeout);
+
+        }
 
     }
 
@@ -593,78 +620,147 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         Long commitTime2 = null;
         final Map<String, Object> map; 
         if (TimestampUtility.isReadOnly(timestamp)
-                && !TimestampUtility.isReadCommitted(timestamp)
-                && indexManager instanceof Journal) {
+                && !TimestampUtility.isReadCommitted(timestamp)) {
 
-            final Journal journal = (Journal) indexManager;
+            /*
+             * A stable read-only view.
+             * 
+             * Note: This code path is NOT for read-committed views since such
+             * views are not stable.
+             * 
+             * Note: We will cache the property set on this code path. This code
+             * path is NOT used for read-committed or mutable views since the
+             * cache would prevent updated information from becoming visible.
+             */
+            
+            final long readTime;
+            
+            if (indexManager instanceof Journal) {
 
-            // find the commit record on which we need to read.
-            final ICommitRecord commitRecord = journal
-                    .getCommitRecord(TimestampUtility
-                            .asHistoricalRead(timestamp));
+                /*
+                 * For a Journal, find the commitTime backing that read-only
+                 * view.
+                 */
 
-            if (commitRecord != null) {
+                final Journal journal = (Journal) indexManager;
 
-                // find the timestamp associated with that commit record.
-                final long commitTime = commitRecord.getTimestamp();
+                // find the commit record on which we need to read.
+                final ICommitRecord commitRecord = journal
+                        .getCommitRecord(TimestampUtility
+                                .asHistoricalRead(timestamp));
 
-                // Save commitTime to stuff into the properties.
-                commitTime2 = commitTime;
-                
-                // Check the cache before materializing the properties from the
-                // GRS.
-                final Map<String, Object> cachedMap = propertyCache.get(new NT(
-                        namespace, commitTime));
-
-                if (cachedMap != null) {
-
-                    // The properties are in the cache.
-                    map = cachedMap;
-
-                } else {
-
-                    // Use the GRS view as of that commit point.
-                    final SparseRowStore rowStore = journal
-                            .getGlobalRowStore(commitTime);
-
-                    // Read the properties from the GRS.
-                    map = rowStore == null ? null : rowStore.read(
-                            RelationSchema.INSTANCE, namespace);
-
-                    if (map != null) {
-
-                        // Stuff the properties into the cache.
-                        propertyCache.put(new NT(namespace, commitTime), map);
-
-                    }
-
+                if (commitRecord == null) {
+                    
+                    /*
+                     * No data for that timestamp.
+                     */
+                    
+                    return null;
+                    
                 }
+
+                /*
+                 * Find the timestamp associated with that commit record.
+                 * 
+                 * Note: We also save commitTime2 to stuff into the properties,
+                 * thereby revealing the commitTime backing the resource view
+                 * whenever possible.
+                 */
+
+                commitTime2 = readTime = commitRecord.getTimestamp();
 
             } else {
 
                 /*
-                 * No such commit record.
+                 * Federation, TemporaryStore, etc.
                  * 
-                 * @todo We can probably just return [null] for this case.
+                 * Note: The TemporaryStore lacks a history mechanism.
+                 * 
+                 * Note: The federation will cache based on the caller's
+                 * [timestamp]. This works well if a global read lock has been
+                 * asserted and query is directed against that read-only tx. It
+                 * works poorly if a new tx is obtained for each query. Use a
+                 * shared read lock for better performance on the federation!
+                 * 
+                 * TODO The IBigdataFederation does not expose the backing
+                 * commit time, which is why using a shared read lock is
+                 * important for good performance.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+                 * (replace native long with thin tx interface)
+                 */
+                
+                readTime = timestamp;
+                
+            }
+
+            /*
+             * The key for the property cache is based on the 'readTime'. When
+             * possible, this will be the commitTime on which the [timestamp] is
+             * reading. That provides some reuse of the cache entry across
+             * different [timestamp]s for read-only views.
+             * 
+             * TODO The TPS stores the evolution of the property set. We could
+             * create a more sophisticated cache which can answer for any
+             * historical view for which there is data in the TPS. Under this
+             * model, the TPS would be cached under the [namespace] without
+             * regard to the [timestamp]. We would then use TPS#asMap(timestamp)
+             * to reconstruct the propertySet for the caller's timestamp. We
+             * would only need to read-through to the GRS when the caller's
+             * [timestamp] was more recent than the last update on the TPS for
+             * the namespace. This approach might be an attractive alternative
+             * in combination with some sort of invalidation mechanism for the
+             * rate writes on the GRS for a relation namespace (relation data
+             * writes vastly outpace GRS writes for the metadata declaring that
+             * relation so a guaranteed invalidation mechanism might very well
+             * pay off).
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+             * (replace native long with thin tx interface)
+             */
+            final NT nt = new NT(namespace, readTime);
+            
+            // Check the cache before materializing the properties from GRS.
+            final Map<String, Object> cachedMap = propertyCache.get(nt);
+
+            if (cachedMap != null) {
+
+                /*
+                 * Property cache hit.
                  */
 
+                // Save reference to the property set.
+                map = cachedMap;
+
+            } else {
+
+                /*
+                 * Property cache miss.
+                 */
+                
+                // Use the GRS view as of that commit point.
                 final SparseRowStore rowStore = indexManager
-                        .getGlobalRowStore(/* timestamp */);
+                        .getGlobalRowStore(readTime);
 
                 // Read the properties from the GRS.
                 map = rowStore == null ? null : rowStore.read(
                         RelationSchema.INSTANCE, namespace);
-                
+
+                if (map != null) {
+
+                    // Stuff the properties into the cache.
+                    propertyCache.put(nt, map);
+
+                }
+
             }
 
         } else {
 
             /*
-             * @todo The timestamp of the resource view is currently ignored.
-             * This probably should be modified to use the corresponding view of
-             * the global row store rather than always using the read-committed
-             * / unisolated view, which will require exposing a
-             * getGlobalRowStore(timestamp) method on IIndexStore.
+             * Look up the GRS for a non-read-historical view.
+             * 
+             * Note: We do NOT cache the property set on this code path.
              */
 
             final SparseRowStore rowStore = indexManager
@@ -690,7 +786,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
         }
 
-        // wrap with properties object to prevent cross view mutation.
+        // Note: Prevent cross view mutation.
         final Properties properties = new Properties();
 
         properties.putAll(map);
