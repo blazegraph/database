@@ -527,6 +527,10 @@ public interface IBigdataClient<T> {
         /**
          * When <code>true</code>, the embedded {@link GangliaService} will
          * listen on to the specified multicast group.
+         * <p>
+         * Note: If both {@link #GANGLIA_LISTEN} and {@link #GANGLIA_REPORT} are
+         * <code>false</code> then the embedded {@link GangliaService} will not
+         * be started.
          */
         String GANGLIA_LISTEN = IBigdataClient.class.getName()
                 + ".ganglia.listen";
@@ -538,6 +542,10 @@ public interface IBigdataClient<T> {
         /**
          * When <code>true</code>, the embedded {@link GangliaService} will
          * report performance metrics to the specified gmetad server(s).
+         * <p>
+         * Note: If both {@link #GANGLIA_LISTEN} and {@link #GANGLIA_REPORT} are
+         * <code>false</code> then the embedded {@link GangliaService} will not
+         * be started.
          */
         String GANGLIA_REPORT = IBigdataClient.class.getName()
                 + ".ganglia.report";
