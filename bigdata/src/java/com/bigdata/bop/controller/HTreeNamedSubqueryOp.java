@@ -44,7 +44,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.controller.JVMNamedSubqueryOp.NamedSolutionSetStats;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -53,6 +52,7 @@ import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinTypeEnum;
+import com.bigdata.bop.join.NamedSolutionSetStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -387,7 +387,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 						runningSubquery.get();
 
                         // Report the #of solutions in the named solution set.
-                        stats.solutionSetSize.addAndGet(ncopied);
+                        stats.solutionSetSize.add(ncopied);
 
                         // Checkpoint the solution set.
                         state.saveSolutionSet();

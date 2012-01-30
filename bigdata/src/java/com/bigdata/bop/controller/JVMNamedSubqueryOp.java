@@ -31,7 +31,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -49,10 +48,11 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.JVMHashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
+import com.bigdata.bop.join.JoinTypeEnum;
+import com.bigdata.bop.join.NamedSolutionSetStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -151,36 +151,36 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
     }
 
-    /**
-     * Adds reporting for the size of the named solution set.
-     */
-    public static class NamedSolutionSetStats extends BOpStats {
-        
-        private static final long serialVersionUID = 1L;
-        
-        final AtomicLong solutionSetSize = new AtomicLong();
-
-        public void add(final BOpStats o) {
-
-            super.add(o);
-
-            if (o instanceof NamedSolutionSetStats) {
-
-                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
-
-                solutionSetSize.addAndGet(t.solutionSetSize.get());
-
-            }
-
-        }
-
-        @Override
-        protected void toString(final StringBuilder sb) {
-            super.toString(sb);
-            sb.append(",solutionSetSize=" + solutionSetSize.get());
-        }
-
-    }
+//    /**
+//     * Adds reporting for the size of the named solution set.
+//     */
+//    public static class NamedSolutionSetStats extends BOpStats {
+//        
+//        private static final long serialVersionUID = 1L;
+//        
+//        final AtomicLong solutionSetSize = new AtomicLong();
+//
+//        public void add(final BOpStats o) {
+//
+//            super.add(o);
+//
+//            if (o instanceof NamedSolutionSetStats) {
+//
+//                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
+//
+//                solutionSetSize.addAndGet(t.solutionSetSize.get());
+//
+//            }
+//
+//        }
+//
+//        @Override
+//        protected void toString(final StringBuilder sb) {
+//            super.toString(sb);
+//            sb.append(",solutionSetSize=" + solutionSetSize.get());
+//        }
+//
+//    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -415,7 +415,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 						runningSubquery.get();
 
                         // Report the #of solutions in the named solution set.
-                        stats.solutionSetSize.addAndGet(ncopied);
+                        stats.solutionSetSize.add(ncopied);
 
 //                        // Publish the solution set on the query context.
 //                        saveSolutionSet();
