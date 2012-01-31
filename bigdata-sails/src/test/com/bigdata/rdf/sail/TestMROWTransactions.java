@@ -32,7 +32,7 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
-public class TestMROWTransactions extends ProxyBigdataSailTestCase {
+abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
     private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
 	
@@ -267,7 +267,8 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 	void domultiple_csem_transaction_onethread(final int retention, final int nuris, final int npreds) throws Exception {
 
-	    final PseudoRandom r = new PseudoRandom(20000 /*10000*/);
+//	    final PseudoRandom r = new PseudoRandom(20000 /*10000*/);
+	    final Random r = new Random();
 	    
         final CAT writes = new CAT();
         final CAT reads = new CAT();
