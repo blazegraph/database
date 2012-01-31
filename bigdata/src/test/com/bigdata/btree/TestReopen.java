@@ -86,7 +86,8 @@ public class TestReopen extends AbstractBTreeTestCase {
             btree.close();
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
-            System.err.println("Ignoring expected exception: " + ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: " + ex);
         }
 
         assertNotNull(btree.getRoot());

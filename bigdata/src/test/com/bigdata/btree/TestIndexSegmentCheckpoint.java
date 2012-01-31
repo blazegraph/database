@@ -34,6 +34,8 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -45,6 +47,9 @@ import com.bigdata.rawstore.WormAddressManager;
  */
 public class TestIndexSegmentCheckpoint extends TestCase {
 
+	private static final Logger log = Logger
+			.getLogger(TestIndexSegmentCheckpoint.class);
+	
     /**
      * 
      */
@@ -61,15 +66,15 @@ public class TestIndexSegmentCheckpoint extends TestCase {
 
     public void test_size() {
 
-    	System.err.println("SIZE: " + IndexSegmentCheckpoint.SIZE);
+    	log.warn("SIZE: " + IndexSegmentCheckpoint.SIZE);
 
-		System.err.println("UNUSED VERSION0: "
+    	log.warn("UNUSED VERSION0: "
 				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION0);
 
-		System.err.println("UNUSED VERSION1: "
+    	log.warn("UNUSED VERSION1: "
 				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION1);
 		
-		System.err.println("UNUSED VERSION2: "
+    	log.warn("UNUSED VERSION2: "
 				+ IndexSegmentCheckpoint.SIZEOF_UNUSED_VERSION2);
 
 		// Verify that the size of the record has not changed over time.
@@ -190,7 +195,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 commitTime//
                 );
         
-            System.err.println("Checkpoint: "+checkpoint);
+            if(log.isInfoEnabled())
+            	log.info("Checkpoint: "+checkpoint);
             
         }
         
@@ -201,9 +207,10 @@ public class TestIndexSegmentCheckpoint extends TestCase {
                 addrBloom, addrFirstLeaf, addrLastLeaf, length, compactingMerge,
                 useChecksums, segmentUUID, commitTime);
         
-        System.err.println("Expected: "+expected);
+        if(log.isInfoEnabled())
+        	log.info("Expected: "+expected);
         
-        File tmp = File.createTempFile("test", "ndx");
+        final File tmp = File.createTempFile("test", "ndx");
         
         tmp.deleteOnExit();
         
@@ -236,7 +243,8 @@ public class TestIndexSegmentCheckpoint extends TestCase {
             // read back from the file.
             final IndexSegmentCheckpoint actual = new IndexSegmentCheckpoint(raf);
 
-            System.err.println("Actual: "+actual);
+            if(log.isInfoEnabled())
+            	log.info("Actual: "+actual);
 
             assertEquals("offsetBits",offsetBits,actual.offsetBits);
             
