@@ -414,7 +414,7 @@ public class Haltable<V> implements IHaltable<V> {
      * always logged @ ERROR.
      */
     protected void logCause(final boolean isFirstCause, final Throwable cause) {
-        if(isFirstCause) {
+        if (isFirstCause && error) {
             log.error(this + " : isFirstCause=" + isFirstCause + " : "
                     + cause, cause);
         } else if (log.isEnabledFor(Level.WARN)) {
