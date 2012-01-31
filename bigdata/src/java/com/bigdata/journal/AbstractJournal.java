@@ -2080,6 +2080,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			}
 
+			txLog.warn("ABORT");
+
 			if (LRUNexus.INSTANCE != null) {
 
 				/*
@@ -2208,7 +2210,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			if (isReadOnly())
 				throw new IllegalStateException();
 
-			log.warn("");
+			txLog.warn("ROLLBACK");
 
 			/*
 			 * Read the alternate root block (NOT the current one!).
