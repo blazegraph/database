@@ -418,12 +418,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		protected Journal getStore(final Properties p) {
-		   
-		    return new Journal(p);
-		    
-		}
-
         protected Journal getStore(final long retentionMillis) {
 
             final Properties properties = new Properties(getProperties());
@@ -1711,7 +1705,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * This test releases over a blobs worth of deferred frees
 		 */
 		public void test_blobDeferredFrees() {
-		    
+
             final Properties properties = new Properties(getProperties());
 
             properties.setProperty(
@@ -1730,9 +1724,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             		addrs.add(bs.write(randomData(45)));
             	}
             	store.commit();
-            	
-            	Thread.currentThread().sleep(5000);
-            	
+
             	for (long addr : addrs) {
             		bs.delete(addr);
             	}
@@ -1744,6 +1736,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
                	store.commit();
                	
+            	// Age the history (of the deletes!)
+            	Thread.currentThread().sleep(6000);
+            	
             	// modify store but do not allocate similar size block
             	// as that we want to see has been removed
                	final long addr2 = bs.write(randomData(220)); // modify store
@@ -1753,17 +1748,19 @@ public class TestRWJournal extends AbstractJournalTestCase {
                	store.commit();
             	
                	// delete is actioned
-                for (int i = 0; i < 4000; i++) {
-                    if(bs.isCommitted(addrs.get(i))) {
-                        fail("i="+i+", addr="+addrs.get(i));
-                    }
-                }
-             } catch (InterruptedException e) {
+            	for (int i = 0; i < 4000; i++) {
+                   	assertFalse(bs.isCommitted(addrs.get(i)));
+            	}
+              } catch (InterruptedException e) {
 			} finally {
             	store.destroy();
             }
 		}
 		
+		private Journal getStore(Properties props) {
+			return new Journal(props);
+		}
+
 		/**
 		 * State2
 		 * 
@@ -1842,19 +1839,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		public void test_allocBlobCommitFreeCommitWithHistory() {
-			Journal store = (Journal) getStore(4);
+			Journal store = (Journal) getStore(4000);
             try {
 
             	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-            	
-            	if (false) {
-	                final int n = 1000000;
-	                final BloomFilter filter = new BloomFilter(n, 0.02d, n);
-	                filter.add(randomBytes(12));
-	                final long addrb = filter.write(store);
-	                
-	                System.out.println("Bloomfilter: " + ((int) addrb));
-            	}
             	
             	final long addr = bs.write(randomData(253728)); // BLOB
             	
