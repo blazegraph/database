@@ -60,17 +60,49 @@ public class TestMROWTransactionsNoHistory extends TestMROWTransactions {
 	// similar to test_multiple_transactions but uses direct AbsractTripleStore
 	// manipulations rather than RepositoryConnections
 	public void test_multiple_csem_transaction_nohistory() throws Exception {
-		domultiple_csem_transaction(0);
+		
+//		domultiple_csem_transaction(0);
+		
+		domultiple_csem_transaction2(0/* retentionMillis */,
+				2/* nreaderThreads */, 1000/* nwriters */, 20 * 1000/* nreaders */);
+
+	}
+
+	public void test_multiple_csem_transaction_nohistory_oneReaderThread() throws Exception {
+
+		domultiple_csem_transaction2(0/* retentionMillis */,
+				1/* nreaderThreads */, 1000/* nwriters */, 20 * 1000/* nreaders */);
+
+	}
+	
+	public void test_multiple_csem_transaction_nohistory_stress() throws Exception {
+
+		for (int i = 0; i < 100; i++) {
+
+			domultiple_csem_transaction2(0/* retentionMillis */,
+					1/* nreaderThreads */, 10/* nwriters */, 200/* nreaders */);
+
+		}
+		
 	}
 	
 	public void notest_stress_multiple_csem_transaction_nohistory() throws Exception {
+
+		final int retentionMillis = 0;
+		
 		for (int i = 0; i< 50; i++) {
-			domultiple_csem_transaction(0);
+			
+			domultiple_csem_transaction2(retentionMillis, 2/* nreaderThreads */,
+					1000/* nwriters */, 20 * 1000/* nreaders */);
+
 		}
+		
 	}
 	
 	public void test_multiple_csem_transaction_onethread_nohistory() throws Exception {
+
 		domultiple_csem_transaction_onethread(0);
+		
 	}
 	
 // Open a read committed transaction

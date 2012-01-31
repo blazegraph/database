@@ -5,6 +5,7 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,17 +20,13 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.PseudoRandom;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
@@ -43,11 +40,38 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		super(arg0);
 	}
 
-	void domultiple_csem_transaction_onethread(final int retention) throws Exception {
-    	domultiple_csem_transaction_onethread(retention, 2000, 50);
+	void domultiple_csem_transaction_onethread(final int retentionMillis) throws Exception {
+    	
+		domultiple_csem_transaction_onethread(retentionMillis, 2000, 50);
+		
     }
     
-	void domultiple_csem_transaction(final int retention) throws Exception {
+	void domultiple_csem_transaction(final int retentionMillis) throws Exception {
+		
+		domultiple_csem_transaction2(retentionMillis, 2/* nreaderThreads */,
+				1000/* nwriters */, 20 * 1000/* nreaders */);
+		
+	}
+	
+	/**
+	 * 
+	 * @param retentionMillis
+	 *            The retention time (milliseconds).
+	 * @param nreaderThreads
+	 *            The #of threads running reader tasks. Increase nreaderThreads
+	 *            to increase chance startup condition and decrement to increase
+	 *            chance of commit point with no open read-only transaction (no
+	 *            sessions). Value is in [1:...].
+	 * @param nwriters
+	 *            The #of writer tasks (there is only one writer thread).
+	 * @param nreaders
+	 *            The #of reader tasks.
+	 * 
+	 * @throws Exception
+	 */
+	void domultiple_csem_transaction2(final int retentionMillis,
+			final int nreaderThreads, final int nwriters, final int nreaders)
+			throws Exception {
 
 		/**
 		 *  The most likely problem is related to the session protection in the
@@ -59,21 +83,23 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		 *  The message of "invalid address" would be generated if an allocation
 		 *  has been freed and is no longer protected from recycling when an
 		 *  attempt is made to read from it.
+		 *  
+		 *  TODO Experiment with different values of [nthreads] for the with and
+		 *  w/o history variations of this test.  Consider lifting that parameter
+		 *  into the signature of this method.
 		 */
-		final int nthreads = 2; // up count to increase chance startup condition
-								// decrement to increase chance of idle (no sessions)
 		final int nuris = 2000; // number of unique subject/objects
 		final int npreds = 50; // 
 //		final PseudoRandom r = new PseudoRandom(2000);
 //		r.next(1500);
-		final Random r = new Random(2000);
+		final Random r = new Random();
 
 		final CAT writes = new CAT();
 		final CAT reads = new CAT();
 		final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
 		// Set [true] iff there are no failures by the time we cancel the running tasks.
 		final AtomicBoolean success = new AtomicBoolean(false);
-        final BigdataSail sail = getSail(getProperties(retention));
+        final BigdataSail sail = getSail(getProperties(retentionMillis));
 		try {
 
 	        sail.initialize();
@@ -213,24 +239,33 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 writers = Executors.newSingleThreadExecutor(DaemonThreadFactory
                         .defaultThreadFactory());
 
-                readers = Executors.newFixedThreadPool(nthreads,
+                readers = Executors.newFixedThreadPool(nreaderThreads,
                         DaemonThreadFactory.defaultThreadFactory());
 
                 // let's schedule a few writers and readers (more than needed)
                 // writers.submit(new Writer(5000000/* nwrite */));
-                for (int i = 0; i < 1000; i++) {
-                    writers.submit(new Writer(500/* nwrite */));
+				Future<Long> lastWriterFuture = null;
+				Future<Long> lastReaderFuture = null;
+				for (int i = 0; i < 1000; i++) {
+					lastWriterFuture = writers
+							.submit(new Writer(500/* nwrite */));
                     for (int rdrs = 0; rdrs < 20; rdrs++) {
-                        readers.submit(new Reader(60/* nread */));
+						lastReaderFuture = readers
+								.submit(new Reader(60/* nread */));
                     }
                 }
 
-                // let the writers run riot for a time, checking for failure
-                for (int i = 0; i < 600; i++) {
-                	Thread.sleep(1000);
-                	if (failex.get() != null)
-                		break;
-                }
+				// let the writers run riot for a time, checking for failure
+				while (failex.get() == null
+						&& !(lastWriterFuture.isDone() || lastReaderFuture
+								.isDone())) {
+					Thread.sleep(1000/* ms */);
+				}
+//                for (int i = 0; i < 600; i++) {
+//                	Thread.sleep(1000);
+//                	if (failex.get() != null)
+//                		break;
+//                }
 				if (failex.get() == null) {
 					/*
 					 * Note whether or not there are failures before we
@@ -272,11 +307,10 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 	    
         final CAT writes = new CAT();
         final CAT reads = new CAT();
-        final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(
-                null);
+//        final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
         // Set [true] iff there are no failures by the time we cancel the
         // running tasks.
-        final AtomicBoolean success = new AtomicBoolean(false);
+//        final AtomicBoolean success = new AtomicBoolean(false);
         final BigdataSail sail = getSail(getProperties(retention));
         try {
 
@@ -294,9 +328,10 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             }
             final int nwrites = 600;
             final int nreads = 50;
+            final int ntrials = 20;
             final boolean isQuads = origStore.isQuads();
 
-            for (int loop = 0; loop < 20; loop++) {
+            for (int loop = 0; loop < ntrials; loop++) {
                 final Long txId = ((Journal) origStore.getIndexManager())
                         .newTx(ITx.READ_COMMITTED);
                 try {
@@ -339,10 +374,9 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
                     } finally {
                         origStore.commit();
-                    	System.err.println("Commit: " + loop);
-                        if (log.isInfoEnabled()) {
-                            log.info("Commit");
-                        }
+                    	log.warn("Commit: " + loop);
+//                        if (log.isInfoEnabled())
+//                            log.info("Commit");
                     }
                     // Close Read Connection
                     ((Journal) readstore.getIndexManager()).abort(txId);
@@ -375,7 +409,6 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
 		props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
 		props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
 		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
 //		props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
 
