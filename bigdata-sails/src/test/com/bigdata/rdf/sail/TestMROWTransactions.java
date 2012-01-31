@@ -100,6 +100,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		// Set [true] iff there are no failures by the time we cancel the running tasks.
 		final AtomicBoolean success = new AtomicBoolean(false);
         final BigdataSail sail = getSail(getProperties(retentionMillis));
+        //log.warn("Journal: "+sail.getDatabase().getIndexManager()+", file="+((Journal)sail.getDatabase().getIndexManager()).getFile());
 		try {
 
 	        sail.initialize();
@@ -236,29 +237,36 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             ExecutorService readers = null;
             try {
                 
-                writers = Executors.newSingleThreadExecutor(DaemonThreadFactory
-                        .defaultThreadFactory());
+				writers = Executors
+						.newSingleThreadExecutor(new DaemonThreadFactory(
+								"test-writer-pool"));
 
-                readers = Executors.newFixedThreadPool(nreaderThreads,
-                        DaemonThreadFactory.defaultThreadFactory());
+				readers = Executors.newFixedThreadPool(nreaderThreads,
+						new DaemonThreadFactory("test-reader-pool"));
 
                 // let's schedule a few writers and readers (more than needed)
                 // writers.submit(new Writer(5000000/* nwrite */));
 				Future<Long> lastWriterFuture = null;
 				Future<Long> lastReaderFuture = null;
-				for (int i = 0; i < 1000; i++) {
+				for (int i = 0; i < nwriters; i++) {
 					lastWriterFuture = writers
 							.submit(new Writer(500/* nwrite */));
-                    for (int rdrs = 0; rdrs < 20; rdrs++) {
-						lastReaderFuture = readers
-								.submit(new Reader(60/* nread */));
-                    }
+                }
+                for (int rdrs = 0; rdrs < nreaders; rdrs++) {
+					lastReaderFuture = readers
+							.submit(new Reader(60/* nread */));
                 }
 
 				// let the writers run riot for a time, checking for failure
-				while (failex.get() == null
-						&& !(lastWriterFuture.isDone() || lastReaderFuture
-								.isDone())) {
+				while (true) {
+					final boolean bothDone = lastWriterFuture.isDone()
+							&& lastReaderFuture.isDone();
+					if (bothDone)
+						break;
+					if(failex.get() != null) {
+						// Something errored.
+						break;
+					}
 					Thread.sleep(1000/* ms */);
 				}
 //                for (int i = 0; i < 600; i++) {
@@ -280,7 +288,11 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 				if (!success.get()) {
                     final Throwable ex = failex.get();
                     if (ex != null) {
-                        fail("Test failed: firstCause=" + ex, ex);
+						fail("Test failed: firstCause=" + ex
+								+ ", retentionMillis=" + retentionMillis
+								+ ", nreaderThreads=" + nreaderThreads
+								+ ", nwriters=" + nwriters + ", nreaders="
+								+ nreaders, ex);
                     }
                 }
                 if (log.isInfoEnabled())
@@ -419,6 +431,8 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		// props.setProperty(Options.CREATE_TEMP_FILE, "false");
 		// props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
 		
+//		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "20");
+//		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "0");
 		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "500");
 		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "10");
 
