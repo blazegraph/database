@@ -385,7 +385,8 @@ public class TestBytesUtil extends TestCase2 {
             
         }
 
-        System.err.println(BytesUtil.toString(seq));
+        if(log.isInfoEnabled())
+        	log.info(BytesUtil.toString(seq));
 
         /*
          * verify bytes in sequence corresponding to [0:255] when interpreted as
@@ -520,14 +521,16 @@ public class TestBytesUtil extends TestCase2 {
             BytesUtil.getSeparatorKey(null, new byte[]{2});
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+            if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
         
         try { // null parameter.
             BytesUtil.getSeparatorKey(new byte[]{2},null);
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
 
         try { // same reference (so givenKey and priorKey must be equal).
@@ -535,7 +538,8 @@ public class TestBytesUtil extends TestCase2 {
             BytesUtil.getSeparatorKey(tmp,tmp);
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
 
         /*

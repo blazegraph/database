@@ -116,7 +116,8 @@ public class TestIterators extends AbstractBTreeTestCase {
             root.rangeIterator(k8, k3,flags).next();
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
         
         // remove keys until the root leaf is empty.
@@ -213,14 +214,16 @@ public class TestIterators extends AbstractBTreeTestCase {
             c.childIterator(k9, k3);
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
 
         try { // try with search keys out of order.
             btree.rangeIterator(k9, k3);
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
         }
 
         /*
