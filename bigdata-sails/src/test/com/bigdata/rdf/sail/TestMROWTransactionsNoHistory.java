@@ -77,10 +77,16 @@ public class TestMROWTransactionsNoHistory extends TestMROWTransactions {
 	
 	public void test_multiple_csem_transaction_nohistory_stress() throws Exception {
 
+		final Random r = new Random();
+		
 		for (int i = 0; i < 100; i++) {
 
+			final int nreaderThreads = r.nextInt(19) + 1;
+			
+			log.warn("Trial: " + i + ", nreaderThreads=" + nreaderThreads);
+
 			domultiple_csem_transaction2(0/* retentionMillis */,
-					1/* nreaderThreads */, 10/* nwriters */, 200/* nreaders */);
+					nreaderThreads, 20/* nwriters */, 400/* nreaders */);
 
 		}
 		
