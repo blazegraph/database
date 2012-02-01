@@ -367,6 +367,28 @@ public class RingBuffer<T> implements Queue<T> {
     }
 
     /**
+     * Return the reference at the specified index in the backing array.
+     * <p>
+     * Note: Unlike {@link #get(int)}, this method does not adjust by the index
+     * of the <code>tail</code>. It is intended for use by subclasses which
+     * require low level access into the backing array.
+     * 
+     * @param i
+     *            The index into the backing array.
+     * 
+     * @return The reference at that index.
+     * 
+     * @see <a
+     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/465#comment:2">
+     *      Too many GRS reads</a>
+     */
+    final protected T _get(final int i) {
+
+        return refs[i];
+        
+    }
+
+    /**
      * Remove the element at the specified index in the buffer. The index
      * positions are counted from the MRU (the insertion point), which has an
      * index of ZERO (0), to the LRU position (the eviction point), which as an
