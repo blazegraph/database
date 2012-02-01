@@ -32,7 +32,6 @@ import java.util.Stack;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-
 /**
  * Unit tests for {@link HardReferenceQueue}.
  * 
@@ -55,9 +54,9 @@ public class TestHardReferenceQueue extends TestCase2 {
      */
     public void test_ctor() {
         
-        HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
-        
-        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
+        final HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
+
+        final HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 100, 20);
 
         assertEquals("listener", listener, cache.getListener());
@@ -96,10 +95,10 @@ public class TestHardReferenceQueue extends TestCase2 {
      */
     public void test_append_null() {
 
-        HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
+        final HardReferenceQueueEvictionListener<String> listener = new MyListener<String>();
 
-        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
-                listener, 100, 2 );
+        final HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
+                listener, 100, 2);
 
         try {
             cache.add(null);
@@ -127,9 +126,9 @@ public class TestHardReferenceQueue extends TestCase2 {
      */
     public void test_add_evict() {
 
-        MyListener<String> listener = new MyListener<String>();
+        final MyListener<String> listener = new MyListener<String>();
 
-        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
+        final HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 5, 0 );
 
         final String ref0 = "0";
@@ -274,9 +273,9 @@ public class TestHardReferenceQueue extends TestCase2 {
      */
     public void test_add_scan() {
 
-        MyListener<String> listener = new MyListener<String>();
+        final MyListener<String> listener = new MyListener<String>();
 
-        HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
+        final HardReferenceQueue<String> cache = new HardReferenceQueue<String>(
                 listener, 5, 2 );
 
         final String ref0 = "0";
@@ -409,10 +408,9 @@ public class TestHardReferenceQueue extends TestCase2 {
      * interface.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <T>
      */
-    public static class MyListener<T> implements
+    private class MyListener<T> implements
             HardReferenceQueueEvictionListener<T> {
 
         /**
@@ -487,7 +485,7 @@ public class TestHardReferenceQueue extends TestCase2 {
             
             if(!evicted) {
                 
-                fail("Expected "+expectedRef+" to have been evicted.");
+                TestHardReferenceQueue.fail("Expected "+expectedRef+" to have been evicted.");
                 
             }
             
@@ -501,7 +499,7 @@ public class TestHardReferenceQueue extends TestCase2 {
          */
         public void assertEvictionCount(int expected) {
             
-            assertEquals("evictionCount",expected,nevicted);
+            TestHardReferenceQueue.assertEquals("evictionCount",expected,nevicted);
             
         }
         /**
@@ -519,8 +517,8 @@ public class TestHardReferenceQueue extends TestCase2 {
          */
         public void evicted(final IHardReferenceQueue<T> cache, final T ref) {
 
-            assertNotNull("cache", cache);
-            assertNotNull("ref", ref);
+            TestHardReferenceQueue.assertNotNull("cache", cache);
+            TestHardReferenceQueue.assertNotNull("ref", ref);
 
             if( expectedRef == null && expectedRefs.size() > 0 ) {
                 
@@ -538,12 +536,12 @@ public class TestHardReferenceQueue extends TestCase2 {
             
             if( expectedRef == null ) {
                 
-                fail("Not expecting a cache eviction: ref="+ref);
+                TestHardReferenceQueue.fail("Not expecting a cache eviction: ref="+ref);
                 
             }
 
-            assertEquals("ref",expectedRef,ref); // Note: This is a reference test.
-//            assertTrue("ref", expectedRef == ref);
+            TestHardReferenceQueue.assertEquals("ref",expectedRef,ref); // Note: This is a reference test.
+//                assertTrue("ref", expectedRef == ref);
 
             // Reset the expectated ref to null.
             expectedRef = null;
@@ -556,5 +554,5 @@ public class TestHardReferenceQueue extends TestCase2 {
         }
 
     }
-
+    
 }
