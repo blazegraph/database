@@ -2063,6 +2063,21 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     /**
+     * Return <code>true</code> iff the address is in the write
+     * cache at the moment which the write cache is checked.
+     * <p>
+     * Note: Unless the caller is holding an appropriate lock
+     * across this operation, the result is NOT guaranteed to
+     * be correct at any time other than the moment when the
+     * cache was tested. 
+     */
+	public boolean isPresent(final long addr) {
+		// System.out.println("Checking address: " + addr);
+		
+		return recordMap.get(addr) != null;
+	}
+	
+	/**
      * Performance counters for the {@link WriteCacheService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan

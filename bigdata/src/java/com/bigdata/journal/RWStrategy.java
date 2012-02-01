@@ -683,4 +683,30 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		}
 	}
 
+    /**
+     * Return true if the address is marked as committed in the {@link RWStore}
+     * in memory bit maps.
+     * 
+     * @param addr
+     *            The address.
+     */
+	public boolean isCommitted(final long addr) {
+		
+	    return m_store.isCommitted(decodeAddr(addr));
+	    
+	}
+
+    /**
+     * Return <code>true</code> iff the address was in the write cache as of the
+     * moment the write cache was inspected.
+     * 
+     * @param addr
+     *            The address.
+     */
+    public boolean inWriteCache(final long addr) {
+
+        return m_store.inWriteCache(decodeAddr(addr));
+        
+    }
+
 }

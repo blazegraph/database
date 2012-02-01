@@ -161,7 +161,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 
             final boolean rawRecords = r.nextBoolean();
 
-            System.err.println("Trial "
+            log.warn("Trial "
                     + trial
                     + " of "
                     + ntrials

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 
 /**
@@ -372,6 +373,34 @@ public class AllocBlock {
 				
 				// reset transients to live OR commit
 				m_transients[i] = m_live[i] | m_commit[i];
+				
+				final int startBit = i * 32;
+				
+				freebits += clearCacheBits(cache, startBit, chkbits);
+			}
+		}
+		
+		return freebits;
+	}
+
+    /**
+     * Releases entries in the {@link WriteCacheService} which are no longer
+     * committed but which were committed as of the previous commit point. This
+     * is invoked as part of the commit protocol.
+     * 
+     * @param cache
+     *            The {@link WriteCacheService}.
+     *            
+     * @return The number bits that were cleared.
+     */
+	int releaseCommitWrites(final RWWriteCacheService cache) {
+		int freebits = 0;
+		
+		if (m_addr != 0) { // check active!
+			for (int i = 0; i < m_live.length; i++) {
+				int chkbits = m_transients[i];
+				// check all addresses set in m_transients NOT set in m_live
+				chkbits &= ~m_live[i];
 				
 				final int startBit = i * 32;
 				

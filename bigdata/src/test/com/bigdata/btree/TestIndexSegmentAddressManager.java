@@ -242,7 +242,8 @@ public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
                 System.currentTimeMillis()//commitTime
                 );
         
-            System.err.println("Checkpoint: "+checkpoint);
+            if(log.isInfoEnabled())
+				log.info("Checkpoint: " + checkpoint);
             
         }
 

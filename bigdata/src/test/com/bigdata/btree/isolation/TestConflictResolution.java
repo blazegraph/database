@@ -186,7 +186,8 @@ public class TestConflictResolution extends TestCase2 {
             journal.commit(tx2);
             fail("Expecting: "+ValidationError.class);
         } catch(ValidationError ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: "+ex);
 //            assertTrue(tmp.isAborted());
         }
         

@@ -376,65 +376,8 @@ public class HTree extends AbstractHTree
      */
     public long handleCommit(final long commitTime) {
 
-        assertNotTransient();
-        assertNotReadOnly();
-
-		/*
-		 * Note: Acquiring this lock provides for atomicity of the checkpoint of
-		 * the BTree during the commit protocol. Without this lock, users of the
-		 * UnisolatedReadWriteIndex could be concurrently modifying the BTree
-		 * while we are attempting to snapshot it for the commit.
-		 * 
-		 * Note: An alternative design would declare a global read/write lock
-		 * for mutation of the indices in addition to the per-BTree read/write
-		 * lock provided by UnisolatedReadWriteIndex. Rather than taking the
-		 * per-BTree write lock here, we would take the global write lock in the
-		 * AbstractJournal's commit protocol, e.g., commitNow(). The global read
-		 * lock would be taken by UnisolatedReadWriteIndex before taking the
-		 * per-BTree write lock. This is effectively a hierarchical locking
-		 * scheme and could provide a workaround if deadlocks are found to occur
-		 * due to lock ordering problems with the acquisition of the
-		 * UnisolatedReadWriteIndex lock (the absence of lock ordering problems
-		 * really hinges around UnisolatedReadWriteLocks not being taken for
-		 * more than one index at a time.)
-		 * 
-		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/288
-		 * 
-		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/278
-		 */
-		final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
-		try {
-
-			if (/* autoCommit && */needsCheckpoint()) {
-
-				/*
-				 * Flush the btree, write a checkpoint record, and return the
-				 * address of that checkpoint record. The [checkpoint] reference
-				 * is also updated.
-				 */
-
-				return writeCheckpoint();
-
-			}
-
-			/*
-			 * There have not been any writes on this btree or auto-commit is
-			 * disabled.
-			 * 
-			 * Note: if the application has explicitly invoked writeCheckpoint()
-			 * then the returned address will be the address of that checkpoint
-			 * record and the BTree will have a new checkpoint address made
-			 * restart safe on the backing store.
-			 */
-
-			return checkpoint.getCheckpointAddr();
-
-		} finally {
-
-			lock.unlock();
-
-		}
-
+    	return writeCheckpoint2().getCheckpointAddr();
+    	
     }
 
     /**
@@ -574,7 +517,7 @@ public class HTree extends AbstractHTree
 
     /**
 	 * Sets the {@link #checkpoint} and initializes the mutable fields from the
-	 * ê * checkpoint record. In order for this operation to be atomic, the
+	 * ï¿½ * checkpoint record. In order for this operation to be atomic, the
 	 * caller must be synchronized on the {@link HTree} or otherwise guaranteed
 	 * to have exclusive access, e.g., during the ctor or when the {@link HTree}
 	 * is mutable and access is therefore required to be single-threaded.
@@ -925,6 +868,79 @@ public class HTree extends AbstractHTree
      * @see #load(IRawStore, long)
      */
     final public Checkpoint writeCheckpoint2() {
+    	
+        assertNotTransient();
+        assertNotReadOnly();
+
+		/*
+		 * Note: Acquiring this lock provides for atomicity of the checkpoint of
+		 * the BTree during the commit protocol. Without this lock, users of the
+		 * UnisolatedReadWriteIndex could be concurrently modifying the BTree
+		 * while we are attempting to snapshot it for the commit.
+		 * 
+		 * Note: An alternative design would declare a global read/write lock
+		 * for mutation of the indices in addition to the per-BTree read/write
+		 * lock provided by UnisolatedReadWriteIndex. Rather than taking the
+		 * per-BTree write lock here, we would take the global write lock in the
+		 * AbstractJournal's commit protocol, e.g., commitNow(). The global read
+		 * lock would be taken by UnisolatedReadWriteIndex before taking the
+		 * per-BTree write lock. This is effectively a hierarchical locking
+		 * scheme and could provide a workaround if deadlocks are found to occur
+		 * due to lock ordering problems with the acquisition of the
+		 * UnisolatedReadWriteIndex lock (the absence of lock ordering problems
+		 * really hinges around UnisolatedReadWriteLocks not being taken for
+		 * more than one index at a time.)
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/278
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/284
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/288
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/343
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+		 */
+		final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
+//		final Lock lock = new UnisolatedReadWriteIndex(this).writeLock();
+		lock.lock();
+		try {
+
+			if (/* autoCommit && */needsCheckpoint()) {
+
+				/*
+				 * Flush the btree, write a checkpoint record, and return the
+				 * address of that checkpoint record. The [checkpoint] reference
+				 * is also updated.
+				 */
+
+				return _writeCheckpoint2();
+
+			}
+
+			/*
+			 * There have not been any writes on this btree or auto-commit is
+			 * disabled.
+			 * 
+			 * Note: if the application has explicitly invoked writeCheckpoint()
+			 * then the returned address will be the address of that checkpoint
+			 * record and the BTree will have a new checkpoint address made
+			 * restart safe on the backing store.
+			 */
+
+			return checkpoint;
+
+		} finally {
+
+			lock.unlock();
+
+		}
+
+    }
+    
+    /**
+	 * Core implementation invoked by {@link #writeCheckpoint2()} while holding
+	 * the lock - <strong>DO NOT INVOKE THIS METHOD DIRECTLY</strong>.
+	 * 
+	 * @return the checkpoint.
+	 */
+    final private Checkpoint _writeCheckpoint2() {
         
         assertNotTransient();
         assertNotReadOnly();

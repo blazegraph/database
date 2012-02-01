@@ -334,19 +334,21 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
         try {
             btree.handleCommit(System.currentTimeMillis());
         } catch (UnsupportedOperationException ex) {
-            log.info("Ignoring expected exception: " + ex);
+            if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: " + ex);
         }
 
-        try {
-            btree.flush();
-        } catch (UnsupportedOperationException ex) {
-            log.info("Ignoring expected exception: " + ex);
-        }
+//        try {
+//            btree.flush();
+//        } catch (UnsupportedOperationException ex) {
+//            log.info("Ignoring expected exception: " + ex);
+//        }
 
         try {
             btree.writeCheckpoint();
         } catch (UnsupportedOperationException ex) {
-            log.info("Ignoring expected exception: " + ex);
+        	if(log.isInfoEnabled())
+            	log.info("Ignoring expected exception: " + ex);
         }
 
     }

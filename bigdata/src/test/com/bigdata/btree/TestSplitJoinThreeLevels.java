@@ -111,9 +111,11 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         {
             System.arraycopy(keys, 0, order, 0, keys.length);
             Arrays.sort(order);
-            System.err.println("keys="+Arrays.toString(keys));
-            System.err.println("vals="+Arrays.toString(vals));
-            System.err.println("order="+Arrays.toString(order));
+			if (log.isInfoEnabled()) {
+				log.info("keys=" + Arrays.toString(keys));
+				log.info("vals=" + Arrays.toString(vals));
+				log.info("order=" + Arrays.toString(order));
+			}
         }
         
         final int m = 3;
@@ -623,9 +625,11 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         {
             System.arraycopy(keys, 0, order, 0, keys.length);
             Arrays.sort(order);
-            System.err.println("keys="+Arrays.toString(keys));
-            System.err.println("vals="+Arrays.toString(vals));
-            System.err.println("order="+Arrays.toString(order));
+			if (log.isInfoEnabled()) {
+				log.info("keys=" + Arrays.toString(keys));
+				log.info("vals=" + Arrays.toString(vals));
+				log.info("order=" + Arrays.toString(order));
+			}
         }
         
         final int m = 3;
@@ -1145,10 +1149,12 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         // generate visitation order.
         {
             System.arraycopy(keys, 0, order, 0, keys.length);
-            Arrays.sort(order);
-            System.err.println("keys="+Arrays.toString(keys));
-            System.err.println("vals="+Arrays.toString(vals));
-            System.err.println("order="+Arrays.toString(order));
+			Arrays.sort(order);
+			if (log.isInfoEnabled()) {
+				log.info("keys=" + Arrays.toString(keys));
+				log.info("vals=" + Arrays.toString(vals));
+				log.info("order=" + Arrays.toString(order));
+			}
         }
         
         final int m = 3;
