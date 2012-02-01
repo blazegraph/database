@@ -260,6 +260,10 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
          * Overridden to handle the indirection from the {@link ValueAge} object
          * to the wrapped reference. It is the wrapped references that we need
          * to test for reference equality.
+         * 
+         * @see <a
+         *      href="https://sourceforge.net/apps/trac/bigdata/ticket/465#comment:2">
+         *      Too many GRS reads</a>
          */
         @Override
         final public boolean scanHead(final int nscan, final T ref) {
@@ -294,7 +298,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
                 count--; // update #of references.
 
                 // Unwrap the reference at this position in the ring buffer.
-                final Object o2 = get(head).get();// refs[head]
+                final Object o2 = _get(head).get();// refs[head]
 
                 if (o1 == o2) {
 
