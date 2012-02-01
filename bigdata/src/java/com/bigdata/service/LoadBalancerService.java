@@ -698,7 +698,7 @@ abstract public class LoadBalancerService extends AbstractService
         try {
 
             // Flush any buffered writes to the event store.
-            eventStore.getIndex("events").flush();
+            eventStore.getIndex("events").writeCheckpoint();
 
             // Normal shutdown of the event store.
             eventStore.shutdown();

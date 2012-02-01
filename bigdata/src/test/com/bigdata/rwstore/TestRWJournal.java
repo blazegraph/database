@@ -39,6 +39,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -56,9 +57,9 @@ import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
-import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -367,14 +368,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		public Properties getProperties(final long retention) {
+		public Properties getProperties() {
 
             if (log.isInfoEnabled())
                 log.info("TestRWJournal:getProperties");
 
-			final Properties properties = super.getProperties();
-
-	        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+//			final Properties properties = PropertyUtil.flatCopy(super.getProperties());
+            final Properties properties = new Properties(super.getProperties());
 
 	        properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 			// properties.setProperty(Options.BUFFER_MODE,
@@ -402,10 +402,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
 			// "1,2,3,5,8,12,16,32,48,64,128"); // 8K - max blob = 2K * 8K = 16M
 			// properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
-			// "1,2,3,5,8,12,16,32,48,64,128"); // 2K max
-			properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 2K
-																							// max
-
+//			properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 2K
+			
 			// ensure history retention to force deferredFrees
 			// properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE,
 			// "1"); // Non-zero
@@ -420,11 +418,17 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		protected IRawStore getStore(final long retention) {
+        protected Journal getStore(final long retentionMillis) {
 
-			return new Journal(getProperties(retention));
+            final Properties properties = new Properties(getProperties());
 
-		}
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, ""
+                            + retentionMillis);
+
+            return getStore(properties);
+
+        }
 
 		// /**
 		// * Test that allocate() pre-extends the store when a record is
@@ -703,11 +707,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * @throws IOException
 		 */
 		public void test_reallocation() throws IOException {
-			final Properties properties = getProperties();
-			File tmpfile = File.createTempFile("TestRW", ".rw");
+			final Properties properties = new Properties(getProperties());
+			final File tmpfile = File.createTempFile("TestRW", ".rw");
 			properties.setProperty(Options.FILE, tmpfile.getAbsolutePath());
-			properties.remove(Options.CREATE_TEMP_FILE);
-			Journal store = new Journal(properties);
+			properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//			Journal store = new Journal(properties);
+			Journal store = getStore(properties);
 
 			try {
 
@@ -1023,61 +1028,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			}
 
-		}
-
-		/**
-		 * This test releases over a blobs worth of deferred frees
-		 */
-		public void test_blobDeferredFrees() {
-			Journal store = (Journal) getStore(5);
-			try {
-
-				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-
-				ArrayList<Long> addrs = new ArrayList<Long>();
-				for (int i = 0; i < 4000; i++) {
-					addrs.add(bs.write(randomData(45)));
-				}
-				store.commit();
-
-				Thread.currentThread().sleep(5000);
-
-				for (long addr : addrs) {
-					bs.delete(addr);
-				}
-				// assertTrue(bs.isCommitted(addrs.get(0)));
-
-				store.commit();
-
-				// modify store but do not allocate similar size block
-				// as that we want to see has been removed
-				final long addr2 = bs.write(randomData(220)); // modify store
-
-				store.commit();
-				bs.delete(addr2); // modify store
-				store.commit();
-
-				// delete is actioned
-				assertFalse(false /* bs.isCommitted(addrs.get(0)) */);
-			} catch (InterruptedException e) {
-
-			} finally {
-				store.destroy();
-			}
-		}
-		
-		ByteBuffer randomData(final int sze) {
-			byte[] buf = new byte[sze + 4]; // extra for checksum
-			r.nextBytes(buf);
-			
-			return ByteBuffer.wrap(buf, 0, sze);
-		}
-		
-		byte[] randomBytes(final int sze) {
-			byte[] buf = new byte[sze + 4]; // extra for checksum
-			r.nextBytes(buf);
-			
-			return buf;
 		}
 
 		/**
@@ -1429,7 +1379,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		public void test_stressCommitIndexWithRetention() {
 
-            assertEquals(1000,doStressCommitIndex(40000L /* 20 secs history */, 1000));
+            assertEquals(1000,doStressCommitIndex(40000L /* 40 secs history */, 1000));
 
 
 		}
@@ -1446,7 +1396,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				final int cRuns = runs;
 				for (int i = 0; i < cRuns; i++)
 					commitSomeData(journal);
-				
+								
 		        final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
 			    {
 		            /*
@@ -1701,43 +1651,457 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			return 0L;
 		}
-	}
+		
+		/**
+		 * Simple state tests.
+		 * 
+		 * These are written to confirm the allocation bit states for a number of scenarios.
+		 */
+		
+		/**
+		 * State1
+		 * 
+		 * Allocate - Commit - Free
+		 * 
+		 * assert that allocation remains committed
+		 */
+		public void test_allocCommitFree() {
+			Journal store = (Journal) getStore();
+            try {
 
-	/**
-	 * Test suite integration for {@link AbstractInterruptsTestCase}.
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
-	 */
-	public static class TestInterrupts extends AbstractInterruptsTestCase {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	assertTrue(bs.isCommitted(addr));
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		public void test_allocCommitFreeWithHistory() {
+			Journal store = (Journal) getStore(4);
+            try {
 
-		public TestInterrupts() {
-			super();
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	assertTrue(bs.isCommitted(addr));
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
+		 * This test releases over a blobs worth of deferred frees
+		 */
+		public void test_blobDeferredFrees() {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
+
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
+                    "1,2,3,5,8,12,16,24,32"); // 2K
+
+			Journal store = (Journal) getStore(properties);
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	ArrayList<Long> addrs = new ArrayList<Long>();
+            	for (int i = 0; i < 4000; i++) {
+            		addrs.add(bs.write(randomData(45)));
+            	}
+            	store.commit();
+
+            	for (long addr : addrs) {
+            		bs.delete(addr);
+            	}
+                for (int i = 0; i < 4000; i++) {
+                    if(!bs.isCommitted(addrs.get(i))) {
+                        fail("i="+i+", addr="+addrs.get(i));
+                    }
+                }
+
+               	store.commit();
+               	
+            	// Age the history (of the deletes!)
+            	Thread.currentThread().sleep(6000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	for (int i = 0; i < 4000; i++) {
+                   	assertFalse(bs.isCommitted(addrs.get(i)));
+            	}
+              } catch (InterruptedException e) {
+			} finally {
+            	store.destroy();
+            }
+		}
+		
+		private Journal getStore(Properties props) {
+			return new Journal(props);
 		}
 
-		public TestInterrupts(String name) {
-			super(name);
+		/**
+		 * State2
+		 * 
+		 * Allocate - Commit - Free - Commit
+		 * 
+		 * assert that allocation is no longer committed
+		 */
+		public void test_allocCommitFreeCommit() {
+			Journal store = (Journal) getStore();
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	assertTrue(bs.isCommitted(addr));
+
+            	store.commit();
+
+            	assertFalse(bs.isCommitted(addr));
+            } finally {
+            	store.destroy();
+            }
 		}
+		
+		/**
+		 * In order to see deferred recycling we need to make two
+		 * commits (with modifications) after the retention period
+		 * has expired.
+		 * 
+		 * To be able to check for the address release, we must ensure that
+		 * the same address cannot be re-allocated, so a different size
+		 * allocation is requested.
+		 */
+		public void test_allocCommitFreeCommitWithHistory() {
+			Journal store = (Journal) getStore(4);
+            try {
 
-		protected IRawStore getStore() {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	assertTrue(bs.isCommitted(addr));
 
-			final Properties properties = getProperties();
+               	store.commit();
 
-			properties.setProperty(Options.DELETE_ON_EXIT, "true");
+            	// delete is deferred
+            	assertTrue(bs.isCommitted(addr));
+            	
+            	Thread.currentThread().sleep(5000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	assertFalse(bs.isCommitted(addr));
+            	
+            } catch (InterruptedException e) {
 
-			properties.setProperty(Options.CREATE_TEMP_FILE, "true");
-
-			properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
-
-			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
-
-			return new Journal(properties);//.getBufferStrategy();
-			// return new Journal(properties);
-
+			} finally {
+            	store.destroy();
+            }
 		}
+		
+		public void test_allocBlobCommitFreeCommitWithHistory() {
+			Journal store = (Journal) getStore(4000);
+            try {
 
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(253728)); // BLOB
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	assertTrue(bs.isCommitted(addr));
+
+               	store.commit();
+
+            	// delete is deferred
+            	assertTrue(bs.isCommitted(addr));
+            	
+            	Thread.currentThread().sleep(5000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	assertFalse(bs.isCommitted(addr));
+            	
+            } catch (InterruptedException e) {
+
+			} finally {
+            	store.destroy();
+            }
+		}
+		
+		public void test_allocBlobBoundariesCommitFreeCommitWithHistory() {
+			Journal store = (Journal) getStore(5);
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	if (false) {
+	                final int n = 1000000;
+	                final BloomFilter filter = new BloomFilter(n, 0.02d, n);
+	                filter.add(randomBytes(12));
+	                final long addrb = filter.write(store);
+	                
+	                System.out.println("Bloomfilter: " + ((int) addrb));
+            	}
+            	
+               	final long addr = bs.write(randomData(4088)); // BLOB 2 * 2044
+               	final long addr1 = bs.write(randomData(4089)); // BLOB 2 * 2044
+               	final long addr3 = bs.write(randomData(4087)); // BLOB 2 * 2044
+            	
+            	store.commit();
+            	
+               	bs.delete(addr);
+               	bs.delete(addr1);
+               	bs.delete(addr3);
+            	
+            	assertTrue(bs.isCommitted(addr));
+
+               	store.commit();
+
+            	// delete is deferred
+            	assertTrue(bs.isCommitted(addr));
+            	
+            	Thread.currentThread().sleep(5000);
+            	
+            	// modify store but do not allocate similar size block
+            	// as that we want to see has been removed
+               	final long addr2 = bs.write(randomData(220)); // modify store
+            	
+            	store.commit();
+            	bs.delete(addr2); // modify store
+               	store.commit();
+            	
+               	// delete is actioned
+            	assertFalse(bs.isCommitted(addr));
+            	
+            } catch (InterruptedException e) {
+
+			} finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
+		 * State3
+		 * 
+		 * Allocate - Commit - Free - Commit
+		 * 
+		 * Tracks writeCache state through allocation
+		 */
+		public void test_allocCommitFreeCommitWriteCache() {
+			Journal store = (Journal) getStore();
+            try {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// Has just been written so must be in cache
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	// since data is committed, should be accessible from any new
+            	// readCommitted transaction
+            	assertTrue(bs.inWriteCache(addr));
+
+            	store.commit();
+            	
+            	// If no transactions are around (which they are not) then must
+            	//	be released as may be re-allocated
+            	assertFalse(bs.inWriteCache(addr));
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		public void test_allocCommitFreeCommitWriteCacheWithHistory() {
+			Journal store = (Journal) getStore(5);
+            try {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// Has just been written so must be in cache
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	store.commit();
+            	
+            	bs.delete(addr);
+            	
+            	// since data is committed, should be accessible from any new
+            	// readCommitted transaction
+            	assertTrue(bs.inWriteCache(addr));
+
+            	store.commit();
+            	
+            	// Since state is retained, the delete is deferred
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
+		 * State4
+		 * 
+		 * Allocate - Commit - Free - Commit
+		 * 
+		 * ..but with session protection using a RawTx
+		 */
+		public void test_allocCommitFreeCommitSessionWriteCache() {
+			Journal store = (Journal) getStore();
+            try {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// Has just been written so must be in cache
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	store.commit();
+            	
+            	RawTx tx = bs.getRWStore().newTx();
+            	
+            	bs.delete(addr);
+            	
+            	// since data is committed, should be accessible from any new
+            	// readCommitted transaction
+            	assertTrue(bs.inWriteCache(addr));
+
+            	store.commit();
+            	
+            	// Since transactions are around the cache will not have been
+            	//	cleared (and cannot be re-allocated)
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	tx.close(); // Release Session
+            	
+            	// Cache must have been cleared
+            	assertFalse(bs.inWriteCache(addr));
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		/**
+		 * State5
+		 * 
+		 * Allocate - Commit - Free - Commit
+		 * 
+		 * Tracks writeCache state through allocation
+		 */
+		public void test_allocCommitFreeCommitAllocSessionWriteCache() {
+			Journal store = (Journal) getStore();
+            try {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// Has just been written so must be in cache
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	store.commit();
+            	
+            	RawTx tx = bs.getRWStore().newTx();
+            	
+            	bs.delete(addr);
+            	
+            	// since data is committed, should be accessible from any new
+            	// readCommitted transaction
+            	assertTrue(bs.inWriteCache(addr));
+
+            	store.commit();
+            	
+            	// Since transactions are around the cache will not have been
+            	//	cleared (and cannot be re-allocated)
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	tx.close(); // Release Session
+            	
+            	// Cache must have been cleared
+            	assertFalse(bs.inWriteCache(addr));
+            	
+            	final long addr2 = bs.write(randomData(78));
+            	
+            	assertTrue(addr2 == addr);
+            	
+            	assertTrue(bs.inWriteCache(addr));
+            	
+            	store.abort(); // removes uncommitted data
+            	
+            	assertFalse(bs.inWriteCache(addr));
+
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		ByteBuffer randomData(final int sze) {
+			byte[] buf = new byte[sze + 4]; // extra for checksum
+			r.nextBytes(buf);
+			
+			return ByteBuffer.wrap(buf, 0, sze);
+		}
+		
+		byte[] randomBytes(final int sze) {
+			byte[] buf = new byte[sze + 4]; // extra for checksum
+			r.nextBytes(buf);
+			
+			return buf;
+		}
 	}
 
 	/**
@@ -1810,6 +2174,43 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
+	}
+
+	/**
+	 * Test suite integration for {@link AbstractInterruptsTestCase}.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
+	 *          $
+	 */
+	public static class TestInterrupts extends AbstractInterruptsTestCase {
+	
+		public TestInterrupts() {
+			super();
+		}
+	
+		public TestInterrupts(String name) {
+			super(name);
+		}
+	
+		protected IRawStore getStore() {
+	
+			final Properties properties = getProperties();
+	
+			properties.setProperty(Options.DELETE_ON_EXIT, "true");
+	
+			properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+	
+			properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+	
+			properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
+	
+			return new Journal(properties);//.getBufferStrategy();
+			// return new Journal(properties);
+	
+		}
+	
 	}
 
 	/**

@@ -4146,6 +4146,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	 * 
 	 * @param addr
 	 *            The address of the node or leaf.
+	 * 
+	 * @see <a
+	 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/434#comment:2">
+	 *      Simplify tracking of address release for B+Tree and HTree </a>
 	 */
 	void deleteNodeOrLeaf(final long addr) {
 
@@ -4155,7 +4159,25 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		if (isReadOnly())
 			throw new IllegalStateException(ERROR_READ_ONLY);
 
-        btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-recycle(addr));
+		if (this instanceof BTree) {
+
+			if (((BTree) this).getCheckpoint().getRootAddr() == addr) {
+			
+				/*
+				 * TODO This is a bit of a hack.  It is designed to prevent
+				 * the double-delete of the last committed root node or leaf.
+				 * This should be cleaned up as part of addressing [1].
+				 * 
+				 * [1] https://sourceforge.net/apps/trac/bigdata/ticket/434
+				 */
+
+				return;
+			
+			}
+			
+		}
+
+		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-recycle(addr));
 
     }
 

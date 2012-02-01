@@ -107,7 +107,8 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             // save the key.
             expectedKeys[ nkeys ] = key;
             
-            System.err.println("Will insert: key=" + BytesUtil.toString(key)
+            if(log.isInfoEnabled())
+            	log.info("Will insert: key=" + BytesUtil.toString(key)
                     + " at index=" + index + " : nkeys=" + nkeys);
 
             // insert an entry under that key.

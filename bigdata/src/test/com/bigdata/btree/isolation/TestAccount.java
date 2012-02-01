@@ -29,6 +29,8 @@ package com.bigdata.btree.isolation;
 
 import junit.framework.TestCase;
 
+import org.apache.log4j.Logger;
+
 /**
  * This test case demonstrates a state-based validation technique described in
  * http://www.cs.brown.edu/~mph/Herlihy90a/p96-herlihy.pdf for a "bank account"
@@ -59,6 +61,8 @@ import junit.framework.TestCase;
  */
 public class TestAccount extends TestCase {
 
+	private static final Logger log = Logger.getLogger(TestAccount.class);
+	
     /**
      * 
      */
@@ -191,7 +195,8 @@ public class TestAccount extends TestCase {
          */
         public boolean validate() {
 
-            System.err.println("validate: " + toString());
+            if(log.isInfoEnabled())
+            		log.info("validate: " + toString());
 
             if (low <= account.bal && account.bal < high) {
 
