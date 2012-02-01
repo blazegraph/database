@@ -11,15 +11,15 @@ public class TestMROWTransactionsWithHistory extends TestMROWTransactions {
 		super(arg0);
 	}
 
-	public void test_multiple_csem_transaction_withHistory() throws Exception {
-		domultiple_csem_transaction(1);
-	}
+//	public void test_multiple_csem_transaction_withHistory() throws Exception {
+//		domultiple_csem_transaction(1);
+//	}
+//	
+//	public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
+//		domultiple_csem_transaction_onethread(1);
+//	}
 	
-	public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
-		domultiple_csem_transaction_onethread(1);
-	}
-	
-    public void test_multiple_csem_transaction_withHhistory_stress() throws Exception {
+    public void test_multiple_csem_transaction_withHistory_stress() throws Exception {
 
         final Random r = new Random();
         
