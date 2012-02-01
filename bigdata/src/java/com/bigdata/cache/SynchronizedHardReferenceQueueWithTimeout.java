@@ -64,7 +64,17 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * Note: Synchronization for the inner {@link #queue} is realized using the
      * <strong>outer</strong> reference!
      */
-    protected final InnerHardReferenceQueue<ValueAge<T>> queue;
+    private final InnerHardReferenceQueue<ValueAge<T>> queue;
+    
+    /**
+     * Package private access in support of the unit tests.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    final HardReferenceQueue<IRef<T>> getQueue() {
+        
+        return (HardReferenceQueue) queue;
+        
+    }
     
     /**
      * Variant with no listener and timeout.
@@ -72,14 +82,14 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
      *            There is no guarantee that all stored references are distinct.
-     * @param timeout
+     * @param timeoutNanos
      *            The timeout (in nanoseconds) for an entry in the queue. When
      *            ZERO (0L), the timeout is disabled.
      */
     public SynchronizedHardReferenceQueueWithTimeout(final int capacity,
-            final long timeout) {
+            final long timeoutNanos) {
 
-        this(capacity, DEFAULT_NSCAN, timeout);
+        this(capacity, DEFAULT_NSCAN, timeoutNanos);
         
     }
 
@@ -96,22 +106,33 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      *            near succession from entering the cache more than once. The
      *            #of reference tests trades off against the latency of adding a
      *            reference to the cache.
-     * @param timeout
+     * @param timeoutNanos
      *            The timeout (in nanoseconds) for an entry in the queue. When
      *            ZERO (0L), the timeout is disabled.
      */
-    @SuppressWarnings("rawtypes")
     public SynchronizedHardReferenceQueueWithTimeout(final int capacity,
-            final int nscan, final long timeout) {
+            final int nscan, final long timeoutNanos) {
 
-        this.queue = new InnerHardReferenceQueue<ValueAge<T>>(capacity,
-                DEFAULT_NSCAN, timeout);
+        this(null/* listener */, capacity, nscan, timeoutNanos);
+        
+    }
 
-        if (timeout > 0) {
+    /*
+     * package private constructor for unit tests.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    SynchronizedHardReferenceQueueWithTimeout(
+            final HardReferenceQueueEvictionListener<IRef<T>> listener,
+            final int capacity, final int nscan, final long timeoutNanos) {
 
-            queues
-                    .add(new WeakReference<SynchronizedHardReferenceQueueWithTimeout>(
-                            this));
+        this.queue = new InnerHardReferenceQueue<ValueAge<T>>(
+                (HardReferenceQueueEvictionListener) listener, capacity, nscan,
+                timeoutNanos);
+
+        if (queue.timeout > 0) {
+
+            queues.add(new WeakReference<SynchronizedHardReferenceQueueWithTimeout>(
+                    this));
 
         }
 
@@ -151,9 +172,10 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
          *            When ZERO (0L), the timeout is disabled.
          */
         public InnerHardReferenceQueue(
+                final HardReferenceQueueEvictionListener<T> listener,
                 final int capacity, final int nscan, final long timeout) {
 
-            super(null/* listener */, capacity, nscan);
+            super(listener, capacity, nscan);
 
             if (timeout < 0)
                 throw new IllegalArgumentException();
@@ -232,6 +254,62 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to handle the indirection from the {@link ValueAge} object
+         * to the wrapped reference. It is the wrapped references that we need
+         * to test for reference equality.
+         */
+        @Override
+        final public boolean scanHead(final int nscan, final T ref) {
+
+            if (nscan <= 0)
+                throw new IllegalArgumentException();
+            
+            if (ref == null)
+                throw new IllegalArgumentException();
+            
+            /*
+             * Note: This loop goes backwards from the head.  Since the head is the
+             * insertion point, we decrement the head position before testing the
+             * reference.  If the head is zero, then we wrap around.  This carries
+             * the head back to the last index in the array (capacity-1).
+             *
+             * Note: This uses local variables to shadow the instance variables
+             * so that we do not modify the state of the cache as a side effect.
+             */
+
+            int head = this.getHeadIndex();
+
+            int count = this.size;
+
+            // unwrap the caller's reference.
+            final Object o1 = ref.get();
+            
+            for (int i = 0; i < nscan && count > 0; i++) {
+
+                head = (head == 0 ? capacity - 1 : head - 1); // update head.
+
+                count--; // update #of references.
+
+                // Unwrap the reference at this position in the ring buffer.
+                final Object o2 = get(head).get();// refs[head]
+
+                if (o1 == o2) {
+
+                    // Found a match.
+
+                    return true;
+
+                }
+
+            }
+
+            return false;
+            
+        }
+        
     }
     
     /*
@@ -289,6 +367,9 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
     // allocate inside of synchronized block: 2781/406 on U10 query.
     synchronized public boolean add(final T ref) {
 
+        if(ref == null)
+            throw new IllegalArgumentException();
+        
         return queue.add(new ValueAge<T>(ref));
         
     }
@@ -448,6 +529,16 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         }
         
     }
+    
+    /**
+     * Interface for something wrapping a reference.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @param <T>
+     */
+    public static interface IRef<T> {
+       T get();
+    }
 
     /**
      * Wraps an object so that it can self-report the last timestamp when it was
@@ -457,13 +548,17 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * @param <T>
      *            The generic type of the wrapped object.
      */
-    private static class ValueAge<T> {
+    static class ValueAge<T> implements IRef<T> {
 
         /**
          * The object stored in the queue.
          */
         private final T ref;
 
+        public T get() {
+            return ref;
+        }
+        
         /**
          * The timestamp associated with the value. This is initialized to the
          * {@link System#nanoTime()} when the {@link ValueAge} was created and

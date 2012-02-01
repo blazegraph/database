@@ -63,6 +63,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestHardReferenceQueue.class);
 
+        suite.addTestSuite(TestSynchronizedHardReferenceQueueWithTimeout.class);
+
         suite.addTestSuite(TestHardReferenceQueueWithBatchingUpdates.class);
         
         suite.addTestSuite(TestConcurrentWeakValueCacheWithBatchingUpdates.class);

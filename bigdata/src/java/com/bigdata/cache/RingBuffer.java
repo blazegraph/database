@@ -489,7 +489,7 @@ public class RingBuffer<T> implements Queue<T> {
      * 
      * @return True iff we found <i>ref</i> in the scanned queue positions.
      */
-    final public boolean scanHead(final int nscan, final T ref) {
+    public boolean scanHead(final int nscan, final T ref) {
 
         if (nscan <= 0)
             throw new IllegalArgumentException();
