@@ -739,7 +739,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * 
      * @return <code>true</code> if anything was written.
      */
-    final public boolean flush() {
+    final private boolean flush() {
 
         assertNotTransient();
         assertNotReadOnly();

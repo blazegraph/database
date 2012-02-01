@@ -136,7 +136,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
 
     }
 
-    public void setDirty(final boolean dirty) {
+    final public void setDirty(final boolean dirty) {
 
         this.dirty = dirty;
 

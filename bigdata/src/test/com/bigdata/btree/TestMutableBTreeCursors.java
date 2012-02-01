@@ -516,7 +516,8 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
              * flush the btree to the store making all nodes clean. any mutation
              * will trigger copy on write.
              */
-            assertTrue(btree.flush());
+//            assertTrue(btree.flush());
+            btree.writeCheckpoint2();
 
             assertTrue(cursor.hasNext());
 
@@ -541,7 +542,8 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             /*
              * flush the btree again making all nodes clean.
              */
-            assertTrue(btree.flush());
+//            assertTrue(btree.flush());
+            btree.writeCheckpoint2();
 
             // insert a tuple (triggers copy-on-write).
             btree.insert(10, "Bryan");
