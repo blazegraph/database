@@ -1386,7 +1386,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		
 		public void test_stressCommitIndexNoRetention() {
 			
-			assertEquals(1,doStressCommitIndex(0L /* no history */, 1000));
+			assertEquals(2,doStressCommitIndex(0L /* no history */, 1000));
 
 		}
 		
