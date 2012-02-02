@@ -867,7 +867,7 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 				 * reject tasks.
 				 */
 
-				log.warn(ex);
+			    if(log.isInfoEnabled()) log.info(ex);
 
 			}
 
