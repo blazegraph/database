@@ -306,8 +306,8 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     }
                 }
                 if (log.isInfoEnabled())
-                    log.info("Statements written: " + commits.get()
-                            + ", read: " + nreadersDone.get());
+                    log.info("Writers committed: " + commits.get()
+                            + ", readers done: " + nreadersDone.get());
             } finally {
                 if (writers != null)
                     writers.shutdownNow();
