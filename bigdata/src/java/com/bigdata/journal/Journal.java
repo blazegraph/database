@@ -355,7 +355,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (bufferStrategy instanceof RWStrategy) {
                     if (txLog.isInfoEnabled())
                         txLog.info("OPEN : txId=" + state.tx
-                                + ", readsOnCommitTime=" + state.readCommitTime);
+                                + ", readsOnCommitTime=" + state.readsOnCommitTime);
                     final RawTx tx = ((RWStrategy)bufferStrategy).getRWStore().newTx();
                     if (m_rawTxs.put(state.tx, tx) != null) {
                         throw new IllegalStateException(
@@ -368,7 +368,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             protected void deactivateTx(final TxState state) {
                 if (txLog.isInfoEnabled())
                     txLog.info("CLOSE: txId=" + state.tx
-                            + ", readsOnCommitTime=" + state.readCommitTime);
+                            + ", readsOnCommitTime=" + state.readsOnCommitTime);
                 /*
                  * Note: We need to deactivate the tx before RawTx.close() is
                  * invoked otherwise the activeTxCount will never be zero inside

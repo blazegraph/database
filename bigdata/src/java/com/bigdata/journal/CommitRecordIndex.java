@@ -504,6 +504,11 @@ public class CommitRecordIndex extends BTree {
             
         }
         
+        public String toString() {
+            return super.toString() + "{commitTime=" + commitTime + ",addr="
+                    + addr + "}";
+        }
+
         /**
          * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
          * 

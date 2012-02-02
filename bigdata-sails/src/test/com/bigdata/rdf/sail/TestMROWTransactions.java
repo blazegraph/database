@@ -32,99 +32,99 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
     private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
-	
+
     TestMROWTransactions() {
-	}
+    }
 
     TestMROWTransactions(String arg0) {
-		super(arg0);
-	}
-
-	void domultiple_csem_transaction_onethread(final int retentionMillis) throws Exception {
-    	
-		domultiple_csem_transaction_onethread(retentionMillis, 2000, 50);
-		
+        super(arg0);
     }
-    
-	void domultiple_csem_transaction(final int retentionMillis) throws Exception {
-		
-		domultiple_csem_transaction2(retentionMillis, 2/* nreaderThreads */,
-				1000/* nwriters */, 20 * 1000/* nreaders */);
-		
-	}
-	
-	/**
-	 * 
-	 * @param retentionMillis
-	 *            The retention time (milliseconds).
-	 * @param nreaderThreads
-	 *            The #of threads running reader tasks. Increase nreaderThreads
-	 *            to increase chance startup condition and decrement to increase
-	 *            chance of commit point with no open read-only transaction (no
-	 *            sessions). Value is in [1:...].
-	 * @param nwriters
-	 *            The #of writer tasks (there is only one writer thread).
-	 * @param nreaders
-	 *            The #of reader tasks.
-	 * 
-	 * @throws Exception
-	 */
-	void domultiple_csem_transaction2(final int retentionMillis,
-			final int nreaderThreads, final int nwriters, final int nreaders)
-			throws Exception {
 
-		/**
-		 *  The most likely problem is related to the session protection in the
-		 *  RWStore.  In development we saw problems when concurrent transactions
-		 *  had reduced the open/active transactions to zero, therefore releasing
-		 *  session protection.  If the protocol works correctly we should never
-		 *  release session protection if any transaction has been initialized.
-		 *  
-		 *  The message of "invalid address" would be generated if an allocation
-		 *  has been freed and is no longer protected from recycling when an
-		 *  attempt is made to read from it.
-		 *  
-		 *  TODO Experiment with different values of [nthreads] for the with and
-		 *  w/o history variations of this test.  Consider lifting that parameter
-		 *  into the signature of this method.
-		 */
-		final int nuris = 2000; // number of unique subject/objects
-		final int npreds = 50; // 
-//		final PseudoRandom r = new PseudoRandom(2000);
-//		r.next(1500);
-		final Random r = new Random();
+    void domultiple_csem_transaction_onethread(final int retentionMillis) throws Exception {
 
-		final CAT writes = new CAT();
-		final CAT reads = new CAT();
-		final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
-		// Set [true] iff there are no failures by the time we cancel the running tasks.
-		final AtomicBoolean success = new AtomicBoolean(false);
+        domultiple_csem_transaction_onethread(retentionMillis, 2000, 50);
+
+    }
+
+    void domultiple_csem_transaction(final int retentionMillis) throws Exception {
+
+        domultiple_csem_transaction2(retentionMillis, 2/* nreaderThreads */,
+                1000/* nwriters */, 20 * 1000/* nreaders */);
+
+    }
+
+    /**
+     * 
+     * @param retentionMillis
+     *            The retention time (milliseconds).
+     * @param nreaderThreads
+     *            The #of threads running reader tasks. Increase nreaderThreads
+     *            to increase chance startup condition and decrement to increase
+     *            chance of commit point with no open read-only transaction (no
+     *            sessions). Value is in [1:...].
+     * @param nwriters
+     *            The #of writer tasks (there is only one writer thread).
+     * @param nreaders
+     *            The #of reader tasks.
+     * 
+     * @throws Exception
+     */
+    void domultiple_csem_transaction2(final int retentionMillis,
+            final int nreaderThreads, final int nwriters, final int nreaders)
+            throws Exception {
+
+        /**
+         * The most likely problem is related to the session protection in the
+         * RWStore. In development we saw problems when concurrent transactions
+         * had reduced the open/active transactions to zero, therefore releasing
+         * session protection. If the protocol works correctly we should never
+         * release session protection if any transaction has been initialized.
+         * 
+         * The message of "invalid address" would be generated if an allocation
+         * has been freed and is no longer protected from recycling when an
+         * attempt is made to read from it.
+         * 
+         * TODO Experiment with different values of [nthreads] for the with and
+         * w/o history variations of this test. Consider lifting that parameter
+         * into the signature of this method.
+         */
+        final int nuris = 2000; // number of unique subject/objects
+        final int npreds = 50; //
+        // final PseudoRandom r = new PseudoRandom(2000);
+        // r.next(1500);
+        final Random r = new Random();
+
+        final CAT commits = new CAT();
+        final CAT reads = new CAT();
+        final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
+        // Set [true] iff there are no failures by the time we cancel the running tasks.
+        final AtomicBoolean success = new AtomicBoolean(false);
         final BigdataSail sail = getSail(getProperties(retentionMillis));
-        //log.warn("Journal: "+sail.getDatabase().getIndexManager()+", file="+((Journal)sail.getDatabase().getIndexManager()).getFile());
-		try {
+        // log.warn("Journal: "+sail.getDatabase().getIndexManager()+", file="+((Journal)sail.getDatabase().getIndexManager()).getFile());
+        try {
 
-	        sail.initialize();
-	        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-	        final AbstractTripleStore origStore = repo.getDatabase();
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final AbstractTripleStore origStore = repo.getDatabase();
 
-	        final URI[] subs = new URI[nuris];
-	        for (int i = 0; i < nuris; i++) {
-	            subs[i] = uri("uri:" + i);
-	        }
-	        final URI[] preds = new URI[npreds];
-	        for (int i = 0; i < npreds; i++) {
-	            preds[i] = uri("pred:" + i);
-	        }
+            final URI[] subs = new URI[nuris];
+            for (int i = 0; i < nuris; i++) {
+                subs[i] = uri("uri:" + i);
+            }
+            final URI[] preds = new URI[npreds];
+            for (int i = 0; i < npreds; i++) {
+                preds[i] = uri("pred:" + i);
+            }
 
-	        // Writer task adds nwrites statements then commits
-			class Writer implements Callable<Long> {
-				final int nwrites;
+            // Writer task adds nwrites statements then commits
+            class Writer implements Callable<Long> {
+                final int nwrites;
 
-				Writer(final int nwrites) {
-					this.nwrites = nwrites;
-				}
+                Writer(final int nwrites) {
+                    this.nwrites = nwrites;
+                }
 
-				public Long call() throws Exception {
+                public Long call() throws Exception {
                     try {
                         final boolean isQuads = origStore.isQuads();
                         // Thread.sleep(r.nextInt(2000) + 500);
@@ -138,15 +138,15 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                                 subs[r.nextInt(nuris)],
                                                 isQuads ? subs[r.nextInt(nuris)]
                                                         : null);
-                                writes.increment();
-//                                System.out.print('.');
+                                // System.out.print('.');
                             }
-//                            System.out.println("\n");
+                            // System.out.println("\n");
+                            commits.increment();
 
                         } finally {
                             origStore.commit();
-                            if(log.isInfoEnabled()) {
-                                log.info("Commit");
+                            if (log.isInfoEnabled()) {
+                                log.info("Commit #" + commits);
                             }
                         }
                     } catch (Throwable ise) {
@@ -166,15 +166,15 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                     return null;
                 }
 
-			}
+            }
 
-			// ReaderTask makes nreads and closes
-			class Reader implements Callable<Long> {
-				final int nreads;
+            // ReaderTask makes nreads and closes
+            class Reader implements Callable<Long> {
+                final int nreads;
 
-				Reader(final int nwrites) {
-					this.nreads = nwrites;
-				}
+                Reader(final int nwrites) {
+                    this.nreads = nwrites;
+                }
 
                 public Long call() throws Exception {
                     try {
@@ -182,8 +182,14 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 .getIndexManager()).newTx(ITx.READ_COMMITTED);
 
                         try {
-                        	txLog.info("Reading with tx: " + txId);
-                        	
+                            /*
+                             * Note: This sleep makes it much easier to hit the
+                             * bug documented here:
+                             * 
+                             * https://sourceforge.net/apps/trac/bigdata/ticket/467
+                             */
+                            Thread.sleep(2000/* millis */);
+                            txLog.info("Reading with tx: " + txId);
                             final AbstractTripleStore readstore = (AbstractTripleStore) origStore
                                     .getIndexManager().getResourceLocator()
                                     .locate(origStore.getNamespace(), txId);
@@ -193,25 +199,25 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                         .getStatements(subs[r.nextInt(nuris)],
                                                 null, null);
                                 try {
-	                                while (stats.hasNext()) {
-	                                    stats.next();
-	                                    reads.increment();
-	                                }
+                                    while (stats.hasNext()) {
+                                        stats.next();
+                                        reads.increment();
+                                    }
                                 } finally {
-                                	stats.close();
+                                    stats.close();
                                 }
                             }
 
-                        	txLog.info("Finished with tx: " + txId);
+                            txLog.info("Finished with tx: " + txId);
                         } catch (IllegalStateException ise) {
-                        	txLog.info("IllegalStateException tx: " + txId);
-                        	failex.compareAndSet(null, ise);
+                            txLog.info("IllegalStateException tx: " + txId);
+                            failex.compareAndSet(null, ise);
                         } catch (Exception e) {
-                        	txLog.info("UnexpectedException tx: " + txId);
-                        	failex.compareAndSet(null, e);
-                        	throw e;
+                            txLog.info("UnexpectedException tx: " + txId);
+                            failex.compareAndSet(null, e);
+                            throw e;
                         } finally {
-                        	txLog.info("Aborting tx: " + txId);
+                            txLog.info("Aborting tx: " + txId);
                             ((Journal) origStore.getIndexManager()).abort(txId);
                         }
                     } catch (Throwable ise) {
@@ -236,94 +242,94 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             ExecutorService writers = null;
             ExecutorService readers = null;
             try {
-                
-				writers = Executors
-						.newSingleThreadExecutor(new DaemonThreadFactory(
-								"test-writer-pool"));
 
-				readers = Executors.newFixedThreadPool(nreaderThreads,
-						new DaemonThreadFactory("test-reader-pool"));
+                writers = Executors
+                        .newSingleThreadExecutor(new DaemonThreadFactory(
+                                "test-writer-pool"));
+
+                readers = Executors.newFixedThreadPool(nreaderThreads,
+                        new DaemonThreadFactory("test-reader-pool"));
 
                 // let's schedule a few writers and readers (more than needed)
                 // writers.submit(new Writer(5000000/* nwrite */));
-				Future<Long> lastWriterFuture = null;
-				Future<Long> lastReaderFuture = null;
-				for (int i = 0; i < nwriters; i++) {
-					lastWriterFuture = writers
-							.submit(new Writer(500/* nwrite */));
+                Future<Long> lastWriterFuture = null;
+                Future<Long> lastReaderFuture = null;
+                for (int i = 0; i < nwriters; i++) {
+                    lastWriterFuture = writers
+                            .submit(new Writer(500/* nwrite */));
                 }
                 for (int rdrs = 0; rdrs < nreaders; rdrs++) {
-					lastReaderFuture = readers
-							.submit(new Reader(60/* nread */));
+                    lastReaderFuture = readers
+                            .submit(new Reader(60/* nread */));
                 }
 
-				// let the writers run riot for a time, checking for failure
-				while (true) {
-					final boolean bothDone = lastWriterFuture.isDone()
-							&& lastReaderFuture.isDone();
-					if (bothDone)
-						break;
-					if(failex.get() != null) {
-						// Something errored.
-						break;
-					}
-					Thread.sleep(1000/* ms */);
-				}
-//                for (int i = 0; i < 600; i++) {
-//                	Thread.sleep(1000);
-//                	if (failex.get() != null)
-//                		break;
-//                }
-				if (failex.get() == null) {
-					/*
-					 * Note whether or not there are failures before we
-					 * interrupt the running tasks.
-					 */
-                	success.set(true);
+                // let the writers run riot for a time, checking for failure
+                while (true) {
+                    final boolean bothDone = lastWriterFuture.isDone()
+                            && lastReaderFuture.isDone();
+                    if (bothDone)
+                        break;
+                    if (failex.get() != null) {
+                        // Something errored.
+                        break;
+                    }
+                    Thread.sleep(1000/* ms */);
+                }
+                // for (int i = 0; i < 600; i++) {
+                // Thread.sleep(1000);
+                // if (failex.get() != null)
+                // break;
+                // }
+                if (failex.get() == null) {
+                    /*
+                     * Note whether or not there are failures before we
+                     * interrupt the running tasks.
+                     */
+                    success.set(true);
                 }
                 writers.shutdownNow();
                 readers.shutdownNow();
                 writers.awaitTermination(5, TimeUnit.SECONDS);
                 readers.awaitTermination(5, TimeUnit.SECONDS);
-				if (!success.get()) {
+                if (!success.get()) {
                     final Throwable ex = failex.get();
                     if (ex != null) {
-						fail("Test failed: firstCause=" + ex
-								+ ", retentionMillis=" + retentionMillis
-								+ ", nreaderThreads=" + nreaderThreads
-								+ ", nwriters=" + nwriters + ", nreaders="
-								+ nreaders + ", indexManager="
+                        fail("Test failed: firstCause=" + ex
+                                + ", retentionMillis=" + retentionMillis
+                                + ", nreaderThreads=" + nreaderThreads
+                                + ", nwriters=" + nwriters + ", nreaders="
+                                + nreaders + ", indexManager="
                                 + repo.getDatabase().getIndexManager(), ex);
                     }
                 }
                 if (log.isInfoEnabled())
-                    log.info("Statements written: " + writes.get() + ", read: "
-                            + reads.get());
+                    log.info("Statements written: " + commits.get()
+                            + ", read: " + reads.get());
             } finally {
                 if (writers != null)
                     writers.shutdownNow();
                 if (readers != null)
                     readers.shutdownNow();
-	        }
-		} finally {
+            }
+        } finally {
 
-			sail.__tearDownUnitTest();
+            sail.__tearDownUnitTest();
 
-		}
+        }
 
-	}
+    }
 
-	void domultiple_csem_transaction_onethread(final int retention, final int nuris, final int npreds) throws Exception {
+    void domultiple_csem_transaction_onethread(final int retention, final int nuris, final int npreds) throws Exception {
 
-//	    final PseudoRandom r = new PseudoRandom(20000 /*10000*/);
-	    final Random r = new Random();
-	    
+        // final PseudoRandom r = new PseudoRandom(20000 /*10000*/);
+        final Random r = new Random();
+
         final CAT writes = new CAT();
         final CAT reads = new CAT();
 //        final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
         // Set [true] iff there are no failures by the time we cancel the
         // running tasks.
-//        final AtomicBoolean success = new AtomicBoolean(false);
+        // final AtomicBoolean success = new AtomicBoolean(false);
         final BigdataSail sail = getSail(getProperties(retention));
         try {
 
@@ -348,23 +354,23 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 final Long txId = ((Journal) origStore.getIndexManager())
                         .newTx(ITx.READ_COMMITTED);
                 try {
-                	// System.err.println("READ_STATE: " + txId);
+                    // System.err.println("READ_STATE: " + txId);
                     final AbstractTripleStore readstore = (AbstractTripleStore) origStore
                             .getIndexManager().getResourceLocator()
                             .locate(origStore.getNamespace(), txId);
                     for (int i = 0; i < nreads; i++) {
                         final BigdataStatementIterator stats = readstore
-//                        .getStatements(subs[nuris/2 + loop], null,
-//                                null);
-                        .getStatements(subs[r.nextInt(nuris)], null,
-                                null);
+                        // .getStatements(subs[nuris/2 + loop], null,
+                        // null);
+                                .getStatements(subs[r.nextInt(nuris)], null,
+                                        null);
                         try {
-	                        while (stats.hasNext()) {
-	                            stats.next();
-	                            reads.increment();
-	                        }
+                            while (stats.hasNext()) {
+                                stats.next();
+                                reads.increment();
+                            }
                         } finally {
-                        	stats.close();
+                            stats.close();
                         }
                     }
 
@@ -376,10 +382,10 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                     preds[r.nextInt(npreds)],
                                     subs[r.nextInt(nuris)],
                                     isQuads ? subs[r.nextInt(nuris)] : null);
-//                            origStore.addStatement(subs[nuris/2 + loop],
-//                                    preds[npreds/2 + loop],
-//                                    subs[nuris/2 - loop],
-//                                    isQuads ? subs[nuris/2 + loop] : null);
+                            // origStore.addStatement(subs[nuris/2 + loop],
+                            // preds[npreds/2 + loop],
+                            // subs[nuris/2 - loop],
+                            // isQuads ? subs[nuris/2 + loop] : null);
                             writes.increment();
                             // System.out.print('.');
                         }
@@ -387,9 +393,9 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
                     } finally {
                         origStore.commit();
-                    	log.warn("Commit: " + loop);
-//                        if (log.isInfoEnabled())
-//                            log.info("Commit");
+                        log.warn("Commit: " + loop);
+                        // if (log.isInfoEnabled())
+                        // log.info("Commit");
                     }
                     // Close Read Connection
                     ((Journal) readstore.getIndexManager()).abort(txId);
@@ -407,45 +413,45 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         }
 
     }
-    
-	protected URI uri(String s) {
-		return new URIImpl(BD.NAMESPACE + s);
-	}
 
-	@Override
-	public Properties getProperties() {
+    protected URI uri(String s) {
+        return new URIImpl(BD.NAMESPACE + s);
+    }
 
-		Properties props = super.getProperties();
+    @Override
+    public Properties getProperties() {
 
-		props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
-		props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-		props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-		props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
-		props.setProperty(BigdataSail.Options.JUSTIFY, "false");
-		props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
-//		props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
+        Properties props = super.getProperties();
 
-		// ensure using RWStore
-		props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
-//		props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
-//		props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
-		// props.setProperty(Options.CREATE_TEMP_FILE, "false");
-		// props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
-		
-//		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "20");
-//		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "0");
-		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "500");
-		props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "10");
+        props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+        props.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+        props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        props.setProperty(BigdataSail.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+        props.setProperty(BigdataSail.Options.JUSTIFY, "false");
+        props.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+        // props.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "3");
 
-		return props;
+        // ensure using RWStore
+        props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+        // props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
+        // props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
+        // props.setProperty(Options.CREATE_TEMP_FILE, "false");
+        // props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
 
-	}
-	
-	protected Properties getProperties(int retention) {
-		final Properties props = getProperties();
-		props.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+        // props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "20");
+        // props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "0");
+        props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "500");
+        props.setProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_SCAN, "10");
 
-		return props;
-	}
+        return props;
+
+    }
+
+    protected Properties getProperties(int retention) {
+        final Properties props = getProperties();
+        props.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+
+        return props;
+    }
 
 }
