@@ -3417,8 +3417,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			if (commitRecord == null) {
 
-				if (log.isInfoEnabled())
-					log.info("No commit record for timestamp=" + commitTime);
+//              if (log.isInfoEnabled())
+				log.warn("No commit record for timestamp=" + commitTime);
 
 				return null;
 
