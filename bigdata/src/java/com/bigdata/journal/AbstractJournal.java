@@ -2080,7 +2080,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			}
 
-			txLog.warn("ABORT");
+			txLog.info("ABORT");
 
 			if (LRUNexus.INSTANCE != null) {
 
