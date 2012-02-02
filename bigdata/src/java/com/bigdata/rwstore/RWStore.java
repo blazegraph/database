@@ -2476,6 +2476,14 @@ public class RWStore implements IStore, IBufferedWriter {
              */
             final long latestReleasableTime = transactionService.getReleaseTime();
 
+            if (lastCommitTime <= latestReleasableTime) {
+                throw new AssertionError("lastCommitTime=" + lastCommitTime
+                        + ", latestReleasableTime=" + latestReleasableTime
+                        + ", lastDeferredReleaseTime="
+                        + m_lastDeferredReleaseTime + ", activeTxCount="
+                        + m_activeTxCount);
+            }
+            
 // Note: This is longer true. Delete blocks are attached to the
 // commit point in which the deletes were made. 
 //              /*
@@ -3689,9 +3697,9 @@ public class RWStore implements IStore, IBufferedWriter {
         }
         
         /*
-         * FIXME Restore this code when addressing 
+         *  
          * 
-         * https://sourceforge.net/apps/trac/bigdata/ticket/440
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
          */
         
 //        // Now remove the commit record entries from the commit record index.
@@ -3705,8 +3713,11 @@ public class RWStore implements IStore, IBufferedWriter {
                     + ", commitPointsRemoved=" + commitPointsRemoved
                     );
 
-//        assert commitPointsRecycled == commitPointsRemoved;
-                
+        assert commitPointsRecycled == commitPointsRemoved : "commitPointsRecycled="
+                + commitPointsRecycled
+                + " != commitPointsRemoved="
+                + commitPointsRemoved;
+
         return totalFreed;
     }
 
