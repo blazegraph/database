@@ -3713,10 +3713,10 @@ public class RWStore implements IStore, IBufferedWriter {
                     + ", commitPointsRemoved=" + commitPointsRemoved
                     );
 
-        assert commitPointsRecycled == commitPointsRemoved : "commitPointsRecycled="
-                + commitPointsRecycled
-                + " != commitPointsRemoved="
-                + commitPointsRemoved;
+        if (commitPointsRecycled != commitPointsRemoved)
+            throw new AssertionError("commitPointsRecycled="
+                    + commitPointsRecycled + " != commitPointsRemoved="
+                    + commitPointsRemoved);
 
         return totalFreed;
     }
