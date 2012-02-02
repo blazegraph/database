@@ -96,9 +96,16 @@ public class TestTransactionService extends TestCase2 {
             return this;
             
         }
-        
+
         @Override
-        public AbstractFederation getFederation() {
+        protected long getReadsOnTime(final long txId) {
+        
+            return super.getReadsOnTime(txId);
+            
+        }
+
+        @Override
+        public AbstractFederation<?> getFederation() {
             return null;
         }
 
@@ -993,16 +1000,14 @@ public class TestTransactionService extends TestCase2 {
     }
 
     /**
-     * Verify that a request for an historical state that is no longer available
-     * will be rejected.
+     * Unit test verifies that the release time does NOT advance when the
+     * earliest running transaction terminates but a second transaction is still
+     * active which reads on the same commit time.
      * 
-     * @todo verify illegal to advance the release time while there are active
-     *       tx LTE that the specified release time (or if legal, then force the
-     *       abort of those tx and verify that).
-     * 
-     * @throws IOException
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/467
      */
-    public void test_newTx_readOnly_historyGone() throws IOException {
+    public void test_newTx_readOnly_releaseTimeRespectsReadsOnCommitTime()
+            throws IOException {
         
         final MockTransactionService service = newFixture();
 
@@ -1021,43 +1026,388 @@ public class TestTransactionService extends TestCase2 {
             // this will be the earliest running tx until it completes.
             final long tx0 = service.newTx(ITx.UNISOLATED);
 
-            // timestamp GT [tx0] and LT [tx1].
+            // timestamp GT [abs(tx0)] and LT [abs(tx1)].
             final long ts = service.nextTimestamp();
+            
+            assertTrue(ts > Math.abs(tx0));
             
             // this will become the earliest running tx if tx0 completes first.
             final long tx1 = service.newTx(ITx.UNISOLATED);
-
-            // commit the tx0 - this will update the release time.
+            
+            assertTrue(ts < Math.abs(tx1));
+            
+            // commit tx0
 //            final long commitTime0 = 
                 service.commit(tx0);
             
             final long newReleaseTime = service.getReleaseTime();
             
-            // verify release time was updated.
-            if (oldReleaseTime == newReleaseTime) {
+            /*
+             * Verify release time was NOT updated since both transactions are
+             * reading from the same commit time.
+             */
+            assertEquals(oldReleaseTime, newReleaseTime);
+            
+            /*
+             * Try to read from [ts]. This should succeed since the release time
+             * was not advanced.
+             */
+            service.newTx(ts);
+            
+        } finally {
 
-                fail("releaseTime not updated: releaseTime=" + newReleaseTime);
-                
-            }
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * Verify that a request for an historical state that is no longer available
+     * will be rejected.
+     * <p>
+     * The test is setup as follows:
+     * 
+     * <pre>
+     *                                           +------tx2---------------
+     *                   +-----------------tx1---------------+
+     *       +-----------tx0---------+
+     * +=====================================================+
+     *                                           +========================
+     * 0-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+     *       tx0   |     tx1   |     |     |     tx2   |     |
+     *       (0)   ts1   (0)   ts2   |     ts3   (ct0) ts4   |
+     *                               ct0                     ct1
+     * rt=0                                                  rt=ct0-1
+     * </pre>
+     * 
+     * where tx0, ... are transactions.<br/>
+     * where ts0, ... are timestamps.<br/>
+     * where ct0, ... are the commit times for the corresponding tx#.<br/>
+     * where (...) indicates the commit time on which the transaction is
+     * reading.<br/>
+     * where rt# is a releaseTime. The releaseTime and lastCommitTime are
+     * initially ZERO (0).<br/>
+     * The long "====" lines above the timeline represent the period during
+     * which a given commit point is available to a new transaction.<br/>
+     * The long "---" lines above the timeline represent the life cycle of a
+     * specific transaction.<br/>
+     * <p>
+     * Any transaction which starts before ct1 will see the history going back
+     * to commitTime=0. This commit time is initially available because there is
+     * no committed data. It is pinned by tx0 and then by tx1. Once both of
+     * those transactions complete, that commit time is released (minReleaseAge
+     * is zero).
+     * <p>
+     * When tx1 completes, the release time is advanced (rt=ct0-1).
+     * <p>
+     * Any transaction which starts after tx2 will see history back to ct0.
+     */
+    public void test_newTx_readOnly_historyGone() throws IOException {
+
+        final MockTransactionService service = newFixture();
+
+        try {
+
+            /*
+             * Verify that the service is not retaining history beyond the last
+             * commit point.
+             */
+            assertEquals(0L, service.getMinReleaseAge());
+
+            final long oldReleaseTime = service.getReleaseTime();
+
+            assertEquals(0L, oldReleaseTime);
+
+            // this will be the earliest running tx until it completes.
+            final long tx0 = service.newTx(ITx.UNISOLATED);
+            
+            assertEquals(0L, service.getReadsOnTime(tx0));
+
+            // timestamp GT [abs(tx0)] and LT [abs(tx1)].
+            final long ts1 = service.nextTimestamp();
+
+            assertTrue(ts1 > Math.abs(tx0));
+
+            // this will become the earliest running tx if tx0 completes first.
+            final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            assertEquals(0L, service.getReadsOnTime(tx1));
+            
+            // timestamp GT [abs(tx1)] and LT [abs(tx2)].
+            final long ts2 = service.nextTimestamp();
+
+            assertTrue(ts1 < Math.abs(tx1));
+            
+            assertTrue(ts2 > Math.abs(tx1));
+
+            // commit tx0.
+            final long commitTimeTx0 = service.commit(tx0);
+            
+            assertTrue(commitTimeTx0 > ts2);
+
+            final long newReleaseTime = service.getReleaseTime();
+
+            // verify release time was NOT updated.
+            assertEquals(oldReleaseTime, newReleaseTime);
+
+            // After tx0 commits.
+            final long ts3 = service.nextTimestamp();
+
+            assertTrue(ts3 > commitTimeTx0);
+
+            /*
+             * Start another transaction. This should read from the commitTime
+             * for tx0.
+             * 
+             * TODO Do an alternative test where we do not obtain tx2. How does
+             * that play out.
+             */
+            final long tx2 = service.newTx(ITx.UNISOLATED);
+
+            // After tx2 starts
+            final long ts4 = service.nextTimestamp();
+
+            assertTrue(ts2 < Math.abs(tx2));
+            assertTrue(ts4 > Math.abs(tx2));
+
+            /*
+             * Commit tx1. The releaseTime SHOULD be updated since tx1 was the
+             * earliest running transaction and no remaining transaction reads
+             * from the same commit time as tx1.
+             */
+            final long commitTimeTx1 = service.commit(tx1);
+            
+            assertTrue(commitTimeTx1 > commitTimeTx0);
+            assertTrue(commitTimeTx1 > ts3);
+            assertTrue(commitTimeTx1 > tx2);
+
+            final long newReleaseTime2 = service.getReleaseTime();
+
+            // verify release time was updated.
+            assertNotSame(oldReleaseTime, newReleaseTime2);
             
             /*
              * Should have advanced the release time right up to (but LT) the
-             * transaction which is now the earliest running tx (that will be
-             * tx1). (This assumes [minReleaseAge==0].)
+             * commit time on which tx2 is reading, which is the commitTime for
+             * tx0.
+             * 
+             * Note: This assumes [minReleaseAge==0].
              */
-            assertEquals(Math.abs(tx1) - 1, newReleaseTime);
+            assertEquals(Math.abs(commitTimeTx0) - 1, newReleaseTime2);
+
+            try {
+                /*
+                 * Try to read from [ts1]. This timestamp was obtain after tx0
+                 * and before tx1. Since [minReleaseAge==0], the history for
+                 * this timestamp was released after both tx0 and tx1 were done.
+                 * Therefore, we should not be able to obtain a transaction for
+                 * this timestamp.
+                 */
+                service.newTx(ts1);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+            try {
+                /*
+                 * Try to read from [ts2]. This timestamp was obtain after tx1
+                 * and before tx1 was committed. Since [minReleaseAge==0], the
+                 * history for this timestamp was released after both tx0 and
+                 * tx1 were done. Therefore, we should not be able to obtain a
+                 * transaction for this timestamp.
+                 */
+                service.newTx(ts2);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+            
+            /*
+             * This will read on the commit point pinned by tx1, which is
+             * [commitTimeTx0].
+             */
+            final long tx3 = service.newTx(ts3);
+            
+            assertEquals(commitTimeTx0, service.getReadsOnTime(tx3));
+
+        } finally {
+
+            service.destroy();
+
+        }
+
+    }
+
+    /**
+     * This is a variant on {@link #test_newTx_readOnly_historyGone()} where we
+     * do not start tx2. In this case, when we end tx1 the release time will
+     * advance right up to the most recent commit time.
+     * <p>
+     * The test is setup as follows:
+     * 
+     * <pre>
+     *                   +-----------------tx1---------------+
+     *       +-----------tx0---------+
+     * +=====================================================+
+     * 0-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+     *       tx0   |     tx1   |     |     |           |     |
+     *       (0)   ts1   (0)   ts2   |     ts3               |
+     *                               ct0                     ct1
+     * rt=0                                                  rt=now-1
+     * </pre>
+     * 
+     * where tx0, ... are transactions.<br/>
+     * where ts0, ... are timestamps.<br/>
+     * where ct0, ... are the commit times for the corresponding tx#.<br/>
+     * where (...) indicates the commit time on which the transaction is
+     * reading.<br/>
+     * where rt# is a releaseTime. The releaseTime and lastCommitTime are
+     * initially ZERO (0).<br/>
+     * The long "====" lines above the timeline represent the period during
+     * which a given commit point is available to a new transaction.<br/>
+     * The long "---" lines above the timeline represent the life cycle of a
+     * specific transaction.<br/>
+     * <p>
+     * Any transaction which starts before ct1 will see the history going back
+     * to commitTime=0. This commit time is initially available because there is
+     * no committed data. It is pinned by tx0 and then by tx1. Once both of
+     * those transactions complete, that commit time is released (minReleaseAge
+     * is zero).
+     * <p>
+     * When tx1 completes, the release time is advanced (rt=now-1).
+     * <p>
+     * Any transaction which starts after ct1 will see read on ct1.
+     */
+    public void test_newTx_readOnly_historyGone2() throws IOException {
+
+        final MockTransactionService service = newFixture();
+
+        try {
+
+            /*
+             * Verify that the service is not retaining history beyond the last
+             * commit point.
+             */
+            assertEquals(0L, service.getMinReleaseAge());
+
+            final long oldReleaseTime = service.getReleaseTime();
+
+            assertEquals(0L, oldReleaseTime);
+
+            // this will be the earliest running tx until it completes.
+            final long tx0 = service.newTx(ITx.UNISOLATED);
+            
+            assertEquals(0L, service.getReadsOnTime(tx0));
+
+            // timestamp GT [abs(tx0)] and LT [abs(tx1)].
+            final long ts1 = service.nextTimestamp();
+
+            assertTrue(ts1 > Math.abs(tx0));
+
+            // this will become the earliest running tx if tx0 completes first.
+            final long tx1 = service.newTx(ITx.UNISOLATED);
+
+            assertEquals(0L, service.getReadsOnTime(tx1));
+            
+            // timestamp GT [abs(tx1)] and LT [abs(tx2)].
+            final long ts2 = service.nextTimestamp();
+
+            assertTrue(ts1 < Math.abs(tx1));
+            
+            assertTrue(ts2 > Math.abs(tx1));
+
+            // commit tx0.
+            final long commitTimeTx0 = service.commit(tx0);
+            
+            assertTrue(commitTimeTx0 > ts2);
+
+            final long newReleaseTime = service.getReleaseTime();
+
+            // verify release time was NOT updated.
+            assertEquals(oldReleaseTime, newReleaseTime);
+
+            // After tx0 commits.
+            final long ts3 = service.nextTimestamp();
+
+            assertTrue(ts3 > commitTimeTx0);
+
+            /*
+             * Commit tx1. The releaseTime SHOULD be updated since tx1 was the
+             * earliest running transaction and no remaining transaction reads
+             * from the same commit time as tx1.
+             */
+            final long commitTimeTx1 = service.commit(tx1);
+            
+            assertTrue(commitTimeTx1 > commitTimeTx0);
+            assertTrue(commitTimeTx1 > ts3);
+
+            final long ts4 = service.nextTimestamp();
+
+            assertTrue(ts4 > commitTimeTx1);
+
+            final long newReleaseTime2 = service.getReleaseTime();
+
+            // verify release time was updated.
+            assertNotSame(oldReleaseTime, newReleaseTime2);
+            
+            /*
+             * Should have advanced the release time right up to (but LT) the
+             * commitTime for tx1.
+             */
+            assertEquals(Math.abs(commitTimeTx1) - 1, newReleaseTime2);
+
+            try {
+                /*
+                 * Try to read from [ts1]. This timestamp was obtain after tx0
+                 * and before tx1. Since [minReleaseAge==0], the history for
+                 * this timestamp was released after both tx0 and tx1 were done.
+                 * Therefore, we should not be able to obtain a transaction for
+                 * this timestamp.
+                 */
+                service.newTx(ts1);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+            try {
+                /*
+                 * Try to read from [ts2]. This timestamp was obtain after tx1
+                 * and before tx1 was committed. Since [minReleaseAge==0], the
+                 * history for this timestamp was released after both tx0 and
+                 * tx1 were done. Therefore, we should not be able to obtain a
+                 * transaction for this timestamp.
+                 */
+                service.newTx(ts2);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
             
             try {
                 /*
-                 * Try to read from [ts]. Since [minReleaseAge==0] the history
-                 * should be gone and this should fail.
+                 * Try to read from [ts3]. This timestamp was obtain before tx1
+                 * committed. Since [minReleaseAge==0], the history for this
+                 * timestamp was released after both tx0 and tx1 were done.
+                 * Therefore, we should not be able to obtain a transaction for
+                 * this timestamp.
                  */
-                service.newTx(ts);
-                fail("Expecting: "+IllegalStateException.class);
-            } catch(IllegalStateException ex) {
-                log.info("Ignoring expected exception: "+ex);
+                service.newTx(ts3);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
             }
+
+            /*
+             * Start transaction. This will read on the commitTime for tx1.
+             */
             
+            final long tx3 = service.newTx(ts4);
+            
+            assertEquals(commitTimeTx1, service.getReadsOnTime(tx3));
+
         } finally {
 
             service.destroy();
@@ -1152,7 +1502,11 @@ public class TestTransactionService extends TestCase2 {
 //             * transactions.
 //             */
 //            service.notifyCommit(service.nextTimestamp());
+
+            // original last commit time is zero.
+            assertEquals(0L, service.getLastCommitTime());
             
+            // original release time is zero.
             assertEquals(0L, service.getReleaseTime());
 
             final long tx0 = service.newTx(ITx.UNISOLATED);
@@ -1173,16 +1527,44 @@ public class TestTransactionService extends TestCase2 {
             // terminate the 1st tx.
             service.abort(tx0);
 
-            // verify that releaseTime was updated.
+            {
+                /*
+                 * Verify that releaseTime was NOT updated yet. The original
+                 * commit time is still pinned by [tx2].
+                 */
+                assertEquals(0L, service.getReleaseTime());
+                /*
+                 * However, the lastCommitTime SHOULD have been updated.
+                 */
+                assertTrue(service.getLastCommitTime() > 0);
+            }
+            
+            /*
+             * Finally, commit the last tx.
+             * 
+             * Note: This should cause the release time to be advanced.
+             */
+            final long ct2 = service.commit(tx2);
+            
             final long releaseTime = service.getReleaseTime();
+            
             final long lastCommitTime = service.getLastCommitTime();
-            System.err.println("tx0           =" + tx0);
-            System.err.println("tx1           =" + tx1);
-            System.err.println("tx2           =" + tx2);
-            System.err.println("releaseTime   = " + releaseTime);
-            System.err.println("lastCommitTime= " + lastCommitTime);
+
+            if (log.isInfoEnabled()) {
+                log.info("tx0           =" + tx0);
+                log.info("tx1           =" + tx1);
+                log.info("tx2           =" + tx2);
+                log.info("ct2           = " + ct2);
+                log.info("releaseTime   = " + releaseTime);
+                log.info("lastCommitTime= " + lastCommitTime);
+            }
+            
+            // Verify release time was updated.
             assertNotSame(0L, releaseTime);
 
+            // Verify the expected release time.
+            assertEquals(ct2 - 1, releaseTime);
+            
             /*
              * Note: The release time MUST NOT be advanced to the last commit
              * time!!!
@@ -1191,11 +1573,11 @@ public class TestTransactionService extends TestCase2 {
              */
             assertTrue(releaseTime < lastCommitTime);
             
-            // releaseTime GTE [tx0].
-            assertTrue(releaseTime >= Math.abs(tx0));
-
-            // releaseTime is LT [tx2].
-            assertTrue(releaseTime < Math.abs(tx2));
+//            // releaseTime GTE [tx0].
+//            assertTrue(releaseTime >= Math.abs(tx0));
+//
+//            // releaseTime is LT [tx2].
+//            assertTrue(releaseTime < Math.abs(tx2));
             
         } finally {
 

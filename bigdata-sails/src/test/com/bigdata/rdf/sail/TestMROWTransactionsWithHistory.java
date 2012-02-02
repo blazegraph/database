@@ -4,21 +4,21 @@ import java.util.Random;
 
 public class TestMROWTransactionsWithHistory extends TestMROWTransactions {
 
-	public TestMROWTransactionsWithHistory() {
-	}
+    public TestMROWTransactionsWithHistory() {
+    }
 
-	public TestMROWTransactionsWithHistory(String arg0) {
-		super(arg0);
-	}
+    public TestMROWTransactionsWithHistory(String arg0) {
+        super(arg0);
+    }
 
-//	public void test_multiple_csem_transaction_withHistory() throws Exception {
-//		domultiple_csem_transaction(1);
-//	}
-//	
-//	public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
-//		domultiple_csem_transaction_onethread(1);
-//	}
-	
+//  public void test_multiple_csem_transaction_withHistory() throws Exception {
+//      domultiple_csem_transaction(1);
+//  }
+//  
+//  public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
+//      domultiple_csem_transaction_onethread(1);
+//  }
+    
     public void test_multiple_csem_transaction_withHistory_stress() throws Exception {
 
         final Random r = new Random();
@@ -32,11 +32,11 @@ public class TestMROWTransactionsWithHistory extends TestMROWTransactions {
             log.warn("Trial: " + i + ", retentionMillis=" + retentionMillis
                     + ", nreaderThreads=" + nreaderThreads);
 
-            domultiple_csem_transaction2(1/* retentionMillis */,
-                    nreaderThreads, 20/* nwriters */, 400/* nreaders */);
+            domultiple_csem_transaction2(retentionMillis, nreaderThreads,
+                    100/* nwriters */, 400/* nreaders */);
 
         }
         
     }
-
+    
 }

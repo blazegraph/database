@@ -82,7 +82,6 @@ public abstract class DistributedTransactionService extends
      * Options understood by this service.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options extends AbstractTransactionService.Options {
 
@@ -370,7 +369,6 @@ public abstract class DistributedTransactionService extends
      * the approach is less rigorous.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class SnapshotTask implements Runnable {
       
@@ -455,7 +453,6 @@ public abstract class DistributedTransactionService extends
      *       a {@link ByteBuffer} or using {@link Adler32}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class SnapshotHelper {
 
@@ -523,8 +520,8 @@ public abstract class DistributedTransactionService extends
 
         }
         
-		static public long write(final CommitTimeIndex ndx,
-				final DataOutputStream os) throws IOException {
+        static public long write(final CommitTimeIndex ndx,
+                final DataOutputStream os) throws IOException {
 
             final long entryCount = ndx.getEntryCount();
             
@@ -813,7 +810,6 @@ public abstract class DistributedTransactionService extends
      * Task runs {@link ITxCommitProtocol#abort(long)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class AbortTask implements Callable<Void> {
         
@@ -1120,7 +1116,6 @@ public abstract class DistributedTransactionService extends
      * </p>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private class DistributedTxCommitTask implements Callable<Long> {
 
@@ -1436,7 +1431,6 @@ public abstract class DistributedTransactionService extends
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
-         * @version $Id$
          */
         private class TaskRunner implements Callable<Void> {
 
@@ -1644,7 +1638,6 @@ public abstract class DistributedTransactionService extends
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
-         * @version $Id$
          */
         protected class PrepareTask implements Callable<Void> {
 
@@ -1928,7 +1921,6 @@ public abstract class DistributedTransactionService extends
      * {@link IDataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class SetReleaseTimeTask implements Callable<Void> {
 
@@ -1980,7 +1972,6 @@ public abstract class DistributedTransactionService extends
      * resources it can release.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected class NotifyReleaseTimeTask implements Runnable {
 
@@ -2066,14 +2057,15 @@ public abstract class DistributedTransactionService extends
     /**
      * Adds counters for the {@link LockManager}.
      */
-    synchronized public CounterSet getCounters() {
+//    synchronized 
+    public CounterSet getCounters() {
 
-        if (countersRoot == null) {
+//        if (countersRoot == null) {
             
             /*
              * Setup basic counters.
              */
-            super.getCounters();
+        final CounterSet countersRoot = super.getCounters();
 
             /**
              * The lock manager imposing a partial ordering on the prepare phase
@@ -2121,9 +2113,15 @@ public abstract class DistributedTransactionService extends
             countersRoot.addCounter("commitTimesCount",
                     new Instrument<Long>() {
                         protected void sample() {
-                            synchronized (commitTimeIndex) {
-                                setValue(commitTimeIndex.getEntryCount());
-                            }
+                            /*
+                             * Note: This uses a method which does not require
+                             * synchronization.  (The entryCount is reported
+                             * without traversing the BTree.)
+                             */
+                            setValue(commitTimeIndex.getEntryCount());
+//                            synchronized (commitTimeIndex) {
+//                                setValue(commitTimeIndex.getEntryCount());
+//                            }
                         }
                     });
 
@@ -2133,7 +2131,7 @@ public abstract class DistributedTransactionService extends
                 }
             });
 
-        }
+//        }
 
         return countersRoot;
 
