@@ -95,7 +95,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         final Random r = new Random();
 
         final CAT commits = new CAT();
-        final CAT reads = new CAT();
+        final CAT nreadersDone = new CAT();
         final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
         // Set [true] iff there are no failures by the time we cancel the running tasks.
         final AtomicBoolean success = new AtomicBoolean(false);
@@ -184,11 +184,14 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                         try {
                             /*
                              * Note: This sleep makes it much easier to hit the
-                             * bug documented here:
+                             * bug documented here. However, the sleep can also
+                             * cause the test to really stretch out. So the
+                             * sleep is only used until the writers are done.
                              * 
                              * https://sourceforge.net/apps/trac/bigdata/ticket/467
                              */
-                            Thread.sleep(2000/* millis */);
+                            if (commits.get() < nwriters)
+                                Thread.sleep(2000/* millis */);
                             txLog.info("Reading with tx: " + txId);
                             final AbstractTripleStore readstore = (AbstractTripleStore) origStore
                                     .getIndexManager().getResourceLocator()
@@ -201,7 +204,6 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                                 try {
                                     while (stats.hasNext()) {
                                         stats.next();
-                                        reads.increment();
                                     }
                                 } finally {
                                     stats.close();
@@ -219,6 +221,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                         } finally {
                             txLog.info("Aborting tx: " + txId);
                             ((Journal) origStore.getIndexManager()).abort(txId);
+                            nreadersDone.increment();
                         }
                     } catch (Throwable ise) {
                         if (!InnerCause.isInnerCause(ise,
@@ -304,7 +307,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 }
                 if (log.isInfoEnabled())
                     log.info("Statements written: " + commits.get()
-                            + ", read: " + reads.get());
+                            + ", read: " + nreadersDone.get());
             } finally {
                 if (writers != null)
                     writers.shutdownNow();
