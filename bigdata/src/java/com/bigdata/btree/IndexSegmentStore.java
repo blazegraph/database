@@ -970,12 +970,12 @@ public class IndexSegmentStore extends AbstractRawStore {
              * [lock] since it could otherwise be concurrently returned to the
              * DirectBufferPool by _close().
              * 
-             * FIXME Because this takes the global [lock] it forces reads
-             * against the nodes buffer to be single threaded. That will
-             * probably cause [lock] to be contended. If so, then it should be
-             * replaced by a ReadWriteLock. The readLock would be used to read
-             * on the buffer. The writeLock would be used to allocate or release
-             * the buffer.
+             * Note: Because this takes the global [lock] it forces reads
+             * against the nodes buffer to be single threaded. That might cause
+             * [lock] to be contended, but I have not yet observed this. If the
+             * lock does become contended, then it should be replaced by a
+             * ReadWriteLock. The readLock would be used to read on the buffer.
+             * The writeLock would be used to allocate or release the buffer.
              */
 
             if (buf_nodes != null) {
