@@ -180,13 +180,13 @@ public class MessageTest {
         final int parallel = (Integer) fed
                 .getClient()
                 .getConfiguration()
-                .getEntry(COMPONENT, ConfigurationOptions.PARALLEL, Long.class,
+                .getEntry(COMPONENT, ConfigurationOptions.PARALLEL, Integer.class,
                         ConfigurationOptions.DEFAULT_PARALLEL);
         
         final int payload = (Integer) fed
                 .getClient()
                 .getConfiguration()
-                .getEntry(COMPONENT, ConfigurationOptions.PAYLOAD, Long.class,
+                .getEntry(COMPONENT, ConfigurationOptions.PAYLOAD, Integer.class,
                         ConfigurationOptions.DEFAULT_PAYLOAD);
 
         try {
