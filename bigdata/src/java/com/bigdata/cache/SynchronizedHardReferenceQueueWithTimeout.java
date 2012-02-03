@@ -220,7 +220,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 //				log.error("Evicting: " + x.ref + " : timeout="
 //						+ TimeUnit.NANOSECONDS.toMillis(timeout) + "ms, age="
 //						+ TimeUnit.NANOSECONDS.toMillis(age) + "ms, size="
-//						+ size());
+//						+ size + ", ncleared=" + ncleared);
                 
                 ncleared++;
 
