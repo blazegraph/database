@@ -31,6 +31,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.nio.channels.ClosedByInterruptException;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,6 +42,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -55,6 +57,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -353,7 +356,8 @@ public class MessageTest {
                 long elapsed;
 
                 while (running.get()
-                        && (elapsed = (System.currentTimeMillis() - begin)) < duration) {
+                        && (elapsed = (System.currentTimeMillis() - begin)) < duration
+                        && nsent.estimate_get() < messages) {
 
                     for (int i = 0; i < dataServices.length; i++) {
 
@@ -368,8 +372,23 @@ public class MessageTest {
                                     f.get();
                                     ndone.increment();
                                 } catch (RemoteException e) {
-                                    nerrors.increment();
-                                    log.error(e, e);
+                                    if (InnerCause.isInnerCause(e,
+                                            RejectedExecutionException.class)
+                                            || InnerCause.isInnerCause(e,
+                                                    InterruptedException.class)
+                                            || InnerCause
+                                                    .isInnerCause(
+                                                            e,
+                                                            ClosedByInterruptException.class)) {
+                                        if (running
+                                                .compareAndSet(
+                                                        false/* expect */, true/* update */)) {
+                                            log.warn("Interrupted - will halt.");
+                                        }
+                                    } else {
+                                        nerrors.increment();
+                                        log.error(e, e);
+                                    }
                                 } catch (InterruptedException e) {
                                     if (running
                                             .compareAndSet(false/* expect */,
@@ -377,8 +396,23 @@ public class MessageTest {
                                         log.warn("Interrupted - will halt.");
                                     }
                                 } catch (ExecutionException e) {
-                                    nerrors.increment();
-                                    log.error(e, e);
+                                    if (InnerCause.isInnerCause(e,
+                                            RejectedExecutionException.class)
+                                            || InnerCause.isInnerCause(e,
+                                                    InterruptedException.class)
+                                            || InnerCause
+                                                    .isInnerCause(
+                                                            e,
+                                                            ClosedByInterruptException.class)) {
+                                        if (running
+                                                .compareAndSet(
+                                                        false/* expect */, true/* update */)) {
+                                            log.warn("Interrupted - will halt.");
+                                        }
+                                    } else {
+                                        nerrors.increment();
+                                        log.error(e, e);
+                                    }
                                 }
                             }
                         });
