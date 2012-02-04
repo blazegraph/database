@@ -1729,7 +1729,8 @@ public class BigdataSail extends SailBase implements Sail {
          * added or removed, it is possible that a statement remains entailed in
          * the database regardless of its removal.
          */
-        synchronized public void addConnectionListener(SailConnectionListener listener) {
+        synchronized public void addConnectionListener(
+                final SailConnectionListener listener) {
 
             if( m_listeners == null ) {
                 
@@ -1755,7 +1756,8 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
-        synchronized public void removeConnectionListener(SailConnectionListener listener) {
+        synchronized public void removeConnectionListener(
+                final SailConnectionListener listener) {
 
             if( m_listeners == null ) {
                 
@@ -1844,11 +1846,6 @@ public class BigdataSail extends SailBase implements Sail {
         
         /*
          * Namespace map CRUD.
-         * 
-         * @todo thread-safety for modifications to the namespaces. Either the
-         * namespaces are local to a SailConnection, in which case the need to
-         * be moved into this class or into a helper class, or they are shared,
-         * in which case the methods need to be synchronized on the Sail.
          * 
          * @todo the namespace API suggests a bi-directional map from namespace
          * to prefix and from prefix to namespace for efficiency. only one
@@ -2796,48 +2793,50 @@ public class BigdataSail extends SailBase implements Sail {
          * to retract statements, then first flush the assertions buffer and
          * visa versa.
          */
-        protected synchronized void flushStatementBuffers(final boolean flushAssertBuffer,
+        protected void flushStatementBuffers(final boolean flushAssertBuffer,
                 final boolean flushRetractBuffer) {
 
             if (readOnly) return;
 
-            if (flushAssertBuffer && assertBuffer != null) {
+            synchronized (this) {
 
-                // flush statements
-                assertBuffer.flush();
-                
-                if(getTruthMaintenance()) {
+                if (flushAssertBuffer && assertBuffer != null) {
 
-                    // do TM, writing on the database.
-                    tm.assertAll(
-                            (TempTripleStore)assertBuffer.getStatementStore(), 
-                            changeLog);
+                    // flush statements
+                    assertBuffer.flush();
 
-                    // must be reallocated on demand.
-                    assertBuffer = null;
+                    if (getTruthMaintenance()) {
 
-                }
-                
-            }
+                        // do TM, writing on the database.
+                        tm.assertAll((TempTripleStore) assertBuffer
+                                .getStatementStore(), changeLog);
 
-            if (flushRetractBuffer && retractBuffer != null) {
+                        // must be reallocated on demand.
+                        assertBuffer = null;
 
-                // flush statements.
-                retractBuffer.flush();
-                
-                if(getTruthMaintenance()) {
-                
-                    // do TM, writing on the database.
-                    tm.retractAll((TempTripleStore)retractBuffer.getStatementStore(),
-                            changeLog);
-
-                    // must be re-allocated on demand.
-                    retractBuffer = null;
+                    }
 
                 }
-                
+
+                if (flushRetractBuffer && retractBuffer != null) {
+
+                    // flush statements.
+                    retractBuffer.flush();
+
+                    if (getTruthMaintenance()) {
+
+                        // do TM, writing on the database.
+                        tm.retractAll((TempTripleStore) retractBuffer
+                                .getStatementStore(), changeLog);
+
+                        // must be re-allocated on demand.
+                        retractBuffer = null;
+
+                    }
+
+                }
             }
-            
+
         }
         
         protected void assertOpenConn() throws SailException {
@@ -3220,7 +3219,9 @@ public class BigdataSail extends SailBase implements Sail {
 //            }
             
             try {
-                
+
+                flushStatementBuffers(true/* assertions */, true/* retractions */);
+
                 return ASTEvalHelper.evaluateTupleQuery(getTripleStore(),
                         astContainer, new QueryBindingSet(bindings));
             
