@@ -1065,6 +1065,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             } else {
                 // distinct stats objects, aggregated as each task finishes.
                 stats = op.newStats();
+//        		log.warn("bopId=" + bopId + ", stats=" + stats);
             }
             assert stats != null;
 
@@ -1612,8 +1613,26 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         }
 
         public void run() {
-            try {
-                clientProxy.haltOp(msg);
+			try {
+				if (q.isController()) {
+					/*
+					 * Local method call.
+					 * 
+					 * Note: This MUST NOT be done using RMI when the operator
+					 * is using shared state to provide live statistics update
+					 * for operators which evaluate on the query controller.
+					 * Using RMI here results in double-counting with each new
+					 * haltOp and can cause queries to terminate too soon
+					 * because they have false #of chunks and units out
+					 * reported.
+					 * 
+					 * @see https://sourceforge.net/apps/trac/bigdata/ticket/464
+					 */
+					q.haltOp(msg);
+				} else {
+					// RMI.
+					clientProxy.haltOp(msg);
+				}
             } catch (Throwable e) {
                 if (!InnerCause.isInnerCause(e, InterruptedException.class)) {
                     log.error("Could not notify query controller: " + e, e);
