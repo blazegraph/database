@@ -80,8 +80,29 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
     private final static Logger log = Logger
             .getLogger(FederationChunkHandler.class); 
     
-    public static final IChunkHandler INSTANCE = new FederationChunkHandler();
+    public static final IChunkHandler INSTANCE = new FederationChunkHandler(100/* nioThreshold */);
 
+    /**
+     * The threshold above which the intermediate solutions are shipped using
+     * NIO rather than RMI.
+     * 
+     * @see ThickChunkMessage
+     * @see NIOChunkMessage
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/462">
+     *      Invalid byte: 3 in ResourceService (StatusEnum) on cluster </a>
+     */
+    private final int nioThreshold;
+    
+    /**
+     * 
+     */
+    public FederationChunkHandler(final int nioThreshold) {
+        
+        this.nioThreshold = nioThreshold;
+        
+    }
+    
     /**
      * {@inheritDoc}
      * 
@@ -412,7 +433,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
          * serialize the chunk.
          */
         final IChunkMessage<IBindingSet> msg;
-        if (source.length < 100) {
+        if (source.length <= nioThreshold) {
 
             msg = new ThickChunkMessage<IBindingSet>(q.getQueryController(),
                     q.getQueryId(), sinkId, partitionId, source);
