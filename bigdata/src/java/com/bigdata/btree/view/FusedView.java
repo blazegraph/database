@@ -61,7 +61,6 @@ import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -868,6 +867,11 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
              * tuples lying outside of the index partition boundaries! However,
              * if there is only a BTree in the view then the partition metadata
              * might not be defined, so we check for that first.
+             * 
+             * TODO Review this assertion and optimize range count which span a
+             * shard view. See
+             * http://sourceforge.net/apps/trac/bigdata/ticket/470 (Optimize
+             * range counts on cluster)
              */
 
             final LocalPartitionMetadata pmd = getIndexMetadata()

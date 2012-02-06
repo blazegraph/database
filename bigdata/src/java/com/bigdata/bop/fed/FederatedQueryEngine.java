@@ -32,9 +32,7 @@ import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,7 +53,6 @@ import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
@@ -111,6 +108,9 @@ public class FederatedQueryEngine extends QueryEngine {
     /**
      * The service used to accept {@link IChunkMessage} for evaluation. This is
      * started by {@link #init()}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/472">
+     *      acceptTaskService pool size on cluster </a>
      */
     private final AtomicReference<ExecutorService> acceptTaskService = new AtomicReference<ExecutorService>();
     
@@ -282,29 +282,21 @@ public class FederatedQueryEngine extends QueryEngine {
      * Extended to also initialize a thread which will materialize
      * {@link IChunkMessage} for consumption by this node.
      * 
-     * @todo ANALYTIC_QUERY: {@link IChunkMessage} are dropped onto a queue and
-     *       materialized in order of arrival. This works fine for low latency
-     *       pipelined query evaluation.
-     *       <p>
-     *       For analytic query, we (a) manage the #of high volume operators
-     *       which run concurrently, presumably based on their demands on
-     *       memory; and (b) model the chunks available before they are
-     *       materialized locally such that (c) they can be materialized on
-     *       demand (flow control); and (d) we can run the operator when there
-     *       are sufficient chunks available without taking on too much data.
-     *       <p>
-     *       This requires a separate queue for executing high volume operators
-     *       and also separate consideration of when chunks available on remote
-     *       nodes should be materialized.
+     * TODO The {@link #acceptTaskService} is not used right now since we are
+     * always running the {@link MaterializeMessageTask} in the caller's thread.
+     * If it becomes used, then we should reconsider the pool size.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/472">
+     *      acceptTaskService pool size on cluster</a>
      */
     @Override
     public void init() {
 
         super.init();
 
-        acceptTaskService.set(Executors
-                .newCachedThreadPool(new DaemonThreadFactory(
-                        FederatedQueryEngine.class + ".acceptService")));
+//        acceptTaskService.set(Executors.newFixedThreadPool(20/* nthreads */,
+//                new DaemonThreadFactory(FederatedQueryEngine.class
+//                        + ".acceptService")));
 
     }
 
@@ -393,6 +385,12 @@ public class FederatedQueryEngine extends QueryEngine {
                 if (log.isDebugEnabled())
                     log.debug("accepted: " + msg);
                 
+                /*
+                 * FIXME This can block since the queue for each
+                 * (operator,shard) bundle has a bounded capacity. If it blocks
+                 * then the acceptQueue can stagnate as no new IChunkMessages
+                 * can be materialized.
+                 */
                 FederatedQueryEngine.this.acceptChunk(msg);
                 
             } catch (Throwable t) {
@@ -531,7 +529,13 @@ public class FederatedQueryEngine extends QueryEngine {
          * on a node for a query. Since we do not broadcast the query to all
          * nodes, the node has to resolve the query from the query controller.
          * 
-         * @throws RemoteException
+         * FIXME This should use a memoizer pattern. We are probably resolving
+         * the query multiple times when the first operation on a node is
+         * scattered over more than one shard on that node.
+         * <p>
+         * Note: The operations performed here MUST NOT encounter any bounded
+         * resource, such as the acceptTaskService. If they did, then this
+         * request could deadlock.
          */
         private FederatedRunningQuery getDeclaredQuery(final UUID queryId)
                 throws RemoteException {
@@ -576,7 +580,24 @@ public class FederatedQueryEngine extends QueryEngine {
         putIfAbsent(queryId, q);
 
     }
-    
+
+    /**
+     * {@inheritDoc}
+     * 
+     * TODO The timing and responsibility for materializing chunks needs to be
+     * examined further when the data are being moved around using NIO rather
+     * than {@link ThickChunkMessage}. At stake is when the intermediate
+     * solutions are materialized on the node where they will be consumed. We
+     * can either do this synchronous or asynchronously when bufferReady() is
+     * caller or we can defer the transfer until the target operator on this
+     * node is ready to run.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/472">
+     *      acceptTaskService pool size on cluster </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/131">
+     *      unselective joins on cluster</a>
+     */
     @Override
     public void bufferReady(final IChunkMessage<IBindingSet> msg) {
 
@@ -589,15 +610,25 @@ public class FederatedQueryEngine extends QueryEngine {
         assertRunning();
         
         /*
-         * Schedule task to materialized or otherwise handle the message.
+         * Schedule task to materialize or otherwise handle the message.
+         * 
+         * Note: We do not explicitly monitor the Future of this task. However,
+         * The MaterializeMessageTask takes responsibility for any failures in
+         * its own operation and will cause the query to be cancelled if
+         * anything goes wrong.
          */
 
-        final Executor s = acceptTaskService.get();
+//        final Executor s = acceptTaskService.get();
+//        
+//        if (s == null)
+//            throw new RuntimeException("Not running");
+//        
+//        s.execute(new MaterializeMessageTask(msg));
         
-        if (s == null)
-            throw new RuntimeException("Not running");
-        
-        s.execute(new MaterializeMessageTask(msg));
+        /*
+         * Run in the caller's thread.
+         */
+        new MaterializeMessageTask(msg).run();
         
     }
 
