@@ -1084,6 +1084,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			ResourceManager.openJournal(getFile() == null ? null : getFile().toString(), size(), getBufferStrategy()
 					.getBufferMode());
 			
+            if (txLog.isInfoEnabled())
+                txLog.info("OPEN-JOURNAL: uuid=" + getUUID() + ", file="
+                        + getFile() + ", bufferMode="
+                        + getBufferStrategy().getBufferMode());
+            
 		} finally {
 
 			lock.unlock();
@@ -1344,8 +1349,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		assertOpen();
 
-		if (log.isInfoEnabled())
-			log.info("file=" + getFile());
+//		if (log.isInfoEnabled())
+//			log.info("file=" + getFile());
 
 		_bufferStrategy.close();
 
@@ -1355,6 +1360,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		// report event.
 		ResourceManager.closeJournal(getFile() == null ? null : getFile().toString());
+
+        if (txLog.isInfoEnabled())
+            txLog.info("CLOSE-JOURNAL: uuid=" + getUUID() + ", file="
+                    + getFile());
 
 		if (LRUNexus.INSTANCE != null) {
 
