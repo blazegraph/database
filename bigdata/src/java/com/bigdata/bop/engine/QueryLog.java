@@ -503,6 +503,7 @@ public class QueryLog {
 //            if (stats.opCount.get() == 0)
 //                sb.append("NotStarted");
 //            else
+                // Note: This requires a lock!
                 sb.append(((AbstractRunningQuery) q).getRunState(bopId));
         } else {
             sb.append(NA);
@@ -1043,7 +1044,8 @@ public class QueryLog {
 //            if (stats.opCount.get() == 0)
 //                w.write(cdata("NotStarted"));
 //            else
-                w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
+            // Note: This requires a lock!
+            w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
         } else {
             w.write(cdata(NA));
         }
