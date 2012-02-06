@@ -1623,7 +1623,21 @@ public class DumpFederation {
             
         }
         
-        // execute all requests in parallel.
+        /*
+         * Execute all requests in parallel.
+         * 
+         * TODO This needs to run with limited parallelism. E.g., using the
+         * LatchedExecutor. If we run with unlimited parallelism, there is a
+         * demand of one Thread per shard. That can turn into too many threads
+         * if there are a 1000 or more shards.
+         * 
+         * TODO This operation could be vectored such that we issue a single
+         * request to each data service. Another way to do this is to just send
+         * the request to ALL data services. Each service would send the data
+         * for each shard that it had matching that index name / UUID and
+         * timestamp. This would be one RMI per data service node (for quorums
+         * it has to be sent to just one member of the quorum).
+         */
         final List<Future<IndexPartitionRecord>> futures = fed.getExecutorService().invokeAll(tasks);
         
         final List<IndexPartitionRecord> results = new LinkedList<IndexPartitionRecord>();

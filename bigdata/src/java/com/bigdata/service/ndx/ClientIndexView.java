@@ -190,9 +190,9 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     static protected final transient String ERR_ABORT_TX = "Could not abort transaction: tx=";
     
-    private final AbstractScaleOutFederation fed;
+    private final AbstractScaleOutFederation<?> fed;
 
-    public AbstractScaleOutFederation getFederation() {
+    public AbstractScaleOutFederation<?> getFederation() {
         
         return fed;
         
@@ -368,7 +368,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      *            object contains the template {@link IndexMetadata} for the
      *            scale-out index partitions.
      */
-    public ClientIndexView(final AbstractScaleOutFederation fed,
+    public ClientIndexView(final AbstractScaleOutFederation<?> fed,
             final String name, final long timestamp,
             final IMetadataIndex metadataIndex) {
 
@@ -595,6 +595,9 @@ public class ClientIndexView implements IScaleOutClientIndex {
     /**
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/470">
+     *      Optimize range counts on cluster </a>
      */
     public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
