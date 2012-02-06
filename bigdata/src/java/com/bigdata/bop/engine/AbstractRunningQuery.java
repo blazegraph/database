@@ -638,7 +638,9 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         final int bopId = bop.getId();
 
-        statsMap.put(bopId, bop.newStats());
+		final BOpStats stats = bop.newStats();
+		statsMap.put(bopId, stats);
+//		log.warn("bopId=" + bopId + ", stats=" + stats);
 
         if (!op.getProperty(BOp.Annotations.CONTROLLER,
                 BOp.Annotations.DEFAULT_CONTROLLER)) {
@@ -781,10 +783,16 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
             // update per-operator statistics.
             final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
 
-            // combine stats, but do not combine a stats object with itself.
+			/*
+			 * Combine stats, but do not combine a stats object with itself.
+			 * 
+			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/464 (Query
+			 * Statistics do not update correctly on cluster)
+			 */
             if (tmp != null && tmp != msg.taskStats) {
                 tmp.add(msg.taskStats);
             }
+//			log.warn(msg.toString() + " : stats=" + tmp);
 
             switch (runState.haltOp(msg)) {
             case Running:

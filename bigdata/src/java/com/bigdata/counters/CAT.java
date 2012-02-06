@@ -134,4 +134,14 @@ public class CAT /*extends ConcurrentAutoTable*/ implements Externalizable {
         
     }
 
+    /**
+     * Return the current value of the counter.
+     */
+    @Override
+    public String toString() {
+    	
+    	return Long.toString(cat.get());
+    	
+    }
+    
 }
