@@ -217,11 +217,12 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
                 // evict the tail.
                 evict();
 
-//				log.error("Evicting: " + x.ref + " : timeout="
-//						+ TimeUnit.NANOSECONDS.toMillis(timeout) + "ms, age="
-//						+ TimeUnit.NANOSECONDS.toMillis(age) + "ms, size="
-//						+ size + ", ncleared=" + ncleared);
-                
+                if (log.isTraceEnabled())
+                    log.trace("Evicting: " + x.ref + " : timeout="
+                            + TimeUnit.NANOSECONDS.toMillis(timeout)
+                            + "ms, age=" + TimeUnit.NANOSECONDS.toMillis(age)
+                            + "ms, size=" + size + ", ncleared=" + ncleared);
+
                 ncleared++;
 
             }
