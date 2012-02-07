@@ -127,6 +127,8 @@ public class TestAll_BTreeBasics extends TestCase {
         suite.addTestSuite(TestReopen.class);
         // test of storing null values under a key with persistence.
         suite.addTestSuite(TestNullValues.class);
+        // test recycling of checkpoint, root block, etc.
+        suite.addTestSuite(TestBTreeRecycle.class);
 
         /*
          * test of transient BTree's (no backing store).
