@@ -973,20 +973,25 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
             }
             
         }
-        
-        // TODO: Ensure indexMetadata is recycled
-        
+
         if (metadata.getMetadataAddr() == 0L) {
             
             /*
              * The index metadata has been modified so we write out a new
              * metadata record on the store.
              */
+
+            if (checkpoint != null) {
+             
+                // Recycle the old IndexMetadata record (if any).
+                recycle(checkpoint.getMetadataAddr());
+
+            }
             
             metadata.write(store);
             
         }
-  
+    
         /*
          * Recycle the old checkpoint record.
          * 
