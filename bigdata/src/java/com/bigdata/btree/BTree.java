@@ -963,18 +963,9 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
                 /*
                  * The bloom filter is enabled, is loaded and is dirty, so write
                  * it on the store now.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
                  */
-            	
-//                /*
-//                 * TODO The code to recycle the old checkpoint addr, the old
-//                 * root addr, and the old bloom filter has been disabled in
-//                 * writeCheckpoint2 and AbstractBTree#insert pending the
-//                 * resolution of ticket #440. This is being done to minimize
-//                 * the likelyhood that the underlying bug for that ticket
-//                 * can be tripped by the code.
-//                 * 
-//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
-//                 */
             	recycle(filter.getAddr());
             	
                 filter.write(store);
@@ -997,20 +988,23 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
         }
   
         /*
-         * TODO The code to recycle the old checkpoint addr, the old
-         * root addr, and the old bloom filter has been disabled in
-         * writeCheckpoint2 and AbstractBTree#insert pending the
-         * resolution of ticket #440. This is being done to minimize
-         * the likelyhood that the underlying bug for that ticket
-         * can be tripped by the code.
+         * Recycle the old checkpoint record.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
          */
-        // delete old checkpoint data       
         recycle(checkpoint != null ? checkpoint.addrCheckpoint : IRawStore.NULL);
          
-        // delete old root data if changed
-        recycle(checkpoint != null ? checkpoint.getRootAddr() : IRawStore.NULL);
+        /*
+         * Delete old root data iff changed.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/473
+         * (PhysicalAddressResolutionException after reopen using RWStore and
+         * recycler)
+         */
+        if (checkpoint != null && getRoot() != null
+                && checkpoint.getRootAddr() != getRoot().identity) {
+            recycle(checkpoint != null ? checkpoint.getRootAddr() : IRawStore.NULL);
+        }
         
         // create new checkpoint record.
         checkpoint = metadata.newCheckpoint(this);
