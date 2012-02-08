@@ -622,9 +622,6 @@ abstract public class DataService extends AbstractService
 
             /*
              * Service specific counters.
-             * 
-             * FIXME These may no longer be properly attached! See 
-             * IFederationDelegate#reattachDynamicCounters().
              */
 
             final CounterSet serviceRoot = dataService.getFederation()
@@ -638,6 +635,19 @@ abstract public class DataService extends AbstractService
 
             serviceRoot.makePath(IDataServiceCounters.transactionManager)
                     .attach(dataService.localTransactionManager.getCounters());
+
+            {
+
+                final QueryEngine queryEngine = dataService.queryEngine.get();
+
+                if (queryEngine != null) {
+                
+                    serviceRoot.makePath(IDataServiceCounters.queryEngine)
+                            .attach(queryEngine.getCounters());
+                    
+                }
+                
+            }
 
             // block API.
             {
@@ -803,6 +813,11 @@ abstract public class DataService extends AbstractService
          * The namespace for the counters pertaining to the {@link ResourceManager}.
          */
         String resourceManager = "Resource Manager";
+
+        /**
+         * The namespace for the counters pertaining to the {@link QueryEngine}.
+         */
+        String queryEngine = "Query Engine";
         
     }
         

@@ -94,8 +94,6 @@ public interface IFederationDelegate<T> {
 	 * However, there are still some counters which need to be dynamically
 	 * reattached. For example, any counter set which is dynamic in its
 	 * structure, such as the DirectBufferPool.
-     * 
-     * FIXME TransactionServer counters might not be properly attached.
 	 */
     public void reattachDynamicCounters();
 
