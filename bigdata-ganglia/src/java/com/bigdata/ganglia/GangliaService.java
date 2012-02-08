@@ -192,7 +192,7 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	/**
 	 * The interval at which we monitor the metrics which are collected on this
 	 * node. When we examine a metric, its current value is copied into
-	 * {@link #counters}. A metric update will be sent at that time if the
+	 * {@link #gangliaState}. A metric update will be sent at that time if the
 	 * metric has never been published (timestamp is zero) or if TMax might
 	 * expire before we sample the metric again.
 	 * 
