@@ -346,8 +346,6 @@ public class ASTEvalHelper {
      *            The query plan.
      * @param bs
      *            The source binding set.
-     * @param queryEngine
-     *            The query engine on which the query will run.
      * @param materializeProjectionInQuery
      *            When <code>true</code>, the projection was materialized within
      *            query plan. When <code>false</code>, this method will take
