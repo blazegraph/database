@@ -61,6 +61,7 @@ import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
@@ -201,8 +202,8 @@ import com.bigdata.util.concurrent.IHaltable;
  *       {@link BOp} aware reuse of result sets available in the cache. This
  *       sort of thing will have to be coordinated among the cache nodes.
  */
-public class QueryEngine implements IQueryPeer, IQueryClient {
-    
+public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess {
+
     private final static transient Logger log = Logger
             .getLogger(QueryEngine.class);
 
@@ -256,7 +257,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * 
      * @author thompsonbry
      */
-    protected static class Counters {
+    protected static class Counters implements ICounterSetAccess {
 
         /**
          * The #of queries which have been executed (set on completion).
@@ -280,6 +281,26 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * where there is more than one query running concurrently.
          */
         final CAT elapsedMillis = new CAT();
+
+        /*
+         * Lower level counters dealing with the work queues and executing chunk
+         * tasks.
+         */
+        
+//        /**
+//         * The #of non-empty work queues.
+//         */
+//        final CAT workQueueCount = new CAT();
+        
+        /**
+         * The #of work queues which are currently blocked.
+         */
+        final CAT blockedWorkQueueCount = new CAT();
+        
+        /**
+         * The #of active operator evaluation tasks (chunk tasks).
+         */
+        final CAT operatorTaskCount = new CAT();
 
         public CounterSet getCounters() {
 
@@ -314,6 +335,27 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                     // compute throughput, normalized to q/s := (q*1000)/ms.
                     final double d = ms == 0 ? 0d : ((1000d * n) / ms);
                     setValue(d);
+                }
+            });
+
+//            // #of non-empty work queues.
+//            root.addCounter("workQueueCount", new Instrument<Long>() {
+//                public void sample() {
+//                    setValue(workQueueCount.get());
+//                }
+//            });
+
+            // #of blocked work queues.
+            root.addCounter("blockedWorkQueueCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(blockedWorkQueueCount.get());
+                }
+            });
+
+            // #of concurrently executing operator tasks.
+            root.addCounter("operatorTaskCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(operatorTaskCount.get());
                 }
             });
 
