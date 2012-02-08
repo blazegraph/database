@@ -70,11 +70,11 @@ public class HostMetricsCollector implements IGangliaMetricsCollector {
 				+ ICounterSet.pathSeparator;
 
 		// Start at the "host" level.
-		final CounterSet serviceCounters = (CounterSet) statisticsCollector
+		final CounterSet counters = (CounterSet) statisticsCollector
 				.getCounters().getPath(basePrefix);
 
 		@SuppressWarnings("rawtypes")
-        final Iterator<ICounter> itr = serviceCounters.getCounters(filter);
+        final Iterator<ICounter> itr = counters.getCounters(filter);
 
 		while (itr.hasNext()) {
 
