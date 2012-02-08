@@ -61,7 +61,9 @@ public class StandaloneChunkHandler implements IChunkHandler {
                 new ThickAsynchronousIterator<IBindingSet[]>(
                         new IBindingSet[][] { chunk }));
 
-        query.getQueryEngine().acceptChunk(msg);
+        final QueryEngine queryEngine = query.getQueryEngine();
+
+        queryEngine.acceptChunk(msg);
 
         return 1;
 

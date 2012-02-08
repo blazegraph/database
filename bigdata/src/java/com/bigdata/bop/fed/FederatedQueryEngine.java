@@ -45,6 +45,7 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.QueryEngineCounters;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -386,12 +387,15 @@ public class FederatedQueryEngine extends QueryEngine {
                     log.debug("accepted: " + msg);
                 
                 /*
-                 * FIXME This can block since the queue for each
-                 * (operator,shard) bundle has a bounded capacity. If it blocks
-                 * then the acceptQueue can stagnate as no new IChunkMessages
-                 * can be materialized.
+                 * Note: This can block if queue for each (operator,shard)
+                 * bundle has a bounded capacity. If it blocks then the
+                 * acceptQueue can stagnate as no new IChunkMessages can be
+                 * materialized.
                  */
+
                 FederatedQueryEngine.this.acceptChunk(msg);
+
+                getQueryEngineCounters().chunksIn.increment();
                 
             } catch (Throwable t) {
 
@@ -753,5 +757,27 @@ public class FederatedQueryEngine extends QueryEngine {
      * Cache for {@link #getQueryPeer(UUID)}.
      */
     private final ConcurrentHashMap<UUID, IQueryPeer> proxyMap = new ConcurrentHashMap<UUID, IQueryPeer>();
-    
+
+    /**
+     * Extension hook for new {@link QueryEngineCounters} instances.
+     */
+    @Override
+    protected FederatedQueryEngineCounters newCounters() {
+        
+        return new FederatedQueryEngineCounters();
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to strengthen the return type.
+     */
+    @Override
+    protected FederatedQueryEngineCounters getQueryEngineCounters() {
+
+        return (FederatedQueryEngineCounters) counters;
+        
+    }
+
 }
