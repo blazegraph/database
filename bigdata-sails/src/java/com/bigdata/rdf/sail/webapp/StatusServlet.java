@@ -28,6 +28,8 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounter;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -131,20 +133,23 @@ public class StatusServlet extends BigdataRDFServlet {
                     q = queryEngine.getRunningQuery(queryId);
                 } catch (RuntimeException ex) {
                     // ignore. (typically the query has already terminated).
-                    log.info("No such query: " + queryId);
+                    if (log.isInfoEnabled())
+                        log.info("No such query: " + queryId);
                     continue;
                 }
 
                 if( q == null ) {
 
-                    log.info("No such query: " + queryId);
+                    if (log.isInfoEnabled())
+                        log.info("No such query: " + queryId);
 
                 }
                 
                 if (q.cancel(true/* mayInterruptIfRunning */)) {
 
                     // TODO Could paint the page with this information.
-                    log.info("Cancelled query: " + queryId);
+                    if (log.isInfoEnabled())
+                        log.info("Cancelled query: " + queryId);
 
                 }
 
@@ -159,13 +164,6 @@ public class StatusServlet extends BigdataRDFServlet {
         
         return;
             
-        /*
-         * FIXME POST should support "?cancel=&queryId=..."
-         * 
-         * It can also do the general status page stuff if it is not a CANCEL
-         * request.
-         */
-        
     }
     
     /**
@@ -251,6 +249,34 @@ public class StatusServlet extends BigdataRDFServlet {
             current.node("p", "Running query count="
                     + getBigdataRDFContext().getQueries().size());
 
+            /*
+             * Performance counters for the QueryEngine.
+             */
+            {
+
+                final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+                        .getQueryController(getIndexManager());
+
+                final CounterSet counterSet = queryEngine.getCounters();
+                
+                @SuppressWarnings("rawtypes")
+                final Iterator<ICounter> itr = counterSet
+                        .getCounters(null/* filter */);
+                
+                while(itr.hasNext()) {
+
+                    final ICounter<?> c = itr.next();
+
+                    final Object value = c.getInstrument().getValue();
+
+                    // The full path to the metric name.
+                    final String path = c.getPath();
+                 
+                    current.node("p", path + "=" + value);
+
+                }
+
+            }
             // Offer a link to the "showQueries" page.
             {
 
