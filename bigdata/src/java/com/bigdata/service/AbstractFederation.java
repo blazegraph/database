@@ -70,7 +70,7 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.ganglia.BigdataGangliaService;
 import com.bigdata.counters.ganglia.BigdataMetadataFactory;
 import com.bigdata.counters.ganglia.HostMetricsCollector;
-import com.bigdata.counters.ganglia.ServiceMetricsCollector;
+import com.bigdata.counters.ganglia.QueryEngineMetricsCollector;
 import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.ganglia.DefaultMetadataFactory;
 import com.bigdata.ganglia.GangliaMetadataFactory;
@@ -1580,6 +1580,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 gangliaService.addMetricCollector(new HostMetricsCollector(
                         statisticsCollector));
 
+                // Collect and report QueryEngine metrics.
+                gangliaService
+                        .addMetricCollector(new QueryEngineMetricsCollector(
+                                statisticsCollector));
+
                 /*
                  * TODO The problem with reporting per-service statistics is
                  * that ganglia lacks a facility to readily aggregate statistics
@@ -1588,8 +1593,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  * metric for the same value (e.g., Mark and Sweep GC). However,
                  * that causes a very large number of distinct metrics. I have
                  * commented this out for now while I think it through some
-                 * more.  Maybe we will wind up only reporting the per-host
+                 * more. Maybe we will wind up only reporting the per-host
                  * counters to ganglia?
+                 * 
+                 * Maybe the right way to handle this is to just filter by the
+                 * service type? Basically, that is what we are doing for the
+                 * QueryEngine metrics.
                  */
                 // Collect and report service metrics.
 //                gangliaService.addMetricCollector(new ServiceMetricsCollector(

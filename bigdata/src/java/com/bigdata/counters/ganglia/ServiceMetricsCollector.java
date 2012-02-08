@@ -64,11 +64,11 @@ public class ServiceMetricsCollector implements IGangliaMetricsCollector {
 		final String pathPrefix = basePrefix
 				+ statisticsCollector.getProcessName();
 
-		final CounterSet serviceCounters = (CounterSet) statisticsCollector
+		final CounterSet counters = (CounterSet) statisticsCollector
 				.getCounters().getPath(pathPrefix);
 
 		@SuppressWarnings("rawtypes")
-		final Iterator<ICounter> itr = serviceCounters.getCounters(filter);
+		final Iterator<ICounter> itr = counters.getCounters(filter);
 
 		while (itr.hasNext()) {
 
