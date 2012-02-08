@@ -296,6 +296,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         final CAT blockedWorkQueueCount = new CAT();
         
         /**
+         * The #of times that a work queue has blocked.
+         */
+        final CAT blockedWorkQueueRunningTotal = new CAT();
+        
+        /**
          * The #of active operator evaluation tasks (chunk tasks).
          */
         final CAT operatorActiveCount = new CAT();
@@ -357,6 +362,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             root.addCounter("blockedWorkQueueCount", new Instrument<Long>() {
                 public void sample() {
                     setValue(blockedWorkQueueCount.get());
+                }
+            });
+
+            // #of times that a work queue has blocked.
+            root.addCounter("blockedWorkQueueRunningTotal", new Instrument<Long>() {
+                public void sample() {
+                    setValue(blockedWorkQueueRunningTotal.get());
                 }
             });
 

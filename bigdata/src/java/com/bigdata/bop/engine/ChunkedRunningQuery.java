@@ -273,6 +273,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if (!queue.offer(msg)) {
                 // Offer failed.  Work queue will block.
                 getQueryEngine().counters.blockedWorkQueueCount.increment();
+                getQueryEngine().counters.blockedWorkQueueRunningTotal.increment();
                 try {
                     // blocking put()
                     queue.put(msg);
