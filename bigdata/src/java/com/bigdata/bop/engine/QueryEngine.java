@@ -30,7 +30,6 @@ package com.bigdata.bop.engine;
 import java.lang.reflect.Constructor;
 import java.rmi.RemoteException;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -65,7 +64,6 @@ import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
@@ -375,30 +373,30 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
         // global counters.
         root.attach(counters.getCounters());
-        
-        // counters per tagged query group.
-        {
 
-            final CounterSet groups = root.makePath("groups");
-
-            final Iterator<Map.Entry<String, Counters>> itr = groupCounters
-                    .entrySet().iterator();
-
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, Counters> e = itr.next();
-
-                final String tag = e.getKey();
-
-                final Counters counters = e.getValue();
-
-                // Note: path component may not be empty!
-                groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
-                        .attach(counters.getCounters());
-
-            }
-
-        }
+//        // counters per tagged query group.
+//        {
+//
+//            final CounterSet groups = root.makePath("groups");
+//
+//            final Iterator<Map.Entry<String, Counters>> itr = groupCounters
+//                    .entrySet().iterator();
+//
+//            while (itr.hasNext()) {
+//
+//                final Map.Entry<String, Counters> e = itr.next();
+//
+//                final String tag = e.getKey();
+//
+//                final Counters counters = e.getValue();
+//
+//                // Note: path component may not be empty!
+//                groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
+//                        .attach(counters.getCounters());
+//
+//            }
+//
+//        }
 
         return root;
 
@@ -409,51 +407,51 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     final protected Counters counters = newCounters();
 
-    /**
-     * Statistics for queries which are "tagged" so we can recognize their
-     * instances as members of some group.
-     */
-    final protected ConcurrentHashMap<String/* groupId */, Counters> groupCounters = new ConcurrentHashMap<String, Counters>();
+//    /**
+//     * Statistics for queries which are "tagged" so we can recognize their
+//     * instances as members of some group.
+//     */
+//    final protected ConcurrentHashMap<String/* groupId */, Counters> groupCounters = new ConcurrentHashMap<String, Counters>();
 
-    /**
-     * Factory for {@link Counters} instances associated with a query group. A
-     * query is marked as a member of a group using {@link QueryHints#TAG}. This
-     * is typically used to mark queries which are instances of the same query
-     * template.
-     * 
-     * @param tag
-     *            The tag identifying a query group.
-     * 
-     * @return The {@link Counters} for that query group.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     */
-    protected Counters getCounters(final String tag) {
-
-        if(tag == null)
-            throw new IllegalArgumentException();
-        
-        Counters c = groupCounters.get(tag);
-
-        if (c == null) {
-
-            c = new Counters();
-
-            final Counters tmp = groupCounters.putIfAbsent(tag, c);
-
-            if (tmp != null) {
-
-                // someone else won the data race.
-                c = tmp;
-
-            }
-
-        }
-
-        return c;
-
-    }
+//    /**
+//     * Factory for {@link Counters} instances associated with a query group. A
+//     * query is marked as a member of a group using {@link QueryHints#TAG}. This
+//     * is typically used to mark queries which are instances of the same query
+//     * template.
+//     * 
+//     * @param tag
+//     *            The tag identifying a query group.
+//     * 
+//     * @return The {@link Counters} for that query group.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the argument is <code>null</code>.
+//     */
+//    protected Counters getCounters(final String tag) {
+//
+//        if(tag == null)
+//            throw new IllegalArgumentException();
+//        
+//        Counters c = groupCounters.get(tag);
+//
+//        if (c == null) {
+//
+//            c = new Counters();
+//
+//            final Counters tmp = groupCounters.putIfAbsent(tag, c);
+//
+//            if (tmp != null) {
+//
+//                // someone else won the data race.
+//                c = tmp;
+//
+//            }
+//
+//        }
+//
+//        return c;
+//
+//    }
 
     /**
      * Extension hook for new {@link Counters} instances.
@@ -1318,16 +1316,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
         }
 
-        final String tag = query.getProperty(QueryHints.TAG,
-                QueryHints.DEFAULT_TAG);
-
-        final Counters c = tag == null ? null : getCounters(tag);
+//        final String tag = query.getProperty(QueryHints.TAG,
+//                QueryHints.DEFAULT_TAG);
+//
+//        final Counters c = tag == null ? null : getCounters(tag);
 
         // track #of started queries.
         counters.startCount.increment();
 
-        if (c != null)
-            c.startCount.increment();
+//        if (c != null)
+//            c.startCount.increment();
 
         // notify query start
         runningQuery.startQuery(msg);

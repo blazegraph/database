@@ -44,9 +44,6 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.btree.proc.RangeCountProcedure;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
 import com.bigdata.service.proxy.ThickFuture;
@@ -122,15 +119,20 @@ public class DataServer extends AbstractServer {
         
     }
     
-    protected DataService newService(Properties properties) {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to setup a delegate that let's us customize some of the
+     * federation behaviors on the behalf of the data service.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    protected DataService newService(final Properties properties) {
 
         final DataService service = new AdministrableDataService(this,
                 properties);
         
         /*
-         * Setup a delegate that let's us customize some of the federation
-         * behaviors on the behalf of the data service.
-         * 
          * Note: We can't do this with the local or embedded federations since
          * they have only one client per federation and an attempt to set the
          * delegate more than once will cause an exception to be thrown!

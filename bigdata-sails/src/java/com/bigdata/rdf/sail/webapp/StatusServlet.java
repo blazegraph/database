@@ -29,7 +29,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -243,40 +242,12 @@ public class StatusServlet extends BigdataRDFServlet {
             // open the body
             current = current.node("body");
 
-            current.node("p", "Accepted query count="
+            current.node("br", "Accepted query count="
                     + getBigdataRDFContext().getQueryIdFactory().get());
 
-            current.node("p", "Running query count="
+            current.node("br", "Running query count="
                     + getBigdataRDFContext().getQueries().size());
 
-            /*
-             * Performance counters for the QueryEngine.
-             */
-            {
-
-                final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
-                        .getQueryController(getIndexManager());
-
-                final CounterSet counterSet = queryEngine.getCounters();
-                
-                @SuppressWarnings("rawtypes")
-                final Iterator<ICounter> itr = counterSet
-                        .getCounters(null/* filter */);
-                
-                while(itr.hasNext()) {
-
-                    final ICounter<?> c = itr.next();
-
-                    final Object value = c.getInstrument().getValue();
-
-                    // The full path to the metric name.
-                    final String path = c.getPath();
-                 
-                    current.node("p", path + "=" + value);
-
-                }
-
-            }
             // Offer a link to the "showQueries" page.
             {
 
@@ -322,14 +293,56 @@ public class StatusServlet extends BigdataRDFServlet {
 
             }
 
-            if (getBigdataRDFContext().getSampleTask() != null) {
+            /*
+             * Performance counters for the QueryEngine.
+             */
+            {
 
-                // Performance counters for the NSS queries.
-                current.node("pre", getBigdataRDFContext().getSampleTask()
-                        .getCounters().toString());
+                final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+                        .getQueryController(getIndexManager());
 
+                final CounterSet counterSet = queryEngine.getCounters();
+                
+                if (getBigdataRDFContext().getSampleTask() != null) {
+
+                    /*
+                     * Performance counters for the NSS queries.
+                     * 
+                     * Note: This is NSS specific, rather than per-QueryEngine.
+                     * For example, DataServices on a federation embed a
+                     * QueryEngine instance, but it does not expose a SPARQL end
+                     * point and will not have a queryService against which
+                     * SPARQL queries can be submitted. The purpose of the
+                     * per-DS QueryEngine instances is support distributed query
+                     * evaluation.
+                     */
+                    counterSet.makePath("queryService").attach(
+                            getBigdataRDFContext().getSampleTask()
+                                    .getCounters());
+
+                }
+
+//                @SuppressWarnings("rawtypes")
+//                final Iterator<ICounter> itr = counterSet
+//                        .getCounters(null/* filter */);
+//                
+//                while(itr.hasNext()) {
+//
+//                    final ICounter<?> c = itr.next();
+//
+//                    final Object value = c.getInstrument().getValue();
+//
+//                    // The full path to the metric name.
+//                    final String path = c.getPath();
+//                 
+//                    current.node("br", path + "=" + value);
+//
+//                }
+
+                current.node("pre", counterSet.toString());
+                
             }
-
+            
             if (!showQueries) {
                 // Nothing more to do.
                 return;
@@ -681,8 +694,8 @@ public class StatusServlet extends BigdataRDFServlet {
              * execution time (longest running queries are first).
              */
             public int compare(final Long o1, final Long o2) {
-                if(o1.longValue()<o2.longValue()) return 1;
-                if(o1.longValue()>o2.longValue()) return -1;
+                if (o1.longValue() < o2.longValue()) return 1;
+                if (o1.longValue() > o2.longValue()) return -1;
                 return 0;
             }
         });
