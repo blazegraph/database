@@ -1237,7 +1237,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 //                final Counters c = tag == null ? null : queryEngine
 //                        .getCounters(tag);
                 // track #of done queries.
-                queryEngine.counters.doneCount.increment();
+                queryEngine.counters.queryDoneCount.increment();
 //                if (c != null)
 //                    c.doneCount.increment();
                 // track elapsed run time of done queries.
@@ -1247,7 +1247,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 //                    c.elapsedMillis.add(elapsed);
                 if (future.getCause() != null) {
                     // track #of queries with abnormal termination.
-                    queryEngine.counters.errorCount.increment();
+                    queryEngine.counters.queryErrorCount.increment();
 //                    if (c != null)
 //                        c.errorCount.increment();
                 }

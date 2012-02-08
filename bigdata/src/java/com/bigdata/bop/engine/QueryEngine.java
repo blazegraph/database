@@ -58,10 +58,8 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.FutureTaskMon;
-import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
-import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -251,155 +249,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
 
     /**
-     * Statistics collected for queries.
-     * 
-     * @author thompsonbry
-     */
-    protected static class Counters implements ICounterSetAccess {
-
-        /**
-         * The #of queries which have been executed (set on completion).
-         */
-        final CAT startCount = new CAT();
-        
-        /**
-         * The #of queries which have been executed (set on completion).
-         */
-        final CAT doneCount = new CAT();
-
-        /**
-         * The #of instances of the query which terminated abnormally.
-         */
-        final CAT errorCount = new CAT();
-
-        /**
-         * The total elapsed time (millis) for evaluation queries. This is the
-         * wall clock time per query. The aggregated wall clock time per query
-         * will sum to greater than the elapsed wall clock time in any interval
-         * where there is more than one query running concurrently.
-         */
-        final CAT elapsedMillis = new CAT();
-
-        /*
-         * Lower level counters dealing with the work queues and executing chunk
-         * tasks.
-         */
-        
-//        /**
-//         * The #of non-empty work queues.
-//         */
-//        final CAT workQueueCount = new CAT();
-        
-        /**
-         * The #of work queues which are currently blocked.
-         */
-        final CAT blockedWorkQueueCount = new CAT();
-        
-        /**
-         * The #of times that a work queue has blocked.
-         */
-        final CAT blockedWorkQueueRunningTotal = new CAT();
-        
-        /**
-         * The #of active operator evaluation tasks (chunk tasks).
-         */
-        final CAT operatorActiveCount = new CAT();
-
-        /**
-         * The #of operator evaluation tasks (chunk tasks) which have started.
-         */
-        final CAT operatorStartCount = new CAT();
-
-        /**
-         * The #of operator evaluation tasks (chunk tasks) which have ended.
-         */
-        final CAT operatorHaltCount = new CAT();
-
-        public CounterSet getCounters() {
-
-            final CounterSet root = new CounterSet();
-
-            // #of queries started on this server.
-            root.addCounter("startCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(startCount.get());
-                }
-            });
-
-            // #of queries retired on this server.
-            root.addCounter("doneCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(doneCount.get());
-                }
-            });
-
-            // #of queries with abnormal termination on this server.
-            root.addCounter("errorCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(errorCount.get());
-                }
-            });
-
-            // #of queries retired per second on this server.
-            root.addCounter("queriesPerSecond", new Instrument<Double>() {
-                public void sample() {
-                    final long ms = elapsedMillis.get();
-                    final long n = doneCount.get();
-                    // compute throughput, normalized to q/s := (q*1000)/ms.
-                    final double d = ms == 0 ? 0d : ((1000d * n) / ms);
-                    setValue(d);
-                }
-            });
-
-//            // #of non-empty work queues.
-//            root.addCounter("workQueueCount", new Instrument<Long>() {
-//                public void sample() {
-//                    setValue(workQueueCount.get());
-//                }
-//            });
-
-            // #of blocked work queues.
-            root.addCounter("blockedWorkQueueCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(blockedWorkQueueCount.get());
-                }
-            });
-
-            // #of times that a work queue has blocked.
-            root.addCounter("blockedWorkQueueRunningTotal", new Instrument<Long>() {
-                public void sample() {
-                    setValue(blockedWorkQueueRunningTotal.get());
-                }
-            });
-
-            // #of concurrently executing operator tasks.
-            root.addCounter("operatorActiveCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(operatorActiveCount.get());
-                }
-            });
-
-            // #of operator evaluation tasks which have started.
-            root.addCounter("operatorStartCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(operatorStartCount.get());
-                }
-            });
-
-            // #of operator evaluation tasks which have ended.
-            root.addCounter("operatorHaltCount", new Instrument<Long>() {
-                public void sample() {
-                    setValue(operatorHaltCount.get());
-                }
-            });
-
-            return root;
-
-        }
-        
-    }
-
-    /**
      * Return a {@link CounterSet} which reports various statistics for the
      * {@link QueryEngine}.
      */
@@ -441,7 +290,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     /**
      * Counters at the global level.
      */
-    final protected Counters counters = newCounters();
+    final protected QueryEngineCounters counters = newCounters();
 
 //    /**
 //     * Statistics for queries which are "tagged" so we can recognize their
@@ -490,11 +339,20 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //    }
 
     /**
-     * Extension hook for new {@link Counters} instances.
+     * Extension hook for new {@link QueryEngineCounters} instances.
      */
-    protected Counters newCounters() {
+    protected QueryEngineCounters newCounters() {
         
-        return new Counters();
+        return new QueryEngineCounters();
+        
+    }
+    
+    /**
+     * The {@link QueryEngineCounters} object for this {@link QueryEngine}.
+     */
+    protected QueryEngineCounters getQueryEngineCounters() {
+        
+        return counters;
         
     }
     
@@ -1358,7 +1216,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //        final Counters c = tag == null ? null : getCounters(tag);
 
         // track #of started queries.
-        counters.startCount.increment();
+        counters.queryStartCount.increment();
 
 //        if (c != null)
 //            c.startCount.increment();

@@ -741,7 +741,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
             final QueryEngine queryEngine = getQueryEngine();
             final UUID serviceId = queryEngine.getServiceUUID();
-            final QueryEngine.Counters c = queryEngine.counters;
+            final QueryEngineCounters c = queryEngine.counters;
             try {
 
                 /*
