@@ -53,7 +53,6 @@ import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -290,9 +289,9 @@ public class QueryLog {
         
         sb.append(q.getQueryId());
         sb.append('\t');
-		sb.append(q.getQuery().getProperty(QueryHints.TAG,
-				QueryHints.DEFAULT_TAG));
-		sb.append('\t');
+//		sb.append(q.getQuery().getProperty(QueryHints.TAG,
+//				QueryHints.DEFAULT_TAG));
+//		sb.append('\t');
         sb.append(dateFormat.format(new Date(q.getStartTime())));
         sb.append('\t');
         sb.append(dateFormat.format(new Date(q.getDoneTime())));
@@ -767,9 +766,9 @@ public class QueryLog {
         
         w.write("<tr\n>");
         w.write(TD + cdata(q.getQueryId().toString()) + TDx);
-        w.write(TD
-                + cdata(q.getQuery().getProperty(QueryHints.TAG,
-                        QueryHints.DEFAULT_TAG)) + TDx);
+//        w.write(TD
+//                + cdata(q.getQuery().getProperty(QueryHints.TAG,
+//                        QueryHints.DEFAULT_TAG)) + TDx);
         w.write(TD + dateFormat.format(new Date(q.getStartTime())) + TDx);
         w.write(TD + cdata(dateFormat.format(new Date(q.getDoneTime()))) + TDx);
         w.write(TD);
