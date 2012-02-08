@@ -298,7 +298,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         /**
          * The #of active operator evaluation tasks (chunk tasks).
          */
-        final CAT operatorTaskCount = new CAT();
+        final CAT operatorActiveCount = new CAT();
+
+        /**
+         * The #of operator evaluation tasks (chunk tasks) which have started.
+         */
+        final CAT operatorStartCount = new CAT();
+
+        /**
+         * The #of operator evaluation tasks (chunk tasks) which have ended.
+         */
+        final CAT operatorHaltCount = new CAT();
 
         public CounterSet getCounters() {
 
@@ -351,9 +361,23 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             });
 
             // #of concurrently executing operator tasks.
-            root.addCounter("operatorTaskCount", new Instrument<Long>() {
+            root.addCounter("operatorActiveCount", new Instrument<Long>() {
                 public void sample() {
-                    setValue(operatorTaskCount.get());
+                    setValue(operatorActiveCount.get());
+                }
+            });
+
+            // #of operator evaluation tasks which have started.
+            root.addCounter("operatorStartCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(operatorStartCount.get());
+                }
+            });
+
+            // #of operator evaluation tasks which have ended.
+            root.addCounter("operatorHaltCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(operatorHaltCount.get());
                 }
             });
 
