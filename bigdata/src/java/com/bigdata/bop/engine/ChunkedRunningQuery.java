@@ -269,12 +269,18 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
              
             }
 
-            if (queue.remainingCapacity() == 0) {
-                // Work queue will block.
+            // offer (non-blocking)
+            if (!queue.offer(msg)) {
+                // Offer failed.  Work queue will block.
                 getQueryEngine().counters.blockedWorkQueueCount.increment();
+                try {
+                    // blocking put()
+                    queue.put(msg);
+                } finally {
+                    // Queue unblocked
+                    getQueryEngine().counters.blockedWorkQueueCount.decrement();
+                }
             }
-            queue.put(msg); // blocking
-//            queue.add(msg); // non-blocking, throws exception if full.
 
             // and see if the target operator can run now.
             scheduleNext(bundle);
@@ -546,13 +552,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
              * Note: Once we drain these messages from the work queue we are
              * responsible for calling release() on them.
              */
-            final boolean wasFull = queue.remainingCapacity() == 0;
             queue.drainTo(accepted, pipelined ? maxMessagesPerTask
                     : Integer.MAX_VALUE);
-            if(wasFull) {
-                // Work queue is no longer blocked.
-                getQueryEngine().counters.blockedWorkQueueCount.decrement();
-            }
             // #of messages accepted from the work queue.
             final int naccepted = accepted.size();
             // #of messages remaining on the work queue.
@@ -766,7 +767,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  */
                 final long begin = System.currentTimeMillis();
                 try {
-                    c.operatorTaskCount.increment();
+                    c.operatorStartCount.increment();
+                    c.operatorActiveCount.increment();
                     t.call();
                 } catch(Throwable t2) {
                     halt(t2); // ensure query halts.
@@ -776,9 +778,10 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                     }
                     // normal termination - swallow the exception.
                 } finally {
+                    c.operatorHaltCount.increment();
+                    c.operatorActiveCount.decrement();
                     t.context.getStats().elapsed.add(System.currentTimeMillis()
                             - begin);
-                    c.operatorTaskCount.decrement();
                 }
 
                 // Notify query controller that operator task did run.
