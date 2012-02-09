@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
@@ -53,7 +54,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.util.InnerCause;
 
 /**
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
@@ -502,17 +502,20 @@ public class FederatedQueryEngine extends QueryEngine {
                     
                 } catch (Throwable t) {
 
-                    if (!InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    if (!AbstractRunningQuery.isRootCauseInterrupt(t)) {
                     
                         /*
-                         * Note: This can be triggered by serialization errors.
-                         * 
-                         * Whatever is thrown out here, we want to log @ ERROR
-                         * unless the root cause was an interrupt.
-                         * 
-                         * @see
-                         * https://sourceforge.net/apps/trac/bigdata/ticket/380
-                         */
+						 * Note: This can be triggered by serialization errors.
+						 * 
+						 * Whatever is thrown out here, we want to log @ ERROR
+						 * unless the root cause was an interrupt.
+						 * 
+						 * @see
+						 * https://sourceforge.net/apps/trac/bigdata/ticket/380
+						 * 
+						 * @see
+						 * https://sourceforge.net/apps/trac/bigdata/ticket/479
+						 */
                         
                         log.error("Problem materializing message: " + msg, t);
                         

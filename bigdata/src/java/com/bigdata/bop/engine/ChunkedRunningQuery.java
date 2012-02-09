@@ -1651,7 +1651,10 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 					clientProxy.haltOp(msg);
 				}
             } catch (Throwable e) {
-                if (!InnerCause.isInnerCause(e, InterruptedException.class)) {
+                if (!isRootCauseInterrupt(e)) {
+                	/*
+                	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/479
+                	 */
                     log.error("Could not notify query controller: " + e, e);
                 }
                 q.cancel(true/* mayInterruptIfRunning */);
