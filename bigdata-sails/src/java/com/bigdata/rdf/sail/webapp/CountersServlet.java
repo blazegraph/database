@@ -27,16 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStreamWriter;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
@@ -44,7 +39,6 @@ import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
 import com.bigdata.counters.render.RendererFactory;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IEventReceivingService;
 import com.bigdata.service.IService;
 
@@ -71,7 +65,7 @@ public class CountersServlet extends BigdataServlet {
      */
     private static final long serialVersionUID = 1L;
     
-    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
+//    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
 
     /**
      * 
@@ -118,10 +112,10 @@ public class CountersServlet extends BigdataServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream(
-                2 * Bytes.kilobyte32);
-
-        final InputStream is;
+//        final ByteArrayOutputStream baos = new ByteArrayOutputStream(
+//                2 * Bytes.kilobyte32);
+//
+//        final InputStream is;
 
 //        /*
 //         * If the request uri is one of the pre-declared resources then we send
@@ -159,10 +153,9 @@ public class CountersServlet extends BigdataServlet {
 //
 //        }
 
-        // FIXME Hook this how?
+        // TODO Hook this how? (NSS does not define an IService right now)
         final IService service = null;
         
-        // FIXME Hook this how? Extension for SPARQL end point when it exists?
         final CounterSet counterSet = ((ICounterSetAccess) getIndexManager())
                 .getCounters();
 
@@ -192,27 +185,9 @@ public class CountersServlet extends BigdataServlet {
             
         }
 
-        /*
-         * Render the counters as specified by the query for the negotiated MIME
-         * type.
-         */
-        {
-
-            final OutputStreamWriter w = new OutputStreamWriter(baos);
-
-            // render the view.
-            renderer.render(w);
-
-            w.flush();
-
-            is = new ByteArrayInputStream(baos.toByteArray());
-            
-        }
-        
         resp.setStatus(HTTP_OK);
-        
-        resp.setContentType(mimeType + "; charset='"
-                + charset + "'");
+
+        resp.setContentType(mimeType + "; charset='" + charset + "'");
 
         /*
          * Sets the cache behavior -- the data should be good for up to 60
@@ -225,7 +200,25 @@ public class CountersServlet extends BigdataServlet {
         // to disable caching.
         // r.addHeader("Cache-Control", "no-cache");
 
-        copyStream(is,resp.getOutputStream());
+        /*
+         * Render the counters as specified by the query for the negotiated MIME
+         * type.
+         */
+        {
+
+            final OutputStreamWriter w = new OutputStreamWriter(
+                    resp.getOutputStream(), charset);
+
+            // render the view.
+            renderer.render(w);
+
+            w.flush();
+
+//            is = new ByteArrayInputStream(baos.toByteArray());
+            
+        }
+        
+//        copyStream(is, resp.getOutputStream());
 
     }
     

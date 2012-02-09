@@ -24,29 +24,29 @@ public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
     
     private final UUID uuid = UUID.randomUUID();
 
-    private final AbstractFederation<?> fed;
+    private final IBigdataClient<?> client;
 
     private final T clientOrService;
 
     /**
      * 
-     * @param fed
-     *            The federation.
+     * @param client
+     *            The client (before it connects to the federation).
      * @param clientOrService
      *            The client or service connected to the federation. This MAY be
      *            <code>null</code> but then {@link #getService()} will also
      *            return <code>null</code>.
      */
-    public DefaultClientDelegate(final AbstractFederation<?> fed,
+    public DefaultClientDelegate(final IBigdataClient<?> client,
             final T clientOrService) {
 
-        if (fed == null)
+        if (client == null)
             throw new IllegalArgumentException();
 
         if (clientOrService == null)
             log.warn("Client or service not specified: " + this);
 
-        this.fed = fed;
+        this.client = client;
 
         this.clientOrService = clientOrService;
 
@@ -74,15 +74,15 @@ public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
      */
     public String getServiceName() {
         
-        return fed.getClient().getClass().getName() + "@"
+        return client.getClass().getName() + "@"
                 + AbstractStatisticsCollector.fullyQualifiedHostName + "#"
-                + fed.getClient().hashCode();
+                + client.hashCode();
     
     }
     
     public Class getServiceIface() {
 
-        return fed.getClient().getClass();
+        return client.getClass();
 
     }
 
