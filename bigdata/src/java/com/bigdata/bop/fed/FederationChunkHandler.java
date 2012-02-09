@@ -135,7 +135,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
             throw new IllegalStateException("Not found: " + sinkId);
 
         if(log.isTraceEnabled())
-            log.trace("queryId=" + query.getQueryId() + ", sink=" + sinkId);
+            log.trace("queryId=" + query.getQueryId() + ", sourceBopId="+bopId+", sink=" + sinkId);
         
         switch (targetOp.getEvaluationContext()) {
         case ANY: {
