@@ -210,7 +210,7 @@ public class QueryLog {
          * Common columns for the overall query and for each pipeline operator.
          */
         sb.append("queryId");
-        sb.append("\ttag");
+//        sb.append("\ttag");
         sb.append("\tbeginTime");
         sb.append("\tdoneTime");
         sb.append("\tdeadline");
@@ -634,7 +634,7 @@ public class QueryLog {
          * Common columns for the overall query and for each pipeline operator.
          */
         w.write("<th>queryId</th>");
-        w.write("<th>tag</th>");
+//        w.write("<th>tag</th>");
         w.write("<th>beginTime</th>");
         w.write("<th>doneTime</th>");
         w.write("<th>deadline</th>");
