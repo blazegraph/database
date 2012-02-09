@@ -33,6 +33,8 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.BufferMode;
@@ -52,6 +54,8 @@ import com.bigdata.util.config.NicUtil;
  */
 public class QueryEngineFactory {
 
+	private static final Logger log = Logger.getLogger(QueryEngineFactory.class);
+	
     /**
      * Weak value cache to enforce the singleton pattern for standalone
      * journals.
@@ -168,7 +172,10 @@ public class QueryEngineFactory {
     private static QueryEngine newStandaloneQueryEngine(
             final Journal indexManager) {
 
-        final QueryEngine queryEngine = new QueryEngine(indexManager);
+		if (log.isInfoEnabled())
+			log.info("Initiallizing query engine: " + indexManager);
+
+		final QueryEngine queryEngine = new QueryEngine(indexManager);
 
         queryEngine.init();
 
@@ -224,6 +231,9 @@ public class QueryEngineFactory {
      */
     private static FederatedQueryEngine newFederatedQueryEngine(
             final IBigdataFederation<?> fed) {
+
+		if (log.isInfoEnabled())
+			log.info("Initiallizing query engine: " + fed);
 
         final FederatedQueryEngine queryEngine;
         
