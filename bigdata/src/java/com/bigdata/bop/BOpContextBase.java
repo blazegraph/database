@@ -70,7 +70,9 @@ public class BOpContextBase {
      * {@link ILocalBTreeView}.
      */
     final public IIndexManager getIndexManager() {
+
         return indexManager;
+        
     }
 
     /**
@@ -81,7 +83,9 @@ public class BOpContextBase {
      * other bigdata services.
      */
     final public IBigdataFederation<?> getFederation() {
+
         return fed;
+        
     }
 
     /**
@@ -91,7 +95,9 @@ public class BOpContextBase {
      * <em>local</em> {@link #getIndexManager() index manager}.
      */
     public final Executor getExecutorService() {
+
         return executor;
+        
     }
 
     public BOpContextBase(final QueryEngine queryEngine) {
@@ -105,25 +111,25 @@ public class BOpContextBase {
      * 
      * @param fed
      *            The federation iff running in scale-out.
-     * @param indexManager
+     * @param localIndexManager
      *            The <strong>local</strong> index manager.
      */
     public BOpContextBase(final IBigdataFederation<?> fed,
-            final IIndexManager indexManager) {
+            final IIndexManager localIndexManager) {
 
         /*
          * @todo null is permitted here for the unit tests, but we should really
          * mock the IIndexManager and pass in a non-null object here and then
          * verify that the reference is non-null.
          */
-//        if (indexManager == null)
+//        if (localIndexManager == null)
 //            throw new IllegalArgumentException();
 
         this.fed = fed;
         
-        this.indexManager = indexManager;
+        this.indexManager = localIndexManager;
      
-        this.executor = indexManager == null ? null : indexManager
+        this.executor = localIndexManager == null ? null : localIndexManager
                 .getExecutorService();
         
     }

@@ -231,12 +231,12 @@ public class FederatedQueryEngine extends QueryEngine {
     private FederatedQueryEngine(//
                 final UUID thisService,
                 final IBigdataFederation<?> fed,//
-                final IIndexManager indexManager,//
+                final IIndexManager localIndexManager,//
                 final ManagedResourceService resourceService,//
                 final boolean isDataService
                 ) {
 
-        super(indexManager);
+        super(localIndexManager);
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -663,8 +663,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
         try {
 
-            getIndexManager().getExecutorService().execute(
-                    new CancelQuery(q, cause));
+            execute(new CancelQuery(q, cause));
 
         } catch (RejectedExecutionException ex) {
 

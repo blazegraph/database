@@ -40,6 +40,8 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.relation.locator.IResourceLocator;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
@@ -166,16 +168,16 @@ public class QueryEngineFactory {
      * 
      * @param indexManager
      *            The journal.
-     *            
+     * 
      * @return The new query engine.
      */
     private static QueryEngine newStandaloneQueryEngine(
             final Journal indexManager) {
 
-		if (log.isInfoEnabled())
-			log.info("Initiallizing query engine: " + indexManager);
+        if (log.isInfoEnabled())
+            log.info("Initiallizing query engine: " + indexManager);
 
-		final QueryEngine queryEngine = new QueryEngine(indexManager);
+        final QueryEngine queryEngine = new QueryEngine(indexManager);
 
         queryEngine.init();
 
@@ -185,13 +187,16 @@ public class QueryEngineFactory {
     
     /**
      * New query controller for scale-out.
+     * <p>
+     * Note: This is NOT used for the {@link QueryEngine} that is embedded
+     * within the {@link DataService}. That instance is setup by the
+     * {@link DataService} itself and relies on a view of the shards as locally
+     * available to the {@link DataService}
      * 
      * @param fed
      *            The federation.
-     *            
-     * @return The query controller.
      * 
-     * @todo parameterize the local resource service and temporary storage.
+     * @return The query controller.
      */
     static public FederatedQueryEngine getFederatedQueryController(
             final IBigdataFederation<?> fed) {
@@ -226,8 +231,12 @@ public class QueryEngineFactory {
      * 
      * @param fed
      *            The federation.
-     *            
+     * 
      * @return The new query engine.
+     * 
+     *         TODO Parameterize the local resource service and temporary
+     *         storage. For example, maybe it should be using a journal backed
+     *         by a MemStore?
      */
     private static FederatedQueryEngine newFederatedQueryEngine(
             final IBigdataFederation<?> fed) {
@@ -256,7 +265,20 @@ public class QueryEngineFactory {
                 p.setProperty(Journal.Options.CREATE_TEMP_FILE,
                         "true");
 
-                queryEngineStore = new Journal(p);
+                queryEngineStore = new Journal(p) {
+
+                    /**
+                     * Locator resources on the federation NOT the embedded
+                     * Journal used by the query controller.
+                     */
+                    @Override
+                    protected IResourceLocator<?> newResourceLocator() {
+                    
+                        return fed.getResourceLocator();
+                        
+                    }
+                    
+                };
 
             }
 

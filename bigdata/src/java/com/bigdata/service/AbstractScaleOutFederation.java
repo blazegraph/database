@@ -111,6 +111,12 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
         
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to clear the various caches.
+     */
+    @Override
     public synchronized void shutdown() {
         
         super.shutdown();
@@ -121,6 +127,12 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to clear the various caches.
+     */
+    @Override
     public synchronized void shutdownNow() {
     
         super.shutdownNow();

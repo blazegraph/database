@@ -273,23 +273,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         }
 
-        {
-
-            final int cacheCapacity = getProperty(
-                    Options.LOCATOR_CACHE_CAPACITY,
-                    Options.DEFAULT_LOCATOR_CACHE_CAPACITY,
-                    IntegerValidator.GT_ZERO);
-
-            final long cacheTimeout = getProperty(
-                    Options.LOCATOR_CACHE_TIMEOUT,
-                    Options.DEFAULT_LOCATOR_CACHE_TIMEOUT,
-                    LongValidator.GTE_ZERO);
-
-            resourceLocator = new DefaultResourceLocator(this, null/*delegate*/,
-                    cacheCapacity, cacheTimeout);
-            
-        }
-
+        resourceLocator = newResourceLocator();
+        
         resourceLockManager = new ResourceLockService();
 
         localTransactionManager = newLocalTransactionManager();
@@ -322,6 +307,24 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return properties;
     }
 
+    /**
+     * Factory for the {@link IResourceLocator} for the {@link Journal}.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    protected IResourceLocator<?> newResourceLocator() {
+
+        final int cacheCapacity = getProperty(Options.LOCATOR_CACHE_CAPACITY,
+                Options.DEFAULT_LOCATOR_CACHE_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
+        final long cacheTimeout = getProperty(Options.LOCATOR_CACHE_TIMEOUT,
+                Options.DEFAULT_LOCATOR_CACHE_TIMEOUT, LongValidator.GTE_ZERO);
+
+        return new DefaultResourceLocator(this, null/* delegate */,
+                cacheCapacity, cacheTimeout);
+
+    }
+    
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
@@ -1576,14 +1579,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final TemporaryStoreFactory tempStoreFactory;
 
-    public DefaultResourceLocator getResourceLocator() {
+    public IResourceLocator<?> getResourceLocator() {
 
         assertOpen();
         
         return resourceLocator;
         
     }
-    private final DefaultResourceLocator<?> resourceLocator;
+    private final IResourceLocator<?> resourceLocator;
     
     public IResourceLockService getResourceLockService() {
         
