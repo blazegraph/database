@@ -3,6 +3,8 @@ package com.bigdata.counters.ganglia;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
@@ -16,6 +18,9 @@ import com.bigdata.ganglia.IGangliaMetricsReporter;
  */
 public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 
+    private static Logger log = Logger
+            .getLogger(QueryEngineMetricsCollector.class);
+    
     /**
      * Match anything which does NOT include <code>.service.</code> in the
      * counter path.
@@ -72,6 +77,14 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
         final CounterSet counters = (CounterSet) statisticsCollector
                 .getCounters().getPath(pathPrefix);
 
+        if(counters == null) {
+            
+            log.warn("Counters not yet available for service.");
+            
+            return;
+            
+        }
+        
 		@SuppressWarnings("rawtypes")
         final Iterator<ICounter> itr = counters.getCounters(filter);
 

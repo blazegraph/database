@@ -357,7 +357,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
     
     /**
-     * Access to the indices.
+     * Access to the <strong>local</strong> indices.
      * <p>
      * Note: You MUST NOT use unisolated indices without obtaining the necessary
      * locks. The {@link QueryEngine} is intended to run only against committed
@@ -398,13 +398,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * running.
      * 
      * @return The {@link UUID} of the service in which this {@link QueryEngine}
-     *         is running -or- <code>null</code> if the {@link QueryEngine} is
-     *         not running against an {@link IBigdataFederation}.
+     *         is running -or- a unique and distinct UUID if the
+     *         {@link QueryEngine} is not running against an
+     *         {@link IBigdataFederation}.
      */
     public UUID getServiceUUID() {
 
-        return ((IRawStore)localIndexManager).getUUID();
-//        return null; // FIXME Cast the local index manager to an IRawStore and return its UUID?
+        return ((IRawStore) localIndexManager).getUUID();
         
     }
 
@@ -526,15 +526,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     /**
      * 
-     * @param indexManager
+     * @param localIndexManager
      *            The <em>local</em> index manager.
      */
-    public QueryEngine(final IIndexManager indexManager) {
+    public QueryEngine(final IIndexManager localIndexManager) {
 
-        if (indexManager == null)
+        if (localIndexManager == null)
             throw new IllegalArgumentException();
 
-        this.localIndexManager = indexManager;
+        this.localIndexManager = localIndexManager;
 
 //        this.iopool = new LatchedExecutor(indexManager.getExecutorService(),
 //                nThreads);
@@ -623,7 +623,14 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     }
     
-    protected void execute(final Runnable r) {
+    /**
+     * Executes the {@link Runnable} on the local {@link IIndexManager}'s
+     * {@link ExecutorService}.
+     * 
+     * @param r
+     *            The {@link Runnable}.
+     */
+    final protected void execute(final Runnable r) {
         
         localIndexManager.getExecutorService().execute(r);
         

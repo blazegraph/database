@@ -699,6 +699,12 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
     private boolean open;
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to terminate discovery.
+     */
+    @Override
     synchronized public void shutdown() {
         
         if(!open) return;
@@ -721,6 +727,12 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to terminate discovery.
+     */
+    @Override
     synchronized public void shutdownNow() {
 
         if(!open) return;
