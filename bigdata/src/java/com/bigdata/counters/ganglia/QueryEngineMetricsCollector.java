@@ -87,8 +87,9 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 
 		if (counters == null) {
             
-            log.warn("Counters not yet available for service.");
-            
+			if (log.isInfoEnabled())
+				log.info("Counters not yet available for service.");
+
             return;
             
         }
