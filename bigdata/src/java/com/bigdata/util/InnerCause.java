@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
+
 /**
  * Utility class declaring methods for examining a stack trace for an instance
  * of some class of exception.
@@ -54,8 +55,9 @@ public class InnerCause {
      *             if any parameter is null.
      */
 //    static public Throwable getInnerCause(Throwable t, Class cls) {
-    static public Throwable getInnerCause(Throwable t, Class<? extends Throwable> cls) {
-        
+	static public Throwable getInnerCause(Throwable t,
+			final Class<? extends Throwable> cls) {
+
         if (t == null)
             throw new IllegalArgumentException();
 
@@ -99,8 +101,9 @@ public class InnerCause {
      */
 //    static public boolean isInnerCause(Throwable t, Class cls) {
         // Note: Use of generics commented out for 1.4 compatibility.
-    static public boolean isInnerCause(Throwable t, Class<? extends Throwable>cls) {
-        
+	static public boolean isInnerCause(final Throwable t,
+			final Class<? extends Throwable> cls) {
+
         return getInnerCause(t, cls) != null;
         
     }

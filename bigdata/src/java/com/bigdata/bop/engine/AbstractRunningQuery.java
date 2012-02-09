@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -66,6 +67,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.IHaltable;
 
@@ -1558,5 +1560,28 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     }
 
     // abstract protected IChunkHandler getChunkHandler();
+
+	/**
+	 * Return <code>true</code> iff the root cause of the {@link Throwable} was
+	 * an interrupt. This checks for any of the different kinds of exceptions
+	 * which can be thrown when an interrupt is encountered.
+	 * 
+	 * @param t
+	 *            The throwable.
+	 * @return <code>true</code> iff the root cause was an interrupt.  
+	 * 
+	 * TODO This could be optimized by checking once at each level for any of
+	 *         the indicated exceptions.
+	 */
+	static public boolean isRootCauseInterrupt(final Throwable t) {
+		if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+			return true;
+		} else if (InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
+			return true;
+		} else if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+			return true;
+		}
+		return false;
+	}
 
 }

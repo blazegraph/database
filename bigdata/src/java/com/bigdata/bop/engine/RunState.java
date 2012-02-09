@@ -1279,8 +1279,14 @@ class RunState {
 
             final AtomicLong n = innerState.runningMap.get(bopId);
 
-            if (n == null)
+            if (n == null) {
+            	/*
+				 * I have observed this exception once. It may have been caused
+				 * by the interrupt of an RMI during the handling of a startOp
+				 * message on a cluster node.
+				 */
                 throw new IllegalArgumentException(ERR_OP_NOT_STARTED);
+            }
 
             if (n.get() <= 0)
                 throw new IllegalArgumentException(ERR_OP_HALTED);
