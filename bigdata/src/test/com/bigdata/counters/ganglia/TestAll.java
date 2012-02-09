@@ -64,6 +64,8 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("counters-ganglia");
         
         suite.addTestSuite(TestHostMetricsCollector.class);
+
+        suite.addTestSuite(TestQueryEngineMetricsCollector.class);
         
         return suite;
         
