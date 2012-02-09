@@ -789,7 +789,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
              * default delegate.
              */
 
-            client2.setDelegate(new DefaultClientDelegate<T>(this, null/* clientOrService */));
+            client2.setDelegate(new DefaultClientDelegate<T>(client, null/* clientOrService */));
 
         }
         

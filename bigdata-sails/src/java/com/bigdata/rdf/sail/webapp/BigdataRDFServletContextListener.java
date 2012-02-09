@@ -42,7 +42,13 @@ import javax.servlet.ServletContextListener;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.cache.SynchronizedHardReferenceQueueWithTimeout;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.IProcessCounters;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -51,9 +57,12 @@ import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.DefaultClientDelegate;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
  * Listener provides life cycle management of the {@link IIndexManager} by
@@ -432,6 +441,9 @@ public class BigdataRDFServletContextListener implements
 
                 jiniClient = new JiniClient(new String[] { propertyFile });
 
+                jiniClient.setDelegate(new NanoSparqlServerFederationDelegate(
+                        jiniClient, this));
+
                 indexManager = jiniClient.connect();
 
             } else {
@@ -470,5 +482,118 @@ public class BigdataRDFServletContextListener implements
         return indexManager;
         
     }
+
+    /**
+     * Hooked to report the query engine performance counters to the federation.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @param <T>
+     */
+    private static class NanoSparqlServerFederationDelegate<T> extends
+            DefaultClientDelegate<T> {
+
+        final private IBigdataClient<?> client;
+        final private BigdataRDFServletContextListener servletContextListener;
         
+        /**
+         * The path component under which the query engine performance counters
+         * will be reported.
+         */
+        static private final String QUERY_ENGINE = "Query Engine";
+        
+        public NanoSparqlServerFederationDelegate(final IBigdataClient<?> client,
+                final BigdataRDFServletContextListener servletContextListener) {
+
+            super(client, null/* clientOrService */);
+
+            this.client = client;
+            
+            if (servletContextListener == null)
+                throw new IllegalArgumentException();
+            
+            this.servletContextListener = servletContextListener;
+
+        }
+
+        /**
+         * Overridden to attach the counters reporting on the things which are
+         * either dynamic or not otherwise part of the reported counter set for
+         * the client.
+         */
+        @Override
+        public void reattachDynamicCounters() {
+
+            final IIndexManager indexManager = servletContextListener.rdfContext
+                    .getIndexManager();
+
+            if (indexManager == null)
+                return;
+            
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(indexManager);
+
+            // The service's counter set hierarchy.
+            final CounterSet serviceRoot = client.getFederation()
+                    .getServiceCounterSet();
+
+            /*
+             * DirectBufferPool counters.
+             */
+            {
+                // Ensure path exists.
+                final CounterSet tmp = serviceRoot
+                        .makePath(IProcessCounters.Memory);
+
+                synchronized (tmp) {
+
+                    // detach the old counters (if any).
+                    tmp.detach("DirectBufferPool");
+
+                    // attach the current counters.
+                    tmp.makePath("DirectBufferPool").attach(
+                            DirectBufferPool.getCounters());
+
+                }
+
+            }
+
+            /*
+             * QueryEngine counters.
+             */
+            {
+                // Ensure path exists.
+                final CounterSet tmp = serviceRoot
+                        .makePath(IProcessCounters.Memory);
+
+                synchronized (tmp) {
+
+                    tmp.detach(QUERY_ENGINE);
+
+                    // attach the current counters.
+                    tmp.makePath(QUERY_ENGINE)
+                            .attach(queryEngine.getCounters());
+
+                }
+
+            }
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to NOT start an embedded performance counter reporting
+         * httpd instance. The {@link NanoSparqlServer} already provides a
+         * {@link CountersServlet} through which this stuff gets reported to the
+         * UI.
+         */
+        @Override
+        public AbstractHTTPD newHttpd(final int httpdPort,
+                final ICounterSetAccess access) throws IOException {
+
+            return null;
+            
+        }
+
+    }
+
 }
