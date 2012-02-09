@@ -1,7 +1,6 @@
 package com.bigdata.counters.ganglia;
 
 import java.util.Iterator;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -12,6 +11,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.ganglia.GangliaMunge;
 import com.bigdata.ganglia.IGangliaMetricsCollector;
 import com.bigdata.ganglia.IGangliaMetricsReporter;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Reflects query engine metrics from the data server nodes to ganglia.
@@ -21,34 +21,40 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
     private static Logger log = Logger
             .getLogger(QueryEngineMetricsCollector.class);
     
-    /**
-     * Match anything which does NOT include <code>.service.</code> in the
-     * counter path.
-     * 
-     * @see <a href="http://www.regular-expressions.info/lookaround.html">
-     *      Regular Expressions Info </a>
-     */
-    static final Pattern filter; 
-    static {
+//    /**
+//     * Match anything which does NOT include <code>.service.</code> in the
+//     * counter path.
+//     * 
+//     * @see <a href="http://www.regular-expressions.info/lookaround.html">
+//     *      Regular Expressions Info </a>
+//     */
+//    static final Pattern filter; 
+//    static {
+//
+//        // bigdata10.bigdata.com / service /
+//        // com.bigdata.service.IMetadataService /
+//        // dabb5034-9db0-4218-a6dd-f9032fc05ce6 / Query Engine /
+//        // blockedWorkQueueCount
+//
+//        filter = Pattern
+//                .compile("^.*/service/com.bigdata.service.IDataService/.*/Query Engine/.*$");
+//        
+//    }
 
-        // bigdata10.bigdata.com / service /
-        // com.bigdata.service.IMetadataService /
-        // dabb5034-9db0-4218-a6dd-f9032fc05ce6 / Query Engine /
-        // blockedWorkQueueCount
-
-        filter = Pattern
-                .compile("^.*/service/com.bigdata.service.IDataService/.*/Query Engine/.*$");
-        
-    }
-
+    private final IBigdataFederation<?> fed;
 	private final AbstractStatisticsCollector statisticsCollector;
 
-	public QueryEngineMetricsCollector(
+	public QueryEngineMetricsCollector(final IBigdataFederation<?> fed,
 			final AbstractStatisticsCollector statisticsCollector) {
 
+		if (fed == null)
+			throw new IllegalArgumentException();
+		
 		if (statisticsCollector == null)
 			throw new IllegalArgumentException();
 
+		this.fed = fed;
+		
 		this.statisticsCollector = statisticsCollector;
 		
 	}
@@ -56,37 +62,42 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 	@Override
 	public void collect(final IGangliaMetricsReporter reporter) {
 
-//		log.warn(statisticsCollector.getCounters().toString());
-
 		// Common base path which is NOT included in the generated metric name.
 		final String basePrefix = ICounterSet.pathSeparator
 				+ AbstractStatisticsCollector.fullyQualifiedHostName
+				+ ICounterSet.pathSeparator
+				+ statisticsCollector.getProcessName()
 				+ ICounterSet.pathSeparator;
 
         /*
-         * Total path prefix for all metrics to be reported.
-         * 
-         * Note: This includes the path components:
-         * "/host/service/serviceIface/serviceUUID/"
-         * 
-         * Thus it will NOT report per-host metrics.
-         */
-        final String pathPrefix = basePrefix
-                + statisticsCollector.getProcessName();
+		 * Total path prefix for all metrics to be reported.
+		 * 
+		 * Note: This includes the path components:
+		 * "/host/service/serviceIface/serviceUUID/"
+		 * 
+		 * Thus it will NOT report per-host metrics.
+		 */
+		final String pathPrefix = basePrefix + "Query Engine";
 
-        final CounterSet counters = (CounterSet) statisticsCollector
-                .getCounters().getPath(pathPrefix);
+		// Note: Necessary for some kinds of things (lazily created).
+		fed.reattachDynamicCounters();
 
-        if(counters == null) {
+		final CounterSet counters = (CounterSet) fed.getCounters().getPath(
+				pathPrefix);
+
+		if (counters == null) {
             
             log.warn("Counters not yet available for service.");
             
             return;
             
         }
+		
+//		log.warn(fed.getCounters().toString());
+//		log.warn(counters.toString());
         
 		@SuppressWarnings("rawtypes")
-        final Iterator<ICounter> itr = counters.getCounters(filter);
+        final Iterator<ICounter> itr = counters.getCounters(null/*filter*/);
 
 		while (itr.hasNext()) {
 
@@ -98,29 +109,14 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 			final String path = c.getPath();
 
             /*
-             * By using pathPrefix, we remove the hostName, the service
-             * interface type, and the service UUID from the counter path before
-             * accepting the rest of the path as the metric name. As long as
-             * there is one "key" service per node (CS, DS, etc), this provides
-             * exact information. When there are multiple services on a node,
-             * this will cause the information from those services to contend
-             * rather than aggregate.
-             * 
-             * This works great for the QueryEngine metrics as long as there is
-             * just one DataService per host.
-             */
-            final String s = path.substring(pathPrefix.length());
+			 * Reporting a bare metric name without any service indicator. This
+			 * works if there is just one QueryEngine per host. If there are
+			 * more then they will clobber one another's metrics.
+			 */
+            final String s = path.substring(basePrefix.length());
             
-//            /*
-//             * With this approach all metric names are unique since we are only
-//             * removing the host name from the counter path. However, the
-//             * presence of the UUID in the metric name makes it difficult to
-//             * aggregate this stuff in the ganglia UI.
-//             */
-//            final String s = path.substring(basePrefix.length());
-
-            // Just the metric name.
-            final String metricName = GangliaMunge.munge(s).replace('/', '.');
+            // Just the metric name (skips leading '/' and then translates the rest).
+            final String metricName = GangliaMunge.munge(s.replace('/', '.'));
 
 			reporter.setMetric(metricName, value);
 

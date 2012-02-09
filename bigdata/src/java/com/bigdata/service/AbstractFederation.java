@@ -1588,8 +1588,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
                 // Collect and report QueryEngine metrics.
                 gangliaService
-                        .addMetricCollector(new QueryEngineMetricsCollector(
-                                statisticsCollector));
+						.addMetricCollector(new QueryEngineMetricsCollector(
+								AbstractFederation.this, statisticsCollector));
 
                 /*
                  * TODO The problem with reporting per-service statistics is

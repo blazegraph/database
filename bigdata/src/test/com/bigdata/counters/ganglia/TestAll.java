@@ -65,7 +65,7 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestHostMetricsCollector.class);
 
-        suite.addTestSuite(TestQueryEngineMetricsCollector.class);
+//        suite.addTestSuite(TestQueryEngineMetricsCollector.class);
         
         return suite;
         

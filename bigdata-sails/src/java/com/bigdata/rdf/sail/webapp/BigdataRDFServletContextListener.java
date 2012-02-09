@@ -522,16 +522,23 @@ public class BigdataRDFServletContextListener implements
         @Override
         public void reattachDynamicCounters() {
 
-        	final BigdataRDFContext rdfContext = servletContextListener.rdfContext;
+//        	final BigdataRDFContext rdfContext = servletContextListener.rdfContext;
         	
-			final IIndexManager indexManager = rdfContext == null ? null
-					: rdfContext.getIndexManager();
+			final IBigdataFederation<?> fed;
 
-			final IBigdataFederation<?> fed = client.getFederation();
+			try {
 			
-			if(fed == null)
+				fed = client.getFederation();
+				
+				assert fed != null;
+
+			} catch (IllegalStateException ex) {
+				
+				log.warn("Closed: " + ex);
+				
 				return;
-			
+			}
+
             // The service's counter set hierarchy.
             final CounterSet serviceRoot = fed
                     .getServiceCounterSet();
@@ -561,10 +568,15 @@ public class BigdataRDFServletContextListener implements
             /*
              * QueryEngine counters.
              */
-            if(indexManager != null) {
-                
-                final QueryEngine queryEngine = QueryEngineFactory
-                        .getQueryController(indexManager);
+            {
+
+				/*
+				 * TODO It would be better to have this on the BigdataRDFContext
+				 * so we are not creating it lazily here if the NSS has not yet
+				 * been issued a query.
+				 */
+				final QueryEngine queryEngine = QueryEngineFactory
+						.getQueryController(fed);
 
             	final CounterSet tmp = serviceRoot;
 
