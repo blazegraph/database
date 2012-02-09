@@ -670,6 +670,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             }
 
+			/*
+			 * Note: We can not invoke this here. It causes recursion back into
+			 * this method from the reattachDynamicCounters() impls.
+			 */
+//            reattachDynamicCounters();
+            
             return countersRoot;
             
         } finally {
