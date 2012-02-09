@@ -39,6 +39,8 @@ import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
 import com.bigdata.counters.render.RendererFactory;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IEventReceivingService;
 import com.bigdata.service.IService;
 
@@ -156,7 +158,15 @@ public class CountersServlet extends BigdataServlet {
         // TODO Hook this how? (NSS does not define an IService right now)
         final IService service = null;
         
-        final CounterSet counterSet = ((ICounterSetAccess) getIndexManager())
+        final IIndexManager indexManager = getIndexManager();
+
+        if(indexManager instanceof IBigdataFederation) {
+        	
+        	((IBigdataFederation<?>)indexManager).reattachDynamicCounters();
+        	
+        }
+        
+        final CounterSet counterSet = ((ICounterSetAccess) indexManager)
                 .getCounters();
 
         final CounterSetSelector counterSelector = new CounterSetSelector(

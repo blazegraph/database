@@ -522,24 +522,26 @@ public class BigdataRDFServletContextListener implements
         @Override
         public void reattachDynamicCounters() {
 
-            final IIndexManager indexManager = servletContextListener.rdfContext
-                    .getIndexManager();
+        	final BigdataRDFContext rdfContext = servletContextListener.rdfContext;
+        	
+			final IIndexManager indexManager = rdfContext == null ? null
+					: rdfContext.getIndexManager();
 
-            if (indexManager == null)
-                return;
-            
-            final QueryEngine queryEngine = QueryEngineFactory
-                    .getQueryController(indexManager);
-
+			final IBigdataFederation<?> fed = client.getFederation();
+			
+			if(fed == null)
+				return;
+			
             // The service's counter set hierarchy.
-            final CounterSet serviceRoot = client.getFederation()
+            final CounterSet serviceRoot = fed
                     .getServiceCounterSet();
 
             /*
              * DirectBufferPool counters.
              */
             {
-                // Ensure path exists.
+
+            	// Ensure path exists.
                 final CounterSet tmp = serviceRoot
                         .makePath(IProcessCounters.Memory);
 
@@ -559,10 +561,12 @@ public class BigdataRDFServletContextListener implements
             /*
              * QueryEngine counters.
              */
-            {
-                // Ensure path exists.
-                final CounterSet tmp = serviceRoot
-                        .makePath(IProcessCounters.Memory);
+            if(indexManager != null) {
+                
+                final QueryEngine queryEngine = QueryEngineFactory
+                        .getQueryController(indexManager);
+
+            	final CounterSet tmp = serviceRoot;
 
                 synchronized (tmp) {
 
