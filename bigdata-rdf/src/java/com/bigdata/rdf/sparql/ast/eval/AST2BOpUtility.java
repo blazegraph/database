@@ -2252,24 +2252,39 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
     
     /**
-     * Conditionally add a {@link StartOp} iff the query will rin on a cluster.
-     * 
-     * @param ctx
-     * 
-     * @return The {@link StartOp} iff this query will run on a cluster and
-     *         otherwise <code>null</code>.
-     * 
-     *         TODO This is experimental (it is currently disabled) and does not
-     *         appear to be necessary.
-     */
+	 * Conditionally add a {@link StartOp} iff the query will rin on a cluster.
+	 * 
+	 * @param ctx
+	 * 
+	 * @return The {@link StartOp} iff this query will run on a cluster and
+	 *         otherwise <code>null</code>.
+	 * 
+	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/478">
+	 *      Cluster does not map input solution(s) across shards</a>
+	 */
 	private static final PipelineOp addStartOpOnCluster(final AST2BOpContext ctx) {
-	
-		if (false && ctx.isCluster())
-			return addStartOp(ctx);
+
+		if (ctx.isCluster()) {
 		
-    	return null;
-    	
-    }
+			/*
+			 * Note: This is necessary if the first operator in the query plan
+			 * is a sharded join and we want it to run using a sharded index
+			 * view. Without this, the operator will actually run against the
+			 * global index view.
+			 * 
+			 * Note: There may be other ways to "fix" this.  See the ticket for
+			 * more information.
+			 * 
+			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/478
+			 */
+			
+			return addStartOp(ctx);
+			
+		}
+
+		return null;
+
+	}
     
     /**
      * Adds a {@link StartOp}.
