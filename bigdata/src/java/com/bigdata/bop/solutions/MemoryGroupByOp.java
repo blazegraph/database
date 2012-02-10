@@ -54,8 +54,8 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -369,7 +369,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
         public Void call() throws Exception {
 
-			final IAsynchronousIterator<IBindingSet[]> itr = context
+			final ICloseableIterator<IBindingSet[]> itr = context
 					.getSource();
 
 			final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

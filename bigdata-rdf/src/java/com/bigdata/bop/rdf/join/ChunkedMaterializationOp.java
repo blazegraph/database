@@ -50,8 +50,8 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A vectored materialization operator based on pretty much the same logic as
@@ -180,7 +180,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final IAsynchronousIterator<IBindingSet[]> itr = context
+            final ICloseableIterator<IBindingSet[]> itr = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

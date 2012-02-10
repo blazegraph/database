@@ -44,13 +44,14 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for {@link CopyOp}.
@@ -151,8 +152,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpStats stats = query.newStats();
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+        final ICloseableIterator<IBindingSet[]> source = newBindingSetIterator(data
+                .toArray(new IBindingSet[0]));
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -199,8 +200,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpStats stats = query.newStats();
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+        final ICloseableIterator<IBindingSet[]> source = newBindingSetIterator(data
+                .toArray(new IBindingSet[0]));
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
         final IBlockingBuffer<IBindingSet[]> altSink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
@@ -268,8 +269,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpStats stats = query.newStats();
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+        final ICloseableIterator<IBindingSet[]> source = newBindingSetIterator(data
+                .toArray(new IBindingSet[0]));
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -295,6 +296,21 @@ public class TestCopyBindingSets extends TestCase2 {
         assertEquals(2L, stats.unitsOut.get());
         assertEquals(1L, stats.chunksOut.get());
 
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read the source
+     * {@link IBindingSet}s.
+     * 
+     * @param bsets
+     *            The source binding sets.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bsets) {
+     
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bsets });
+        
     }
 
 }

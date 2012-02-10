@@ -44,9 +44,9 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * DataSetJoin(left)[var=g; graphs={graphIds}]
@@ -166,7 +166,7 @@ public class DataSetJoin extends PipelineOp {
 
         public Void call() throws Exception {
             
-            final IAsynchronousIterator<IBindingSet[]> source = context
+            final ICloseableIterator<IBindingSet[]> source = context
                     .getSource();
             
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

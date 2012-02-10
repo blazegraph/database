@@ -47,7 +47,6 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
@@ -56,9 +55,7 @@ import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
@@ -376,9 +373,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId, -1 /* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                new ListBindingSet());
 
         // Wait until the query is done.
         runningQuery.get();
@@ -409,7 +404,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             // the expected solution (just one empty binding set).
             final IBindingSet[] expected = new IBindingSet[] {//
-            new HashBindingSet() //
+            new ListBindingSet() //
             };
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
@@ -460,10 +455,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId,//
-                        -1, /* partitionId */
-                        newBindingSetIterator(expected)));
+                expected);
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
@@ -610,11 +602,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // run query with empty binding set, so nothing is bound on the join.
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId,//
-                        -1, /* partitionId */
-                        newBindingSetIterator(new HashBindingSet())));
-
+                new ListBindingSet());
+        
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
@@ -759,17 +748,14 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final IRunningQuery runningQuery;
         {
-            final IBindingSet initialBindingSet = new HashBindingSet();
+            final IBindingSet initialBindingSet = new ListBindingSet();
 
 //            initialBindingSet.set(y, new Constant<String>("Paul"));
             
             final UUID queryId = UUID.randomUUID();
 
-            runningQuery = queryEngine.eval(queryId, query,
-                    new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                            startId,//
-                            -1, /* partitionId */
-                            newBindingSetIterator(initialBindingSet)));
+            runningQuery = queryEngine.eval(queryId, query, initialBindingSet);
+
         }
 
         // verify solutions.
@@ -896,10 +882,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId,//
-                        -1, /* partitionId */
-                        newBindingSetIterator(new HashBindingSet())));
+                new ListBindingSet());
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
@@ -1053,21 +1036,14 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
-        final IChunkMessage<IBindingSet> initialChunkMessage;
+        final IBindingSet initialBindings = new ListBindingSet();
         {
-
-            final IBindingSet initialBindings = new HashBindingSet();
 
             initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            initialChunkMessage = new LocalChunkMessage<IBindingSet>(
-                    queryEngine, queryId, startId,//
-                    -1, // partitionId
-                    newBindingSetIterator(initialBindings));
-
         }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                initialChunkMessage);
+                initialBindings);
 
         runningQuery.get();
 
@@ -1269,20 +1245,20 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
-        final IChunkMessage<IBindingSet> initialChunkMessage;
-        {
-
-            final IBindingSet initialBindings = new HashBindingSet();
-
-//            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
-
-            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
-                    queryId, startId,//
-                    -1, // partitionId
-                    newBindingSetIterator(initialBindings));
-        }
+//        final IChunkMessage<IBindingSet> initialChunkMessage;
+//        {
+//
+//            final IBindingSet initialBindings = new HashBindingSet();
+//
+////            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
+//
+//            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+//                    queryId, startId,//
+//                    -1, // partitionId
+//                    newBindingSetIterator(initialBindings));
+//        }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                initialChunkMessage);
+                new ListBindingSet());
 
         // verify solutions.
         {

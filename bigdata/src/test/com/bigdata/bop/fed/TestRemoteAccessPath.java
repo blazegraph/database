@@ -59,6 +59,7 @@ import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Unit tests of a remote access path.
@@ -306,8 +307,7 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(new IBindingSet[][] { new IBindingSet[0] });
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -363,8 +363,7 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(new IBindingSet[][] { new IBindingSet[0] });
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -421,8 +420,7 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(new IBindingSet[][] { new IBindingSet[0] });
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -459,6 +457,20 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         } finally {
             itr.close();
         }
+
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+     * containing all of the specified {@link IBindingSet}s.
+     * 
+     * @param bindingSetChunks
+     *            the chunks of binding sets.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[][] bindingSetChunks) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
 
     }
 

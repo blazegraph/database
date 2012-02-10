@@ -71,7 +71,6 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
      * Options understood by the {@link JiniClient}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends AbstractScaleOutClient.Options {
         

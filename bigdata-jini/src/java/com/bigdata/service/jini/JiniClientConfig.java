@@ -23,15 +23,10 @@ public class JiniClientConfig {
     final static protected Logger log = Logger
             .getLogger(JiniClientConfig.class);
 
-    final protected boolean INFO = log.isInfoEnabled();
-
-    final protected boolean DEBUG = log.isDebugEnabled();
-
     /**
      * {@link Configuration} options for this class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
     
@@ -143,7 +138,7 @@ public class JiniClientConfig {
         //                , null/* default */
                 );
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(toString());
 
     }

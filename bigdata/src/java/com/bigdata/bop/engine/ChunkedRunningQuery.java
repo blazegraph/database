@@ -60,6 +60,7 @@ import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
 import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Memoizer;
 import com.sun.jini.thread.Executor;
 
@@ -588,6 +589,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //                    && isOperatorDone(bundle.bopId)
                     && firstChunk.isLastInvocation()
                     ;
+            /*
+             * FIXME There is no longer any reliance on the IAsynchronous
+             * Iterator API here. It is perfectly sufficient to only
+             * implement ICloseableIterator. These "multi-source" classes
+             * should be revisited with that simplifying assumption in mind.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+             */
             final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(//
 //                  accepted.remove(0).getChunkAccessor().iterator()//
                     firstChunk.getChunkAccessor().iterator()//
@@ -990,7 +999,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          */
         public ChunkTask(final int bopId, final int partitionId,
                 final int messagesIn, boolean isLastInvocation,
-                final IAsynchronousIterator<IBindingSet[]> src) {
+                final ICloseableIterator<IBindingSet[]> src) {
 
             this.bopId = bopId;
             
@@ -1245,9 +1254,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * safely publish the state change to the source iterator when
                  * it is closed.
                  */
-                final IAsynchronousIterator<IBindingSet[]> src = context
-                        .getSource();
-                src.close();
+                context.getSource().close();
             }
             // Done.
             return null;

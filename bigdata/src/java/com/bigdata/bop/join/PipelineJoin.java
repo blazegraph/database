@@ -40,7 +40,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -576,7 +575,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 * terminated if there is a problem setting up this join. Given that, it
 		 * might need to be an atomic reference or volatile or the like.
 		 */
-		final private IAsynchronousIterator<IBindingSet[]> source;
+		final private ICloseableIterator<IBindingSet[]> source;
 
 		/**
 		 * Where the join results are written.
@@ -909,32 +908,57 @@ public class PipelineJoin<E> extends PipelineOp implements
 		 */
 		protected IBindingSet[] nextChunk() throws InterruptedException {
 
-			if (log.isDebugEnabled())
-				log.debug("joinOp=" + joinOp);
+            if (log.isDebugEnabled())
+                log.debug("joinOp=" + joinOp);
 
-			while (!source.isExhausted()) {
+            /*
+             * We no longer have chunks which are being read from a remote
+             * process. All chunks are fully materialized before a PipelineOp
+             * begins to execute. Therefore there is no longer any reason to use
+             * the non-blocking API in PipelineJoin.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+             */
+//			while (!source.isExhausted()) {
+//
+//				halted();
+//
+//				// note: uses timeout to avoid blocking w/o testing [halt].
+//				if (source.hasNext(10, TimeUnit.MILLISECONDS)) {
+//
+//					// read the chunk.
+//					final IBindingSet[] chunk = source.next();
+//
+//					 stats.chunksIn.increment(); 
+//					 stats.unitsIn.add(chunk.length);
+//
+//					if (log.isDebugEnabled())
+//						log.debug("Read chunk from source: chunkSize="
+//								+ chunk.length + ", joinOp=" + joinOp);
+//
+//					return chunk;
+//
+//				}
+//
+            // }
+            while (source.hasNext()) {
 
-				halted();
+                halted();
 
-				// note: uses timeout to avoid blocking w/o testing [halt].
-				if (source.hasNext(10, TimeUnit.MILLISECONDS)) {
+                // read the chunk.
+                final IBindingSet[] chunk = source.next();
 
-					// read the chunk.
-					final IBindingSet[] chunk = source.next();
+                stats.chunksIn.increment();
+                stats.unitsIn.add(chunk.length);
 
-					 stats.chunksIn.increment(); 
-					 stats.unitsIn.add(chunk.length);
+                if (log.isDebugEnabled())
+                    log.debug("Read chunk from source: chunkSize="
+                            + chunk.length + ", joinOp=" + joinOp);
 
-					if (log.isDebugEnabled())
-						log.debug("Read chunk from source: chunkSize="
-								+ chunk.length + ", joinOp=" + joinOp);
+                return chunk;
 
-					return chunk;
-
-				}
-
-			}
-
+            }
+            
 			/*
 			 * Termination condition: the source is exhausted.
 			 */

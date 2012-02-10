@@ -38,8 +38,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator drops the identified variables from the solutions
@@ -137,7 +137,7 @@ public class DropOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final IAsynchronousIterator<IBindingSet[]> itr = context
+            final ICloseableIterator<IBindingSet[]> itr = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

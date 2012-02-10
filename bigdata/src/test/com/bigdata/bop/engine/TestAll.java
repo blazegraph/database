@@ -92,6 +92,9 @@ public class TestAll extends TestCase {
 
         // test suite for the bop statistics class.
         suite.addTestSuite(TestBOpStats.class);
+
+        // test suite for local (same JVM) chunk messages.
+        suite.addTestSuite(TestLocalChunkMessage.class);
         
         // test suite for the RunState class.
         suite.addTestSuite(TestRunState.class);

@@ -32,8 +32,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
@@ -44,7 +42,6 @@ import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.striterator.ChunkedFilter;
@@ -60,7 +57,7 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class BOpContext<E> extends BOpContextBase {
 
-    static private final transient Logger log = Logger.getLogger(BOpContext.class);
+//    static private final transient Logger log = Logger.getLogger(BOpContext.class);
 
     private final IRunningQuery runningQuery;
     
@@ -69,7 +66,7 @@ public class BOpContext<E> extends BOpContextBase {
     private final BOpStats stats;
 
 //    private final IMultiSourceAsynchronousIterator<E[]> source;
-    private final IAsynchronousIterator<E[]> source;
+    private final ICloseableIterator<E[]> source;
 
     private final IBlockingBuffer<E[]> sink;
 
@@ -142,7 +139,7 @@ public class BOpContext<E> extends BOpContextBase {
     /**
      * Where to read the data to be consumed by the operator.
      */
-    public final IAsynchronousIterator<E[]> getSource() {
+    public final ICloseableIterator<E[]> getSource() {
         return source;
     }
 
@@ -213,15 +210,23 @@ public class BOpContext<E> extends BOpContextBase {
 	 * @throws IllegalArgumentException
 	 *             if the <i>sink</i> is <code>null</code>
 	 * 
-	 * @todo modify to accept {@link IChunkMessage} or an interface available
+	 * @todo Modify to accept {@link IChunkMessage} or an interface available
 	 *       from getChunk() on {@link IChunkMessage} which provides us with
 	 *       flexible mechanisms for accessing the chunk data.
 	 *       <p>
 	 *       When doing that, modify to automatically track the {@link BOpStats}
 	 *       as the <i>source</i> is consumed.
+	 *       <p>
+	 *       Note: The only call to this method outside of the test suite is 
+	 *       from ChunkedRunningQuery.  It always has a fully materialized
+	 *       chunk on hand and ready to be processed.
+	 *       
+	 *       TODO Chase down all callers and convert to just ICloseableIterator
+	 *       as part of a clean out of the IAsynchronousIterator API from the
+	 *       query engine architecture.
 	 */
     public BOpContext(final IRunningQuery runningQuery,final int partitionId,
-            final BOpStats stats, final IAsynchronousIterator<E[]> source,
+            final BOpStats stats, final ICloseableIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
         
         super(runningQuery.getFederation(), runningQuery.getLocalIndexManager());

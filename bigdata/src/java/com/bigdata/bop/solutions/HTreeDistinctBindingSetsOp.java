@@ -19,9 +19,9 @@ import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A pipelined DISTINCT operator based on the persistence capable {@link HTree}
@@ -182,7 +182,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final IAsynchronousIterator<IBindingSet[]> itr = context
+            final ICloseableIterator<IBindingSet[]> itr = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

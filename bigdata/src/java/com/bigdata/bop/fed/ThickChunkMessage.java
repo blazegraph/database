@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.rmi.RemoteException;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +44,6 @@ import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-
 
 /**
  * A thick version of this interface in which the chunk is sent inline with the
@@ -61,6 +61,8 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     final private IQueryClient queryController;
 
+    final private UUID queryControllerId;
+    
     final private UUID queryId;
 
     final private int bopId;
@@ -73,6 +75,10 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     public IQueryClient getQueryController() {
         return queryController;
+    }
+    
+    public UUID getQueryControllerId() {
+        return queryControllerId;
     }
 
     public UUID getQueryId() {
@@ -138,6 +144,11 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
             throw new IllegalArgumentException();
 
         this.queryController = queryController;
+        try {
+            this.queryControllerId = queryController.getServiceUUID();
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
         
         this.queryId = queryId;
 

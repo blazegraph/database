@@ -30,6 +30,7 @@ package com.bigdata.bop.fed;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.rmi.RemoteException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -65,6 +66,8 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     private static final long serialVersionUID = 1L;
 
     final private IQueryClient queryController;
+    
+    final private UUID queryControllerId;
 
     final private UUID queryId;
 
@@ -93,6 +96,10 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return queryController;
     }
 
+    public UUID getQueryControllerId() {
+        return queryControllerId;
+    }
+    
     public UUID getQueryId() {
         return queryId;
     }
@@ -180,6 +187,11 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
                 allocationContext, source, nsolutions);
 
         this.queryController = queryController;
+        try {
+            this.queryControllerId = queryController.getServiceUUID();
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
         this.queryId = queryId;
         this.bopId = sinkId;
         this.partitionId = partitionId;

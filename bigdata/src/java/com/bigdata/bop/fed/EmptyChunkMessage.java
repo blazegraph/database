@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.fed;
 
 import java.io.Serializable;
+import java.rmi.RemoteException;
 import java.util.UUID;
 
 import com.bigdata.bop.engine.IChunkAccessor;
@@ -53,6 +54,8 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     final private IQueryClient queryController;
 
+    final private UUID queryControllerId;
+    
     final private UUID queryId;
 
     final private int bopId;
@@ -65,6 +68,10 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return queryController;
     }
 
+    public UUID getQueryControllerId() {
+        return queryControllerId;
+    }
+    
     public UUID getQueryId() {
         return queryId;
     }
@@ -119,6 +126,11 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
             throw new IllegalArgumentException();
 
         this.queryController = queryController;
+        try {
+            this.queryControllerId = queryController.getServiceUUID();
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
         
         this.queryId = queryId;
 

@@ -42,8 +42,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * This operator is used as part of the BigdataValue materialization step inside
@@ -128,7 +128,7 @@ public class InlineMaterializeOp<E> extends PipelineOp {
         
         private final LexiconRelation lex;
         
-        private final IAsynchronousIterator<IBindingSet[]> source;
+        private final ICloseableIterator<IBindingSet[]> source;
 
         private final IBlockingBuffer<IBindingSet[]> sink;
         

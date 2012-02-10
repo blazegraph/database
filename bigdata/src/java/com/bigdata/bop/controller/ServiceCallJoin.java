@@ -49,7 +49,6 @@ import com.bigdata.rdf.sparql.ast.ServiceCall;
 import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -228,7 +227,7 @@ public class ServiceCallJoin extends PipelineOp {
             
             try {
 
-                final IAsynchronousIterator<IBindingSet[]> sitr = context
+                final ICloseableIterator<IBindingSet[]> sitr = context
                         .getSource();
 
                 boolean first = true;

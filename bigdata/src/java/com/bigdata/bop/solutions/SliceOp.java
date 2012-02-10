@@ -40,10 +40,10 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An operator which imposes an offset/limit on a binding set pipeline.
@@ -293,7 +293,7 @@ public class SliceOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-            final IAsynchronousIterator<IBindingSet[]> source = context
+            final ICloseableIterator<IBindingSet[]> source = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

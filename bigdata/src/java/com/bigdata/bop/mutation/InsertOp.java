@@ -45,10 +45,10 @@ import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -161,7 +161,7 @@ public class InsertOp<E> extends PipelineOp implements
         
         private final BOpContext<IBindingSet> context;
         
-        private final IAsynchronousIterator<IBindingSet[]> source;
+        private final ICloseableIterator<IBindingSet[]> source;
 
         /**
          * Only used to close the sink when we are done.
@@ -174,7 +174,7 @@ public class InsertOp<E> extends PipelineOp implements
         
         private final IKeyOrder<E> keyOrder;
         
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         InsertTask(final InsertOp<E> op, final BOpContext<IBindingSet> context) {
         
             this.context = context;

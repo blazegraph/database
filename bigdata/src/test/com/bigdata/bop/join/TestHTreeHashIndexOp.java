@@ -50,7 +50,6 @@ import com.bigdata.bop.join.AbstractHashJoinUtilityTestCase.JoinSetup;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
  * Test suite for {@link HTreeHashIndexOp}.
@@ -117,12 +116,12 @@ public class TestHTreeHashIndexOp extends TestCase2 {
 
     }
 
-    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[][] bindingSets) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSets);
-
-    }
+//    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet[][] bindingSets) {
+//
+//        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSets);
+//
+//    }
     
     /**
      * Correct rejection tests for the constructor (must run on the controller,
@@ -375,8 +374,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         };
 
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                newBindingSetIterator(new IBindingSet[][] { bindingSets1,
-                        bindingSets2 }));
+                concat(bindingSets1, bindingSets2));
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
@@ -470,13 +468,45 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         };
 
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                newBindingSetIterator(new IBindingSet[][] { bindingSets1,
-                        bindingSets2 }));
+                concat(bindingSets1, bindingSets2));
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 runningQuery);
         
+    }
+
+    /**
+     * Combines the two arrays, appending the contents of the 2nd array to the
+     * contents of the first array.
+     * 
+     * @param a
+     * @param b
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T[] concat(final T[] a, final T[] b) {
+
+        if (a == null && b == null)
+            return a;
+
+        if (a == null)
+            return b;
+
+        if (b == null)
+            return a;
+
+        final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
+                .getComponentType(), a.length + b.length);
+
+        // final String[] c = new String[a.length + b.length];
+
+        System.arraycopy(a, 0, c, 0, a.length);
+
+        System.arraycopy(b, 0, c, a.length, b.length);
+
+        return c;
+
     }
 
 }

@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
  * Implementation supports a standalone database. The generated chunk is left on
@@ -55,11 +54,12 @@ public class StandaloneChunkHandler implements IChunkHandler {
         if (chunk.length == 0)
             return 0;
         
-        final LocalChunkMessage<IBindingSet> msg = new LocalChunkMessage<IBindingSet>(
-                query.getQueryController(), query.getQueryId(), sinkId,
-                -1/* partitionId */,
-                new ThickAsynchronousIterator<IBindingSet[]>(
-                        new IBindingSet[][] { chunk }));
+        final LocalChunkMessage msg = new LocalChunkMessage(
+                query.getQueryController(), //
+                query.getQueryId(),// 
+                sinkId,// bopId
+                -1, // partitionId
+                chunk);
 
         final QueryEngine queryEngine = query.getQueryEngine();
 
