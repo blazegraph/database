@@ -2509,12 +2509,17 @@ public class RWStore implements IStore, IBufferedWriter {
             /*
              * Free deferrals.
              * 
-             * Note: This adds one to the lastDeferredReleaseTime to give
-             * exclusive lower bound semantics.
+             * Note: Per ticket#480, we can not begin recycling from the first
+             * commit point in the commit record index as there are some bigdata
+             * versions (1.0.4) where we did not prune the commit record index.
+             * Therefore, this relies on the (lastDeferredReleaseTime+1) for the
+             * exclusive lower bound. This is avoids triggering an exception
+             * from an attempt to process deferred free blocks which have
+             * already been released.
              * 
-             * FIXME Discuss lower bound again with Martyn. 0L should be Ok.
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
              */
-            return freeDeferrals(journal, 0L /*m_lastDeferredReleaseTime + 1*/,
+            return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
                     latestReleasableTime);
 
         } finally {
