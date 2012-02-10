@@ -75,7 +75,7 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
      * wise and this {@link IIndexManager} MUST be able to read on the
      * {@link ILocalBTreeView}.
      */
-    IIndexManager getIndexManager();
+    IIndexManager getLocalIndexManager();
 
     /**
      * The query engine class executing the query on this node.

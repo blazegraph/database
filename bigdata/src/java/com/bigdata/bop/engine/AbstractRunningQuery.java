@@ -1382,7 +1382,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
-    public IIndexManager getIndexManager() {
+    public IIndexManager getLocalIndexManager() {
 
         return queryEngine.getIndexManager();
 

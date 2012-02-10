@@ -87,7 +87,7 @@ public class MockRunningQuery implements IRunningQuery {
         return fed;
     }
 
-    public IIndexManager getIndexManager() {
+    public IIndexManager getLocalIndexManager() {
         return indexManager;
     }
 

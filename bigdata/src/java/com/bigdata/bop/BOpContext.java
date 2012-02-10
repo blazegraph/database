@@ -224,7 +224,7 @@ public class BOpContext<E> extends BOpContextBase {
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
         
-        super(runningQuery.getFederation(), runningQuery.getIndexManager());
+        super(runningQuery.getFederation(), runningQuery.getLocalIndexManager());
         
         if (stats == null)
             throw new IllegalArgumentException();
