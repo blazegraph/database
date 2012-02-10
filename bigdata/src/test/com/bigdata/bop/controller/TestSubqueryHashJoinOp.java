@@ -47,7 +47,6 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
@@ -56,9 +55,7 @@ import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.PipelineJoin;
@@ -344,12 +341,12 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -455,12 +452,12 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -569,12 +566,12 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -676,12 +673,12 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -865,20 +862,21 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
-        final IChunkMessage<IBindingSet> initialChunkMessage;
-        {
-
-            final IBindingSet initialBindings = new HashBindingSet();
-
-//            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
-
-            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
-                    queryId, startId,//
-                    -1, // partitionId
-                    newBindingSetIterator(initialBindings));
-        }
+//        final IChunkMessage<IBindingSet> initialChunkMessage;
+//        {
+//
+//            final IBindingSet initialBindings = new HashBindingSet();
+//
+////            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
+//
+//            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+//                    queryId, startId,//
+//                    -1, // partitionId
+//                    newBindingSetIterator(initialBindings));
+//        }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                initialChunkMessage);
+                new ListBindingSet());
+//                initialChunkMessage);
 
         // verify solutions.
         {
@@ -1126,20 +1124,21 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
-        final IChunkMessage<IBindingSet> initialChunkMessage;
-        {
-
-            final IBindingSet initialBindings = new HashBindingSet();
-
-//            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
-
-            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
-                    queryId, startId,//
-                    -1, // partitionId
-                    newBindingSetIterator(initialBindings));
-        }
+//        final IChunkMessage<IBindingSet> initialChunkMessage;
+//        {
+//
+//            final IBindingSet initialBindings = new HashBindingSet();
+//
+////            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
+//
+//            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+//                    queryId, startId,//
+//                    -1, // partitionId
+//                    newBindingSetIterator(initialBindings));
+//        }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                initialChunkMessage);
+                new ListBindingSet());
+//                initialChunkMessage);
 
         // verify solutions.
         {
@@ -1382,20 +1381,22 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         // start the query.
         final UUID queryId = UUID.randomUUID();
-        final IChunkMessage<IBindingSet> initialChunkMessage;
+        final IBindingSet initialBindings = new ListBindingSet();
+//        final IChunkMessage<IBindingSet> initialChunkMessage;
         {
 
-            final IBindingSet initialBindings = new HashBindingSet();
+//            final IBindingSet initialBindings = new HashBindingSet();
 
 //            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
-                    queryId, startId,//
-                    -1, // partitionId
-                    newBindingSetIterator(initialBindings));
+//            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+//                    queryId, startId,//
+//                    -1, // partitionId
+//                    newBindingSetIterator(initialBindings));
         }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                initialChunkMessage);
+                initialBindings);
+//                initialChunkMessage);
 
         // verify solutions.
         {

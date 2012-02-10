@@ -54,6 +54,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Pipelined join with subquery.
@@ -290,7 +291,7 @@ public class SubqueryOp extends PipelineOp {
             
             try {
 
-                final IAsynchronousIterator<IBindingSet[]> sitr = context
+                final ICloseableIterator<IBindingSet[]> sitr = context
                         .getSource();
                 
                 while(sitr.hasNext()) {

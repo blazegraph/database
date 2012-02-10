@@ -39,8 +39,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.JoinAnnotations;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator projects only the identified variables.
@@ -130,7 +130,7 @@ public class ProjectionOp extends PipelineOp {
 
             final BOpStats stats = context.getStats();
 
-            final IAsynchronousIterator<IBindingSet[]> itr = context
+            final ICloseableIterator<IBindingSet[]> itr = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

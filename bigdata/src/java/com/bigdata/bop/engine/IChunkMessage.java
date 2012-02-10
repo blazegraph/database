@@ -17,12 +17,43 @@ import com.bigdata.service.ResourceService;
  * @param <E>
  *            The generic type of the elements in the chunk (binding sets,
  *            elements from a relation, etc).
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/475"> Optimize
+ *      serialization for query messages on cluster </a>
  */
 public interface IChunkMessage<E> {
 
-    /** The proxy for the query controller. */
+    /**
+     * The proxy for the query controller.
+     * 
+     * @deprecated This forces us to serialize and send the proxy for the query
+     *             controller on a cluster. The message format is slimmer if we
+     *             instead rely on resolution of {@link #getQueryControllerId()}
+     *             against a service discovery cache.
+     *             <p>
+     *             We can not discover the query controller using river because
+     *             it is not registered as a service. We can find the query
+     *             peers on the data service nodes easily enough because they
+     *             are all registered with river. However, the QueryEngine
+     *             serving as the query controller is not currently registered
+     *             with river and hence it can not be discovered using the UUID
+     *             of the query controller alone. Probably the right thing to do
+     *             is to register the query controller with river so it can be
+     *             discovered. We could then modify getQueryPeer() (or add
+     *             getQueryClient(UUID)) which would hit the discovery cache.
+     *             
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+     */
     IQueryClient getQueryController();
 
+    /**
+     * The UUID of the query controller (the {@link IQueryClient} to which the
+     * query was submitted).
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+     */
+    UUID getQueryControllerId();
+    
     /** The query identifier. */
     UUID getQueryId();
 
@@ -70,4 +101,9 @@ public interface IChunkMessage<E> {
      */
     IChunkAccessor<E> getChunkAccessor();
 
+    /**
+     * Return the #of solutions which are available from this message.
+     */
+    int getSolutionCount();
+    
 }

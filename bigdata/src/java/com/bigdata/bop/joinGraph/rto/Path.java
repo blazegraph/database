@@ -25,7 +25,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.Dechunkerator;
 
 /**
@@ -837,11 +836,12 @@ public class Path {
 
         // run the cutoff sampling of the edge.
         final UUID queryId = UUID.randomUUID();
-        final IRunningQuery runningQuery = queryEngine.eval(queryId, queryOp,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId, joinOp
+        final IRunningQuery runningQuery = queryEngine.eval(
+                queryId,
+                queryOp,
+                new LocalChunkMessage(queryEngine, queryId, joinOp
                         .getId()/* startId */, -1 /* partitionId */,
-                        new ThickAsynchronousIterator<IBindingSet[]>(
-                                new IBindingSet[][] { sourceSample.getSample() })));
+                        sourceSample.getSample()));
 
         final List<IBindingSet> result = new LinkedList<IBindingSet>();
         try {

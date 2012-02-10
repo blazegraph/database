@@ -34,13 +34,13 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An operator for conditional routing of binding sets in a pipeline. The
@@ -122,7 +122,7 @@ public class ConditionalRoutingOp extends PipelineOp {
 
         private final IConstraint condition;
         
-        private final IAsynchronousIterator<IBindingSet[]> source;
+        private final ICloseableIterator<IBindingSet[]> source;
 
         private final IBlockingBuffer<IBindingSet[]> sink;
         

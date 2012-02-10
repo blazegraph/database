@@ -59,6 +59,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Unit test for reading on an access path using a {@link Predicate}. This unit
@@ -276,8 +277,8 @@ public class TestPredicateAccessPath extends TestCase2 {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(
+                new IBindingSet[0]);
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -352,8 +353,7 @@ public class TestPredicateAccessPath extends TestCase2 {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(new IBindingSet[0]);
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -453,8 +453,7 @@ public class TestPredicateAccessPath extends TestCase2 {
         
         final BOpStats statIsIgnored = new BOpStats();
 
-        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[0] });
+        final ICloseableIterator<IBindingSet[]> sourceIsIgnored = newBindingSetIterator(new IBindingSet[0]);
 
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
@@ -488,6 +487,21 @@ public class TestPredicateAccessPath extends TestCase2 {
         } finally {
             itr.close();
         }
+        
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read the source
+     * {@link IBindingSet}s.
+     * 
+     * @param bsets
+     *            The source binding sets.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bsets) {
+     
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bsets });
         
     }
 

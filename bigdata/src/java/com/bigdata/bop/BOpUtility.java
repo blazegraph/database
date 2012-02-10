@@ -42,14 +42,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -876,7 +875,7 @@ public class BOpUtility {
     	final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
 
         int nchunks = 0, nelements = 0;
-        {
+        try {
 
             while (itr.hasNext()) {
 
@@ -893,6 +892,14 @@ public class BOpUtility {
             stats.chunksIn.add(nchunks);
             stats.unitsIn.add(nelements);
 
+        } finally {
+            
+            if (itr instanceof ICloseableIterator<?>) {
+             
+                ((ICloseableIterator<?>) itr).close();
+                
+            }
+            
         }
 
         if (nchunks == 0) {

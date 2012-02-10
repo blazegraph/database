@@ -39,15 +39,38 @@ import com.bigdata.striterator.IChunkedIterator;
  * API providing a variety of ways to access chunks of data (data are typically
  * elements or binding sets).
  * 
- * @todo Expose an {@link IChunkedIterator}, which handles both element at a
- *       time and chunk at a time.
+ * TODO We do not need to use {@link IAsynchronousIterator} any more. This could
+ * be much more flexible and should be harmonized to support high volume
+ * operators, GPU operators, etc. probably the right thing to do is introduce
+ * another interface here with a getChunk():IChunk where IChunk let's you access
+ * the chunks data in different ways (and chunks can be both {@link IBindingSet}
+ * []s and element[]s so we might need to raise that into the interfaces and/or
+ * generics as well).
  * 
- * @todo Expose a mechanism to visit the direct {@link ByteBuffer} slices in
- *       which the data are stored. For an operator which executes on a GPU, we
- *       want to transfer the data from the direct {@link ByteBuffer} in which
- *       it was received into a direct {@link ByteBuffer} which is a slice onto
- *       its VRAM. (And obviously we need to do the reverse with the outputs of
- *       a GPU operator).
+ * TODO It is likely that we can convert to the use of {@link BlockingQueue}
+ * instead of {@link BlockingBuffer} in the operators and then handle the logic
+ * for combining chunks inside of the {@link QueryEngine}. E.g., by scanning
+ * this list for chunks for the same bopId and combining them logically into a
+ * single chunk.
+ * <p>
+ * For scale-out, chunk combination will naturally occur when the node on which
+ * the operator will run requests the {@link ByteBuffer}s from the source nodes.
+ * Those will get wrapped up logically into a source for processing. For
+ * selective operators, those chunks can be combined before we execute the
+ * operator. For unselective operators, we are going to run over all the data
+ * anyway.
+ * 
+ * TODO Expose an {@link IChunkedIterator}, which handles both element at a time
+ * and chunk at a time.
+ * 
+ * TODO Expose a mechanism to visit the direct {@link ByteBuffer} slices in
+ * which the data are stored. For an operator which executes on a GPU, we want
+ * to transfer the data from the direct {@link ByteBuffer} in which it was
+ * received into a direct {@link ByteBuffer} which is a slice onto its VRAM.
+ * (And obviously we need to do the reverse with the outputs of a GPU operator).
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/475"> Optimize
+ *      serialization for query messages on cluster </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -56,28 +79,6 @@ public interface IChunkAccessor<E> {
 
     /**
      * Visit the binding sets in the chunk.
-     * 
-     * @todo We do not need to use {@link IAsynchronousIterator} any more. This
-     *       could be much more flexible and should be harmonized to support
-     *       high volume operators, GPU operators, etc. probably the right thing
-     *       to do is introduce another interface here with a getChunk():IChunk
-     *       where IChunk let's you access the chunks data in different ways
-     *       (and chunks can be both {@link IBindingSet}[]s and element[]s so we
-     *       might need to raise that into the interfaces and/or generics as
-     *       well).
-     * 
-     * @todo It is likely that we can convert to the use of
-     *       {@link BlockingQueue} instead of {@link BlockingBuffer} in the
-     *       operators and then handle the logic for combining chunks inside of
-     *       the {@link QueryEngine}. E.g., by scanning this list for chunks for
-     *       the same bopId and combining them logically into a single chunk.
-     *       <p>
-     *       For scale-out, chunk combination will naturally occur when the node
-     *       on which the operator will run requests the {@link ByteBuffer}s
-     *       from the source nodes. Those will get wrapped up logically into a
-     *       source for processing. For selective operators, those chunks can be
-     *       combined before we execute the operator. For unselective operators,
-     *       we are going to run over all the data anyway.
      */
     IAsynchronousIterator<E[]> iterator();
 

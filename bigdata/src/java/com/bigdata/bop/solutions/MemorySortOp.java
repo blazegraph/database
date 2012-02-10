@@ -20,8 +20,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An in-memory merge sort for binding sets. The operator is pipelined. Each
@@ -201,7 +201,7 @@ public class MemorySortOp extends SortOp {
 
         public Void call() throws Exception {
 
-            final IAsynchronousIterator<IBindingSet[]> itr = context
+            final ICloseableIterator<IBindingSet[]> itr = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
@@ -251,7 +251,7 @@ public class MemorySortOp extends SortOp {
          *            The source solutions.
          */
         private void acceptSolutions(
-                final IAsynchronousIterator<IBindingSet[]> itr) {
+                final ICloseableIterator<IBindingSet[]> itr) {
 
             try {
 

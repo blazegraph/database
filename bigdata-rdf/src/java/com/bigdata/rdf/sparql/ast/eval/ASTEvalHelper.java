@@ -62,7 +62,6 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -82,31 +81,34 @@ public class ASTEvalHelper {
      */
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
     
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read a single, empty
+//     * {@link IBindingSet}.
+//     * 
+//     * @param bindingSet
+//     *            the binding set.
+//     */
+//    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet bindingSet) {
+//
+//        return new ThickAsynchronousIterator<IBindingSet[]>(
+//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+//
+//    }
+
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single, empty
-     * {@link IBindingSet}.
+     * Setup the input binding set which will be fed into the query pipeline.
      * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-
-    }
-
-    /**
-     * Setup the input binding sets which will be fed into the query pipeline.
+     * @param bs
+     *            The given source binding set (optional).
      * 
-     * @throws SailException 
+     * @return Either the argument or an empty {@link IBindingSet} if the
+     *         argument was <code>null</code>.
      */
-    static private IAsynchronousIterator<IBindingSet[]> wrapSource(
-            final AbstractTripleStore store, final IBindingSet bs)
+    static private IBindingSet wrapSource(final IBindingSet bs)
             throws SailException {
 
-        final IAsynchronousIterator<IBindingSet[]> source;
+//        final IAsynchronousIterator<IBindingSet[]> source;
         
         if (bs != null) {
         
@@ -116,7 +118,8 @@ public class ASTEvalHelper {
              */
 
             // wrap the resolved binding set.
-            source = newBindingSetIterator(bs);
+//            source = newBindingSetIterator(bs);
+            return bs;
 
         } else {
             
@@ -125,11 +128,12 @@ public class ASTEvalHelper {
              * pipeline.
              */
             
-            source = newBindingSetIterator(new ListBindingSet());
+//            source = newBindingSetIterator(new ListBindingSet());
+            return new ListBindingSet();
             
         }
 
-        return source;
+//        return source;
         
     }
     
@@ -380,13 +384,14 @@ public class ASTEvalHelper {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
         
         IRunningQuery runningQuery = null;
-        IAsynchronousIterator<IBindingSet[]> source = null;
+//        IAsynchronousIterator<IBindingSet[]> source = null;
         try {
             
-            source = wrapSource(ctx.db, bs);
+//            source = wrapSource(bs);
 
             // Submit query for evaluation.
-            runningQuery = ctx.queryEngine.eval(queryPlan, source);
+            runningQuery = ctx.queryEngine.eval(queryPlan,wrapSource(bs));
+//                    1/* solutionCount */, source);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
@@ -400,9 +405,9 @@ public class ASTEvalHelper {
                 // ensure query is halted.
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
-            // ensure source is closed on error path.
-            if(source != null) 
-                source.close();
+//            // ensure source is closed on error path.
+//            if(source != null) 
+//                source.close();
             throw new QueryEvaluationException(t);
         }
 

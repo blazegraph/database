@@ -959,9 +959,9 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
         
         // step1 : startQuery, notice that a chunk is available.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
+        runState.startQuery(new LocalChunkMessage(queryController,
                 queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+                new HashBindingSet()));
    
         expected.started.set(true);
         expected.stepCount.incrementAndGet();
@@ -1065,9 +1065,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
         
         // step1 : startQuery, notice that a chunk is available.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
-                queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+        runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                startId, -1/* partitionId */, new HashBindingSet()));
 
         expected.started.set(true);
         expected.stepCount.incrementAndGet();
@@ -1199,9 +1198,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
 
         // step1 : startQuery, notice that a chunk is available.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
-                queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+        runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                startId, -1/* partitionId */, new HashBindingSet()));
 
         expected.started.set(true);
         expected.stepCount.incrementAndGet();
@@ -1212,9 +1210,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
 
         try {
-            runState.startQuery(new LocalChunkMessage<IBindingSet>(
-                    queryController, queryId, startId, -1/* partitionId */,
-                    newBindingSetIterator(new HashBindingSet())));
+            runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                    startId, -1/* partitionId */, new HashBindingSet()));
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -1286,9 +1283,8 @@ public class TestRunState extends TestCase2 {
 
         // start the query.
         try {
-            runState.startQuery(new LocalChunkMessage<IBindingSet>(
-                    queryController, queryId, startId, -1/* partitionId */,
-                    newBindingSetIterator(new HashBindingSet())));
+            runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                    startId, -1/* partitionId */, new HashBindingSet()));
             fail("Expected: " + TimeoutException.class);
         } catch (TimeoutException ex) {
             if (log.isInfoEnabled())
@@ -1356,9 +1352,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
 
         // start the query.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
-                queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+        runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                startId, -1/* partitionId */, new HashBindingSet()));
         
         // verify post-conditions.
         expected.started.set(true);
@@ -1443,9 +1438,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
 
         // start the query.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
-                queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+        runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                startId, -1/* partitionId */, new HashBindingSet()));
         
         // verify post-conditions.
         expected.started.set(true);
@@ -1560,9 +1554,8 @@ public class TestRunState extends TestCase2 {
         assertSameState(expected, actual);
         
         // step1 : startQuery, notice that a chunk is available.
-        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
-                queryId, startId, -1/* partitionId */,
-                newBindingSetIterator(new HashBindingSet())));
+        runState.startQuery(new LocalChunkMessage(queryController, queryId,
+                startId, -1/* partitionId */, new HashBindingSet()));
 
         expected.started.set(true);
         expected.stepCount.incrementAndGet();

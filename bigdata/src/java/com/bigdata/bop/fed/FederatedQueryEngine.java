@@ -408,6 +408,10 @@ public class FederatedQueryEngine extends QueryEngine {
                     
                     q.halt(t);
                     
+                } else {
+                    
+                    log.error(t, t);
+                    
                 }
                 
             }
@@ -441,7 +445,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
                 // true iff this is the query controller
                 final boolean isController = getServiceUUID().equals(
-                        msg.getQueryController().getServiceUUID());
+                        msg.getQueryControllerId());
 
                 if (isController) {
                     
@@ -549,10 +553,27 @@ public class FederatedQueryEngine extends QueryEngine {
 
             /*
              * Request the query from the query controller (RMI).
+             * 
+             * FIXME We can not discover the query controller using river
+             * because it is not registered as a service. We can find the query
+             * peers on the data service nodes easily enough because they are
+             * all registered with river. However, the QueryEngine serving as
+             * the query controller is not currently registered with river and
+             * hence it can not be discovered using the UUID of the query
+             * controller alone. Probably the right thing to do is to register
+             * the query controller with river so it can be discovered. We could
+             * then modify getQueryPeer() (or add getQueryClient(UUID)) which
+             * would hit the discovery cache.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
              */
             
-            final PipelineOp query = msg.getQueryController().getQuery(
-                    msg.getQueryId());
+//            final IQueryClient queryController = (IQueryClient) getQueryPeer(msg
+//                    .getQueryControllerId());
+
+            final IQueryClient queryController = msg.getQueryController();
+            
+            final PipelineOp query = queryController.getQuery(msg.getQueryId());
             
             if (query == null) {
             
@@ -565,9 +586,9 @@ public class FederatedQueryEngine extends QueryEngine {
                 
             }
 
-            final FederatedRunningQuery q = newRunningQuery(
-            /* FederatedQueryEngine.this, */queryId, false/* controller */,
-                    msg.getQueryController(), query, msg);
+            final FederatedRunningQuery q = newRunningQuery(queryId,
+                    false/* controller */, queryController,
+                    msg.getQueryControllerId(), query, msg);
 
             return (FederatedRunningQuery) putIfAbsent(queryId, q);
 
@@ -576,12 +597,13 @@ public class FederatedQueryEngine extends QueryEngine {
     }
     
     @Deprecated // see IQueryClient
-    public void declareQuery(final IQueryDecl queryDecl) {
+    public void declareQuery(final IQueryDecl queryDecl) throws RemoteException {
 
         final UUID queryId = queryDecl.getQueryId();
         
         final FederatedRunningQuery q = newRunningQuery(/*this, */queryId,
                 false/* controller */, queryDecl.getQueryController(),
+                queryDecl.getQueryController().getServiceUUID(), // TODO This is an RMI(!)
                 queryDecl.getQuery(), null/*realSource*/);
         
         putIfAbsent(queryId, q);
@@ -682,13 +704,13 @@ public class FederatedQueryEngine extends QueryEngine {
      * Overridden to always use a {@link FederatedRunningQuery}.
      */
     @Override
-    protected FederatedRunningQuery newRunningQuery(
-            /*final QueryEngine queryEngine,*/ final UUID queryId,
+    protected FederatedRunningQuery newRunningQuery(final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
-            final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
+            final UUID queryControllerId, final PipelineOp query,
+            final IChunkMessage<IBindingSet> realSource) {
 
-        return new FederatedRunningQuery(this/*queryEngine*/, queryId, controller,
-                clientProxy, query, realSource);
+        return new FederatedRunningQuery(this/* queryEngine */, queryId,
+                controller, clientProxy, queryControllerId, query, realSource);
 
     }
 

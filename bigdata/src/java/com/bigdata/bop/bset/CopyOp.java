@@ -41,9 +41,9 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * This operator copies its source to its sink(s). Specializations exist which are
@@ -168,7 +168,7 @@ public class CopyOp extends PipelineOp {
         public Void call() throws Exception {
 
             // source.
-            final IAsynchronousIterator<IBindingSet[]> source = context
+            final ICloseableIterator<IBindingSet[]> source = context
                     .getSource();
 
             // default sink

@@ -156,19 +156,19 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
 	}
 
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSetChunks
-     *            the chunks of binding sets.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[][] bindingSetChunks) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
-
-    }
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+//     * containing all of the specified {@link IBindingSet}s.
+//     * 
+//     * @param bindingSetChunks
+//     *            the chunks of binding sets.
+//     */
+//    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet[][] bindingSetChunks) {
+//
+//        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
+//
+//    }
 
 	/**
 	 * Test helper for ORDER_BY tests. We can judge correctness by ensuring that
@@ -244,9 +244,8 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery q = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId, -1/* partitionId */,
-                        newBindingSetIterator(chunks)));
+                new LocalChunkMessage(queryEngine, queryId, startId,
+                        -1/* partitionId */, chunks));
 
 		/*
 		 * Consume solutions, verifying the #of solutions and their order.

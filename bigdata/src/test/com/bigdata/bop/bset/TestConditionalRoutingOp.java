@@ -54,6 +54,7 @@ import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Unit tests for {@link JVMDistinctBindingSetsOp}.
@@ -183,8 +184,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
 
         final BOpStats stats = query.newStats();
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+        final ICloseableIterator<IBindingSet[]> source = newBindingSetIterator(data
+                .toArray(new IBindingSet[0]));
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);
@@ -215,4 +216,19 @@ public class TestConditionalRoutingOp extends TestCase2 {
 
     }
     
+    /**
+     * Return an {@link IAsynchronousIterator} that will read the source
+     * {@link IBindingSet}s.
+     * 
+     * @param bsets
+     *            The source binding sets.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bsets) {
+     
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bsets });
+        
+    }
+
 }

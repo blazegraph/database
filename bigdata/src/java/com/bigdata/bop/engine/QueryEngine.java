@@ -62,8 +62,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -848,7 +846,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     
     @Deprecated // see IQueryClient
-    public void declareQuery(final IQueryDecl queryDecl) {
+    public void declareQuery(final IQueryDecl queryDecl) throws RemoteException {
         
         throw new UnsupportedOperationException();
         
@@ -908,45 +906,45 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
 
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, empty
-     * {@link IBindingSet}.
-     */
-    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator() {
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read a single, empty
+//     * {@link IBindingSet}.
+//     */
+//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator() {
+//
+//        return newBindingSetIterator(new ListBindingSet());
+//
+//    }
 
-        return newBindingSetIterator(new ListBindingSet());
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read a single
+//     * {@link IBindingSet}.
+//     * 
+//     * @param bindingSet
+//     *            the binding set.
+//     */
+//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet bindingSet) {
+//
+//        return new ThickAsynchronousIterator<IBindingSet[]>(
+//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+//
+//    }
 
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single
-     * {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read the source
-     * {@link IBindingSet}s.
-     * 
-     * @param bsets
-     *            The source binding sets.
-     */
-    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[] bsets) {
-     
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bsets });
-        
-    }
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read the source
+//     * {@link IBindingSet}s.
+//     * 
+//     * @param bsets
+//     *            The source binding sets.
+//     */
+//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet[] bsets) {
+//     
+//        return new ThickAsynchronousIterator<IBindingSet[]>(
+//                new IBindingSet[][] { bsets });
+//        
+//    }
     
     /** Use a random UUID unless the UUID was specified on the query. */
     private static UUID getQueryUUID(final BOp op) {
@@ -969,27 +967,56 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
 
-    /**
-     * Return a {@link LocalChunkMessage} for the query wrapping the specified
-     * source.
-     * 
-     * @param queryId
-     *            The query's {@link UUID}.
-     * @param op
-     *            The query.
-     * @param src
-     *            The source to be wrapped.
-     *            
-     * @return The message.
-     */
-    private LocalChunkMessage<IBindingSet> newLocalChunkMessage(
-            final UUID queryId, final BOp op,
-            final IAsynchronousIterator<IBindingSet[]> src) {
+    private LocalChunkMessage newLocalChunkMessage(final UUID queryId,
+            final BOp op, final IBindingSet src) {
 
-        return new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
-                queryId, getStartId(op), -1 /* partitionId */, src);
+        return new LocalChunkMessage(this/* queryEngine */, queryId,
+                getStartId(op), -1 /* partitionId */, src);
 
     }
+    
+    private LocalChunkMessage newLocalChunkMessage(final UUID queryId,
+            final BOp op, final IBindingSet[] src) {
+
+        return new LocalChunkMessage(this/* queryEngine */, queryId,
+                getStartId(op), -1 /* partitionId */, src);
+
+    }
+
+    private LocalChunkMessage newLocalChunkMessage(final UUID queryId,
+            final BOp op, final IBindingSet[][] src) {
+
+        return new LocalChunkMessage(this/* queryEngine */, queryId,
+                getStartId(op), -1 /* partitionId */, src);
+
+    }
+
+//    /**
+//     * Return a {@link LocalChunkMessage} for the query wrapping the specified
+//     * source.
+//     * 
+//     * @param queryId
+//     *            The query's {@link UUID}.
+//     * @param op
+//     *            The query.
+//     * @param solutionCount
+//     *            The #of solutions which can be drained from that source.
+//     * @param src
+//     *            The source to be wrapped.
+//     * 
+//     * @return The message.
+//     * 
+//     * @deprecated We are trying to get the {@link IAsynchronousIterator} out
+//     * of the API here.
+//     */
+//    private LocalChunkMessage newLocalChunkMessage(final UUID queryId,
+//            final BOp op, final int solutionCount,
+//            final IAsynchronousIterator<IBindingSet[]> src) {
+//
+//        return new LocalChunkMessage(this/* queryEngine */, queryId,
+//                getStartId(op), -1 /* partitionId */, solutionCount, src);
+//
+//    }
     
     /**
      * Evaluate a query. This node will serve as the controller for the query.
@@ -1026,7 +1053,37 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     public AbstractRunningQuery eval(final BOp op, final IBindingSet bset)
             throws Exception {
 
-        return eval(getQueryUUID(op), op, newBindingSetIterator(bset));
+        final UUID queryId = getQueryUUID(op);
+        
+        return eval(queryId, (PipelineOp) op,
+                newLocalChunkMessage(queryId, op, bset));
+
+    }
+
+    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
+            final IBindingSet bset) throws Exception {
+
+        return eval(queryId, (PipelineOp) op,
+                newLocalChunkMessage(queryId, op, bset));
+
+    }
+
+    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
+            final IBindingSet[] bset) throws Exception {
+
+        return eval(queryId, (PipelineOp) op,
+                newLocalChunkMessage(queryId, op, bset));
+
+//        return eval(queryId, op, bset.length/* solutionCount */,
+//                newBindingSetIterator(bset));
+
+    }
+
+    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
+            final IBindingSet[][] bset) throws Exception {
+
+        return eval(queryId, (PipelineOp) op,
+                newLocalChunkMessage(queryId, op, bset));
 
     }
 
@@ -1047,57 +1104,72 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     public AbstractRunningQuery eval(final BOp op, final IBindingSet[] bsets)
             throws Exception {
 
-        return eval(getQueryUUID(op), op, newBindingSetIterator(bsets));
-
-    }
-
-    /**
-     * Evaluate a query. This node will serve as the controller for the query.
-     * 
-     * @param query
-     *            The query to evaluate.
-     * @param bsets
-     *            The binding sets to be consumed by the query.
-     * 
-     * @return The {@link IRunningQuery}.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link QueryEngine} has been {@link #shutdown()}.
-     * @throws Exception
-     */
-    public AbstractRunningQuery eval(final BOp op,
-            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
-
         final UUID queryId = getQueryUUID(op);
-        
-        return eval(queryId, (PipelineOp) op,
-                newLocalChunkMessage(queryId, op, bsets));
-
-    }
-
-    /**
-     * Evaluate a query. This node will serve as the controller for the query.
-     * 
-     * @param queryId
-     *            The unique identifier for the query.
-     * @param query
-     *            The query to evaluate.
-     * @param bsets
-     *            The binding sets to be consumed by the query.
-     * 
-     * @return The {@link IRunningQuery}.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link QueryEngine} has been {@link #shutdown()}.
-     * @throws Exception
-     */
-    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
-            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
 
         return eval(queryId, (PipelineOp) op,
                 newLocalChunkMessage(queryId, op, bsets));
 
     }
+
+//    /**
+//     * Evaluate a query. This node will serve as the controller for the query.
+//     * 
+//     * @param query
+//     *            The query to evaluate.
+//     * @param solutionCount
+//     *            The #of solutions which can be drained from the iterator.
+//     * @param bsets
+//     *            The binding sets to be consumed by the query.
+//     * 
+//     * @return The {@link IRunningQuery}.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+//     * @throws Exception
+//     * 
+//     * @deprecated We are trying to get the {@link IAsynchronousIterator} out of
+//     *             the API here.
+//     */
+//    public AbstractRunningQuery eval(final BOp op, final int solutionCount,
+//            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
+//
+//        final UUID queryId = getQueryUUID(op);
+//        
+//        return eval(queryId, (PipelineOp) op,
+//                newLocalChunkMessage(queryId, op, solutionCount, bsets));
+//
+//    }
+
+//    /**
+//     * Evaluate a query. This node will serve as the controller for the query.
+//     * 
+//     * @param queryId
+//     *            The unique identifier for the query.
+//     * @param query
+//     *            The query to evaluate.
+//     * @param solutionCount
+//     *            The #of source solutions which are being provided to the
+//     *            query.
+//     * @param bsets
+//     *            The binding sets to be consumed by the query.
+//     * 
+//     * @return The {@link IRunningQuery}.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+//     * @throws Exception
+//     * 
+//     * @deprecated We are trying to get the {@link IAsynchronousIterator} out of
+//     *             the API here.
+//     */
+//    public AbstractRunningQuery eval(final UUID queryId, final BOp op,
+//            final int solutionCount,
+//            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
+//
+//        return eval(queryId, (PipelineOp) op,
+//                newLocalChunkMessage(queryId, op, solutionCount, bsets));
+//
+//    }
 
     /**
      * Evaluate a query. This node will serve as the controller for the query.
@@ -1165,9 +1237,14 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
+        /*
+         * We are the query controller. Our reference will be reported as the
+         * proxy and our serviceUUID will be reported as the UUID of the query
+         * controller.
+         */
         final AbstractRunningQuery runningQuery = newRunningQuery(queryId,
-                true/* controller */, getProxy()/* queryController */, query,
-                msg/* realSource */);
+                true/* controller */, getProxy()/* queryController */,
+                getServiceUUID(), query, msg/* realSource */);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -1471,6 +1548,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     protected AbstractRunningQuery newRunningQuery(
             /*final QueryEngine queryEngine,*/ final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
+            final UUID queryControllerId,
             final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
 
         final String className = query.getProperty(

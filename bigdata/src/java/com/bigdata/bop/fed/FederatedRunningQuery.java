@@ -161,22 +161,26 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
 
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
             final UUID queryId, final boolean controller,
-            final IQueryClient clientProxy, final PipelineOp query,
-            final IChunkMessage<IBindingSet> realSource) {
+            final IQueryClient clientProxy, final UUID queryControllerId,
+            final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
 
         super(queryEngine, queryId, /* begin, */controller, clientProxy, query,
                 realSource);
 
-        /*
-         * Note: getServiceUUID() should be a smart proxy method and thus not
-         * actually do RMI here.  However, it is resolved eagerly and cached
-         * anyway.
-         */
-        try {
-            this.queryControllerUUID = getQueryController().getServiceUUID();
-        } catch (RemoteException e) {
-            throw new RuntimeException(e);
-        }
+        if (queryControllerId == null)
+            throw new IllegalArgumentException();
+
+        this.queryControllerUUID = queryControllerId;
+//        /*
+//         * Note: getServiceUUID() should be a smart proxy method and thus not
+//         * actually do RMI here.  However, it is resolved eagerly and cached
+//         * anyway.
+//         */
+//        try {
+//            this.queryControllerUUID = getQueryController().getServiceUUID();
+//        } catch (RemoteException e) {
+//            throw new RuntimeException(e);
+//        }
         
         if (!getQuery().getEvaluationContext().equals(
                 BOpEvaluationContext.CONTROLLER)) {
@@ -237,8 +241,10 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
             throw new IllegalArgumentException();
         
         final IQueryPeer queryPeer;
+
+        final FederatedQueryEngine queryEngine = getQueryEngine();
         
-        if(serviceUUID.equals(getQueryEngine().getServiceUUID())) {
+        if(serviceUUID.equals(queryEngine.getServiceUUID())) {
 
             /*
              * Return a hard reference to this query engine (NOT a proxy).
@@ -248,7 +254,7 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
              * performance optimization which is supported by all of the data
              * structures involved.
              */
-            queryPeer = getQueryEngine();
+            queryPeer = queryEngine;
             
 //            if(log.isTraceEnabled()) log.trace("Target is self: "+serviceUUID);
             
@@ -265,7 +271,7 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
             
 //            if(log.isTraceEnabled()) log.trace("Target is peer: "+serviceUUID);
 
-            queryPeer = getQueryEngine().getQueryPeer(serviceUUID);
+            queryPeer = queryEngine.getQueryPeer(serviceUUID);
             
         }
 

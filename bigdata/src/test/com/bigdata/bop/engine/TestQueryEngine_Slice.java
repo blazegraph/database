@@ -200,9 +200,8 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery q = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        sliceId, -1/* partitionId */,
-                        newBindingSetIterator(chunks)));
+                new LocalChunkMessage(queryEngine, queryId, sliceId,
+                        -1/* partitionId */, chunks));
 
         // consume solutions.
         int nsolutions = 0;

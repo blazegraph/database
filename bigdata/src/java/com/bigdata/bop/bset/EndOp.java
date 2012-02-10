@@ -10,8 +10,8 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A operator which may be used at the end of query pipelines when there is a
@@ -75,7 +75,7 @@ public class EndOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-            final IAsynchronousIterator<IBindingSet[]> source = context
+            final ICloseableIterator<IBindingSet[]> source = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();

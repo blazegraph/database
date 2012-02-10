@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
-import java.rmi.RemoteException;
 import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -583,14 +582,8 @@ class RunState {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:12
          */
+        final UUID controllerId = msg.getQueryControllerId();
         {
-            final UUID controllerId;
-            try {
-                controllerId = msg.getQueryController().getServiceUUID();
-            } catch (RemoteException ex) {
-                // Note: Local method call. This exception is not thrown.
-                throw new RuntimeException(ex);
-            }
             final Iterator<BOp> itr = BOpUtility.preOrderIterator(innerState.query);
             while(itr.hasNext()) {
                 final BOp op = itr.next();
@@ -619,23 +612,23 @@ class RunState {
             }
         }
         
-        /*
-         * Note: RunState is only used by the query controller so this will not
-         * do an RMI and the RemoteException will not be thrown.
-         */
-        final UUID serviceId;
-        try {
-            serviceId = msg.getQueryController().getServiceUUID();
-        } catch (RemoteException ex) {
-            throw new AssertionError(ex);
-        }
-        innerState.serviceIds.add(serviceId);
+//        /*
+//         * Note: RunState is only used by the query controller so this will not
+//         * do an RMI and the RemoteException will not be thrown.
+//         */
+//        final UUID serviceId;
+//        try {
+//            serviceId = msg.getQueryController().getServiceUUID();
+//        } catch (RemoteException ex) {
+//            throw new AssertionError(ex);
+//        }
+        innerState.serviceIds.add(controllerId);
         
         if (TableLog.tableLog.isInfoEnabled()) {
 //            TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
             
             TableLog.tableLog.info(getTableHeader());
-            TableLog.tableLog.info(getTableRow("startQ", serviceId, msg
+            TableLog.tableLog.info(getTableRow("startQ", controllerId, msg
                     .getBOpId(), -1/* shardId */, 1/* fanIn */,
                     null/* cause */, null/* stats */));
         }
