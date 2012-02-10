@@ -60,7 +60,6 @@ import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
 import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Memoizer;
 import com.sun.jini.thread.Executor;
 
