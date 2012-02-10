@@ -3332,6 +3332,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	public ICommitRecord getCommitRecord(final long commitTime) {
 		
 		if (this._bufferStrategy instanceof RWStrategy) {
+            /*
+             * There are some bigdata releases (such as 1.0.4) where the commit
+             * record index was not pruned when deferred deletes were recycled.
+             * By maintaining this test, we will correctly refuse to return a
+             * commit record for a commit point whose deferred deletes have been
+             * recycled, even when the commit record is still present in the
+             * commit record index.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
+             */
 			if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
 				return null; // no index available
 			}
