@@ -1742,9 +1742,19 @@ public class ClientIndexView implements IScaleOutClientIndex {
                     f.get();
                     
                 } catch (ExecutionException e) {
-                    
+                    /*
+                     * FIXME This needs to recognize when the remote task was
+                     * cancelled by an interrupt and handle that condition
+                     * appropriately. This is tricky since we are running
+                     * multiple tasks in parallel. Probably we should interrupt
+                     * any tasks which are still running and then through an
+                     * InterruptedException wrapping the first exception whose
+                     * root cause was an interrupt out to the caller.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/479#comment:4
+                     */
                     final AbstractDataServiceProcedureTask task = tasks.get(i);
-
+                    
                     // log w/ stack trace so that we can see where this came
                     // from.
                     log.error("Execution failed: task=" + task, e);
