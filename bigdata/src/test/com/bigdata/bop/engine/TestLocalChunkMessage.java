@@ -201,10 +201,10 @@ public class TestLocalChunkMessage extends TestCase2 {
      */
     private static class MockQueryController implements IQueryClient {
 
-        public void haltOp(HaltOpMessage msg) throws RemoteException {
+        public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
-        public void startOp(StartOpMessage msg) throws RemoteException {
+        public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
         public void bufferReady(IChunkMessage<IBindingSet> msg)

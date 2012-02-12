@@ -49,7 +49,7 @@ import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.bop.join.PipelineJoinStats;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
@@ -235,9 +235,10 @@ public class QueryLog {
         sb.append("\tfastRangeCount"); // fast range count used by the static optimizer.
         // dynamics (aggregated for totals as well).
         sb.append("\trunState"); // true iff the operator will not be evaluated again.
-        sb.append("\tfanIO");
         sb.append("\tsumMillis"); // cumulative milliseconds for eval of this operator.
         sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
+        sb.append("\tnumRunning");// #of concurrent invocations of the operator (current value)
+        sb.append("\tfanOut"); // #of shards/nodes on which the operator has started.
         sb.append("\tchunksIn");
         sb.append("\tunitsIn");
         sb.append("\tchunksOut");
@@ -480,7 +481,10 @@ public class QueryLog {
 		 * Dynamics.
 		 */
 
-		int fanIO = 0; // @todo aggregate from RunState.
+        final int fanOut = ((AbstractRunningQuery) q).getStartedOnCount(bopId);
+
+        final long numRunning = ((AbstractRunningQuery) q)
+                .getRunningCount(bopId);
 
 		final PipelineJoinStats stats = new PipelineJoinStats();
 		if(summary) {
@@ -509,12 +513,14 @@ public class QueryLog {
         }
 
 		sb.append('\t');
-		sb.append(Integer.toString(fanIO));
-		sb.append('\t');
 		sb.append(stats.elapsed.get());
 		sb.append('\t');
 		sb.append(stats.opCount.get());
-		sb.append('\t');
+        sb.append('\t');
+        sb.append(Long.toString(numRunning));
+        sb.append('\t');
+        sb.append(Integer.toString(fanOut));
+        sb.append('\t');
 		sb.append(stats.chunksIn.get());
 		sb.append('\t');
 		sb.append(stats.unitsIn.get());
@@ -660,13 +666,12 @@ public class QueryLog {
         w.write("<th>nvars</th>"); // #of variables in the predicate for a join.
         w.write("<th>fastRangeCount</th>"); // fast range count used by the
                                             // static optimizer.
-        // dynamics (aggregated for totals as well).
+                                            // dynamics (aggregated for totals as well).
         w.write("<th>runState</th>");
-        w.write("<th>fanIO</th>");
-        w.write("<th>sumMillis</th>"); // cumulative milliseconds for eval of
-                                       // this operator.
-        w.write("<th>opCount</th>"); // cumulative #of invocations of tasks for
-                                     // this operator.
+        w.write("<th>sumMillis</th>"); // cumulative milliseconds for eval of this operator.
+        w.write("<th>opCount</th>"); // cumulative #of invocations of tasks for this operator.
+        w.write("<th>numRunning</th>"); // #of concurrent invocations of the operator (current value)
+        w.write("<th>fanOut</th>"); // #of shards/nodes on which the operator has started.
         w.write("<th>chunksIn</th>");
         w.write("<th>unitsIn</th>");
         w.write("<th>chunksOut</th>");
@@ -1021,7 +1026,10 @@ public class QueryLog {
          * Dynamics.
          */
 
-        int fanIO = 0; // @todo aggregate from RunState.
+        final int fanOut = ((AbstractRunningQuery) q).getStartedOnCount(bopId);
+
+        final long numRunning = ((AbstractRunningQuery) q)
+                .getRunningCount(bopId);
 
         final PipelineJoinStats stats = new PipelineJoinStats();
         if(summary) {
@@ -1051,13 +1059,16 @@ public class QueryLog {
         w.write(TDx);
 
         w.write(TD);
-        w.write(Integer.toString(fanIO));
-        w.write(TDx);
-        w.write(TD);
         w.write(Long.toString(stats.elapsed.get()));
         w.write(TDx);
         w.write(TD);
         w.write(Long.toString(stats.opCount.get()));
+        w.write(TDx);
+        w.write(TD);
+        w.write(Long.toString(numRunning));
+        w.write(TDx);
+        w.write(TD);
+        w.write(Integer.toString(fanOut));
         w.write(TDx);
         w.write(TD);
         w.write(Long.toString(stats.chunksIn.get()));

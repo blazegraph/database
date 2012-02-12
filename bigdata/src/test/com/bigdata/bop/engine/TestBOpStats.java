@@ -29,6 +29,8 @@ package com.bigdata.bop.engine;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.io.SerializerUtil;
+
 /**
  * Test suite for {@link BOpStats}.
  * 
@@ -128,5 +130,50 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("chunksOut", 0L, stats.chunksOut.get());
 
     }
-    
+
+    public void test_serialization() {
+
+        final BOpStats expected = new BOpStats();
+        expected.elapsed.set(System.currentTimeMillis());
+        expected.opCount.add(12);
+        expected.chunksIn.add(1);
+        expected.chunksOut.add(3);
+        expected.unitsIn.add(4);
+        expected.unitsOut.add(6);
+        expected.typeErrors.add(8);
+
+        doSerializationTest(expected);
+        
+    }
+
+    private static void doSerializationTest(final BOpStats expected) {
+
+        final BOpStats actual = (BOpStats) SerializerUtil
+                .deserialize(SerializerUtil.serialize(expected));
+
+        assertSameStats(expected, actual);
+        
+    }
+
+    private static void assertSameStats(final BOpStats expected,
+            final BOpStats actual) {
+
+        assertEquals("elapsed", expected.elapsed.get(), actual.elapsed.get());
+
+        assertEquals("opCount", expected.opCount.get(), actual.opCount.get());
+        
+        assertEquals("chunksIn", expected.chunksIn.get(), actual.chunksIn.get());
+        
+        assertEquals("chunksOut", expected.chunksOut.get(),
+                actual.chunksOut.get());
+        
+        assertEquals("unitsIn", expected.unitsIn.get(), actual.unitsIn.get());
+        
+        assertEquals("unitsOut", expected.unitsOut.get(), actual.unitsOut.get());
+        
+        assertEquals("typeErrors", expected.typeErrors.get(),
+                actual.typeErrors.get());
+
+    }
+
 }

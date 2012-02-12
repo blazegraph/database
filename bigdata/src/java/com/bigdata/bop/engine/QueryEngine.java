@@ -882,9 +882,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
 
-    public void startOp(final StartOpMessage msg) throws RemoteException {
+    public void startOp(final IStartOpMessage msg) throws RemoteException {
         
-        final AbstractRunningQuery q = getRunningQuery(msg.queryId);
+        final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
         
         if (q != null) {
         
@@ -894,9 +894,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     }
 
-    public void haltOp(final HaltOpMessage msg) throws RemoteException {
+    public void haltOp(final IHaltOpMessage msg) throws RemoteException {
         
-        final AbstractRunningQuery q = getRunningQuery(msg.queryId);
+        final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
         
         if (q != null) {
             

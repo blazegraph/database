@@ -713,12 +713,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * consume some specific number of binding set chunks.
      * 
      * @param msg
-     *            The {@link StartOpMessage}.
+     *            The {@link IStartOpMessage}.
      * 
      * @throws UnsupportedOperationException
      *             If this node is not the query coordinator.
      */
-    final protected void startOp(final StartOpMessage msg) {
+    final protected void startOp(final IStartOpMessage msg) {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
@@ -726,7 +726,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (!queryId.equals(msg.queryId))
+        if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
         lock.lock();
@@ -757,12 +757,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * start/stop in order to make the termination decision atomic).
      * 
      * @param msg
-     *            The {@link HaltOpMessage}
+     *            The {@link IHaltOpMessage}
      * 
      * @throws UnsupportedOperationException
      *             If this node is not the query coordinator.
      */
-    protected void haltOp(final HaltOpMessage msg) {
+    protected void haltOp(final IHaltOpMessage msg) {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
@@ -770,7 +770,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (!queryId.equals(msg.queryId))
+        if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
         lock.lock();
@@ -781,7 +781,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 log.trace(msg.toString());
 
             // update per-operator statistics.
-            final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
+            final BOpStats tmp = statsMap.putIfAbsent(msg.getBOpId(), msg.getStats());
 
 			/*
 			 * Combine stats, but do not combine a stats object with itself.
@@ -789,8 +789,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/464 (Query
 			 * Statistics do not update correctly on cluster)
 			 */
-            if (tmp != null && tmp != msg.taskStats) {
-                tmp.add(msg.taskStats);
+            if (tmp != null && tmp != msg.getStats()) {
+                tmp.add(msg.getStats());
             }
 //			log.warn(msg.toString() + " : stats=" + tmp);
 
@@ -800,8 +800,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 return;
             case StartLastPass: {
                 @SuppressWarnings("rawtypes")
-                final Set doneOn = runState.getDoneOn(msg.bopId);
-                doLastPass(msg.bopId, doneOn);
+                final Set doneOn = runState.getDoneOn(msg.getBOpId());
+                doLastPass(msg.getBOpId(), doneOn);
                 return;
             }
             case AllDone:
@@ -810,11 +810,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                  */
                 triggerOperatorsAwaitingLastPass();
                 // Release any native buffers.
-                releaseNativeMemoryForOperator(msg.bopId);
+                releaseNativeMemoryForOperator(msg.getBOpId());
                 // Check to see if the query is also all done.
                 if (runState.isAllDone()) {
                     if (log.isInfoEnabled())
-                        log.info("Query reports all done: bopId=" + msg.bopId
+                        log.info("Query reports all done: bopId=" + msg.getBOpId()
                                 + ", msg=" + msg + ", runState=" + runState);
                     // Normal termination.
                     halt((Void) null);
@@ -1388,6 +1388,39 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    /**
+     * Return the #of instances of the operator which are concurrently
+     * executing.
+     */
+    protected long getRunningCount(final int bopId) {
+
+        // Note: lock is NOT required.
+        
+        return runState.getRunningCount(bopId);
+        
+    }
+
+    /**
+     * Return the #of shards or nodes on which the operator has started
+     * evaluation. This is basically a measure of the fan out of the operator
+     * across the cluster. For example, it will report the #of shards on which a
+     * sharded join has read based on the solutions being mapped across that
+     * join. The units are shards if the operator is sharded and nodes if the
+     * operator is hash partitioned.
+     * 
+     * @param bopId
+     *            The operator identifier.
+     * 
+     * @return The #of shards or nodes on which the operator has started.
+     */
+    protected int getStartedOnCount(final int bopId) {
+        
+        // Note: lock is NOT required.
+        
+        return runState.getStartedOnCount(bopId);
+        
+    }
+    
     /**
      * {@inheritDoc}
      * <p>

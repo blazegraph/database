@@ -718,12 +718,17 @@ public class BOpUtility {
         if (op == null)
             throw new IllegalArgumentException();
 
-        final Iterator<BOp> itr = root.argIterator();
-
-        while (itr.hasNext()) {
-
-            final BOp current = itr.next();
-
+        final int arity = root.arity();
+        
+        for (int i = 0; i < arity; i++) {
+//        final Iterator<BOp> itr = root.argIterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final BOp current = itr.next();
+            
+            final BOp current = root.get(i);
+            
             if (current == op)
                 return root;
 

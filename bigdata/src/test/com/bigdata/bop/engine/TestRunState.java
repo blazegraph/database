@@ -973,9 +973,10 @@ public class TestRunState extends TestCase2 {
 
         // step2 : start operator.
         runState.startOp(new StartOpMessage(queryId, startId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                startOp.getEvaluationContext(),
-                startOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                startOp.getEvaluationContext(),
+//                startOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -996,8 +997,11 @@ public class TestRunState extends TestCase2 {
 
             runState.haltOp(new HaltOpMessage(queryId, startId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    null/* sinkId */, 0/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats)
+                    //null/* sinkId */,
+                    0,// sinkMessagesOut
+//                    null/* altSinkId */,
+                    0, // altSinkMessagesOut
+                    stats)
                     );
 
         }
@@ -1078,9 +1082,10 @@ public class TestRunState extends TestCase2 {
 
         // step2 : start operator.
         runState.startOp(new StartOpMessage(queryId, startId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                startOp.getEvaluationContext(),
-                startOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                startOp.getEvaluationContext(),
+//                startOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1098,8 +1103,10 @@ public class TestRunState extends TestCase2 {
 
             runState.haltOp(new HaltOpMessage(queryId, startId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    otherId/* sinkId */, 1/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats)
+//                    otherId/* sinkId */, 
+                    1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats)
                     );
 
         }
@@ -1115,9 +1122,10 @@ public class TestRunState extends TestCase2 {
 
         // start the 2nd operator.
         runState.startOp(new StartOpMessage(queryId, otherId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                otherOp.getEvaluationContext(),
-                otherOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                otherOp.getEvaluationContext(),
+//                otherOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1135,8 +1143,10 @@ public class TestRunState extends TestCase2 {
 
             runState.haltOp(new HaltOpMessage(queryId, otherId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    null/* sinkId */, 0/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats)
+                    //null/* sinkId */, 
+                    0/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats)
                     );
 
         }
@@ -1306,7 +1316,7 @@ public class TestRunState extends TestCase2 {
      * Unit test for correct interpretation of a deadline. There are a series of
      * deadline tests which verify that the deadline is detected by the various
      * action methods (startQuery, startOp, haltOp). For this test, the deadline
-     * should be recognized by {@link RunState#startOp(StartOpMessage)}.
+     * should be recognized by {@link RunState#startOp(IStartOpMessage)}.
      * 
      * @throws TimeoutException
      * @throws ExecutionException
@@ -1373,9 +1383,10 @@ public class TestRunState extends TestCase2 {
         try {
             // step2 : start operator.
             runState.startOp(new StartOpMessage(queryId, startId,
-                    -1/* partitionId */, serviceId, 1/* nmessages */,
-                    startOp.getEvaluationContext(),
-                    startOp.isLastPassRequested()));
+                    -1/* partitionId */, serviceId, 1/* nmessages */
+//                    startOp.getEvaluationContext(),
+//                    startOp.isLastPassRequested()
+                    ));
             fail("Expected: " + TimeoutException.class);
         } catch (TimeoutException ex) {
             if (log.isInfoEnabled())
@@ -1391,7 +1402,7 @@ public class TestRunState extends TestCase2 {
      * Unit test for correct interpretation of a deadline. There are a series of
      * deadline tests which verify that the deadline is detected by the various
      * action methods (startQuery, startOp, haltOp). For this test, the deadline
-     * should recognized by {@link RunState#haltOp(HaltOpMessage)}.
+     * should recognized by {@link RunState#haltOp(IHaltOpMessage)}.
      * 
      * @throws TimeoutException
      * @throws ExecutionException
@@ -1452,9 +1463,10 @@ public class TestRunState extends TestCase2 {
         
         // step2 : start operator.
         runState.startOp(new StartOpMessage(queryId, startId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                startOp.getEvaluationContext(),//
-                startOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+                //,startOp.getEvaluationContext(),//
+                //,startOp.isLastPassRequested()
+                ));
 
         // verify post-conditions.
         expected.stepCount.incrementAndGet();
@@ -1478,8 +1490,10 @@ public class TestRunState extends TestCase2 {
 
             runState.haltOp(new HaltOpMessage(queryId, startId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    null/* sinkId */, 0/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats));
+//                    null/* sinkId */, 
+                    0/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats));
 
             fail("Expected: " + TimeoutException.class);
 
@@ -1573,9 +1587,10 @@ public class TestRunState extends TestCase2 {
 
         // step2 : start operator.
         runState.startOp(new StartOpMessage(queryId, startId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                startOp.getEvaluationContext(),
-                startOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                startOp.getEvaluationContext(),
+//                startOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1591,10 +1606,12 @@ public class TestRunState extends TestCase2 {
 
             final BOpStats stats = new BOpStats();
 
-            final HaltOpMessage msg = new HaltOpMessage(queryId, startId,
+            final IHaltOpMessage msg = new HaltOpMessage(queryId, startId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    otherId/* sinkId */, 1/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+//                    otherId/* sinkId */, 
+                    1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats);
             
             assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
 
@@ -1611,9 +1628,10 @@ public class TestRunState extends TestCase2 {
 
         // start the 2nd operator.
         runState.startOp(new StartOpMessage(queryId, otherId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                otherOp.getEvaluationContext(),
-                otherOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                otherOp.getEvaluationContext(),
+//                otherOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1629,10 +1647,12 @@ public class TestRunState extends TestCase2 {
 
             final BOpStats stats = new BOpStats();
 
-            final HaltOpMessage msg = new HaltOpMessage(queryId, otherId,
+            final IHaltOpMessage msg = new HaltOpMessage(queryId, otherId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    orderOp.getId()/* sinkId */, 1/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+                    //orderOp.getId()/* sinkId */, 
+                    1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats);
 
             assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
 
@@ -1648,9 +1668,10 @@ public class TestRunState extends TestCase2 {
 
         // step4: start the 3rd operator.
         runState.startOp(new StartOpMessage(queryId, orderId,
-                -1/* partitionId */, serviceId, 1/* nmessages */,
-                orderOp.getEvaluationContext(),
-                orderOp.isLastPassRequested()));
+                -1/* partitionId */, serviceId, 1/* nmessages */
+//                orderOp.getEvaluationContext(),
+//                orderOp.isLastPassRequested()
+                ));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1673,10 +1694,12 @@ public class TestRunState extends TestCase2 {
 
             final BOpStats stats = new BOpStats();
 
-            final HaltOpMessage msg = new HaltOpMessage(queryId, orderId,
+            final IHaltOpMessage msg = new HaltOpMessage(queryId, orderId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    null/* sinkId (queryBuffer)*/, 1/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+//                    null/* sinkId (queryBuffer)*/, 
+                    1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 
+                    0/* altSinkMessagesOut */, stats);
             
             assertEquals(RunStateEnum.StartLastPass, runState.haltOp(msg));
 
@@ -1694,9 +1717,10 @@ public class TestRunState extends TestCase2 {
         // step4: start the last pass evaluation for the 3nd operator.
         assertFalse(runState
                 .startOp(new StartOpMessage(queryId, orderId,
-                        -1/* partitionId */, serviceId, 1/* nmessages */,
-                        orderOp.getEvaluationContext(), orderOp
-                                .isLastPassRequested())));
+                        -1/* partitionId */, serviceId, 1/* nmessages */
+//                        orderOp.getEvaluationContext(), orderOp
+//                                .isLastPassRequested()
+                )));
 
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
@@ -1714,10 +1738,12 @@ public class TestRunState extends TestCase2 {
 
             final BOpStats stats = new BOpStats();
 
-            final HaltOpMessage msg = new HaltOpMessage(queryId, orderId,
+            final IHaltOpMessage msg = new HaltOpMessage(queryId, orderId,
                     -1/* partitionId */, serviceId, null/* cause */,
-                    null/* sinkId (queryBuffer)*/, 1/* sinkMessagesOut */,
-                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+                    //null/* sinkId (queryBuffer)*/
+                    1/* sinkMessagesOut */,
+                    //null/* altSinkId */
+                    0/* altSinkMessagesOut */, stats);
 
             assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
 
@@ -2007,10 +2033,10 @@ public class TestRunState extends TestCase2 {
             this.serviceId = serviceId;
         }
         
-        public void haltOp(HaltOpMessage msg) throws RemoteException {
+        public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
-        public void startOp(StartOpMessage msg) throws RemoteException {
+        public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
         public void bufferReady(IChunkMessage<IBindingSet> msg)

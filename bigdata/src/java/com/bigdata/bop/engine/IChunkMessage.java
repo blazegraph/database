@@ -2,7 +2,6 @@ package com.bigdata.bop.engine;
 
 import java.util.UUID;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.fed.FederatedRunningQuery;
@@ -21,7 +20,7 @@ import com.bigdata.service.ResourceService;
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/475"> Optimize
  *      serialization for query messages on cluster </a>
  */
-public interface IChunkMessage<E> {
+public interface IChunkMessage<E> extends IOpMessage {
 
     /**
      * The proxy for the query controller.
@@ -53,15 +52,6 @@ public interface IChunkMessage<E> {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
      */
     UUID getQueryControllerId();
-    
-    /** The query identifier. */
-    UUID getQueryId();
-
-    /** The identifier for the target {@link BOp}. */
-    int getBOpId();
-    
-    /** The identifier for the target index partition. */
-    int getPartitionId();
 
     /**
      * Return true iff the {@link IChunkMessage} is for the last evaluation pass
