@@ -50,6 +50,16 @@ public class FederatedQueryEngineCounters extends QueryEngineCounters {
      */
     final CAT chunksOut = new CAT();
 
+    /**
+     * The #of solutions received.
+     */
+    final CAT solutionsIn = new CAT();
+
+    /**
+     * The #of solutions sent.
+     */
+    final CAT solutionsOut = new CAT();
+
     @Override
     public CounterSet getCounters() {
 
@@ -66,6 +76,20 @@ public class FederatedQueryEngineCounters extends QueryEngineCounters {
         root.addCounter("chunksOut", new Instrument<Long>() {
             public void sample() {
                 setValue(chunksOut.get());
+            }
+        });
+
+        // #of chunks in.
+        root.addCounter("solutionsIn", new Instrument<Long>() {
+            public void sample() {
+                setValue(solutionsIn.get());
+            }
+        });
+
+        // #of chunks out.
+        root.addCounter("solutionsOut", new Instrument<Long>() {
+            public void sample() {
+                setValue(solutionsOut.get());
             }
         });
 
