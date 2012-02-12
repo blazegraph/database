@@ -395,7 +395,9 @@ public class FederatedQueryEngine extends QueryEngine {
 
                 FederatedQueryEngine.this.acceptChunk(msg);
 
-                getQueryEngineCounters().chunksIn.increment();
+                final FederatedQueryEngineCounters c = getQueryEngineCounters();
+                c.chunksIn.increment();
+                c.solutionsIn.add(msg.getSolutionCount());
                 
             } catch (Throwable t) {
 

@@ -403,7 +403,10 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
         // true iff the target is this service (no proxy, no RMI).
         final boolean thisService = peerProxy == q.getQueryEngine();
         
-        q.getQueryEngine().getQueryEngineCounters().chunksOut.increment();
+        final FederatedQueryEngineCounters c = q.getQueryEngine()
+                .getQueryEngineCounters();
+        c.chunksOut.increment();
+        c.solutionsOut.add(source.length);
 
         if(thisService) {
 
