@@ -58,6 +58,8 @@ abstract public class PipelineOp extends BOpBase {
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
          * the ancestor in the operator tree which serves as the default sink
          * for binding sets (optional, default is the parent).
+         * 
+         * @see BOpUtility#getEffectiveDefaultSink(BOp, BOp)
          */
         String SINK_REF = PipelineOp.class.getName() + ".sinkRef";
 
@@ -523,7 +525,7 @@ abstract public class PipelineOp extends BOpBase {
 				Annotations.DEFAULT_SHARED_STATE);
         
     }
-
+    
     /**
      * Return a new object which can be used to collect statistics on the
      * operator evaluation. This may be overridden to return a more specific

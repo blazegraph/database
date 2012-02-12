@@ -75,15 +75,6 @@ public class TestAll extends TestCase {
 	 * wait for the ORDER BY to begin emitting its solutions before it can
 	 * execute.</li>
 	 * </ul>
-	 * 
-	 * @todo It should be possible to test the ability of the operators to
-	 *       accept multiple chunks of solutions before applying their semantics
-	 *       given an appropriate MockRunningQuery, but we can't really test for
-	 *       correct management of concurrency without a live integration with
-	 *       the QueryEngine.
-	 * 
-	 * @todo tests need to be developed of the distributed evaluation of these
-	 *       operators.
 	 */
     public static Test suite()
     {
@@ -93,6 +84,12 @@ public class TestAll extends TestCase {
         // test suite for the bop statistics class.
         suite.addTestSuite(TestBOpStats.class);
 
+        // test suite for startOp messages.
+        suite.addTestSuite(TestStartOpMessage.class);
+        
+        // test suite for haltOp messages.
+        suite.addTestSuite(TestHaltOpMessage.class);
+        
         // test suite for local (same JVM) chunk messages.
         suite.addTestSuite(TestLocalChunkMessage.class);
         

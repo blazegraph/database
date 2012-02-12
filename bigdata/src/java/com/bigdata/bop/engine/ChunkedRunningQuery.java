@@ -137,7 +137,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     static private final boolean removeMapOperatorQueueEntries = false;
 
     /**
-     * When <code>true</code> the {@link HaltOpMessage} is queued on an
+     * When <code>true</code> the {@link IHaltOpMessage} is queued on an
      * {@link Executor} and will be delivered asynchronously to the query
      * controller. When <code>false</code> the message is delivered in the same
      * thread that ran the {@link ChunkTask}. This has implications for the
@@ -145,9 +145,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * {@link IRunningQuery}.
      * <p>
      * Note: it appears to be valid to use either synchronous or asynchronous
-     * messaging for the {@link HaltOpMessage}s. However, this can always be
+     * messaging for the {@link IHaltOpMessage}s. However, this can always be
      * changes to <code>true</code> in order to rule out the asynchronous
-     * arrival of the {@link HaltOpMessage} as a source of concurrency issues.
+     * arrival of the {@link IHaltOpMessage} as a source of concurrency issues.
      * 
      * TODO Test the performance impact of this option, e.g., on BSBM.
      */
@@ -332,7 +332,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * their predecessor(s) in the pipeline.
      */
     @Override
-    protected void haltOp(final HaltOpMessage msg) {
+    protected void haltOp(final IHaltOpMessage msg) {
         lock.lock();
         try {
             super.haltOp(msg);
@@ -762,14 +762,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * to consume chunks.
                  */
 
-                final boolean lastPassRequested = ((PipelineOp) (t.bop))
-                        .isLastPassRequested();
+//                final boolean lastPassRequested = ((PipelineOp) (t.bop))
+//                        .isLastPassRequested();
 
                 getQueryController().startOp(
                         new StartOpMessage(getQueryId(), t.bopId,
-                                t.partitionId, serviceId, t.messagesIn, t.bop
-                                        .getEvaluationContext(),
-                                lastPassRequested));
+                                t.partitionId, serviceId, t.messagesIn 
+//                                ,t.bop.getEvaluationContext(),
+//                                lastPassRequested
+                                ));
 
                 /*
                  * Run the operator task.
@@ -828,11 +829,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     }
 
     /**
-     * Send a {@link HaltOpMessage}. Whether the delivery is synchronous or not
+     * Send a {@link IHaltOpMessage}. Whether the delivery is synchronous or not
      * depends on {@link #asynchronousHaltMessage}. If this is the controller
      * and we are using synchronous message delivery, then the message is
-     * delivered directly to {@link AbstractRunningQuery#haltOp(HaltOpMessage)}.
-     * Otherwise it will pass through {@link IQueryClient#haltOp(HaltOpMessage)}
+     * delivered directly to {@link AbstractRunningQuery#haltOp(IHaltOpMessage)}.
+     * Otherwise it will pass through {@link IQueryClient#haltOp(IHaltOpMessage)}
      * .
      * 
      * @param serviceId
@@ -846,10 +847,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     private final void sendHaltMessage(final UUID serviceId, final ChunkTask t,
             final Throwable cause) {
 
-        final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
-                t.partitionId, serviceId, cause, t.sinkId,
-                t.sinkMessagesOut.get(), t.altSinkId,
-                t.altSinkMessagesOut.get(), t.context.getStats());
+        final IHaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
+                t.partitionId, serviceId, cause, //t.sinkId,
+                t.sinkMessagesOut.get(), //t.altSinkId,
+                t.altSinkMessagesOut.get(),//
+                t.context.getStats());
 
         if (asynchronousHaltMessage) {
             try {
@@ -1611,12 +1613,12 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
         private final IQueryClient clientProxy;
 
-        private final HaltOpMessage msg;
+        private final IHaltOpMessage msg;
 
         private final ChunkedRunningQuery q;
 
         public SendHaltMessageTask(final IQueryClient clientProxy,
-                final HaltOpMessage msg, final ChunkedRunningQuery q) {
+                final IHaltOpMessage msg, final ChunkedRunningQuery q) {
 
             if (clientProxy == null)
                 throw new IllegalArgumentException();

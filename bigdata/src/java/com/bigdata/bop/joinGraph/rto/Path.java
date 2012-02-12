@@ -23,7 +23,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.bop.join.PipelineJoinStats;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.striterator.Dechunkerator;
 

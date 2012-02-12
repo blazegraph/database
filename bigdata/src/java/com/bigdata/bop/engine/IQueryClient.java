@@ -33,7 +33,7 @@ public interface IQueryClient extends IQueryPeer {
      * Notify the client that execution has started for some query, operator,
      * node, and index partition.
      */
-    void startOp(StartOpMessage msg)
+    void startOp(IStartOpMessage msg)
             throws RemoteException;
 
     /**
@@ -41,6 +41,6 @@ public interface IQueryClient extends IQueryPeer {
      * node, shard, and source binding set chunk(s). If execution halted
      * abnormally, then the cause is sent as well.
      */
-    void haltOp(HaltOpMessage msg) throws RemoteException;
+    void haltOp(IHaltOpMessage msg) throws RemoteException;
     
 }

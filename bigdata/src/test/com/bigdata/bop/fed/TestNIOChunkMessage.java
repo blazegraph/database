@@ -42,11 +42,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
-import com.bigdata.bop.engine.HaltOpMessage;
 import com.bigdata.bop.engine.IChunkMessage;
+import com.bigdata.bop.engine.IHaltOpMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
-import com.bigdata.bop.engine.StartOpMessage;
+import com.bigdata.bop.engine.IStartOpMessage;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.striterator.Dechunkerator;
@@ -233,10 +233,10 @@ public class TestNIOChunkMessage extends TestCase2 {
      */
     private static class MockQueryController implements IQueryClient {
 
-        public void haltOp(HaltOpMessage msg) throws RemoteException {
+        public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
-        public void startOp(StartOpMessage msg) throws RemoteException {
+        public void startOp(IStartOpMessage msg) throws RemoteException {
         }
 
         public void bufferReady(IChunkMessage<IBindingSet> msg)
