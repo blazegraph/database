@@ -79,6 +79,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
     private final static Logger log = Logger
             .getLogger(FederationChunkHandler.class); 
     
+    @SuppressWarnings("rawtypes")
     public static final IChunkHandler INSTANCE = new FederationChunkHandler(100/* nioThreshold */);
 
     /**
@@ -403,11 +404,6 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
         // true iff the target is this service (no proxy, no RMI).
         final boolean thisService = peerProxy == q.getQueryEngine();
         
-        final FederatedQueryEngineCounters c = q.getQueryEngine()
-                .getQueryEngineCounters();
-        c.chunksOut.increment();
-        c.solutionsOut.add(source.length);
-
         if(thisService) {
 
             /*
@@ -425,7 +421,17 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
             if (log.isDebugEnabled())
                 log.debug("Sending local message: " + msg);
 
-            q.getQueryEngine().bufferReady(msg);
+            /*
+             * The message is fully materialized and will not cross a machine
+             * boundary. Drop it directly onto the work queue on this
+             * QueryEngine rather than handing it off to the QueryEngine. This
+             * is more efficient and also prevents counting messages which
+             * target the same query controller as inter-controller messages.
+             */
+            // drop the message onto the IRunningQuery
+            q.acceptChunk(msg);
+            // drop the message onto the QueryEngine.
+            // q.getQueryEngine().bufferReady(msg);
          
             return;
             
@@ -438,6 +444,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
          * RMI message or out of band using NIO. This decision effects how we
          * serialize the chunk.
          */
+
         final IChunkMessage<IBindingSet> msg;
         if (source.length <= nioThreshold) {
 
@@ -459,6 +466,12 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
 
         if (log.isDebugEnabled())
             log.debug("Sending remote message: " + msg);
+
+        // Update counters since message will cross machine boundary.
+        final FederatedQueryEngineCounters c = q.getQueryEngine()
+                .getQueryEngineCounters();
+        c.chunksOut.increment();
+        c.solutionsOut.add(source.length);
 
         try {
 

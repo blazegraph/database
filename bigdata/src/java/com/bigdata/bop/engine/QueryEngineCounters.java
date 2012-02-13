@@ -42,17 +42,19 @@ public class QueryEngineCounters implements ICounterSetAccess {
     /**
      * The #of queries which have been executed (set on completion).
      */
-    final CAT queryStartCount = new CAT();
+    protected final CAT queryStartCount = new CAT();
 
     /**
      * The #of queries which have been executed (set on completion).
+     * <p>
+     * Note: This counts both normal and abnormal query termination.
      */
-    final CAT queryDoneCount = new CAT();
+    protected final CAT queryDoneCount = new CAT();
 
     /**
      * The #of instances of the query which terminated abnormally.
      */
-    final CAT queryErrorCount = new CAT();
+    protected final CAT queryErrorCount = new CAT();
 
     /**
      * The total elapsed time (millis) for evaluation queries. This is the wall
@@ -60,7 +62,7 @@ public class QueryEngineCounters implements ICounterSetAccess {
      * to greater than the elapsed wall clock time in any interval where there
      * is more than one query running concurrently.
      */
-    final CAT elapsedMillis = new CAT();
+    protected final CAT elapsedMillis = new CAT();
 
     /*
      * Lower level counters dealing with the work queues and executing chunk
@@ -75,27 +77,27 @@ public class QueryEngineCounters implements ICounterSetAccess {
     /**
      * The #of work queues which are currently blocked.
      */
-    final CAT blockedWorkQueueCount = new CAT();
+    protected final CAT blockedWorkQueueCount = new CAT();
 
     /**
      * The #of times that a work queue has blocked.
      */
-    final CAT blockedWorkQueueRunningTotal = new CAT();
+    protected final CAT blockedWorkQueueRunningTotal = new CAT();
 
     /**
      * The #of active operator evaluation tasks (chunk tasks).
      */
-    final CAT operatorActiveCount = new CAT();
+    protected final CAT operatorActiveCount = new CAT();
 
     /**
      * The #of operator evaluation tasks (chunk tasks) which have started.
      */
-    final CAT operatorStartCount = new CAT();
+    protected final CAT operatorStartCount = new CAT();
 
     /**
      * The #of operator evaluation tasks (chunk tasks) which have ended.
      */
-    final CAT operatorHaltCount = new CAT();
+    protected final CAT operatorHaltCount = new CAT();
 
     public CounterSet getCounters() {
 
@@ -119,6 +121,16 @@ public class QueryEngineCounters implements ICounterSetAccess {
         root.addCounter("queryErrorCount", new Instrument<Long>() {
             public void sample() {
                 setValue(queryErrorCount.get());
+            }
+        });
+
+        // average #of operator tasks evaluated per query
+        root.addCounter("operatorTasksPerQuery", new Instrument<Double>() {
+            public void sample() {
+                final long opCount = operatorHaltCount.get();
+                final long n = queryDoneCount.get();
+                final double d = n == 0 ? 0d : (opCount / (double) n);
+                setValue(d);
             }
         });
 
