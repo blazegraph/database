@@ -524,7 +524,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      * This method is responsible for bulk resolving / adding the buffered
      * {@link BigdataValue}s against the {@link #db} and adding the fully
      * resolved {@link BigdataStatement}s to the queue on which the
-     * {@link #iterator()} is reading.
+     * iterator is reading.
      */
     @SuppressWarnings("unchecked")
     final protected void overflow() {
