@@ -79,8 +79,14 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
     private final static Logger log = Logger
             .getLogger(FederationChunkHandler.class); 
     
+    /**
+     * 
+     * FIXME Debug the NIO chunk message materialization logic (it is currently
+     * disabled by the setting of the nioThreshold parameter to the
+     * constructor).
+     */
     @SuppressWarnings("rawtypes")
-    public static final IChunkHandler INSTANCE = new FederationChunkHandler(100/* nioThreshold */);
+    public static final IChunkHandler INSTANCE = new FederationChunkHandler(Integer.MAX_VALUE/* nioThreshold */);
 
     /**
      * The threshold above which the intermediate solutions are shipped using
