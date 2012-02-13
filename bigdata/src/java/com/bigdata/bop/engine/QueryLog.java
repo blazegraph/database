@@ -1155,32 +1155,32 @@ public class QueryLog {
         
     }
 
-    private static String prettyPrintSparql(String s) {
-
-//    	return cdata(s);
+//    private static String prettyPrintSparql(String s) {
+//
+////    	return cdata(s);
+////    	
+////    }
+//    
+//    	s = s.replace("\n", " ");
+//    	
+//    	s = s.replace("PREFIX", "\nPREFIX");
+//    	s = s.replace("select", "\nselect");
+//    	s = s.replace("where", "\nwhere");
+//    	s = s.replace("{","{\n");
+//    	s = s.replace("}","\n}");
+//    	s = s.replace(" ."," .\n"); // TODO Must not match within quotes (literals) or <> (URIs).
+////    	s = s.replace("||","||\n");
+////    	s = s.replace("&&","&&\n");
+//    	
+//    	s = cdata(s);
+//    	
+//    	s = s.replace("\n", "<br>");
+//    	
+////    	return "<pre>"+s+"</pre>";
+//    	
+//    	return s;
 //    	
 //    }
-    
-    	s = s.replace("\n", " ");
-    	
-    	s = s.replace("PREFIX", "\nPREFIX");
-    	s = s.replace("select", "\nselect");
-    	s = s.replace("where", "\nwhere");
-    	s = s.replace("{","{\n");
-    	s = s.replace("}","\n}");
-    	s = s.replace(" ."," .\n"); // TODO Must not match within quotes (literals) or <> (URIs).
-//    	s = s.replace("||","||\n");
-//    	s = s.replace("&&","&&\n");
-    	
-    	s = cdata(s);
-    	
-    	s = s.replace("\n", "<br>");
-    	
-//    	return "<pre>"+s+"</pre>";
-    	
-    	return s;
-    	
-    }
     
     /**
      * Return the {@link IRunningQuery} for that queryId iff it is available.
