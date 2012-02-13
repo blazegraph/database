@@ -550,7 +550,7 @@ public class QueryLog {
                     .get(bopId);
             if (tmp != null) {
                 sb.append('\t');
-                sb.append(tmp.shardSet.size());
+                sb.append(tmp.shardSet.size()); // aka #of work queues.
                 sb.append('\t');
                 sb.append(tmp.chunkCount);
                 sb.append('\t');
@@ -662,6 +662,8 @@ public class QueryLog {
         
         if (!summaryOnly) {
 
+            // Then the children too.
+            
             if (children != null) {
 
                 for (int i = 0; i < children.length; i++) {

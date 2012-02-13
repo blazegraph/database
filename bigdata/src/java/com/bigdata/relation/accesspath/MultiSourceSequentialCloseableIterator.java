@@ -30,10 +30,11 @@ package com.bigdata.relation.accesspath;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Class allows new sources to be attached dynamically. If the existing sources
@@ -43,14 +44,14 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MultiSourceSequentialAsynchronousIterator<E> implements
-        IMultiSourceAsynchronousIterator<E> {
+public class MultiSourceSequentialCloseableIterator<E> implements
+        IMultiSourceCloseableIterator<E> {
 
-    private final static Logger log = Logger.getLogger(MultiSourceSequentialAsynchronousIterator.class);
+    private final static Logger log = Logger.getLogger(MultiSourceSequentialCloseableIterator.class);
     
     private final ReentrantLock lock = new ReentrantLock();
 
-    private final Queue<IAsynchronousIterator<E>> sources = new LinkedBlockingQueue<IAsynchronousIterator<E>>();
+    private final Queue<ICloseableIterator<E>> sources = new LinkedBlockingQueue<ICloseableIterator<E>>();
 
     /**
      * The current inner iterator. When <code>null</code> the outer iterator has
@@ -64,9 +65,9 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
      * weaker atomicity by copying the reference to a local variable and then
      * testing that variable.
      */
-    private volatile IAsynchronousIterator<E> current;
+    private volatile ICloseableIterator<E> current;
 
-    public MultiSourceSequentialAsynchronousIterator(final IAsynchronousIterator<E> src) {
+    public MultiSourceSequentialCloseableIterator(final ICloseableIterator<E> src) {
         current = src;
     }
     
@@ -77,7 +78,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
              * Ensure that all sources are eventually closed.
              */
             // close the current source (if any).
-            final IAsynchronousIterator<E> current = this.current;
+            final ICloseableIterator<E> current = this.current;
             this.current = null;
             if (current != null) {
                 if (log.isInfoEnabled())
@@ -85,7 +86,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
                 current.close();
             }
             // Close any sources still in the queue.
-            for(IAsynchronousIterator<E> t : sources) {
+            for(ICloseableIterator<E> t : sources) {
                 if (log.isInfoEnabled())
                     log.info("Closing source: " + t);
                 t.close();
@@ -97,7 +98,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
         }
     }
 
-    public boolean add(final IAsynchronousIterator<E> src) {
+    public boolean add(final ICloseableIterator<E> src) {
         if (src == null)
             throw new IllegalArgumentException();
         lock.lock();
@@ -121,11 +122,11 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
      * @return The next source -or- <code>null</code> if there are no sources
      *         available.
      */
-    private IAsynchronousIterator<E> nextSource() {
-        final IAsynchronousIterator<E> tmp = current;
+    private ICloseableIterator<E> nextSource() {
+        final ICloseableIterator<E> tmp = current;
         if (tmp == null)
             return null;
-        if (!tmp.isExhausted())
+        if (tmp.hasNext())
             return current; // Note: MAY be asynchronously cleared!
         // current is known to be [null].
         lock.lock();
@@ -138,7 +139,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
             current.close();
             // remove the head of the queue (non-blocking)
             while ((current = sources.poll()) != null) {
-                if (!current.isExhausted()) {
+                if (current.hasNext()) {
                     return current;
                 } else {
                     // Note: should already be closed since exhausted.
@@ -155,7 +156,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
 
     public boolean hasNext() {
         while (true) {
-            final IAsynchronousIterator<E> tmp = nextSource();
+            final ICloseableIterator<E> tmp = nextSource();
             if (tmp == null)
                 return false;
             if (tmp.hasNext())
@@ -173,7 +174,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
      */
     public E next() {
         while (true) {
-            final IAsynchronousIterator<E> tmp = nextSource();
+            final ICloseableIterator<E> tmp = nextSource();
             if (tmp == null)
                 throw new NoSuchElementException();
             if (tmp.hasNext())
@@ -183,50 +184,6 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
 
     public void remove() {
         throw new UnsupportedOperationException();
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note: This will report <code>true</code> iff all iterators currently
-     * attached have been consumed, at which point {@link #current} becomes
-     * <code>null</code> and no more iterators may be attached, hence the high
-     * level iterator is provably exhausted.
-     */
-    public boolean isExhausted() {
-        return nextSource() == null;
-    }
-
-    public boolean hasNext(final long timeout, final TimeUnit unit)
-            throws InterruptedException {
-        final long begin = System.nanoTime();
-        final long nanos = unit.toNanos(timeout);
-        long remaining = nanos;
-        while (remaining > 0) {
-            final IAsynchronousIterator<E> tmp = nextSource();
-            if (tmp == null)
-                return false;
-            if (tmp.hasNext(remaining, TimeUnit.NANOSECONDS))
-                return true;
-            remaining = nanos - (System.nanoTime() - begin);
-        }
-        // timeout.
-        return false;
-    }
-
-    public E next(final long timeout, final TimeUnit unit)
-            throws InterruptedException {
-        final long begin = System.nanoTime();
-        final long nanos = unit.toNanos(timeout);
-        long remaining = nanos;
-        while (true) {
-            final IAsynchronousIterator<E> tmp = nextSource();
-            if (tmp == null)
-                return null;
-            if (tmp.hasNext(remaining, TimeUnit.NANOSECONDS))
-                return tmp.next();
-            remaining = nanos - (System.nanoTime() - begin);
-        }
     }
 
 }

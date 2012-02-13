@@ -82,11 +82,13 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestUnsynchronizedUnboundedChunkBuffer.class);
 
+        suite.addTestSuite(TestThickCloseableIterator.class);
+
         suite.addTestSuite(TestThickAsynchronousIterator.class);
 
         suite.addTestSuite(TestMultiplexBlockingBuffer.class);
 
-        suite.addTestSuite(TestMultiSourceSequentialAsynchronousIterator.class);
+        suite.addTestSuite(TestMultiSourceSequentialCloseableIterator.class);
 
         //suite.addTestSuite(TestMultiSourceParallelAsynchronousIterator.class);
         

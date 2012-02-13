@@ -30,7 +30,6 @@ package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.TimeUnit;
 
-import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.SerializerUtil;
@@ -89,6 +88,7 @@ public class TestThickAsynchronousIterator extends TestCase2 {
     protected void doRoundTripTest(final String[] expected,
             final IAsynchronousIterator<String> itr) {
 
+        @SuppressWarnings("unchecked")
         final IAsynchronousIterator<String> itr2 = (IAsynchronousIterator<String>) SerializerUtil
                 .deserialize(SerializerUtil.serialize(itr));
 
