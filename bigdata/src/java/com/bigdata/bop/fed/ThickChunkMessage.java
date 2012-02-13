@@ -37,13 +37,12 @@ import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A thick version of this interface in which the chunk is sent inline with the
@@ -164,19 +163,13 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
             final ObjectOutputStream oos = new ObjectOutputStream(baos);
 
-//            final IAsynchronousIterator<IBindingSet[]> itr = source.iterator();
-            
             int solutionCount = 0;
-            
-//            while(source.hasNext()) {
-            
-                final IBindingSet[] a = source;//.next();
-                
-                oos.writeObject(a);
-                
-                solutionCount += a.length;
-                
-//            }
+
+            final IBindingSet[] a = source;
+
+            oos.writeObject(a);
+
+            solutionCount += a.length;
             
             oos.flush();
             baos.flush();
@@ -193,7 +186,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
         
     }
 
-    public void materialize(FederatedRunningQuery runningQuery) {
+    public void materialize(final FederatedRunningQuery runningQuery) {
         // NOP
     }
 
@@ -217,16 +210,24 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
      * and bats, but there should be specific coders for handling binding sets
      * which leverages the known set of variables in play as of the operator
      * which generated those intermediate results.
+     * <p>
+     * Note: Some similar work was done to improve the htree performance.
+     * <p>
+     * Note: Very small chunks (1-5 solutions) are common on a cluster and might
+     * be optimized different than modest chunks (10-100+).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/395">HTree
+     *      performance tuning</a>
      */
     private class ChunkAccessor implements IChunkAccessor<E> {
 
-        private final IAsynchronousIterator<E[]> source;
+        private final ICloseableIterator<E[]> source;
         
         public ChunkAccessor() {
             source = new DeserializationIterator();
         }
         
-        public IAsynchronousIterator<E[]> iterator() {
+        public ICloseableIterator<E[]> iterator() {
             return source;
         }
         
@@ -236,7 +237,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     }
 
-    private class DeserializationIterator implements IAsynchronousIterator<E[]> {
+    private class DeserializationIterator implements ICloseableIterator<E[]> {
 
         private volatile ObjectInputStream ois;
         private E[] current = null;
@@ -316,26 +317,6 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
             throw new UnsupportedOperationException();
             
-        }
-
-        /*
-         * Note: Asynchronous API is not implemented in a non-blocking manner
-         * since all the data is in a byte[] and there is an expectation that
-         * this interface will be excised from query processing soon.
-         */
-
-        public boolean hasNext(long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return hasNext();
-        }
-
-        public boolean isExhausted() {
-            return !hasNext();
-        }
-
-        public E[] next(long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return next();
         }
 
     }

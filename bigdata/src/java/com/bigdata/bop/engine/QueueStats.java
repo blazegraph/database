@@ -39,7 +39,9 @@ public class QueueStats {
 
     /**
      * The set of shard identifiers for which there are queued
-     * {@link IChunkMessage}s.
+     * {@link IChunkMessage}s. The size of this set is also the #of work queues
+     * for the operator). The shard identifier will be <code>-1</code> unless
+     * the operator is sharded and running on a cluster.
      */
     public final Set<Integer> shardSet;
 
@@ -55,17 +57,9 @@ public class QueueStats {
     public int solutionCount;
 
     public QueueStats() {
-        this.shardSet = new HashSet<Integer>();
-    }
 
-    // static QueueStats total(final Set<QueueStats> set) {
-    // final QueueStats total = new QueueStats();
-    // for(QueueStats x : set) {
-    // total.shardSet.addAll(x.shardSet);
-    // total.chunkCount+=x.chunkCount;
-    // total.solutionCount+=x.solutionCount;
-    // }
-    // return total;
-    // }
+        this.shardSet = new HashSet<Integer>();
+        
+    }
 
 }

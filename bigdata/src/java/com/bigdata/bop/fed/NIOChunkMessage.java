@@ -36,19 +36,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.io.DirectBufferPoolAllocator;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An {@link IChunkMessage} where the payload is made available to the receiving
@@ -223,63 +222,49 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             final IAllocationContext allocationContext,
             final E[] source,
             final AtomicInteger nsolutions) {
-        
+
         int nbytes = 0;
-        
-        int n = 0; 
-        
+
+        int n = 0;
+
         final List<IAllocation> allocations = new LinkedList<IAllocation>();
-        
-//        final IAsynchronousIterator<E[]> itr = source.iterator();
-//        
-//        try {
-//
-//            while (itr.hasNext()) {
 
-                // Next chunk to be serialized.
-                final E[] chunk = source;//itr.next();
-                
-                // track #of solutions.
-                n += chunk.length;
-                
-                // serialize the chunk of binding sets.
-                final byte[] data = SerializerUtil.serialize(chunk);
-                
-                // track size of the allocations.
-                nbytes += data.length;
+        // Next chunk to be serialized.
+        final E[] chunk = source;// itr.next();
 
-                // allocate enough space for those data.
-                final IAllocation[] tmp;
-                try {
-                    tmp = allocationContext.alloc(data.length);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                }
+        // track #of solutions.
+        n += chunk.length;
 
-                // copy the data into the allocations.
-                DirectBufferPoolAllocator.put(data, tmp);
+        // serialize the chunk of binding sets.
+        final byte[] data = SerializerUtil.serialize(chunk);
 
-                for(IAllocation a : tmp) {
-                    
-                    // prepare for reading.
-                    a.getSlice().flip();
-                    
-                    // append the allocation.
-                    allocations.add(a);
+        // track size of the allocations.
+        nbytes += data.length;
 
-                }
-                
-//            }
-            
-            nsolutions.addAndGet(n);
+        // allocate enough space for those data.
+        final IAllocation[] tmp;
+        try {
+            tmp = allocationContext.alloc(data.length);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
 
-            return allocations;
-            
-//        } finally {
-//
-//            itr.close();
-//
-//        }
+        // copy the data into the allocations.
+        DirectBufferPoolAllocator.put(data, tmp);
+
+        for (IAllocation a : tmp) {
+
+            // prepare for reading.
+            a.getSlice().flip();
+
+            // append the allocation.
+            allocations.add(a);
+
+        }
+
+        nsolutions.addAndGet(n);
+
+        return allocations;
 
     }
 
@@ -464,10 +449,18 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      * and bats, but there should be specific coders for handling binding sets
      * which leverages the known set of variables in play as of the operator
      * which generated those intermediate results.
+     * <p>
+     * Note: Some similar work was done to improve the htree performance.
+     * <p>
+     * Note: Very small chunks (1-5 solutions) are common on a cluster and might
+     * be optimized different than modest chunks (10-100+).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/395">HTree
+     *      performance tuning</a>
      */
     private class ChunkAccessor implements IChunkAccessor<E> {
 
-        private final IAsynchronousIterator<E[]> source;
+        private final ICloseableIterator<E[]> source;
         
         public ChunkAccessor() {
             
@@ -480,7 +473,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
         }
         
-        public IAsynchronousIterator<E[]> iterator() {
+        public ICloseableIterator<E[]> iterator() {
             
             return source;
             
@@ -494,7 +487,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     }
 
-    private class DeserializationIterator implements IAsynchronousIterator<E[]> {
+    private class DeserializationIterator implements ICloseableIterator<E[]> {
 
         private final Iterator<IAllocation> src;
         private volatile boolean open = true;
@@ -554,26 +547,6 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
             throw new UnsupportedOperationException();
             
-        }
-
-        /*
-         * Note: Asynchronous API is not implemented in a non-blocking manner
-         * since all the data is in a byte[] and there is an expectation that
-         * this interface will be excised from query processing soon.
-         */
-
-        public boolean hasNext(long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return hasNext();
-        }
-
-        public boolean isExhausted() {
-            return !hasNext();
-        }
-
-        public E[] next(long timeout, TimeUnit unit)
-                throws InterruptedException {
-            return next();
         }
 
     }

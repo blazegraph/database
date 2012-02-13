@@ -39,18 +39,18 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.TestCase2;
 
 /**
- * Test suite for the {@link MultiSourceSequentialAsynchronousIterator}.
+ * Test suite for the {@link MultiSourceSequentialCloseableIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
+public class TestMultiSourceSequentialCloseableIterator extends TestCase2 {
     
-    public TestMultiSourceSequentialAsynchronousIterator() {
+    public TestMultiSourceSequentialCloseableIterator() {
         
     }
 
-    public TestMultiSourceSequentialAsynchronousIterator(String name) {
+    public TestMultiSourceSequentialCloseableIterator(String name) {
         super(name);
     }
 
@@ -65,7 +65,7 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
     public void test1() throws InterruptedException {
         
         // empty iterator.
-        final MultiSourceSequentialAsynchronousIterator<String> itr = new MultiSourceSequentialAsynchronousIterator<String>(
+        final MultiSourceSequentialCloseableIterator<String> itr = new MultiSourceSequentialCloseableIterator<String>(
                 emptyIterator());
         
 //        // nothing available yet.
@@ -85,8 +85,10 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
                 new String[] { "a" })));
 
         // reports data available and visits data.
-        assertTrue(itr.hasNext(1, TimeUnit.MILLISECONDS));
-        assertEquals("a", itr.next(1, TimeUnit.MILLISECONDS));
+        assertTrue(itr.hasNext());
+        assertEquals("a", itr.next());
+//        assertTrue(itr.hasNext(1, TimeUnit.MILLISECONDS));
+//        assertEquals("a", itr.next(1, TimeUnit.MILLISECONDS));
 
         // add a non-empty chunk.
         assertTrue(itr.add(new ThickAsynchronousIterator<String>(
@@ -101,8 +103,8 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
 
         // iterator reports nothing available.
         assertFalse(itr.hasNext());
-        assertFalse(itr.hasNext(1, TimeUnit.MILLISECONDS));
-        assertNull(itr.next(1, TimeUnit.MILLISECONDS));
+//        assertFalse(itr.hasNext(1, TimeUnit.MILLISECONDS));
+//        assertNull(itr.next(1, TimeUnit.MILLISECONDS));
 
         // can not add more sources.
         assertFalse(itr.add(new ThickAsynchronousIterator<String>(
@@ -113,7 +115,7 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
     public void test2() throws InterruptedException {
 
         // empty iterator.
-        final MultiSourceSequentialAsynchronousIterator<String> itr = new MultiSourceSequentialAsynchronousIterator<String>(
+        final MultiSourceSequentialCloseableIterator<String> itr = new MultiSourceSequentialCloseableIterator<String>(
                 emptyIterator());
 
         // add a non-empty chunk.
@@ -148,7 +150,7 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
     public void test3() throws InterruptedException, ExecutionException {
 
         // empty iterator.
-        final MultiSourceSequentialAsynchronousIterator<String> itr = new MultiSourceSequentialAsynchronousIterator<String>(
+        final MultiSourceSequentialCloseableIterator<String> itr = new MultiSourceSequentialCloseableIterator<String>(
                 emptyIterator());
 
         final ExecutorService service = Executors.newSingleThreadExecutor();
@@ -160,9 +162,10 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
                 public Void call() throws Exception {
 
                     log.info("Will wait on iterator.");
-                    
-                    if (itr.hasNext(1000, TimeUnit.MILLISECONDS))
-                        fail("Iterator should not visit anything.");
+
+                    assertFalse(itr.hasNext());
+//                    if (itr.hasNext(1000, TimeUnit.MILLISECONDS))
+//                        fail("Iterator should not visit anything.");
 
                     // Can not add more sources.
                     assertFalse(itr.add(new ThickAsynchronousIterator<String>(
@@ -202,7 +205,7 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
         final ThickAsynchronousIterator<String> itr1 = iterator("a","b","c");
         
         // empty iterator.
-        final MultiSourceSequentialAsynchronousIterator<String> itr = new MultiSourceSequentialAsynchronousIterator<String>(
+        final MultiSourceSequentialCloseableIterator<String> itr = new MultiSourceSequentialCloseableIterator<String>(
                 itr1);
 
         assertEquals("a", itr.next());
@@ -241,7 +244,7 @@ public class TestMultiSourceSequentialAsynchronousIterator extends TestCase2 {
         final ThickAsynchronousIterator<String> itr3 = iterator("g","h","i");
         
         // empty iterator.
-        final MultiSourceSequentialAsynchronousIterator<String> itr = new MultiSourceSequentialAsynchronousIterator<String>(
+        final MultiSourceSequentialCloseableIterator<String> itr = new MultiSourceSequentialCloseableIterator<String>(
                 itr1);
         itr.add(itr2);
         itr.add(itr3);

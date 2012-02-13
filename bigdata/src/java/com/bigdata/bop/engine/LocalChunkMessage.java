@@ -7,8 +7,8 @@ import java.util.UUID;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.fed.FederatedRunningQuery;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.relation.accesspath.ThickCloseableIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An non-{@link Serializable} chunk of intermediate results which are ready to
@@ -181,18 +181,13 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
     
     private class ChunkAccessor implements IChunkAccessor<IBindingSet> {
 
-//        public IAsynchronousIterator<IBindingSet[]> iterator() {
-//
-//            return newBindingSetIterator(bindingSetChunks);
-//            
-//        }
-        private final IAsynchronousIterator<IBindingSet[]> source;
+        private final ICloseableIterator<IBindingSet[]> source;
 
         public ChunkAccessor() {
             source = newBindingSetIterator(bindingSetChunks);
         }
 
-        public IAsynchronousIterator<IBindingSet[]> iterator() {
+        public ICloseableIterator<IBindingSet[]> iterator() {
             return source;
         }
 
@@ -202,57 +197,17 @@ public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
 
     }
 
-//    /**
-//     * Return an {@link IAsynchronousIterator} that will read a single, empty
-//     * {@link IBindingSet}.
-//     */
-//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator() {
-//
-//        return newBindingSetIterator(new ListBindingSet());
-//
-//    }
-
-//    /**
-//     * Return an {@link IAsynchronousIterator} that will read a single
-//     * {@link IBindingSet}.
-//     * 
-//     * @param bindingSet
-//     *            the binding set.
-//     */
-//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-//            final IBindingSet bindingSet) {
-//
-//        return new ThickAsynchronousIterator<IBindingSet[]>(
-//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-//
-//    }
-
-//    /**
-//     * Return an {@link IAsynchronousIterator} that will read the source
-//     * {@link IBindingSet}s.
-//     * 
-//     * @param bsets
-//     *            The source binding sets.
-//     */
-//    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-//            final IBindingSet[] bsets) {
-//     
-//        return new ThickAsynchronousIterator<IBindingSet[]>(
-//                new IBindingSet[][] { bsets });
-//        
-//    }
-
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+     * Return an {@link ICloseableIterator} that will read a single, chunk
      * containing all of the specified {@link IBindingSet}s.
      * 
      * @param bindingSetChunks
      *            the chunks of binding sets.
      */
-    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+    private static ThickCloseableIterator<IBindingSet[]> newBindingSetIterator(
             final IBindingSet[][] bindingSetChunks) {
 
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
+        return new ThickCloseableIterator<IBindingSet[]>(bindingSetChunks);
 
     }
 

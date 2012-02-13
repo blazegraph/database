@@ -57,8 +57,8 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.DelegateBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
-import com.bigdata.relation.accesspath.MultiSourceSequentialAsynchronousIterator;
+import com.bigdata.relation.accesspath.IMultiSourceCloseableIterator;
+import com.bigdata.relation.accesspath.MultiSourceSequentialCloseableIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
@@ -591,14 +591,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                     && firstChunk.isLastInvocation()
                     ;
             /*
-             * FIXME There is no longer any reliance on the IAsynchronous
+             * Note: There is no longer any reliance on the IAsynchronous
              * Iterator API here. It is perfectly sufficient to only
-             * implement ICloseableIterator. These "multi-source" classes
-             * should be revisited with that simplifying assumption in mind.
+             * implement ICloseableIterator. Query operator and chunk
+             * message implementations should be revisited with this
+             * simplifying assumption in mind.
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
              */
-            final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(//
+            final IMultiSourceCloseableIterator<IBindingSet[]> source = new MultiSourceSequentialCloseableIterator<IBindingSet[]>(//
 //                  accepted.remove(0).getChunkAccessor().iterator()//
                     firstChunk.getChunkAccessor().iterator()//
                     );
@@ -1761,12 +1762,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             if (chunks.length == 0)
                 continue;
 
-            QueueStats stats = map.get(bundle);
-            
+            final Integer bopId = Integer.valueOf(bundle.bopId);
+
+            QueueStats stats = map.get(bopId);
+
             if (stats == null) {
-                
-                map.put(bundle.bopId, stats = new QueueStats());
-                
+
+                map.put(bopId, stats = new QueueStats());
+
             }
             
             stats.shardSet.add(bundle.shardId);

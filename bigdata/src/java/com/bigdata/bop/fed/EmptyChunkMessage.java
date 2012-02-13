@@ -34,8 +34,8 @@ import java.util.UUID;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
-import com.bigdata.relation.accesspath.EmptyAsynchronousIterator;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.EmptyCloseableIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 
 /**
@@ -154,9 +154,9 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
         return new IChunkAccessor<E>() {
 
-            public IAsynchronousIterator<E[]> iterator() {
+            public ICloseableIterator<E[]> iterator() {
 
-                return new EmptyAsynchronousIterator<E[]>();
+                return new EmptyCloseableIterator<E[]>();
                 
             }
             

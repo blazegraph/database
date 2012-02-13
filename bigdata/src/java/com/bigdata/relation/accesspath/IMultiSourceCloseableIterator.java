@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,33 +22,34 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 10, 2011
+ * Created on Oct 19, 2010
  */
 
 package com.bigdata.relation.accesspath;
 
-import java.util.concurrent.TimeUnit;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * An empty {@link IAsynchronousIterator}.
+ * An interface which permits new sources to be attached dynamically. The
+ * decision to accept a new source via {@link #add(ICloseableIterator)} or to
+ * {@link IMultiSourceCloseableIterator#close()} the iterator must be atomic.
+ * In particular, it is illegal for a source to be accepted after the iterator
+ * has been closed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyAsynchronousIterator<E> extends EmptyCloseableIterator<E>
-        implements IAsynchronousIterator<E> {
+public interface IMultiSourceCloseableIterator<E> extends
+        ICloseableIterator<E> {
 
-    public boolean isExhausted() {
-        return true;
-    }
-
-    public boolean hasNext(long timeout, TimeUnit unit)
-            throws InterruptedException {
-        return false;
-    }
-
-    public E next(long timeout, TimeUnit unit) throws InterruptedException {
-        return null;
-    }
+    /**
+     * Add a source. If the iterator already reports that it is closed then the
+     * new source can not be added and this method will return false.
+     * 
+     * @param src
+     *            The source.
+     * @return <code>true</code> iff the source could be added.
+     */
+    boolean add(ICloseableIterator<E> src);
 
 }
