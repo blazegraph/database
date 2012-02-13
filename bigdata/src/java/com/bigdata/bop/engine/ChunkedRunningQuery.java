@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -1730,6 +1731,60 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      
     }
 
+    /**
+     * Return a summary of the work queue for the operators in this query
+     * (non-blocking).
+     * 
+     * @return A map whose keys are the operator identifiers and whose values
+     *         provide summary statistics for the work queue(s) for those
+     *         operators.
+     *         <p>
+     *         Note: For a cluster, there is one work queue per (operator,shard)
+     *         pair.
+     */
+    protected Map<Integer/* bopId */, QueueStats> getQueueStats() {
+        
+        final Map<Integer, QueueStats> map = new HashMap<Integer, QueueStats>();
+
+        for (Map.Entry<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> e : operatorQueues
+                .entrySet()) {
+
+            final BSBundle bundle = e.getKey();
+
+            final BlockingQueue<IChunkMessage<IBindingSet>> queue = e
+                    .getValue();
+
+            @SuppressWarnings("unchecked")
+            final IChunkMessage<IBindingSet>[] chunks = queue
+                    .toArray(new IChunkMessage[0]);
+
+            if (chunks.length == 0)
+                continue;
+
+            QueueStats stats = map.get(bundle);
+            
+            if (stats == null) {
+                
+                map.put(bundle.bopId, stats = new QueueStats());
+                
+            }
+            
+            stats.shardSet.add(bundle.shardId);
+            
+            for (IChunkMessage<IBindingSet> msg : chunks) {
+
+                stats.chunkCount++;
+
+                stats.solutionCount += msg.getSolutionCount();
+
+            }
+
+        }
+
+        return map;
+        
+    }
+    
 //    @Override
     protected IChunkHandler getChunkHandler() {
         

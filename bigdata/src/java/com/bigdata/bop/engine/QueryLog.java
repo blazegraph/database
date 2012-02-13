@@ -109,14 +109,19 @@ public class QueryLog {
 				 * this if the monitor for this StringBuilder shows up as a hot
 				 * spot when query logging is enabled.
 				 */
-				synchronized(sb) {
-				
-					// clear the buffer.
-					sb.setLength(0);
+                synchronized (sb) {
 
-                    logSummaryRow(q, sb);
-                    
-                    logDetailRows(q, sb);
+                    // clear the buffer.
+                    sb.setLength(0);
+
+                    {
+                        final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) q)
+                                .getQueueStats();
+
+                        logSummaryRow(q, queueStats, sb);
+
+                        logDetailRows(q, queueStats, sb);
+                    }
 
                     if (children != null) {
 
@@ -124,9 +129,12 @@ public class QueryLog {
 
                             final IRunningQuery c = children[i];
                             
-                            logSummaryRow(c, sb);
+                            final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) c)
+                                    .getQueueStats();
                             
-                            logDetailRows(c, sb);
+                            logSummaryRow(c, queueStats, sb);
+                            
+                            logDetailRows(c, queueStats, sb);
 
 					    }
 					    
@@ -172,8 +180,9 @@ public class QueryLog {
 	/**
 	 * Log a detail row for each operator in the query.
 	 */
-	static private void logDetailRows(final IRunningQuery q,
-			final StringBuilder sb) {
+    static private void logDetailRows(final IRunningQuery q,
+            final Map<Integer/* bopId */, QueueStats> queueStats,
+            final StringBuilder sb) {
 
 		final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
 
@@ -181,7 +190,8 @@ public class QueryLog {
 		
 		for (Integer bopId : order) {
 
-			sb.append(getTableRow(q, orderIndex, bopId, false/* summary */));
+			sb.append(getTableRow(q, orderIndex, bopId, false/* summary */,
+			        queueStats));
 			
 //			sb.append('\n');
 			
@@ -194,9 +204,12 @@ public class QueryLog {
     /**
      * Log a summary row for the query.
      */
-    static private void logSummaryRow(final IRunningQuery q, final StringBuilder sb) {
+    static private void logSummaryRow(final IRunningQuery q,
+            final Map<Integer/* bopId */, QueueStats> queueStats,
+            final StringBuilder sb) {
 
-		sb.append(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(), true/* summary */));
+        sb.append(getTableRow(q, -1/* orderIndex */, q.getQuery().getId(),
+                true/* summary */, queueStats));
 		
 //		sb.append('\n');
 
@@ -239,10 +252,15 @@ public class QueryLog {
         sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
         sb.append("\tnumRunning");// #of concurrent invocations of the operator (current value)
         sb.append("\tfanOut"); // #of shards/nodes on which the operator has started.
+        sb.append("\tqueueShards"); // #of shards with work queued for this operator.
+        sb.append("\tqueueChunks"); // #of chunks queued for this operator.
+        sb.append("\tqueueSolutions"); // #of solutions queued for this operator.
         sb.append("\tchunksIn");
         sb.append("\tunitsIn");
+        sb.append("\tunitsInPerChunk"); // average #of solutions in per chunk.
         sb.append("\tchunksOut");
         sb.append("\tunitsOut");
+        sb.append("\tunitsOutPerChunk"); // average #of solutions out per chunk.
         sb.append("\ttypeErrors");
         sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
         sb.append("\taccessPathDups");
@@ -264,15 +282,22 @@ public class QueryLog {
 
     /**
      * Return a tabular representation of the query {@link RunState}.
-     *
-     * @param q The {@link IRunningQuery}.
-     * @param evalOrder The evaluation order for the operator.
-     * @param bopId The identifier for the operator.
-     * @param summary <code>true</code> iff the summary for the query should be written.
+     * 
+     * @param q
+     *            The {@link IRunningQuery}.
+     * @param evalOrder
+     *            The evaluation order for the operator.
+     * @param bopId
+     *            The identifier for the operator.
+     * @param summary
+     *            <code>true</code> iff the summary for the query should be
+     *            written.
+     *            
      * @return The row of the table.
      */
 	static private String getTableRow(final IRunningQuery q,
-			final int evalOrder, final Integer bopId, final boolean summary) {
+			final int evalOrder, final Integer bopId, final boolean summary,
+			final Map<Integer/*bopId*/,QueueStats> queueStats) {
 
         final StringBuilder sb = new StringBuilder();
 
@@ -520,14 +545,34 @@ public class QueryLog {
         sb.append(Long.toString(numRunning));
         sb.append('\t');
         sb.append(Integer.toString(fanOut));
+        {
+            final QueueStats tmp = queueStats == null ? null : queueStats
+                    .get(bopId);
+            if (tmp != null) {
+                sb.append('\t');
+                sb.append(tmp.shardSet.size());
+                sb.append('\t');
+                sb.append(tmp.chunkCount);
+                sb.append('\t');
+                sb.append(tmp.solutionCount);
+            } else {
+                sb.append('\t');
+                sb.append('\t');
+                sb.append('\t');
+            }
+        }
         sb.append('\t');
 		sb.append(stats.chunksIn.get());
 		sb.append('\t');
 		sb.append(stats.unitsIn.get());
-		sb.append('\t');
+        sb.append('\t');
+        sb.append(Double.toString(avg(stats.unitsIn.get(), stats.chunksIn.get())));
+        sb.append('\t');
 		sb.append(stats.chunksOut.get());
 		sb.append('\t');
 		sb.append(stats.unitsOut.get());
+        sb.append('\t');
+        sb.append(Double.toString(avg(stats.unitsOut.get(), stats.chunksOut.get())));
         sb.append('\t');
         sb.append(stats.typeErrors.get());
 		sb.append('\t');
@@ -597,13 +642,25 @@ public class QueryLog {
 
         getTableHeaderXHTML(w);
 
-        // Summary first.
-        getSummaryRowXHTML(queryStr, q, w, maxBopLength);
+        // Main query.
+        {
 
+            final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) q)
+                    .getQueueStats();
+
+            // Summary first.
+            getSummaryRowXHTML(queryStr, q, w, queueStats, maxBopLength);
+            
+            if (!summaryOnly) {
+
+                // Then the detail rows.
+                getTableRowsXHTML(queryStr, q, w, queueStats, maxBopLength);
+                
+            }
+
+        }
+        
         if (!summaryOnly) {
-
-            // Then the detail rows.
-            getTableRowsXHTML(queryStr, q, w, maxBopLength);
 
             if (children != null) {
 
@@ -615,11 +672,20 @@ public class QueryLog {
                     // child query.
                     getTableHeaderXHTML(w);
 
-                    // Summary first.
-                    getSummaryRowXHTML(null/* queryStr */, c, w, maxBopLength);
+                    {
+                        // Work queue summary for the child query.
+                        final Map<Integer/* bopId */, QueueStats> queueStats = ((ChunkedRunningQuery) c)
+                                .getQueueStats();
 
-                    // Then the detail rows.
-                    getTableRowsXHTML(null/* queryStr */, c, w, maxBopLength);
+                        // Summary first.
+                        getSummaryRowXHTML(null/* queryStr */, c, w,
+                                queueStats, maxBopLength);
+
+                        // Then the detail rows.
+                        getTableRowsXHTML(null/* queryStr */, c, w, queueStats,
+                                maxBopLength);
+                        
+                    }
 
                 }
 
@@ -672,13 +738,17 @@ public class QueryLog {
         w.write("<th>opCount</th>"); // cumulative #of invocations of tasks for this operator.
         w.write("<th>numRunning</th>"); // #of concurrent invocations of the operator (current value)
         w.write("<th>fanOut</th>"); // #of shards/nodes on which the operator has started.
+        w.write("<th>queueShards</th>"); // #of shards with work queued for this operator.
+        w.write("<th>queueChunks</th>"); // #of chunks queued for this operator.
+        w.write("<th>queueSolutions</th>"); // #of solutions queued for this operator.
         w.write("<th>chunksIn</th>");
         w.write("<th>unitsIn</th>");
+        w.write("<th>unitsInPerChunk</th>"); // average #of solutions in per chunk.
         w.write("<th>chunksOut</th>");
         w.write("<th>unitsOut</th>");
+        w.write("<th>unitsOutPerChunk</th>"); // average #of solutions out per chunk.
         w.write("<th>typeErrors</th>"); 
-        w.write("<th>joinRatio</th>"); // expansion rate multiplier in the
-                                       // solution count.
+        w.write("<th>joinRatio</th>"); // expansion rate multiplier in the solution count.
         w.write("<th>accessPathDups</th>");
         w.write("<th>accessPathCount</th>");
         w.write("<th>accessPathRangeCount</th>");
@@ -711,8 +781,10 @@ public class QueryLog {
 	 * 
 	 * @throws IOException
 	 */
-	public static void getTableRowsXHTML(final String queryStr,
-			final IRunningQuery q, final Writer w, final int maxBopLength)
+    public static void getTableRowsXHTML(final String queryStr,
+            final IRunningQuery q, final Writer w,
+            final Map<Integer/* bopId */, QueueStats> queueStats,
+            final int maxBopLength)
 			throws IOException {
 
         final Integer[] order = BOpUtility.getEvaluationOrder(q.getQuery());
@@ -721,8 +793,8 @@ public class QueryLog {
         
         for (Integer bopId : order) {
 
-			getTableRowXHTML(queryStr, q, w, orderIndex, bopId,
-					false/* summary */, maxBopLength);
+            getTableRowXHTML(queryStr, q, w, orderIndex, bopId,
+                    false/* summary */, queueStats, maxBopLength);
 
             orderIndex++;
             
@@ -754,7 +826,9 @@ public class QueryLog {
 	 */
 	static private void getTableRowXHTML(final String queryStr,
 			final IRunningQuery q, final Writer w, final int evalOrder,
-			final Integer bopId, final boolean summary, final int maxBopLength)
+			final Integer bopId, final boolean summary, 
+	        final Map<Integer/* bopId */, QueueStats> queueStats,    
+	        final int maxBopLength)
 			throws IOException {
 
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
@@ -1070,6 +1144,28 @@ public class QueryLog {
         w.write(TD);
         w.write(Integer.toString(fanOut));
         w.write(TDx);
+        {
+            final QueueStats tmp = queueStats == null ? null : queueStats
+                    .get(bopId);
+            if (tmp != null) {
+                w.write(TD);
+                w.write(Long.toString(tmp.shardSet.size()));
+                w.write(TDx);
+                w.write(TD);
+                w.write(Long.toString(tmp.chunkCount));
+                w.write(TDx);
+                w.write(TD);
+                w.write(Long.toString(tmp.solutionCount));
+                w.write(TDx);
+            } else {
+                w.write(TD);
+                w.write(TDx);
+                w.write(TD);
+                w.write(TDx);
+                w.write(TD);
+                w.write(TDx);
+            }
+        }
         w.write(TD);
         w.write(Long.toString(stats.chunksIn.get()));
         w.write(TDx);
@@ -1077,10 +1173,16 @@ public class QueryLog {
         w.write(Long.toString(stats.unitsIn.get()));
         w.write(TDx);
         w.write(TD);
+        w.write(Double.toString(avg(stats.unitsIn.get(), stats.chunksIn.get())));
+        w.write(TDx);
+        w.write(TD);
         w.write(Long.toString(stats.chunksOut.get()));
         w.write(TDx);
         w.write(TD);
         w.write(Long.toString(stats.unitsOut.get()));
+        w.write(TDx);
+        w.write(TD);
+        w.write(Double.toString(avg(stats.unitsOut.get(), stats.chunksOut.get())));
         w.write(TDx);
         w.write(TD);
         w.write(Long.toString(stats.typeErrors.get()));
@@ -1122,24 +1224,29 @@ public class QueryLog {
     }
 
     /**
-     * Write a summary row for the query.  The table element, header, and footer
+     * Write a summary row for the query. The table element, header, and footer
      * must be written separately.
-     * @param queryStr The original query text (optional).
-     * @param q The {@link IRunningQuery}.
-     * @param w Where to write the data.
-	 * @param maxBopLength
-	 *            The maximum length to display from {@link BOp#toString()} and
-	 *            ZERO (0) to display everything.  Data longer than this value
-	 *            will be accessible from a flyover, but not directly visible
-	 *            in the page.
+     * 
+     * @param queryStr
+     *            The original query text (optional).
+     * @param q
+     *            The {@link IRunningQuery}.
+     * @param w
+     *            Where to write the data.
+     * @param maxBopLength
+     *            The maximum length to display from {@link BOp#toString()} and
+     *            ZERO (0) to display everything. Data longer than this value
+     *            will be accessible from a flyover, but not directly visible in
+     *            the page.
      * @throws IOException
      */
-	static public void getSummaryRowXHTML(final String queryStr,
-			final IRunningQuery q, final Writer w, final int maxBopLength)
-			throws IOException {
+    static private void getSummaryRowXHTML(final String queryStr,
+            final IRunningQuery q, final Writer w,
+            final Map<Integer/* bopId */, QueueStats> queueStats,
+            final int maxBopLength) throws IOException {
 
-		getTableRowXHTML(queryStr, q, w, -1/* orderIndex */, q.getQuery()
-				.getId(), true/* summary */, maxBopLength);
+        getTableRowXHTML(queryStr, q, w, -1/* orderIndex */, q.getQuery()
+                .getId(), true/* summary */, queueStats, maxBopLength);
 
     }
 
@@ -1181,6 +1288,26 @@ public class QueryLog {
 //    	return s;
 //    	
 //    }
+
+    /**
+     * Return <code>x/y</code> unless <code>y:=0</code>, in which case return
+     * ZERO (0).
+     * 
+     * @param x
+     *            The numerator.
+     * @param y
+     *            The denomerator.
+     *            
+     * @return The average.
+     */
+    static private double avg(final long x, final long y) {
+        
+        if (y == 0)
+            return 0d;
+        
+        return x / (double) y;
+        
+    }
     
     /**
      * Return the {@link IRunningQuery} for that queryId iff it is available.
