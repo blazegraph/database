@@ -60,16 +60,16 @@ public interface IRunnableBuffer<E> extends IBuffer<E> {
     
     /**
      * Signal that no more data will be written on this buffer (this is required
-     * in order for the {@link #iterator()} to know when no more data will be
-     * made available).
+     * in order for the iterator to know when no more data will be made
+     * available).
      */
     public void close();
 
     /**
      * Signal abnormal termination of the process writing on the buffer. The
-     * buffer will be closed. The {@link #iterator()} will report the <i>cause</i>
-     * via a wrapped exception the next time any method on its interface is
-     * invoked. The internal queue may be cleared once this method is invoked.
+     * buffer will be closed. The iterator will report the <i>cause</i> via a
+     * wrapped exception the next time any method on its interface is invoked.
+     * The internal queue may be cleared once this method is invoked.
      * 
      * @param cause
      *            The exception thrown by the processing writing on the buffer.
