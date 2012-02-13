@@ -43,22 +43,22 @@ public class FederatedQueryEngineCounters extends QueryEngineCounters {
     /**
      * The #of chunks of solutions received.
      */
-    final CAT chunksIn = new CAT();
+    protected final CAT chunksIn = new CAT();
 
     /**
      * The #of chunks of solutions sent.
      */
-    final CAT chunksOut = new CAT();
+    protected final CAT chunksOut = new CAT();
 
     /**
      * The #of solutions received.
      */
-    final CAT solutionsIn = new CAT();
+    protected final CAT solutionsIn = new CAT();
 
     /**
      * The #of solutions sent.
      */
-    final CAT solutionsOut = new CAT();
+    protected final CAT solutionsOut = new CAT();
 
     @Override
     public CounterSet getCounters() {
@@ -90,6 +90,66 @@ public class FederatedQueryEngineCounters extends QueryEngineCounters {
         root.addCounter("solutionsOut", new Instrument<Long>() {
             public void sample() {
                 setValue(solutionsOut.get());
+            }
+        });
+
+        // average #of chunks flowing out of the query controller per query
+        root.addCounter("chunksOutPerQuery", new Instrument<Double>() {
+            public void sample() {
+                final long nchunks = chunksOut.get();
+                final long n = queryStartCount.get();
+                final double d = n == 0 ? 0d : (nchunks / (double) n);
+                setValue(d);
+            }
+        });
+
+        // average #of chunks flowing into the query controller per query
+        root.addCounter("chunksInPerQuery", new Instrument<Double>() {
+            public void sample() {
+                final long nchunks = chunksIn.get();
+                final long n = queryStartCount.get();
+                final double d = n == 0 ? 0d : (nchunks / (double) n);
+                setValue(d);
+            }
+        });
+
+        // average #of solutions flowing out of the query controller per query
+        root.addCounter("solutionsOutPerQuery", new Instrument<Double>() {
+            public void sample() {
+                final long nsol = solutionsOut.get();
+                final long n = queryStartCount.get();
+                final double d = n == 0 ? 0d : (nsol / (double) n);
+                setValue(d);
+            }
+        });
+
+        // average #of solutions flowing into the query controller per query
+        root.addCounter("solutionsInPerQuery", new Instrument<Double>() {
+            public void sample() {
+                final long nsol = solutionsIn.get();
+                final long n = queryStartCount.get();
+                final double d = n == 0 ? 0d : (nsol / (double) n);
+                setValue(d);
+            }
+        });
+
+        // average #of solutions per chunk flowing out of the query controller
+        root.addCounter("solutionsOutPerChunk", new Instrument<Double>() {
+            public void sample() {
+                final long nsol = solutionsOut.get();
+                final long nchunks = chunksOut.get();
+                final double d = nchunks == 0 ? 0d : (nsol / (double) nchunks);
+                setValue(d);
+            }
+        });
+
+        // average #of solutions per chunk flowing into the query controller
+        root.addCounter("solutionsInPerChunk", new Instrument<Double>() {
+            public void sample() {
+                final long nsol = solutionsIn.get();
+                final long nchunks = chunksIn.get();
+                final double d = nchunks == 0 ? 0d : (nsol / (double) nchunks);
+                setValue(d);
             }
         });
 
