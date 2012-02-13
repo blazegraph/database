@@ -171,7 +171,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
              * of the operator's outputs
              */
             @SuppressWarnings("unchecked")
-            final IPredicate<E> pred = ((IShardwisePipelineOp) targetOp).getPredicate();
+            final IPredicate<E> pred = ((IShardwisePipelineOp<E>) targetOp).getPredicate();
             final long timestamp = pred.getTimestamp(); 
             final int capacity = 1000;// @todo
             // FIXME Capacity is unbounded to prevent deadlock. See the node below.
