@@ -5,10 +5,13 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -647,7 +650,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doShardReport(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (getBigdataRDFContext().isScaleOut()) {
+        if (!getBigdataRDFContext().isScaleOut()) {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Not scale-out");
             return;
@@ -727,7 +730,14 @@ public class QueryServlet extends BigdataRDFServlet {
                                 timestamp, accessPath.getFromKey(),
                                 accessPath.getToKey(), false/* reverseScan */);
 
-                        int i = 0;
+                        int nlocators = 0;
+
+                        // The distinct hosts on which the shards are located.
+                        final Map<String,AtomicInteger> hosts = new TreeMap<String,AtomicInteger>();
+                        
+                        // The host+locators in key order.
+                        final StringBuilder sb = new StringBuilder();
+                        
                         while (itr.hasNext()) {
 
                             final PartitionLocator loc = itr.next();
@@ -735,18 +745,59 @@ public class QueryServlet extends BigdataRDFServlet {
                             final IDataService ds = fed.getDataService(loc
                                     .getDataServiceUUID());
                             
-                            current.node(
-                                    "pre",
-                                    "#" + (i + 1) + loc.toString() + " : host="
-                                            + ds == null ? "N/A" : ds
-                                            .getHostname());
+							final String hostname = ds == null ? "N/A" : ds
+									.getHostname();
+
+							AtomicInteger nshards = hosts.get(hostname);
+
+							if (nshards == null) {
+
+								hosts.put(hostname,
+										nshards = new AtomicInteger());
+							
+							}
+							
+							nshards.incrementAndGet();
+							
+//									"order=" + Integer.toString(nlocators + 1)
+//											+ ", "
+							sb.append("\nhost=" + hostname);
+							sb.append(", locator=" + loc);
+							
+							nlocators++;
 
                         } // while(itr.hasNext())
 
+						final long elapsed = System.currentTimeMillis() - begin;
+
+						current.node("p", "index="
+								+ ndx.getIndexMetadata().getName()
+								+ ", locators=" + nlocators + ", hosts="
+								+ hosts.size() + ", elapsed=" + elapsed + "ms");
+
+						// host + locators in key order.
+						current.node("pre", sb.toString());
+						
+						// hosts + #shards in host name order
+						{
+
+							sb.setLength(0); // clear buffer.
+
+							for (Map.Entry<String, AtomicInteger> e : hosts
+									.entrySet()) {
+
+								sb.append("\nhost=" + e.getKey());
+								
+								sb.append(", #shards=" + e.getValue());
+								
+							}
+
+							current.node("pre", sb.toString());
+
+						}
+
                         doc.closeAll(current);
                         
-                        final long elapsed = System.currentTimeMillis() - begin;
-
                     } finally {
                         w.flush();
                         w.close();
