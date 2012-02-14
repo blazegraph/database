@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -29,12 +30,17 @@ import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.relation.accesspath.AccessPath;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -72,6 +78,8 @@ public class QueryServlet extends BigdataRDFServlet {
             doQuery(req, resp);
         } else if (req.getParameter("ESTCARD") != null) {
             doEstCard(req, resp);
+        } else if (req.getParameter("SHARDS") != null) {
+            doShardReport(req, resp);
         } else {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
             return;
@@ -362,8 +370,11 @@ public class QueryServlet extends BigdataRDFServlet {
 			XMLBuilder.Node current = doc.root("html");
 			{
 				current = current.node("head");
-				current.node("meta").attr("http-equiv", "Content-Type")
-						.attr("content", "text/html;charset=utf-8").close();
+                current.node("meta")
+                        .attr("http-equiv", "Content-Type")
+                        .attr("content",
+                                "text/html;charset=" + queryTask.charset.name())
+                        .close();
 				current.node("title").textNoEncode("bigdata&#174;").close();
 				current = current.close();// close the head.
 			}
@@ -596,6 +607,150 @@ public class QueryServlet extends BigdataRDFServlet {
                     final long elapsed = System.currentTimeMillis() - begin;
                     
                     reportRangeCount(resp, rangeCount, elapsed);
+
+                } catch(Throwable t) {
+                    
+                    if(conn != null)
+                        conn.rollback();
+                    
+                    throw new RuntimeException(t);
+                    
+                } finally {
+
+                    if (conn != null)
+                        conn.close();
+
+                }
+
+            } catch (Throwable t) {
+
+                throw BigdataRDFServlet.launderThrowable(t, resp, "");
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * Private API reports the shards against which the access path would
+     * read.
+     * 
+     * @param req
+     * @param resp
+     */
+    private void doShardReport(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        if (getBigdataRDFContext().isScaleOut()) {
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Not scale-out");
+            return;
+        }
+        
+        final long begin = System.currentTimeMillis();
+        
+        final String namespace = getNamespace(req);
+
+        final Resource s;
+        final URI p;
+        final Value o;
+        final Resource c;
+        try {
+            s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
+            p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
+            o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
+            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+        } catch (IllegalArgumentException ex) {
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    ex.getLocalizedMessage());
+            return;
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("SHARDS: access path: (s=" + s + ", p=" + p + ", o="
+                    + o + ", c=" + c + ")");
+
+        try {
+
+            try {
+
+                BigdataSailRepositoryConnection conn = null;
+                try {
+
+                    final long timestamp = getTimestamp(req);
+
+                    conn = getBigdataRDFContext().getQueryConnection(
+                            namespace, timestamp);
+
+                    final AccessPath<?> accessPath = (AccessPath<?>) conn
+                            .getSailConnection().getBigdataSail().getDatabase()
+                            .getAccessPath(s, p, o, c);
+                    
+                    final ClientIndexView ndx = (ClientIndexView) accessPath
+                            .getIndex();
+                    
+                    final String charset = "utf-8";// TODO from request.
+
+                    resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
+                    resp.setCharacterEncoding(charset);
+                    final Writer w = resp.getWriter();
+                    try {
+
+                        final HTMLBuilder doc = new HTMLBuilder(charset, w);
+                        
+                        XMLBuilder.Node current = doc.root("html");
+                        {
+                            current = current.node("head");
+                            current.node("meta")
+                                    .attr("http-equiv", "Content-Type")
+                                    .attr("content",
+                                            "text/html;charset=utf-8")
+                                    .close();
+                            current.node("title")
+                                    .textNoEncode("bigdata&#174;").close();
+                            current = current.close();// close the head.
+                        }
+
+                        // open the body
+                        current = current.node("body");
+
+                        final IBigdataFederation<?> fed = (IBigdataFederation<?>) getBigdataRDFContext()
+                                .getIndexManager();
+                        
+                        final Iterator<PartitionLocator> itr = ndx.locatorScan(
+                                timestamp, accessPath.getFromKey(),
+                                accessPath.getToKey(), false/* reverseScan */);
+
+                        int i = 0;
+                        while (itr.hasNext()) {
+
+                            final PartitionLocator loc = itr.next();
+
+                            final IDataService ds = fed.getDataService(loc
+                                    .getDataServiceUUID());
+                            
+                            current.node(
+                                    "pre",
+                                    "#" + (i + 1) + loc.toString() + " : host="
+                                            + ds == null ? "N/A" : ds
+                                            .getHostname());
+
+                        } // while(itr.hasNext())
+
+                        doc.closeAll(current);
+                        
+                        final long elapsed = System.currentTimeMillis() - begin;
+
+                    } finally {
+                        w.flush();
+                        w.close();
+                    }
 
                 } catch(Throwable t) {
                     

@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sail.webapp;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Context object provides access to the {@link IIndexManager}.
@@ -25,6 +26,18 @@ public class BigdataBaseContext {
 	public IIndexManager getIndexManager() {
 
 	    return m_indexManager;
+	    
+	}
+
+    /**
+     * Return <code>true</code> iff the {@link IIndexManager} is an
+     * {@link IBigdataFederation} and {@link IBigdataFederation#isScaleOut()}
+     * reports <code>true</code>.
+     */
+    public boolean isScaleOut() {
+
+        return m_indexManager instanceof IBigdataFederation
+                && ((IBigdataFederation<?>) m_indexManager).isScaleOut();
 	    
 	}
 
