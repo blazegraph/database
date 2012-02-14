@@ -2157,7 +2157,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 							bset = bset.clone();
 
 							// propagate bindings from the visited element.
-							if (context.bind(predicate, constraints, e, bset)) {
+							if (BOpContext.bind(predicate, constraints, e, bset)) {
 
 								// optionally strip off unnecessary variables.
 								bset = variablesToKeep == null ? bset : bset
