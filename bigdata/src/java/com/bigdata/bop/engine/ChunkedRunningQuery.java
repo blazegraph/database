@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
@@ -119,7 +120,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * map. Changing to a weak value map should provide the necessary pruning of
      * unused entries without opening up this concurrency hole.
      */
-    private final Map<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> operatorQueues;
+    private final ConcurrentMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>> operatorQueues;
 
     /**
      * FIXME It appears that this is Ok based on a single unit test known to

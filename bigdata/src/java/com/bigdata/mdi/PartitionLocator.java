@@ -75,7 +75,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
     /**
      * The unique partition identifier.
-o     */
+     */
     private int partitionId;
 
     /**
