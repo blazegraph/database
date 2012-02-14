@@ -660,6 +660,7 @@ public class QueryServlet extends BigdataRDFServlet {
         
         final String namespace = getNamespace(req);
 
+		final boolean doRangeCount = true;
         final Resource s;
         final URI p;
         final Value o;
@@ -759,8 +760,6 @@ public class QueryServlet extends BigdataRDFServlet {
 							
 							nshards.incrementAndGet();
 							
-//									"order=" + Integer.toString(nlocators + 1)
-//											+ ", "
 							sb.append("\nhost=" + hostname);
 							sb.append(", locator=" + loc);
 							
@@ -768,15 +767,34 @@ public class QueryServlet extends BigdataRDFServlet {
 
                         } // while(itr.hasNext())
 
-						final long elapsed = System.currentTimeMillis() - begin;
+                        // elapsed locator scan time
+						final long begin2 = System.currentTimeMillis();
+						final long elapsed = begin2 - begin;
+						
+						// fast range count (requires visiting shards)
+						final long rangeCount = doRangeCount ? accessPath
+								.rangeCount(false/* exact */) : -1;
 
-						current.node("p", "index="
-								+ ndx.getIndexMetadata().getName()
-								+ ", locators=" + nlocators + ", hosts="
-								+ hosts.size() + ", elapsed=" + elapsed + "ms");
+						// elapsed time for the fast range count
+						final long elapsed2 = System.currentTimeMillis()
+								- begin2;
+
+						current = current.node("H2", "summary");
+						{
+							current.node("p", "index="
+									+ ndx.getIndexMetadata().getName()
+									+ ", locators=" + nlocators + ", hosts="
+									+ hosts.size() + ", elapsed=" + elapsed
+									+ "ms");
+							if (doRangeCount) {
+								current.node("p", "rangeCount=" + rangeCount
+										+ ", elapsed=" + elapsed2 + "ms");
+							}
+							current = current.close();
+						}
 
 						// host + locators in key order.
-						current.node("pre", sb.toString());
+						current.node("H2","shards").node("pre", sb.toString()).close();
 						
 						// hosts + #shards in host name order
 						{
@@ -792,7 +810,7 @@ public class QueryServlet extends BigdataRDFServlet {
 								
 							}
 
-							current.node("pre", sb.toString());
+							current.node("H2","hosts").node("pre", sb.toString()).close();
 
 						}
 
