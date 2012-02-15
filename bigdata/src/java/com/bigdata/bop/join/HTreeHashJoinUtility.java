@@ -30,7 +30,6 @@ package com.bigdata.bop.join;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.UUID;
@@ -49,20 +48,14 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.Tuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
@@ -73,17 +66,8 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.impl.BlobIV;
-import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
-import com.bigdata.rdf.lexicon.BlobsIndexHelper;
-import com.bigdata.rdf.lexicon.BlobsTupleSerializer;
-import com.bigdata.rdf.lexicon.Id2TermTupleSerializer;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
@@ -219,22 +203,31 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     private final int chunkSize = 1000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
     /**
-     * The schema provides the order in which the {@link IV}[] for solutions
-     * stored in the hash index are encoded in the {@link HTree}. {@link IV}
-     * s which are not bound are modeled by a {@link TermId#NullIV}.
-     * <p>
-     * Note: In order to be able to encode/decode the schema based on the
-     * lazy identification of the variables which appear in solutions the
-     * {@link HTree} must store variable length {@link IV}[]s since new
-     * variables may be discovered at any point.
+     * Utility class for compactly and efficiently encoding and decoding
+     * {@link IBindingSet}s.
      */
-    private final LinkedHashSet<IVariable<?>> schema;
-
-    /**
-     * The set of variables for which materialized {@link IV}s have been
-     * observed.
-     */
-    private final LinkedHashSet<IVariable<?>> ivCacheSchema;
+    private final IVBindingSetEncoderWithIVCache encoder;
+//    /**
+//     * The schema provides the order in which the {@link IV}[] for solutions
+//     * stored in the hash index are encoded in the {@link HTree}. {@link IV}
+//     * s which are not bound are modeled by a {@link TermId#NullIV}.
+//     * <p>
+//     * Note: In order to be able to encode/decode the schema based on the
+//     * lazy identification of the variables which appear in solutions the
+//     * {@link HTree} must store variable length {@link IV}[]s since new
+//     * variables may be discovered at any point.
+//     * 
+//     * FIXME PORTED
+//     */
+//    private final LinkedHashSet<IVariable<?>> schema;
+//
+//    /**
+//     * The set of variables for which materialized {@link IV}s have been
+//     * observed.
+//     * 
+//     * FIXME PORTED
+//     */
+//    private final LinkedHashSet<IVariable<?>> ivCacheSchema;
 
     /**
      * The type of join to be performed.
@@ -282,17 +275,17 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      */
     private final IConstraint[] constraints;
 
-    /**
-     * The namespace of the {@link LexiconRelation} IFF we need to maintain
-     * the {@link #ivCache}.
-     */
-    private final String namespace;
-
-    /**
-     * The {@link BigdataValueFactory} for the {@link LexiconRelation} IFF we
-     * need to maintain the {@link #ivCache}.
-     */
-    private final BigdataValueFactory valueFactory;
+//    /**
+//     * The namespace of the {@link LexiconRelation} IFF we need to maintain
+//     * the {@link #ivCache}.
+//     */
+//    private final String namespace;
+//
+//    /**
+//     * The {@link BigdataValueFactory} for the {@link LexiconRelation} IFF we
+//     * need to maintain the {@link #ivCache}.
+//     */
+//    private final BigdataValueFactory valueFactory;
 
     /**
      * The backing {@link IRawStore}.
@@ -303,39 +296,34 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The hash index. The keys are int32 hash codes built from the join
      * variables. The values are an {@link IV}[], similar to the encoding in
      * the statement indices. The mapping from the index positions in the
-     * {@link IV}s to the variables is specified by the {@link #schema}.
+     * {@link IV}s to the variables is managed by the {@link #encoder}.
      */
     private final AtomicReference<HTree> rightSolutions = new AtomicReference<HTree>();
 
     /**
-     * The set of distinct source solutions which joined. This set is
-     * maintained iff the join is optional and is <code>null</code>
-     * otherwise.
+     * The set of distinct source solutions which joined. This set is maintained
+     * iff the join is optional and is <code>null</code> otherwise.
      */
     private final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
     
-    /**
-     * The {@link IV}:{@link BigdataValue} mapping for non-{@link BlobIV}s. This
-     * captures any cached BigdataValue references encountered on {@link IV}s.
-     * This map does not store duplicate entries for the same {@link IV}.
-     * <p>
-     * Note: This is precisely the same mapping we use for the ID2TERM index.
-     */
-    private final AtomicReference<BTree> ivCache = new AtomicReference<BTree>();
-
-    /**
-     * The {@link IV}:{@link BigdataValue} mapping for {@link BlobIV}s with
-     * cached {@link BigdataValue}s. This captures any cached BigdataValue
-     * references encountered on {@link BlobIV}s. This map does not store
-     * duplicate entries for the same {@link IV}.
-     * <p>
-     * Note: This is precisely the same mapping we use for the BLOBS index.
-     * 
-     * TODO The last committed revision of this class prior to introducing the
-     * blobsCache was r5568. I need to verify that there is no performance
-     * regression due to the presence of the blobsCache.
-     */
-    private final AtomicReference<BTree> blobsCache = new AtomicReference<BTree>();
+//    /**
+//     * The {@link IV}:{@link BigdataValue} mapping for non-{@link BlobIV}s. This
+//     * captures any cached BigdataValue references encountered on {@link IV}s.
+//     * This map does not store duplicate entries for the same {@link IV}.
+//     * <p>
+//     * Note: This is precisely the same mapping we use for the ID2TERM index.
+//     */
+//    private final AtomicReference<BTree> ivCache = new AtomicReference<BTree>();
+//
+//    /**
+//     * The {@link IV}:{@link BigdataValue} mapping for {@link BlobIV}s with
+//     * cached {@link BigdataValue}s. This captures any cached BigdataValue
+//     * references encountered on {@link BlobIV}s. This map does not store
+//     * duplicate entries for the same {@link IV}.
+//     * <p>
+//     * Note: This is precisely the same mapping we use for the BLOBS index.
+//     */
+//    private final AtomicReference<BTree> blobsCache = new AtomicReference<BTree>();
 
     /**
      * The maximum #of (left,right) solution joins that will be considered
@@ -411,16 +399,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
             sb.append(",constraints=" + Arrays.toString(constraints));
-        sb.append(",namespace=" + namespace);
         sb.append(",size=" + getRightSolutionCount());
         sb.append(",considered(left=" + nleftConsidered + ",right="
                 + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
         if (joinSet.get() != null)
             sb.append(",joinSetSize=" + getJoinSetSize());
-        if (ivCache.get() != null)
-            sb.append(",ivCacheSize=" + getIVCacheSize());
-        if (blobsCache.get() != null)
-            sb.append(",blobCacheSize=" + getBlobsCacheSize());
+        sb.append(",encoder=");
         sb.append("}");
         
         return sb.toString();
@@ -456,34 +440,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (htree != null) {
 
             return htree.getEntryCount();
-
-        }
-
-        return 0L;
-        
-    }
-
-    private long getIVCacheSize() {
-
-        final BTree ndx = ivCache.get();
-
-        if (ndx != null) {
-
-            return ndx.getEntryCount();
-
-        }
-
-        return 0L;
-        
-    }
-
-    private long getBlobsCacheSize() {
-
-        final BTree ndx = blobsCache.get();
-
-        if (ndx != null) {
-
-            return ndx.getEntryCount();
 
         }
 
@@ -532,7 +488,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         final int addressBits = op.getProperty(HTreeAnnotations.ADDRESS_BITS,
                 HTreeAnnotations.DEFAULT_ADDRESS_BITS);
 
-        final int branchingFactor = 2 ^ addressBits;
+//        final int branchingFactor = 2 ^ addressBits;
         
         final int ratio = 32; // TODO Config/tune.
         
@@ -565,92 +521,92 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
     
-    /**
-     * Setup the {@link IndexMetadata} for {@link #ivCache}.
-     * <p>
-     * Note: This is basically the same setup as the ID2TERM index.
-     */
-    private IndexMetadata getIVCacheIndexMetadata(final PipelineOp op) {
-
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-        final int branchingFactor = 256;// TODO Config/tune.
-        
-        final int ratio = 32; // TODO Config/tune.
-        
-        metadata.setBranchingFactor(branchingFactor);
-
-        metadata.setWriteRetentionQueueCapacity(op.getProperty(
-                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
-                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
-
-        metadata.setTupleSerializer(new Id2TermTupleSerializer(namespace,
-                valueFactory, new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
-                new FrontCodedRabaCoder(ratio), SimpleRabaCoder.INSTANCE));
-
-        // a bloom filter should help avoid lookups when IVs do not have cached
-        // values.
-        metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
-
-        // enable raw record support.
-        metadata.setRawRecords(true);
-
-        /*
-         * Very small RDF values can be inlined into the index, but after that
-         * threshold we want to have the values out of line on the backing
-         * store.
-         * 
-         * TODO Tune this and the threshold at which we use the BLOBS index
-         * instead.
-         */
-        metadata.setMaxRecLen(16); 
-        
-        return metadata;
-
-    }
-    
-    /**
-     * Setup the {@link IndexMetadata} for {@link #blobsCache}.
-     * <p>
-     * Note: This is basically the same setup as the BLOBS index.
-     */
-    private IndexMetadata getBlobsCacheIndexMetadata(final PipelineOp op) {
-
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-        metadata.setTupleSerializer(new BlobsTupleSerializer(namespace,
-                valueFactory));
-
-        // enable raw record support.
-        metadata.setRawRecords(true);
-
-        /*
-         * The presumption is that we are storing large literals (blobs) in this
-         * index so we always want to write them on raw records rather than have
-         * them be inline in the leaves of the index.
-         */
-        metadata.setMaxRecLen(0);
-
-        /*
-         * TODO The default branching factor for this index should probably be
-         * pretty big. All of the values are on raw records, so it is just the
-         * keys in the index and the have a fixed width (8 bytes).
-         */
-        final int branchingFactor = 256;
-        
-        metadata.setBranchingFactor(branchingFactor);
-
-        metadata.setWriteRetentionQueueCapacity(op.getProperty(
-                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
-                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
-
-        // a bloom filter should help avoid lookups when IVs do not have cached
-        // values.
-        metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
-
-        return metadata;
-
-    }
+//    /**
+//     * Setup the {@link IndexMetadata} for {@link #ivCache}.
+//     * <p>
+//     * Note: This is basically the same setup as the ID2TERM index.
+//     */
+//    private IndexMetadata getIVCacheIndexMetadata(final PipelineOp op) {
+//
+//        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+//
+//        final int branchingFactor = 256;// TODO Config/tune.
+//        
+//        final int ratio = 32; // TODO Config/tune.
+//        
+//        metadata.setBranchingFactor(branchingFactor);
+//
+//        metadata.setWriteRetentionQueueCapacity(op.getProperty(
+//                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
+//                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
+//
+//        metadata.setTupleSerializer(new Id2TermTupleSerializer(namespace,
+//                valueFactory, new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
+//                new FrontCodedRabaCoder(ratio), SimpleRabaCoder.INSTANCE));
+//
+//        // a bloom filter should help avoid lookups when IVs do not have cached
+//        // values.
+//        metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
+//
+//        // enable raw record support.
+//        metadata.setRawRecords(true);
+//
+//        /*
+//         * Very small RDF values can be inlined into the index, but after that
+//         * threshold we want to have the values out of line on the backing
+//         * store.
+//         * 
+//         * TODO Tune this and the threshold at which we use the BLOBS index
+//         * instead.
+//         */
+//        metadata.setMaxRecLen(16); 
+//        
+//        return metadata;
+//
+//    }
+//    
+//    /**
+//     * Setup the {@link IndexMetadata} for {@link #blobsCache}.
+//     * <p>
+//     * Note: This is basically the same setup as the BLOBS index.
+//     */
+//    private IndexMetadata getBlobsCacheIndexMetadata(final PipelineOp op) {
+//
+//        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+//
+//        metadata.setTupleSerializer(new BlobsTupleSerializer(namespace,
+//                valueFactory));
+//
+//        // enable raw record support.
+//        metadata.setRawRecords(true);
+//
+//        /*
+//         * The presumption is that we are storing large literals (blobs) in this
+//         * index so we always want to write them on raw records rather than have
+//         * them be inline in the leaves of the index.
+//         */
+//        metadata.setMaxRecLen(0);
+//
+//        /*
+//         * TODO The default branching factor for this index should probably be
+//         * pretty big. All of the values are on raw records, so it is just the
+//         * keys in the index and the have a fixed width (8 bytes).
+//         */
+//        final int branchingFactor = 256;
+//        
+//        metadata.setBranchingFactor(branchingFactor);
+//
+//        metadata.setWriteRetentionQueueCapacity(op.getProperty(
+//                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
+//                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
+//
+//        // a bloom filter should help avoid lookups when IVs do not have cached
+//        // values.
+//        metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
+//
+//        return metadata;
+//
+//    }
     
     /**
      * 
@@ -696,12 +652,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         this.selectVars = filter ? joinVars : (IVariable<?>[]) op
                 .getProperty(JoinAnnotations.SELECT);
 
-        // Initialize the schema with the join variables.
-        this.schema = new LinkedHashSet<IVariable<?>>();
-        this.schema.addAll(Arrays.asList(joinVars));
+        /*
+         * This wraps an efficient raw store interface around a child memory
+         * manager created from the IMemoryManager which will back the named
+         * solution set.
+         */
+        store = new MemStore(mmgr.createAllocationContext());
 
-        // The set of variables for which materialized values are observed.
-        this.ivCacheSchema = filter ? null : new LinkedHashSet<IVariable<?>>();
+        // Initialize the schema with the join variables.
+        this.encoder = new IVBindingSetEncoderWithIVCache(store, filter, op);
+//        this.schema = new LinkedHashSet<IVariable<?>>();
+        encoder.updateSchema(joinVars);
+//        this.schema.addAll(Arrays.asList(joinVars));
+
+//        // The set of variables for which materialized values are observed.
+//        this.ivCacheSchema = filter ? null : new LinkedHashSet<IVariable<?>>();
 
         // The join constraints (optional).
         this.constraints = (IConstraint[]) op
@@ -716,28 +681,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 //        // ignore unbound variables when used as a DISTINCT filter.
 //        this.ignoreUnboundVariables = filter;
 
-        if (!filter) {
-
-            namespace = ((String[]) op
-                    .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0];
-
-            valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
-
-        } else {
-
-            namespace = null;
-            
-            valueFactory = null;
-            
-        }
+//        if (!filter) {
+//
+//            namespace = ((String[]) op
+//                    .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0];
+//
+//            valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+//
+//        } else {
+//
+//            namespace = null;
+//            
+//            valueFactory = null;
+//            
+//        }
         
-        /*
-         * This wraps an efficient raw store interface around a child memory
-         * manager created from the IMemoryManager which will back the named
-         * solution set.
-         */
-        store = new MemStore(mmgr.createAllocationContext());
-
         // Will support incremental eviction and persistence.
         rightSolutions.set(HTree.create(store, getIndexMetadata(op)));
 
@@ -750,19 +708,19 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             break;
         }
 
-        /*
-         * Setup the IV => BigdataValue mapping. This captures any cached
-         * BigdataValue references encountered on IVs. This map does not store
-         * duplicate entries for the same IV.
-         */
-        if (!filter) {
-
-            this.ivCache.set(BTree.create(store, getIVCacheIndexMetadata(op)));
-
-            this.blobsCache.set(BTree
-                    .create(store, getBlobsCacheIndexMetadata(op)));
-
-        }
+//        /*
+//         * Setup the IV => BigdataValue mapping. This captures any cached
+//         * BigdataValue references encountered on IVs. This map does not store
+//         * duplicate entries for the same IV.
+//         */
+//        if (!filter) {
+//
+//            this.ivCache.set(BTree.create(store, getIVCacheIndexMetadata(op)));
+//
+//            this.blobsCache.set(BTree
+//                    .create(store, getBlobsCacheIndexMetadata(op)));
+//
+//        }
 
     }
 
@@ -789,8 +747,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         checkpointHTree(rightSolutions);
 
-        checkpointBTree(ivCache);
-        checkpointBTree(blobsCache);
+        encoder.saveSolutionSet();
+//        checkpointBTree(ivCache);
+//        checkpointBTree(blobsCache);
 
         /*
          * Note: DO NOT checkpoint the joinSet here. That index is not even
@@ -839,29 +798,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
-    private void checkpointBTree(final AtomicReference<BTree> ref) {
-
-        final BTree tmp = ref.get();
-
-        if (tmp != null) {
-
-            // Checkpoint the HTree.
-            final Checkpoint checkpoint = tmp.writeCheckpoint2();
-
-            final BTree readOnly = BTree.load(store,
-                    checkpoint.getCheckpointAddr(), true/* readOnly */);
-
-            // Get a read-only view of the HTree.
-            if (!ref.compareAndSet(tmp/* expect */, readOnly)) {
-
-                throw new IllegalStateException();
-
-            }
-
-        }
-
-    }
-
     @Override
     public void release() {
 
@@ -870,13 +806,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             return;
         }
 
-        schema.clear();
-
-        if (ivCacheSchema != null) {
-
-            ivCacheSchema.clear();
-            
-        }
+        encoder.clear();
+//        schema.clear();
+//
+//        if (ivCacheSchema != null) {
+//
+//            ivCacheSchema.clear();
+//            
+//        }
         
         HTree tmp = rightSolutions.getAndSet(null/* newValue */);
 
@@ -891,22 +828,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (tmp != null) {
 
             tmp.close();
-
-        }
-
-        BTree tmp2 = ivCache.getAndSet(null/* newValue */);
-        
-        if (tmp2 != null) {
-
-            tmp2.close();
-
-        }
-
-        tmp2 = blobsCache.getAndSet(null/* newValue */);
-        
-        if (tmp2 != null) {
-
-            tmp2.close();
 
         }
 
@@ -984,15 +905,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 final BS tmp = a[i];
 
                 // Update the schema.
-                updateSchema(tmp.bset);
+                encoder.updateSchema(tmp.bset);
 
                 // Encode the key.
                 final byte[] key = keyBuilder.reset().append(tmp.hashCode)
                         .getKey();
 
                 // Encode the solution.
-                final byte[] val = encodeSolution(keyBuilder, schema, cache,
-                        tmp.bset);
+                final byte[] val = encoder.encodeSolution(cache, tmp.bset);
 
                 // Insert binding set under hash code for that key.
                 htree.insert(key, val);
@@ -1001,7 +921,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
             naccepted += a.length;
 
-            updateIVCache(cache, ivCache.get(), blobsCache.get());
+            encoder.updateIVCache(cache);
 
         }
         
@@ -1078,15 +998,15 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 final BS tmp = a[i];
                 
                 // Update the schema.
-                updateSchema(tmp.bset);
+                encoder.updateSchema(tmp.bset);
 
                 // Encode the key.
                 final byte[] key = keyBuilder.reset().append(tmp.hashCode)
                         .getKey();
 
                 // Encode the solution.
-                final byte[] val = encodeSolution(keyBuilder, schema,
-                        null/* cache */, tmp.bset);
+                final byte[] val = encoder.encodeSolution(null/* cache */,
+                        tmp.bset);
 
                 /*
                  * Search the hash index for a match.
@@ -1140,123 +1060,151 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
     
-    /**
-     * Build up the schema. This includes all observed variables, not just those
-     * declared in {@link #joinVars}
-     * 
-     * @param bset An observed binding set.
-     */
-    private void updateSchema(final IBindingSet bset) {
+//    /**
+//     * Build up the schema. This includes all observed variables, not just those
+//     * declared in {@link #joinVars}
+//     * 
+//     * @param bset An observed binding set.
+//     * 
+//     * FIXME PORTED
+//     */
+//    static private void updateSchema(final LinkedHashSet<IVariable<?>> schema,
+//            final IBindingSet bset) {
+//
+//        @SuppressWarnings("rawtypes")
+//        final Iterator<IVariable> vitr = bset.vars();
+//        
+//        while (vitr.hasNext()) {
+//        
+//            schema.add(vitr.next());
+//            
+//        }
+//
+//    }
+//    
+//    /**
+//     * Declare any variables which are known to be used, such as join variables.
+//     * 
+//     * @param vars
+//     *            The variables.
+//     *            
+//     * FIXME PORTED
+//     */
+//    static private void updateSchema(final LinkedHashSet<IVariable<?>> schema,
+//            final IVariable<?>[] vars) {
+//
+//        for (IVariable<?> v : vars) {
+//         
+//            schema.add(v);
+//            
+//        }
+//        
+////        schema.addAll(Arrays.asList(joinVars));
+//        
+//    }
 
-        @SuppressWarnings("rawtypes")
-        final Iterator<IVariable> vitr = bset.vars();
-        
-        while (vitr.hasNext()) {
-        
-            schema.add(vitr.next());
-            
-        }
+//    /**
+//     * Transfer any {@link IV} to {@link BigdataValue} mappings to the ivCache.
+//     * 
+//     * @param cache
+//     *            A JVM cache.
+//     * @param ivCache
+//     *            A persistence capable cache for non-{@link BlobIV}s {@link IV}
+//     *            s having a cached {@link BigdataValue} reference.
+//     * @param blobsCache
+//     *            A persistence capable cache for {@link BlobIV}s having a
+//     *            cached {@link BigdataValue} reference.
+//     */
+//    private void updateIVCache(final Map<IV<?, ?>, BigdataValue> cache,
+//            final BTree ivCache, final BTree blobsCache) {
+//
+//        // Used to serialize RDF {@link Value}s.
+//        final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
+//                .getIndexMetadata().getTupleSerializer();
+//
+//        for (Map.Entry<IV<?, ?>, BigdataValue> e : cache.entrySet()) {
+//
+//            final IV<?, ?> iv = e.getKey();
+//
+//            final BigdataValue value = e.getValue();
+//
+//            if (iv instanceof BlobIV<?>) {
+//
+//                final BlobsIndexHelper h = new BlobsIndexHelper();
+//                
+//                final IKeyBuilder keyBuilder = h.newKeyBuilder();
+//
+//                final byte[] baseKey = h.makePrefixKey(keyBuilder.reset(),
+//                        value);
+//
+//                final byte[] val = valueFactory.getValueSerializer().serialize(
+//                        value);
+//
+//                h.resolveOrAddValue(blobsCache, false/* readOnly */,
+//                        keyBuilder, baseKey, val, null/* tmp */, null/* bucketSize */);
+//                
+//            } else {
+//
+//                final byte[] key = tupSer.serializeKey(iv);
+//
+//                if (!ivCache.contains(key)) {
+//
+//                    ivCache.insert(key, tupSer.serializeVal(value));
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//    }
 
-    }
-
-    /**
-     * Transfer any {@link IV} to {@link BigdataValue} mappings to the ivCache.
-     * 
-     * @param cache
-     *            A JVM cache.
-     * @param ivCache
-     *            A persistence capable cache for non-{@link BlobIV}s {@link IV}
-     *            s having a cached {@link BigdataValue} reference.
-     * @param blobsCache
-     *            A persistence capable cache for {@link BlobIV}s having a
-     *            cached {@link BigdataValue} reference.
-     */
-    private void updateIVCache(final Map<IV<?, ?>, BigdataValue> cache,
-            final BTree ivCache, final BTree blobsCache) {
-
-        // Used to serialize RDF {@link Value}s.
-        final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
-                .getIndexMetadata().getTupleSerializer();
-
-        for (Map.Entry<IV<?, ?>, BigdataValue> e : cache.entrySet()) {
-
-            final IV<?, ?> iv = e.getKey();
-
-            final BigdataValue value = e.getValue();
-
-            if (iv instanceof BlobIV<?>) {
-
-                final BlobsIndexHelper h = new BlobsIndexHelper();
-                
-                final IKeyBuilder keyBuilder = h.newKeyBuilder();
-
-                final byte[] baseKey = h.makePrefixKey(keyBuilder.reset(),
-                        value);
-
-                final byte[] val = valueFactory.getValueSerializer().serialize(
-                        value);
-
-                h.resolveOrAddValue(blobsCache, false/* readOnly */,
-                        keyBuilder, baseKey, val, null/* tmp */, null/* bucketSize */);
-                
-            } else {
-
-                final byte[] key = tupSer.serializeKey(iv);
-
-                if (!ivCache.contains(key)) {
-
-                    ivCache.insert(key, tupSer.serializeVal(value));
-
-                }
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Encode the solution as an IV[].
-     * 
-     * @param keyBuilder
-     *            Where to format the solution.
-     * @param schema
-     *            The schema, which specifies the order in which the variable
-     *            bindings will appear. If a variable declared in the schema is
-     *            not bound in the solution, then it will be represented by a
-     *            {@link TermId#NullIV}.
-     * @param cache
-     *            Any cached {@link BigdataValue}s on the {@link IV}s are
-     *            inserted into this map (optional since the cache is not 
-     *            used when we are filtering DISTINCT solutions).
-     * @param bset
-     *            The solution to be encoded.
-     * @return The encoded solution.
-     */
-    private byte[] encodeSolution(final IKeyBuilder keyBuilder,
-            final LinkedHashSet<IVariable<?>> schema,
-            final Map<IV<?, ?>, BigdataValue> cache, final IBindingSet bset) {
-
-        keyBuilder.reset();
-        final Iterator<IVariable<?>> vitr = schema.iterator();
-        while (vitr.hasNext()) {
-            final IVariable<?> v = vitr.next();
-            @SuppressWarnings("unchecked")
-            final IConstant<IV<?, ?>> c = bset.get(v);
-            if (c == null) {
-                IVUtility.encode(keyBuilder, TermId.NullIV);
-            } else {
-                final IV<?, ?> iv = c.get();
-                IVUtility.encode(keyBuilder, iv);
-                if (iv.hasValue() && !filter) {
-                    ivCacheSchema.add(v);
-                    cache.put(iv, iv.getValue());
-                }
-            }
-        }
-        return keyBuilder.getKey();
-        
-    }
+//    /**
+//     * Encode the solution as an IV[].
+//     * 
+//     * @param keyBuilder
+//     *            Where to format the solution.
+//     * @param schema
+//     *            The schema, which specifies the order in which the variable
+//     *            bindings will appear. If a variable declared in the schema is
+//     *            not bound in the solution, then it will be represented by a
+//     *            {@link TermId#NullIV}.
+//     * @param cache
+//     *            Any cached {@link BigdataValue}s on the {@link IV}s are
+//     *            inserted into this map (optional since the cache is not 
+//     *            used when we are filtering DISTINCT solutions).
+//     * @param bset
+//     *            The solution to be encoded.
+//     * @return The encoded solution.
+//     * 
+//     * FIXME PORTED
+//     */
+//    static private byte[] encodeSolution(final IKeyBuilder keyBuilder,
+//            final boolean filter,
+//            final LinkedHashSet<IVariable<?>> schema,
+//            final LinkedHashSet<IVariable<?>> ivCacheSchema,
+//            final Map<IV<?, ?>, BigdataValue> cache, final IBindingSet bset) {
+//
+//        keyBuilder.reset();
+//        final Iterator<IVariable<?>> vitr = schema.iterator();
+//        while (vitr.hasNext()) {
+//            final IVariable<?> v = vitr.next();
+//            @SuppressWarnings("unchecked")
+//            final IConstant<IV<?, ?>> c = bset.get(v);
+//            if (c == null) {
+//                IVUtility.encode(keyBuilder, TermId.NullIV);
+//            } else {
+//                final IV<?, ?> iv = c.get();
+//                IVUtility.encode(keyBuilder, iv);
+//                if (iv.hasValue() && !filter) {
+//                    ivCacheSchema.add(v);
+//                    cache.put(iv, iv.getValue());
+//                }
+//            }
+//        }
+//        return keyBuilder.getKey();
+//        
+//    }
 
     /**
      * Decode a solution from an encoded {@link IV}[].
@@ -1265,72 +1213,101 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * data and will NOT be present in the returned {@link IBindingSet}. The
      * cached {@link BigdataValue} (if any) must be unified by consulting the
      * {@link #ivCache}.
+     * <p>
+     * Note: This instance method is required by the MERGE JOIN logic which
+     * associates the schema with the first {@link IHashJoinUtility} instance.
      * 
      * @param t
      *            A tuple whose value is an encoded {@link IV}[].
-     *            
+     * 
      * @return The decoded {@link IBindingSet}.
      */
     private IBindingSet decodeSolution(final ITuple<?> t) {
-        
-        final ByteArrayBuffer b = t.getValueBuffer();
-        
-        return decodeSolution(b.array(), 0, b.limit());
-
+        return encoder.decodeSolution(t);
     }
 
-    /**
-     * Decode a solution from an encoded {@link IV}[].
-     * <p>
-     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
-     * data and will NOT be present in the returned {@link IBindingSet}. The
-     * cached {@link BigdataValue} (if any) must be unified by consulting the
-     * {@link #ivCache}.
-     * 
-     * @param val
-     *            The encoded IV[].
-     * @param fromOffset
-     *            The starting offset.
-     * @param toOffset
-     *            The byte beyond the end of the encoded data.
-     * 
-     * @return The decoded {@link IBindingSet}.
-     */
-    private IBindingSet decodeSolution(final byte[] val, final int fromOffset,
-            final int toOffset) {
-
-        final IBindingSet rightSolution = new ListBindingSet();
-
-        final IV<?, ?>[] ivs = IVUtility.decodeAll(val, fromOffset, toOffset);
-
-        int i = 0;
-
-        for (IVariable<?> v : schema) {
-
-            if (i == ivs.length) {
-                /*
-                 * This solution does not include all variables which were
-                 * eventually discovered to be part of the schema.
-                 */
-                break;
-            }
-
-            final IV<?, ?> iv = ivs[i++];
-            
-            if (iv == null) {
-            
-                // Not bound.
-                continue;
-                
-            }
-
-            rightSolution.set(v, new Constant<IV<?, ?>>(iv));
-
-        }
-
-        return rightSolution;
-
-    }
+//    /**
+//     * Decode a solution from an encoded {@link IV}[].
+//     * <p>
+//     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
+//     * data and will NOT be present in the returned {@link IBindingSet}. The
+//     * cached {@link BigdataValue} (if any) must be unified by consulting the
+//     * {@link #ivCache}.
+//     * <p>
+//     * Note: This instance method is required by the MERGE JOIN logic which
+//     * associates the schema with the first {@link IHashJoinUtility} instance.
+//     * 
+//     * @param t
+//     *            A tuple whose value is an encoded {@link IV}[].
+//     * 
+//     * @return The decoded {@link IBindingSet}.
+//     * 
+//     * FIXME PORTED
+//     */
+//    static private IBindingSet decodeSolution(
+//            final LinkedHashSet<IVariable<?>> schema, final ITuple<?> t) {
+//
+//        final ByteArrayBuffer b = t.getValueBuffer();
+//        
+//        return decodeSolution(schema, b.array(), 0, b.limit());
+//
+//    }
+//
+//    /**
+//     * Decode a solution from an encoded {@link IV}[].
+//     * <p>
+//     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
+//     * data and will NOT be present in the returned {@link IBindingSet}. The
+//     * cached {@link BigdataValue} (if any) must be unified by consulting the
+//     * {@link #ivCache}.
+//     * 
+//     * @param val
+//     *            The encoded IV[].
+//     * @param fromOffset
+//     *            The starting offset.
+//     * @param toOffset
+//     *            The byte beyond the end of the encoded data.
+//     * 
+//     * @return The decoded {@link IBindingSet}.
+//     * 
+//     * FIXME PORTED
+//     */
+//    static private IBindingSet decodeSolution(
+//            final LinkedHashSet<IVariable<?>> schema, final byte[] val,
+//            final int fromOffset, final int toOffset) {
+//
+//        final IBindingSet rightSolution = new ListBindingSet();
+//
+//        final IV<?, ?>[] ivs = IVUtility.decodeAll(val, fromOffset, toOffset);
+//
+//        int i = 0;
+//
+//        for (IVariable<?> v : schema) {
+//
+//            if (i == ivs.length) {
+//                /*
+//                 * This solution does not include all variables which were
+//                 * eventually discovered to be part of the schema.
+//                 */
+//                break;
+//            }
+//
+//            final IV<?, ?> iv = ivs[i++];
+//            
+//            if (iv == null) {
+//            
+//                // Not bound.
+//                continue;
+//                
+//            }
+//
+//            rightSolution.set(v, new Constant<IV<?, ?>>(iv));
+//
+//        }
+//
+//        return rightSolution;
+//
+//    }
 
     /**
      * Glue class for hash code and binding set used when the hash code is for
@@ -1425,9 +1402,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IKeyBuilder keyBuilder = rightSolutions.getIndexMetadata()
                     .getKeyBuilder();
 
-            final BTree ivCache = this.ivCache.get();
-            
-            final BTree blobsCache = this.blobsCache.get();
+//            final BTree ivCache = this.ivCache.get();
+//            
+//            final BTree blobsCache = this.blobsCache.get();
             
             final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
                     leftItr, chunkSize, IBindingSet.class);
@@ -1521,7 +1498,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                              * whose bindings are inconsistent will be rejected
                              * by bind() below.
                              */
-                            final IBindingSet rightSolution = decodeSolution(t);
+                            final IBindingSet rightSolution = encoder.decodeSolution(t);
 
                             nrightConsidered.increment();
 
@@ -1589,8 +1566,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                                     }
 
                                     // Resolve against ivCache.
-                                    resolveCachedValues(ivCache, blobsCache,
-                                            outSolution);
+                                    encoder.resolveCachedValues(outSolution);
                                     
                                     // Output this solution.
                                     outputBuffer.add(outSolution);
@@ -1766,7 +1742,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Note: the hash key is based on the entire solution (not just the join
      * variables). The values are the full encoded {@link IBindingSet}.
      */
-    void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
+    private void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
 
         final HTree joinSet = this.getJoinSet();
 
@@ -1841,9 +1817,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final IKeyBuilder keyBuilder = joinSet.getIndexMetadata()
                     .getKeyBuilder();
 
-            final BTree ivCache = this.ivCache.get();
-
-            final BTree blobsCache = this.blobsCache.get();
+//            final BTree ivCache = this.ivCache.get();
+//
+//            final BTree blobsCache = this.blobsCache.get();
 
             // Visit all source solutions.
             final ITupleIterator<?> sitr = getRightSolutions().rangeIterator();
@@ -1852,7 +1828,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 final ITuple<?> t = sitr.next();
 
-                IBindingSet rightSolution = decodeSolution(t);
+                IBindingSet rightSolution = encoder.decodeSolution(t);
 
                 // The hash code is based on the entire solution for the
                 // joinSet.
@@ -1901,7 +1877,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                     }
 
-                    resolveCachedValues(ivCache, blobsCache, rightSolution);
+                    encoder.resolveCachedValues(rightSolution);
 
                     if (f != null) {
 
@@ -1939,9 +1915,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         + rightSolutions.getEntryCount());
             }
 
-            final BTree ivCache = this.ivCache.get();
-
-            final BTree blobsCache = this.blobsCache.get();
+//            final BTree ivCache = this.ivCache.get();
+//
+//            final BTree blobsCache = this.blobsCache.get();
 
             // source.
             final ITupleIterator<?> solutionsIterator = rightSolutions
@@ -1951,7 +1927,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 final ITuple<?> t = solutionsIterator.next();
 
-                IBindingSet bset = decodeSolution(t);
+                IBindingSet bset = encoder.decodeSolution(t);
 
                 if (selectVars != null) {
 
@@ -1960,7 +1936,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 }
 
-                resolveCachedValues(ivCache, blobsCache, bset);
+                encoder.resolveCachedValues(bset);
 
                 out.add(bset);
 
@@ -1992,9 +1968,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         + joinSet.getEntryCount());
             }
 
-            final BTree ivCache = this.ivCache.get();
-
-            final BTree blobsCache = this.blobsCache.get();
+//            final BTree ivCache = this.ivCache.get();
+//
+//            final BTree blobsCache = this.blobsCache.get();
 
             // source.
             final ITupleIterator<?> solutionsIterator = joinSet
@@ -2002,7 +1978,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
             while (solutionsIterator.hasNext()) {
 
-                IBindingSet bset = decodeSolution(solutionsIterator.next());
+                IBindingSet bset = encoder.decodeSolution(solutionsIterator.next());
 
                 if (selectVars != null) {
 
@@ -2020,7 +1996,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 }
 
-                resolveCachedValues(ivCache, blobsCache, bset);
+                encoder.resolveCachedValues(bset);
 
                 out.add(bset);
 
@@ -2034,218 +2010,218 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     } // outputJoinSet
 
-    /**
-     * Resolve any {@link IV}s in the solution for which there are cached
-     * {@link BigdataValue}s to those values.
-     * 
-     * @param bset
-     *            A solution having {@link IV}s which need to be reunited with
-     *            their cached {@link BigdataValue}s.
-     * 
-     *            TODO If we vectored this operation it would substantially
-     *            reduce its costs. We would have to collect up a bunch of
-     *            solutions which needed resolution, then collect up the IVs
-     *            which do not have cached values for variables which might have
-     *            values in the ivCache. We would then sort the IVs and do a
-     *            vectored resolution against the ivCache. Finally, the
-     *            solutions could be output in a chunk with their resolved
-     *            Values.
-     */
-    @SuppressWarnings("rawtypes")
-    private void resolveCachedValues(final BTree ivCache,
-            final BTree blobsCache, final IBindingSet bset) {
+//    /**
+//     * Resolve any {@link IV}s in the solution for which there are cached
+//     * {@link BigdataValue}s to those values.
+//     * 
+//     * @param bset
+//     *            A solution having {@link IV}s which need to be reunited with
+//     *            their cached {@link BigdataValue}s.
+//     * 
+//     *            TODO If we vectored this operation it would substantially
+//     *            reduce its costs. We would have to collect up a bunch of
+//     *            solutions which needed resolution, then collect up the IVs
+//     *            which do not have cached values for variables which might have
+//     *            values in the ivCache. We would then sort the IVs and do a
+//     *            vectored resolution against the ivCache. Finally, the
+//     *            solutions could be output in a chunk with their resolved
+//     *            Values.
+//     */
+//    @SuppressWarnings("rawtypes")
+//    private void resolveCachedValues(final BTree ivCache,
+//            final BTree blobsCache, final IBindingSet bset) {
+//
+//        if (ivCache.getEntryCount() == 0L && blobsCache.getEntryCount() == 0L) {
+//            // Nothing materialized.
+//            return;
+//        }
+//        
+//        final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
+//                .getIndexMetadata().getTupleSerializer();
+//        
+//        final IKeyBuilder keyBuilder = tupSer.getKeyBuilder();
+//
+//        final Tuple ivCacheTuple = new Tuple(ivCache, IRangeQuery.KEYS
+//                | IRangeQuery.VALS);
+//
+//        final Iterator<Map.Entry<IVariable, IConstant>> itr = bset.iterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<IVariable, IConstant> e = itr.next();
+//
+//            final IVariable<?> v = e.getKey();
+//            
+//            if (!encoder.ivCacheSchema.contains(v)) {
+//                // Nothing observed for that variable.
+//                continue;
+//            }
+//            
+//            final IV iv = (IV) e.getValue().get();
+//
+//            if (iv.hasValue()) {
+//                // Already cached.
+//                continue;
+//            }
+//
+//            keyBuilder.reset();
+//
+//            if (iv instanceof BlobIV<?>) {
+//
+//                final BlobIV<?> blobIV = (BlobIV<?>)iv; 
+//            
+//                // TODO factor out the ctor when we do the resolution of IVs.
+//                final byte[] val = new BlobsIndexHelper().lookup(blobsCache,
+//                        blobIV, keyBuilder);
+//
+//                if (val == null) {
+//
+//                    continue;
+//
+//                }
+//
+//                /*
+//                 * TODO Factor out the buffers used to do the de-serialization
+//                 * when we vector the resolution of IVs.
+//                 */
+//                final BigdataValue value = valueFactory.getValueSerializer()
+//                        .deserialize(val);
+//
+//                iv.setValue(value);
+//
+//            } else {
+//
+//                keyBuilder.reset();
+//
+//                IVUtility.encode(keyBuilder, iv);
+//
+//                final byte[] key = keyBuilder.getKey();
+//
+//                if (ivCache.lookup(key, ivCacheTuple) == null) {
+//
+//                    continue;
+//
+//                }
+//
+//                final BigdataValue value = tupSer.deserialize(ivCacheTuple);
+//
+//                iv.setValue(value);
+//
+//            }
+//            
+//        }
+//
+//    }
 
-        if (ivCache.getEntryCount() == 0L && blobsCache.getEntryCount() == 0L) {
-            // Nothing materialized.
-            return;
-        }
-        
-        final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
-                .getIndexMetadata().getTupleSerializer();
-        
-        final IKeyBuilder keyBuilder = tupSer.getKeyBuilder();
-
-        final Tuple ivCacheTuple = new Tuple(ivCache, IRangeQuery.KEYS
-                | IRangeQuery.VALS);
-
-        final Iterator<Map.Entry<IVariable, IConstant>> itr = bset.iterator();
-
-        while (itr.hasNext()) {
-
-            final Map.Entry<IVariable, IConstant> e = itr.next();
-
-            final IVariable<?> v = e.getKey();
-            
-            if (!ivCacheSchema.contains(v)) {
-                // Nothing observed for that variable.
-                continue;
-            }
-            
-            final IV iv = (IV) e.getValue().get();
-
-            if (iv.hasValue()) {
-                // Already cached.
-                continue;
-            }
-
-            keyBuilder.reset();
-
-            if (iv instanceof BlobIV<?>) {
-
-                final BlobIV<?> blobIV = (BlobIV<?>)iv; 
-            
-                // TODO factor out the ctor when we do the resolution of IVs.
-                final byte[] val = new BlobsIndexHelper().lookup(blobsCache,
-                        blobIV, keyBuilder);
-
-                if (val == null) {
-
-                    continue;
-
-                }
-
-                /*
-                 * TODO Factor out the buffers used to do the de-serialization
-                 * when we vector the resolution of IVs.
-                 */
-                final BigdataValue value = valueFactory.getValueSerializer()
-                        .deserialize(val);
-
-                iv.setValue(value);
-
-            } else {
-
-                keyBuilder.reset();
-
-                IVUtility.encode(keyBuilder, iv);
-
-                final byte[] key = keyBuilder.getKey();
-
-                if (ivCache.lookup(key, ivCacheTuple) == null) {
-
-                    continue;
-
-                }
-
-                final BigdataValue value = tupSer.deserialize(ivCacheTuple);
-
-                iv.setValue(value);
-
-            }
-            
-        }
-
-    }
-
-    /**
-     * Return <code>true</code> iff the tuple contains a solution having the
-     * same hash code.
-     * 
-     * @param key
-     *            The hash code (as an unsigned byte[]).
-     * @param t
-     *            The tuple.
-     * 
-     * @return <code>true</code> iff the tuple has the same hash code.
-     */
-    static private boolean sameHashCode(byte[] key, ITuple<?> t) {
-
-        final ByteArrayBuffer b = t.getKeyBuffer();
-
-        return 0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
-                key.length/* alen */, key, 0/* boff */, b.limit()/* blen */,
-                b.array());
-
-    }
-
-    /**
-     * Copy the key (an unsigned byte[] representing an int32 hash code) from
-     * the tuple into the caller's the buffer.
-     * 
-     * @param t
-     *            The tuple.
-     * @param key
-     *            The caller's buffer.
-     */
-    static private void copyKey(ITuple<?> t, byte[] key) {
-        
-        final ByteArrayBuffer b = t.getKeyBuffer();
-        
-        System.arraycopy(b.array()/* src */, 0/* srcPos */, key/* dest */,
-                0/* destPos */, key.length);
-    
-    }
-
-    /**
-     * Synchronize the other sources (this just verifies that the join is
-     * possible given the hash code).
-     * 
-     * @param key
-     *            A key from the first source (aka a hash code).
-     * @param all
-     *            All of the sources.
-     * @param optional
-     *            <code>true</code> iff the join is optional.
-     * @return iff a join is possible for the given key (aka hash code).
-     */
-    static private boolean canJoin(final byte[] key,
-            final HTreeHashJoinUtility[] all, final boolean optional) {
-        if (optional) {
-            // The join can always proceed. No need to check.
-            return true;
-        }
-        for (int i = 1; i < all.length; i++) {
-            final boolean found = all[i].getRightSolutions().contains(key);
-            if (!found) {
-                // No join is possible against this source.
-                return false;
-            }
-        }
-        // The join is possible against all sources.
-        return true;
-    }
-
-    /**
-     * Synchronize the iterators for the other sources.
-     * 
-     * @param key
-     *            A key from the first source (aka a hash code).
-     * @param all
-     *            All of the sources.
-     * @param oitr
-     *            An array with one iterator per source. The first index
-     *            position is unused and will always be <code>null</code>. The
-     *            other positions will never be <code>null</code>, but the
-     *            iterator in a given position might not visit any tuples if the
-     *            join is optional. (For a required join, each iterator will
-     *            always visit at least one tuple.)
-     * @param index
-     *            The index of the first source iterator to be reset. The
-     *            iterator for that source and all remaining sources will be
-     *            reset to read on the given key.
-     * @param optional
-     *            <code>true</code> iff the join is optional.
-     */
-    static private void synchronizeOtherSources(//
-            final byte[] key,//
-            final HTreeHashJoinUtility[] all,//
-            final ITupleIterator<?>[] oitr,//
-            final int index,//
-            final boolean optional) {
-
-        if (index < 1)
-            throw new IllegalArgumentException();
-        
-        if (index >= all.length)
-            throw new IllegalArgumentException();
-        
-        for (int i = index; i < all.length; i++) {
-        
-            oitr[i] = all[i].getRightSolutions().lookupAll(key);
-            
-        }
-        
-    }
+//    /**
+//     * Return <code>true</code> iff the tuple contains a solution having the
+//     * same hash code.
+//     * 
+//     * @param key
+//     *            The hash code (as an unsigned byte[]).
+//     * @param t
+//     *            The tuple.
+//     * 
+//     * @return <code>true</code> iff the tuple has the same hash code.
+//     */
+//    static private boolean sameHashCode(byte[] key, ITuple<?> t) {
+//
+//        final ByteArrayBuffer b = t.getKeyBuffer();
+//
+//        return 0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+//                key.length/* alen */, key, 0/* boff */, b.limit()/* blen */,
+//                b.array());
+//
+//    }
+//
+//    /**
+//     * Copy the key (an unsigned byte[] representing an int32 hash code) from
+//     * the tuple into the caller's the buffer.
+//     * 
+//     * @param t
+//     *            The tuple.
+//     * @param key
+//     *            The caller's buffer.
+//     */
+//    static private void copyKey(ITuple<?> t, byte[] key) {
+//        
+//        final ByteArrayBuffer b = t.getKeyBuffer();
+//        
+//        System.arraycopy(b.array()/* src */, 0/* srcPos */, key/* dest */,
+//                0/* destPos */, key.length);
+//    
+//    }
+//
+//    /**
+//     * Synchronize the other sources (this just verifies that the join is
+//     * possible given the hash code).
+//     * 
+//     * @param key
+//     *            A key from the first source (aka a hash code).
+//     * @param all
+//     *            All of the sources.
+//     * @param optional
+//     *            <code>true</code> iff the join is optional.
+//     * @return iff a join is possible for the given key (aka hash code).
+//     */
+//    static private boolean canJoin(final byte[] key,
+//            final HTreeHashJoinUtility[] all, final boolean optional) {
+//        if (optional) {
+//            // The join can always proceed. No need to check.
+//            return true;
+//        }
+//        for (int i = 1; i < all.length; i++) {
+//            final boolean found = all[i].getRightSolutions().contains(key);
+//            if (!found) {
+//                // No join is possible against this source.
+//                return false;
+//            }
+//        }
+//        // The join is possible against all sources.
+//        return true;
+//    }
+//
+//    /**
+//     * Synchronize the iterators for the other sources.
+//     * 
+//     * @param key
+//     *            A key from the first source (aka a hash code).
+//     * @param all
+//     *            All of the sources.
+//     * @param oitr
+//     *            An array with one iterator per source. The first index
+//     *            position is unused and will always be <code>null</code>. The
+//     *            other positions will never be <code>null</code>, but the
+//     *            iterator in a given position might not visit any tuples if the
+//     *            join is optional. (For a required join, each iterator will
+//     *            always visit at least one tuple.)
+//     * @param index
+//     *            The index of the first source iterator to be reset. The
+//     *            iterator for that source and all remaining sources will be
+//     *            reset to read on the given key.
+//     * @param optional
+//     *            <code>true</code> iff the join is optional.
+//     */
+//    static private void synchronizeOtherSources(//
+//            final byte[] key,//
+//            final HTreeHashJoinUtility[] all,//
+//            final ITupleIterator<?>[] oitr,//
+//            final int index,//
+//            final boolean optional) {
+//
+//        if (index < 1)
+//            throw new IllegalArgumentException();
+//        
+//        if (index >= all.length)
+//            throw new IllegalArgumentException();
+//        
+//        for (int i = index; i < all.length; i++) {
+//        
+//            oitr[i] = all[i].getRightSolutions().lookupAll(key);
+//            
+//        }
+//        
+//    }
 
     /**
      * {@inheritDoc}
@@ -2453,7 +2429,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 					if (log.isDebugEnabled())
 						log.debug("Output solution: " + in);
 					// FIXME Vector resolution of ivCache.
-                    resolveCachedValues(ivCache.get(), blobsCache.get(), in);
+                    encoder.resolveCachedValues(in);
 					outputBuffer.add(in);
 				}
 
