@@ -42,7 +42,6 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.ShortPacker;
-import com.bigdata.io.compression.BOCU1Compressor;
 import com.bigdata.io.compression.NoCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
