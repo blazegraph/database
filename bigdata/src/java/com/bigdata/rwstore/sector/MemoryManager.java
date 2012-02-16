@@ -526,6 +526,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 					hdrbuf.flip();
 					final int retaddr = getAllocationAddress(allocate(hdrbuf,blocks));
 					
+					if (log.isTraceEnabled())
+						log.trace("Allocation BLOB at: " + retaddr);
+					
 					return makeAddr(retaddr, nbytes);
 				} catch (MemoryManagerOutOfMemory oom) {
 					// We could have failed to allocate any of the blob parts or the header
@@ -741,6 +744,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		if (size == 0)
 			throw new IllegalArgumentException();
+		
+		if (log.isTraceEnabled())
+			log.trace("Releasing allocation at: " + rwaddr + "[" + size + "]");
 		
 		m_allocationLock.lock();
 		try {

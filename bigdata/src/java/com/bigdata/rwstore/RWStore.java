@@ -523,19 +523,6 @@ public class RWStore implements IStore, IBufferedWriter {
 	private StorageStats m_storageStats;
 	private long m_storageStatsAddr = 0;
 	
-	/**
-	 * Direct ByteBuffer allocations.
-	 * 
-	 * TODO: Support different scaleups for disk and direct allocation to
-	 * allow for finer granularity of allocation.  For example, a 1K
-	 * scaleup would allow 32bit slot allocations for all slot sizes.
-	 */
-	private int m_directSpaceAvailable = 0;
-	private int m_nextDirectAllocation = cDirectAllocationOffset;
-	private ArrayList<ByteBuffer> m_directBuffers = null;
-	
-	private final boolean m_enableDirectBuffer;
-    
     /**
      * <code>true</code> iff the backing store is open.
      */
@@ -623,16 +610,6 @@ public class RWStore implements IStore, IBufferedWriter {
         if (log.isInfoEnabled())
             log.info(AbstractTransactionService.Options.MIN_RELEASE_AGE + "="
                     + m_minReleaseAge);
-        /*
-         * Disable TemporaryRW option for now
-         */
-        // m_enableDirectBuffer = fileMetadata.getBufferMode() == BufferMode.TemporaryRW;
-        m_enableDirectBuffer = false;
-        
-        if (m_enableDirectBuffer) {
-			m_directBuffers = new ArrayList<ByteBuffer>();
-			addDirectBuffer();
-        }
 
         cDefaultMetaBitsSize = Integer.valueOf(fileMetadata.getProperty(
                 Options.META_BITS_SIZE,
@@ -787,14 +764,6 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
     
-    private void addDirectBuffer() {
-    	if (cMaxDirectBuffers > m_directBuffers.size()) {
-			ByteBuffer bbuf = ByteBuffer.allocateDirect(cDirectBufferCapacity);
-			m_directBuffers.add(bbuf);
-			m_directSpaceAvailable += cDirectBufferCapacity;
-    	}
-	}
-
 	private void setAllocations(final FileMetadata fileMetadata)
             throws IOException {
         
@@ -1393,11 +1362,7 @@ public class RWStore implements IStore, IBufferedWriter {
                     
 				}
 	            
-				if (paddr < 0) { // read from Direct ByteBuffer
-					directRead(paddr, buf, offset, length);
-					
-					return;
-				}
+				assert paddr > 0;
 
                 /**
                  * Check WriteCache first
@@ -1501,69 +1466,6 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 
-    /**
-     * Retrieves data from the direct byte buffers, must handle transfers across
-     * multiple buffers
-     */
-	private void directRead(final long paddr, final byte[] buf, final int offset, final int length) {
-		assert paddr < 0;
-		assert m_directBuffers != null;
-		
-		final int baddr = (int) (-paddr) - cDirectAllocationOffset; // buffer address
-		int bufIndex = baddr / cDirectBufferCapacity;
-		int bufOffset = baddr % cDirectBufferCapacity;
-		
-		int transfer = 0;
-		int curOut = offset;
-		
-		while (transfer < length) {
-			ByteBuffer direct = m_directBuffers.get(bufIndex);
-			direct.position(bufOffset);
-			int avail = cDirectBufferCapacity - bufOffset;
-			int req = length - transfer;
-			int tlen = avail < req ? avail : req;
-			
-			direct.get(buf, curOut, tlen);
-			
-			transfer += tlen;
-			curOut += tlen;
-			
-			bufIndex++;
-			bufOffset = 0;
-		}
-	}
-
-	/**
-	 * Writes to direct buffers, transferring across boundaries as required
-	 */
-    private void directWrite(final long pa, final byte[] buf, final int offset, final int length, final int chk) {
-		assert pa < 0;
-		assert m_directBuffers != null;
-		
-		final int baddr = (int) (-pa) - cDirectAllocationOffset; // buffer address
-		int bufIndex = baddr / cDirectBufferCapacity;
-		int bufOffset = baddr % cDirectBufferCapacity;
-		
-		int transfer = 0;
-		int curIn = offset;
-		
-		while (transfer < length) {
-			ByteBuffer direct = m_directBuffers.get(bufIndex);
-			direct.position(bufOffset);
-			int avail = cDirectBufferCapacity - bufOffset;
-			int req = length - transfer;
-			int tlen = avail < req ? avail : req;
-			
-			direct.put(buf, curIn, tlen);
-			
-			transfer += tlen;
-			curIn += tlen;
-			
-			bufIndex++;
-			bufOffset = 0;
-		}
-	}
-
 	private void assertAllocators() {
 		for (int i = 0; i < m_allocs.size(); i++) {
 			if (m_allocs.get(i).getIndex() != i) {
@@ -1654,17 +1556,19 @@ public class RWStore implements IStore, IBufferedWriter {
 					/*
 					 * The session protection is complicated by the mix of
 					 * transaction protection and isolated AllocationContexts.
+					 * 
+					 * If this is the first use of an IAllocationContext then
+					 * then isSessionProtected may return false, so check the
+					 * context first.
 					 */
-					if (this.isSessionProtected()) {
-						if (context != null) {
-							if (alloc.canImmediatelyFree(addr, sze, context)) {
-								immediateFree(addr, sze, true);
-							} else {
-								establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
-							}
+					if (context != null) {
+						if (alloc.canImmediatelyFree(addr, sze, context)) {
+							immediateFree(addr, sze, true);
 						} else {
-							immediateFree(addr, sze, false);
+							establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
 						}
+					} else if (this.isSessionProtected()) {
+						immediateFree(addr, sze, false);
 					} else {
 						immediateFree(addr, sze);
 					}
@@ -1945,11 +1849,7 @@ public class RWStore implements IStore, IBufferedWriter {
 					final ArrayList<FixedAllocator> list = m_freeFixed[i];
 					if (list.size() == 0) {
 
-						if (canAllocateDirect()) {
-							allocator = new DirectFixedAllocator(this, block);
-						} else {
-							allocator = new FixedAllocator(this, block);
-						}
+						allocator = new FixedAllocator(this, block);
 						
 						allocator.setFreeList(list);
 						allocator.setIndex(m_allocs.size());
@@ -2008,13 +1908,6 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 	
-	/**
-	 * @return true if we have spare directBuffers.
-	 */
-	private boolean canAllocateDirect() {
-		return m_directBuffers != null && m_directBuffers.size() < cMaxDirectBuffers;
-	}
-
 	private int fixedAllocatorIndex(final int size) {
 		int i = 0;
 
@@ -2104,15 +1997,10 @@ public class RWStore implements IStore, IBufferedWriter {
 		
 		final long pa = physicalAddress(newAddr);
 
-		// if from DirectFixedAllocator then physical address will be negative
-		if (pa < 0) {
-			directWrite(pa, buf, 0, size, chk);
-		} else {
-			try {
-				m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk);
-			} catch (InterruptedException e) {
-	            throw new RuntimeException("Closed Store?", e);
-			}
+		try {
+			m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk);
+		} catch (InterruptedException e) {
+            throw new RuntimeException("Closed Store?", e);
 		}
 
         // Update counters.
@@ -2194,8 +2082,12 @@ public class RWStore implements IStore, IBufferedWriter {
 //	}
 
 	/**
-     * Toss away all buffered writes and then reload from the current root
-     * block.
+     * The semantics of reset are to revert unisolated writes to committed state.
+     * 
+     * Unisolated writes must also be removed from the write cache.
+     * 
+     * The AllocBlocks of the FixedAllocators maintain the state to determine
+     * the correct reset behaviour.
      * 
      * If the store is using DirectFixedAllocators then an IllegalStateException
      * is thrown
@@ -2203,43 +2095,14 @@ public class RWStore implements IStore, IBufferedWriter {
 	public void reset() {
 	    assertOpen();
 	    
-	    if (m_directBuffers != null)
-	    	throw new IllegalStateException("Reset is not supported with direct buffers");
-	    
 		if (log.isInfoEnabled()) {
 			log.info("RWStore Reset");
 		}
 	    m_allocationLock.lock();
 		try {
-
-            final RootBlockUtility tmp = new RootBlockUtility(m_reopener, m_fd,
-                    true/* validateChecksum */, false/* alternateRootBlock */,
-                    false/* ignoreBadRootBlock */);
-
-            final IRootBlockView rootBlock = tmp.rootBlock;
-            
-	        checkRootBlock(rootBlock);
-
-	        m_commitList.clear();
-			m_allocs.clear();
-			// m_freeBlobs.clear();
-			
-			final int numFixed = m_allocSizes.length;
-			for (int i = 0; i < numFixed; i++) {
-				m_freeFixed[i].clear();
+			for (FixedAllocator fa : m_allocs) {
+				fa.reset(m_writeCache);
 			}
-
-
-			try {
-				m_writeCache.reset();
-			} catch (InterruptedException e) {
-			    throw new RuntimeException(e);
-			}
-	        			
-			initfromRootBlock(rootBlock);
-
-			// notify of current file length.
-			m_writeCache.setExtent(convertAddr(m_fileSize));
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to reset the store", e);
 		} finally {
@@ -2297,14 +2160,13 @@ public class RWStore implements IStore, IBufferedWriter {
 		if (addr == 0) {
 			throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
 		}
-		if (addr < 0) {
-			directWrite(addr, buf, 0, buf.length, 0);
-		} else {
-			try {
-				m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
-			} catch (InterruptedException e) {
-				throw new RuntimeException(e);
-			}
+		
+		assert addr > 0;
+		
+		try {
+			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -3106,7 +2968,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			final int offset = getOffset(addr);
 			final long laddr = allocator.getPhysicalAddress(offset, nocheck);
 			
-			return allocator instanceof DirectFixedAllocator ? -laddr : laddr;
+			return laddr;
 		}
 	}
 	
@@ -3707,9 +3569,9 @@ public class RWStore implements IStore, IBufferedWriter {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
          */
         
-//        // Now remove the commit record entries from the commit record index.
+        // Now remove the commit record entries from the commit record index.
         final int commitPointsRemoved = journal.removeCommitRecordEntries(
-                fromKey, toKey);
+        		fromKey, toKey);
 
         if (txLog.isInfoEnabled())
             txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
@@ -4707,30 +4569,6 @@ public class RWStore implements IStore, IBufferedWriter {
             m_allocationLock.unlock();
         }
     }
-
-    /**
-     * A request for a direct allocation from a Direct ByteBuffer
-     * 
-     * @param blockSize the size requested
-     * @return the address of the direct allocation
-     */
-	public int allocateDirect(final int blockSize) {
-		final int allocBytes = blockSize << this.ALLOCATION_SCALEUP;
-		if (m_directSpaceAvailable < allocBytes) {
-			// try and allocate a further buffer
-			addDirectBuffer();			
-		}
-		
-		if (m_directSpaceAvailable < allocBytes) {
-			return -1;
-		} else {
-			final int ret = m_nextDirectAllocation;
-			m_nextDirectAllocation += allocBytes;
-			m_directSpaceAvailable -= allocBytes;
-			
-			return ret;
-		}
-	}
 
 	/**
 	 * Returns the slot size associated with this address

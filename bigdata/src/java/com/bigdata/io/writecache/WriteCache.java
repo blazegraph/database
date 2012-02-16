@@ -1636,7 +1636,8 @@ abstract public class WriteCache implements IWriteCache {
             if (m_written) {
                 log.warn("DUPLICATE writeOnChannel for : " + this.hashCode());
             } else {
-                assert !this.isEmpty();
+            	// Can be empty if reset!
+                // assert !this.isEmpty();
 
                 m_written = true;
             }
