@@ -660,20 +660,9 @@ public class FixedAllocator implements Allocator {
 					checkFreeList();
 
 				} else {
+					m_freeTransients++;
 					if (m_sessionActive) {
-						m_freeTransients++;
-						boolean assertsEnabled = false;
-						assert assertsEnabled = true;
-						if (assertsEnabled){
-							final int sessionFrees = m_sessionFrees.incrementAndGet();
-							int sessionBits = 0;
-							for (AllocBlock ab : m_allocBlocks) {
-								sessionBits += ab.sessionBits();
-							}
-							assert sessionFrees <= sessionBits : "sessionFrees: " + sessionFrees + " > sessionBits: " + sessionBits;	
-						}
-					} else {
-						m_freeTransients++;
+						assert checkSessionFrees();
 					}						
 				}				
 				
@@ -711,12 +700,18 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
+	private boolean checkSessionFrees() {
+		final int sessionFrees = m_sessionFrees.incrementAndGet();
+		int sessionBits = 0;
+		for (AllocBlock ab : m_allocBlocks) {
+			sessionBits += ab.sessionBits();
+		}
+		return sessionFrees <= sessionBits;	
+	}
+	
 	private void checkFreeList() {
 		if (m_freeWaiting && !m_pendingContextCommit) {
-			if (m_freeBits > 0 && this instanceof DirectFixedAllocator) {
-				m_freeWaiting = false;
-				m_freeList.add(0, this);
-			} else if (m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
+			if (m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
 				m_freeWaiting = false;
 				
 				if (log.isDebugEnabled())
@@ -971,6 +966,32 @@ public class FixedAllocator implements Allocator {
     
 	public void setBucketStats(Bucket b) {
 		m_statsBucket = b;
+	}
+	
+	/**
+	 * The semantics of reset are to ditch all unisolated modifications
+	 * since the last commit point.
+	 * 
+	 * @param cache
+	 */
+	void reset(RWWriteCacheService cache) {
+		for (AllocBlock ab : m_allocBlocks) {
+			ab.reset(cache);
+		}
+		
+		m_freeTransients = transientbits();
+		
+		assert calcSessionFrees();
+	}
+	
+	private boolean calcSessionFrees() {
+		int sessionBits = 0;
+		for (AllocBlock ab : m_allocBlocks) {
+			sessionBits += ab.sessionBits();
+		}
+		m_sessionFrees.set(sessionBits);
+		
+		return true;
 	}
 
 	void releaseSession(RWWriteCacheService cache) {

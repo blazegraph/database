@@ -349,6 +349,63 @@ public class AllocBlock {
 	}
 
 	/**
+	 * When resetting an alloc block to committed unisolated state, care must be
+	 * taken to protect any isolated writes. This is indicated by a non-null
+	 * m_saveCommit array which is set when a ContextAlocation takes ownership
+	 * of the parent FixedAllocator.
+	 * 
+	 * With no Isolated writes the state simply reverts to the committed state as
+	 * retained in the m_commit array and any buffered allocations are cleared from 
+	 * the cache.
+	 * 
+	 * @param cache containing buffered writes to be cleared
+	 */
+	void reset(final RWWriteCacheService cache) {
+		for (int i = 0; i < m_live.length; i++) {
+			final int startBit = i * 32;
+			if (m_saveCommit == null) {
+				/*
+				 * Simply set live and transients to the commit bits
+				 * 
+				 * But remember to clear out any buffered writes in the cache
+				 * first!  New allocations determined by comparing
+				 * m_commit with m_transients.
+				 */
+				final int chkbits = m_transients[i] & ~m_commit[i];
+				clearCacheBits(cache, startBit, chkbits);
+				
+				m_live[i] = m_commit[i];
+				m_transients[i] = m_commit[i];
+			} else {
+				/*
+				 * Example
+				 * 
+				 * C1: 1100
+				 * T1: 1110 (single unisolated allocation)
+				 * 
+				 * ContextAllocation takes over FixedAllocator
+				 * 
+				 * S2: 1100 (saved commit)
+				 * C2: 1110 (copy of transient T1)
+				 * T2: 1111 (new allocation)
+				 * 
+				 * RESET called: must clear isolated allocations
+				 * 	- difference of S2 and C2
+				 * = C2 & ~S2 = 1110 & 0011 = 0010
+				 * 
+				 * Must then clear any buffered writes from the cache
+				 * ...and clear unisolated allocations from m_live and m_transients
+				 */
+				final int chkbits = m_commit[i] & ~m_saveCommit[i];
+				clearCacheBits(cache, startBit, chkbits);
+				
+				m_live[i] &= ~chkbits;
+				m_transients[i] &= ~chkbits;
+			}
+		}
+	}
+	
+	/**
 	 * When a session is active, the transient bits do not equate to an ORing
 	 * of the committed bits and the live bits, but rather an ORing of the live
 	 * with all the committed bits since the start of the session.

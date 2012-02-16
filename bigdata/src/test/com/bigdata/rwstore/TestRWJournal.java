@@ -34,6 +34,8 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -66,6 +68,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore.RawTx;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
+import com.bigdata.journal.VerifyCommitRecordIndex;
 
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
@@ -1757,6 +1760,57 @@ public class TestRWJournal extends AbstractJournalTestCase {
             }
 		}
 		
+		/**
+		 * Can be tested by removing RWStore call to journal.removeCommitRecordEntries
+		 * in freeDeferrals.
+		 * 
+		 * final int commitPointsRemoved = journal.removeCommitRecordEntries(fromKey, toKey);
+		 * 
+		 * replaced with
+		 * 
+		 * final int commitPointsRemoved = commitPointsRecycled;
+		 * 
+		 */
+		public void testVerifyCommitRecordIndex() {
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "100");
+
+			final Journal store = (Journal) getStore(properties);
+            try {
+
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	      	
+	        	for (int r = 0; r < 10; r++) {
+		        	ArrayList<Long> addrs = new ArrayList<Long>();
+		        	for (int i = 0; i < 100; i++) {
+		        		addrs.add(bs.write(randomData(45)));
+		        	}
+		        	store.commit();
+		
+		        	for (long addr : addrs) {
+		        		bs.delete(addr);
+		        	}
+		
+		           	store.commit();
+		           	
+		        	// Age the history (of the deletes!)
+		        	Thread.currentThread().sleep(200);
+	        	}
+	        	
+				final String fname = bs.getRWStore().getStoreFile().getAbsolutePath();
+				
+	        	store.close();
+	        	
+	        	VerifyCommitRecordIndex.main(new String[]{fname});
+        	
+            } catch (InterruptedException e) {
+			} finally {
+            	store.destroy();
+            }
+		}
+
 		private Journal getStore(Properties props) {
 			return new Journal(props);
 		}
@@ -2089,6 +2143,272 @@ public class TestRWJournal extends AbstractJournalTestCase {
             }
 		}
 		
+		/**
+		 * Tests semantics of a simple reset
+		 * 
+		 * Commit some data
+		 * Delete committed and allocate new data
+		 * Reset
+		 * Test that deletion and new allocation are void
+		 */
+		public void test_simpleReset() {
+			Journal store = (Journal) getStore();
+	        try {
+	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	
+	        	final long addr = bs.write(randomData(78));
+	        	
+	        	// Has just been written so must be in cache
+	        	assertTrue(bs.inWriteCache(addr));
+	        	
+	        	store.commit();
+	        	
+	        	bs.delete(addr);
+	        	
+	        	final long addr2 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr2));
+	        	
+	        	bs.abort();
+	        	
+	        	assertTrue(bs.inWriteCache(addr)); // not removed in reset
+	           	assertFalse(bs.inWriteCache(addr2));
+	        	try {
+	        		bs.read(addr2);
+	        		fail("Exception expected");
+	        	} catch (IllegalArgumentException e) {
+	        		// expected
+	        	}
+	        	store.commit();
+
+	        	assertTrue(bs.isCommitted(addr));
+	        } finally {
+	        	store.destroy();
+	        }
+			
+		}
+		
+		/**
+		 * Tests semantics of a simple isolated reset
+		 * 
+		 * Commit some data
+		 * UnIsolated: Delete committed and allocate new data
+		 * Isolated: Delete committed and allocate new data
+		 * Reset
+		 * Test that deletion and new allocation are void for
+		 * unisolated actions but not isolated
+		 */
+		public void test_isolatedReset() {
+			Journal store = (Journal) getStore();
+	        try {
+	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	final IAllocationContext isolated = new IAllocationContext() {};
+	        	
+	        	final long addr = bs.write(randomData(78));
+	        	final long addr2 = bs.write(randomData(78));
+	        	
+	        	// Has just been written so must be in cache
+	        	assertTrue(bs.inWriteCache(addr));
+	        	
+	        	store.commit();
+	        	
+	        	bs.delete(addr);
+	        	
+	        	final long addr3 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr3));
+	           	
+	        	bs.delete(addr2, isolated);
+	        	final long addr4 = bs.write(randomData(78), isolated);
+	           	assertTrue(bs.inWriteCache(addr4));
+	           		        	
+	        	bs.abort();
+	        	
+	        	assertTrue(bs.inWriteCache(addr)); // not removed in reset
+	           	assertFalse(bs.inWriteCache(addr3)); // unisolated removed
+	           	assertTrue(bs.inWriteCache(addr4)); // isolated remains
+	        	try {
+	        		bs.read(addr3);
+	        		fail("Exception expected");
+	        	} catch (IllegalArgumentException e) {
+	        		// expected
+	        	}
+	        	
+	        	bs.detachContext(isolated);
+	        	
+	        	store.commit();
+
+	        	assertTrue(bs.isCommitted(addr));
+	        	assertTrue(bs.isCommitted(addr4));
+	        } finally {
+	        	store.destroy();
+	        }
+			
+		}
+		
+		/**
+		 * Tests semantics of a more complex isolated reset
+		 * 
+		 * Primarily the same as the simple isolated but ensuring
+		 * more unisolated interactions after isolation is
+		 * established.
+		 * 
+		 * Commit some data
+		 * UnIsolated: Delete committed and allocate new data
+		 * Isolated: Delete committed and allocate new data
+		 * UnIsolated: Delete committed and allocate new data
+		 * Reset
+		 * Test that deletion and new allocation are void for
+		 * unisolated actions but not isolated
+		 */
+		public void test_notSoSimpleIsolatedReset() {
+			Journal store = (Journal) getStore();
+	        try {
+	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	final IAllocationContext isolated = new IAllocationContext() {};
+	        	
+	        	final long addr = bs.write(randomData(78));
+	        	final long addr2 = bs.write(randomData(78));
+	        	final long addr5 = bs.write(randomData(78));
+	        	
+	        	// Has just been written so must be in cache
+	        	assertTrue(bs.inWriteCache(addr));
+	        	
+	        	store.commit();
+	        	
+	        	// Unisolated actions
+	        	bs.delete(addr);
+	        	
+	        	final long addr3 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr3));
+	           	
+	           	// Isolated actions
+	        	bs.delete(addr2, isolated);
+	        	final long addr4 = bs.write(randomData(78), isolated);
+	           	assertTrue(bs.inWriteCache(addr4));
+	           		        	
+	        	// Further Unisolated actions
+	        	bs.delete(addr5);
+	        	final long addr6 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr6));
+	           	
+	        	bs.abort();
+	        	
+	        	assertTrue(bs.inWriteCache(addr)); // not removed in reset
+	           	assertFalse(bs.inWriteCache(addr3)); // unisolated removed
+	           	assertFalse(bs.inWriteCache(addr6)); // unisolated removed
+	           	assertTrue(bs.inWriteCache(addr4)); // isolated remains
+	        	try {
+	        		bs.read(addr3);
+	        		fail("Exception expected");
+	        	} catch (IllegalArgumentException e) {
+	        		// expected
+	        	}
+	        	try {
+	        		bs.read(addr6);
+	        		fail("Exception expected");
+	        	} catch (IllegalArgumentException e) {
+	        		// expected
+	        	}
+	        	
+	        	// Detach isolated context prior to commit
+	        	bs.detachContext(isolated);
+	        	
+	        	store.commit();
+
+	        	assertTrue(bs.isCommitted(addr));
+	        	assertTrue(bs.isCommitted(addr4));
+	        	assertTrue(bs.isCommitted(addr5));
+	        	assertFalse(bs.isCommitted(addr2));
+	        } finally {
+	        	store.destroy();
+	        }
+			
+		}
+		
+		/**
+		 * Concurrent readers should no longer be an issue now that
+		 * reset() is not re-initializing from the root block.
+		 * 
+		 * This test should confirm that.
+		 * 
+		 * Establishes some committed data and runs two readers
+		 * concurrent with a single writer intermittently aborting
+		 * 
+		 * @throws InterruptedException 
+		 */
+		public void test_simpleConcurrentReadersWithResets() throws InterruptedException {
+			final Journal store = (Journal) getStore();
+			// use executor service to enable exception trapping
+			final ExecutorService es = store.getExecutorService();
+	        try {
+	        	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	
+	        	final long[] addrs = new long[50];
+	        	for (int w = 0; w < addrs.length; w++) {
+	        		addrs[w] = bs.write(randomData(r.nextInt(150)+10));
+	        	}
+	        	
+	        	store.commit();
+	        	
+	        	assertTrue(bs.isCommitted(addrs[0]));
+	        	
+				Runnable writer = new Runnable() {
+	        		public void run() {
+	        			for (int i = 0; i < 2000; i++) {
+	        				bs.delete(addrs[r.nextInt(addrs.length)]);
+	        				for (int w = 0; w < 1000; w++)
+	        					bs.write(randomData(r.nextInt(500)+1));
+	        				bs.abort();
+	        			}
+	        		}
+	        	};
+				final Future wfuture = es.submit(writer);
+				Runnable reader1 = new Runnable() {
+	        		public void run() {
+	        			for (int i = 0; i < 5000; i++) {
+	        				for (int rdr = 0; rdr < addrs.length; rdr++) {
+	        					bs.read(addrs[r.nextInt(addrs.length)]);
+	        				}
+	        				try {
+								Thread.sleep(1);
+							} catch (InterruptedException e) {
+								throw new RuntimeException(e);
+							}
+	        			}
+	        		}
+	        	};
+	        	final Future r1future = es.submit(reader1);
+	        	Runnable reader2 = new Runnable() {
+	        		public void run() {
+	        			for (int i = 0; i < 5000; i++) {
+	        				for (int rdr = 0; rdr < addrs.length; rdr++) {
+	        					bs.read(addrs[r.nextInt(addrs.length)]);
+	        				}
+	        				try {
+								Thread.sleep(1);
+							} catch (InterruptedException e) {
+								throw new RuntimeException(e);
+							}
+	        			}
+	        		}
+	        	};
+	        	final Future r2future = es.submit(reader2);
+	        	
+	        	try {
+		        	wfuture.get();
+		        	r1future.get();
+		        	r2future.get();
+	        	} catch (Exception e) {
+	        		fail(e.getMessage(), e);
+	        	}
+	        	for (int i = 0; i < addrs.length; i++) {
+	        		assertTrue(bs.isCommitted(addrs[i]));
+	        	}
+	        } finally {
+	        	es.shutdownNow();
+	        	store.destroy();
+	        }			
+		}
+		
 		ByteBuffer randomData(final int sze) {
 			byte[] buf = new byte[sze + 4]; // extra for checksum
 			r.nextBytes(buf);
@@ -2103,7 +2423,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			return buf;
 		}
 	}
-
+	
 	/**
 	 * Test suite integration for {@link AbstractMROWTestCase}.
 	 * 
