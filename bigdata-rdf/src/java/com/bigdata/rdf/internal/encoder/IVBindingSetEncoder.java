@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -42,6 +43,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
@@ -50,11 +52,15 @@ import com.bigdata.rdf.model.BigdataValue;
  * A utility class for generating and processing compact representations of
  * {@link IBindingSet}s whose {@link IConstant}s are bound to {@link IV}s.
  * Individual {@link IV}s may be associated with a cached RDF {@link Value}.
+ * <p>
+ * Note: This implementation does NOT maintain the {@link IVCache} associations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: IVBindingSetEncoder.java 6032 2012-02-16 12:48:04Z thompsonbry
+ *          $
  */
-public class IVBindingSetEncoder {
+public class IVBindingSetEncoder implements IBindingSetEncoder,
+        IBindingSetDecoder {
 
     /**
      * <code>true</code> iff this is in support of a DISTINCT filter.
@@ -62,7 +68,7 @@ public class IVBindingSetEncoder {
      * Note: we do not maintain the {@link #ivCacheSchema} for a DISTINCT filter
      * since the original solutions flow through the filter.
      */
-    private final boolean filter;
+    protected final boolean filter;
     
     /**
      * The schema provides the order in which the {@link IV}[] for solutions
@@ -81,6 +87,8 @@ public class IVBindingSetEncoder {
      * observed.
      */
     final protected LinkedHashSet<IVariable<?>> ivCacheSchema;
+    
+    final Map<IV<?, ?>, BigdataValue> cache;
     
     /**
      * Used to encode the {@link IV}s.
@@ -106,6 +114,9 @@ public class IVBindingSetEncoder {
         this.ivCacheSchema = filter ? null : new LinkedHashSet<IVariable<?>>();
 
         this.keyBuilder = new ASCIIKeyBuilderFactory(128).getKeyBuilder();
+
+        // Used to batch updates into the ID2TERM and BLOBS indices.
+        this.cache = filter ? null : new HashMap<IV<?, ?>, BigdataValue>();
 
     }
 
@@ -145,37 +156,22 @@ public class IVBindingSetEncoder {
 
     }
 
-    /**
-     * Encode the solution as an {@link IV}[].
-     * 
-     * @param bset
-     *            The solution to be encoded.
-     * 
-     * @return The encoded solution.
-     */
+    @Override
     public byte[] encodeSolution(final IBindingSet bset) {
 
-        return encodeSolution(null/* cache */, bset);
-        
+        return encodeSolution(bset, true/* updateCache */);
+
     }
     
-    /**
-     * Encode the solution as an {@link IV}[].
-     * 
-     * @param cache
-     *            Any cached {@link BigdataValue}s on the {@link IV}s are
-     *            inserted into this map (optional since the cache is not used
-     *            when we are filtering DISTINCT solutions).
-     * @param bset
-     *            The solution to be encoded.
-     * 
-     * @return The encoded solution.
-     */
-    public byte[] encodeSolution(final Map<IV<?, ?>, BigdataValue> cache,
-            final IBindingSet bset) {
+    @Override
+    public byte[] encodeSolution(final IBindingSet bset,
+            final boolean updateCache) {
 
         if(bset == null)
             throw new IllegalArgumentException();
+
+        final Map<IV<?, ?>, BigdataValue> cache = updateCache ? this.cache
+                : null;
         
         /*
          * Before we can encode the binding set, we need to update the schema
@@ -202,7 +198,8 @@ public class IVBindingSetEncoder {
                 IVUtility.encode(keyBuilder, iv);
                 if (iv.hasValue() && !filter) {
                     ivCacheSchema.add(v);
-                    cache.put(iv, iv.getValue());
+                    if (cache != null)
+                        cache.put(iv, iv.getValue());
                 }
             }
         }
@@ -211,25 +208,16 @@ public class IVBindingSetEncoder {
         
     }
 
-    /**
-     * Decode a solution from an encoded {@link IV}[].
-     * <p>
-     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
-     * data and will NOT be present in the returned {@link IBindingSet}. The
-     * cached {@link BigdataValue} (if any) must be unified by consulting the
-     * {@link #ivCache}.
-     * 
-     * @param val
-     *            The encoded IV[].
-     * @param off
-     *            The starting offset.
-     * @param len
-     *            The #of bytes of data to be decoded.
-     * 
-     * @return The decoded {@link IBindingSet}.
-     */
+    @Override
+    public void flush() {
+
+        cache.clear();
+        
+    }
+    
+    @Override
     public IBindingSet decodeSolution(final byte[] val, final int off,
-            final int len) {
+            final int len, final boolean resolveCachedValues) {
 
         final IBindingSet bset = new ListBindingSet();
 
@@ -259,14 +247,28 @@ public class IVBindingSetEncoder {
             bset.set(v, new Constant<IV<?, ?>>(iv));
 
         }
+        
+        if(resolveCachedValues)
+            resolveCachedValues(bset);
 
         return bset;
 
     }
 
     /**
-     * Release the state associated with the {@link IVBindingSetEncoder}.
+     * {@inheritDoc}
+     * <p>
+     * Note: This implementation is a NOP as the {@link IVCache} association
+     * is NOT maintained by this class.
      */
+    @Override
+    public void resolveCachedValues(final IBindingSet bset) {
+
+        // NOP
+        
+    }
+    
+    @Override
     public void release() {
         
         schema.clear();
@@ -278,5 +280,5 @@ public class IVBindingSetEncoder {
         }
 
     }
-    
+
 }

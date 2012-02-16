@@ -298,6 +298,8 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      */
     public void saveSolutionSet() {
 
+        flush();
+        
         checkpointBTree(ivCache);
         
         checkpointBTree(blobsCache);
@@ -349,33 +351,29 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         super.release();
         
     }
-    
-    /**
-     * Transfer any {@link IV} to {@link BigdataValue} mappings to the ivCache.
-     * 
-     * @param cache
-     *            A JVM cache.
-     */
-    public void updateIVCache(final Map<IV<?, ?>, BigdataValue> cache) {
-        
-        updateIVCache(cache, ivCache.get(), blobsCache.get());
-        
-    }
 
     /**
-     * Transfer any {@link IV} to {@link BigdataValue} mappings to the ivCache.
-     * 
-     * @param cache
-     *            A JVM cache.
-     * @param ivCache
-     *            A persistence capable cache for non-{@link BlobIV}s {@link IV}
-     *            s having a cached {@link BigdataValue} reference.
-     * @param blobsCache
-     *            A persistence capable cache for {@link BlobIV}s having a
-     *            cached {@link BigdataValue} reference.
+     * {@inheritDoc}
+     * <p>
+     * Vectored update of the internal ivCache.
      */
-    private void updateIVCache(final Map<IV<?, ?>, BigdataValue> cache,
-            final BTree ivCache, final BTree blobsCache) {
+    @Override
+    public void flush() {
+
+        if (filter) {
+
+            super.flush();
+            
+            return;
+            
+        }
+
+        final BTree ivCache = this.ivCache.get();
+
+        final BTree blobsCache = this.blobsCache.get();
+
+        // Lazily resolved.
+        BlobsIndexHelper h = null;
 
         // Used to serialize RDF {@link Value}s.
         final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
@@ -389,19 +387,38 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
             if (iv instanceof BlobIV<?>) {
 
-                final BlobsIndexHelper h = new BlobsIndexHelper();
+                if (h == null) {
+        
+                    // Lazily resolved.
+                    h = new BlobsIndexHelper();
+                    
+                }
+
+                /*
+                 * Note: The insert logic for the BLOBS index here is different
+                 * (and much simpler) because we already have the exact BlobIV
+                 * and we want to ensure that there is an entry under that key
+                 * in the [blobsCache].
+                 * 
+                 * Normally, you use the helper class to do a conditional
+                 * resolveOrAddValue() which assigns a collision counter for the
+                 * blob, but here we already know the collision counter which
+                 * was assigned by the real BLOBS index on the LexiconRelation.
+                 */
                 
                 final IKeyBuilder keyBuilder = h.newKeyBuilder();
 
-                final byte[] baseKey = h.makePrefixKey(keyBuilder.reset(),
-                        value);
+                final byte[] key = iv.encode(keyBuilder.reset()).getKey();
 
                 final byte[] val = valueFactory.getValueSerializer().serialize(
                         value);
 
-                h.resolveOrAddValue(blobsCache, false/* readOnly */,
-                        keyBuilder, baseKey, val, null/* tmp */, null/* bucketSize */);
-                
+                if (!blobsCache.contains(key)) {
+
+                    blobsCache.insert(key, val);
+
+                }
+
             } else {
 
                 final byte[] key = tupSer.serializeKey(iv);
@@ -416,42 +433,29 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         }
 
+        super.flush();
+
     }
 
     /**
-     * Resolve any {@link IV}s in the solution for which there are cached
-     * {@link BigdataValue}s to those values.
+     * {@inheritDoc}
      * 
-     * @param bset
-     *            A solution having {@link IV}s which need to be reunited with
-     *            their cached {@link BigdataValue}s.
-     */
-    public void resolveCachedValues(final IBindingSet bset) {
-        
-        resolveCachedValues(ivCache.get(), blobsCache.get(), bset);
-        
-    }
-    
-    /**
-     * Resolve any {@link IV}s in the solution for which there are cached
-     * {@link BigdataValue}s to those values.
-     * 
-     * @param bset
-     *            A solution having {@link IV}s which need to be reunited with
-     *            their cached {@link BigdataValue}s.
-     * 
-     *            TODO If we vectored this operation it would substantially
-     *            reduce its costs. We would have to collect up a bunch of
-     *            solutions which needed resolution, then collect up the IVs
-     *            which do not have cached values for variables which might have
-     *            values in the ivCache. We would then sort the IVs and do a
-     *            vectored resolution against the ivCache. Finally, the
-     *            solutions could be output in a chunk with their resolved
-     *            Values.
+     * TODO If we vectored this operation it would substantially reduce its
+     * costs. We would have to collect up a bunch of solutions which needed
+     * resolution, then collect up the IVs which do not have cached values for
+     * variables which might have values in the ivCache. We would then sort the
+     * IVs and do a vectored resolution against the ivCache. Finally, the
+     * solutions could be output in a chunk with their resolved Values.
+     * <p>
+     * If the operator is not vectored, then we should just fold it into
+     * {@link #decodeSolution(byte[], int, int)}.
      */
     @SuppressWarnings("rawtypes")
-    private void resolveCachedValues(final BTree ivCache,
-            final BTree blobsCache, final IBindingSet bset) {
+    public void resolveCachedValues(final IBindingSet bset) {
+        
+        final BTree ivCache = this.ivCache.get();
+
+        final BTree blobsCache = this.blobsCache.get();
 
         if (ivCache.getEntryCount() == 0L && blobsCache.getEntryCount() == 0L) {
             // Nothing materialized.
@@ -466,6 +470,9 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         final Tuple ivCacheTuple = new Tuple(ivCache, IRangeQuery.KEYS
                 | IRangeQuery.VALS);
 
+        // Lazily initialized.
+        BlobsIndexHelper h = null;
+        
         final Iterator<Map.Entry<IVariable, IConstant>> itr = bset.iterator();
 
         while (itr.hasNext()) {
@@ -490,11 +497,15 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
             if (iv instanceof BlobIV<?>) {
 
-                final BlobIV<?> blobIV = (BlobIV<?>)iv; 
-            
-                // TODO factor out the ctor when we do the resolution of IVs.
-                final byte[] val = new BlobsIndexHelper().lookup(blobsCache,
-                        blobIV, keyBuilder);
+                final BlobIV<?> blobIV = (BlobIV<?>) iv;
+
+                if(h == null) {
+                    
+                    h = new BlobsIndexHelper();
+                    
+                }
+                
+                final byte[] val = h.lookup(blobsCache, blobIV, keyBuilder);
 
                 if (val == null) {
 
@@ -512,8 +523,6 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
                 iv.setValue(value);
 
             } else {
-
-                keyBuilder.reset();
 
                 IVUtility.encode(keyBuilder, iv);
 

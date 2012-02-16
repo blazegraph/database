@@ -62,10 +62,10 @@ public class TestAll extends TestCase {
 
         // FIXME Enable test suites.
         // Encoding/decoding of IV binding sets with scalable IV => Value cache.
-//        suite.addTestSuite(TestIVBindingSetEncoderWithCache.class);
-//
-//        // Encoding/decoding for the wire of IV solution sets.
-//        suite.addTestSuite(TestIVSolutionSetEncoder.class);
+        suite.addTestSuite(TestIVBindingSetEncoderWithCache.class);
+
+        // Encoding/decoding for the wire of IV solution sets.
+        suite.addTestSuite(TestIVSolutionSetEncoder.class);
         
         return suite;
         
