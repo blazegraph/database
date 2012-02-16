@@ -229,6 +229,12 @@ public class FastClosure extends BaseClosure {
     
                 }
                 
+                if (forwardChainOwlSymmetricProperty) {
+                    
+                    tmp.add(new RuleOwlSymmetricProperty(db, vocab));
+    
+                }
+                
                 // add the custom rules
                 tmp.addAll(getCustomRules(db));
     
