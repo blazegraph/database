@@ -2682,4 +2682,25 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
  	   }
     }
 
+	public void removeAll() {
+		Iterator<AbstractPage> chs = childIterator(false);
+		while (chs.hasNext()) {
+			final AbstractPage ch = chs.next();
+			if (ch instanceof BucketPage) {
+				if (log.isTraceEnabled())
+					log.trace("Removing bucket page: " + ch.PPID());
+				
+				if (ch.isPersistent())
+					htree.store.delete(ch.getIdentity());		
+			} else {
+				if (log.isTraceEnabled())
+					log.trace("Removing child directory page: " + ch.PPID());
+				
+				((DirectoryPage) ch).removeAll();
+			}
+		}
+		if (identity != IRawStore.NULL)
+			htree.store.delete(identity);		
+	}
+
 }

@@ -282,7 +282,10 @@ public class TestHTreeWithMemStore extends TestCase {
             
             if (log.isInfoEnabled()) {
             	log.info("Htree Leaves: " + htree.nleaves + ", Evicted: " + counters.leavesWritten 
-                		+ ", Nodes: " + htree.nnodes + ", Evicted: " + counters.nodesWritten);
+                		+ ", Nodes: " + htree.nnodes + ", Evicted: " + counters.nodesWritten
+						+ ", allocation count="
+						+ ((MemStore) store).getMemoryManager()
+						.getAllocationCount());
 
                 log.info("Load took " + (load - start) + "ms, loops for "
                         + (inserts + altInserts1 + altInserts2) + " "
@@ -438,14 +441,24 @@ public class TestHTreeWithMemStore extends TestCase {
                         .currentTimeMillis() - beginValueIterator;
                 
                 if (log.isInfoEnabled()) {
-                    log.info("Inserted: " + s_limit + " tuples in "
-                            + elapsedInsertMillis + "ms, lookupFirst(all)="
-                            + elapsedLookupFirstTime+ ", valueScan(all)="
-                            + elapsedValueIteratorTime + ", addressBits="
-                            + htree.getAddressBits() + ", nnodes="
-                            + htree.getNodeCount() + ", nleaves="
-                            + htree.getLeafCount());
-                }
+					log.info("Inserted: "
+							+ s_limit
+							+ " tuples in "
+							+ elapsedInsertMillis
+							+ "ms, lookupFirst(all)="
+							+ elapsedLookupFirstTime
+							+ ", valueScan(all)="
+							+ elapsedValueIteratorTime
+							+ ", addressBits="
+							+ htree.getAddressBits()
+							+ ", nnodes="
+							+ htree.getNodeCount()
+							+ ", nleaves="
+							+ htree.getLeafCount()
+							+ ", allocation count="
+							+ ((MemStore) store).getMemoryManager()
+									.getAllocationCount());
+				}
                 
                 // Attempts to access absent keys should not lazily create bucketPage
                 assertTrue(htree.lookupFirst(badkey) == null); 
@@ -469,7 +482,7 @@ public class TestHTreeWithMemStore extends TestCase {
             // log.error("Pretty Print of final state:\n" + htree.PP());
 
         } finally {
-
+        	
             store.destroy();
 
         }
@@ -581,12 +594,30 @@ public class TestHTreeWithMemStore extends TestCase {
                             + elapsedValueIteratorTime + ", addressBits="
                             + htree.getAddressBits() + ", nnodes="
                             + htree.getNodeCount() + ", nleaves="
-                            + htree.getLeafCount());
+                            + htree.getLeafCount()
+							+ ", allocation count="
+							+ ((MemStore) store).getMemoryManager()
+							.getAllocationCount());
                 }
                 
                 for (int i = 0; i < s_limit; i++) {
                 	
                     assertTrue(htree.contains(keys[i]));
+                }
+                
+//                if (log.isInfoEnabled()) {
+//                    log.info("HTree: " + htree.PP());
+//                }
+                
+                htree.removeAll();
+                
+                if (log.isInfoEnabled()) {
+                    log.info("After removeAll: nnodes="
+                            + htree.getNodeCount() + ", nleaves="
+                            + htree.getLeafCount()
+							+ ", allocation count="
+							+ ((MemStore) store).getMemoryManager()
+							.getAllocationCount());
                 }
 
 
