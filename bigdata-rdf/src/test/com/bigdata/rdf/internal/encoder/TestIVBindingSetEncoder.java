@@ -196,8 +196,9 @@ public class TestIVBindingSetEncoder extends TestCase2 {
 
         final byte[] data = encoder.encodeSolution(expected);
 
-        final IBindingSet actual = encoder.decodeSolution(data,
-                0/* fromOffset */, data.length/* toOffset */);
+        final IBindingSet actual = encoder
+                .decodeSolution(data, 0/* fromOffset */,
+                        data.length/* toOffset */, true/* resolveCachedValues */);
 
         assertEquals(expected, actual);
     }

@@ -35,7 +35,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.encoder.IVBindingSetEncoder;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
@@ -95,7 +94,7 @@ public class TestIVSolutionSetEncoder extends TestCase2 {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public class IVSolutionSetEncoder {
+    public class IVSolutionSetEncoder implements IBindingSetEncoder {
 
         private final IVBindingSetEncoder encoder;
         private final Map<IV<?, ?>, BigdataValue> sharedCache;
@@ -123,8 +122,32 @@ public class TestIVSolutionSetEncoder extends TestCase2 {
              */
 
             localCache.clear();
-            final byte[] a = encoder.encodeSolution(localCache, bset);
+//            final byte[] a = encoder.encodeSolution(localCache, bset);
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte[] encodeSolution(IBindingSet bset) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public byte[] encodeSolution(IBindingSet bset, boolean updateCache) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public void flush() {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void release() {
+            // TODO Auto-generated method stub
+            
         }
         
     }
@@ -134,7 +157,7 @@ public class TestIVSolutionSetEncoder extends TestCase2 {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public static class IVSolutionSetDecoder extends IVBindingSetEncoder {
+    public static class IVSolutionSetDecoder implements IBindingSetDecoder {
 
         private final BigdataValueFactory valueFactory;
 
@@ -150,7 +173,7 @@ public class TestIVSolutionSetEncoder extends TestCase2 {
         public IVSolutionSetDecoder(final BigdataValueFactory valueFactory,
                 final byte[] data, final int off) {
 
-            super(false/* filter */);
+//            super(false/* filter */);
 
             if (valueFactory == null)
                 throw new IllegalArgumentException();
@@ -173,6 +196,29 @@ public class TestIVSolutionSetEncoder extends TestCase2 {
 
         public IBindingSet decodeNext() {
             throw new UnsupportedOperationException();
+        }
+
+        /*
+         * Note: The decode needs to update the internal cache regardless of
+         * whether or not the IVCache is resolved on the decoded IVs.
+         */
+        @Override
+        public IBindingSet decodeSolution(byte[] val, int off, int len,
+                boolean resolveCachedValues) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public void release() {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void resolveCachedValues(IBindingSet bset) {
+            // TODO Auto-generated method stub
+            
         }
 
     }

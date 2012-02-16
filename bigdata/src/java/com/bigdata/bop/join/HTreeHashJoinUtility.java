@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,6 +64,8 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.encoder.IBindingSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVBindingSetEncoderWithIVCache;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -105,6 +105,9 @@ import cutthecrap.utils.striterators.Visitor;
  * collisions will cause basically no increase in the work to be done. However,
  * if there are 50,000 solutions per distinct combination of the join variables
  * then we would be better off using a 64-bit hash code.
+ * 
+ * FIXME Vector resolution of ivCache. Various methods use
+ * {@link IVBindingSetEncoderWithIVCache#resolveCachedValues(IBindingSet)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinUtility.java 5568 2011-11-07 19:39:12Z thompsonbry
@@ -656,83 +659,61 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         try {
 
-        long naccepted = 0L;
-        
-        final HTree htree = getRightSolutions();
+            long naccepted = 0L;
 
-        final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
-        
-        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
-        
-        /*
-         * Rechunk in order to have a nice fat vector size for ordered inserts.
-         */
-        final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
-                new Dechunkerator<IBindingSet>(itr), chunkSize,
-                IBindingSet.class);
+            final HTree htree = getRightSolutions();
 
-        final AtomicInteger vectorSize = new AtomicInteger();
-        while (it.hasNext()) {
+            final IKeyBuilder keyBuilder = htree.getIndexMetadata()
+                    .getKeyBuilder();
 
-            final BS[] a = vector(it.next(), joinVars, null/* selectVars */,
-                    false/* ignoreUnboundVariables */, vectorSize);
+            /*
+             * Rechunk in order to have a nice fat vector size for ordered
+             * inserts.
+             */
+            final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
+                    new Dechunkerator<IBindingSet>(itr), chunkSize,
+                    IBindingSet.class);
 
-            final int n = vectorSize.get();
-            
-//        while (itr.hasNext()) {
-//
-//            final IBindingSet[] a = itr.next();
+            final AtomicInteger vectorSize = new AtomicInteger();
+            while (it.hasNext()) {
 
-            stats.chunksIn.increment();
-            stats.unitsIn.add(a.length);
+                // Vector a chunk of solutions.
+                final BS[] a = vector(it.next(), joinVars,
+                        null/* selectVars */,
+                        false/* ignoreUnboundVariables */, vectorSize);
 
-//            for (IBindingSet bset : a) {
-//
-//                int hashCode = ONE; // default (used iff join is optional).
-//                try {
-//
-//                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
-//                            ignoreUnboundVariables);
-//
-//                } catch (JoinVariableNotBoundException ex) {
-//
-//                    if (!optional) {
-//                        
-//                        // Drop solution;
-//
-//                        if (log.isTraceEnabled())
-//                            log.trace(ex);
-//
-//                        continue;
-//
-//                    }
-//                    
-//                }
-            
-            for (int i = 0; i < n; i++) {
+                final int n = vectorSize.get();
 
-                final BS tmp = a[i];
+                stats.chunksIn.increment();
+                stats.unitsIn.add(a.length);
 
-                // Encode the key.
-                final byte[] key = keyBuilder.reset().append(tmp.hashCode)
-                        .getKey();
+                // Insert solutions into HTree in key order.
+                for (int i = 0; i < n; i++) {
 
-                // Encode the solution.
-                final byte[] val = encoder.encodeSolution(cache, tmp.bset);
+                    final BS tmp = a[i];
 
-                // Insert binding set under hash code for that key.
-                htree.insert(key, val);
+                    // Encode the key.
+                    final byte[] key = keyBuilder.reset().append(tmp.hashCode)
+                            .getKey();
+
+                    // Encode the solution.
+                    final byte[] val = encoder.encodeSolution(tmp.bset);
+
+                    // Insert binding set under hash code for that key.
+                    htree.insert(key, val);
+
+                }
+
+                naccepted += a.length;
+
+                // Vectored update of the IV Cache.
+//                encoder.updateIVCache(cache);
+                encoder.flush();
 
             }
 
-            naccepted += a.length;
+            return naccepted;
 
-            encoder.updateIVCache(cache);
-
-        }
-        
-        return naccepted;
-        
         } catch(Throwable t) {
             throw launderThrowable(t);
         }
@@ -755,8 +736,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
         final HTree htree = getRightSolutions();
 
-//        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
-        
         final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
 
         /*
@@ -774,30 +753,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
   
             final int n = vectorSize.get();
 
-//        while (itr.hasNext()) {
-//
-//            final IBindingSet[] a = itr.next();
-
             stats.chunksIn.increment();
             stats.unitsIn.add(a.length);
-
-//            for (IBindingSet bset : a) {
-//                
-//                // Note: Must *only* consider the projected variables.
-//                bset = bset.copy(selectVars);
-//
-//                int hashCode = ONE; // default (used iff join is optional).
-//                try {
-//
-//                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
-//                            ignoreUnboundVariables);
-//
-//                } catch (JoinVariableNotBoundException ex) {
-//
-//                    // Exception is not thrown when used as a filter.
-//                    throw new AssertionError();
-//                    
-//                }
 
             for (int i = 0; i < n; i++) {
 
@@ -807,9 +764,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 final byte[] key = keyBuilder.reset().append(tmp.hashCode)
                         .getKey();
 
-                // Encode the solution.
-                final byte[] val = encoder.encodeSolution(null/* cache */,
-                        tmp.bset);
+                /*
+                 * Encode the solution. Do not update the cache since we are
+                 * only encoding so we can probe the hash index.
+                 */
+                final byte[] val = encoder
+                        .encodeSolution(tmp.bset, false/* updateCache */);
 
                 /*
                  * Search the hash index for a match.
@@ -851,6 +811,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 
             }
 
+            // Note: The IV=>Value cache is NOT maintained for DISTINCT.
+//            encoder.flush();
 //            updateIVCache(cache, ivCache.get());
 
         }
@@ -866,10 +828,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     /**
      * Decode a solution from an encoded {@link IV}[].
      * <p>
-     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
-     * data and will NOT be present in the returned {@link IBindingSet}. The
-     * cached {@link BigdataValue} (if any) must be unified by consulting the
-     * {@link #ivCache}.
+     * Note: The {@link IVCache} associated are NOT resolved by this method. The
+     * resolution step is relatively expensive since it must do lookups in
+     * persistence capable data structures. The caller MUST use
+     * {@link IBindingSetDecoder#resolveCachedValues(IBindingSet)} to resolve
+     * the {@link IVCache} associations once they decide that the decoded
+     * solution can join.
      * <p>
      * Note: This instance method is required by the MERGE JOIN logic which
      * associates the schema with the first {@link IHashJoinUtility} instance.
@@ -883,7 +847,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
         final ByteArrayBuffer b = t.getValueBuffer();
         
-        return encoder.decodeSolution(b.array(), 0, b.limit());
+        return encoder
+                .decodeSolution(b.array(), 0, b.limit(), false/* resolveCachedValues */);
         
     }
 
@@ -1777,7 +1742,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 				if (in != null) {
 					if (log.isDebugEnabled())
 						log.debug("Output solution: " + in);
-					// FIXME Vector resolution of ivCache.
                     encoder.resolveCachedValues(in);
 					outputBuffer.add(in);
 				}
