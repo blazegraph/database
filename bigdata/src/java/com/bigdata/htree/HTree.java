@@ -982,6 +982,15 @@ public class HTree extends AbstractHTree
         
         if (metadata.getMetadataAddr() == 0L) {
             
+        	/*
+        	 * Is there an old metadata addr in need of recyling?
+        	 */
+            if (checkpoint != null) {
+            	final long addr = checkpoint.getMetadataAddr();
+            	if (addr != IRawStore.NULL)
+            		store.delete(addr);
+            }
+            
             /*
              * The index metadata has been modified so we write out a new
              * metadata record on the store.
@@ -989,6 +998,15 @@ public class HTree extends AbstractHTree
             
             metadata.write(store);
             
+         }
+        
+        if (checkpoint != null && getRoot() != null
+                && checkpoint.getRootAddr() != getRoot().getIdentity()) {
+            recycle(checkpoint.getRootAddr());
+        }
+
+        if (checkpoint != null) {
+        	recycle(checkpoint.getCheckpointAddr());
         }
         
         // create new checkpoint record.
@@ -1594,8 +1612,11 @@ public class HTree extends AbstractHTree
 	}
 
 	public void removeAll() {
-		// TODO Remove all entries (newRoot()).  See BTree for how this is done.
-		throw new UnsupportedOperationException();
+		
+		DirectoryPage root = getRoot();
+		root.removeAll();
+				
+		newRoot();
 	}
 
 	public long rangeCount() {
@@ -1876,6 +1897,31 @@ public class HTree extends AbstractHTree
 
     }
     
+    /**
+     * Recycle (aka delete) the allocation. This method also adjusts the #of
+     * bytes released in the {@link BTreeCounters}.
+     * 
+     * @param addr
+     *            The address to be recycled.
+     * 
+     * @return The #of bytes which were recycled and ZERO (0) if the address is
+     *         {@link IRawStore#NULL}.
+     */
+    protected int recycle(final long addr) {
+        
+        if (addr == IRawStore.NULL) 
+            return 0;
+        
+        final int nbytes = store.getByteCount(addr);
+        
+        // getBtreeCounters().bytesReleased += nbytes;
+        
+        store.delete(addr);
+        
+        return nbytes;
+
+    }
+
     /**
      * Move to test suite.
      */

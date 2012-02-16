@@ -135,6 +135,8 @@ public class TestAll_HTree extends TestCase {
         // Integration stress test w/ Memory manager.
         suite.addTestSuite(TestHTreeWithMemStore.class);
         
+        suite.addTestSuite(TestHTreeRecycle.class);
+        
         return suite;
 
 	}
