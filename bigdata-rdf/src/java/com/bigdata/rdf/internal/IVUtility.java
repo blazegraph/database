@@ -35,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.LinkedList;
 import java.util.List;
@@ -739,42 +738,50 @@ public class IVUtility {
      */
     public static IV[] decodeAll(final byte[] key) {
 
-        return decodeAll(key, 0/* fromOffset */, key.length/* toOffset */);
+        return decodeAll(key, 0/* off */, key.length/* len */);
 
     }
 
     /**
-     * Decodes all {@link IV}s from a slice of a byte[].
+     * Decodes {@link IV}s from a slice of a byte[].
      * 
      * @param key
      *            The byte[].
-     * @param fromOffset
+     * @param off
      *            The offset of the first encoded {@link IV} in the byte[].
-     * @param toOffset
-     *            The offset of the first byte which will not be decoded.
+     * @param len
+     *            The #of bytes of valid data to be decoded starting at that
+     *            offset.
      * 
-     * @return The set of {@link IV}s.
+     * @return The {@link IV}s in the order in which they were decoded.
      */
-    public static IV[] decodeAll(final byte[] key, final int fromOffset,
-            final int toOffset) {
+    public static IV[] decodeAll(final byte[] key, int off, final int len) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        if (off < 0)
+            throw new IllegalArgumentException();
+
+        final int limit = off + len;
+
+        if (len < 0 || limit > key.length)
+            throw new IllegalArgumentException();
 
         final List<IV> ivs = new LinkedList<IV>();
-        
-        int offset = fromOffset;
-        
-        while (offset < toOffset) {
 
-            final IV iv = decodeFromOffset(key, offset);
-            
+        while (off < limit) {
+
+            final IV iv = decodeFromOffset(key, off);
+
             ivs.add(iv);
-            
-            offset += iv == null
-                    ? TermId.NullIV.byteLength() : iv.byteLength();
-            
+
+            off += iv == null ? TermId.NullIV.byteLength() : iv.byteLength();
+
         }
-        
+
         return ivs.toArray(new IV[ivs.size()]);
-        
+
     }
 
     /**

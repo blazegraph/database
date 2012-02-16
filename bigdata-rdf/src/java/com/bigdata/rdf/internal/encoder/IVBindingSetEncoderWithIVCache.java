@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 15, 2012
  */
 
-package com.bigdata.bop.join;
+package com.bigdata.rdf.internal.encoder;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -34,11 +34,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
@@ -53,7 +53,6 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVBindingSetEncoder;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -80,11 +79,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  */
 public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
-//    /**
-//     * The backing {@link IRawStore}.
-//     */
-//    private final IRawStore store;
-    
     /**
      * The namespace of the {@link LexiconRelation} IFF we need to maintain
      * the {@link #ivCache}.
@@ -117,6 +111,12 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     private final AtomicReference<BTree> blobsCache = new AtomicReference<BTree>();
 
     public String toString() {
+        /*
+         * Note: schema and ivCacheSchema are not thread-safe, so it is not safe
+         * to show their state here. A concurrent modification exception could
+         * easily be thrown. Not synchronizing on these things is currently
+         * valued more than observing their contents outside of a debugger.
+         */
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName());
         sb.append("{namespace=" + namespace);
@@ -161,7 +161,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      * <p>
      * Note: This is basically the same setup as the ID2TERM index.
      */
-    private IndexMetadata getIVCacheIndexMetadata(final PipelineOp op) {
+    private IndexMetadata getIVCacheIndexMetadata(final BOp op) {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
@@ -205,7 +205,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
      * <p>
      * Note: This is basically the same setup as the BLOBS index.
      */
-    private IndexMetadata getBlobsCacheIndexMetadata(final PipelineOp op) {
+    private IndexMetadata getBlobsCacheIndexMetadata(final BOp op) {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
@@ -244,15 +244,22 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     }
 
     /**
+     * @param store
+     *            The backing {@link IRawStore} for the {@link IV} to
+     *            {@link BigdataValue} cache.
      * @param filter
      *            <code>true</code> iff this is in support of a DISTINCT filter.
      *            <p>
      *            Note: we do not maintain the {@link #ivCacheSchema} for a
      *            DISTINCT filter since the original solutions flow through the
      *            filter.
+     * @param op
+     *            The operator whose annotations are used to parameterize the
+     *            creation of the backing indices for the {@link IV} to
+     *            {@link BigdataValue} cache.
      */
     public IVBindingSetEncoderWithIVCache(final IRawStore store,
-            final boolean filter, final PipelineOp op) {
+            final boolean filter, final BOp op) {
 
         super(filter);
 
@@ -321,7 +328,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
     }
 
     @Override
-    public void clear() {
+    public void release() {
 
         BTree tmp2 = ivCache.getAndSet(null/* newValue */);
 
@@ -339,7 +346,7 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         }
 
-        super.clear();
+        super.release();
         
     }
     

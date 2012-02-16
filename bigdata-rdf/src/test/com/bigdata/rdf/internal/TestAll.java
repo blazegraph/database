@@ -23,11 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
-import com.bigdata.rdf.lexicon.TestTermIVComparator;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.lexicon.TestTermIVComparator;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -122,6 +122,9 @@ public class TestAll extends TestCase {
         
         // Encode/decode and *comparator* for mixed VIs.
         suite.addTestSuite(TestEncodeDecodeMixedIVs.class);
+
+        // Encoding/decoding of individual IV binding sets
+        suite.addTest(com.bigdata.rdf.internal.encoder.TestAll.suite());
         
         /*
          * Note: This is an old and never finished test suite. All it does is

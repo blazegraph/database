@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 15, 2012
  */
 
-package com.bigdata.rdf.internal;
+package com.bigdata.rdf.internal.encoder;
 
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -38,12 +38,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.join.IHashJoinUtility;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.htree.HTree;
-import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -110,21 +109,21 @@ public class IVBindingSetEncoder {
 
     }
 
-    /**
-     * Declare any variables which are known to be used, such as join variables.
-     * 
-     * @param vars
-     *            The variables.
-     */
-    public void updateSchema(final IVariable<?>[] vars) {
-
-        for (IVariable<?> v : vars) {
-
-            schema.add(v);
-
-        }
-
-    }
+//    /**
+//     * Declare any variables which are known to be used, such as join variables.
+//     * 
+//     * @param vars
+//     *            The variables.
+//     */
+//    public void updateSchema(final IVariable<?>[] vars) {
+//
+//        for (IVariable<?> v : vars) {
+//
+//            schema.add(v);
+//
+//        }
+//
+//    }
 
     /**
      * Build up the schema. This includes all observed variables, not just those
@@ -133,7 +132,7 @@ public class IVBindingSetEncoder {
      * @param bset
      *            An observed binding set.
      */
-    public void updateSchema(final IBindingSet bset) {
+    private void updateSchema(final IBindingSet bset) {
 
         @SuppressWarnings("rawtypes")
         final Iterator<IVariable> vitr = bset.vars();
@@ -178,6 +177,18 @@ public class IVBindingSetEncoder {
         if(bset == null)
             throw new IllegalArgumentException();
         
+        /*
+         * Before we can encode the binding set, we need to update the schema
+         * such that it captures any variables used in the binding set (plus
+         * any variables which have been observed in previous binding sets).
+         */
+        updateSchema(bset);
+
+        /*
+         * Encode the binding set. Bindings will appear in the same order that
+         * they were added to the schema. Unbound variables are represented by a
+         * NullIV.
+         */
         keyBuilder.reset();
         final Iterator<IVariable<?>> vitr = schema.iterator();
         while (vitr.hasNext()) {
@@ -207,46 +218,22 @@ public class IVBindingSetEncoder {
      * data and will NOT be present in the returned {@link IBindingSet}. The
      * cached {@link BigdataValue} (if any) must be unified by consulting the
      * {@link #ivCache}.
-     * <p>
-     * Note: This instance method is required by the MERGE JOIN logic which
-     * associates the schema with the first {@link IHashJoinUtility} instance.
-     * 
-     * @param t
-     *            A tuple whose value is an encoded {@link IV}[].
-     * 
-     * @return The decoded {@link IBindingSet}.
-     */
-    public IBindingSet decodeSolution(final ITuple<?> t) {
-
-        final ByteArrayBuffer b = t.getValueBuffer();
-        
-        return decodeSolution(b.array(), 0, b.limit());
-
-    }
-
-    /**
-     * Decode a solution from an encoded {@link IV}[].
-     * <p>
-     * Note: The {@link IV#getValue() cached value} is NOT part of the encoded
-     * data and will NOT be present in the returned {@link IBindingSet}. The
-     * cached {@link BigdataValue} (if any) must be unified by consulting the
-     * {@link #ivCache}.
      * 
      * @param val
      *            The encoded IV[].
-     * @param fromOffset
+     * @param off
      *            The starting offset.
-     * @param toOffset
-     *            The byte beyond the end of the encoded data.
+     * @param len
+     *            The #of bytes of data to be decoded.
      * 
      * @return The decoded {@link IBindingSet}.
      */
-    public IBindingSet decodeSolution(final byte[] val, final int fromOffset,
-            final int toOffset) {
+    public IBindingSet decodeSolution(final byte[] val, final int off,
+            final int len) {
 
         final IBindingSet bset = new ListBindingSet();
 
-        final IV<?, ?>[] ivs = IVUtility.decodeAll(val, fromOffset, toOffset);
+        final IV<?, ?>[] ivs = IVUtility.decodeAll(val, off, len);
 
         int i = 0;
 
@@ -280,7 +267,7 @@ public class IVBindingSetEncoder {
     /**
      * Release the state associated with the {@link IVBindingSetEncoder}.
      */
-    public void clear() {
+    public void release() {
         
         schema.clear();
 
