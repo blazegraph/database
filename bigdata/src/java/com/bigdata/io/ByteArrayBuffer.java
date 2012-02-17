@@ -202,13 +202,19 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         if (capacity < 0)
             throw new IllegalArgumentException();
 
+        if (buf == null) {
+
+            buf = new byte[capacity];
+
+            return;
+            
+        }
+        
         final int overflow = capacity - buf.length;
 
         if (overflow > 0) {
         
-            /*
-             * extend to at least the target capacity.
-             */
+            // Extend to at least the target capacity.
             final byte[] tmp = new byte[extend(capacity)];
             
             // copy all bytes to the new byte[].
@@ -223,8 +229,8 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     final public int capacity() {
         
-        return buf.length;
-        
+        return buf == null ? 0 : buf.length;
+
     }
     
     /**
@@ -241,7 +247,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      */
     protected int extend(final int required) {
 
-        final int capacity = Math.max(required, buf.length * 2);
+        final int capacity = Math.max(required, capacity() * 2);
 
         if(log.isInfoEnabled())
             log.info("Extending buffer to capacity=" + capacity + " bytes.");
@@ -286,6 +292,15 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
         // return the old buffer.
         return tmp;
+        
+    }
+
+    /**
+     * Clears the buffer reference to <code>null</code>.
+     */
+    final public void clear() {
+        
+        this.buf = null;
         
     }
     

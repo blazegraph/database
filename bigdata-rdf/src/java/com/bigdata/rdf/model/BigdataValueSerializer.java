@@ -215,6 +215,29 @@ public class BigdataValueSerializer<V extends Value> {
      */
     public byte[] serialize(final V val, final DataOutputBuffer out, final
             ByteArrayBuffer tmp) {
+    
+        serialize2(val, out, tmp);
+        
+        return out.toByteArray();
+        
+    }
+    
+    /**
+     * Variant which permits reuse of the same buffer and avoids copying the
+     * data once it has been formated onto the caller's {@link DataOutputBuffer}
+     * (core impl).
+     * 
+     * @param val
+     *            The value.
+     * @param out
+     *            The buffer - the caller is responsible for resetting the
+     *            buffer before each invocation.
+     * @param tmp
+     *            A buffer used to compress the component Unicode strings. This
+     *            will be reset as necessary by this method.
+     */
+    public void serialize2(final V val, final DataOutputBuffer out, final
+            ByteArrayBuffer tmp) {
         
         try {
 
@@ -233,7 +256,7 @@ public class BigdataValueSerializer<V extends Value> {
                 throw new UnsupportedOperationException(ERR_VERSION);
             }
 
-            return out.toByteArray();
+//            return out.toByteArray();
 
         } catch (IOException ex) {
 

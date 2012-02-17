@@ -409,6 +409,25 @@ public class DataInputBuffer extends InputStream implements DataInput,
      */
 
     /**
+     * Convenience method unpacks long and throws an exception if the value
+     * exceeds {@link Integer#MAX_VALUE}.
+     * 
+     * @return The integer value.
+     * 
+     * @throws IOException
+     */
+    final public int unpackInt() throws IOException {
+        
+        final long v = unpackLong();
+
+        if (v > Integer.MAX_VALUE)
+            throw new IOException();
+
+        return (int) v;
+
+    }
+
+    /**
      * Unpack a long value from the current buffer position.
      * 
      * @return The long value.

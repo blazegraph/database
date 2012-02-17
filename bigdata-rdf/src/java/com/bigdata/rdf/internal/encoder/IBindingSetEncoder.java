@@ -59,6 +59,12 @@ import com.bigdata.rdf.model.BigdataValue;
 public interface IBindingSetEncoder {
 
     /**
+     * Return <code>true</code> iff the {@link IVCache} associations are
+     * preserved by the encoder.
+     */
+    boolean isValueCache();
+    
+    /**
      * Encode the solution as an {@link IV}[], collecting updates for the
      * internal {@link IV} to {@link BigdataValue} cache.
      * 

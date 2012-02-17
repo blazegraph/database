@@ -35,6 +35,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInput;
+import java.io.OutputStream;
 
 import com.bigdata.io.compression.IUnicodeCompressor;
 import com.bigdata.journal.Name2Addr;
@@ -314,16 +315,39 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      */
     public void writeUTF(final String str) throws IOException {
         
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        
+//        final DataOutputStream dos = new DataOutputStream(baos);
+//        
+//        dos.writeUTF(str);
+//        
+//        dos.flush();
+//        
+//        write(baos.toByteArray());
+//        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
-        final DataOutputStream dos = new DataOutputStream(baos);
+        final DataOutputStream dos = new DataOutputStream(this);
         
         dos.writeUTF(str);
         
         dos.flush();
         
-        write(baos.toByteArray());
+//        write(baos.toByteArray());
 
+    }
+
+    /**
+     * Version of {@link #writeUTF(String)} which wraps the {@link IOException}.
+     * 
+     * @param str
+     *            The string.
+     */
+    public void writeUTF2(final String str) {
+        try {
+            writeUTF(str);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

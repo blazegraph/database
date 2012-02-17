@@ -178,10 +178,10 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * in case a distinct lexicon is subsequently creating with the same
      * namespace. There is no need to discard an entry during abort processing.
      * 
-     * @param namespace
-     *            The namespace of the {@link LexiconRelation}.
      */
-    public void remove(final String namespace) {
+//    * @param namespace
+//    *            The namespace of the {@link LexiconRelation}.
+    public void remove(/*final String namespace*/) {
         
 //        if (namespace == null)
 //            throw new IllegalArgumentException();
