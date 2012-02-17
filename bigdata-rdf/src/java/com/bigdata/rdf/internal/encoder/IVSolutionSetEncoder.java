@@ -363,9 +363,9 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         }
         out.packLong(newVars.size());
         out.packLong(newCached);
-        System.err.println("schemaSize=" + schema.size() + ", newVars="
-                + newVars.size() + ", numBindings=" + numBindings
-                + ", newCached=" + newCached);
+//        System.err.println("schemaSize=" + schema.size() + ", newVars="
+//                + newVars.size() + ", numBindings=" + numBindings
+//                + ", newCached=" + newCached);
         
         // write newly declared variable names.
         for (IVariable<?> var : newVars) {
@@ -386,8 +386,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
             final int nbytes = BytesUtil.bitFlagByteLength(schema.size());
             // current buffer position as bit index.
             int bitIndex = out.pos() << 3;
-            System.err.println("varbitmap: beginBitOffset=" + bitIndex
-                    + ", nbytes=" + nbytes);
+//            System.err.println("varbitmap: beginBitOffset=" + bitIndex
+//                    + ", nbytes=" + nbytes);
             // pre-extend the buffer, zeroing the bitmap.
             out.ensureFree(nbytes);
             for (int i = 0; i < nbytes; i++) {
@@ -414,8 +414,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
             for (int i = 0; i < nbytes; i++) {
                 out.append((byte) 0);
             }
-            System.err.println("cachebitmap: beginBitOffset=" + bitIndex
-                    + ", nbytes=" + nbytes);
+//            System.err.println("cachebitmap: beginBitOffset=" + bitIndex
+//                    + ", nbytes=" + nbytes);
             for (BigdataValue value : values) {
                 if (value != null) {
                     BytesUtil.setBit(out.array(), bitIndex, true);
@@ -425,16 +425,16 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         }
 
         // write IV[].
-        System.err.println("IV[]: off=" + out.pos() + ", numBindings="
-                + numBindings + ", byteLength=" + keyBuilder.len());
+//        System.err.println("IV[]: off=" + out.pos() + ", numBindings="
+//                + numBindings + ", byteLength=" + keyBuilder.len());
         out.append(keyBuilder.array(), 0/* off */, keyBuilder.len());
 
         /*
          * Write Value[]. Each Value is written directly into [out].
          */
         if (newCached > 0) {
-            System.err.println("cache[]: off=" + out.pos() + ", newCached="
-                    + newCached);
+//            System.err.println("cache[]: off=" + out.pos() + ", newCached="
+//                    + newCached);
             for (BigdataValue value : values) {
 
                 if (value != null) {
@@ -445,7 +445,7 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
 
             }
         }
-        System.err.println("done: off=" + out.pos());
+//        System.err.println("done: off=" + out.pos());
 
         // Return formatted record.
         return out.toByteArray();
