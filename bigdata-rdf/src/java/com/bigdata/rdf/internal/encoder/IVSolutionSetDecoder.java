@@ -50,7 +50,7 @@ import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
@@ -87,17 +87,6 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
     private final Map<IV<?, ?>, BigdataValue> cache;
 
     /**
-     * The namespace of the lexicon relation.
-     */
-    private final String namespace;
-    
-    /**
-     * Used to de-serialize the {@link BigdataValue}s for {@link IVCache}
-     * associations.
-     */
-    private final BigdataValueSerializer<BigdataValue> valueSer;
-
-    /**
      * Used to de-serialize the {@link BigdataValue}s.
      */
     private final StringBuilder tmp;
@@ -113,7 +102,25 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
      * stream.
      */
     private int version = -1;
+
+    /*
+     * Discovered dynamically.
+     */
     
+    /**
+     * The namespace of the lexicon relation. The namespace is discovered
+     * dynamically when we read the first record with an {@link IVCache}
+     * association. It will be <code>null</code> until then.
+     */
+    private String namespace;
+    
+    /**
+     * Used to de-serialize the {@link BigdataValue}s for {@link IVCache}
+     * associations. This is initialized if and when we discover the
+     * {@link #namespace}.
+     */
+    private BigdataValueSerializer<BigdataValue> valueSer;
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -126,19 +133,7 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
         return sb.toString();
     }
     
-    /**
-     * @param valueFactory
-     *            The value factory used to materialize {@link BigdataValue} for
-     *            {@link IVCache} associations.
-     */
-    public IVSolutionSetDecoder(final BigdataValueFactory valueFactory) {
-
-        if (valueFactory == null)
-            throw new IllegalArgumentException();
-
-        this.namespace = valueFactory.getNamespace();
-        
-        this.valueSer = valueFactory.getValueSerializer();
+    public IVSolutionSetDecoder() {
 
         // The ordered set of variables for which bindings have been observed.
         this.schema = new LinkedHashSet<IVariable<?>>();
@@ -167,11 +162,30 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
     public IBindingSet decodeSolution(final byte[] data, int off, int len,
             final boolean resolveCachedValues) {
 
+        // Note: close() is NOT required for DataInputBuffer.
+        final DataInputBuffer in = new DataInputBuffer(data, off, len);
+        
+        return decodeSolution(in, resolveCachedValues);
+        
+    }
+
+    /**
+     * Stream oriented decode.
+     * 
+     * @param in
+     *            The source data.
+     * @param resolveCachedValues
+     *            <code>true</code> if {@link IVCache} associations should be
+     *            resolved as the solutions are decoded.
+     *            
+     * @return The next decoded solution.
+     */
+    public IBindingSet decodeSolution(final DataInputBuffer in,
+            final boolean resolveCachedValues) {
+
         if (version == -1) {
 
             try {
-
-                final DataInputBuffer in = new DataInputBuffer(data, off, len);
 
                 version = in.unpackInt();
 
@@ -182,31 +196,36 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
                     throw new RuntimeException("Unknown version: " + version);
                 }
 
-                final int versionLength = (int) in.position();
+//                final int versionLength = (int) in.position();
+//
+//                off += versionLength;
+//                len -= versionLength;
 
-                off += versionLength;
-                len -= versionLength;
-                
             } catch (IOException e) {
-                
+
                 throw new RuntimeException(e);
-                
+
             }
 
         }
 
-        final IBindingSet bset = _decodeSolution(data, off, len,
+        final IBindingSet bset = _decodeSolution(in, //data, off, len,
                 resolveCachedValues);
 
         nsolutions++;
 
         return bset;
-        
+
     }
 
-    private IBindingSet _decodeSolution(final byte[] data, final int off,
-            final int len, final boolean resolveCachedValues) {
+    private IBindingSet _decodeSolution(final DataInputBuffer in,
+//            final byte[] data, final int off, final int lenX,
+            final boolean resolveCachedValues) {
 
+        final byte[] data = in.getBuffer();
+
+        final int off = in.getOrigin();
+        
         try {
 
             final IBindingSet bset = new ListBindingSet();
@@ -220,7 +239,7 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
             // * IV[0] ... IV[nbound-1]
             // * Value[0] ... Value[ncached-1]
 
-            final DataInputBuffer in = new DataInputBuffer(data, off, len);
+//            final DataInputBuffer in = new DataInputBuffer(data, off, len);
 
             // #of bindings in this record.
             final int numBindings = in.unpackInt();
@@ -245,18 +264,28 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
                  */
                 throw new RuntimeException();
             }
+
+            if (newCached > 0 && namespace == null) {
+                /*
+                 * This is where we discover the namespace for the serialized
+                 * BigdataValue objects.
+                 */
+                namespace = in.readUTF2();
+                valueSer = BigdataValueFactoryImpl.getInstance(namespace)
+                        .getValueSerializer();
+            }
             
             // read newly declared variable names and add them to the schema.
             for (int i = 0; i < newVars; i++) {
 
-                final IVariable<?> var = Var.var(in.readUTF());
+                final IVariable<?> var = Var.var(in.readUTF2());
 
                 if (schema.add(var)) {
 
                     schemaIndex.add(var);
 
-                } else if(false) {
-                    
+                } else {
+
                     // The variable was already declared.
                     throw new IllegalStateException("Already declared: "
                             + var.getName());
@@ -428,6 +457,10 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
         version = -1;
         
         nsolutions = 0;
+
+        namespace = null;
+
+        valueSer = null;
 
     }
 

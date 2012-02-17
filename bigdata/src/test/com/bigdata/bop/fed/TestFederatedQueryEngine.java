@@ -63,14 +63,11 @@ import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Unit tests for {@link FederatedQueryEngine} running against an
@@ -98,10 +95,11 @@ import com.bigdata.striterator.Dechunkerator;
  * 
  * @todo reuse the stress tests from {@link TestQueryEngine}.
  */
-public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
+public class TestFederatedQueryEngine extends
+        AbstractEmbeddedFederationTestCase {
 
     public TestFederatedQueryEngine() {
-        
+
     }
     
     public TestFederatedQueryEngine(String name) {
@@ -116,12 +114,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     // The separator key between the index partitions.
     private byte[] separatorKey;
 
-//    /** The local persistence store for the {@link #queryEngine}. */
-//    private Journal queryEngineStore;
-//    
-//    /** The local {@link ResourceService} for the {@link #queryEngine}. */
-//    private ManagedResourceService queryEngineResourceService;
-    
     /** The query controller. */
     private FederatedQueryEngine queryEngine;
     
@@ -145,43 +137,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         assertNotNull(dataService0);
         assertNull(dataService1);
         
-//        final IBigdataFederation<?> fed = client.connect();
-
-//        // create index manager for the query controller.
-//        {
-//            final Properties p = new Properties();
-//            p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-//                    .toString());
-//            queryEngineStore = new Journal(p);
-//        }
-//        
-//        // create resource service for the query controller.
-//        {
-//            queryEngineResourceService = new ManagedResourceService(
-//                    new InetSocketAddress(InetAddress
-//                            .getByName(NicUtil.getIpAddress("default.nic",
-//                                    "default", true/* loopbackOk */)), 0/* port */
-//                    ), 0/* requestServicePoolSize */) {
-//
-//                @Override
-//                protected File getResource(UUID uuid) throws Exception {
-//                    // Will not serve up files.
-//                    return null;
-//                }
-//            };
-//        }
-//
-//        {
-//
-//            // create the query controller.
-//            queryEngine = new FederatedQueryEngine(UUID.randomUUID(), fed,
-//                    queryEngineStore, queryEngineResourceService);
-//
-//            queryEngine.init();
-//
-//            System.err.println("controller: " + queryEngine);
-//
-//        }
         queryEngine = QueryEngineFactory.getFederatedQueryController(fed);
         
 //        dataService0 = fed.getDataService(dataServices[0]); 
@@ -207,27 +162,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             
         }
 
-//        // resolve the query engine on the other data services.
-//        {
-//
-//            IQueryPeer other = null;
-//            
-////            assertTrue(((DataService) dataServer.getProxy())
-////                    .getResourceManager().awaitRunning());
-//            
-//            while ((other = dataService1.getQueryEngine()) == null) {
-//
-//                if (log.isInfoEnabled())
-//                    log.info("Waiting for query engine on dataService1");
-//
-//                Thread.sleep(250);
-//
-//            }
-//
-//            System.err.println("other     : " + other);
-//            
-//        }
-
         loadData();
         
     }
@@ -237,14 +171,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // clear reference.
         separatorKey = null;
         
-//        if (queryEngineResourceService != null) {
-//            queryEngineResourceService.shutdownNow();
-//            queryEngineResourceService = null;
-//        }
-//        if (queryEngineStore != null) {
-//            queryEngineStore.destroy();
-//            queryEngineStore = null;
-//        }
         if (queryEngine != null) {
             queryEngine.shutdownNow();
             queryEngine = null;
@@ -312,36 +238,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single,
-     * empty {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSets
-     *            the binding sets.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[] bindingSets) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bindingSets });
-
-    }
-
-    /**
      * Starts and stops the {@link QueryEngine}, but does not validate the
      * semantics of shutdown() versus shutdownNow() since we need to be
      * evaluating query mixes in order to verify the semantics of those
@@ -369,6 +265,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
+                new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                        FederationChunkHandler.TEST_INSTANCE),//
                 }));
 
         final UUID queryId = UUID.randomUUID();
@@ -408,7 +306,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             };
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                    runningQuery);
 
         }
         
@@ -439,6 +337,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
 
@@ -459,7 +359,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -555,6 +455,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
 
@@ -606,7 +508,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -722,6 +624,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
 
@@ -760,7 +664,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -866,6 +770,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         })//
         );
 
@@ -886,7 +792,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -942,28 +848,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         }
 
     }
-
-//    /**
-//     * @todo Test the ability close the iterator draining a result set before
-//     *       the query has finished executing and verify that the query is
-//     *       correctly terminated [this is difficult to test without having
-//     *       significant data scale since there is an implicit race between the
-//     *       consumer and the producer to close out the query evaluation, but
-//     *       the {@link PipelineDelayOp} can be used to impose sufficient
-//     *       latency on the pipeline that the test can close the query buffer
-//     *       iterator first].
-//     *       <p>
-//     *       This must also be tested in scale-out to make sure that the data
-//     *       backing the solutions is not discarded before the caller can use
-//     *       those data. [This could be handled by materializing binding set
-//     *       objects out of a {@link ByteBuffer} rather than using a live decode
-//     *       of the data in that {@link ByteBuffer}.]
-//     */
-//    public void test_query_closeIterator() {
-//
-////        fail("write test");
-//
-//    }
 
     /**
      * Test the ability run a query requiring two joins.
@@ -1032,6 +916,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         }));
 
         // start the query.
@@ -1066,7 +952,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             )};
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                    runningQuery);
 
 //          // partition0
 //          new E("John", "Mary"),// 
@@ -1239,6 +1125,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                                FederationChunkHandler.TEST_INSTANCE),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -1308,8 +1196,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             };
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-        
+                    runningQuery);
+
 //            // partition0
 //            new E("John", "Mary"),// 
 //            new E("Leon", "Paul"),// 

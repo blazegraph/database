@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
+import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,14 +37,24 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IHaltOpMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.IStartOpMessage;
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.striterator.Dechunkerator;
 
 /**
@@ -67,6 +78,54 @@ public class TestThickChunkMessage extends TestCase2 {
         super(name);
     }
 
+    private String namespace;
+    private BigdataValueFactory valueFactory;
+    private long nextId = 1;
+    
+    @Override
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        this.namespace = getName();
+        
+        this.valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+        
+    }
+    
+    @Override
+    protected void tearDown() throws Exception {
+
+        this.namespace = null;
+        
+        this.valueFactory.remove();
+        
+        super.tearDown();
+        
+    }
+
+    /**
+     * Create an {@link IV} for a {@link BigdataLiteral}, set the
+     * {@link IVCache} association, and wrap it as an {@link IConstant}.
+     * 
+     * @param s
+     *            The literal value.
+     *            
+     * @return The {@link IConstant}.
+     */
+    private IConstant<IV<?, ?>> makeLiteral(final String s) {
+
+        final BigdataLiteral value = valueFactory.createLiteral(s);
+
+        final TermId<BigdataLiteral> termId = new TermId<BigdataLiteral>(
+                VTE.LITERAL, nextId++);
+
+        termId.setValue(value);
+
+        return new Constant<IV<?, ?>>(termId);
+        
+    }
+    
     /**
      * Unit test for a message with a single chunk containing a single empty
      * binding set.
@@ -75,29 +134,29 @@ public class TestThickChunkMessage extends TestCase2 {
 
         final List<IBindingSet> data = new LinkedList<IBindingSet>();
         {
-            data.add(new HashBindingSet());
+            data.add(new ListBindingSet());
         }
         
         final IQueryClient queryController = new MockQueryController();
         final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-//                10);
-//
-//        // populate the source.
-//        source.add(data.toArray(new IBindingSet[0]));
-//        
-//        // close the source.
-//        source.close();
         
         final IBindingSet[] source = data.toArray(new IBindingSet[0]);
-        
+
         // build the chunk.
-        final IChunkMessage<IBindingSet> msg = new ThickChunkMessage<IBindingSet>(
+        final IChunkMessage<IBindingSet> msg1 = new ThickChunkMessage<IBindingSet>(
                 queryController, queryId, bopId, partitionId, source);
 
-        assertTrue(queryController == msg.getQueryController());
+        // same reference.
+        assertTrue(queryController == msg1.getQueryController());
+
+        // encode/decode.
+        final IChunkMessage<IBindingSet> msg = (IChunkMessage<IBindingSet>) SerializerUtil
+                .deserialize(SerializerUtil.serialize(msg1));
+
+        // equals()
+        assertEquals(queryController, msg.getQueryController());
 
         assertEquals(queryId, msg.getQueryId());
         
@@ -114,7 +173,7 @@ public class TestThickChunkMessage extends TestCase2 {
                         .iterator()));
 
     }
-
+    
     /**
      * Unit test for a message with a single chunk of binding sets.
      */
@@ -127,39 +186,39 @@ public class TestThickChunkMessage extends TestCase2 {
         {
             IBindingSet bset = null;
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("John"));
-                bset.set(y, new Constant<String>("Mary"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("John"));
+                bset.set(y, makeLiteral("Mary"));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Paul"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("Mary"));
+                bset.set(y, makeLiteral("Paul"));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Jane"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("Mary"));
+                bset.set(y, makeLiteral("Jane"));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("Leon"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("Paul"));
+                bset.set(y, makeLiteral("Leon"));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("John"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("Paul"));
+                bset.set(y, makeLiteral("John"));
                 data.add(bset);
             }
             {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Leon"));
-                bset.set(y, new Constant<String>("Paul"));
+                bset = new ListBindingSet();
+                bset.set(x, makeLiteral("Leon"));
+                bset.set(y, makeLiteral("Paul"));
                 data.add(bset);
             }
 
@@ -169,22 +228,22 @@ public class TestThickChunkMessage extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
-//        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
-//                10);
-//
-//        // populate the source.
-//        source.add(data.toArray(new IBindingSet[0]));
-//        
-//        // close the source.
-//        source.close();
 //        
         final IBindingSet[] source = data.toArray(new IBindingSet[0]);
         
         // build the chunk.
-        final IChunkMessage<IBindingSet> msg = new ThickChunkMessage<IBindingSet>(
+        final IChunkMessage<IBindingSet> msg1 = new ThickChunkMessage<IBindingSet>(
                 queryController, queryId, bopId, partitionId, source);
+        
+        // same reference.
+        assertTrue(queryController == msg1.getQueryController());
 
-        assertTrue(queryController == msg.getQueryController());
+        // encode/decode.
+        final IChunkMessage<IBindingSet> msg = (IChunkMessage<IBindingSet>) SerializerUtil
+                .deserialize(SerializerUtil.serialize(msg1));
+
+        // equals()
+        assertEquals(queryController, msg.getQueryController());
 
         assertEquals(queryId, msg.getQueryId());
         
@@ -203,9 +262,21 @@ public class TestThickChunkMessage extends TestCase2 {
 
     /**
      * Mock object.
+     * <p>
+     * Note: This needs to be serializable since we are sending the proxy with
+     * the {@link IChunkMessage}.  There is an issue open to change that. See
+     * {@link IChunkMessage#getQueryController()}.
      */
-    private static class MockQueryController implements IQueryClient {
+    private static class MockQueryController implements IQueryClient,
+            Serializable {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+
+        final private UUID serviceId = UUID.randomUUID();
+        
         public void haltOp(IHaltOpMessage msg) throws RemoteException {
         }
 
@@ -220,7 +291,7 @@ public class TestThickChunkMessage extends TestCase2 {
         }
 
         public UUID getServiceUUID() throws RemoteException {
-            return null;
+            return serviceId;
         }
 
         public PipelineOp getQuery(UUID queryId)
@@ -236,6 +307,18 @@ public class TestThickChunkMessage extends TestCase2 {
 			return null;
 		}
 
+        /**
+         * Note: Assume equal as long as same class. This is used by the code
+         * which tests the serialization of the {@link ThickChunkMessage}. In a
+         * real federation, the query controller is a proxy. But also see
+         * {@link IChunkMessage#getQueryController()}, which is an issue to
+         * remove the {@link IQueryPeer} proxy from the {@link IChunkMessage}.
+         */
+        public boolean equals(Object o) {
+            final MockQueryController x = (MockQueryController) o;
+            return true;
+		}
+		
     }
     
 }

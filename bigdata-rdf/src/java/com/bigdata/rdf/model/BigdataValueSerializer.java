@@ -68,9 +68,8 @@ public class BigdataValueSerializer<V extends Value> {
     private static final short VERSION0 = 0x0;
 
     /**
-     * Version ONE(1) of the serialization format. This version uses BOCU-1 to
-     * encode the data (BOCU-1 provides code point order preserving compressed
-     * Unicode).
+     * Version ONE(1) of the serialization format. This version supports very
+     * large Unicode strings using the {@link UnicodeHelper} class.
      */
     private static final short VERSION1 = 0x1;
     

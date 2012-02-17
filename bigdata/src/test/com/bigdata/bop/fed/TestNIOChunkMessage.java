@@ -56,14 +56,18 @@ import com.bigdata.util.config.NicUtil;
  * Unit tests for {@link NIOChunkMessage}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- * @todo test with chunks which are not {@link IBindingSet}s - the code should
- *       be general purpose.
+ * @version $Id: TestNIOChunkMessage.java 6013 2012-02-12 21:29:01Z thompsonbry
+ *          $
  * 
  * @todo test with large source chunks which span more than one direct buffer.
  * 
  * @todo concurrency test.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/160">
+ *      ResourceService should use NIO for file and buffer transfers</a>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/486">Support
+ *      NIO solution set interchange on the cluster</a>
  */
 public class TestNIOChunkMessage extends TestCase2 {
 

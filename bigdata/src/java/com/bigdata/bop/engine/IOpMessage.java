@@ -27,15 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.io.Serializable;
 import java.util.UUID;
 
 /**
- * Common metadata for operator evaluation messages. 
+ * Common metadata for operator evaluation messages. Messages are
+ * {@link Serializable} since they are sent on the wire in the clustered
+ * database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IOpMessage {
+public interface IOpMessage extends Serializable {
 
     /** Return the query identifier. */
     UUID getQueryId();

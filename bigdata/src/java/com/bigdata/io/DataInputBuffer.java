@@ -155,6 +155,15 @@ public class DataInputBuffer extends InputStream implements DataInput,
     }
     
     /**
+     * Return the backing buffer.
+     */
+    public byte[] getBuffer() {
+        
+        return buf;
+        
+    }
+    
+    /**
      * Replaces the buffer and reset the offset and length to the specified
      * values.
      * 
@@ -193,6 +202,15 @@ public class DataInputBuffer extends InputStream implements DataInput,
             throw new IllegalArgumentException();
 
         setBuffer(buf.array(), buf.pos, buf.limit);
+        
+    }
+    
+    /**
+     * The origin (original offset) associated with the backing buffer.
+     */
+    public int getOrigin() {
+        
+        return origin;
         
     }
     
@@ -366,6 +384,23 @@ public class DataInputBuffer extends InputStream implements DataInput,
     public String readUTF() throws IOException {
 
         return DataInputStream.readUTF(this);
+        
+    }
+
+    /**
+     * Variant of {@link #readUTF()} which wraps the {@link IOException}.
+     */
+    public String readUTF2() {
+
+        try {
+
+            return DataInputStream.readUTF(this);
+
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+
+        }
         
     }
 
