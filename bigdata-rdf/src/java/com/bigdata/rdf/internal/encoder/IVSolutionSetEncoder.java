@@ -319,10 +319,22 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
          */
         final List<IVariable<?>> newVars = new LinkedList<IVariable<?>>();
         {
+            /*
+             * Note: Changed to use bset.iterator() based on a hot spot in the
+             * profiler.
+             */
             @SuppressWarnings("rawtypes")
-            final Iterator<IVariable> vitr = bset.vars();
-            while (vitr.hasNext()) {
-                final IVariable<?> v = vitr.next();
+//            final Iterator<IVariable> vitr = bset.vars();
+//            while (vitr.hasNext()) {
+//                final IVariable<?> v = vitr.next();
+//                if (schema.add(v)) {
+//                    newVars.add(v);
+//                }
+//            }
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = bset
+                    .iterator();
+            while (itr.hasNext()) {
+                final IVariable<?> v = itr.next().getKey();
                 if (schema.add(v)) {
                     newVars.add(v);
                 }
@@ -331,8 +343,7 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
 
         /*
          * Encode the binding set. Bindings will appear in the same order that
-         * they were added to the schema. Unbound variables are represented by a
-         * NullIV.
+         * they were added to the schema. 
          */
         // Ordered set of new IV -> Value associations. List entry is [null] if
         // no association for IV at that ordinal position in the solution.
@@ -343,32 +354,34 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         int newCached = 0;
         boolean discoveredNamespace = false;
         {
+            // For each variable in the [schema] order.
             final Iterator<IVariable<?>> vitr = schema.iterator();
             while (vitr.hasNext()) {
                 final IVariable<?> v = vitr.next();
+                // Lookup binding for that variable in the solution.
                 @SuppressWarnings("unchecked")
                 final IConstant<IV<?, ?>> c = bset.get(v);
                 if (c == null)
                     continue;
+                // Variable is bound in this solution.
                 final IV<?, ?> iv = c.get();
+                // Encode binding into buffer.
                 IVUtility.encode(keyBuilder, iv);
-                if (iv.hasValue()) {
-                    if (!cache.containsKey(iv)) {
-                        // New IV => Value association.
-                        final BigdataValue value = iv.getValue();
-                        if(cache.isEmpty()) {
-                            // Note: The namespace is discovered here!!!
-                            namespace = value.getValueFactory().getNamespace();
-                            valueSer = BigdataValueFactoryImpl.getInstance(
-                                    namespace).getValueSerializer();
-                            discoveredNamespace = true;
-                        }
-                        cache.put(iv, value);
-                        values.add(value);
-                        newCached++;
-                    } else {
-                        values.add(null/* no-value */);
+                if (iv.hasValue() && !cache.containsKey(iv)) {
+                    // New IV => Value association.
+                    final BigdataValue value = iv.getValue();
+                    if (cache.isEmpty()) {
+                        // Note: The namespace is discovered here!!!
+                        namespace = value.getValueFactory().getNamespace();
+                        valueSer = BigdataValueFactoryImpl.getInstance(
+                                namespace).getValueSerializer();
+                        discoveredNamespace = true;
                     }
+                    cache.put(iv, value);
+                    values.add(value);
+                    newCached++;
+                } else {
+                    values.add(null/* no-value */);
                 }
                 numBindings++;
             }

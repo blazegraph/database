@@ -70,9 +70,13 @@ import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
  * control on the producer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: FederationChunkHandler.java 6038 2012-02-17 17:43:26Z
+ *          thompsonbry $
  * @param <E>
  *            The generic type of the objects in the relation.
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/488">Vector
+ *      query engine messages per node</a>
  */
 public class FederationChunkHandler<E> extends StandaloneChunkHandler {
 
