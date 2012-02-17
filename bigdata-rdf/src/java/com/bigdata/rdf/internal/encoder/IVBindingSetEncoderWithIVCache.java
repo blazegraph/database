@@ -53,6 +53,7 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -287,6 +288,19 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
             valueFactory = null;
             
         }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This maintains the {@link IVCache} associations UNLESS
+     * <i>filter:=true</code> was specified to the constructor.
+     */
+    @Override
+    public boolean isValueCache() {
+
+        return !filter;
 
     }
 

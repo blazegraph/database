@@ -676,7 +676,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             }
 
             // discard the value factory for the lexicon's namespace.
-            valueFactory.remove(getNamespace());
+            valueFactory.remove(/*getNamespace()*/);
 
             termCache.clear();
 

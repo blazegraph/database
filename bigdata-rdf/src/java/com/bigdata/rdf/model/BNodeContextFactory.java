@@ -40,7 +40,8 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.getNamespace();
     }
     
-    public void remove(String namespace) {
+    public void remove(/*String namespace*/) {
+        // NOP
 	}
 
     /**

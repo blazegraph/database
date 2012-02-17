@@ -27,19 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
-import junit.framework.TestCase2;
-
-import org.openrdf.model.impl.URIImpl;
-
-import com.bigdata.bop.Constant;
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 
 /**
  * Test suite for {@link IVBindingSetEncoder}.
@@ -47,7 +34,7 @@ import com.bigdata.rdf.model.BigdataURI;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIVBindingSetEncoder extends TestCase2 {
+public class TestIVBindingSetEncoder extends AbstractBindingSetEncoderTestCase {
 
     /**
      * 
@@ -59,148 +46,31 @@ public class TestIVBindingSetEncoder extends TestCase2 {
         super(name);
     }
 
-    private IVBindingSetEncoder encoder = new IVBindingSetEncoder(false/* filter */);
-
-    protected void tearDown() throws Exception {
+    @Override
+    protected void setUp() throws Exception {
+     
+        super.setUp();
         
-        super.tearDown();
+        // The encoder under test.
+        encoder = new IVBindingSetEncoder(false/* filter */);
         
-        // Clear references.
-        encoder.release();
-        encoder = null;
+        // The decoder under test (same object as the encoder).
+        decoder = (IVBindingSetEncoder) encoder;
+        
+        // The encoder/decoder does not support IVCache resolution.
+        testCache = false;
         
     }
 
-    public void test_encodeEmpty() {
-
-        final IBindingSet expected = new ListBindingSet();
-
-        doEncodeDecodeTest(encoder, expected);
-
-    }
-
-    @SuppressWarnings("rawtypes")
-    public void test_encodeNonEmpty() {
-
-        final IBindingSet expected = new ListBindingSet();
-        expected.set(Var.var("x"), new Constant<IV>(
-                new XSDNumericIV<BigdataLiteral>(12)));
-
-        doEncodeDecodeTest(encoder, expected);
-    }
-
-    @SuppressWarnings("rawtypes")
-    public void test_encodeNonEmpty2() {
-
-        final IBindingSet expected = new ListBindingSet();
-        expected.set(Var.var("x"), new Constant<IV>(
-                new XSDNumericIV<BigdataLiteral>(12)));
-        expected.set(Var.var("y"), new Constant<IV>(
-                new FullyInlineURIIV<BigdataURI>(new URIImpl(
-                        "http://www.bigdata.com"))));
-
-        doEncodeDecodeTest(encoder, expected);
-
-    }
-
-    /**
-     * Multiple solutions where a variable does not appear in the 2nd solution.
-     */
-    @SuppressWarnings("rawtypes")
-    public void test_multipleSolutions() {
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(12)));
-            expected.set(Var.var("y"), new Constant<IV>(
-                    new FullyInlineURIIV<BigdataURI>(new URIImpl(
-                            "http://www.bigdata.com"))));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(99)));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-    }
-
-    /**
-     * Multiple solutions where a new variables appears in the 2nd solution.
-     */
-    @SuppressWarnings("rawtypes")
-    public void test_multipleSolutions2() {
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(12)));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(99)));
-            expected.set(Var.var("y"), new Constant<IV>(
-                    new FullyInlineURIIV<BigdataURI>(new URIImpl(
-                            "http://www.bigdata.com"))));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-    }
-
-    /**
-     * Multiple solutions where an empty solution appears in the middle of the
-     * sequence.
-     */
-    @SuppressWarnings("rawtypes")
-    public void test_multipleSolutions3() {
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(12)));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-        {
-            final IBindingSet expected = new ListBindingSet();
-            expected.set(Var.var("x"), new Constant<IV>(
-                    new XSDNumericIV<BigdataLiteral>(99)));
-            expected.set(Var.var("y"), new Constant<IV>(
-                    new FullyInlineURIIV<BigdataURI>(new URIImpl(
-                            "http://www.bigdata.com"))));
-
-            doEncodeDecodeTest(encoder, expected);
-        }
-
-    }
-
-    private void doEncodeDecodeTest(final IVBindingSetEncoder encoder,
-            final IBindingSet expected) {
-
-        final byte[] data = encoder.encodeSolution(expected);
-
-        final IBindingSet actual = encoder
-                .decodeSolution(data, 0/* fromOffset */,
-                        data.length/* toOffset */, true/* resolveCachedValues */);
-
-        assertEquals(expected, actual);
-    }
+//    protected void tearDown() throws Exception {
+//        
+//        super.tearDown();
+//        
+//        // Clear references.
+//        encoder.release();
+//        encoder = null;
+//        decoder = null;
+//        
+//    }
 
 }

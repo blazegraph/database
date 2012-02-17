@@ -42,6 +42,12 @@ import com.bigdata.rdf.model.BigdataValue;
 public interface IBindingSetDecoder {
 
     /**
+     * Return <code>true</code> iff the {@link IVCache} associations are
+     * preserved by the encoder.
+     */
+    boolean isValueCache();
+
+    /**
      * Decode an {@link IBindingSet}.
      * <p>
      * The resolution step can be deferred when the decoded {@link IBindingSet}

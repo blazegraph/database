@@ -120,21 +120,17 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
 
     }
 
-//    /**
-//     * Declare any variables which are known to be used, such as join variables.
-//     * 
-//     * @param vars
-//     *            The variables.
-//     */
-//    public void updateSchema(final IVariable<?>[] vars) {
-//
-//        for (IVariable<?> v : vars) {
-//
-//            schema.add(v);
-//
-//        }
-//
-//    }
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation does not maintain the {@link IVCache} associations.
+     */
+    @Override
+    public boolean isValueCache() {
+        
+        return false;
+        
+    }
 
     /**
      * Build up the schema. This includes all observed variables, not just those
