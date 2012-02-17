@@ -601,6 +601,49 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     }
 
     /**
+     * Unit test of a solution with 3 bindings, some of which do not have an
+     * {@link IVCache} association. This test was added when some
+     * {@link IVCache} associations were observed to be associated with the
+     * wrong variables.
+     */
+    public void test_solutionWithThreeBindingsSomeNotCached1() {
+
+        final TermId<BigdataLiteral> termIdNoCache = new TermId<BigdataLiteral>(
+                VTE.LITERAL, 912/* termId */);
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+    }
+
+    /**
      * Unit test of a solution with 3 bindings in a different order.
      */
     public void test_solutionWithThreeBindings2() {

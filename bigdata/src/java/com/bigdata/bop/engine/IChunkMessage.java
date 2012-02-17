@@ -40,8 +40,12 @@ public interface IChunkMessage<E> extends IOpMessage {
      *             is to register the query controller with river so it can be
      *             discovered. We could then modify getQueryPeer() (or add
      *             getQueryClient(UUID)) which would hit the discovery cache.
-     *             
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/475
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/475">
+     *      Optimize serialization for query messages on cluster</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/487"> The
+     *      query controller should be discoverable</a>
      */
     IQueryClient getQueryController();
 
