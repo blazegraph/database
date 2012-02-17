@@ -68,6 +68,11 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
      * this query.
      */
     /*private*/ final UUID queryControllerUUID;
+    
+    /**
+     * Used to map {@link IBindingSet}s across the federation.
+     */
+    private final IChunkHandler chunkHandler;
 
     /**
      * A map of all allocation contexts associated with this query.
@@ -171,16 +176,10 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
             throw new IllegalArgumentException();
 
         this.queryControllerUUID = queryControllerId;
-//        /*
-//         * Note: getServiceUUID() should be a smart proxy method and thus not
-//         * actually do RMI here.  However, it is resolved eagerly and cached
-//         * anyway.
-//         */
-//        try {
-//            this.queryControllerUUID = getQueryController().getServiceUUID();
-//        } catch (RemoteException e) {
-//            throw new RuntimeException(e);
-//        }
+
+        this.chunkHandler = query.getProperty(
+                FederatedQueryEngine.Annotations.CHUNK_HANDLER,
+                FederationChunkHandler.INSTANCE);
         
         if (!getQuery().getEvaluationContext().equals(
                 BOpEvaluationContext.CONTROLLER)) {
@@ -352,7 +351,7 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
     @Override
     protected IChunkHandler getChunkHandler() {
         
-        return FederationChunkHandler.INSTANCE;
+        return chunkHandler;
         
     }
 

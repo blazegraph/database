@@ -68,6 +68,21 @@ public class FederatedQueryEngine extends QueryEngine {
             .getLogger(FederatedQueryEngine.class);
 
     /**
+     * Annotations understood by the {@link QueryEngine}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Annotations extends QueryEngine.Annotations {
+
+        /**
+         * The class used to map binding sets across the federation.
+         */
+        String CHUNK_HANDLER = FederatedQueryEngine.class.getName()
+                + ".chunkHandler";
+        
+    }
+    
+    /**
      * The {@link UUID} associated with this service.
      */
     private final UUID serviceUUID;

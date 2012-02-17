@@ -1,6 +1,5 @@
 package com.bigdata.bop.engine;
 
-import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.UUID;
 
@@ -11,11 +10,18 @@ import com.bigdata.relation.accesspath.ThickCloseableIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * An non-{@link Serializable} chunk of intermediate results which are ready to
- * be consumed by some {@link BOp} in a specific query (this is only used in
- * query evaluation for the standalone database).
+ * A chunk of intermediate results which are ready to be consumed by some
+ * {@link BOp} in a specific query.
+ * <p>
+ * Note: This class is only used in query evaluation for the standalone
+ * database.
  */
 public class LocalChunkMessage implements IChunkMessage<IBindingSet> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     /** The query controller. */
     private final IQueryClient queryController;

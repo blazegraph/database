@@ -80,13 +80,29 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
             .getLogger(FederationChunkHandler.class); 
     
     /**
-     * 
      * FIXME Debug the NIO chunk message materialization logic (it is currently
      * disabled by the setting of the nioThreshold parameter to the
      * constructor).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/160">
+     *      ResourceService should use NIO for file and buffer transfers</a>
+     * 
+     * @see <a
+     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/486">Support
+     *      NIO solution set interchange on the cluster</a>
      */
     @SuppressWarnings("rawtypes")
-    public static final IChunkHandler INSTANCE = new FederationChunkHandler(Integer.MAX_VALUE/* nioThreshold */);
+    public static final IChunkHandler INSTANCE = new FederationChunkHandler(
+            Integer.MAX_VALUE/* nioThreshold */, false/*usePOJO*/);
+
+    /**
+     * Instance used by some test suites to avoid a dependency on the RDF data
+     * model. All messages will use {@link LocalChunkMessage} which uses POJO
+     * serialization.
+     */
+    @SuppressWarnings("rawtypes")
+    public static final IChunkHandler TEST_INSTANCE = new FederationChunkHandler(
+            Integer.MAX_VALUE/* nioThreshold */, true/*usePOJO*/);
 
     /**
      * The threshold above which the intermediate solutions are shipped using
@@ -101,11 +117,28 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
     private final int nioThreshold;
     
     /**
-     * 
+     * When <code>true</code>, the {@link LocalChunkMessage} will be used for
+     * all messages.  This allows the test cases to avoid RDF specific logic
+     * in the {@link IChunkMessage} serialization.
      */
-    public FederationChunkHandler(final int nioThreshold) {
+    private final boolean usePOJO;
+
+    /**
+     * 
+     * @param nioThreshold
+     *            The threshold above which the intermediate solutions are
+     *            shipped using NIO rather than RMI. This is ignored if
+     *            <code>usePOJO:=true</code>.
+     * @param usePOJO
+     *            When <code>true</code>, the {@link LocalChunkMessage} will be
+     *            used for all messages. This allows the test cases to avoid RDF
+     *            specific logic in the {@link IChunkMessage} serialization.
+     */
+    public FederationChunkHandler(final int nioThreshold, final boolean usePOJO) {
         
         this.nioThreshold = nioThreshold;
+        
+        this.usePOJO = usePOJO;
         
     }
     
@@ -452,22 +485,33 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
          */
 
         final IChunkMessage<IBindingSet> msg;
-        if (source.length <= nioThreshold) {
-
-            msg = new ThickChunkMessage<IBindingSet>(q.getQueryController(),
-                    q.getQueryId(), sinkId, partitionId, source);
-
+        if (usePOJO) {
+        
+            msg = new LocalChunkMessage(q.getQueryController(), q.getQueryId(),
+                    sinkId, partitionId, source);
+            
         } else {
+            
+            if (source.length <= nioThreshold) {
 
-            /*
-             * Marshall the data onto direct ByteBuffer(s) and send a thin
-             * message by RMI. The receiver will retrieve the data using NIO
-             * against the ResourceService.
-             */
-            msg = new NIOChunkMessage<IBindingSet>(q.getQueryController(),
-                    q.getQueryId(), sinkId, partitionId, allocationContext,
-                    source, q.getQueryEngine().getResourceService().getAddr());
+                msg = new ThickChunkMessage<IBindingSet>(
+                        q.getQueryController(), q.getQueryId(), sinkId,
+                        partitionId, source);
 
+            } else {
+
+                /*
+                 * Marshall the data onto direct ByteBuffer(s) and send a thin
+                 * message by RMI. The receiver will retrieve the data using NIO
+                 * against the ResourceService.
+                 */
+                msg = new NIOChunkMessage<IBindingSet>(q.getQueryController(),
+                        q.getQueryId(), sinkId, partitionId, allocationContext,
+                        source, q.getQueryEngine().getResourceService()
+                                .getAddr());
+
+            }
+        
         }
 
         if (log.isDebugEnabled())

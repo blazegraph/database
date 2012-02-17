@@ -27,50 +27,61 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
+import java.io.Externalizable;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.rmi.RemoteException;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.LongPacker;
+import com.bigdata.io.ShortPacker;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
+import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
+import com.bigdata.relation.accesspath.EmptyCloseableIterator;
+import com.bigdata.relation.accesspath.ThickCloseableIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A thick version of this interface in which the chunk is sent inline with the
  * RMI message.
+ * <p>
+ * Note: The encoding is {@link IV} specific and supports the {@link IVCache}
+ * associations. However, it CAN NOT be used with non-{@link IV} data. This is
+ * fine in the deployed system but it makes the class properly dependent on the
+ * RDF layer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
+public class ThickChunkMessage<E> implements IChunkMessage<E>, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    final private IQueryClient queryController;
+    private IQueryClient queryController;
 
-    final private UUID queryControllerId;
+    private UUID queryControllerId;
     
-    final private UUID queryId;
+    private UUID queryId;
 
-    final private int bopId;
+    private int bopId;
     
-    final private int partitionId;
+    private int partitionId;
 
-    final private int solutionCount;
+    private int solutionCount;
     
-    final private byte[] data;
+    private byte[] data;
 
     public IQueryClient getQueryController() {
         return queryController;
@@ -118,13 +129,12 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     }
 
     /**
-     * 
-     * @param queryController
-     * @param queryId
-     * @param bopId
-     * @param partitionId
-     * @param source
+     * De-serialization constructor.
      */
+    public ThickChunkMessage() {
+        
+    }
+    
     public ThickChunkMessage(final IQueryClient queryController,
             final UUID queryId, final int bopId, final int partitionId,
             final IBindingSet[] source) {
@@ -155,35 +165,35 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
         this.partitionId = partitionId;
 
-        /*
-         * Format the data.
-         */
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try {
-
-            final ObjectOutputStream oos = new ObjectOutputStream(baos);
-
-            int solutionCount = 0;
-
-            final IBindingSet[] a = source;
-
-            oos.writeObject(a);
-
-            solutionCount += a.length;
-            
-            oos.flush();
-            baos.flush();
-
-            this.data = baos.toByteArray();
+        this.solutionCount = source.length;
         
-            this.solutionCount = solutionCount;
+        if (solutionCount == 0) {
             
-        } catch (IOException ex) {
+            this.data = null;
             
-            throw new RuntimeException(ex);
+        } else {
+
+            /*
+             * Encode the solutions.
+             */
+
+            // SWAG.
+            final int initialCapacity = solutionCount * 24;
+
+            final DataOutputBuffer out = new DataOutputBuffer(initialCapacity);
+            
+            final IVSolutionSetEncoder encoder = new IVSolutionSetEncoder();
+            
+            for (int i = 0; i < source.length; i++) {
+            
+                encoder.encodeSolution(out, source[i]);
+                
+            }
+
+            this.data = out.toByteArray();
             
         }
-        
+
     }
 
     public void materialize(final FederatedRunningQuery runningQuery) {
@@ -204,17 +214,12 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     }
 
     /**
-     * FIXME Provide in place decompression and read out of the binding sets.
-     * This should be factored out into classes similar to IRaba and IRabaCoder.
-     * This stuff should be generic so it can handle elements and binding sets
-     * and bats, but there should be specific coders for handling binding sets
-     * which leverages the known set of variables in play as of the operator
-     * which generated those intermediate results.
+     * Deserialization of the binding sets.
      * <p>
-     * Note: Some similar work was done to improve the htree performance.
-     * <p>
-     * Note: Very small chunks (1-5 solutions) are common on a cluster and might
-     * be optimized different than modest chunks (10-100+).
+     * Note: Both very small chunks (1-5 solutions) and large chunks (100-1000+)
+     * are common on a cluster. The observed chunk size is a function of the
+     * selectivity of the access path together with the chunk capacity (e.g., as
+     * set by a query hint).
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/395">HTree
      *      performance tuning</a>
@@ -222,103 +227,95 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     private class ChunkAccessor implements IChunkAccessor<E> {
 
         private final ICloseableIterator<E[]> source;
-        
-        public ChunkAccessor() {
-            source = new DeserializationIterator();
-        }
-        
-        public ICloseableIterator<E[]> iterator() {
-            return source;
-        }
-        
-        public void close() {
-            source.close();
-        }
 
-    }
-
-    private class DeserializationIterator implements ICloseableIterator<E[]> {
-
-        private volatile ObjectInputStream ois;
-        private E[] current = null;
-
-        public DeserializationIterator() {
-        
-            try {
-                ois = new ObjectInputStream(new ByteArrayInputStream(data));
-            
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-        }
-
-        public void close() {
-            
-            ois = null;
-            
-        }
-
-        public boolean hasNext() {
-
-            if (ois != null && _hasNext())
-                return true;
-
-            close();
-
-            return false;
-
-        }
-        
         @SuppressWarnings("unchecked")
-        private boolean _hasNext() {
-            
-            if (current != null)
-                return true;
-            
-            try {
-            
-                current = (E[]) ois.readObject();
+        public ChunkAccessor() {
+
+            if (solutionCount == 0) {
                 
-                return true;
+                source = new EmptyCloseableIterator<E[]>();
                 
-            } catch (EOFException e) {
-                
-                return false;
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            } catch (ClassNotFoundException e) {
-                
-                throw new RuntimeException(e);
+                return;
                 
             }
-            
+
+            final IVSolutionSetDecoder decoder = new IVSolutionSetDecoder();
+
+            final IBindingSet[] a = new IBindingSet[solutionCount];
+
+            // Note: close() is NOT required for DataInputBuffer.
+            final DataInputBuffer in = new DataInputBuffer(data, 0/* off */,
+                    data.length);
+
+            for (int i = 0; i < solutionCount; i++) {
+
+                a[i] = decoder
+                        .decodeSolution(in, true/* resolveCachedValues */);
+
+            }
+
+            source = new ThickCloseableIterator<E[]>(
+                    ((E[][]) new IBindingSet[][] { a }));
+
         }
 
-        public E[] next() {
+        public ICloseableIterator<E[]> iterator() {
 
-            if (!hasNext())
-                throw new NoSuchElementException();
-            
-            final E[] tmp = current;
-            
-            current = null;
-            
-            return tmp;
-            
+            return source;
+
         }
 
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
+        public void close() {
+
+            source.close();
+
         }
 
     }
+
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
+        ShortPacker.packShort(out, currentVersion);
+        out.writeObject(queryController);
+        out.writeLong(queryControllerId.getMostSignificantBits());
+        out.writeLong(queryControllerId.getLeastSignificantBits());
+        out.writeLong(queryId.getMostSignificantBits());
+        out.writeLong(queryId.getLeastSignificantBits());
+        out.writeInt(bopId);
+        out.writeInt(partitionId);// Note: 32-bit clean.
+        LongPacker.packLong(out, solutionCount); // non-negative
+        if (solutionCount > 0) {
+            LongPacker.packLong(out, data.length);
+            out.write(data);
+        }
+    }
+
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+        final short version = ShortPacker.unpackShort(in);
+        if (version != VERSION0) {
+            throw new IOException("Unknown version: " + version);
+        }
+        queryController = (IQueryClient) in.readObject();
+        queryControllerId = new UUID(in.readLong()/* MSB */, in.readLong()/* LSB */);
+        queryId = new UUID(in.readLong()/* MSB */, in.readLong()/* LSB */);
+        bopId = in.readInt();
+        partitionId = in.readInt();
+        solutionCount = LongPacker.unpackInt(in);
+        if (solutionCount > 0) {
+            final int len = LongPacker.unpackInt(in);
+            data = new byte[len];
+            in.readFully(data);
+        }
+
+    }
+
+    /**
+     * The original version.
+     */
+    private static final transient short VERSION0 = 0x0;
+
+    private static final transient short currentVersion = VERSION0;
 
 }

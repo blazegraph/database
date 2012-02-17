@@ -34,6 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -50,6 +52,7 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
@@ -69,6 +72,7 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
  * nbound
  * nvars
  * ncached 
+ * (namespace)
  * var[0]...var[nvars-1]
  * bitmap-for-bound-variables
  * bitmap-for-IV-with-cached-Values
@@ -93,6 +97,12 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
  * Further, if the {@link IV} appears more than once in a given record, the
  * cached value is only marked in the bitmap for the first such occurrence and
  * the cached value is only written into the record once.
+ * <p>
+ * where <code>namespace</code> is the namespace of the lexicon relation. This
+ * is written out for the first solution having an {@link IVCache} association.
+ * It is assumed that all {@link Value}s are {@link BigdataValue} for the same
+ * lexicon relation. If no solutions have an {@link IVCache} association, then
+ * the namespace will never be written into the encoded output.
  * <p>
  * where <code>var</code> is the name of a variable for which a binding was
  * first observed for the current solution. The names of the variables are
@@ -190,17 +200,6 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
     private final ByteArrayBuffer tmp;
     
     /**
-     * The namespace of the lexicon relation.
-     */
-    private final String namespace;
-
-    /**
-     * Used to de-serialize the {@link BigdataValue}s for {@link IVCache}
-     * associations.
-     */
-    private final BigdataValueSerializer<BigdataValue> valueSer;
-
-    /**
      * The initial version.
      */
     static final int VERSION0 = 0x0;
@@ -214,7 +213,24 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
      * The #of solutions encoded to date.
      */
     private int nsolutions = 0;
+
+    /*
+     * Set when the first solution having a bound value is processed.
+     */
     
+    /**
+     * The namespace of the lexicon relation. This is discovered from the first
+     * {@link IVCache} association and written out into the stream at that
+     * point. If there are no {@link IVCache} associations then it is never set.
+     */
+    private String namespace;
+
+    /**
+     * Used to de-serialize the {@link BigdataValue}s for {@link IVCache}
+     * associations.
+     */
+    private BigdataValueSerializer<BigdataValue> valueSer;
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
@@ -227,20 +243,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         return sb.toString();
     }
     
-    /**
-     * @param valueFactory
-     *            The value factory used to serialize {@link BigdataValue} for
-     *            {@link IVCache} associations.
-     */
-    public IVSolutionSetEncoder(final BigdataValueFactory valueFactory) {
+    public IVSolutionSetEncoder() {
 
-        if (valueFactory == null)
-            throw new IllegalArgumentException();
-
-        this.namespace = valueFactory.getNamespace();
-        
-        this.valueSer = valueFactory.getValueSerializer();
-        
         // The ordered set of variables for which bindings have been observed.
         this.schema = new LinkedHashSet<IVariable<?>>();
 
@@ -258,6 +262,21 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         
     }
 
+    /**
+     * Encode the solution on the stream.
+     * 
+     * @param out
+     *            The stream.
+     * @param bset
+     *            The solution.
+     */
+    public void encodeSolution(final DataOutputBuffer out,
+            final IBindingSet bset) {
+
+        out.append(encodeSolution(bset));
+
+    }
+    
     @Override
     public byte[] encodeSolution(final IBindingSet bset) {
 
@@ -321,7 +340,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         // #of bindings with non-null IVs.
         int numBindings = 0;
         // #of new IVCache associations.
-        int newCached = 0; 
+        int newCached = 0;
+        boolean discoveredNamespace = false;
         {
             final Iterator<IVariable<?>> vitr = schema.iterator();
             while (vitr.hasNext()) {
@@ -336,6 +356,13 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
                     if (!cache.containsKey(iv)) {
                         // New IV => Value association.
                         final BigdataValue value = iv.getValue();
+                        if(cache.isEmpty()) {
+                            // Note: The namespace is discovered here!!!
+                            namespace = value.getValueFactory().getNamespace();
+                            valueSer = BigdataValueFactoryImpl.getInstance(
+                                    namespace).getValueSerializer();
+                            discoveredNamespace = true;
+                        }
                         cache.put(iv, value);
                         values.add(value);
                         newCached++;
@@ -363,9 +390,14 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         }
         out.packLong(newVars.size());
         out.packLong(newCached);
-//        System.err.println("schemaSize=" + schema.size() + ", newVars="
+        if (discoveredNamespace) {
+            out.writeUTF2(namespace);
+        }
+//        System.err.println("schemaSize=" + schema.size() + ", cacheSize="
+//                + cache.size() + "namespace=" + namespace);
+//        System.err.println("newVars="
 //                + newVars.size() + ", numBindings=" + numBindings
-//                + ", newCached=" + newCached);
+//        + ", newCached=" + newCached);
         
         // write newly declared variable names.
         for (IVariable<?> var : newVars) {

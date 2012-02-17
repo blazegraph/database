@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
+import java.io.Externalizable;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -45,6 +46,7 @@ import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.ICloseableIterator;
@@ -56,6 +58,15 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/160">
+ *      ResourceService should use NIO for file and buffer transfers</a>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/486">Support
+ *      NIO solution set interchange on the cluster</a>
+ * 
+ *      TODO Implement {@link Externalizable} for this class based on the
+ *      {@link ThickChunkMessage} and {@link IVSolutionSetEncoder}.
  */
 public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
@@ -235,6 +246,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         // track #of solutions.
         n += chunk.length;
 
+        // FIXME Replace with FAST/TIGHT SERIALIZATION
         // serialize the chunk of binding sets.
         final byte[] data = SerializerUtil.serialize(chunk);
 

@@ -364,6 +364,72 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
     }
 
+    /**
+     * Multiple solutions where an empty solution appears in the 1st solution.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_multipleSolutions4() {
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(
+                    new XSDNumericIV<BigdataLiteral>(12)));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(
+                    new XSDNumericIV<BigdataLiteral>(99)));
+            expected.set(Var.var("y"), new Constant<IV>(
+                    new FullyInlineURIIV<BigdataURI>(new URIImpl(
+                            "http://www.bigdata.com"))));
+
+            doEncodeDecodeTest(expected);
+        }
+
+    }
+
+    /**
+     * Multiple solutions where an empty solution appears in the last solution.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_multipleSolutions5() {
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(
+                    new XSDNumericIV<BigdataLiteral>(12)));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(
+                    new XSDNumericIV<BigdataLiteral>(99)));
+            expected.set(Var.var("y"), new Constant<IV>(
+                    new FullyInlineURIIV<BigdataURI>(new URIImpl(
+                            "http://www.bigdata.com"))));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            doEncodeDecodeTest(expected);
+        }
+
+    }
+
     @SuppressWarnings("rawtypes")
     public void test_encodeNonEmptyWithCachedValue() {
 
@@ -455,6 +521,64 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
             final IBindingSet expected = new ListBindingSet();
             expected.set(Var.var("x"), new Constant<IV>(termId));
             expected.set(Var.var("y"), new Constant<IV>(blobIV));
+
+            doEncodeDecodeTest(expected);
+        }
+
+    }
+
+    /**
+     * Multiple solutions where an empty solution appears in the 1st solution.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_multipleSolutionsWithCachedValue4() {
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(termId));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(termId));
+            expected.set(Var.var("y"), new Constant<IV>(blobIV));
+
+            doEncodeDecodeTest(expected);
+        }
+
+    }
+
+    /**
+     * Multiple solutions where an empty solution appears in the last solution.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_multipleSolutionsWithCachedValue5() {
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(termId));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+            expected.set(Var.var("x"), new Constant<IV>(termId));
+            expected.set(Var.var("y"), new Constant<IV>(blobIV));
+
+            doEncodeDecodeTest(expected);
+        }
+
+        {
+            final IBindingSet expected = new ListBindingSet();
 
             doEncodeDecodeTest(expected);
         }
