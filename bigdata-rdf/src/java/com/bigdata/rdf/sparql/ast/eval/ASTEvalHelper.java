@@ -45,6 +45,7 @@ import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -81,21 +82,6 @@ public class ASTEvalHelper {
      */
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
     
-//    /**
-//     * Return an {@link IAsynchronousIterator} that will read a single, empty
-//     * {@link IBindingSet}.
-//     * 
-//     * @param bindingSet
-//     *            the binding set.
-//     */
-//    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-//            final IBindingSet bindingSet) {
-//
-//        return new ThickAsynchronousIterator<IBindingSet[]>(
-//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-//
-//    }
-
     /**
      * Setup the input binding set which will be fed into the query pipeline.
      * 
@@ -108,8 +94,6 @@ public class ASTEvalHelper {
     static private IBindingSet wrapSource(final IBindingSet bs)
             throws SailException {
 
-//        final IAsynchronousIterator<IBindingSet[]> source;
-        
         if (bs != null) {
         
             /*
@@ -117,8 +101,6 @@ public class ASTEvalHelper {
              * using the supplied bindings.
              */
 
-            // wrap the resolved binding set.
-//            source = newBindingSetIterator(bs);
             return bs;
 
         } else {
@@ -128,12 +110,9 @@ public class ASTEvalHelper {
              * pipeline.
              */
             
-//            source = newBindingSetIterator(new ListBindingSet());
             return new ListBindingSet();
             
         }
-
-//        return source;
         
     }
     
@@ -219,9 +198,7 @@ public class ASTEvalHelper {
             itr = ASTEvalHelper.evaluateQuery(
                     astContainer,
                     context,
-//                    store, queryPlan, 
                     bset
-//                    context.queryEngine
                     , materializeProjectionInQuery//
                     , new IVariable[0]// required
                     );
@@ -281,9 +258,7 @@ public class ASTEvalHelper {
                 ASTEvalHelper.evaluateQuery(
                         astContainer,
                         context,
-//                        store, queryPlan, 
                         bset
-//                        context.queryEngine
                         ,materializeProjectionInQuery//
                         , projected//
                         ));
@@ -330,9 +305,7 @@ public class ASTEvalHelper {
                         ASTEvalHelper.evaluateQuery(
                                 astContainer,
                                 context,
-//                                queryPlan,
                                 bset//
-//                                context.queryEngine //
                                 ,materializeProjectionInQuery//
                                 ,optimizedQuery.getProjection()
                                         .getProjectionVars()//
@@ -370,9 +343,7 @@ public class ASTEvalHelper {
     static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final ASTContainer astContainer,
             final AST2BOpContext ctx,            
-//            final AbstractTripleStore database, final PipelineOp queryPlan,
             final IBindingSet bs, 
-//            final QueryEngine queryEngine,
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
@@ -384,14 +355,10 @@ public class ASTEvalHelper {
         final PipelineOp queryPlan = astContainer.getQueryPlan();
         
         IRunningQuery runningQuery = null;
-//        IAsynchronousIterator<IBindingSet[]> source = null;
         try {
-            
-//            source = wrapSource(bs);
 
             // Submit query for evaluation.
             runningQuery = ctx.queryEngine.eval(queryPlan,wrapSource(bs));
-//                    1/* solutionCount */, source);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
@@ -405,9 +372,6 @@ public class ASTEvalHelper {
                 // ensure query is halted.
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
-//            // ensure source is closed on error path.
-//            if(source != null) 
-//                source.close();
             throw new QueryEvaluationException(t);
         }
 
@@ -474,8 +438,11 @@ public class ASTEvalHelper {
             final IVariable<?>[] required) {
     
         /*
-         * FIXME We should not dechunk just to rechunk here.  This is not very
+         * FIXME We should not dechunk just to rechunk here. This is not very
          * efficient.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/483 (Eliminate
+         * unnecessary chunking and dechunking)
          */
         
         // Dechunkify the running query and monitor the Sesame iterator.
@@ -507,11 +474,63 @@ public class ASTEvalHelper {
              * BindingSet objects.
              */
             
+            /*
+             * Note: This captures the historical behavior, which was based on
+             * the AbstractTripleStore's configuration properties for
+             * chunkCapacity, chunkOfChunksCapacity, and the chunkTimeout. Those
+             * properties still affect the rules engine but do not otherwise
+             * effect query performance. Most query operators use the PipelineOp
+             * annotations to control these properties. RDF Value
+             * materialization is the exception. To correct this, I have lifted
+             * out all these parameters here so we can override it based on
+             * query annotations.
+             * 
+             * There are two basic code paths for RDF Value materialization: One
+             * is the ChunkedMateralizationOp (it handles the "chunk" you feed
+             * it as a "chunk" and is used for materialization for FILTERs). The
+             * other is the BigdataBindingSetResolverator. Both call through to
+             * LexiconRelation#getTerms().
+             * 
+             * Regarding [termsChunkSize] and [blobsChunkSize], on a cluster,
+             * the operation is parallelized (by the ClientIndexView) on a
+             * cluster regardless so there is no reason to ever run materialized
+             * with more than one thread. Shard local resolution can be enabled
+             * by setting [materializeProjectionInQuery:=true], but at the cost
+             * of doing the materialization after a SLICE (if there is one in
+             * the query). However, when running through the
+             * BigdataBindingSetResolverator, there will be exactly one thread
+             * materializing RDF values (because the iterator pattern is single
+             * threaded) unless the chunkSize exceeds this threshold.
+             */
+            
+            // Historical values.
+//            final int chunkCapacity = db.getChunkCapacity();
+//            final int chunkOfChunksCapacity = db.getChunkOfChunksCapacity();
+//            final long chunkTimeout = db.getChunkTimeout();
+//            final int termsChunkSize = 4000;
+//            final int blobsChunkSize = 4000;
+            
+            // Values set based on query hints.
+            final BOp query = runningQuery.getQuery();
+            final int chunkCapacity = query.getProperty(
+                    PipelineOp.Annotations.CHUNK_CAPACITY,
+                    PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
+            final int chunkOfChunksCapacity = query.getProperty(
+                    PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY,
+                    PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+            final long chunkTimeout = query.getProperty(
+                    PipelineOp.Annotations.CHUNK_TIMEOUT,
+                    PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT);
+            final int termsChunkSize = chunkCapacity;
+            final int blobsChunkSize = chunkCapacity;
+            
             // Convert bigdata binding sets to Sesame binding sets.
             it3 = new Bigdata2Sesame2BindingSetIterator(
                     // Materialize IVs as RDF Values.
-                    new BigdataBindingSetResolverator(db, it2, required)
-                            .start(db.getExecutorService()));
+                    new BigdataBindingSetResolverator(db, it2, required,
+                            chunkCapacity, chunkOfChunksCapacity, chunkTimeout,
+                            termsChunkSize, blobsChunkSize).start(db
+                            .getExecutorService()));
 
         }
      

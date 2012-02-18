@@ -220,7 +220,7 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
 
     private IBindingSet _decodeSolution(final DataInputBuffer in,
 //            final byte[] data, final int off, final int lenX,
-            final boolean resolveCachedValues) {
+            final boolean resolveCachedValuesIsIgnored) {
 
         final byte[] data = in.getBuffer();
 
@@ -349,11 +349,14 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
                     if (isSet) {
                         /*
                          * Decode the IV for this variable.
+                         * 
+                         * Note: A "mock" IV will be decoded into a non-null
+                         * TermId.
                          */
                         chksum++;
                         final IVariable<?> var = schemaIndex.get(i);
                         final IV<?, ?> iv = IVUtility.decodeFromOffset(data,
-                                ivoff);
+                                ivoff, false/* nullIsNullRef */);
                         bset.set(var, new Constant<IV<?, ?>>(iv));
                         if (newCached > 0) {
                             ivs.add(iv);
@@ -394,7 +397,25 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
                         final IV<?, ?> iv = ivs.get(i);
                         final BigdataValue value = valueSer
                                 .deserialize(in, tmp);
-                        cache.put(iv, value);
+                        if (!iv.isNullIV()) {
+                            cache.put(iv, value);
+                        } else {
+                            /*
+                             * We must attach the IVCache association for a
+                             * mockIV since it is NOT possible to recover that
+                             * association from the cache.
+                             * 
+                             * Note: This is because TermId.equals() considers
+                             * TermIds to be equals() if they have termId=0L and
+                             * ignores the cached Value unless BOTH TermIds have
+                             * the value set. When we decode a mock IV the Value
+                             * is not set so we can not resolve it against a
+                             * hash map. Hence we MUST set it on the IV
+                             * immediately while we can stil maintain the
+                             * correlation between the IV and the cached Value.
+                             */
+                           ((IV) iv).setValue(value);
+                        }
                     }
                     i++;
                 }
@@ -404,7 +425,7 @@ public class IVSolutionSetDecoder implements IBindingSetDecoder {
                 }
             }
             
-            if (resolveCachedValues && numBindings > 0)
+            if (numBindings > 0)
                 resolveCachedValues(bset);
 
             return bset;

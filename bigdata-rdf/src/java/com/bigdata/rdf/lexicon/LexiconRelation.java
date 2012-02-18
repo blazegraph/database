@@ -2009,6 +2009,36 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public Map<IV<?, ?>, BigdataValue> getTerms(
             final Collection<IV<?, ?>> ivs) {
 
+        /*
+         * TODO The values below represent constants which were historically
+         * hard coded into BatchResolveTermIVs and BatchResolveBlobIVs. This
+         * value was not terribly sensitive when it was originally set, probably
+         * because nearly all chunks are smaller than 4000 so basically all RDF
+         * Value resolution was happening on the "one-chunk" code path.
+         * 
+         * See ASTEvalHelper which can override these values.
+         */
+
+        return getTerms(ivs, 4000/* termsChunkSize */, 4000/* blobsChunkSize */);
+        
+    }
+
+    /**
+     * Batch resolution of internal values to {@link BigdataValue}s.
+     * 
+     * @param ivs
+     *            An collection of internal values
+     * 
+     * @return A map from internal value to the {@link BigdataValue}. If an
+     *         internal value was not resolved then the map will not contain an
+     *         entry for that internal value.
+     * 
+     * @see #getTerms(Collection)
+     */
+    final public Map<IV<?, ?>, BigdataValue> getTerms(
+            final Collection<IV<?, ?>> ivs, final int termsChunksSize,
+            final int blobsChunkSize) {
+
         if (ivs == null)
             throw new IllegalArgumentException();
 
@@ -2118,14 +2148,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (!termIVs.isEmpty()) {
 
             tasks.add(new BatchResolveTermIVsTask(service, getId2TermIndex(),
-                    termIVs, ret, termCache, valueFactory));
+                    termIVs, ret, termCache, valueFactory, termsChunksSize));
 
         }
 
         if (!blobIVs.isEmpty()) {
 
             tasks.add(new BatchResolveBlobIVsTask(service, getBlobsIndex(),
-                    blobIVs, ret, termCache, valueFactory));
+                    blobIVs, ret, termCache, valueFactory, blobsChunkSize));
 
         }
 

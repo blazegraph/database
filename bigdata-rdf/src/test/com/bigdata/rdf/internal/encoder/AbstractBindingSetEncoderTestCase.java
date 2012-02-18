@@ -41,8 +41,10 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -50,6 +52,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
@@ -108,6 +111,15 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
      */
     protected BlobIV<BigdataLiteral> blobIV;
 
+    /** A "mockIV". */
+    protected TermId<BigdataValue> mockIV1;
+
+    /** A "mockIV". */
+    protected TermId<BigdataValue> mockIV2;
+
+    /** A "mockIV". */
+    protected TermId<BigdataValue> mockIV3;
+
     /**
      * The encoder under test.
      */
@@ -118,6 +130,7 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
      */
     protected IBindingSetDecoder decoder;
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Override
     protected void setUp() throws Exception {
 
@@ -132,6 +145,15 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         blobIV = new BlobIV<BigdataLiteral>(VTE.LITERAL, 912/* hash */,
                 (short) 0/* collisionCounter */);
         blobIV.setValue(valueFactory.createLiteral("bigfoo"));
+        
+        mockIV1 = (TermId) TermId.mockIV(VTE.LITERAL);
+        mockIV1.setValue((BigdataValue) valueFactory.createLiteral("red"));
+
+        mockIV2 = (TermId) TermId.mockIV(VTE.LITERAL);
+        mockIV2.setValue((BigdataValue) valueFactory.createLiteral("blue"));
+
+        mockIV3 = (TermId) TermId.mockIV(VTE.LITERAL);
+        mockIV3.setValue((BigdataValue) valueFactory.createLiteral("green"));
 
     }
 
@@ -147,8 +169,9 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         valueFactory.remove();
         valueFactory = null;
         namespace = null;
-        termId = null;
+        termId = termId2 = null;
         blobIV = null;
+        mockIV1 = mockIV2 = mockIV3 = null;
         
     }
 
@@ -738,6 +761,77 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
         doEncodeDecodeTest(expected);
         
+    }
+
+    public void test_solutionWithSameValueBoundTwice() {
+
+        final IBindingSet expected = new ListBindingSet();
+
+        expected.set(Var.var("y"), new Constant<IV<?, ?>>(termId));
+        expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+
+        doEncodeDecodeTest(expected);
+
+    }
+    
+    /**
+     * Unit test with one mock IV.
+     * <p>
+     * Note: {@link TermId#mockIV(VTE)} is used to generate "mock" {@link IV}s
+     * by operators which produce values (such as SUBSTR()) that are not in the
+     * database. The termId for all "mock" {@link IV} is <code>0L</code>. While
+     * {@link TermId#equals(Object)} takes the {@link IVCache} association into
+     * account, the association is not yet available when we are de-serializing
+     * an encoded solution and is not part of the key when the key is
+     * constructed using {@link IVUtility#encode(IKeyBuilder, IV)}. In each case
+     * this can lead to incorrectly resolving two "mock" {@link IV}s to the same
+     * value in an internal case.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/475#comment:14
+     */
+    public void test_solutionWithOneMockIV() {
+
+        final IBindingSet expected = new ListBindingSet();
+
+        expected.set(Var.var("y"), new Constant<IV<?, ?>>(termId));
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+        expected.set(Var.var("z"), new Constant<IV<?, ?>>(mockIV1));
+
+        doEncodeDecodeTest(expected);
+
+    }
+
+    /**
+     * Unit test with all mock IVs.
+     */
+    public void test_solutionWithAllMockIVs() {
+
+        final IBindingSet expected = new ListBindingSet();
+
+        expected.set(Var.var("y"), new Constant<IV<?, ?>>(mockIV1));
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(mockIV2));
+        expected.set(Var.var("z"), new Constant<IV<?, ?>>(mockIV3));
+
+        doEncodeDecodeTest(expected);
+
+    }
+
+    /**
+     * Unit test with all mix of MockIVs, TermIds, and BlobIVs.
+     */
+    public void test_solutionWithMockIVAndOthersToo() {
+
+        final IBindingSet expected = new ListBindingSet();
+
+        expected.set(Var.var("a"), new Constant<IV<?, ?>>(termId));
+        expected.set(Var.var("y"), new Constant<IV<?, ?>>(mockIV1));
+        expected.set(Var.var("c"), new Constant<IV<?, ?>>(blobIV));
+        expected.set(Var.var("x"), new Constant<IV<?, ?>>(mockIV2));
+        expected.set(Var.var("b"), new Constant<IV<?, ?>>(termId2));
+        expected.set(Var.var("z"), new Constant<IV<?, ?>>(mockIV3));
+
+        doEncodeDecodeTest(expected);
+
     }
 
 }

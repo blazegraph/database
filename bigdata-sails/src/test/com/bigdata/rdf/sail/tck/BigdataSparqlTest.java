@@ -40,7 +40,6 @@ import java.util.Properties;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
@@ -74,7 +73,7 @@ public class BigdataSparqlTest
 extends SPARQLASTQueryTest // Bigdata native AST based evaluation
 {
 
-    static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);
+//    static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);
     
     /**
      * We cannot use inlining for these test because we do normalization on
@@ -165,6 +164,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     static TestSuite filterOutTests(final TestSuite suite1, final String name) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
+        @SuppressWarnings("unchecked")
         final Enumeration<Test> e = suite1.tests();
         while (e.hasMoreElements()) {
             final Test aTest = e.nextElement();
@@ -378,6 +378,7 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     static SPARQLQueryTest getSingleTest(final TestSuite suite,
             final String testURI) throws RuntimeException {
     
+        @SuppressWarnings("unchecked")
         final Enumeration<Test> e1 = suite.tests();
         while (e1.hasMoreElements()) {
             final Test aTest = e1.nextElement();

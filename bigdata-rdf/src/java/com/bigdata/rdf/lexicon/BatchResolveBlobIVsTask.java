@@ -36,6 +36,7 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
     private final ConcurrentHashMap<IV<?,?>/* iv */, BigdataValue/* term */> ret;
     private final ITermCache<IV<?,?>, BigdataValue> termCache;
     private final BigdataValueFactory valueFactory;
+    private final int MAX_CHUNK;
 
     public BatchResolveBlobIVsTask(
             final ExecutorService service,
@@ -43,7 +44,8 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
             final Collection<BlobIV<?>> ivs,
             final ConcurrentHashMap<IV<?, ?>/* iv */, BigdataValue/* term */> ret,
             final ITermCache<IV<?,?>, BigdataValue> termCache,
-            final BigdataValueFactory valueFactory) {
+            final BigdataValueFactory valueFactory,
+            final int chunkSize) {
 
         this.service = service;
         
@@ -56,6 +58,8 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
         this.termCache = termCache;
         
         this.valueFactory = valueFactory;
+        
+        this.MAX_CHUNK = chunkSize;
         
     }
 
@@ -83,12 +87,6 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
             
         }
 
-        /*
-         * Note: This parameter is not terribly sensitive.
-         * 
-         * FIXME Config, tune, and use smaller chunk size for blobs.
-         */
-        final int MAX_CHUNK = 4000;
         if (numNotFound < MAX_CHUNK) {
 
             /*

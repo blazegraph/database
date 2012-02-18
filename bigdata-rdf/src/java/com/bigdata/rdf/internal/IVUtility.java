@@ -795,6 +795,27 @@ public class IVUtility {
      * @return The {@link IV} decoded from that offset.
      */
     public static IV decodeFromOffset(final byte[] key, final int offset) {
+        
+        return decodeFromOffset(key, offset, true/*nullIsNullRef*/);
+        
+    }
+    
+    /**
+     * Decode one {@link IV}.
+     * 
+     * @param key
+     *            The unsigned byte[] key.
+     * @param offset
+     *            The offset.
+     * @param nullIsNullRef
+     *            When <code>true</code> a <code>termId:=0L</code> {@link IV} is
+     *            decoded as a <code>null</code> reference. Otherwise it is
+     *            decoded using {@link TermId#mockIV(VTE)}.
+     * 
+     * @return The {@link IV} decoded from that offset.
+     */
+    public static IV decodeFromOffset(final byte[] key, final int offset,
+            final boolean nullIsNullRef) {
 
         int o = offset;
         
@@ -869,10 +890,15 @@ public class IVUtility {
                 // decode the term identifier.
                 final long termId = KeyBuilder.decodeLong(key, o);
 
-                if (termId == TermId.NULL)
-                    return null;
-                else
+                if (termId == TermId.NULL) {
+                    if(nullIsNullRef) {
+                        return null;
+                    }
+                    // Return a "mock" IV consistent with the VTE flags.
+                    return TermId.mockIV(VTE.valueOf(flags));
+                } else {
                     return new TermId(flags, termId);
+                }
                 
             }
 

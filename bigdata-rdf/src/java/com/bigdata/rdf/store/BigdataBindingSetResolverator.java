@@ -42,26 +42,9 @@ public class BigdataBindingSetResolverator
 
     @SuppressWarnings("rawtypes")
     private final IVariable[] required;
+    private final int termsChunkSize;
+    private final int blobsChunkSize;
 
-    /**
-     * 
-     * @param db
-     *            Used to resolve term identifiers to {@link Value} objects.
-     * @param src
-     *            The source iterator (will be closed when this iterator is
-     *            closed).
-     * 
-     *            FIXME must accept reverse bnodes map (from term identifier to
-     *            blank nodes) for resolution of blank nodes within a Sesame
-     *            connection context.
-     */
-    public BigdataBindingSetResolverator(final AbstractTripleStore db,
-            final IChunkedOrderedIterator<IBindingSet> src) {
-    	
-    	this(db, src, null);
-    	
-    }
-    
     /**
      * 
      * @param db
@@ -72,18 +55,24 @@ public class BigdataBindingSetResolverator
      * @param required
      *            The variables to be resolved (optional). When
      *            <code>null</code>, all variables will be resolved.
+     * 
+     *            FIXME must accept reverse bnodes map (from term identifier to
+     *            blank nodes) for resolution of blank nodes within a Sesame
+     *            connection context.
      */
     public BigdataBindingSetResolverator(final AbstractTripleStore db,
             final IChunkedOrderedIterator<IBindingSet> src,
-            final IVariable[] required) {
+            final IVariable[] required, final int chunkOfChunksCapacity,
+            final int chunkCapacity, final long chunkTimeout,
+            final int termsChunkSize,
+            final int blobsChunkSize) {
 
-        super(db, src, new BlockingBuffer<IBindingSet[]>(
-                db.getChunkOfChunksCapacity(),
-                db.getChunkCapacity(),
-                db.getChunkTimeout(),
-                TimeUnit.MILLISECONDS));
-        
+        super(db, src, new BlockingBuffer<IBindingSet[]>(chunkOfChunksCapacity,
+                chunkCapacity, chunkTimeout, TimeUnit.MILLISECONDS));
+
         this.required = required;
+        this.termsChunkSize = termsChunkSize;
+        this.blobsChunkSize = blobsChunkSize;
         
 //        System.err.println("required: " + (required != null ? Arrays.toString(required) : "null"));
 
@@ -103,6 +92,7 @@ public class BigdataBindingSetResolverator
      * {@link IBindingSet}s in which term identifiers have been resolved to
      * {@link BigdataValue}s.
      */
+    @Override
     protected IBindingSet[] resolveChunk(final IBindingSet[] chunk) {
 
         return resolveChunk(/*required, */state.getLexiconRelation(), chunk);
@@ -132,8 +122,10 @@ public class BigdataBindingSetResolverator
             final IBindingSet[] chunk//
             ) {
     
-        if (log.isInfoEnabled())
-            log.info("Fetched chunk: size=" + chunk.length + ", chunk="
+        final long begin = System.currentTimeMillis();
+        
+        if (log.isDebugEnabled())
+            log.debug("Fetched chunk: size=" + chunk.length + ", chunk="
                     + Arrays.toString(chunk));
 
         /*
@@ -211,12 +203,13 @@ public class BigdataBindingSetResolverator
         
 //        System.err.println("resolving: " + Arrays.toString(ids.toArray()));
 
-        if (log.isInfoEnabled())
-            log.info("Resolving " + ids.size() + " IVs, required="
+        if (log.isDebugEnabled())
+            log.debug("Resolving " + ids.size() + " IVs, required="
                     + Arrays.toString(required));
 
         // batch resolve term identifiers to terms.
-        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(ids);
+        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(ids,
+                termsChunkSize, blobsChunkSize);
 
         /*
          * Assemble a chunk of resolved elements.
@@ -239,9 +232,15 @@ public class BigdataBindingSetResolverator
 
             }
             
-            if (log.isInfoEnabled())
-                log.info("Resolved chunk: size=" + chunk2.length + ", chunk="
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            if (log.isDebugEnabled())
+                log.debug("Resolved chunk: size=" + chunk2.length + ", chunk="
                         + Arrays.toString(chunk2));
+
+            if (log.isInfoEnabled())
+                log.info("Resolved chunk: size=" + chunk2.length + ", elapsed="
+                        + elapsed);
 
             // return the chunk of resolved elements.
             return chunk2;
