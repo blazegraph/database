@@ -35,6 +35,7 @@ class BatchResolveTermIVsTask implements Callable<Void> {
     private final ConcurrentHashMap<IV<?,?>/* iv */, BigdataValue/* term */> ret;
     private final ITermCache<IV<?,?>, BigdataValue> termCache;
     private final BigdataValueFactory valueFactory;
+    private final int MAX_CHUNK;
 
     public BatchResolveTermIVsTask(
             final ExecutorService service,
@@ -42,7 +43,8 @@ class BatchResolveTermIVsTask implements Callable<Void> {
             final Collection<TermId<?>> ivs,
             final ConcurrentHashMap<IV<?, ?>/* iv */, BigdataValue/* term */> ret,
             final ITermCache<IV<?,?>, BigdataValue> termCache,
-            final BigdataValueFactory valueFactory) {
+            final BigdataValueFactory valueFactory,
+            final int chunkSize) {
 
         this.service = service;
         
@@ -55,6 +57,8 @@ class BatchResolveTermIVsTask implements Callable<Void> {
         this.termCache = termCache;
         
         this.valueFactory = valueFactory;
+
+        this.MAX_CHUNK = chunkSize;
         
     }
 
@@ -83,10 +87,6 @@ class BatchResolveTermIVsTask implements Callable<Void> {
 
         }
 
-        /*
-         * Note: This parameter is not terribly sensitive.
-         */
-        final int MAX_CHUNK = 4000;
         if (numNotFound < MAX_CHUNK) {
 
             /*

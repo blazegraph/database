@@ -154,6 +154,10 @@ public class AST2BOpContext implements IdFactory {
      * variable appears within the query plan generator as if it is
      * "known materialized" when it is only in fact materialized within the
      * scope of the optional group.)
+     * 
+     * @see <a
+     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/489">Optimize
+     *      RDF Value materialization performance on cluster </a>
      */
     boolean materializeProjectionInQuery = false;
     

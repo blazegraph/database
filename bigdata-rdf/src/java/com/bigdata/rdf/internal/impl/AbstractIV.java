@@ -899,7 +899,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 	 */
 	final public boolean hasValue() {
 		
-		return this.cache != null;
+		return cache != null;
 		
 	}
 	

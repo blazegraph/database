@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.IBindingSet;
@@ -165,6 +166,9 @@ import com.bigdata.rdf.model.BigdataValueSerializer;
  */
 public class IVSolutionSetEncoder implements IBindingSetEncoder {
 
+    private static final Logger log = Logger
+            .getLogger(IVSolutionSetEncoder.class);
+    
     /**
      * The schema provides the order in which the {@link IV}[] for solutions
      * stored in the hash index are encoded in the {@link HTree}. {@link IV} s
@@ -299,6 +303,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         if (bset == null)
             throw new IllegalArgumentException();
 
+        final boolean trace = log.isTraceEnabled();
+        
         // Reset internal buffers.
         keyBuilder.reset();
         out.reset();
@@ -367,17 +373,26 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
                 final IV<?, ?> iv = c.get();
                 // Encode binding into buffer.
                 IVUtility.encode(keyBuilder, iv);
-                if (iv.hasValue() && !cache.containsKey(iv)) {
-                    // New IV => Value association.
+                if (iv.hasValue() && (iv.isNullIV() || !cache.containsKey(iv))) {
+                    // New IV => Value association (all NullIVs are "new").
                     final BigdataValue value = iv.getValue();
-                    if (cache.isEmpty()) {
+                    if (namespace == null) {
                         // Note: The namespace is discovered here!!!
                         namespace = value.getValueFactory().getNamespace();
                         valueSer = BigdataValueFactoryImpl.getInstance(
                                 namespace).getValueSerializer();
                         discoveredNamespace = true;
                     }
-                    cache.put(iv, value);
+                    if (!iv.isNullIV()) {
+                        /*
+                         * We can not lookup Null IVs in the cache on the
+                         * decoder side since ties are broken by comparing the
+                         * IVCache association, which is what we are trying to
+                         * resolve. Therefore we always inline the IVCache
+                         * assocation if TermId.isNull() is true.
+                         */
+                        cache.put(iv, value);
+                    }
                     values.add(value);
                     newCached++;
                 } else {
@@ -406,11 +421,12 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         if (discoveredNamespace) {
             out.writeUTF2(namespace);
         }
-//        System.err.println("schemaSize=" + schema.size() + ", cacheSize="
-//                + cache.size() + "namespace=" + namespace);
-//        System.err.println("newVars="
-//                + newVars.size() + ", numBindings=" + numBindings
-//        + ", newCached=" + newCached);
+        if (trace) {
+            log.trace("schemaSize=" + schema.size() + ", cacheSize="
+                    + cache.size() + ", namespace=" + namespace);
+            log.trace("newVars=" + newVars.size() + ", numBindings="
+                    + numBindings + ", newCached=" + newCached);
+        }
         
         // write newly declared variable names.
         for (IVariable<?> var : newVars) {
@@ -431,8 +447,9 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
             final int nbytes = BytesUtil.bitFlagByteLength(schema.size());
             // current buffer position as bit index.
             int bitIndex = out.pos() << 3;
-//            System.err.println("varbitmap: beginBitOffset=" + bitIndex
-//                    + ", nbytes=" + nbytes);
+            if (trace)
+                log.trace("varbitmap: beginBitOffset=" + bitIndex + ", nbytes="
+                        + nbytes);
             // pre-extend the buffer, zeroing the bitmap.
             out.ensureFree(nbytes);
             for (int i = 0; i < nbytes; i++) {
@@ -459,8 +476,9 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
             for (int i = 0; i < nbytes; i++) {
                 out.append((byte) 0);
             }
-//            System.err.println("cachebitmap: beginBitOffset=" + bitIndex
-//                    + ", nbytes=" + nbytes);
+            if (trace)
+                log.trace("cachebitmap: beginBitOffset=" + bitIndex
+                        + ", nbytes=" + nbytes);
             for (BigdataValue value : values) {
                 if (value != null) {
                     BytesUtil.setBit(out.array(), bitIndex, true);
@@ -470,16 +488,18 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
         }
 
         // write IV[].
-//        System.err.println("IV[]: off=" + out.pos() + ", numBindings="
-//                + numBindings + ", byteLength=" + keyBuilder.len());
+        if (trace)
+            log.trace("IV[]: off=" + out.pos() + ", numBindings=" + numBindings
+                    + ", byteLength=" + keyBuilder.len());
         out.append(keyBuilder.array(), 0/* off */, keyBuilder.len());
 
         /*
          * Write Value[]. Each Value is written directly into [out].
          */
         if (newCached > 0) {
-//            System.err.println("cache[]: off=" + out.pos() + ", newCached="
-//                    + newCached);
+            if(trace)
+                log.trace("cache[]: off=" + out.pos() + ", newCached="
+                        + newCached);
             for (BigdataValue value : values) {
 
                 if (value != null) {
@@ -490,7 +510,8 @@ public class IVSolutionSetEncoder implements IBindingSetEncoder {
 
             }
         }
-//        System.err.println("done: off=" + out.pos());
+        if(trace)
+            log.trace("done: off=" + out.pos());
 
         // Return formatted record.
         return out.toByteArray();
