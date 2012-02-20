@@ -1318,6 +1318,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String className = (String) tps.get(RelationSchema.CLASS)
                     .getValue();
 
+            if (className == null) {
+                // Skip deleted triple store entry.
+                continue;
+            }
+
             try {
                 final Class<?> cls = Class.forName(className);
                 if (AbstractTripleStore.class.isAssignableFrom(cls)) {

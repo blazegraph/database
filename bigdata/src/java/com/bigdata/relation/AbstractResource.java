@@ -692,6 +692,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         // Delete the entry for this relation from the row store.
         indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE,
                 namespace);
+        
+        // Clear the entry from the resource locator cache.
+        indexManager.getResourceLocator().discard(this);
 
     }
 
