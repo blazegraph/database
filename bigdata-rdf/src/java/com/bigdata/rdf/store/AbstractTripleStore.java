@@ -146,6 +146,7 @@ import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
@@ -1968,7 +1969,8 @@ abstract public class AbstractTripleStore extends
          * visible.
          */
 
-        final DefaultResourceLocator locator = (DefaultResourceLocator) getIndexManager()
+        @SuppressWarnings("rawtypes")
+        final IResourceLocator locator = getIndexManager()
                 .getResourceLocator();
 
         if (lexiconRelation != null) {

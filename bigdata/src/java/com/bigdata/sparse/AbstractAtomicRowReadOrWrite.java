@@ -242,7 +242,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
 //                : null);
         
         // iterator scanning tuples encoding timestamped property values.
-        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
+        final ITupleIterator<?> itr = ndx.rangeIterator(fromKey, toKey,
                 0/* capacity */, flags, null/* filter */);
     
         // #of entries scanned for that primary key.
@@ -250,7 +250,7 @@ abstract public class AbstractAtomicRowReadOrWrite extends
         
         while(itr.hasNext()) {
             
-            final ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
             
             final byte[] key = tuple.getKey();
             

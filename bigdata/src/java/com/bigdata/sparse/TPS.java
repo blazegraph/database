@@ -201,7 +201,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      *            The property value -or- <code>null</code> if the property
      *            was deleted as of the given timestamp.
      */
-    public void set(String name, long timestamp, Object value) {
+    public void set(final String name, final long timestamp, final Object value) {
         
         tuples.put(new TP(name, timestamp), new TPV(schema, name, timestamp,
                 value));
@@ -653,7 +653,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      * @todo use huffman compression for the name and timestamp dictionaries
      *       (fewer bits for the more frequent symbols, but at what added cost)?
      */
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         // serialization version.
         out.writeShort(VERSION0);
@@ -718,7 +718,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
 
         final short version = in.readShort();
         
@@ -778,15 +778,15 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      * A {property, timestamp} tuple.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
+//    * @version $Id$
     protected static class TP implements Comparable<TP> {
         
         public final String name;
 
         public final long timestamp;
         
-        public TP(String name, long timestamp) {
+        public TP(final String name, final long timestamp) {
 
             if (name == null)
                 throw new IllegalArgumentException();
@@ -802,7 +802,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
          * name (ascending). This means that a scan may abort once it reads a
          * timestamp greater than the largest timestamp of interest.
          */
-        public int compareTo(TP o) {
+        public int compareTo(final TP o) {
 
             if (this == o)
                 return 0;
@@ -832,11 +832,11 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      * Helper class models a single property value as of a given timestamp.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
+//    * @version $Id$
     public static class TPV implements ITPV {
 
-        private static final long serialVersionUID = -3301002622055086380L;
+//        private static final long serialVersionUID = -3301002622055086380L;
 
         private Schema schema;
         private String name;
@@ -855,7 +855,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
          *            The property value -or- <code>null</code> if the
          *            property was deleted as of the given timestamp.
          */
-        public TPV(Schema schema, String name, long timestamp, Object value) {
+        public TPV(final Schema schema, final String name, final long timestamp, final Object value) {
 
             if (schema == null)
                 throw new IllegalArgumentException();
@@ -911,8 +911,8 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      * property name, and timestamp.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
+//    * @version $Id$
     protected static class TPVComparator implements Comparator<TPV> {
 
         public static transient final Comparator<TPV> INSTANCE = new TPVComparator();
@@ -953,13 +953,13 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
         final StringBuilder sb = new StringBuilder();
         
         sb.append("TPS{schema=" + schema + ", timestamp=" + writeTime
-                + ", tuples={");
-        
+                + ", primaryKey=" + getPrimaryKey() + ", tuples={");
+
         final int n = 0;
         
         for(ITPV tpv : tuples.values()) {
             
-            if(n>0) {
+            if (n > 0) {
 
                 sb.append(",\n");
                 

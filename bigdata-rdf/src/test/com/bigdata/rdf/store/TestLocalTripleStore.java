@@ -79,6 +79,8 @@ public class TestLocalTripleStore extends AbstractTestCase {
          */
 
         suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
+        
+        suite.addTestSuite(TestLocalTripleStoreDestroy.class);
 
         /*
          * Pickup the basic triple store test suite. This is a proxied test

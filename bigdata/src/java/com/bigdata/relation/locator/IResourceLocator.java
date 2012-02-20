@@ -70,4 +70,13 @@ public interface IResourceLocator<T extends ILocatableResource> {
      */
     public T locate(String namespace, long timestamp);
     
+    /**
+     * Resources that hold hard references to local index objects MUST be
+     * discarded during abort processing. Otherwise the same resource objects
+     * will be returned from the cache and buffered writes on the indices for
+     * those relations (if they are local index objects) will still be visible,
+     * thus defeating the abort semantics.
+     */
+    public void discard(final ILocatableResource<T> instance);
+    
 }

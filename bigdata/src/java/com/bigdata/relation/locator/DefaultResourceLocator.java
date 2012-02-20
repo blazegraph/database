@@ -430,9 +430,15 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
         if (className == null) {
 
-            throw new IllegalStateException(
-                    "Required property not found: namespace=" + nt.getName()
-                            + ", property=" + RelationSchema.CLASS);
+            /*
+             * Note: This can indicate a deleted resource (all properties have
+             * been cleared from the global row store).
+             */
+            
+//            throw new IllegalStateException(
+//                    "Required property not found: namespace=" + nt.getName()
+//                            + ", property=" + RelationSchema.CLASS);
+            return null;
 
         }
 
@@ -953,13 +959,6 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         
     }
 
-    /**
-     * Resources that hold hard references to local index objects MUST be
-     * discarded during abort processing. Otherwise the same resource objects
-     * will be returned from the cache and buffered writes on the indices for
-     * those relations (if they are local index objects) will still be visible,
-     * thus defeating the abort semantics.
-     */
     public void discard(final ILocatableResource<T> instance) {
         
         if (instance == null)
