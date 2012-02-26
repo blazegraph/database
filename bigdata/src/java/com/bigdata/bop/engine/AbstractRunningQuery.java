@@ -1001,6 +1001,50 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     }
     
     /**
+     * Attempt to return the {@link RunStateEnum} for an operator
+     * (non-blocking).
+     * <p>
+     * Note: This method is intended for use in contexts where it is desirable,
+     * but not critical, to have the {@link RunStateEnum} for the operator. For
+     * example, in log messages. The implementation is non-blocking and will
+     * barge in if the lock is available and return the {@link RunStateEnum} of
+     * the operator. If the lock is not available, it will return
+     * <code>null</code>.
+     * 
+     * @param bopId
+     *            The operator.
+     * 
+     * @return It's {@link RunStateEnum} and <code>null</code> if the lock could
+     *         not be acquired.
+     */
+    protected RunStateEnum tryGetRunState(final int bopId) {
+
+        if (lock.tryLock()) {
+
+            try {
+
+                // if (isDone()) {
+                // // The query has already halted.
+                // throw new InterruptedException();
+                // }
+
+                return runState.getOperatorRunState(bopId);
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
+        } else {
+        
+            return null;
+            
+        }
+
+    }
+    
+    /**
      * Release native memory associated with this operator, if any (NOP, but
      * overridden in scale-out to release NIO buffers used to move solutions
      * around in the cluster).
