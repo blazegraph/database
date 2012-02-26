@@ -127,6 +127,31 @@ public class TestThickChunkMessage extends TestCase2 {
     }
     
     /**
+     * Correct rejection test for an empty chunk (no solutions, not even an
+     * empty solution).
+     */
+    public void test_emptyChunk() {
+
+        final IQueryClient queryController = new MockQueryController();
+        final UUID queryId = UUID.randomUUID();
+        final int bopId = 1;
+        final int partitionId = 2;
+        
+        final IBindingSet[] source = new IBindingSet[]{};
+
+        // build the chunk.
+        try {
+            new ThickChunkMessage<IBindingSet>(queryController, queryId, bopId,
+                    partitionId, source);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+    
+    /**
      * Unit test for a message with a single chunk containing a single empty
      * binding set.
      */

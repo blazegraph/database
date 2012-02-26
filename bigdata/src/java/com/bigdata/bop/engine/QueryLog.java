@@ -47,6 +47,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.engine.RunState.RunStateEnum;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoinStats;
@@ -531,8 +532,13 @@ public class QueryLog {
 //            if (stats.opCount.get() == 0)
 //                sb.append("NotStarted");
 //            else
-                // Note: This requires a lock!
-                sb.append(((AbstractRunningQuery) q).getRunState(bopId));
+            // Note: This requires a lock!
+//            final RunStateEnum runState = ((AbstractRunningQuery) q)
+//                    .getRunState(bopId);
+            // Note: Barges in if possible, but does not wait for a lock.
+            final RunStateEnum runState = ((AbstractRunningQuery) q)
+                    .tryGetRunState(bopId);
+            sb.append(runState == null ? NA : runState.name());
         } else {
             sb.append(NA);
         }
@@ -1128,8 +1134,13 @@ public class QueryLog {
 //                w.write(cdata("NotStarted"));
 //            else
             // Note: This requires a lock!
-            w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
-        } else {
+//          final RunStateEnum runState = ((AbstractRunningQuery) q)
+//                  .getRunState(bopId);
+          // Note: Barges in if possible, but does not wait for a lock.
+          final RunStateEnum runState = ((AbstractRunningQuery) q)
+                  .tryGetRunState(bopId);
+            w.write(cdata(runState == null ? NA : runState.name()));
+          } else {
             w.write(cdata(NA));
         }
         w.write(TDx);

@@ -211,7 +211,8 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
              * FIXME the chunkSize will limit us to RMI w/ the payload inline
              * when it is the same as the threshold for NIO chuck transfers.
              * This needs to be adaptive and responsive to the actual data scale
-             * of the operator's outputs
+             * of the operator's outputs. [Actually, we wind up re-combining the
+             * chunks into a single chunk per target shard below.]
              */
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp<E>) targetOp).getPredicate();
@@ -276,6 +277,9 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
              * which outputs a chunk to instead directly send the IChunkMessage.
              * We could also simplify the API from IBlockingBuffer to something
              * much thinner, such as add(IBindingSet[] chunk).
+             * 
+             * TODO We should report the time spent mapping chunks out to the
+             * QueryLog. That could be done through an extension of BOpStats.
              */
             int messageSendCount = 0;
             for (Map.Entry<PartitionLocator, IBuffer<IBindingSet[]>> e : mapper
@@ -301,7 +305,7 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
                     final IAsynchronousIterator<IBindingSet[]> itr = shardSink.iterator();
                     try {
                         while (itr.hasNext()) {
-                            IBindingSet[] t = itr.next();
+                            final IBindingSet[] t = itr.next();
                             lst.add(t);
                             n += t.length;
                         }
@@ -317,12 +321,26 @@ public class FederationChunkHandler<E> extends StandaloneChunkHandler {
                         i += t.length;
                     }
                 }
-                
-                // send message.
-                sendChunkMessage(q, locator.getDataServiceUUID(), sinkId,
-                        locator.getPartitionId(), allocationContext, a);
 
-                messageSendCount++;
+                if (a.length > 0) {
+
+                    /*
+                     * Send message.
+                     * 
+                     * Note: This avoids sending empty chunks.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/492
+                     * (Empty chunk in ThickChunkMessage (cluster))
+                     */
+                    
+                    // send message.
+                    sendChunkMessage(q, locator.getDataServiceUUID(), sinkId,
+                            locator.getPartitionId(), allocationContext, a);
+
+                    // #of messages sent.
+                    messageSendCount++;
+                    
+                }
 
             }
 
