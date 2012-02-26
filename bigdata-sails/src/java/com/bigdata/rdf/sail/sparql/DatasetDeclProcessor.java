@@ -34,7 +34,7 @@ public class DatasetDeclProcessor {
 	 * @throws MalformedQueryException
 	 *         If DatasetClause does not contain a valid URI.
 	 */
-	public static Dataset process(ASTOperationContainer qc)
+	public static Dataset process(final ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		DatasetImpl dataset = null;
@@ -47,7 +47,7 @@ public class DatasetDeclProcessor {
 
 			for (ASTDatasetClause dc : datasetClauses) {
 			
-			    ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
+			    final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
 
 				try {
 					
