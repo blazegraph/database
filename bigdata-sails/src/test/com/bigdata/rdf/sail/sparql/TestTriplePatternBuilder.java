@@ -35,10 +35,10 @@ import java.util.Map;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.sail.sparql.ast.ParseException;
+import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;

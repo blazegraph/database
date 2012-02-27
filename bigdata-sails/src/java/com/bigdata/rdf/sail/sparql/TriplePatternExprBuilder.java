@@ -31,13 +31,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
-import org.openrdf.query.parser.sparql.ast.ASTCollection;
-import org.openrdf.query.parser.sparql.ast.ASTObjectList;
-import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
-import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.rdf.sail.sparql.ast.ASTBlankNodePropertyList;
+import com.bigdata.rdf.sail.sparql.ast.ASTCollection;
+import com.bigdata.rdf.sail.sparql.ast.ASTObjectList;
+import com.bigdata.rdf.sail.sparql.ast.ASTPropertyList;
+import com.bigdata.rdf.sail.sparql.ast.ASTPropertyListPath;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 

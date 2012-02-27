@@ -29,11 +29,11 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
 
-import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**

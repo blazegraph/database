@@ -38,12 +38,12 @@ import java.util.Map;
 
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;

@@ -33,11 +33,11 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.parser.sparql.DC;
-import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.sparql.ast.ParseException;
+import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;

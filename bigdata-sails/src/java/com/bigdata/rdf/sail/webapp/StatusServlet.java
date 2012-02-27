@@ -18,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -29,6 +28,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;

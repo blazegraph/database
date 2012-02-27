@@ -43,22 +43,17 @@ import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.BaseDeclProcessor;
-import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
-import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
-import org.openrdf.query.parser.sparql.StringEscapesProcessor;
-import org.openrdf.query.parser.sparql.UpdateExprBuilder;
-import org.openrdf.query.parser.sparql.ast.ASTPrefixDecl;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
-import org.openrdf.query.parser.sparql.ast.ASTUpdate;
-import org.openrdf.query.parser.sparql.ast.ASTUpdateContainer;
-import org.openrdf.query.parser.sparql.ast.ASTUpdateSequence;
-import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
-import org.openrdf.query.parser.sparql.ast.TokenMgrError;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
+import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdateSequence;
+import com.bigdata.rdf.sail.sparql.ast.ParseException;
+import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
+import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -143,7 +138,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                      */
                     BlankNodeVarProcessor.process(uc);
 
-                    UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
+                    final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
 
                     // Handle dataset declaration
                     Dataset dataset = DatasetDeclProcessor.process(uc);

@@ -21,7 +21,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -36,6 +35,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
