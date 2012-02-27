@@ -33,23 +33,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import org.openrdf.query.parser.sparql.ASTVisitorBase;
-import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
-import org.openrdf.query.parser.sparql.ast.ASTBlankNode;
-import org.openrdf.query.parser.sparql.ast.ASTFalse;
-import org.openrdf.query.parser.sparql.ast.ASTIRI;
-import org.openrdf.query.parser.sparql.ast.ASTNumericLiteral;
-import org.openrdf.query.parser.sparql.ast.ASTQName;
-import org.openrdf.query.parser.sparql.ast.ASTRDFLiteral;
-import org.openrdf.query.parser.sparql.ast.ASTRDFValue;
-import org.openrdf.query.parser.sparql.ast.ASTString;
-import org.openrdf.query.parser.sparql.ast.ASTTrue;
-import org.openrdf.query.parser.sparql.ast.ASTVar;
-import org.openrdf.query.parser.sparql.ast.Node;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
+import com.bigdata.rdf.sail.sparql.ast.ASTFalse;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTNumericLiteral;
+import com.bigdata.rdf.sail.sparql.ast.ASTQName;
+import com.bigdata.rdf.sail.sparql.ast.ASTRDFLiteral;
+import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTString;
+import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
+import com.bigdata.rdf.sail.sparql.ast.ASTVar;
+import com.bigdata.rdf.sail.sparql.ast.Node;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 

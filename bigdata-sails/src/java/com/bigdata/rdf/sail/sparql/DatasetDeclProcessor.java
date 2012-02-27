@@ -10,11 +10,11 @@ import java.util.List;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.query.parser.sparql.ast.ASTDatasetClause;
-import org.openrdf.query.parser.sparql.ast.ASTIRI;
-import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 
 /**
  * Extracts a SPARQL {@link Dataset} from an ASTQueryContainer, if one is

@@ -41,20 +41,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.ASTVisitorBase;
-import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
-import org.openrdf.query.parser.sparql.ast.ASTBlankNode;
-import org.openrdf.query.parser.sparql.ast.ASTDatasetClause;
-import org.openrdf.query.parser.sparql.ast.ASTFalse;
-import org.openrdf.query.parser.sparql.ast.ASTIRI;
-import org.openrdf.query.parser.sparql.ast.ASTNumericLiteral;
-import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
-import org.openrdf.query.parser.sparql.ast.ASTQName;
-import org.openrdf.query.parser.sparql.ast.ASTRDFLiteral;
-import org.openrdf.query.parser.sparql.ast.ASTRDFValue;
-import org.openrdf.query.parser.sparql.ast.ASTString;
-import org.openrdf.query.parser.sparql.ast.ASTTrue;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
@@ -66,6 +52,18 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
+import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
+import com.bigdata.rdf.sail.sparql.ast.ASTFalse;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTNumericLiteral;
+import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
+import com.bigdata.rdf.sail.sparql.ast.ASTQName;
+import com.bigdata.rdf.sail.sparql.ast.ASTRDFLiteral;
+import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTString;
+import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
+import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
 /**
  * Class performs efficient batch resolution of RDF Values against the database.

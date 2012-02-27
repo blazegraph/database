@@ -33,10 +33,6 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.ast.Node;
-import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.SimpleNode;
-import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
@@ -49,6 +45,10 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.ast.Node;
+import com.bigdata.rdf.sail.sparql.ast.ParseException;
+import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
+import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
