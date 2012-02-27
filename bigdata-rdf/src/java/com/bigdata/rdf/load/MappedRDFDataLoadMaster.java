@@ -45,13 +45,14 @@ import org.openrdf.rio.RDFParser;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.inf.ClosureStats;
-import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.RDFParserOptions;
+import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
@@ -422,12 +423,13 @@ V extends Serializable//
          * Force the load of the NxParser integration class and its registration
          * of the NQuadsParser#nquads RDFFormat.
          * 
-         * @todo Should be done via META-INFO.
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+         *      Class loader problems </a>
          */
         static {
 
             // Force the load of the NXParser integration.
-            NQuadsParser.forceLoad();
+            ServiceProviderHook.forceLoad();
 
         }
 
@@ -606,7 +608,12 @@ V extends Serializable//
 
                 if (tmp != null) {
 
-                    NQuadsParser.forceLoad();
+                    /*
+                     * @see <a
+                     * href="https://sourceforge.net/apps/trac/bigdata/ticket/439"
+                     * > Class loader problems </a>
+                     */
+                    ServiceProviderHook.forceLoad();
 
                     rdfFormat = RDFFormat.valueOf(tmp);
 

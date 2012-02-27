@@ -236,6 +236,12 @@ public class BuildInfo {
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
+		    <!-- Note: This simple copy works so long as there is just one service
+		         provider file per interface.  It will not combine (append) multiple
+		         files for the same interface. -->
+			<fileset dir="${bigdata.dir}/bigdata-rdf/src/resources/service-providers">
+				<include name="META-INF/**" />
+			</fileset>
 			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
 				<include name="META-INF/**" />
 			</fileset>

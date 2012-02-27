@@ -19,8 +19,8 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.rio.rdfxml.RDFXMLParser;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -63,7 +63,8 @@ public class LoadPdb {
 		StatementCollector collector = new StatementCollector();
 		InputStream in = new FileInputStream(file);
 		try {
-			RDFParser parser = new RDFXMLParser();
+            final RDFParser parser = RDFParserRegistry.getInstance()
+                    .get(RDFFormat.RDFXML).getParser();
 			parser.setRDFHandler(collector);
 			parser.parse(in, file.toURI().toString());
 		} finally {

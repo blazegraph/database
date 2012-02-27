@@ -24,6 +24,7 @@
 	<classpathentry kind="src" path="bigdata-war/src"/>
 	<classpathentry kind="src" path="bigdata-ganglia/src/java"/>
 	<classpathentry kind="src" path="bigdata-ganglia/src/test"/>
+	<classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
@@ -67,7 +68,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.5.0-onejar.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.5.0-onejar.jar" sourcepath="/org.openrdf.sesame-2.6.1"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.5.0.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.5.0.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
 	<classpathentry kind="output" path="bin"/>

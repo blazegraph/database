@@ -3,7 +3,7 @@
  *
  * Licensed under the Aduna BSD-style license.
  */
-package org.openrdf.rio.rdfxml;
+package com.bigdata.rdf.rio.rdfxml;
 
 import info.aduna.xml.XMLUtil;
 
@@ -37,7 +37,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @see BD#SID
  */
-public class RDFXMLWriter implements RDFWriter {
+public class BigdataRDFXMLWriter implements RDFWriter {
 
 	/*-----------*
 	 * Variables *
@@ -63,7 +63,7 @@ public class RDFXMLWriter implements RDFWriter {
 	 * @param out
 	 *        The OutputStream to write the RDF/XML document to.
 	 */
-	public RDFXMLWriter(OutputStream out) {
+	public BigdataRDFXMLWriter(OutputStream out) {
 		this(new OutputStreamWriter(out, Charset.forName("UTF-8")));
 	}
 
@@ -73,7 +73,7 @@ public class RDFXMLWriter implements RDFWriter {
 	 * @param writer
 	 *        The Writer to write the RDF/XML document to.
 	 */
-	public RDFXMLWriter(Writer writer) {
+	public BigdataRDFXMLWriter(Writer writer) {
 		this.writer = writer;
 		namespaceTable = new LinkedHashMap<String, String>();
 		writingStarted = false;

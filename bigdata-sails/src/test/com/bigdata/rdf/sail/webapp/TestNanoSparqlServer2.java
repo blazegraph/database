@@ -69,7 +69,7 @@ import org.xml.sax.ext.DefaultHandler2;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.rio.NQuadsParser;
+import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;

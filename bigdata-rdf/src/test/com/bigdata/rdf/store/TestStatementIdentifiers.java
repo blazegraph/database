@@ -57,7 +57,10 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.rio.rdfxml.RDFXMLWriter;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
+import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
@@ -70,6 +73,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.StatementCyclesException;
 import com.bigdata.rdf.rio.UnificationException;
+import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -297,15 +301,26 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             try {
 
-                Writer w = new StringWriter();
+                final Writer w = new StringWriter();
                 
-                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+//                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+                
+                final RDFWriterFactory writerFactory = RDFWriterRegistry
+                        .getInstance().get(RDFFormat.RDFXML);
+                
+                assertNotNull(writerFactory);
+                
+                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
+                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
+                            + writerFactory.getClass());
+                
+                final RDFWriter rdfWriter = writerFactory.getWriter(w);
                 
                 rdfWriter.startRDF();
 
                 while(itr.hasNext()) {
                 
-                    Statement stmt = itr.next();
+                    final Statement stmt = itr.next();
                     
                     rdfWriter.handleStatement(stmt);
                     

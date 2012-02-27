@@ -41,8 +41,8 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
@@ -635,7 +635,7 @@ public class SampleCode {
             final GraphQuery graphQuery = 
                 cxn.prepareGraphQuery(QueryLanguage.SPARQL, sb.toString());
             final StringWriter sw = new StringWriter();
-            graphQuery.evaluate(new RDFXMLWriter(sw));
+            graphQuery.evaluate(RDFWriterRegistry.getInstance().get(RDFFormat.RDFXML).getWriter(sw));
             
             elapsed = System.currentTimeMillis() - start;
             log.info("done. evaluted in " + elapsed + " millis");

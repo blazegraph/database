@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.HashSet;
@@ -39,21 +38,19 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.rdfxml.RDFXMLWriter;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
+import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailConnection;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataStatementImpl;
+import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 
@@ -119,7 +116,17 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
                 final Writer w = new StringWriter();
 
-                final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+//                final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+                final RDFWriterFactory writerFactory = RDFWriterRegistry
+                        .getInstance().get(RDFFormat.RDFXML);
+                
+                assertNotNull(writerFactory);
+                
+                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
+                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
+                            + writerFactory.getClass());
+                
+                final RDFWriter rdfWriter = writerFactory.getWriter(w);
 
                 rdfWriter.startRDF();
 

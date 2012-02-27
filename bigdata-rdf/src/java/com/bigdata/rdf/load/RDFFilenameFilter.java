@@ -7,7 +7,7 @@ import java.io.Serializable;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.rdf.rio.NQuadsParser;
+import com.bigdata.rdf.ServiceProviderHook;
 
 /**
  * Filter recognizes anything that is a registered as an {@link RDFFormat} or
@@ -37,7 +37,7 @@ public class RDFFilenameFilter implements FilenameFilter, Serializable {
     static {
 
         // Force the load of the NXParser integration.
-        NQuadsParser.forceLoad();
+        ServiceProviderHook.forceLoad();
         
     }
     

@@ -3,7 +3,7 @@
  *
  * Licensed under the Aduna BSD-style license.
  */
-package org.openrdf.rio.rdfxml;
+package com.bigdata.rdf.rio.rdfxml;
 
 import info.aduna.net.ParsedURI;
 import info.aduna.xml.XMLReaderFactory;
@@ -39,8 +39,8 @@ import org.xml.sax.XMLReader;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.store.BD;
 
 /**
  * A parser for XML-serialized RDF. This parser operates directly on the SAX
@@ -88,10 +88,13 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * @see org.openrdf.rio.ParseErrorListener
  * @see org.openrdf.rio.ParseLocationListener
  * @author Arjohn Kampman
+ * @author Bryan Thompson
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439"> Class loader problems </a>
  */
-public class RDFXMLParser extends RDFParserBase {
+public class BigdataRDFXMLParser extends RDFParserBase {
 
-    private static final Logger log = Logger.getLogger(RDFXMLParser.class);
+    private static final Logger log = Logger.getLogger(BigdataRDFXMLParser.class);
     
 	/*-----------*
 	 * Variables *
@@ -151,7 +154,7 @@ public class RDFXMLParser extends RDFParserBase {
 	 * Creates a new RDFXMLParser that will use a {@link ValueFactoryImpl} to
 	 * create RDF model objects.
 	 */
-	public RDFXMLParser() {
+	public BigdataRDFXMLParser() {
 		super();
 
 		// SAXFilter does some filtering and verifying of SAX events
@@ -165,7 +168,7 @@ public class RDFXMLParser extends RDFParserBase {
 	 * @param valueFactory
 	 *        A ValueFactory.
 	 */
-	public RDFXMLParser(ValueFactory valueFactory) {
+	public BigdataRDFXMLParser(ValueFactory valueFactory) {
 		super(valueFactory);
 
 		// SAXFilter does some filtering and verifying of SAX events

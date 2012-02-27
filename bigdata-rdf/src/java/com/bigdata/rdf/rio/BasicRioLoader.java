@@ -37,6 +37,8 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
 
+import com.bigdata.rdf.ServiceProviderHook;
+
 /**
  * Parses data but does not load it into the indices.
  * 
@@ -55,12 +57,13 @@ public class BasicRioLoader implements IRioLoader {
     /**
      * Force the load of the NxParser integration class.
      * 
-     * @todo Should be done via META-INFO.
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+     *      Class loader problems </a>
      */
     static {
 
         // Force the load of the NXParser integration.
-        NQuadsParser.forceLoad();
+        ServiceProviderHook.forceLoad();
         
     }
     

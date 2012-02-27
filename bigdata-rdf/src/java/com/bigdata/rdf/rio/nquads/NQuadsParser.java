@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 22, 2010
  */
 
-package com.bigdata.rdf.rio;
+package com.bigdata.rdf.rio.nquads;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,8 +46,6 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
-import org.openrdf.rio.RDFParserFactory;
-import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.helpers.RDFParserBase;
 import org.semanticweb.yars.nx.Node;
@@ -62,8 +60,6 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Write some unit tests for this integration.
- * 
  * FIXME Add {@link RDFWriter} for NQUADS.
  */
 public class NQuadsParser extends RDFParserBase implements RDFParser  {
@@ -71,14 +67,6 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
     final protected transient static Logger log = Logger
             .getLogger(NQuadsParser.class);
 
-    /**
-     * This hook may be used to force the load of this class so it can register
-     * the {@link #nquads} {@link RDFFormat} and the parser.
-     */
-    static public void forceLoad() {
-
-    }
-    
     /**
      * The nquads RDF format.
      * <p>
@@ -95,8 +83,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
     /**
      * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
      * 
-     * @todo These things should be registered automatically using META-INF per
-     *       the openrdf javadoc.  For now, use {@link #forceLoad()}.
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+     *      Class loader problems </a>
      */
     static {
 
@@ -115,24 +103,24 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
         // register the nquads format.
         RDFFormat.register(nquads);
 
-        // register the parser factory for nquads.
-        RDFParserRegistry.getInstance().add(new RDFParserFactory() {
-
-            public RDFParser getParser() {
-                return new NQuadsParser();
-            }
-
-            public RDFFormat getRDFFormat() {
-                return nquads;
-            }
-
-        });
+//        // register the parser factory for nquads.
+//        RDFParserRegistry.getInstance().add(new RDFParserFactory() {
+//
+//            public RDFParser getParser() {
+//                return new NQuadsParser();
+//            }
+//
+//            public RDFFormat getRDFFormat() {
+//                return nquads;
+//            }
+//
+//        });
         
     }
 
     private ValueFactory valueFactory = new ValueFactoryImpl();
 
-    public void setValueFactory(ValueFactory f) {
+    public void setValueFactory(final ValueFactory f) {
 
         if (f == null)
             throw new IllegalArgumentException();
@@ -196,8 +184,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      *       allow/disallow long literals in the {@link ILexiconConfiguration}
      *       and store them appropriately.
      */
-    public void parse(Reader r, String baseUriIsIgnored) throws IOException,
-            RDFParseException, RDFHandlerException {
+    public void parse(final Reader r, final String baseUriIsIgnored)
+            throws IOException, RDFParseException, RDFHandlerException {
 
         if (r == null)
             throw new IllegalArgumentException();
