@@ -3,7 +3,7 @@
  *
  * Licensed under the Aduna BSD-style license.
  */
-package org.openrdf.rio.rdfxml;
+package com.bigdata.rdf.rio.rdfxml;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +41,7 @@ class SAXFilter implements ContentHandler {
 	/**
 	 * The RDF parser to supply the filtered SAX events to.
 	 */
-	private RDFXMLParser rdfParser;
+	private BigdataRDFXMLParser rdfParser;
 
 	/**
 	 * A Locator indicating a position in the text that is currently being parsed
@@ -120,7 +120,7 @@ class SAXFilter implements ContentHandler {
 	 * Constructors *
 	 *--------------*/
 
-	public SAXFilter(RDFXMLParser rdfParser) {
+	public SAXFilter(BigdataRDFXMLParser rdfParser) {
 		this.rdfParser = rdfParser;
 	}
 

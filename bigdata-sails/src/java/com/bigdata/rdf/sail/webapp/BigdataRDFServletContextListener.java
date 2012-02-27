@@ -53,7 +53,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.rio.NQuadsParser;
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -324,8 +324,13 @@ public class BigdataRDFServletContextListener implements
 
         }
 
-        // Force registration of the NQuads RDFFormat.
-        NQuadsParser.forceLoad();
+        /*
+         * Force service/format registration.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+         * Class loader problems </a>
+         */
+        ServiceProviderHook.forceLoad();
         
         if (log.isInfoEnabled())
             log.info("done");

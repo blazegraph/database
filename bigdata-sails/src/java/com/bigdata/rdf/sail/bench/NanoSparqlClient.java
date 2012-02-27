@@ -52,14 +52,14 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.impl.GraphImpl;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResultHandlerBase;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory;
+import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.rio.rdfxml.RDFXMLParser;
 
 import com.bigdata.counters.CAT;
 import com.bigdata.journal.TemporaryStore;
@@ -506,8 +506,9 @@ public class NanoSparqlClient {
 
 	            final String baseURI = "";
 	            
-	            final RDFXMLParser rdfParser = new RDFXMLParser(
-	                    new ValueFactoryImpl());
+                final RDFParser rdfParser = RDFParserRegistry.getInstance()
+                        .get(RDFFormat.RDFXML)
+                        .getParser();
 
 	            rdfParser.setVerifyData(true);
 	            

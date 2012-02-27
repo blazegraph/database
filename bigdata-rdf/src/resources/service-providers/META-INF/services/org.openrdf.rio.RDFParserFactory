@@ -1,0 +1,2 @@
+com.bigdata.rdf.rio.nquads.NQuadsParserFactory
+com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLParserFactory

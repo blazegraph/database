@@ -51,12 +51,12 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.rio.LoadStats;
-import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.RioLoaderEvent;
@@ -1611,12 +1611,14 @@ public class DataLoader {
     };
 
     /**
-     * Force the load of the NxParser integration class.
+     * Force the load of the various integration/extension classes.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+     *      Class loader problems </a>
      */
     static {
 
-        // Force the load of the NXParser integration.
-        NQuadsParser.forceLoad();
+        ServiceProviderHook.forceLoad();
         
     }
     

@@ -53,6 +53,8 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Properties;
+
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -66,8 +68,12 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
+import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -75,6 +81,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
@@ -99,6 +106,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         AbstractTripleStoreTestCase {
 
+    private static final Logger log = Logger
+            .getLogger(TestRDFXMLInterchangeWithStatementIdentifiers.class);
+    
     /**
      * 
      */
@@ -464,15 +474,26 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             final String rdfXml;
             try {
 
-                Writer w = new StringWriter();
+                final Writer w = new StringWriter();
 
-                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+//              RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+
+                final RDFWriterFactory writerFactory = RDFWriterRegistry
+                        .getInstance().get(RDFFormat.RDFXML);
+                
+                assertNotNull(writerFactory);
+                
+                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
+                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
+                            + writerFactory.getClass());
+                
+                final RDFWriter rdfWriter = writerFactory.getWriter(w);
 
                 rdfWriter.startRDF();
 
                 while (itr.hasNext()) {
 
-                    Statement stmt = itr.next();
+                    final Statement stmt = itr.next();
 
                     rdfWriter.handleStatement(stmt);
 
@@ -489,7 +510,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             }
 
             // write the rdf/xml on the console.
-            System.err.println(rdfXml);
+            if (log.isInfoEnabled())
+                log.info(rdfXml);
 
             /*
              * Deserialize the RDF/XML into a temporary store and verify
@@ -643,15 +665,26 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         final String rdfXml;
         try {
 
-            Writer w = new StringWriter();
+            final Writer w = new StringWriter();
 
-            RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+//            final RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+            
+            final RDFWriterFactory writerFactory = RDFWriterRegistry
+                    .getInstance().get(RDFFormat.RDFXML);
+            
+            assertNotNull(writerFactory);
+            
+            if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
+                fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
+                        + writerFactory.getClass());
+            
+            final RDFWriter rdfWriter = writerFactory.getWriter(w);
 
             rdfWriter.startRDF();
 
             while (itr.hasNext()) {
 
-                Statement stmt = itr.next();
+                final Statement stmt = itr.next();
 
                 rdfWriter.handleStatement(stmt);
 
@@ -668,7 +701,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         }
 
         // write the rdf/xml on the console.
-        System.err.println(rdfXml);
+        if(log.isInfoEnabled())
+            log.info(rdfXml);
 
         /*
          * Deserialize the RDF/XML into a temporary store and verify read-back

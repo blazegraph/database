@@ -82,6 +82,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.BaseAxioms;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -1181,6 +1182,8 @@ abstract public class AbstractTripleStore extends
             final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
+        
+        ServiceProviderHook.forceLoad();
         
         /*
          * Reads off the property for the inference engine that tells us whether

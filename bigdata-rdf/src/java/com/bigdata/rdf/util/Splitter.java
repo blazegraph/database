@@ -76,12 +76,12 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.Rio;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.rio.BasicRioLoader;
 import com.bigdata.rdf.rio.IStatementBuffer;
-import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -1106,7 +1106,7 @@ public class Splitter {
 //        }
 //        System.exit(0);
         
-        NQuadsParser.forceLoad();
+        ServiceProviderHook.forceLoad();
 //        System.err.println(NQuadsParser.nquads.toString());
         
         final Configuration c = ConfigurationProvider.getInstance(args);
