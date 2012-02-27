@@ -609,5 +609,68 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
     }
+
+    /**
+     * This is sesame TCK test <code>sparql11-subquery-04</code>. We picked it
+     * up with Sesame 2.6.3.  It fails in the TCK run, but it appears to be Ok
+     * when run at this layer.
+     * 
+     * Query:
+     * <pre>
+     * PREFIX ex: <http://example.org/>
+     * SELECT ?friend
+     * WHERE {
+     *   ?popular ex:knows ?friend .
+     *   {
+     *     SELECT ?popular
+     *     WHERE {
+     *       ?someone ex:knows ?popular
+     *     } 
+     *     GROUP BY ?popular
+     *     ORDER BY DESC(COUNT(?someone))
+     *     LIMIT 2
+     *   }
+     * }
+     * </pre>
+     * 
+     * Data:
+     * <pre>
+     * @prefix ex: <http://example.org/> .
+     * 
+     * ex:george ex:knows ex:ringo, ex:john .
+     * ex:ringo ex:knows ex:george, ex:john.
+     * ex:paul  ex:knows ex:george, ex:john .
+     * </pre>
+     */
+    public void test_subquery_04() throws Exception {
+        
+        new TestHelper(
+                "sparql11-subquery-04", // testURI,
+                "sparql11-subquery-04.rq",// queryFileURL
+                "sparql11-subquery-04.ttl",// dataFileURL
+                "sparql11-subquery-04.srx"// resultFileURL
+                ).runTest();
+        
+    }
+    
+    /**
+     * This is BSBM BI query 05 on the PC100 data set. We picked this up with
+     * Sesame 2.6.3. It is failing with a "solution set not found" error in the
+     * TCK. The problem is reproduced by this test. However, the test is a bit
+     * long running, so take it out of this test suite once we get to the bottom
+     * of the problem.
+     * <p>
+     * Note: The problem with Q5 is likely to be the way it is written.
+     */
+    public void test_BSBM_BI_05() throws Exception {
+        
+        new TestHelper(
+                "BSBM BI 05", // testURI,
+                "bsbm-bi-q5.rq",// queryFileURL
+                "bsbm-100.ttl",// dataFileURL
+                "bsbm-bi-q5.srx"// resultFileURL
+                ).runTest();
+        
+    }
     
 }
