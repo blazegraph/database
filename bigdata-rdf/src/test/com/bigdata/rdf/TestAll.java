@@ -57,6 +57,11 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("RDF");
 
+        /*
+         * test suite for the rio parser without the triple store integrations.
+         */
+        suite.addTest(com.bigdata.rdf.rio.TestAll_RIO.suite());
+
         // test suite for the internal representation of RDF Values.
         suite.addTest( com.bigdata.rdf.internal.TestAll.suite() );
 

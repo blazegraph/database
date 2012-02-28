@@ -23,14 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rio;
 
-import com.bigdata.rdf.rio.nquads.TestNQuadsParserFactory;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites into increasing dependency order.
+ * RIO integration tests.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -58,12 +56,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("RIO Integration");
 
-        // bigdata RDF/XML parser/writer extension.
-        suite.addTest(com.bigdata.rdf.rio.rdfxml.TestAll.suite());
-        
-        // bigdata nquads interchange integration.
-        suite.addTest(com.bigdata.rdf.rio.nquads.TestAll.suite());
-        
         // basic tests for StatementBuffer.
         suite.addTestSuite(TestStatementBuffer.class);
 
@@ -93,5 +85,5 @@ public class TestAll extends TestCase {
         return suite;
         
     }
-    
+
 }
