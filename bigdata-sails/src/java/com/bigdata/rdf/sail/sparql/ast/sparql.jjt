@@ -42,11 +42,18 @@ public class SyntaxTreeBuilder {
 	 * @throws TokenMgrError If the query was syntactically incorrect.
 	 * @throws ParseException If the query was syntactically incorrect.
 	 */
-	public static ASTQueryContainer parseQuery(String query)
+	public static ASTQueryContainer parseQuery(final String query)
 		throws TokenMgrError, ParseException
 	{
-		SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(query) );
-		return stb.QueryContainer();
+		final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(query) );
+
+		// Set size of tab to 1 to force tokenmanager to report correct column
+		// index for substring splitting of service graph pattern.
+		stb.jj_input_stream.setTabSize(1);
+
+		final ASTQueryContainer container = stb.QueryContainer();
+		container.setSourceString(query);
+		return container;
 	}
 
 	/**
@@ -57,10 +64,10 @@ public class SyntaxTreeBuilder {
 	 * @throws TokenMgrError If the update sequence was syntactically incorrect.
 	 * @throws ParseException If the update sequence was syntactically incorrect.
 	 */
-	public static ASTUpdateSequence parseUpdateSequence(String sequence)
+	public static ASTUpdateSequence parseUpdateSequence(final String sequence)
 		throws TokenMgrError, ParseException
 	{
-		SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(sequence) );
+		final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(sequence) );
 		return stb.UpdateSequence();
 	}
 	
@@ -193,10 +200,16 @@ TOKEN [IGNORE_CASE] :
 |	<TRUE: "true">
 |	<FALSE: "false">
 |	<BIND: "bind">
+|	<SERVICE: "service">
+|	<BINDINGS: "bindings">
+|	<UNDEF: "UNDEF">
 |	<STRLEN: "strlen">
 |	<SUBSTR: "substr">
 |	<STR_STARTS: "strStarts">
 |	<STR_ENDS: "strEnds">
+|	<STR_BEFORE: "strBefore">
+|	<STR_AFTER: "strAfter">
+|	<REPLACE: "replace">
 |	<UCASE: "ucase">
 |	<LCASE: "lcase">
 |	<CONCAT: "concat">
@@ -320,7 +333,7 @@ TOKEN:
 ASTUpdateSequence UpdateSequence():
 {}
 {
-    UpdateContainer() ( <SEMICOLON> UpdateContainer() )* <EOF>
+    UpdateContainer() ( <SEMICOLON> [ UpdateContainer() ] )* <EOF>
     { return jjtThis; }
 }
 
@@ -341,7 +354,7 @@ ASTQueryContainer QueryContainer():
 void Prolog() #void :
 {}
 {
-	[ BaseDecl() ] ( PrefixDecl() )*
+	( PrefixDecl() | BaseDecl() )*
 }
 
 void BaseDecl() :
@@ -367,10 +380,7 @@ void PrefixDecl() :
 void Query() #void :
 {}
 {
-	SelectQuery()
-|	ConstructQuery()
-|	DescribeQuery()
-|	AskQuery()
+    (SelectQuery() | ConstructQuery() |	DescribeQuery() | AskQuery())
 }
 
 void SelectQuery() :
@@ -381,6 +391,7 @@ void SelectQuery() :
 	( NamedSubquery() )*
 	WhereClause()
 	SolutionModifier()
+	[BindingsClause()]
 }
 
 void Select() :
@@ -417,6 +428,7 @@ void ConstructQuery() :
 	( NamedSubquery() )*
 	WhereClause()
 	SolutionModifier()
+	[BindingsClause()]
 }
 
 void Construct() :
@@ -441,6 +453,7 @@ void DescribeQuery() :
 	( NamedSubquery() )*
 	[ WhereClause() ]
 	SolutionModifier()
+	[BindingsClause()]
 }
 
 void Describe() :
@@ -461,6 +474,7 @@ void AskQuery() :
 	( DatasetClause() )*
 	( NamedSubquery() )*
 	WhereClause()
+	[BindingsClause()]
 }
 
 void NamedSubquery() :
@@ -478,6 +492,28 @@ void WhereClause() :
 {}
 {
 	 [<WHERE>] GroupGraphPattern()
+}
+
+void BindingsClause() :
+{}
+{
+    <BINDINGS> ( Var() )* <LBRACE> ( BindingSet())* <RBRACE> 
+}
+
+void BindingSet() :
+{}
+{
+    <LPAREN> ( BindingValue() )* <RPAREN> | <NIL> 
+}
+
+void BindingValue() :
+{}
+{
+	IRIref()
+|	RDFLiteral()
+|	NumericLiteral()
+|	BooleanLiteral()
+|	<UNDEF> 
 }
 
 void SolutionModifier() #void :
@@ -544,11 +580,26 @@ void Offset() :
 	{ jjtThis.setValue(Long.parseLong(t.image)); }
 }
 
-void GroupGraphPattern() #GraphPatternGroup :
-{}
+// Note: Allows return of the text for the SERVICE's inner graph pattern.
+Token GroupGraphPattern() #GraphPatternGroup :
+{Token endOfPatternToken; }
 {
-	<LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
+	<LBRACE> 
+	(
+	    SelectQuery() 
+	    | 
+	    GraphPattern()
+	) 
+	endOfPatternToken = <RBRACE>
+	{
+	    return endOfPatternToken;
+	}
 }
+//void GroupGraphPattern() #GraphPatternGroup :
+//{}
+//{
+//	<LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
+//}
 
 void GraphPattern() #void :
 {}
@@ -613,6 +664,7 @@ void GraphPatternNotTriples() #void :
 |	GroupOrUnionGraphPattern()
 |	GraphGraphPattern()
 |	MinusGraphPattern()
+|	ServiceGraphPattern()
 }
 
 void OptionalGraphPattern() :
@@ -620,7 +672,7 @@ void OptionalGraphPattern() :
 {
 	// Note: does not refer GroupGraphPattern() because constraints are not limited
 	// to the optional graph pattern, but can also reference the operator's LHS
-	<OPTIONAL> <LBRACE> GraphPattern() <RBRACE>
+    <OPTIONAL> <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
 }
 
 void GraphGraphPattern() :
@@ -639,6 +691,23 @@ void MinusGraphPattern() :
 {}
 {
     <MINUS_SETOPER> GroupGraphPattern()
+}
+
+void ServiceGraphPattern() :
+{ Token t; }
+{
+    t =  <SERVICE> 
+    {
+	jjtThis.setBeginTokenLinePos(t.beginLine);
+	jjtThis.setBeginTokenColumnPos(t.beginColumn);
+    }
+    [<SILENT> { jjtThis.setSilent(true); } ] 
+    VarOrIRIref() 
+    t = GroupGraphPattern()
+    {
+	jjtThis.setEndTokenLinePos(t.beginLine);
+	jjtThis.setEndTokenColumnPos(t.beginColumn);
+    }
 }
 
 void Filter() #void :
@@ -1067,6 +1136,9 @@ void StringFunction() #void :
 |	LowerCase()
 |	StrStarts()
 |	StrEnds()
+|	StrBefore()
+|	StrAfter()
+|	Replace()
 |	Concat()
 |	Contains()
 |	EncodeForURI()
@@ -1279,6 +1351,24 @@ void StrEnds() :
 {}
 {
     <STR_ENDS> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+}
+
+void StrBefore() :
+{}
+{
+    <STR_BEFORE> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+}
+
+void StrAfter() :
+{}
+{
+    <STR_AFTER> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+}
+
+void Replace() :
+{}
+{
+    <REPLACE> <LPAREN> Expression() <COMMA> Expression() <COMMA> Expression() [ <COMMA> Expression() ] <RPAREN>
 }
 
 void Concat() :

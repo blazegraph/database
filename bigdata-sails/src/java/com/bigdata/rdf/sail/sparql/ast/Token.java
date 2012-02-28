@@ -2,8 +2,6 @@
 /* JavaCCOptions:TOKEN_EXTENDS=,KEEP_LINE_COL=null,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package com.bigdata.rdf.sail.sparql.ast;
 
-import com.bigdata.rdf.sail.sparql.ast.Token;
-
 /**
  * Describes the input token stream.
  */
@@ -130,4 +128,4 @@ public class Token implements java.io.Serializable {
   }
 
 }
-/* JavaCC - OriginalChecksum=8af9229c9981b309855e97f0951c1b9c (do not edit this line) */
+/* JavaCC - OriginalChecksum=c40eed3dc3279f92556e8520c68586b7 (do not edit this line) */

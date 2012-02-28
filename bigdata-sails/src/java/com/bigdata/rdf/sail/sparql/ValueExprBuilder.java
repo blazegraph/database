@@ -88,6 +88,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTNow;
 import com.bigdata.rdf.sail.sparql.ast.ASTOr;
 import com.bigdata.rdf.sail.sparql.ast.ASTRand;
 import com.bigdata.rdf.sail.sparql.ast.ASTRegexExpression;
+import com.bigdata.rdf.sail.sparql.ast.ASTReplace;
 import com.bigdata.rdf.sail.sparql.ast.ASTRound;
 import com.bigdata.rdf.sail.sparql.ast.ASTSHA1;
 import com.bigdata.rdf.sail.sparql.ast.ASTSHA224;
@@ -98,6 +99,8 @@ import com.bigdata.rdf.sail.sparql.ast.ASTSameTerm;
 import com.bigdata.rdf.sail.sparql.ast.ASTSample;
 import com.bigdata.rdf.sail.sparql.ast.ASTSeconds;
 import com.bigdata.rdf.sail.sparql.ast.ASTStr;
+import com.bigdata.rdf.sail.sparql.ast.ASTStrAfter;
+import com.bigdata.rdf.sail.sparql.ast.ASTStrBefore;
 import com.bigdata.rdf.sail.sparql.ast.ASTStrDt;
 import com.bigdata.rdf.sail.sparql.ast.ASTStrEnds;
 import com.bigdata.rdf.sail.sparql.ast.ASTStrLang;
@@ -215,6 +218,24 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
                         right(node),
                         (ValueExpressionNode) node.jjtGetChild(2).jjtAccept(
                                 this, null) });
+
+    }
+
+    /**
+     * Handle a function with four arguments (there are four children of the
+     * node which are the arguments to the function).
+     */
+    protected FunctionNode quadary(final SimpleNode node, final URI functionURI)
+            throws VisitorException {
+
+        return new FunctionNode(functionURI,
+                null/* scalarValues */, new ValueExpressionNode[] {
+                        left(node),
+                        right(node),
+                        (ValueExpressionNode) node.jjtGetChild(2).jjtAccept(
+                                this, null),
+                        (ValueExpressionNode) node.jjtGetChild(3).jjtAccept(
+                                this, null)});
 
     }
 
@@ -498,6 +519,22 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
+    final public FunctionNode visit(ASTStrAfter node, Object data)
+        throws VisitorException
+    {
+        return binary(node, FunctionRegistry.STR_AFTER);
+//        return createFunctionCall(FN.SUBSTRING_AFTER.toString(), node, 2, 2);
+    }
+
+    @Override
+    final public FunctionNode visit(ASTStrBefore node, Object data)
+        throws VisitorException
+    {
+        return binary(node, FunctionRegistry.STR_BEFORE);
+//        return createFunctionCall(FN.SUBSTRING_BEFORE.toString(), node, 2, 2);
+    }
+
+    @Override
     final public FunctionNode visit(ASTUpperCase node, Object data)
             throws VisitorException {
         return unary(node, FN.UPPER_CASE);
@@ -606,6 +643,15 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     final public FunctionNode visit(ASTIRIFunc node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IRI);
+        /*
+         * FIXME baseURI resolution eeds to be handle for IRI functions, most
+         * likely in unary(), binary(), nary(), and aggregate().  Write AST 
+         * layer unit tests for this.
+         */
+//        ValueExpr expr = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
+//        IRIFunction fn = new IRIFunction(expr);
+//        fn.setBaseURI(node.getBaseURI());
+//        return fn;
     }
 
     @Override
@@ -671,6 +717,17 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
             return binary(node, FunctionRegistry.REGEX);
         }
         return ternary(node, FunctionRegistry.REGEX);
+    }
+
+    @Override
+    public FunctionNode visit(ASTReplace node, Object data)
+        throws VisitorException
+    {
+        if (node.jjtGetNumChildren() == 3) {
+            return ternary(node, FunctionRegistry.REPLACE);
+        }
+        return quadary(node, FunctionRegistry.REPLACE);
+//        return createFunctionCall(FN.REPLACE.toString(), node, 3, 4);
     }
 
     /**
@@ -747,6 +804,9 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     /**
      * Unwrap an {@link ASTInfix} node, returning the inner {@link FunctionNode}
      * constructed for it.
+     * <p>
+     * Note: Sesame has picked up the notion of an ASTInfix node, but they are
+     * handling it slightly differently.
      * 
      * @see http://www.openrdf.org/issues/browse/SES-818
      */

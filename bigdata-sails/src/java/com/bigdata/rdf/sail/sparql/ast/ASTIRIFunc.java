@@ -7,20 +7,36 @@ import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
 import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderVisitor;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
-public
-class ASTIRIFunc extends SimpleNode {
-  public ASTIRIFunc(int id) {
-    super(id);
-  }
+public class ASTIRIFunc extends SimpleNode {
+    private String baseURI;
 
-  public ASTIRIFunc(SyntaxTreeBuilder p, int id) {
-    super(p, id);
-  }
+    public ASTIRIFunc(int id) {
+        super(id);
+    }
 
+    public ASTIRIFunc(SyntaxTreeBuilder p, int id) {
+        super(p, id);
+    }
 
-  /** Accept the visitor. **/
-  public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data) throws VisitorException {
-    return visitor.visit(this, data);
-  }
+    /** Accept the visitor. **/
+    public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
+            throws VisitorException {
+        return visitor.visit(this, data);
+    }
+
+    /**
+     * @param baseURI
+     *            The baseURI to set.
+     */
+    public void setBaseURI(String baseURI) {
+        this.baseURI = baseURI;
+    }
+
+    /**
+     * @return Returns the baseURI.
+     */
+    public String getBaseURI() {
+        return baseURI;
+    }
 }
 /* JavaCC - OriginalChecksum=24686ad25db647184bbe120af4ee3c5c (do not edit this line) */

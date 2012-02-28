@@ -642,35 +642,93 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * ex:paul  ex:knows ex:george, ex:john .
      * </pre>
      */
-    public void test_subquery_04() throws Exception {
+    public void test_sparql11_subquery_04() throws Exception {
         
         new TestHelper(
                 "sparql11-subquery-04", // testURI,
                 "sparql11-subquery-04.rq",// queryFileURL
                 "sparql11-subquery-04.ttl",// dataFileURL
                 "sparql11-subquery-04.srx"// resultFileURL
-                ).runTest();
-        
+        ).runTest();
+
     }
-    
+
     /**
-     * This is BSBM BI query 05 on the PC100 data set. We picked this up with
-     * Sesame 2.6.3. It is failing with a "solution set not found" error in the
-     * TCK. The problem is reproduced by this test. However, the test is a bit
-     * long running, so take it out of this test suite once we get to the bottom
-     * of the problem.
-     * <p>
-     * Note: The problem with Q5 is likely to be the way it is written.
+     * TCK query we picked up with <code>Sesame 2.6.3</code>
      */
-    public void test_BSBM_BI_05() throws Exception {
-        
-        new TestHelper(
-                "BSBM BI 05", // testURI,
-                "bsbm-bi-q5.rq",// queryFileURL
-                "bsbm-100.ttl",// dataFileURL
-                "bsbm-bi-q5.srx"// resultFileURL
-                ).runTest();
-        
+    public void test_sparql11_order_02() throws Exception {
+
+        new TestHelper("sparql11-order-02", // testURI,
+                "sparql11-order-02.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ,false// laxCardinality
+                ,true// checkOrder
+        ).runTest();
+
     }
+
+    /**
+     * TCK query we picked up with <code>Sesame 2.6.3</code>
+     */
+    public void test_sparql11_order_03() throws Exception {
+
+        new TestHelper("sparql11-order-03", // testURI,
+                "sparql11-order-03.rq",// queryFileURL
+                "sparql11-order-03.ttl",// dataFileURL
+                "sparql11-order-03.srx"// resultFileURL
+                ,false// laxCardinality
+                ,true// checkOrder
+        ).runTest();
+
+    }
+
+    /**
+     * TCK test for the BINDINGS clause.
+     */
+    public void test_sparql11_bindings_01() throws Exception {
+
+        new TestHelper("sparql11-bindings-01", // testURI,
+                "sparql11-bindings-01.rq",// queryFileURL
+                "sparql11-bindings-01.ttl",// dataFileURL
+                "sparql11-bindings-01.srx"// resultFileURL
+        ).runTest();
+
+    }
+
+    /**
+     * TCK test for the BINDINGS clause.
+     */
+    public void test_sparql11_bindings_02() throws Exception {
+
+        new TestHelper("sparql11-bindings-02", // testURI,
+                "sparql11-bindings-02.rq",// queryFileURL
+                "sparql11-bindings-02.ttl",// dataFileURL
+                "sparql11-bindings-02.srx"// resultFileURL
+        ).runTest();
+
+    }
+
+//    /**
+//     * This is BSBM BI query 05 on the PC100 data set. We picked this up with
+//     * Sesame 2.6.3. It is failing with a "solution set not found" error in the
+//     * TCK. The problem is reproduced by this test. However, the test is a bit
+//     * long running, so take it out of this test suite once we get to the bottom
+//     * of the problem.
+//     * <p>
+//     * Note: The problem with Q5 is likely to be the way it is written.
+//     */
+//    public void test_BSBM_BI_05() throws Exception {
+//        
+//        new TestHelper(
+//                "BSBM BI 05", // testURI,
+//                "bsbm-bi-q5.rq",// queryFileURL
+//                "bsbm-100.ttl",// dataFileURL
+//                "bsbm-bi-q5.srx"// resultFileURL
+//                ,false// laxCardinality
+//                ,true// checkOrder
+//                ).runTest();
+//        
+//    }
     
 }

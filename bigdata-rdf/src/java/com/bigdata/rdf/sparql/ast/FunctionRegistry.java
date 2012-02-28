@@ -153,11 +153,14 @@ public class FunctionRegistry {
     public static final URI ENCODE_FOR_URI = FN.ENCODE_FOR_URI;//new URIImpl(SPARQL_FUNCTIONS+"encodeForUri");
     public static final URI STR_LEN = FN.STRING_LENGTH;//new URIImpl(XPATH_FUNCTIONS+"string-length");
     public static final URI SUBSTR = FN.SUBSTRING;//new URIImpl(SPARQL_FUNCTIONS+"substr");
-    public static final URI STARTS_WITH = FN.STARTS_WITH; // FIXME implement 
-    public static final URI ENDS_WITH = FN.ENDS_WITH; // FIXME implement
+    public static final URI STARTS_WITH = FN.STARTS_WITH; 
+    public static final URI ENDS_WITH = FN.ENDS_WITH;
+    public static final URI STR_AFTER = FN.SUBSTRING_AFTER; // FIXME implement. See StrAfter
+    public static final URI STR_BEFORE = FN.SUBSTRING_BEFORE; // FIXME implement. See StrBefore
+    public static final URI REPLACE = FN.REPLACE; // FIXME implement. See Replace.
 
     /**
-     * FIXME Implement and register the IRI function, as defined in <a
+     * The IRI function, as defined in <a
      * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
      * Language for RDF</a>.
      */
@@ -165,8 +168,7 @@ public class FunctionRegistry {
             + "iri");
 
     /**
-     * FIXME Implement and register the BNODE()/BNODE(Literal) function as
-     * defined in <a
+     * The BNODE()/BNODE(Literal) function as defined in <a
      * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
      * Language for RDF</a>.
      */

@@ -63,6 +63,7 @@ import com.bigdata.relation.accesspath.MultiSourceSequentialCloseableIterator;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Memoizer;
 import com.sun.jini.thread.Executor;
 
@@ -615,9 +616,22 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             /*
              * Create task to consume that source.
              */
-            final ChunkFutureTask cft = new ChunkFutureTask(new ChunkTask(
-                    bundle.bopId, bundle.shardId, naccepted, isLastInvocation,
-                    source));
+            final ChunkFutureTask cft;
+            try {
+                cft = new ChunkFutureTask(
+                        new ChunkTask(bundle.bopId, bundle.shardId,
+                                naccepted, isLastInvocation, source));
+            } catch (Throwable t2) {
+                // Ensure accepted messages are released();
+                safeRelease(accepted);
+                halt(t2); // ensure query halts.
+                if (getCause() != null) {
+                    // Abnormal termination - wrap and rethrow.
+                    throw new RuntimeException(t2);
+                }
+                // normal termination - swallow the exception.
+                return false;
+            }
             /*
              * Save the Future for this task. Together with the logic above this
              * may be used to limit the #of concurrent tasks per (bopId,shardId)
@@ -637,18 +651,47 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             getQueryEngine().execute(cft);
             return true;
             } catch(Throwable t) {
-                try {
-                    // Ensure messages are released().
-                    for (IChunkMessage<IBindingSet> msg : accepted)
-                        msg.release();
-                } catch (Throwable t2) {
-                    log.error(t2, t2);
-                }
+                // Ensure accepted messages are released();
+                safeRelease(accepted);
                 // wrap and rethrow cause.
                 throw new RuntimeException(t);
             }
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * Ensure messages are {@link IChunkMessage#release() released()}. Nothing
+     * is thrown unless the {@link Throwable} has a root cause which indicates
+     * an interrupt.
+     * 
+     * @param accepted
+     *            The messages.
+     * 
+     * @throws RuntimeException
+     *             wrapping an {@link InterruptedException} cause.
+     */
+    private void safeRelease(final List<IChunkMessage<IBindingSet>> accepted) {
+        if (accepted == null)
+            return;
+        try {
+            for (IChunkMessage<IBindingSet> msg : accepted) {
+                try {
+                    msg.release();
+                } catch (Throwable t2) {
+                    if (isRootCauseInterrupt(t2)) {
+                        throw t2;
+                    }
+                    log.error("Could not release message: " + msg, t2);
+                }
+            }
+        } catch (Throwable t2) {
+            if (isRootCauseInterrupt(t2)) {
+                // Wrap and throw out.
+                throw new RuntimeException(t2);
+            }
+            log.error(t2, t2);
         }
     }
 

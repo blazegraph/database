@@ -36,6 +36,14 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
+/**
+ * The BNODE()/BNODE(Literal) function as defined in <a
+ * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+ * Language for RDF</a>.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ */
 public class BNodeBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -8448763718374010166L;
