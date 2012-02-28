@@ -46,8 +46,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Property path support is not yet integrated into this class.
  */
 public class TriplePatternExprBuilder extends ValueExprBuilder {
 
@@ -223,33 +221,33 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
     // FIXME Property paths (Implement).
     //
 
-//  @Override
-//  public Object visit(ASTPathAlternative pathAltNode, Object data)
-//      throws VisitorException
-//  {
+//    @Override
+//    public Object visit(ASTPathAlternative pathAltNode, Object data)
+//        throws VisitorException
+//    {
 //
-//      if (pathAltNode.jjtGetNumChildren() > 1) {
+//        if (pathAltNode.jjtGetNumChildren() > 1) {
 //
-//          GraphPattern parentGP = graphPattern;
+//            GraphPattern parentGP = graphPattern;
 //
-//          graphPattern = new GraphPattern(parentGP);
-//          pathAltNode.jjtGetChild(0).jjtAccept(this, data);
-//          TupleExpr leftArg = graphPattern.buildTupleExpr();
+//            graphPattern = new GraphPattern(parentGP);
+//            pathAltNode.jjtGetChild(0).jjtAccept(this, data);
+//            TupleExpr leftArg = graphPattern.buildTupleExpr();
 //
-//          graphPattern = new GraphPattern(parentGP);
+//            graphPattern = new GraphPattern(parentGP);
 //
-//          pathAltNode.jjtGetChild(1).jjtAccept(this, data);
-//          TupleExpr rightArg = graphPattern.buildTupleExpr();
-//          parentGP.addRequiredTE(new Union(leftArg, rightArg));
+//            pathAltNode.jjtGetChild(1).jjtAccept(this, data);
+//            TupleExpr rightArg = graphPattern.buildTupleExpr();
+//            parentGP.addRequiredTE(new Union(leftArg, rightArg));
 //
-//          graphPattern = parentGP;
-//      }
-//      else {
-//          pathAltNode.jjtGetChild(0).jjtAccept(this, data);
-//      }
+//            graphPattern = parentGP;
+//        }
+//        else {
+//            pathAltNode.jjtGetChild(0).jjtAccept(this, data);
+//        }
 //
-//      return null;
-//  }
+//        return null;
+//    }
 //
 //  @Override
 //  public PropertySetElem visit(ASTPathOneInPropertySet node, Object data)
@@ -339,7 +337,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //            else if (pathElement.isNestedPath()) {
 //                GraphPattern parentGP = graphPattern;
 //
-//                graphPattern = new GraphPattern();
+//                graphPattern = new GraphPattern(parentGP);
 //
 //                if (i == pathLength - 1) {
 //                    // last element in the path

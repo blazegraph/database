@@ -5,17 +5,6 @@
  */
 package com.bigdata.rdf.sail.sparql.ast;
 
-import java.util.List;
-
-import com.bigdata.rdf.sail.sparql.ast.ASTGroupClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTHavingClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTLimit;
-import com.bigdata.rdf.sail.sparql.ast.ASTOffset;
-import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
-import com.bigdata.rdf.sail.sparql.ast.ASTOrderClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTWhereClause;
-import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
-
 public abstract class ASTQuery extends ASTOperation {
 
 	public ASTQuery(int id) {
@@ -42,6 +31,10 @@ public abstract class ASTQuery extends ASTOperation {
 		return jjtGetChild(ASTHavingClause.class);
 	}
 
+	public ASTBindingsClause getBindingsClause() {
+        return jjtGetChild(ASTBindingsClause.class);
+    }
+	   
 	public boolean hasLimit() {
 		return getLimit() != null;
 	}

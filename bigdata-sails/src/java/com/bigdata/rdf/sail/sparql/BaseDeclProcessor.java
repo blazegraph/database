@@ -11,7 +11,9 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRIFunc;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
+import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
 /**
@@ -95,6 +97,20 @@ public class BaseDeclProcessor {
 			return super.visit(node, data);
 		}
 
+		@Override
+        public Object visit(ASTIRIFunc node, Object data)
+            throws VisitorException
+        {
+            node.setBaseURI(parsedBaseURI.toString());
+            return super.visit(node, data);
+        }
 
+        @Override
+        public Object visit(ASTServiceGraphPattern node, Object data)
+            throws VisitorException
+        {
+            node.setBaseURI(parsedBaseURI.toString());
+            return super.visit(node, data);
+        }
 	}
 }

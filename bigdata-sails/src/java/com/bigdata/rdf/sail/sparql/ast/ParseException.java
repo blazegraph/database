@@ -2,8 +2,6 @@
 /* JavaCCOptions:KEEP_LINE_COL=null */
 package com.bigdata.rdf.sail.sparql.ast;
 
-import com.bigdata.rdf.sail.sparql.ast.Token;
-
 /**
  * This exception is thrown when parse errors are encountered.
  * You can explicitly create objects of this exception type by
@@ -186,4 +184,4 @@ public class ParseException extends Exception {
    }
 
 }
-/* JavaCC - OriginalChecksum=c895d8ebbc33f62dec81c50b54bd07bc (do not edit this line) */
+/* JavaCC - OriginalChecksum=7e2e94888c96d9c789c6bf29cb1bb89e (do not edit this line) */

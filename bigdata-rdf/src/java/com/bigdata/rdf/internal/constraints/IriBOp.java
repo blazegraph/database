@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -37,6 +35,14 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
+/**
+ * The IRI function, as defined in <a
+ * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+ * Language for RDF</a>.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ */
 public class IriBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -8448763718374010166L;
