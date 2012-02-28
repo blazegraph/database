@@ -176,10 +176,28 @@ public class BuildInfo {
                 style="${ant.home}/etc/jdepend.xsl" />
     </target>
 
+    <!-- Note: This will (re-)compile the SPARQL grammar.  Compilation is -->
+    <!-- fast, but javacc must be installed. -->
+    <target name="javacc" depends="prepare"
+    	description="Compile the SPARQL grammar.">
+    <jjtree
+    	javacchome="${javacc.home}"
+    	target="bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jjt"
+    	outputfile="sparql.jj"
+        outputdirectory="bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
+    />
+    <javacc
+    	javacchome="${javacc.home}"
+		target="bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jj"
+    	outputdirectory="bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
+		/>
+    </target>
+    
 	<!-- Note: javac error results often if verbose is disabled. -->
 	<!-- I was able to perform a build with 1.6.0_07. -->
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
-	<target name="compile" depends="prepare, buildinfo">
+	<target name="compile" depends="prepare, buildinfo"
+	    description="Compile the code base.">
 		<mkdir dir="${build.dir}" />
 	    <echo>javac</echo>
 	    <echo>    destdir="${build.dir}"</echo>
