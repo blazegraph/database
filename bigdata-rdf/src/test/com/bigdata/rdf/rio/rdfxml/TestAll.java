@@ -27,6 +27,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import org.apache.log4j.Logger;
+
 /**
  * Aggregates test suites into increasing dependency order.
  *
@@ -35,6 +37,8 @@ import junit.framework.TestSuite;
  */
 public class TestAll extends TestCase {
 
+    private static final Logger log = Logger.getLogger(TestAll.class);
+    
     /**
      * 
      */
@@ -60,8 +64,16 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestRDFXMLWriterFactory.class);
 
+        try {
+            suite.addTest(RDFXMLParserTest.suite());
+        } catch (Exception ex) {
+            log.error(ex, ex);
+        }
+
+        suite.addTestSuite(RDFXMLWriterTest.class);
+
         return suite;
-        
+
     }
-    
+
 }

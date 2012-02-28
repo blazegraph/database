@@ -36,6 +36,9 @@ import com.bigdata.rdf.store.BD;
  * the interchange of statement-level provenance.
  * 
  * @see BD#SID
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/498"> Bring
+ *      bigdata RDF/XML parser up to openrdf 2.6.3.</a>
  */
 public class BigdataRDFXMLWriter implements RDFWriter {
 
@@ -45,7 +48,9 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 
 	protected Writer writer;
 
-	protected Map<String, String> namespaceTable;
+	protected String defaultNamespace;
+
+	protected final Map<String, String> namespaceTable;
 
 	protected boolean writingStarted;
 
@@ -91,7 +96,7 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 
 	public void startRDF() {
 		if (writingStarted) {
-			throw new RuntimeException("Document writing has already started");
+            throw new IllegalStateException("Document writing has already started");
 		}
 		writingStarted = true;
 	}
@@ -102,26 +107,34 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 		try {
 			// This export format needs the RDF namespace to be defined, add a
 			// prefix for it if there isn't one yet.
-			setNamespace("rdf", RDF.NAMESPACE, false);
+			setNamespace("rdf", RDF.NAMESPACE);
 
             // Namespace the [graph] attribute.
-            setNamespace("bigdata", BD.NAMESPACE, false);
+            setNamespace("bigdata", BD.NAMESPACE);
 
 			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
 			writeStartOfStartTag(RDF.NAMESPACE, "RDF");
 
-			for (Map.Entry<String, String> entry : namespaceTable.entrySet()) {
+            if (defaultNamespace != null) {
+                writeNewLine();
+                writeIndent();
+                writer.write("xmlns=\"");
+                writer.write(XMLUtil.escapeDoubleQuotedAttValue(defaultNamespace));
+                writer.write("\"");
+            }
+
+            for (Map.Entry<String, String> entry : namespaceTable.entrySet()) {
 				String name = entry.getKey();
 				String prefix = entry.getValue();
 
 				writeNewLine();
 				writeIndent();
-				writer.write("xmlns");
-				if (prefix.length() > 0) {
-					writer.write(':');
+				writer.write("xmlns:");
+//				if (prefix.length() > 0) {
+//					writer.write(':');
 					writer.write(prefix);
-				}
+//				}
 				writer.write("=\"");
 				writer.write(XMLUtil.escapeDoubleQuotedAttValue(name));
 				writer.write("\"");
@@ -140,7 +153,7 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 		throws RDFHandlerException
 	{
 		if (!writingStarted) {
-			throw new RuntimeException("Document writing has not yet started");
+			throw new IllegalStateException("Document writing has not yet started");
 		}
 
 		try {
@@ -165,56 +178,49 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 	}
 
 	public void handleNamespace(String prefix, String name) {
-		setNamespace(prefix, name, false);
+		setNamespace(prefix, name);
 	}
 
-	protected void setNamespace(String prefix, String name, boolean fixedPrefix) {
-		if (headerWritten) {
-			// Header containing namespace declarations has already been written
-			return;
-		}
+    protected void setNamespace(String prefix, String name) {
+        if (headerWritten) {
+            // Header containing namespace declarations has already been written
+            return;
+        }
 
-		if (!namespaceTable.containsKey(name)) {
-			// Namespace not yet mapped to a prefix, try to give it the specified
-			// prefix
-			
-			boolean isLegalPrefix = prefix.length() == 0 || XMLUtil.isNCName(prefix);
-			
-			if (!isLegalPrefix || namespaceTable.containsValue(prefix)) {
-				// Specified prefix is not legal or the prefix is already in use,
-				// generate a legal unique prefix
+        if (prefix.length() == 0) {
+            defaultNamespace = name;
+            return;
+        }
 
-				if (fixedPrefix) {
-					if (isLegalPrefix) {
-						throw new IllegalArgumentException("Prefix is already in use: " + prefix);
-					}
-					else {
-						throw new IllegalArgumentException("Prefix is not a valid XML namespace prefix: " + prefix);
-					}
-				}
+        if (namespaceTable.containsKey(name)) {
+            // Namespace is already mapped to a prefix
+            return;
+        }
 
-				if (prefix.length() == 0 || !isLegalPrefix) {
-					prefix = "ns";
-				}
+        // Try to give the namespace the specified prefix
+        boolean isLegalPrefix = XMLUtil.isNCName(prefix);
 
-				int number = 1;
+        if (!isLegalPrefix || namespaceTable.containsValue(prefix)) {
+            // Specified prefix is not legal or the prefix is already in use,
+            // generate a legal unique prefix
+            if (!isLegalPrefix) {
+                prefix = "ns";
+            }
+            int number = 1;
+            while (namespaceTable.containsValue(prefix + number)) {
+                number++;
+            }
+            prefix += number;
+        }
 
-				while (namespaceTable.containsValue(prefix + number)) {
-					number++;
-				}
-
-				prefix += number;
-			}
-
-			namespaceTable.put(name, prefix);
-		}
-	}
+        namespaceTable.put(name, prefix);
+    }
 
 	public void handleStatement(Statement st)
 		throws RDFHandlerException
 	{
 		if (!writingStarted) {
-			throw new RuntimeException("Document writing has not yet been started");
+			throw new IllegalStateException("Document writing has not yet been started");
 		}
 
 		Resource subj = st.getSubject();
@@ -377,7 +383,7 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 	}
 
 	protected void flushPendingStatements()
-		throws IOException
+		throws IOException, RDFHandlerException
 	{
 		if (lastWrittenSubject != null) {
 			// The last statement still has to be closed:
@@ -391,7 +397,12 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 	protected void writeStartOfStartTag(String namespace, String localName)
 		throws IOException
 	{
-		String prefix = namespaceTable.get(namespace);
+        if (namespace.equals(defaultNamespace)) {
+            writer.write("<");
+            writer.write(localName);
+        }
+        else {
+        String prefix = namespaceTable.get(namespace);
 
 		if (prefix == null) {
 			writer.write("<");
@@ -400,17 +411,18 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 			writer.write(XMLUtil.escapeDoubleQuotedAttValue(namespace));
 			writer.write("\"");
 		}
-		else if (prefix.length() == 0) {
-			// default namespace
-			writer.write("<");
-			writer.write(localName);
-		}
+//		else if (prefix.length() == 0) {
+//			// default namespace
+//			writer.write("<");
+//			writer.write(localName);
+//		}
 		else {
 			writer.write("<");
 			writer.write(prefix);
 			writer.write(":");
 			writer.write(localName);
 		}
+        }
 	}
 
 	protected void writeAttribute(String attName, String value)
@@ -424,14 +436,15 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 	}
 
 	protected void writeAttribute(String namespace, String attName, String value)
-		throws IOException
+		throws IOException, RDFHandlerException
 	{
+        // Note: attribute cannot use the default namespace
 		String prefix = namespaceTable.get(namespace);
 
-		if (prefix == null || prefix.length() == 0) {
-			throw new RuntimeException("No prefix has been declared for the namespace used in this attribute: "
-					+ namespace);
-		}
+        if (prefix == null) {
+            throw new RDFHandlerException(
+                    "No prefix has been declared for the namespace used in this attribute: " + namespace);
+        }
 
 		writer.write(" ");
 		writer.write(prefix);
@@ -454,24 +467,25 @@ public class BigdataRDFXMLWriter implements RDFWriter {
 		writer.write("/>");
 	}
 
-	protected void writeEndTag(String namespace, String localName)
-		throws IOException
-	{
-		String prefix = namespaceTable.get(namespace);
-
-		if (prefix == null || prefix.length() == 0) {
-			writer.write("</");
-			writer.write(localName);
-			writer.write(">");
-		}
-		else {
-			writer.write("</");
-			writer.write(prefix);
-			writer.write(":");
-			writer.write(localName);
-			writer.write(">");
-		}
-	}
+    protected void writeEndTag(String namespace, String localName)
+            throws IOException
+    {
+        if (namespace.equals(defaultNamespace)) {
+            writer.write("</");
+            writer.write(localName);
+            writer.write(">");
+        }
+        else {
+            writer.write("</");
+            String prefix = namespaceTable.get(namespace);
+            if (prefix != null) {
+                writer.write(prefix);
+                writer.write(":");
+            }
+            writer.write(localName);
+            writer.write(">");
+        }
+    }
 
 	protected void writeCharacterData(String chars)
 		throws IOException

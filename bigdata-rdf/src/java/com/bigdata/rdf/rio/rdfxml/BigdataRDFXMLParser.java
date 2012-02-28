@@ -17,7 +17,6 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.Stack;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -91,10 +90,12 @@ import com.bigdata.rdf.store.BD;
  * @author Bryan Thompson
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439"> Class loader problems </a>
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/498"> Bring
+ *      bigdata RDF/XML parser up to openrdf 2.6.3.</a>
  */
 public class BigdataRDFXMLParser extends RDFParserBase {
 
-    private static final Logger log = Logger.getLogger(BigdataRDFXMLParser.class);
+//    private static final Logger log = Logger.getLogger(BigdataRDFXMLParser.class);
     
 	/*-----------*
 	 * Variables *
@@ -174,7 +175,7 @@ public class BigdataRDFXMLParser extends RDFParserBase {
 		// SAXFilter does some filtering and verifying of SAX events
 		saxFilter = new SAXFilter(this);
         
-        log.info("this is the bigdata parser");
+//        log.info("this is the bigdata parser");
 	}
 
 	/*---------*
@@ -293,20 +294,23 @@ public class BigdataRDFXMLParser extends RDFParserBase {
 			xmlReader.parse(inputSource);
 			rdfHandler.endRDF();
 		}
-		catch (SAXParseException e) {
-			Exception wrappedExc = e.getException();
-			if (wrappedExc == null) {
-				wrappedExc = e;
-			}
-			reportFatalError(wrappedExc, e.getLineNumber(), e.getColumnNumber());
-		}
-		catch (SAXException e) {
-			Exception wrappedExc = e.getException();
-			if (wrappedExc == null) {
-				wrappedExc = e;
-			}
+        catch (SAXParseException e) {
+            Exception wrappedExc = e.getException();
 
-			if (wrappedExc instanceof RDFParseException) {
+            if (wrappedExc == null) {
+                reportFatalError(e, e.getLineNumber(), e.getColumnNumber());
+            }
+            else {
+                reportFatalError(wrappedExc, e.getLineNumber(), e.getColumnNumber());
+            }
+        }
+        catch (SAXException e) {
+            Exception wrappedExc = e.getException();
+
+            if (wrappedExc == null) {
+                reportFatalError(e);
+            }
+            else if (wrappedExc instanceof RDFParseException) {
 				throw (RDFParseException)wrappedExc;
 			}
 			else if (wrappedExc instanceof RDFHandlerException) {
@@ -797,7 +801,7 @@ public class BigdataRDFXMLParser extends RDFParserBase {
 			// Check for rdf:datatype attribute
 			Att datatype = atts.removeAtt(RDF.NAMESPACE, "datatype");
 			if (datatype != null) {
-				URI dtURI = createURI(datatype.getValue());
+				URI dtURI = resolveURI(datatype.getValue());
 				predicate.setDatatype(dtURI);
 			}
 
