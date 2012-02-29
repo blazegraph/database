@@ -104,6 +104,13 @@ public class TestAll extends TestCase {
 
         // Test suite for FILTER evaluation.
         suite.addTestSuite(TestFilters.class);
+
+        // Test suite for SPARQL 1.1 BINDINGS clause
+        suite.addTestSuite(TestBindings.class);
+
+        // Test suites for SPARQL 1.1 Federated Query
+        suite.addTestSuite(TestServiceInternal.class);
+        suite.addTestSuite(TestServiceExternal.class);
         
         // Full text search
         suite.addTestSuite(TestSearch.class);

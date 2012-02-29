@@ -219,6 +219,26 @@ class GroupGraphPattern {
         return groupNode;
 
     }
+    
+    /**
+     * Useful when the caller knows that the children will be a single
+     * {@link JoinGroupNode}.
+     * 
+     * @return That {@link JoinGroupNode}.
+     */
+    public JoinGroupNode getSingletonGroup() {
+        
+        assertValid();
+        
+        invalid = true;
+
+        if (children.size() != 1)
+            throw new RuntimeException("Expecting one child, not "
+                    + children.size());
+        
+        return (JoinGroupNode) children.get(0);
+        
+    }
 
     public String toString() {
         final StringBuilder sb = new StringBuilder();

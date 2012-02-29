@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 8, 2011
+ * Created on Feb 29, 2012
  */
 
 package com.bigdata.rdf.sparql.ast;
@@ -30,10 +30,10 @@ package com.bigdata.rdf.sparql.ast;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Factory for creating objects which can talk to registered service URIs within
- * the same JVM.
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public interface ServiceFactory {
+public interface BigdataServiceFactory extends ServiceFactory {
 
     /**
      * Create a service invocation object.
@@ -46,8 +46,8 @@ public interface ServiceFactory {
      * @return The object which can be used to evaluate the service on the graph
      *         pattern.
      */
-    ServiceCall<? extends Object> create(
-            final AbstractTripleStore store,
+    @Override
+    BigdataServiceCall create(final AbstractTripleStore store,
             final IGroupNode<IGroupMemberNode> groupNode);
 
 }

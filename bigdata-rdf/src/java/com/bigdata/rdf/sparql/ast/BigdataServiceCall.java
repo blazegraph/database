@@ -12,15 +12,4 @@ import com.bigdata.rdf.internal.IV;
  */
 public interface BigdataServiceCall extends ServiceCall<IBindingSet> {
 
-//    /**
-//     * Invoke an in-process, {@link IV} aware service.
-//     * 
-//     * @param bindingSets
-//     *            The BindingsClause from the SPARQL grammar.
-//     * 
-//     * @return An iterator from which the solutions can be drained. If the
-//     *         iterator is closed, the service invocation must be cancelled.
-//     */
-//    ICloseableIterator<IBindingSet> call(IBindingSet[] bindingSets);
-
 }

@@ -51,6 +51,10 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         /**
          * The service {@link URI}, which will be resolved against the
          * {@link ServiceRegistry} to obtain a {@link ServiceCall} object.
+         * 
+         * FIXME This needs to be a value expression, which can evaluate to a
+         * URI or a variable.  The query planner needs to handle the case where
+         * it is a variable differently.
          */
         String SERVICE_URI = "serviceURI";
 
@@ -60,6 +64,16 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
          * made available to the {@link ServiceCall}.
          */
         String NAMESPACE = "namespace";
+     
+        /**
+         * The "SELECT" option.
+         * 
+         * TODO Lift out. This is used for many things in SPARQL UPDATE, not 
+         * just for SPARQL Federation.
+         */
+        String SILENT = "silent";
+        
+        boolean DEFAULT_SILENT = false;
         
     }
 
@@ -93,10 +107,9 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
      *            just a constant URI.
      */
     public ServiceNode(//
-            final URI serviceURI,
-            final IGroupNode<IGroupMemberNode> groupNode) {
+            final URI serviceURI, final IGroupNode<IGroupMemberNode> groupNode) {
 
-        super(new BOp[]{}, null/*anns*/);
+        super(new BOp[] {}, null/* anns */);
 
         super.setProperty(Annotations.SERVICE_URI, serviceURI);
 
@@ -155,6 +168,18 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         
     }
 
+    final public boolean isSilent() {
+
+        return getProperty(Annotations.SILENT, Annotations.DEFAULT_SILENT);
+
+    }
+
+    final public void setSilent(final boolean silent) {
+
+        setProperty(Annotations.SILENT, silent);
+
+    }
+
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -185,7 +210,11 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
         sb.append("\n");
         sb.append(indent(indent));
-        sb.append("SERVICE <");
+        sb.append("SERVICE");
+        if(isSilent()) {
+            sb.append(" SILENT");
+        }
+        sb.append(" <"); // FIXME This is not always a URI (TermId or ValueExpr)
         sb.append(serviceURI);
         sb.append("> ");
 

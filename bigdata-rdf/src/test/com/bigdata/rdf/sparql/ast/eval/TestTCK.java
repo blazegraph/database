@@ -683,32 +683,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    /**
-     * TCK test for the BINDINGS clause.
-     */
-    public void test_sparql11_bindings_01() throws Exception {
-
-        new TestHelper("sparql11-bindings-01", // testURI,
-                "sparql11-bindings-01.rq",// queryFileURL
-                "sparql11-bindings-01.ttl",// dataFileURL
-                "sparql11-bindings-01.srx"// resultFileURL
-        ).runTest();
-
-    }
-
-    /**
-     * TCK test for the BINDINGS clause.
-     */
-    public void test_sparql11_bindings_02() throws Exception {
-
-        new TestHelper("sparql11-bindings-02", // testURI,
-                "sparql11-bindings-02.rq",// queryFileURL
-                "sparql11-bindings-02.ttl",// dataFileURL
-                "sparql11-bindings-02.srx"// resultFileURL
-        ).runTest();
-
-    }
-
 //    /**
 //     * This is BSBM BI query 05 on the PC100 data set. We picked this up with
 //     * Sesame 2.6.3. It is failing with a "solution set not found" error in the

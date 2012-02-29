@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.rdf.sail.sparql.ast.ASTBasicGraphPattern;
@@ -47,6 +48,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTLet;
 import com.bigdata.rdf.sail.sparql.ast.ASTMinusGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTNamedSubqueryInclude;
 import com.bigdata.rdf.sail.sparql.ast.ASTOptionalGraphPattern;
+import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTUnionGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.ASTWhereClause;
@@ -57,6 +59,7 @@ import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -277,7 +280,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * semantics.
      * <p>
      * Note: The grammar file treats OPTIONAL somewhat differently than MINUS
-     * due to the scope of the filters. For OPTIOANL, the child group can see
+     * due to the scope of the filters. For OPTIONAL, the child group can see
      * the variable bindings in the parent group. That is not true for MINUS.
      * Therefore the code in this method only sets the MINUS attribute on the
      * group and does not need to create a new group.
@@ -565,7 +568,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 //             * consider N x M solutions, rather than selectively probing a hash
 //             * index to find just those solutions which could match.)
 //             * 
-//             * TODO We should recognize the syntax () as explicitly requesting
+//             * Note: We should recognize the syntax () as explicitly requesting
 //             * a join without join variables.  This would have to be done as an
 //             * action in [sparql.jjt].
 //             */
@@ -588,6 +591,84 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         return null;
         
+    }
+
+//    public Object visit(ASTServiceGraphPattern node, Object data)
+//        throws VisitorException
+//    {
+//        GraphPattern parentGP = graphPattern;
+//
+//        ValueExpr serviceRef = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
+//
+//        graphPattern = new GraphPattern(parentGP);
+//        node.jjtGetChild(1).jjtAccept(this, null);
+//        TupleExpr serviceExpr = graphPattern.buildTupleExpr();
+//        
+//        if (serviceExpr instanceof SingletonSet)
+//            return null;    // do not add an empty service block
+//        
+//        String serviceExpressionString = node.getPatternString();
+//
+//        parentGP.addRequiredTE(new Service(valueExpr2Var(serviceRef), serviceExpr, serviceExpressionString,
+//                node.getPrefixDeclarations(), node.getBaseURI(), node.isSilent()));
+//
+//        graphPattern = parentGP;
+//
+//        return null;
+//    }
+
+    /**
+     * SPARQL 1.1 SERVICE.
+     */
+    @Override
+    final public Void visit(final ASTServiceGraphPattern node,
+            Object data) throws VisitorException {
+
+        // left arg is the URI or variable for the service reference.
+        final ValueExpressionNode serviceRef = (ValueExpressionNode) node
+                .jjtGetChild(0).jjtAccept(this, null);
+
+        final GroupGraphPattern parentGP = graphPattern;
+
+        graphPattern = new GroupGraphPattern(parentGP);
+
+        // right arg is a some kind of group.
+        node.jjtGetChild(1).jjtAccept(this, null);
+
+        // Extract the service's join group.
+//        final JoinGroupNode graphNode = graphPattern.buildGroup(new JoinGroupNode());
+        final JoinGroupNode graphNode = graphPattern.getSingletonGroup();
+
+        graphPattern = parentGP;
+
+        /*
+         * FIXME Can not assume that the serviceRef is a URI. It can be a
+         * variable.
+         * 
+         * FIXME See the comment block above this method for how openrdf handles
+         * the data on the SERVICE node as reported by the parser.
+         * 
+         * FIXME Annotate ServiceNode with the actual text of the service's
+         * graph pattern.
+         * 
+         * FIXME Do we need to pass through the baseURI?
+         * 
+         * FIXME What about prefix declarations?
+         */
+        final URI serviceUri = (URI) ((TermNode) serviceRef).getValue();
+        
+        final ServiceNode serviceNode = new ServiceNode(serviceUri, graphNode);
+
+        if(node.isSilent()) {
+            
+            serviceNode.setSilent(true);
+            
+        }
+        
+        graphPattern.add(serviceNode);
+        
+        return (Void) null;
+
     }
 
 }

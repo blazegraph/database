@@ -41,7 +41,7 @@ public interface ServiceCall<E> {
      * Invoke an service.
      * 
      * @param bindingSets
-     *            The BindingsClause from the SPARQL grammar.
+     *            The binding sets flowing into the service.
      * 
      * @return An iterator from which the solutions can be drained. If the
      *         iterator is closed, the service invocation must be cancelled.

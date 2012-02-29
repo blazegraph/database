@@ -30,9 +30,11 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.openrdf.model.URI;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.Constant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.constraints.ComputedIN;
@@ -48,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -991,4 +994,121 @@ public class TestGroupGraphPatternBuilder extends
 
     }
     
+    /**
+     * Simple SERVICE graph pattern.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o. SERVICE <http://bigdata.com/myService> {?s ?p ?o}}
+     * </pre>
+     * 
+     * FIXME Tests of the variable scope issues (more likely handled at the
+     * static analysis level).
+     * 
+     * FIXME Test with variable for the Service URI (this will require an AST
+     * model change and query planner change since the serviceRef is not always
+     * a URI and there are impacts on the query plan when it is a variable vs
+     * a URI).
+     * 
+     * FIXME Test to verify that we capture and retain the original string data
+     * for the SERVICE's graph pattern.
+     */
+    public void test_service_001()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. SERVICE <http://bigdata.com/myService> {?s ?p ?o}}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode groupNode = new JoinGroupNode();
+            groupNode.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final URI serviceURI = valueFactory
+                    .createURI("http://bigdata.com/myService");
+            
+            final ServiceNode serviceNode = new ServiceNode(serviceURI,
+                    groupNode);
+            
+            whereClause.addArg(serviceNode);
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Simple SERVICE graph pattern with SILENT keyword.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o. SERVICE SILENT <http://bigdata.com/myService> {?s ?p ?o}}
+     * </pre>
+     */
+    public void test_service_002()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. SERVICE SILENT <http://bigdata.com/myService> {?s ?p ?o}}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode groupNode = new JoinGroupNode();
+            groupNode.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final URI serviceURI = valueFactory
+                    .createURI("http://bigdata.com/myService");
+            
+            final ServiceNode serviceNode = new ServiceNode(serviceURI,
+                    groupNode);
+            
+            serviceNode.setSilent(true);
+            
+            whereClause.addArg(serviceNode);
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
 }
