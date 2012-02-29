@@ -67,6 +67,11 @@ public class QueryRoot extends QueryBase {
          */
         String NAMED_SUBQUERIES = "namedSubqueries";
 
+        /**
+         * The BINDINGS clause (optional).
+         */
+        String BINDINGS_CLAUSE = "bindingsClause";
+        
     }
 
     /**
@@ -227,6 +232,26 @@ public class QueryRoot extends QueryBase {
 
     }
 
+    /**
+     * Set the BINDINGS.
+     * 
+     * @param bindings
+     */
+    public void setBindingsClause(final BindingsClause bindings) {
+
+        setProperty(Annotations.BINDINGS_CLAUSE, bindings);
+
+    }
+
+    /**
+     * Return the BINDINGS.
+     */
+    public BindingsClause getBindingsClause() {
+
+        return (BindingsClause) getProperty(Annotations.BINDINGS_CLAUSE);
+
+    }
+    
     public String toString(final int indent) {
         
         final String s = indent(indent);
@@ -242,6 +267,8 @@ public class QueryRoot extends QueryBase {
         final Map<String/* prefix */, String/* uri */> prefixDecls = getPrefixDecls();
         
         final DatasetNode dataset = getDataset();
+
+        final BindingsClause bindings = getBindingsClause();
 
         final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
 
@@ -328,7 +355,13 @@ public class QueryRoot extends QueryBase {
         }
         
         sb.append(super.toString(indent));
-        
+
+        if (bindings != null) {
+
+            sb.append(bindings.toString(indent + 1));
+
+        }
+
         return sb.toString();
         
     }

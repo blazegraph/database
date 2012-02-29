@@ -35,13 +35,25 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTAskQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingSets;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingVars;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingsClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstructQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribe;
@@ -66,6 +78,8 @@ import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
@@ -160,6 +174,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleSlice(astQuery, queryRoot);
         
+        handleBindings(astQuery, queryRoot);
+        
         return queryRoot;
 
     }
@@ -200,6 +216,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         queryRoot.setSlice(slice);
         
+        handleBindings(node, queryRoot);
+
         return queryRoot;
         
     }
@@ -234,6 +252,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleSlice(node, queryRoot);
 
+        handleBindings(node, queryRoot);
+        
         return queryRoot;
         
     }
@@ -349,6 +369,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         handleOrderBy(node, queryRoot);
 
         handleSlice(node, queryRoot);
+        
+        handleBindings(node, queryRoot);
 
         return queryRoot;
 
@@ -783,6 +805,160 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         }
 
+    }
+
+    /**
+     * Handle an optional BINDINGS clause.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     * 
+     * @throws VisitorException
+     */
+    private void handleBindings(final ASTQuery astQuery,
+            final QueryBase queryRoot) throws VisitorException {
+
+        if(!(queryRoot instanceof QueryRoot)) {
+            // Only allowed on the QueryRoot
+            return;
+        }
+        
+        final ASTBindingsClause bindingsClause = astQuery.getBindingsClause();
+
+        if (bindingsClause == null)
+            return;
+
+        final BindingsClause bindingSets = visit(bindingsClause, null/* data */);
+
+        if (bindingSets.getBindingSetsCount() > 0) {
+
+            // Attach the binding sets (if any).
+            ((QueryRoot) queryRoot).setBindingsClause(bindingSets);
+
+        }
+
+    }
+
+    /**
+     * @return An object which encapsulates both the ordered set of variables
+     *         for which bindings exist and the set of binding sets. The
+     *         bindings are {@link BigdataValue}s. They must be translated into
+     *         {@link IV} through a batch resolution process before they can be
+     *         passed into the query engine.
+     */
+    @Override
+    final public BindingsClause visit(final ASTBindingsClause node, Object data)
+            throws VisitorException
+    {
+
+        // The ordered list of variable bindings.
+        final ASTBindingVars varNodes = (ASTBindingVars) node.jjtGetChild(0); 
+        final int nvars = varNodes.jjtGetNumChildren(); 
+        final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>(nvars);
+
+        {
+            for (Node varNode : varNodes.jjtGetChildren()) {
+                final VarNode var = (VarNode) varNode.jjtAccept(this, data);
+                final IVariable<?> v = var.getValueExpression();
+                if (!vars.add(v)) {
+                    throw new VisitorException("duplicate variable in BINDINGS");
+                }
+            }
+        }
+
+        /*
+         * Collect binding sets.
+         */
+        {
+
+            final ASTBindingSets bindingSetsNode = (ASTBindingSets) node
+                    .jjtGetChild(1);
+
+            final List<IBindingSet> bindingSets = new LinkedList<IBindingSet>();
+
+            final IVariable<?>[] declaredVars = vars
+                    .toArray(new IVariable[nvars]);
+
+            for (Node bindingNode : bindingSetsNode.jjtGetChildren()) {
+
+                final IBindingSet bindingSet = (IBindingSet) bindingNode
+                        .jjtAccept(this, declaredVars);
+
+                bindingSets.add(bindingSet);
+
+            }
+
+            return new BindingsClause(vars, bindingSets);
+
+        }
+        
+    }
+
+    /**
+     * Note: {@link BigdataValue}s have already been resolved to {@link IV}s.
+     * 
+     * @param data
+     *            The ordered variables for which bindings must be given.
+     * 
+     * @return The binding set. Variables will be bound unless UNDEF was
+     *         specified at the index corresponding to a given variable.
+     */
+    @Override
+    public IBindingSet visit(final ASTBindingSet node, final Object data)
+        throws VisitorException
+    {
+        
+        final IVariable<?>[] vars = (IVariable[]) data;
+
+        final int numberOfBindingValues = node.jjtGetNumChildren();
+
+        if (numberOfBindingValues != vars.length) {
+            throw new VisitorException(
+                    "number of values in bindingset does not match variables in BINDINGS clause");
+        }
+
+        final ListBindingSet bset = new ListBindingSet();
+
+        for (int i = 0; i < numberOfBindingValues; i++) {
+
+            final ConstantNode ve = (ConstantNode) node.jjtGetChild(i)
+                    .jjtAccept(this, null);
+
+            if (ve == null) {
+                
+                /*
+                 * No binding for the current variable in this binding set.
+                 */
+
+                continue;
+                
+            }
+
+            // valueExpr2Var(ve).getValue();
+
+            bset.set(vars[i], ve.getValueExpression());
+
+        }
+
+        return bset;
+        
+    }
+
+    @Override
+    public ValueExpressionNode visit(final ASTBindingValue node, final Object data)
+        throws VisitorException
+    {
+        if (node.jjtGetNumChildren() > 0) {
+            return (ValueExpressionNode) node.jjtGetChild(0).jjtAccept(this,
+                    data);
+        }
+        else {
+            // UNDEF
+            return null;
+        }
     }
 
 }

@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -85,6 +86,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -109,6 +111,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceCall;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -170,11 +173,14 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         /*
          * TODO Do we still want the ability to pass in an IBindingSet[] to
-         * query evaluation for the BindingsClauser or we are planning to handle
-         * this entirely via a "java" service interface. If so, then we need the
-         * ability to run the optimizer once we have evaluated that service
-         * request in order to do things like set an IN filter based on the
-         * returned solution set.
+         * query evaluation for the BindingsClause or we are planning to handle
+         * this entirely via a "java" service interface (or by stuffing the data
+         * into a named solution set during the query rewrite and attaching that
+         * named solution set to the AST).
+         * 
+         * TODO Do we need the ability to run the optimizer once we have
+         * evaluated that service request in order to do things like set an IN
+         * filter based on the returned solution set?
          * 
          * If we model this with an "inline access path", then that is really
          * very close to the Htree / hash join. The IN constraint could just be
@@ -768,14 +774,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * @param serviceNode
      * @param ctx
      * @return
-     * 
-     *         TODO Pass BindingsClause from QueryRoot through to Service.
-     * 
-     *         TODO When we provide an integration for Sesame aware services
-     *         (whether remote or local) the [doneSet] needs to be expanded by
-     *         the variables within the SERVICE's graph pattern which are known
-     *         bound after the SERVICE call since those variables will have been
-     *         (of necessity) materialized by the service.
      */
     static private PipelineOp addServiceCall(PipelineOp left,
             final ServiceNode serviceNode, final Set<IVariable<?>> doneSet,
@@ -787,20 +785,111 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(serviceNode), needsMaterialization);
 
+        final boolean silent = serviceNode.isSilent();
+        
+        final GraphPatternGroup<IGroupMemberNode> serviceGraphPattern = serviceNode
+                .getGraphPattern();
+
+        /*
+         * FIXME If the serviceRef is a Variable then we MUST add the
+         * materialization step since we can not know in advance whether any
+         * given binding for the serviceRef will be a REMOTE SERVICE or an
+         * internal bigdata aware service.
+         */
+        final URI serviceURI = serviceNode.getServiceURI();
+
+        // true IFF we need to materialize variables before running the SERVICE.
+        final boolean isMaterialize;
+        {
+            final ServiceCall<?> serviceCall = ServiceRegistry.toServiceCall(
+                    ctx.db, serviceURI, serviceGraphPattern);
+
+            /*
+             * true IFF the service is remote (services which are not registered
+             * are assumed to be remote).
+             */
+            // final boolean isRemote = serviceCall == null;
+
+            /*
+             * true IFF this is a registered bigdata aware service running in
+             * the same JVM.
+             */
+            final boolean isBigdata = serviceCall instanceof BigdataServiceCall;
+
+            isMaterialize = !isBigdata;
+        }
+
+        /*
+         * SERVICEs do not have explicit "projections" (there is no capacity to
+         * rename variables) but they still must hide variables which are not in
+         * scope. Also, if we have to materialize RDF Values for the SERVICE,
+         * then we have to ensure that anything gets materialized which is (a)
+         * used by the SERVICE; and (b) MIGHT be incoming bound to the SERVICE.
+         * 
+         * Note: The materialization requirement is only on entry to the
+         * SERVICE. Solutions which flow out of the SERVICE will already be
+         * materialized (though they might use mock IVs) unless the service is
+         * bigdata aware (in which case it is responsible for getting the IVs
+         * right).
+         * 
+         * FIXME getDefinitelyProducedBindings(final ServiceNode node) and
+         * getMaybeProducedBindings(final ServiceNode node) MUST be revisited.
+         * They assume that SERVICEs do not run "as bound". This is not true.
+         * For example, when the serviceRef is a variable the SERVICE will often
+         * run bound.
+         */
+        
+        // Anything which can flow out of the SERVICE is "projected".
+        final Set<IVariable<?>> projectedVars = ctx.sa
+                .getMaybeProducedBindings(serviceNode);
+        
+        final int rightId = ctx.nextId();
+        
+        if (isMaterialize) {
+
+            /*
+             * Setup materialization steps for any projected variables which
+             * MIGHT be incoming bound into the SERVICE call.
+             */
+
+            // Anything which MIGHT be bound by the time the SERVICE runs.
+            final Set<IVariable<?>> maybeBound = ctx.sa
+                    .getMaybeIncomingBindings(serviceNode,
+                            new LinkedHashSet<IVariable<?>>());
+            
+            final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+            vars.addAll(projectedVars); // start with everything "projected".
+            vars.retainAll(maybeBound); // retain "maybe" incoming bound vars.
+            vars.removeAll(doneSet); // remove already materialized vars.
+
+            if (!vars.isEmpty()) {
+
+                // Add the materialization step.
+                addMaterializationSteps(left, rightId, (Collection) vars, ctx);
+
+                // These variables have now been materialized.
+                doneSet.addAll(vars);
+                
+            }            
+        }
+        
         left = new ServiceCallJoin(leftOrEmpty(left), //
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.BOP_ID, rightId),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(ServiceCallJoin.Annotations.SERVICE_URI,
-                        serviceNode.getServiceURI()),//
+                        serviceURI),//
                 new NV(ServiceCallJoin.Annotations.GRAPH_PATTERN,
-                        serviceNode.getGraphPattern()),//
+                        serviceGraphPattern),//
                 new NV(ServiceCallJoin.Annotations.NAMESPACE,
                         ctx.db.getNamespace()),//
                 new NV(ServiceCallJoin.Annotations.TIMESTAMP,
                         ctx.db.getTimestamp()),//
+                new NV(ServiceCallJoin.Annotations.SILENT, silent),//
+                new NV(ServiceCallJoin.Annotations.PROJECTED_VARS,
+                        projectedVars),//
                 new NV(JoinAnnotations.CONSTRAINTS, joinConstraints)//
         );
 

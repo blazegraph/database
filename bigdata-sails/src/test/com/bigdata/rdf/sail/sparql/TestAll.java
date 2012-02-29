@@ -80,6 +80,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestSubqueryPatterns.class);
         
+        // Test suite for the BINDINGs clause.
+        suite.addTestSuite(TestBindingsClause.class);
+
         /*
          * Test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT),
          * including DISTINCT/REDUCED, GROUP BY, HAVING, ORDER BY, and

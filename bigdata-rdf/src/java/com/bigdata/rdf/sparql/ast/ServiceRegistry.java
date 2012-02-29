@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -13,8 +12,8 @@ import com.bigdata.rdf.store.BD;
 /**
  * Registry for service calls.
  * 
- * TODO We should restrict registration of services in the {@link BD#NAMESPACE}
- * to static initialization.
+ * TODO We should restrict registration/management of services in the
+ * {@link BD#NAMESPACE} to static initialization.
  */
 public class ServiceRegistry {
 
@@ -47,6 +46,18 @@ public class ServiceRegistry {
 
 	}
 
+    /**
+     * Return <code>true</code> iff a service for that URI was removed.
+     * 
+     * @param serviceURI
+     *            The service URI.
+     */
+    public static final boolean remove(final URI serviceURI) {
+
+        return services.remove(serviceURI) != null;
+
+    }
+
     public static final void addAlias(final URI serviceURI, final URI aliasURI) {
 
         if (!services.containsKey(serviceURI)) {
@@ -64,7 +75,7 @@ public class ServiceRegistry {
     }
 
     /**
-     * Convert a {@link FunctionNode} into an {@link IValueExpression}.
+     * Resolve a {@link ServiceCall} for a service {@link URI}.
      * 
      * @param store
      *            The {@link AbstractTripleStore}.
@@ -76,9 +87,10 @@ public class ServiceRegistry {
      * @param args
      *            The function arguments.
      * 
-     * @return The {@link IValueExpression}.
+     * @return The {@link ServiceCall} -or- <code>null</code> if there is no
+     *         service registered for that {@link URI}.
      */
-    public static final BigdataServiceCall toServiceCall(
+    public static final ServiceCall<? extends Object> toServiceCall(
             final AbstractTripleStore store, final URI serviceURI,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
@@ -102,25 +114,5 @@ public class ServiceRegistry {
         return f.create(store, groupNode);
 
     }
-
-    /*
-     * Skeleton of a mock ServiceCall implementation.
-     */
-//    static ServiceCall matchCal = new ServiceCall() {
-//        @Override
-//        public IAsynchronousIterator<IBindingSet[]> call(
-//                IRunningQuery runningQueryx) {
-//            IBindingSet[] solutions = new IBindingSet[vals.size()];
-//            for (int i = 0; i < vals.size(); i++) {
-//                solutions[i] = new ListBindingSet(
-//                        new IVariable[] { (IVariable) subject },
-//                        new IConstant[] { vals.get(i) });
-//            }
-//            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedArrayIterator<IBindingSet>(
-//                    solutions);
-//            return new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
-//                    src3);
-//        }
-//    };
 
 }

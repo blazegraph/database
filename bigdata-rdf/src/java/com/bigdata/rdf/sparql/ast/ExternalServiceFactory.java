@@ -27,13 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Factory for creating objects which can talk to registered service URIs within
- * the same JVM.
+ * Factory for creating {@link ExternalServiceCall}s from registered service
+ * URIs. These SERVICE calls are "external" in the sense that they require us to
+ * present materialized RDF {@link Value}s and resolve RDF {@link Value}s which
+ * against the lexicon before passing the solutions into the remainder of the
+ * query.
  */
-public interface ServiceFactory {
+public interface ExternalServiceFactory extends ServiceFactory {
 
     /**
      * Create a service invocation object.
@@ -46,8 +51,9 @@ public interface ServiceFactory {
      * @return The object which can be used to evaluate the service on the graph
      *         pattern.
      */
-    ServiceCall<? extends Object> create(
+    ExternalServiceCall create(
             final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode);
+            final IGroupNode<IGroupMemberNode> groupNode
+            );
 
 }

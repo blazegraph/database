@@ -44,15 +44,4 @@ import com.bigdata.rdf.internal.IV;
  */
 public interface ExternalServiceCall extends ServiceCall<BindingSet> { 
 
-//    /**
-//     * Invoke an external service.
-//     * 
-//     * @param bindingSets
-//     *            The BindingsClause from the SPARQL grammar.
-//     *          
-//     * @return An iterator from which the solutions can be drained. If the
-//     *         iterator is closed, the service invocation must be cancelled.
-//     */
-//    ICloseableIterator<BindingSet> call(BindingSet[] bindingSets);
-
 }

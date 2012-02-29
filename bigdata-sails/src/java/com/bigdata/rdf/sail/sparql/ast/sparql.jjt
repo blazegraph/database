@@ -494,10 +494,22 @@ void WhereClause() :
 	 [<WHERE>] GroupGraphPattern()
 }
 
+// Note: Modified to group the binding variables and binding sets for more
+// efficient processing.
 void BindingsClause() :
 {}
 {
-    <BINDINGS> ( Var() )* <LBRACE> ( BindingSet())* <RBRACE> 
+//    <BINDINGS> ( Var() )* <LBRACE> ( BindingSet())* <RBRACE>
+    <BINDINGS> BindingVars() BindingSets() 
+}
+
+void BindingVars() :
+{}{	( Var() )*
+}
+
+void BindingSets() :
+{}
+{	<LBRACE> ( BindingSet() )* <RBRACE>
 }
 
 void BindingSet() :
