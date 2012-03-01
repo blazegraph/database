@@ -83,6 +83,7 @@ import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -110,6 +111,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceCall;
+import com.bigdata.rdf.sparql.ast.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -791,24 +793,23 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 .getGraphPattern();
 
         /*
-         * FIXME If the serviceRef is a Variable then we MUST add the
+         * Note: If the serviceRef is a Variable then we MUST add the
          * materialization step since we can not know in advance whether any
          * given binding for the serviceRef will be a REMOTE SERVICE or an
          * internal bigdata aware service.
          */
-        final URI serviceURI = serviceNode.getServiceURI();
+        final IVariableOrConstant<?> serviceRef = serviceNode.getServiceRef()
+                .getValueExpression();
 
-        // true IFF we need to materialize variables before running the SERVICE.
+        // true if we need to materialize variables before running the SERVICE.
         final boolean isMaterialize;
-        {
+        if(serviceRef instanceof IConstant) {
+
+            final BigdataURI serviceURI = ServiceCallUtility
+                    .getConstantServiceURI(serviceRef);
+            
             final ServiceCall<?> serviceCall = ServiceRegistry.toServiceCall(
                     ctx.db, serviceURI, serviceGraphPattern);
-
-            /*
-             * true IFF the service is remote (services which are not registered
-             * are assumed to be remote).
-             */
-            // final boolean isRemote = serviceCall == null;
 
             /*
              * true IFF this is a registered bigdata aware service running in
@@ -817,6 +818,22 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final boolean isBigdata = serviceCall instanceof BigdataServiceCall;
 
             isMaterialize = !isBigdata;
+
+        } else {
+
+            /*
+             * Since the service reference can not be evaluated to a constant we
+             * have to assume that we need to do value materialization before
+             * the service call.
+             * 
+             * Note: If the service call winds up being a native bigdata
+             * service, then this will do more work. But, since the service
+             * reference does not evaluate to a URI constant we are not able to
+             * figure that out in advance.
+             */
+            
+            isMaterialize = true;
+            
         }
 
         /*
@@ -863,6 +880,16 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
             vars.addAll(projectedVars); // start with everything "projected".
             vars.retainAll(maybeBound); // retain "maybe" incoming bound vars.
+            if(serviceRef instanceof IVariable) {
+                /*
+                 * If the serviceRef is a bare variable, then that variable
+                 * needs to be materialized.
+                 * 
+                 * FIXME Unit test for this case. The test should be written to
+                 * verify that the materialization step is correctly generated.
+                 */
+                vars.add((IVariable<?>) serviceRef);
+            }
             vars.removeAll(doneSet); // remove already materialized vars.
 
             if (!vars.isEmpty()) {
@@ -873,28 +900,72 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 // These variables have now been materialized.
                 doneSet.addAll(vars);
                 
-            }            
+            }
+            
         }
+
+        /*
+         * Identify the join variables for the SERVICE solution set. This is
+         * based on the variables which are definitely bound on entry and the
+         * variables which are definitely bound on exit from the SERVICE. It
+         * is Ok if there are no join variables, but it means that we will do
+         * a full cross product of the solutions vectored into a SERVICE call
+         * and the solutions flowing out of that SERVICE call.
+         * 
+         * FIXME TEST SUITE for predicting service node join vars.
+         */
+        final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
+                serviceNode, new LinkedHashSet<IVariable<?>>());
         
-        left = new ServiceCallJoin(leftOrEmpty(left), //
-                new NV(BOp.Annotations.BOP_ID, rightId),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(ServiceCallJoin.Annotations.SERVICE_URI,
-                        serviceURI),//
-                new NV(ServiceCallJoin.Annotations.GRAPH_PATTERN,
-                        serviceGraphPattern),//
-                new NV(ServiceCallJoin.Annotations.NAMESPACE,
-                        ctx.db.getNamespace()),//
-                new NV(ServiceCallJoin.Annotations.TIMESTAMP,
-                        ctx.db.getTimestamp()),//
-                new NV(ServiceCallJoin.Annotations.SILENT, silent),//
-                new NV(ServiceCallJoin.Annotations.PROJECTED_VARS,
-                        projectedVars),//
-                new NV(JoinAnnotations.CONSTRAINTS, joinConstraints)//
-        );
+        /*
+         * Note: For overall sanity, the ServiceCallJoin is being run on the
+         * query controller. This will prevent HTTP connections from being
+         * originated on the data services in a cluster.
+         * 
+         * Note: In order to have better throughput, this operator is annotated
+         * as "at-once" (PIPELINED:=false). This will force the query engine to
+         * wait until all source solutions are available and then run the
+         * ServiceCallJoin exactly once. The ServiceCallJoin will internally
+         * vector the solutions per target service and will use limited
+         * parallelism (based on MAX_PARALLEL) to reduce the latency of the
+         * service requests across multiple service targets.
+         * 
+         * TODO Unit test where join constraints wind up attached to the
+         * ServiceCallJoin operator.
+         */
+        final Map<String, Object> anns = new LinkedHashMap<String, Object>();
+        anns.put(BOp.Annotations.BOP_ID, rightId);
+        anns.put(BOp.Annotations.EVALUATION_CONTEXT,
+                BOpEvaluationContext.CONTROLLER);
+        anns.put(PipelineOp.Annotations.PIPELINED, false);
+//      anns.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
+        anns.put(PipelineOp.Annotations.SHARED_STATE, true);// live stats.
+        anns.put(ServiceCallJoin.Annotations.SERVICE_REF, serviceRef);
+        anns.put(ServiceCallJoin.Annotations.GRAPH_PATTERN, serviceGraphPattern);
+        {
+            /*
+             * Additional metadata only used for a REMOTE SPARQL end point
+             * SERVICE request.
+             */
+            final String exprImage = serviceNode.getExprImage();
+            if (exprImage != null) {
+                anns.put(ServiceCallJoin.Annotations.EXPR_IMAGE, exprImage);
+                final Map<String, String> prefixDecls = serviceNode
+                        .getPrefixDecls();
+                if (prefixDecls != null && !prefixDecls.isEmpty()) {
+                    anns.put(ServiceCallJoin.Annotations.PREFIX_DECLS,
+                            prefixDecls);
+                }
+            }
+        }
+        anns.put(ServiceCallJoin.Annotations.NAMESPACE, ctx.db.getNamespace());
+        anns.put(ServiceCallJoin.Annotations.TIMESTAMP, ctx.db.getTimestamp());
+        anns.put(ServiceCallJoin.Annotations.SILENT, silent);
+        anns.put(ServiceCallJoin.Annotations.PROJECTED_VARS, projectedVars);
+        anns.put(ServiceCallJoin.Annotations.JOIN_VARS,
+                joinVarSet.toArray(new IVariable[] {}));
+        anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);
+        left = new ServiceCallJoin(leftOrEmpty(left), anns);
 
         /*
          * For each filter which requires materialization steps, add the

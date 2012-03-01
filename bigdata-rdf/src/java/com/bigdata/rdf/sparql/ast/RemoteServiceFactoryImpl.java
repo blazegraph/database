@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Feb 29, 2012
+ * Created on Mar 1, 2012
  */
 
 package com.bigdata.rdf.sparql.ast;
@@ -34,17 +34,31 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Factory for service calls against bigdata aware services.
+ * A factory for service calls against remote SPARQL end points.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BigdataServiceFactory.java 6053 2012-02-29 18:47:54Z
- *          thompsonbry $
+ * @version $Id$
  */
-public interface BigdataServiceFactory extends ServiceFactory {
+public class RemoteServiceFactoryImpl implements RemoteServiceFactory {
+
+    /**
+     * TODO Rather than using a single static instance, this should be
+     * configurable, maybe through the service provider API? There are a lot of
+     * ways in which it could be useful to configure this, including http
+     * authentication, service end point capabilities, etc. [Another way to
+     * support configuration is through an annotation on the ServiceCallJoin
+     * which specifies which {@link ServiceFactory} to use for remote services.]
+     */
+    public static final ServiceFactory DEFAULT = new RemoteServiceFactoryImpl();
 
     @Override
-    BigdataServiceCall create(final AbstractTripleStore store,
+    public RemoteServiceCall create(final AbstractTripleStore store,
             final IGroupNode<IGroupMemberNode> groupNode, final URI serviceURI,
-            final String exprImage, final Map<String, String> prefixDecls);
+            final String exprImage, final Map<String, String> prefixDecls) {
+
+        return new RemoteServiceCallImpl(store, groupNode, serviceURI,
+                exprImage, prefixDecls);
+
+    }
 
 }

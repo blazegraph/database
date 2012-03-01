@@ -45,7 +45,8 @@ public interface ServiceCall<E> {
      * 
      * @return An iterator from which the solutions can be drained. If the
      *         iterator is closed, the service invocation must be cancelled.
+     * @throws Exception 
      */
-    ICloseableIterator<E> call(E[] bindingSets);
+    ICloseableIterator<E> call(E[] bindingSets) throws Exception;
 
 }

@@ -31,8 +31,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -49,14 +47,10 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
             IJoinNode.Annotations, IGraphPatternContainer.Annotations {
 
         /**
-         * The service {@link URI}, which will be resolved against the
-         * {@link ServiceRegistry} to obtain a {@link ServiceCall} object.
-         * 
-         * FIXME This needs to be a value expression, which can evaluate to a
-         * URI or a variable.  The query planner needs to handle the case where
-         * it is a variable differently.
+         * The {@link TermNode} for the SERVICE URI (either a simple variable or
+         * a simple constant).
          */
-        String SERVICE_URI = "serviceURI";
+        String SERVICE_REF = "serviceRef";
 
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
@@ -75,12 +69,29 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         
         boolean DEFAULT_SILENT = false;
         
+        /**
+         * The text "image" of the original SPARQL SERVICE clause. The "image"
+         * of the original graph pattern is what gets sent to a remote SPARQL
+         * end point when we evaluate the SERVICE node. Because the original
+         * "image" of the graph pattern is being used, we also need to have the
+         * prefix declarations so we can generate a valid SPARQL request.
+         */
+        String EXPR_IMAGE = "exprImage";
+        
+        /**
+         * The prefix declarations for the SPARQL query from which the
+         * {@link #EXPR_IMAGE} was taken. This is needed in order to generate a
+         * valid SPARQL query for a remote SPARQL end point when we evaluate the
+         * SERVICE request.
+         */
+        String PREFIX_DECLS = "prefixDecls";
+        
     }
 
     /**
      * Required deep copy constructor.
      */
-    public ServiceNode(ServiceNode op) {
+    public ServiceNode(final ServiceNode op) {
 
         super(op);
         
@@ -98,44 +109,60 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
     /**
      * Construct a function node in the AST.
      * 
-     * @param serviceURI
-     *            The service URI. See {@link ServiceRegistry}
+     * @param serviceRef
+     *            The value expression for the SERVICE URI.
      * @param groupNode
      *            The graph pattern used to invoke the service.
-     * 
-     *            FIXME This needs to permit a TermNode for the serviceUri, not
-     *            just a constant URI.
+     *            
+     * @see ServiceRegistry
      */
-    public ServiceNode(//
-            final URI serviceURI, final IGroupNode<IGroupMemberNode> groupNode) {
+    public ServiceNode(
+            final TermNode serviceRef,
+            final GraphPatternGroup<IGroupMemberNode> groupNode) {
 
         super(new BOp[] {}, null/* anns */);
 
-        super.setProperty(Annotations.SERVICE_URI, serviceURI);
+        setServiceRef(serviceRef);
 
-        super.setProperty(Annotations.GRAPH_PATTERN, groupNode);
+        setGraphPattern(groupNode);
 
     }
 
     /**
-     * The service URI.
+     * The service reference.
      */
-    public URI getServiceURI() {
+    public TermNode getServiceRef() {
 
-        return (URI) getRequiredProperty(Annotations.SERVICE_URI);
+        return (TermNode) getRequiredProperty(Annotations.SERVICE_REF);
+
+    }
+
+    /**
+     * Set the service reference.
+     */
+    public void setServiceRef(final TermNode serviceRef) {
+
+        if(serviceRef == null)
+            throw new IllegalArgumentException();
+        
+        setProperty(Annotations.SERVICE_REF, serviceRef);
 
     }
 
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
-        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
+        return (GraphPatternGroup<IGroupMemberNode>) getRequiredProperty(Annotations.GRAPH_PATTERN);
 
     }
 
+    @Override
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
+        if (graphPattern == null)
+            throw new IllegalArgumentException();
+         
         /*
          * Clear the parent reference on the new where clause.
          * 
@@ -180,6 +207,41 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     }
 
+    public String getExprImage() {
+
+        return (String) getProperty(Annotations.EXPR_IMAGE);
+
+    }
+
+    /**
+     * Set the text "image" of the SPARQL SERVICE clause. This will be used IFF
+     * we generate a SPARQL query for a remote SPARQL end point. You must also
+     * specify the prefix declarations for that text "image".
+     */
+    public void setExprImage(final String serviceExpressionString) {
+
+        setProperty(Annotations.EXPR_IMAGE, serviceExpressionString);
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, String> getPrefixDecls() {
+
+        return (Map) getProperty(Annotations.PREFIX_DECLS);
+
+    }
+
+    /**
+     * Set the prefix declarations for the group graph pattern. This will be
+     * used IFF we generate a SPARQL query for a remote SPARQL end point. You
+     * must also specify the text "image".
+     */
+    public void setPrefixDecls(final Map<String, String> prefixDecls) {
+
+        setProperty(Annotations.PREFIX_DECLS, prefixDecls);
+
+    }
+
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -206,7 +268,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
         final StringBuilder sb = new StringBuilder();
 
-        final URI serviceURI = getServiceURI();
+        final TermNode serviceRef = getServiceRef();
 
         sb.append("\n");
         sb.append(indent(indent));
@@ -214,9 +276,14 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         if(isSilent()) {
             sb.append(" SILENT");
         }
-        sb.append(" <"); // FIXME This is not always a URI (TermId or ValueExpr)
-        sb.append(serviceURI);
-        sb.append("> ");
+        if(serviceRef.isConstant()) {
+            sb.append(" <");
+            sb.append(serviceRef);
+            sb.append(">");
+        } else {
+            sb.append(" ?");
+            sb.append(serviceRef);
+        }
 
         if (getGraphPattern() != null) {
 

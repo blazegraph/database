@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.*;
+import com.bigdata.striterator.ICloseableIterator;
 
 /***************************************************************************
  * SingleValueIterator
@@ -33,17 +33,17 @@ import java.util.*;
  * Only one value but need to return an iterator?  This makes it easy.
  */
 
- public class SingleValueIterator implements Iterator {
-	Object m_value;
-	boolean m_hasNext = true;
+ public class SingleValueIterator<E> implements ICloseableIterator<E> {
+	private E m_value;
+	private boolean m_hasNext = true;
 	
-	public SingleValueIterator(Object value) {
+	public SingleValueIterator(final E value) {
 		m_value = value;
 	}
 	public boolean hasNext() {
 		return m_hasNext;
 	}
-	public Object next() {
+	public E next() {
     if (!m_hasNext) {
       m_value = null;
     } else {
@@ -56,6 +56,11 @@ import java.util.*;
 		m_hasNext = false;
 		m_value = null;
 	}
+
+	@Override
+    public void close() {
+	    m_hasNext = false;
+    }
 }
 
 

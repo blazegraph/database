@@ -34,15 +34,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -52,6 +52,7 @@ import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -178,20 +179,33 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
                 final ServiceNode serviceNode = ((ServiceNode) child);
                 
-                final URI serviceUri = serviceNode.getServiceURI();
+                final IVariableOrConstant<?> serviceRef = serviceNode
+                        .getServiceRef().getValueExpression();
 
-                if (!BD.SEARCH.equals(serviceUri)) {
+                if (serviceRef.isVar()) {
+                    
+                    continue;
+
+                }
+
+                final BigdataURI serviceURI = ServiceCallUtility
+                        .getConstantServiceURI(serviceRef);
+
+                if (!BD.SEARCH.equals(serviceURI)) {
+
                     /*
-                     * Do NOT translate SERVICE nodes (unless they are a bigdata
-                     * service).
+                     * Do NOT translate SERVICE nodes (unless they are a well
+                     * known bigdata service).
                      */
 
                     continue;
 
                 }
 
-                collectOptionalGroups(serviceNode.getGraphPattern(),
-                        optionalGroups);
+                final GraphPatternGroup<IGroupMemberNode> graphPattern = serviceNode
+                        .getGraphPattern();
+
+                collectOptionalGroups(graphPattern, optionalGroups);
                 
             }
             

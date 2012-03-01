@@ -1955,6 +1955,44 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
     
     /**
+     * Return the join variables for a SERVICE.
+     * 
+     * @param serviceNode
+     * @param vars
+     * @return 
+     * 
+     * FIXME TEST SUITE for predicting service node join vars.
+     */
+    public Set<IVariable<?>> getJoinVars(final ServiceNode serviceNode,
+            final Set<IVariable<?>> vars) {
+
+        /*
+         * The variables which are projected by the subquery which will be
+         * definitely bound based on an analysis of the subquery.
+         */
+        final Set<IVariable<?>> boundBySubquery = getDefinitelyProducedBindings(serviceNode);
+
+        /*
+         * The variables which are definitely bound on entry to the join group
+         * in which the subquery appears.
+         */
+        final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
+                serviceNode, new LinkedHashSet<IVariable<?>>());
+        
+        /*
+         * This is only those variables which are bound on entry into the group
+         * in which the subquery join appears *and* which are "must" bound
+         * variables projected by the subquery.
+         */
+        boundBySubquery.retainAll(incomingBindings);
+            
+        vars.addAll(boundBySubquery);
+
+        return vars;
+
+    }
+    
+    /**
      * Return any variables which are used after the given node in the current
      * ordering of its parent {@link JoinGroupNode} but DOES NOT consider the
      * parent or the PROJECTION for the query in which this group appears.

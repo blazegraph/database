@@ -27,51 +27,62 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JoinAnnotations;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.htree.HTree;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVCache;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.RemoteServiceCall;
+import com.bigdata.rdf.sparql.ast.RemoteServiceFactoryImpl;
 import com.bigdata.rdf.sparql.ast.ServiceCall;
+import com.bigdata.rdf.sparql.ast.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.LatchedExecutor;
+
+import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
- * Pipelined join with results from a {@link ServiceCall} invocation.
+ * Vectored pipeline join of the source solution(s) with solutions from a a
+ * SERVICE invocation. This operator may be used to invoke: (a) internal,
+ * bigdata-aware services; (b) internal openrdf aware services; and (c) remote
+ * services.
+ * <p>
+ * Source solutions are vectored for the same target service. Source solutions
+ * which target different services are first grouped by the target service and
+ * then vectored to each target service. Remote SERVICEs receive their vectored
+ * inputs through a BINDINGS clause rather than a {@link IBindingSet}[]. The
+ * service call(s) will be cancelled if the parent query is cancelled.
  * <p>
  * For each binding set presented, this operator executes the service joining
  * the solutions from the service against the source binding set. Since each
@@ -81,9 +92,7 @@ import com.bigdata.util.InnerCause;
  * the sink may then joined with other access paths before they reach the end of
  * the named subquery and are materialized (by the parent) on an {@link HTree}.
  * <p>
- * Any solutions produced by the service are copied to the default sink. The
- * service call will be cancelled (by closing its iterator) if the parent query
- * is cancelled.
+ * Any solutions produced by the service are copied to the default sink.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -106,37 +115,73 @@ public class ServiceCallJoin extends PipelineOp {
         String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
 
         /**
-         * The service URI from the {@link ServiceRegistry}.
+         * The {@link IVariableOrConstant} which will evaluate to the URI of the
+         * SERVICE.
+         * 
+         * @see ServiceRegistry
          */
-        String SERVICE_URI = ServiceCallJoin.class.getName()+".serviceURI";
+        String SERVICE_REF = ServiceCallJoin.class.getName() + ".serviceRef";
 
         /**
          * The <code>group graph pattern</code> used to invoke the service.
          */
-        String GRAPH_PATTERN = ServiceCallJoin.class.getName()+".graphPattern";
+        String GRAPH_PATTERN = ServiceCallJoin.class.getName()
+                + ".graphPattern";
+
+        /**
+         * The text "image" of the original SPARQL SERVICE clause. The "image"
+         * of the original group graph pattern is what gets sent to a remote
+         * SPARQL end point when we evaluate the SERVICE node. Because the
+         * original "image" of the graph pattern is being used, we also need to
+         * have the prefix declarations so we can generate a valid SPARQL
+         * request.
+         */
+        String EXPR_IMAGE = ServiceCallJoin.class.getName() + ".exprImage";
+
+        /**
+         * The prefix declarations for the SPARQL query from which the
+         * {@link #EXPR_IMAGE} was taken. This is needed in order to generate a
+         * valid SPARQL query for a remote SPARQL end point when we evaluate the
+         * SERVICE request.
+         */
+        String PREFIX_DECLS = ServiceCallJoin.class.getName() + ".prefixDecls";
 
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
          * namespace of the lexicon relation). This resource will be located and
          * made available to the {@link ServiceCall}.
          */
-        String NAMESPACE = ServiceCallJoin.class.getName()+".namespace";
+        String NAMESPACE = ServiceCallJoin.class.getName() + ".namespace";
 
         /**
          * The timestamp of the {@link AbstractTripleStore} view to be located.
          */
-        String TIMESTAMP = ServiceCallJoin.class.getName()+".timestamp";
+        String TIMESTAMP = ServiceCallJoin.class.getName() + ".timestamp";
 
         /**
          * Service errors will be ignored when <code>true</code>.
          */
         String SILENT = ServiceCallJoin.class.getName() + ".silent";
-        
+
+        /**
+         * The timeout in milliseconds before a SERVICE request is failed.
+         */
+        String TIMEOUT = ServiceCallJoin.class.getName() + ".timeout";
+
         /**
          * The set of variables which can flow in/out of the SERVICE.
          */
         String PROJECTED_VARS = ServiceCallJoin.class.getName()
                 + ".projectedVars";
+
+        /**
+         * The join variables. This is used to establish a correlation between
+         * the solutions vectored into the SERVICE call and the solutions
+         * flowing out of the SERVICE call.
+         * 
+         * @see HashJoinAnnotations#JOIN_VARS
+         */
+        String JOIN_VARS = HashJoinAnnotations.JOIN_VARS;
 
     }
 
@@ -158,7 +203,7 @@ public class ServiceCallJoin extends PipelineOp {
 
         super(args, annotations);
 
-        getRequiredProperty(Annotations.SERVICE_URI);
+        getRequiredProperty(Annotations.SERVICE_REF);
 
         getRequiredProperty(Annotations.GRAPH_PATTERN);
 
@@ -166,6 +211,10 @@ public class ServiceCallJoin extends PipelineOp {
 
         getRequiredProperty(Annotations.TIMESTAMP);
 
+        getRequiredProperty(Annotations.PROJECTED_VARS);
+
+        getRequiredProperty(Annotations.JOIN_VARS);
+        
     }
 
     public ServiceCallJoin(final BOp[] args, NV... annotations) {
@@ -192,19 +241,21 @@ public class ServiceCallJoin extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
         
-        private final IConstraint[] constraints;
+//        private final IConstraint[] constraints;
 
         private final AbstractTripleStore db;
         
-        private final URI serviceURI;
-        
-        private final ServiceCall<? extends Object> serviceCall;
+        private final IVariableOrConstant<?> serviceRef;
+
+        final IGroupNode<IGroupMemberNode> groupNode;
         
         private final boolean silent;
+
+        private final long timeout;
         
         private final Set<IVariable<?>> projectedVars;
         
-//        private final BigdataValueFactory valueFactory;
+//        private final Set<IVariable<?>> joinVars;
 
         @SuppressWarnings("unchecked")
         public ChunkTask(final ServiceCallJoin op,
@@ -220,38 +271,42 @@ public class ServiceCallJoin extends PipelineOp {
             
             this.context = context;
 
-            serviceURI = (URI) op.getRequiredProperty(Annotations.SERVICE_URI);
+//            this.constraints = op
+//                    .getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
-            final IGroupNode<IGroupMemberNode> groupNode = (IGroupNode<IGroupMemberNode>) op
+            this.serviceRef = (IVariableOrConstant<?>) op
+                    .getRequiredProperty(Annotations.SERVICE_REF);
+
+            this.groupNode  = (IGroupNode<IGroupMemberNode>) op
                     .getRequiredProperty(Annotations.GRAPH_PATTERN);
-
+            
             final String namespace = (String) op
                     .getRequiredProperty(Annotations.NAMESPACE);
 
             final long timestamp = ((Long) op
                     .getRequiredProperty(Annotations.TIMESTAMP)).longValue();
 
-            constraints = op.getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
-
             this.db = (AbstractTripleStore) context
                     .getResource(namespace, timestamp);
 
 //            this.valueFactory = db.getValueFactory();
-            
-            // Lookup a class to "talk" to that Service URI.
-            this.serviceCall = ServiceRegistry.toServiceCall(db, serviceURI,
-                    groupNode);
-            
+
             // Service errors are ignored when true.
             this.silent = op.getProperty(Annotations.SILENT, false);
 
+            // The service request timeout.
+            this.timeout = op.getProperty(Annotations.TIMEOUT, Long.MAX_VALUE);
+            
             /*
              * Note: We MUST use the projected variables for the SERVICE since
              * we can otherwise break the variable scope.
              */
             this.projectedVars = (Set<IVariable<?>>) op
                     .getRequiredProperty(Annotations.PROJECTED_VARS);
-            
+
+//            this.joinVars = (Set<IVariable<?>>) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
+
         }
 
         /**
@@ -259,34 +314,67 @@ public class ServiceCallJoin extends PipelineOp {
          */
         public Void call() throws Exception {
             
+            if(serviceRef.isConstant()) {
+
+                doServiceCallWithConstant();
+                
+            } else {
+                
+                doServiceCallWithExpression();
+                
+            }
+            
+            return (Void) null;
+            
+        }
+
+        /**
+         * The value expression for the SERVICE reference is a constant (fast
+         * path).
+         * 
+         * @throws Exception
+         */
+        private void doServiceCallWithConstant() throws Exception {
+
+            final BigdataURI serviceURI = ServiceCallUtility
+                    .getConstantServiceURI(serviceRef);
+
+            if (serviceURI == null)
+                throw new AssertionError();
+            
+            // Lookup a class to "talk" to that Service URI.
+            final ServiceCall<? extends Object> serviceCall = resolveService(serviceURI);
+
             try {
 
                 final ICloseableIterator<IBindingSet[]> sitr = context
                         .getSource();
 
-                boolean first = true;
-                
                 while (sitr.hasNext()) {
 
                     final IBindingSet[] chunk = sitr.next();
 
-                    for (IBindingSet bset : chunk) {
+                    final ServiceCallChunk serviceCallChunk = new ServiceCallChunk(
+                            serviceURI, serviceCall, chunk);
 
-                        /*
-                         * Note: The query plan should be structured such that
-                         * we invoke the service exactly once. This is done by
-                         * having the ServiceCallJoin at the start of a named
-                         * subquery. The named subquery is run once and should
-                         * only see a single input solution.
-                         */
-                        if (!first)
-                            throw new RuntimeException(
-                                    "Multiple invocations of Service?");
+                    final FutureTask<Void> ft = new FutureTask<Void>(
+                            new ServiceCallTask(serviceCallChunk));
+                    
+                    context.getExecutorService().execute(ft);
+                    
+                    try {
 
-                        new ServiceCallTask(bset).call();
+                        ft.get(timeout, TimeUnit.MILLISECONDS);
+                        
+                    } catch (TimeoutException ex) {
+                        
+                        if (!silent)
+                            throw ex;
+                        
+                    } finally {
 
-                        first = false;
-
+                        ft.cancel(true/* mayInterruptIfRunning */);
+                        
                     }
 
                 }
@@ -295,7 +383,7 @@ public class ServiceCallJoin extends PipelineOp {
                 context.getSink().flush();
                 
                 // Done.
-                return null;
+                return;
 
             } finally {
                 
@@ -303,12 +391,197 @@ public class ServiceCallJoin extends PipelineOp {
 
                 context.getSink().close();
 
-            }
+            } 
             
         }
 
         /**
-         * Run a subquery.
+         * The SERVICE reference value expression is not a constant.
+         * <p>
+         * We need to evaluate the value expression for each source solution and
+         * group the solutions by the distinct as-bound serviceRef values. If is
+         * an error if any given serviceRef expression does not evaluate to a
+         * URI. Once grouped by the target service URI, we vector the solutions
+         * to each service. If there are multiple distinct services, then they
+         * are vectored with limited parallelism to reduce latency.
+         * 
+         * @throws Exception 
+         */
+        private void doServiceCallWithExpression() throws Exception {
+            
+            try {
+
+                final ICloseableIterator<IBindingSet[]> sitr = context
+                        .getSource();
+
+                while (sitr.hasNext()) {
+
+                    final Map<BigdataURI, ServiceCallChunk> serviceCallChunks = new HashMap<BigdataURI, ServiceCallChunk>();
+
+                    final IBindingSet[] chunk = sitr.next();
+
+                    for (int i = 0; i < chunk.length; i++) {
+
+                        final IBindingSet bset = chunk[i];
+
+                        final BigdataURI serviceURI = ServiceCallUtility
+                                .getServiceURI(serviceRef, bset);
+
+                        ServiceCallChunk serviceCallChunk = serviceCallChunks
+                                .get(serviceURI);
+
+                        if (serviceCallChunk == null) {
+
+                            // Lookup a class to "talk" to that Service URI.
+                            final ServiceCall<? extends Object> serviceCall = resolveService(serviceURI);
+
+                            serviceCallChunks.put(serviceURI,
+                                    serviceCallChunk = new ServiceCallChunk(
+                                            serviceURI, serviceCall));
+
+                        }
+
+                        serviceCallChunk.addSourceSolution(bset);
+
+                    }
+                    
+                    /*
+                     * Submit vectored service calls to each target service in
+                     * parallel.
+                     * 
+                     * Note: Parallelism evaluation of multiple services can
+                     * radically reduce the latency of this operation. Limited
+                     * parallelism is used to avoid too many threads being tied
+                     * up in those service requests.
+                     * 
+                     * Note: [nparallel] as reported by getMaxParallel() is a
+                     * hint to the QueryEngine to indicate how many instances of
+                     * an operator may be executed in parallel. This is using
+                     * the same hint to specify how many service requests each
+                     * operator instance may execute in parallel. That means
+                     * that the real parallelism of this operator is limited by
+                     * [nparallel * nparallel].
+                     * 
+                     * In order to manage threads growth for the
+                     * ServiceCallJoin, the query plan generator SHOULD specify
+                     * this as an "at-once" operator (or possible "blocked")
+                     * operator. That way the QueryEngine will wait until all
+                     * source solutions are on hand and then invoke the
+                     * ServiceCallJoin exactly once.
+                     */
+                    
+                    final int nparallel = op.getMaxParallel();
+                    
+                    final LatchedExecutor executorService = new LatchedExecutor(
+                            context.getExecutorService(), nparallel);
+
+                    final List<FutureTask<Void>> tasks = new ArrayList<FutureTask<Void>>(
+                            serviceCallChunks.size());
+
+                    try {
+
+                        for (ServiceCallChunk serviceCallChunk : serviceCallChunks
+                                .values()) {
+
+                            final FutureTask<Void> ft = new FutureTask<Void>(
+                                    new ServiceCallTask(serviceCallChunk));
+
+                            tasks.add(ft);
+
+                            executorService.execute(ft);
+
+                        }
+
+                        for (FutureTask<Void> ft : tasks) {
+
+                            /*
+                             * Each service request is faced with the same
+                             * timeout.
+                             */
+
+                            try {
+
+                                ft.get(timeout, TimeUnit.MILLISECONDS);
+                                
+                            } catch (TimeoutException ex) {
+                                
+                                ft.cancel(true/* mayInterruptIfRunning */);
+                                
+                                if (!silent)
+                                    throw ex;
+
+                            }
+
+                        }
+
+                    } finally {
+
+                        // Ensure that all tasks are cancelled.
+                        for (FutureTask<Void> ft : tasks) {
+
+                            ft.cancel(true/* mayInterruptIfRunning */);
+
+                        }
+                        
+                    }
+
+                } // next source solution chunk.
+
+                // Flush the sink.
+                context.getSink().flush();
+                
+                // Done.
+                return;
+
+            } finally {
+                
+                context.getSource().close();
+
+                context.getSink().close();
+
+            } 
+                        
+        }
+        
+        /**
+         * Return a {@link ServiceCall} which may be used to talk to a service
+         * at that URI.
+         * 
+         * @param serviceURI
+         *            The service URI.
+         *            
+         * @return The {@link ServiceCall} and never <code>null</code>.
+         */
+        private ServiceCall<? extends Object> resolveService(
+                final BigdataURI serviceURI) {
+
+            ServiceCall<?> serviceCall = ServiceRegistry.toServiceCall(db,
+                    serviceURI, groupNode);
+
+            if (serviceCall == null) {
+
+                final String exprImage = (String) op
+                        .getProperty(Annotations.EXPR_IMAGE);
+
+                if (exprImage == null)
+                    throw new RuntimeException(
+                            "Remote SERVICE request graph pattern image.");
+                
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                final Map<String, String> prefixDecls = (Map) op
+                        .getProperty(Annotations.PREFIX_DECLS);
+                
+                serviceCall = RemoteServiceFactoryImpl.DEFAULT.create(db,
+                        groupNode, serviceURI, exprImage, prefixDecls);
+
+            }
+
+            return serviceCall;
+
+        }
+
+        /**
+         * Invoke a SERVICE.
          */
         private class ServiceCallTask implements Callable<Void> {
 
@@ -317,11 +590,29 @@ public class ServiceCallJoin extends PipelineOp {
              * there are no solutions for the subquery (optional join
              * semantics).
              */
-            private final IBindingSet left;
-            
-            public ServiceCallTask(final IBindingSet bset) {
+            private final IBindingSet[] chunk;
 
-                this.left = bset;
+            /** The service URI. */
+            private final BigdataURI serviceURI;
+
+            /** The object used to talk to that service. */
+            private final ServiceCall<?> serviceCall;
+
+            /**
+             * @param serviceCallChunk
+             *            A chunk of solutions to be vectored to some target
+             *            service.
+             */
+            public ServiceCallTask(final ServiceCallChunk serviceCallChunk) {
+
+                if (serviceCallChunk == null)
+                    throw new IllegalArgumentException();
+
+                serviceURI = serviceCallChunk.serviceURI;
+                
+                serviceCall = serviceCallChunk.serviceCall;
+                
+                chunk = serviceCallChunk.getSourceSolutions();
 
             }
 
@@ -334,57 +625,24 @@ public class ServiceCallJoin extends PipelineOp {
                 ICloseableIterator<IBindingSet> serviceSolutionItr = null;
                 try {
 
+                    final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
+                            JoinTypeEnum.Normal);
+
+                    // Pump the solutions into the hash map.
+                    state.acceptSolutions(
+                            new SingleValueIterator<IBindingSet[]>(chunk), null/* stats */);
+
                     /*
                      * Invoke the service.
-                     * 
-                     * FIXME This task is not vectored. It does one SERVICE call
-                     * for each source solution. We should generate a BINDINGS
-                     * clause when the service is external to vector the
-                     * request. When it is internal, just pass through all
-                     * source solutions in one chunk.
-                     * 
-                     * Note: Vectoring is important for the efficiency of
-                     * SERVICEs running in the same JVM, not just for those
-                     * which are external to the JVM. Remote SERVICEs receive
-                     * their vectored inputs through a BINDINGS clause rather
-                     * than a IBindingSet[]. This class MUST handle that
-                     * vectored remote service invocation by generating an
-                     * appropriate SPARQL query (with BINDINGS) and an
-                     * appropriate HTTP request. [We may want to have
-                     * annotations for services which can not handle BINDINGS
-                     * and services which require authentication flow through,
-                     * etc.]
-                     * 
-                     * FIXME Support external service invocation. This might be
-                     * best done through a vectored bridge to the openrdf
-                     * federated query support. There are likely to be all kinds
-                     * of questions concerning when the SERVICE's graph pattern
-                     * can be decomposed and interpreted by the query planner.
                      */
-                    serviceSolutionItr = doServiceCall(serviceCall,left);
+                    serviceSolutionItr = doServiceCall(serviceCall, chunk);
 
                     /*
-                     * JOIN each service solution with the *correlated* source
-                     * solution in order to recover variables which were not
-                     * projected by the SERVICE call. [When vectoring this
-                     * operator, make sure that correlation is maintained!]
+                     * Do a hash join of the source solutions with the solutions
+                     * from the service, outputting any solutions which join.
                      */
-                    while (serviceSolutionItr.hasNext()) {
-
-                        final IBindingSet right = serviceSolutionItr.next();
-                        
-                        final IBindingSet out = BOpContext.bind(left, right,
-                                constraints, null/*varsToKeep*/);
-                       
-                        if (out != null) {
-                            
-                            // Accept this binding set.
-                            unsyncBuffer.add(out);
-
-                        }
-
-                    }
-
+                    state.hashJoin(serviceSolutionItr, unsyncBuffer);
+                    
                     unsyncBuffer.flush();
                     
                     // done.
@@ -425,98 +683,101 @@ public class ServiceCallJoin extends PipelineOp {
 
             private ICloseableIterator<IBindingSet> doServiceCall(
                     final ServiceCall<? extends Object> serviceCall,
-                    final IBindingSet left) {
+                    final IBindingSet[] left) throws Exception {
 
                 if (serviceCall instanceof BigdataServiceCall) {
 
                     return doBigdataServiceCall(
                             (BigdataServiceCall) serviceCall, left);
 
-                } else {
+                } else if(serviceCall instanceof ExternalServiceCall){
 
                     return doExternalServiceCall(
                             (ExternalServiceCall) serviceCall, left);
                 
+                } else if(serviceCall instanceof RemoteServiceCall) {
+                    
+                    return doRemoteServiceCall(
+                            (RemoteServiceCall) serviceCall, left);
+
+                } else {
+                    
+                    throw new AssertionError();
+                    
                 }
                 
             }
 
+            /**
+             * Evaluate a bigdata aware "service" call in the same JVM.
+             */
             private ICloseableIterator<IBindingSet> doBigdataServiceCall(
                     final BigdataServiceCall serviceCall,
-                    final IBindingSet left2) {
+                    final IBindingSet left[]) throws Exception {
 
-                return serviceCall.call(new IBindingSet[] { left });
+                return serviceCall.call(left);
 
             }
 
+            /**
+             * Evaluate an openrdf "service" call in the same JVM.
+             */
             private ICloseableIterator<IBindingSet> doExternalServiceCall(
                     final ExternalServiceCall serviceCall,
-                    final IBindingSet left) {
+                    final IBindingSet left[]) throws Exception {
 
-                final BindingSet left2 = bigdata2Openrdf(projectedVars, left);
+                return doNonBigdataServiceCall(serviceCall, left);
+                
+            }
 
+            /**
+             * Evaluate an remote SPARQL service call.
+             */
+            private ICloseableIterator<IBindingSet> doRemoteServiceCall(
+                    final RemoteServiceCall serviceCall,
+                    final IBindingSet left[]) throws Exception {
+
+                return doNonBigdataServiceCall(serviceCall, left);
+                
+            }
+            
+            /**
+             * The "openrdf" internal and REMOTE SPARQL invocations look the
+             * same at this abstraction. The differences are hidden in the
+             * {@link ServiceCall} objects.
+             * 
+             * @param serviceCall
+             *            The object which will make the service call.
+             * @param left
+             *            The source solutions.
+             *            
+             * @return The solutions.
+             */
+            private ICloseableIterator<IBindingSet> doNonBigdataServiceCall(
+                    final ServiceCall<BindingSet> serviceCall,
+                    final IBindingSet left[]) throws Exception {
+
+                // Convert IBindingSet[] to openrdf BindingSet[].
+                final BindingSet[] left2 = ServiceCallUtility.convert(
+                        projectedVars, left);
+
+                /*
+                 * Note: This operation is "at-once" over the service solutions.
+                 * It could be turned into a "chunked" operator over those
+                 * solutions. That would make sense if the service was capable
+                 * of delivering a very large number of solutions.
+                 */
                 ICloseableIterator<BindingSet> results = null;
                 final List<BindingSet> serviceResults = new LinkedList<BindingSet>();
                 try {
                     
-                    results = serviceCall.call(new BindingSet[] { left2 });
+                    results = serviceCall.call(left2);
                     
                     while (results.hasNext()) {
 
-                        final BindingSet bset = results.next();
-                        
-//                        /*
-//                         * Convert the solution into a bigdata IBindingSet.
-//                         */
-//                        final IBindingSet bset2 = openrdf2Bigdata(projectedVars,
-//                                valueFactory, bset);
-                        
-                        serviceResults.add(bset);
+                        serviceResults.add(results.next());
 
                     }
-
-                    /*
-                     * Batch resolve BigdataValues to IVs. This is necessary in
-                     * order to have subsequent JOINs succeed when they join on
-                     * variables which are bound to terms which are in the
-                     * lexicon.
-                     * 
-                     * Note: This will be a distributed operation on a cluster.
-                     */
-                    final BindingSet[] resolvedServiceResults;
-                    {
-
-                        final BindingSet[] a = serviceResults
-                                .toArray(new BindingSet[serviceResults.size()]);
-
-                        final Object[] b = new BigdataValueReplacer(db)
-                                .replaceValues(null/* dataset */, a/* bindings */);
-
-                        resolvedServiceResults = (BindingSet[]) b[1];
-
-                    }
-
-                    /*
-                     * Convert the openrdf BindingSet[] into a bigdata IBindingSet[].
-                     */
-                    final IBindingSet[] bigdataSolutions = new IBindingSet[resolvedServiceResults.length];
-                    {
-
-                        for (int i = 0; i < resolvedServiceResults.length; i++) {
-                            
-                            final BindingSet bset = resolvedServiceResults[i];
-                        
-                            final IBindingSet bset2 = openrdf2Bigdata(
-                                    projectedVars, /*valueFactory,*/ bset);
-                            
-                            bigdataSolutions[i] = bset2;
-                            
-                        }
-                        
-                    }
-
-                    return new ChunkedArrayIterator<IBindingSet>(
-                            bigdataSolutions);
 
                 } finally {
 
@@ -525,6 +786,22 @@ public class ServiceCallJoin extends PipelineOp {
                     
                 }
                 
+                /*
+                 * Batch resolve BigdataValues to IVs. This is necessary in
+                 * order to have subsequent JOINs succeed when they join on
+                 * variables which are bound to terms which are in the
+                 * lexicon.
+                 */
+                
+                final BindingSet[] serviceResultChunk = serviceResults
+                        .toArray(new BindingSet[serviceResults.size()]);
+
+                final IBindingSet[] bigdataSolutionChunk = ServiceCallUtility
+                        .resolve(db, serviceResultChunk);
+
+                return new ChunkedArrayIterator<IBindingSet>(
+                        bigdataSolutionChunk);
+
             }
 
         } // ServiceCallTask
@@ -532,135 +809,103 @@ public class ServiceCallJoin extends PipelineOp {
     } // ChunkTask
 
     /**
-     * Convert the {@link IBindingSet} into an openrdf {@link BindingSet}.
-     * <p>
-     * Note: The {@link IV} MUST have the cache set. An exception WILL be thrown
-     * if the {@link IV} has not been materialized.
-     * 
-     * @param vars
-     *            The set of variables which are to be projected (optional).
-     *            When given, only the projected variables are in the returned
-     *            {@link BindingSet}.
-     * @param in
-     *            A bigdata {@link IBindingSet} with materialized values.
+     * A chunk of solutions for the same target service.
      */
-    static private BindingSet bigdata2Openrdf(final Set<IVariable<?>> vars,
-            final IBindingSet in) {
+    private static class ServiceCallChunk {
 
-        final MapBindingSet out = new MapBindingSet();
-        
-        @SuppressWarnings("rawtypes")
-        final Iterator<Map.Entry<IVariable,IConstant>> itr = in.iterator();
-        
-        while(itr.hasNext()) {
-        
-            @SuppressWarnings("rawtypes")
-            final Map.Entry<IVariable,IConstant> e = itr.next();
+        public final BigdataURI serviceURI;
 
-            final IVariable<?> var = e.getKey();
+        public final ServiceCall<?> serviceCall;
+
+        private IBindingSet[] chunk;
+        
+        private final List<IBindingSet> sourceSolutions;
+        
+        public ServiceCallChunk(final BigdataURI serviceURI,
+                final ServiceCall<?> serviceCall, final IBindingSet[] chunk) {
+
+            if(serviceURI == null)
+                throw new IllegalArgumentException();
+
+            if(serviceCall == null)
+                throw new IllegalArgumentException();
+
+            if (chunk == null)
+                throw new IllegalArgumentException();
             
-            if (vars != null && !vars.contains(var)) {
+            if (chunk.length == 0)
+                throw new IllegalArgumentException();
 
-                // This variable is not being projected.
-                continue;
+            this.serviceURI = serviceURI;
+            
+            this.serviceCall = serviceCall;
+            
+            this.chunk = chunk;
+            
+            this.sourceSolutions = null;
+
+        }
+
+        public ServiceCallChunk(final BigdataURI serviceURI,
+                final ServiceCall<?> serviceCall) {
+    
+            if(serviceURI == null)
+                throw new IllegalArgumentException();
+
+            if(serviceCall == null)
+                throw new IllegalArgumentException();
+
+            this.serviceURI = serviceURI;
+            
+            this.serviceCall = serviceCall;
+
+            this.chunk = null;
+            
+            this.sourceSolutions = new LinkedList<IBindingSet>();
+            
+        }
+        
+        public void addSourceSolution(final IBindingSet bset) {
+        
+            if (sourceSolutions == null)
+                throw new UnsupportedOperationException();
+            
+            sourceSolutions.add(bset);
+            
+        }
+
+        public IBindingSet[] getSourceSolutions() {
+            
+            if(chunk != null) {
+                
+                return chunk;
                 
             }
+
+            chunk = sourceSolutions.toArray(new IBindingSet[sourceSolutions
+                    .size()]);
             
-            final String name = var.getName();
-            
-            @SuppressWarnings("rawtypes")
-            final IV iv = (IV) e.getValue().get();
-            
-            final BigdataValue value = iv.getValue();
-            
-            out.addBinding(name, value);
+            return chunk;
             
         }
         
-        return out;
+        public int hashCode() {
 
-    }
-    
-    /**
-     * Convert an openrdf {@link BindingSet} into a bigdata {@link IBindingSet}.
-     * The {@link BindingSet} MUST contain {@link BigdataValue}s and the
-     * {@link IV}s for those {@link BigdataValue}s MUST have been resolved
-     * against the database and the {@link IVCache} association set.
-     * 
-     * @param vars
-     *            The variables to be projected (optional). When given, only the
-     *            projected variables are in the returned {@link IBindingSet}.
-     * @param in
-     *            The openrdf {@link BindingSet}
-     * 
-     * @return The bigdata {@link IBindingSet}.
-     */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    static private IBindingSet openrdf2Bigdata(//
-            final Set<IVariable<?>> vars,//
-//            final BigdataValueFactory valueFactory,
-            final BindingSet in//
-            ) {
-
-        final IBindingSet out = new ListBindingSet();
+            return serviceURI.hashCode();
+            
+        }
         
-        final Iterator<Binding> itr = in.iterator();
-        
-        while(itr.hasNext()) {
-        
-            final Binding e = itr.next();
-
-            final String name = e.getName();
-
-            final IVariable<?> var = Var.var(name);
+        public boolean equals(final Object o) {
+         
+            if (this == o)
+                return true;
             
-            if (vars != null && !vars.contains(var)) {
-
-                // This variable is not being projected.
-                continue;
-
-            }
-
-            // Note: MUST already be BigdataValues.
-            final BigdataValue value = (BigdataValue) e.getValue();
-
-            // Note: IVs MUST already be resolved.
-            final IV<?,?> iv = value.getIV();
+            final ServiceCallChunk c = (ServiceCallChunk) o;
             
-            if(iv == null)
-                throw new AssertionError();
-
-            // IV must have cached Value.
-            if (!iv.hasValue())
-                throw new AssertionError();
-            
-            // The cached Value must be the Value (objects point at each other)
-            if(iv.getValue() != value)
-                throw new AssertionError();
-            
-            out.set(var, new Constant(iv));
-
-//            if (value instanceof BigdataValue
-//                    && ((BigdataValue) value).getIV() != null) {
-//
-//                final IV iv = ((BigdataValue) value).getIV();
-//
-//                out.set(var, new Constant<IV>(iv));
-//
-//            } else {
-//
-//                final IV iv = TermId.mockIV(VTE.valueOf(value));
-//
-//                iv.setValue(valueFactory.asValue(value));
-//
-//                out.set(var, new Constant(iv));
-//                
-//            }
+            return this.serviceURI.equals(c.serviceURI);
 
         }
         
-        return out;
-
     }
 
 }

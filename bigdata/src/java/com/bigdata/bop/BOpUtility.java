@@ -894,8 +894,10 @@ public class BOpUtility {
 
             }
 
-            stats.chunksIn.add(nchunks);
-            stats.unitsIn.add(nelements);
+            if (stats != null) {
+                stats.chunksIn.add(nchunks);
+                stats.unitsIn.add(nelements);
+            }
 
         } finally {
             

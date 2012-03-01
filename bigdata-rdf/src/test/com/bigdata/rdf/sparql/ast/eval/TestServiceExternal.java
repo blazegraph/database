@@ -29,14 +29,13 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.impl.MapBindingSet;
 
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -214,7 +213,9 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
         
         @Override
         public ExternalServiceCall create(final AbstractTripleStore store,
-                final IGroupNode<IGroupMemberNode> groupNode) {
+                final IGroupNode<IGroupMemberNode> groupNode,
+                final URI serviceURI, final String exprImage,
+                final Map<String, String> prefixDecls) {
 
             assertNotNull(store);
             
