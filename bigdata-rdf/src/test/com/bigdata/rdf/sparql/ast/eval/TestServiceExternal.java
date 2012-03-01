@@ -75,25 +75,26 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_service_001() throws Exception {
         
-        final BigdataValueFactory valueFactory = store.getValueFactory();
-        
-        /*
-         * Note: This IV needs to be resolved in order to join against data that
-         * loaded into the database. Since we have not yet loaded the data, the
-         * RDF Value is being inserted into the store now. That way, when the
-         * data are loaded, the data will use the same IV and the join will
-         * succeed.
-         */
-        final BigdataValue book1 = valueFactory
-                .createURI("http://example.org/book/book1");
-        {
-            store.addTerm(book1);
-        }
+//        final BigdataValueFactory valueFactory = store.getValueFactory();
+//        
+//        /*
+//         * Note: This IV needs to be resolved in order to join against data that
+//         * loaded into the database. Since we have not yet loaded the data, the
+//         * RDF Value is being inserted into the store now. That way, when the
+//         * data are loaded, the data will use the same IV and the join will
+//         * succeed.
+//         */
+//        final BigdataValue book1 = valueFactory
+//                .createURI("http://example.org/book/book1");
+//        {
+//            store.addTerm(book1);
+//        }
         
         final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
         {
             final MapBindingSet bset = new MapBindingSet();
-            bset.addBinding("book", book1);
+            bset.addBinding("book",
+                    new URIImpl("http://example.org/book/book1"));
             serviceSolutions.add(bset);
         }
    
@@ -129,36 +130,40 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_service_002() throws Exception {
         
-        final BigdataValueFactory valueFactory = store.getValueFactory();
-        
-        /*
-         * Note: This IV needs to be resolved in order to join against data that
-         * loaded into the database. Since we have not yet loaded the data, the
-         * RDF Value is being inserted into the store now. That way, when the
-         * data are loaded, the data will use the same IV and the join will
-         * succeed.
-         */
-        final BigdataValue book1 = valueFactory
-                .createURI("http://example.org/book/book1");
-        {
-            store.addTerm(book1);
-        }
-
-        final BigdataValue book2 = valueFactory
-                .createURI("http://example.org/book/book2");
-        {
-            store.addTerm(book2);
-        }
+//        final BigdataValueFactory valueFactory = store.getValueFactory();
+//        
+//        /*
+//         * Note: This IV needs to be resolved in order to join against data that
+//         * loaded into the database. Since we have not yet loaded the data, the
+//         * RDF Value is being inserted into the store now. That way, when the
+//         * data are loaded, the data will use the same IV and the join will
+//         * succeed.
+//         */
+//        final BigdataValue book1 = valueFactory
+//                .createURI("http://example.org/book/book1");
+//        {
+//            store.addTerm(book1);
+//        }
+//
+//        final BigdataValue book2 = valueFactory
+//                .createURI("http://example.org/book/book2");
+//        {
+//            store.addTerm(book2);
+//        }
 
         final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
         {
             final MapBindingSet bset = new MapBindingSet();
-            bset.addBinding("book", book1);
+//            bset.addBinding("book", book1);
+            bset.addBinding("book",
+                    new URIImpl("http://example.org/book/book1"));
             serviceSolutions.add(bset);
         }
         {
             final MapBindingSet bset = new MapBindingSet();
-            bset.addBinding("book", book2);
+//            bset.addBinding("book", book2);
+            bset.addBinding("book",
+                    new URIImpl("http://example.org/book/book2"));
             serviceSolutions.add(bset);
         }
         {

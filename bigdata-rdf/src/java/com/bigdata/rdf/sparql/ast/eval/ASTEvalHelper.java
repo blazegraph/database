@@ -141,18 +141,12 @@ public class ASTEvalHelper {
             return bs;
         }
 
-        try {
-            
-            final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
-                    null/* dataset */, null/* tupleExpr */, bs);
+        final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
+                null/* dataset */, new BindingSet[] { bs });
 
-            return (BindingSet) tmp[1];
-            
-        } catch (SailException ex) {
-            
-            throw new QueryEvaluationException(ex);
-            
-        }
+        final BindingSet[] a = (BindingSet[]) tmp[1];
+
+        return a[0];
 
     }
     

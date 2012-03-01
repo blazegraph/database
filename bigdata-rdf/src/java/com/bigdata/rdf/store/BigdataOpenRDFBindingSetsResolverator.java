@@ -30,6 +30,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 /**
  * Efficiently resolve openrdf {@link BindingSet}s to bigdata {@link IBindingSets}s.
  * 
+ * @see BigdataValueReplacer
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
