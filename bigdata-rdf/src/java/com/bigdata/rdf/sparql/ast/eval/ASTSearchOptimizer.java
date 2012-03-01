@@ -40,6 +40,9 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -106,6 +109,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
@@ -319,8 +323,8 @@ public class ASTSearchOptimizer implements IASTOptimizer {
                  * Translate search predicates into a ServiceNode and associated
                  * filters.
                  */
-                final ServiceNode serviceNode = createServiceNode(queryBase,
-                        group, searchVar, statementPatterns);
+                final ServiceNode serviceNode = createServiceNode(ctx,
+                        queryBase, group, searchVar, statementPatterns);
 
                 group.addChild(serviceNode);
 
@@ -470,9 +474,11 @@ public class ASTSearchOptimizer implements IASTOptimizer {
      * @param statementPatterns
      * @return
      */
-    private ServiceNode createServiceNode(QueryBase queryBase,
-            GroupNodeBase<IGroupMemberNode> group, IVariable<?> searchVar,
-            Map<URI, StatementPatternNode> statementPatterns) {
+    private ServiceNode createServiceNode(final AST2BOpContext ctx,
+            final QueryBase queryBase,
+            final GroupNodeBase<IGroupMemberNode> group,
+            IVariable<?> searchVar,
+            final Map<URI, StatementPatternNode> statementPatterns) {
         
         final JoinGroupNode groupNode = new JoinGroupNode();
         
@@ -482,7 +488,13 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             
         }
 
-        return new ServiceNode(BD.SEARCH, groupNode);
+        @SuppressWarnings("unchecked")
+        final TermId<BigdataURI> iv = (TermId<BigdataURI>) TermId
+                .mockIV(VTE.URI);
+
+        iv.setValue(ctx.db.getValueFactory().asValue(BD.SEARCH));
+
+        return new ServiceNode(new ConstantNode(iv), groupNode);
 
     }
 

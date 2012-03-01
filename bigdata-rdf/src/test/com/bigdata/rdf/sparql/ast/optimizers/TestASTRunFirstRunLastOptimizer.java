@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 
@@ -342,8 +341,8 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                 
                 final JoinGroupNode serviceGroup = new JoinGroupNode();
 
-                final ServiceNode service = new ServiceNode(
-                        (URI) serviceURI.getValue(), serviceGroup);
+                final ServiceNode service = new ServiceNode(new ConstantNode(
+                        serviceURI), serviceGroup);
                 where.addChild(service);
 
                 serviceGroup.addChild(new StatementPatternNode(
@@ -403,8 +402,8 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
              
                 final JoinGroupNode serviceGroup = new JoinGroupNode();
 
-                final ServiceNode service = new ServiceNode(
-                        (URI) serviceURI.getValue(), serviceGroup);
+                final ServiceNode service = new ServiceNode(new ConstantNode(
+                        serviceURI), serviceGroup);
 
                 where.addChild(service);
 

@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -51,29 +52,8 @@ import com.bigdata.striterator.ICloseableIterator;
  * Data driven test suite for SPARQL 1.1 Federated Query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- *          TODO Compute the projected variables. Unless the SERVICE is a within
- *          JVM bigdata aware service, ensure that those variables are
- *          materialized before the SERVICE is invoked in the query plan.
- * 
- *          TODO The ServiceCallJoin operator should be vectored. There are
- *          three cases. Within JVM (bigdata, openrdf) and remote. Transfer of
- *          solutions should be chunked in all cases. For a REMOTE service this
- *          may mean rewriting the service graph pattern into a UNION of graph
- *          patterns having different variables and then reassembling things
- *          afterwards (this is really only a problem for services which have
- *          more than one solution flowing in; multiple solutions flowing out
- *          will be naturally vectored).
- * 
- *          TODO We need to test with a serviceRef which is a URI (done), which
- *          is a value expression which evaluates to a URI, and which is a
- *          variable.
- * 
- *          TODO It might be nice to add a TIMEOUT to the SERVICE call.
- * 
- *          TODO Test queries where the evaluation order might not place the
- *          service first. (How?)
+ * @version $Id: TestServiceInternal.java 6053 2012-02-29 18:47:54Z thompsonbry
+ *          $
  */
 public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
 
@@ -202,6 +182,38 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * FIXME Write test which vectors multiple source solutions into the
+     * service.
+     */
+    public void test_service_004() {
+        fail("write test");
+    }
+    
+    /**
+     * FIXME Write test which uses a variable for the service reference, but
+     * where the service always resolves to a known service. Verify evaluation
+     * with an empty solution in. Maybe write an alternative test which does the
+     * same thing with multiple source solutions in (e.g., using BINDINGS in the
+     * SPARQL query).
+     * <p>
+     * The join variables SHOULD be a non-empty set for this case unless the
+     * incoming variables are only MAYBE bound due to an OPTIONAL construct.
+     * Write a test for that case too and write tests of the static analysis of
+     * the join and projected variables for a SERVICE call.
+     */
+    public void test_service_005() {
+        fail("write test");
+    }
+    
+    /**
+     * TODO Test queries where the evaluation order does not place the service
+     * first (or does not lift it out into a named subquery).
+     */
+    public void test_service_006() {
+        fail("write test");
+    }
+    
+    /**
      * Mock service reports the solutions provided in the constructor.
      * <p>
      * Note: This can not be used to test complex queries because the caller
@@ -221,7 +233,9 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
         
         @Override
         public BigdataServiceCall create(final AbstractTripleStore store,
-                final IGroupNode<IGroupMemberNode> groupNode) {
+                final IGroupNode<IGroupMemberNode> groupNode,
+                final URI serviceURI, final String exprImage,
+                final Map<String, String> prefixDecls) {
 
             assertNotNull(store);
             

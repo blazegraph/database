@@ -709,6 +709,9 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
+        @SuppressWarnings("rawtypes")
+        final IV serviceRef = makeIV(BD.SEARCH);
+        
 //        @SuppressWarnings("rawtypes")
 //        final IV c = makeIV(new URIImpl("http://example/c"));
 //        
@@ -727,7 +730,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode whereClause = new JoinGroupNode();
 
-            final ServiceNode serviceNode = new ServiceNode(BD.SEARCH,
+            final ServiceNode serviceNode = new ServiceNode(new ConstantNode(serviceRef),
                     new JoinGroupNode(new StatementPatternNode(
                         new VarNode("x"), new ConstantNode(search), new ConstantNode(foo))));
             
@@ -753,7 +756,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode whereClause = new JoinGroupNode();
 
-            final ServiceNode serviceNode = new ServiceNode(BD.SEARCH,
+            final ServiceNode serviceNode = new ServiceNode(new ConstantNode(serviceRef),
                     new JoinGroupNode(new StatementPatternNode(
                         new VarNode("x"), new ConstantNode(search), new ConstantNode(foo))));
             
@@ -850,7 +853,10 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
         @SuppressWarnings("rawtypes")
         final IV g = makeIV(new URIImpl("http://example/g"));
-        
+
+        @SuppressWarnings("rawtypes")
+        final IV serviceRef = makeIV(BD.SEARCH);
+
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
         {
@@ -860,7 +866,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode whereClause = new JoinGroupNode();
 
-            final ServiceNode serviceNode = new ServiceNode(BD.SEARCH,
+            final ServiceNode serviceNode = new ServiceNode(new ConstantNode(serviceRef),
                     new JoinGroupNode(new StatementPatternNode(
                         new VarNode("x"), new ConstantNode(search), new ConstantNode(foo))));
             
@@ -901,7 +907,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             final JoinGroupNode whereClause = new JoinGroupNode();
 
-            final ServiceNode serviceNode = new ServiceNode(BD.SEARCH,
+            final ServiceNode serviceNode = new ServiceNode(new ConstantNode(serviceRef),
                     new JoinGroupNode(new StatementPatternNode(
                         new VarNode("x"), new ConstantNode(search), new ConstantNode(foo))));
             

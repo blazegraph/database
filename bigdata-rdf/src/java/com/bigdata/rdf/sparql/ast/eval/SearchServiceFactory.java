@@ -82,9 +82,10 @@ public class SearchServiceFactory implements ServiceFactory {
 //    private static final Logger log = Logger
 //            .getLogger(SearchServiceFactory.class);
 
-    public BigdataServiceCall create(
-            final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode) {
+    public BigdataServiceCall create(final AbstractTripleStore store,
+            final IGroupNode<IGroupMemberNode> groupNode,
+            final URI serviceUriIsIgnored, final String exprImageIsIgnored,
+            final Map<String, String> prefixDeclsIsIgnored) {
 
         /*
          * Validate the search predicates for a given search variable.

@@ -12,8 +12,9 @@ import com.bigdata.rdf.store.BD;
 /**
  * Registry for service calls.
  * 
- * TODO We should restrict registration/management of services in the
- * {@link BD#NAMESPACE} to static initialization.
+ * TODO Should we restrict registration/management of services in the
+ * {@link BD#NAMESPACE} to static initialization or otherwise secure the
+ * registry?
  */
 public class ServiceRegistry {
 
@@ -99,20 +100,16 @@ public class ServiceRegistry {
 
         final ServiceFactory f = services.get(serviceURI);
 
-        if (f == null) {
-            /*
-             * TODO If we eagerly translate FunctionNodes in the AST to IV value
-             * expressions then we should probably attach a function which will
-             * result in a runtime type error when it encounters value
-             * expression for a function URI which was not known to the backend.
-             * However, if we handle this translation lazily then this might not
-             * be an issue.
-             */
-            throw new IllegalArgumentException("unknown service: " + serviceURI);
+        if (f != null) {
+
+            return f.create(store, groupNode, serviceURI, null/* exprImage */,
+                    null/* prefixDecls */);
+            
         }
 
-        return f.create(store, groupNode);
-
+        // Not found.
+        return null;
+        
     }
 
 }

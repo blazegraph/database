@@ -53,14 +53,18 @@ public class ASTServiceGraphPattern extends SimpleNode {
     }
 
     /**
+     * Return the full text image of the SERVICE clause, including the SERVICE
+     * keyword and everything through the closing <code>}</code>.
+     * 
      * @return Returns the patternString.
      */
     public String getPatternString() {
 
         if (patternString == null) {
-            ASTOperationContainer parentContainer = (ASTOperationContainer)getParentContainer(this);
 
-            String sourceString = parentContainer.getSourceString();
+            final ASTOperationContainer parentContainer = (ASTOperationContainer)getParentContainer(this);
+
+            final String sourceString = parentContainer.getSourceString();
 
             // snip away line until begin token line position
             String substring = sourceString;

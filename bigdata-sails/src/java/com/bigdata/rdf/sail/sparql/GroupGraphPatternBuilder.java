@@ -33,8 +33,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Map;
+
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.rdf.sail.sparql.ast.ASTBasicGraphPattern;
@@ -619,14 +620,21 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
     /**
      * SPARQL 1.1 SERVICE.
+     * 
+     * TODO Do we need to pass through the baseURI? Can this be used to
+     * abbreviate serialized IRIs? (I would think that we would use the prefix
+     * declarations for that.)
+     * 
+     * FIXME The prefix declarations are not being attached. We need
+     * a new visitor to attach them?
      */
     @Override
-    final public Void visit(final ASTServiceGraphPattern node,
-            Object data) throws VisitorException {
+    final public Void visit(final ASTServiceGraphPattern node, Object data)
+            throws VisitorException {
 
-        // left arg is the URI or variable for the service reference.
-        final ValueExpressionNode serviceRef = (ValueExpressionNode) node
-                .jjtGetChild(0).jjtAccept(this, null);
+        // left arg is the service reference (a value expression).
+        final TermNode serviceRef = (TermNode) node.jjtGetChild(0).jjtAccept(
+                this, null);
 
         final GroupGraphPattern parentGP = graphPattern;
 
@@ -641,25 +649,30 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         graphPattern = parentGP;
 
-        /*
-         * FIXME Can not assume that the serviceRef is a URI. It can be a
-         * variable.
-         * 
-         * FIXME See the comment block above this method for how openrdf handles
-         * the data on the SERVICE node as reported by the parser.
-         * 
-         * FIXME Annotate ServiceNode with the actual text of the service's
-         * graph pattern.
-         * 
-         * FIXME Do we need to pass through the baseURI?
-         * 
-         * FIXME What about prefix declarations?
-         */
-        final URI serviceUri = (URI) ((TermNode) serviceRef).getValue();
-        
-        final ServiceNode serviceNode = new ServiceNode(serviceUri, graphNode);
+        final ServiceNode serviceNode = new ServiceNode(serviceRef, graphNode);
 
-        if(node.isSilent()) {
+        /*
+         * Note: This "image" of the original group graph pattern is what gets
+         * sent to a remote SPARQL end point when we evaluate the SERVICE node.
+         * Because the original "image" of the graph pattern is being used, we
+         * also need to have the prefix declarations so we can generate a valid
+         * SPARQL request.
+         */
+        serviceNode.setExprImage(node.getPatternString());
+        
+        final Map<String, String> prefixDecls = node.getPrefixDeclarations();
+        
+        if (prefixDecls != null && !prefixDecls.isEmpty()) {
+
+            /*
+             * Set the prefix declarations which go with that expression image.
+             */
+
+            serviceNode.setPrefixDecls(prefixDecls);
+            
+        }
+
+        if (node.isSilent()) {
             
             serviceNode.setSilent(true);
             

@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collections;
 
-import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -1022,8 +1021,8 @@ public class TestASTQueryHintOptimizer extends
                             "score"), null, Scope.DEFAULT_CONTEXTS));
 
                     final ServiceNode service = new ServiceNode(
-                            (URI) serviceURI.getValue(), serviceGroup);
-                    
+                            new ConstantNode(serviceURI), serviceGroup);
+
                     whereClause.addChild(service);
                     
                 }
@@ -1066,7 +1065,7 @@ public class TestASTQueryHintOptimizer extends
                             "score"), null, Scope.DEFAULT_CONTEXTS));
 
                     final ServiceNode service = new ServiceNode(
-                            (URI) serviceURI.getValue(), serviceGroup);
+                            new ConstantNode(serviceURI), serviceGroup);
 
                     service.setProperty(QueryHints.RUN_LAST, true);
                     

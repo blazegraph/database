@@ -29,7 +29,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -3219,7 +3218,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 serviceGroup.addChild(new StatementPatternNode(
                         new VarNode("x"), new ConstantNode(age), new VarNode(
                                 "a")));
-                serviceNode = new ServiceNode((URI) serviceUri.getValue(),
+                serviceNode = new ServiceNode(new ConstantNode(serviceUri),
                         serviceGroup);
                 whereClause.addChild(serviceNode);
 
