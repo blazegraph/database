@@ -37,15 +37,9 @@ import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
-import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.ValueConstant;
-import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MapBindingSet;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -53,14 +47,18 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
 
 /**
  * Utility class to manage the efficient translation of openrdf {@link Value}s
- * in a {@link TupleExpr} or {@link BindingSet} into the {@link BigdataValue}s
- * used internally by bigdata.
+ * in a {@link BindingSet} into the {@link BigdataValue}s used internally by
+ * bigdata.
+ * 
+ * @see BigdataOpenRDFBindingSetsResolverator
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BigdataValueReplacer.java 5159 2011-09-08 15:35:15Z thompsonbry
+ *          $
  */
 public class BigdataValueReplacer {
 
@@ -86,17 +84,26 @@ public class BigdataValueReplacer {
      * <p>
      * Note: The native rule execution must examine the resulting
      * {@link BigdataValue}s. If any value does not exist in the lexicon then
-     * its term identifier will be ZERO (0L). {@link StatementPattern}s with
-     * term identifiers of ZERO (0L) WILL NOT match anything in the data and
-     * MUST NOT be executed since a ZERO (0L) will be interpreted as a variable!
+     * its term identifier will be ZERO (0L). Term identifiers of ZERO (0L) WILL
+     * NOT match anything in the data and MUST NOT be executed since a ZERO (0L)
+     * will be interpreted as a variable!
      * 
      * @return yucky hack, need to return a new dataset and a new binding set.
      *         dataset is [0], binding set is [1]
      */
-    public Object[] replaceValues(Dataset dataset,
-            final TupleExpr tupleExpr, BindingSet bindings)
-            throws SailException {
+    public Object[] replaceValues(//
+            final Dataset dataset,
+//            final TupleExpr tupleExpr,
+            final BindingSet[] bindingSets//
+    ) {//throws SailException {
 
+        if(dataset == null && bindingSets == null) {
+
+            // At least one argument must be non-null.
+            throw new IllegalArgumentException();
+            
+        }
+        
         /*
          * Resolve the values used by this query.
          * 
@@ -107,10 +114,10 @@ public class BigdataValueReplacer {
          */
         final Map<Value, BigdataValue> values = new LinkedHashMap<Value, BigdataValue>();
         
-        /*
-         * The set of variables encountered in the query.
-         */
-        final Map<String/* name */, Var> vars = new LinkedHashMap<String, Var>();
+//        /*
+//         * The set of variables encountered in the query.
+//         */
+//        final Map<String/* name */, Var> vars = new LinkedHashMap<String, Var>();
 
         final BigdataValueFactory valueFactory = database.getValueFactory();
 
@@ -124,77 +131,81 @@ public class BigdataValueReplacer {
             
         }
 
-        if(tupleExpr != null) {
-        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
+//        if(tupleExpr != null) {
+//        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
+//
+//            @Override
+//            public void meet(final Var var) {
+//                
+//                vars.put(var.getName(), var);
+//                
+//                if (var.hasValue()) {
+//
+//                    final Value val = var.getValue();
+//
+//                    // add BigdataValue variant of the var's Value.
+//                    values.put(val, valueFactory.asValue(val));
+//                    
+//                }
+//                
+//            }
+//            
+//            @Override
+//            public void meet(final ValueConstant constant) {
+//                
+//            	/*
+//            	 * I fixed this over in BigdataEvaluationStrategyImpl3.
+//            	 * ValueExpr nodes used in constraints are allowed to use
+//            	 * values not actually in the database. MP
+//            	 */
+////                if (constant.getParentNode() instanceof LangMatches) {
+////                    /* Don't try to resolve for lang matches.
+////                     * 
+////                     * Note: Sesame will sometimes use a Literal to represent
+////                     * a constant parameter to a function, such as LangMatches.
+////                     * For such uses, we DO NOT want to attempt to resolve the
+////                     * Literal against the lexicon.  Instead, it should just be
+////                     * passed through.  BigdataSailEvaluationStrategy is then
+////                     * responsible for recognizing cases where the lack of an
+////                     * IV on a constant is associated with such function calls
+////                     * rather than indicating that the Value is not known to
+////                     * the KB. 
+////                     */
+////                    return;
+////                }
+//            	
+//            	if (log.isInfoEnabled()) {
+//            		log.info("meeting: " + constant);
+//            	}
+//
+//                final Value val = constant.getValue();
+//
+//                // add BigdataValue variant of the var's Value.
+//                values.put(val, valueFactory.asValue(val));
+//                
+//            }
+//            
+//        });
+//        } // tupleExpr != null
+        if (bindingSets != null && bindingSets.length > 0) {
+        
+            for(BindingSet bindings : bindingSets) {
 
-            @Override
-            public void meet(final Var var) {
-                
-                vars.put(var.getName(), var);
-                
-                if (var.hasValue()) {
+                final Iterator<Binding> it = bindings.iterator();
 
-                    final Value val = var.getValue();
+                while (it.hasNext()) {
+
+                    final Binding binding = it.next();
+
+                    final Value val = binding.getValue();
 
                     // add BigdataValue variant of the var's Value.
                     values.put(val, valueFactory.asValue(val));
-                    
+
                 }
-                
-            }
-            
-            @Override
-            public void meet(final ValueConstant constant) {
-                
-            	/*
-            	 * I fixed this over in BigdataEvaluationStrategyImpl3.
-            	 * ValueExpr nodes used in constraints are allowed to use
-            	 * values not actually in the database. MP
-            	 */
-//                if (constant.getParentNode() instanceof LangMatches) {
-//                    /* Don't try to resolve for lang matches.
-//                     * 
-//                     * Note: Sesame will sometimes use a Literal to represent
-//                     * a constant parameter to a function, such as LangMatches.
-//                     * For such uses, we DO NOT want to attempt to resolve the
-//                     * Literal against the lexicon.  Instead, it should just be
-//                     * passed through.  BigdataSailEvaluationStrategy is then
-//                     * responsible for recognizing cases where the lack of an
-//                     * IV on a constant is associated with such function calls
-//                     * rather than indicating that the Value is not known to
-//                     * the KB. 
-//                     */
-//                    return;
-//                }
-            	
-            	if (log.isInfoEnabled()) {
-            		log.info("meeting: " + constant);
-            	}
 
-                final Value val = constant.getValue();
+            }
 
-                // add BigdataValue variant of the var's Value.
-                values.put(val, valueFactory.asValue(val));
-                
-            }
-            
-        });
-        } // tupleExpr != null
-        if (bindings != null) {
-        
-            final Iterator<Binding> it = bindings.iterator();
-        
-            while (it.hasNext()) {
-                
-                final Binding binding = it.next();
-                
-                final Value val = binding.getValue();
-                
-                // add BigdataValue variant of the var's Value.
-                values.put(val, valueFactory.asValue(val));
-                
-            }
-            
         }
 
         /*
@@ -214,7 +225,8 @@ public class BigdataValueReplacer {
 			// cache the BigdataValues on the IVs for later
 			for (BigdataValue term : terms) {
 
-				final IV iv = term.getIV();
+				@SuppressWarnings("rawtypes")
+                final IV iv = term.getIV();
 
 				if (iv == null) {
 
@@ -230,7 +242,8 @@ public class BigdataValueReplacer {
 					 * Create a dummy iv and cache the unknown value on it so
 					 * that it can be used during query evalution.
 					 */
-					final IV dummy = TermId.mockIV(VTE.valueOf(term));
+					@SuppressWarnings("rawtypes")
+                    final IV dummy = TermId.mockIV(VTE.valueOf(term));
 
 					term.setIV(dummy);
 
@@ -246,108 +259,123 @@ public class BigdataValueReplacer {
 
         }
         
-        /*
-         * Replace the values with BigdataValues having their resolve term
-         * identifiers.
-         */
-        if(tupleExpr!=null) {
-        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
-
-            @Override
-            public void meet(Var var) {
-                
-                if (var.hasValue()) {
-
-                    // the Sesame Value object.
-                    final Value val = var.getValue();
-
-                    // Lookup the resolve BigdataValue object.
-                    final BigdataValue val2 = values.get(val);
-
-                    assert val2 != null : "value not found: "+var.getValue();
-                    
-                    if (log.isDebugEnabled())
-                        log.debug("value: " + val + " : " + val2 + " ("
-                                + val2.getIV() + ")");
-
-                    if (val2.getIV() == null) {
-
-                        /*
-                         * Since the term identifier is NULL this value is
-                         * not known to the kb.
-                         */
-                        
-                        if(log.isInfoEnabled())
-                            log.info("Not in knowledge base: " + val2);
-                        
-                    }
-                    
-                    // replace the constant in the query.
-                    var.setValue(val2);
-
-                }
-            }
-            
-            @Override
-            public void meet(ValueConstant constant) {
-                
-//                if (constant.getParentNode() instanceof LangMatches) {
-//                    /* Note: This is parallel to the meet in the visit
-//                     * pattern above.
-//                     */
-//                   return;
+//        /*
+//         * Replace the values with BigdataValues having their resolve term
+//         * identifiers.
+//         */
+//        if(tupleExpr!=null) {
+//        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
+//
+//            @Override
+//            public void meet(Var var) {
+//                
+//                if (var.hasValue()) {
+//
+//                    // the Sesame Value object.
+//                    final Value val = var.getValue();
+//
+//                    // Lookup the resolve BigdataValue object.
+//                    final BigdataValue val2 = values.get(val);
+//
+//                    assert val2 != null : "value not found: "+var.getValue();
+//                    
+//                    if (log.isDebugEnabled())
+//                        log.debug("value: " + val + " : " + val2 + " ("
+//                                + val2.getIV() + ")");
+//
+//                    if (val2.getIV() == null) {
+//
+//                        /*
+//                         * Since the term identifier is NULL this value is
+//                         * not known to the kb.
+//                         */
+//                        
+//                        if(log.isInfoEnabled())
+//                            log.info("Not in knowledge base: " + val2);
+//                        
+//                    }
+//                    
+//                    // replace the constant in the query.
+//                    var.setValue(val2);
+//
 //                }
-
-                 // the Sesame Value object.
-                final Value val = constant.getValue();
-
-                // Lookup the resolved BigdataValue object.
-                final BigdataValue val2 = values.get(val);
-
-                assert val2 != null : "value not found: "+constant.getValue();
-                
-                if (log.isDebugEnabled())
-                    log.debug("value: " + val + " : " + val2 + " ("
-                            + val2.getIV() + ")");
-
-                if (val2.getIV() == null) {
-
-                    /*
-                     * Since the term identifier is NULL this value is
-                     * not known to the kb.
-                     */
-                    
-                    if(log.isInfoEnabled())
-                        log.info("Not in knowledge base: " + val2);
-                    
-                }
-                
-                // replace the constant in the query.
-                constant.setValue(val2);
-                
-            }
+//            }
+//            
+//            @Override
+//            public void meet(ValueConstant constant) {
+//                
+////                if (constant.getParentNode() instanceof LangMatches) {
+////                    /* Note: This is parallel to the meet in the visit
+////                     * pattern above.
+////                     */
+////                   return;
+////                }
+//
+//                 // the Sesame Value object.
+//                final Value val = constant.getValue();
+//
+//                // Lookup the resolved BigdataValue object.
+//                final BigdataValue val2 = values.get(val);
+//
+//                assert val2 != null : "value not found: "+constant.getValue();
+//                
+//                if (log.isDebugEnabled())
+//                    log.debug("value: " + val + " : " + val2 + " ("
+//                            + val2.getIV() + ")");
+//
+//                if (val2.getIV() == null) {
+//
+//                    /*
+//                     * Since the term identifier is NULL this value is
+//                     * not known to the kb.
+//                     */
+//                    
+//                    if(log.isInfoEnabled())
+//                        log.info("Not in knowledge base: " + val2);
+//                    
+//                }
+//                
+//                // replace the constant in the query.
+//                constant.setValue(val2);
+//                
+//            }
+//            
+//        });
+//        } // tupleExpr != null
+        
+        final BindingSet[] bindingSets2;
+        
+        if (bindingSets == null) {
+        
+            bindingSets2 = null;
             
-        });
-        } // tupleExpr != null
-        if (bindings != null) {
+        } else {
         
-            /*
-             * Replace the bindings with one's which have their IV set.
-             */
+            // Allocate the output solutions array.
+            bindingSets2 = new BindingSet[bindingSets.length];
             
-            final MapBindingSet bindings2 = new MapBindingSet();
-        
-            final Iterator<Binding> it = bindings.iterator();
-        
-            while (it.hasNext()) {
-                
-                final BindingImpl binding = (BindingImpl) it.next();
+            // Generate each output solution from each source solution.
+            for (int i = 0; i < bindingSets.length; i++) {
 
                 /*
-                 * Note: We can not do this. The Sesame APIs let bindings flow
-                 * through the query even if they are not projected by the
-                 * query.
+                 * Replace the bindings with one's which have their IV set.
                  */
+        
+                final MapBindingSet bindings2 = new MapBindingSet();
+
+                bindingSets2[i] = bindings2; // save off result.
+                
+                final Iterator<Binding> it = bindingSets[i].iterator();
+            
+                while (it.hasNext()) {
+                    
+                    final BindingImpl binding = (BindingImpl) it.next();
+
+                    /*
+                     * Note: We can not do this. The Sesame APIs let bindings
+                     * flow through the query even if they are not projected by
+                     * the query.
+                     */
 //                if (!vars.containsKey(binding.getName())) {
 //
 //                    // Drop bindings which are not used within the query.
@@ -359,16 +387,17 @@ public class BigdataValueReplacer {
 //                    
 //                }
                 
-                final Value val = binding.getValue();
-                
-                // Lookup the resolved BigdataValue object.
-                final BigdataValue val2 = values.get(val);
+                    final Value val = binding.getValue();
 
-                assert val2 != null : "value not found: "+binding.getValue();
-                
-                if (log.isDebugEnabled())
-                    log.debug("value: " + val + " : " + val2 + " ("
-                            + val2.getIV() + ")");
+                    // Lookup the resolved BigdataValue object.
+                    final BigdataValue val2 = values.get(val);
+
+                    assert val2 != null : "value not found: "
+                            + binding.getValue();
+
+                    if (log.isDebugEnabled())
+                        log.debug("value: " + val + " : " + val2 + " ("
+                                + val2.getIV() + ")");
 
 //                if (val2.getIV() == null) {
 //
@@ -396,31 +425,39 @@ public class BigdataValueReplacer {
 //                     */
 //                    val2.setIV(TermId.mockIV(VTE.valueOf(val)));
 //                }
-                
-                // rewrite the constant in the query.
-                bindings2.addBinding(binding.getName(), val2);
+
+                    // rewrite the constant in the query.
+                    bindings2.addBinding(binding.getName(), val2);
+
+                }
 
             }
-            
-            bindings = bindings2;
+//            bindings = bindings2;
             
         }
 
-        if (dataset != null) {
-            
-            final DatasetImpl dataset2 = new DatasetImpl();
-            
-            for(URI uri : dataset.getDefaultGraphs())
-                dataset2.addDefaultGraph((URI)values.get(uri));
-            
-            for(URI uri : dataset.getNamedGraphs())
-                dataset2.addNamedGraph((URI)values.get(uri));
-            
-            dataset = dataset2;
-            
-        }
+        /*
+         * Create a new Dataset using the resolved Values.
+         */
+        final DatasetImpl dataset2;
         
-        return new Object[] { dataset, bindings };
+        if (dataset == null) {
+
+            dataset2 = null;
+
+        } else {
+
+            dataset2 = new DatasetImpl();
+
+            for (URI uri : dataset.getDefaultGraphs())
+                dataset2.addDefaultGraph((URI) values.get(uri));
+
+            for (URI uri : dataset.getNamedGraphs())
+                dataset2.addNamedGraph((URI) values.get(uri));
+
+        }
+
+        return new Object[] { dataset2, bindingSets2 };
 
     }
 

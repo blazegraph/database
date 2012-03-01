@@ -837,6 +837,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * They assume that SERVICEs do not run "as bound". This is not true.
          * For example, when the serviceRef is a variable the SERVICE will often
          * run bound.
+         * 
+         * FIXME We should prune any variables which are not used outside of the
+         * SERVICE's graph pattern by removing them from its "projection".
          */
         
         // Anything which can flow out of the SERVICE is "projected".

@@ -37,7 +37,6 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.impl.MapBindingSet;
@@ -53,14 +52,12 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -69,7 +66,7 @@ import com.bigdata.rdf.sparql.ast.ServiceCall;
 import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.striterator.CloseableIteratorWrapper;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
@@ -196,6 +193,8 @@ public class ServiceCallJoin extends PipelineOp {
         private final BOpContext<IBindingSet> context;
         
         private final IConstraint[] constraints;
+
+        private final AbstractTripleStore db;
         
         private final URI serviceURI;
         
@@ -205,8 +204,9 @@ public class ServiceCallJoin extends PipelineOp {
         
         private final Set<IVariable<?>> projectedVars;
         
-        private final BigdataValueFactory valueFactory;
+//        private final BigdataValueFactory valueFactory;
 
+        @SuppressWarnings("unchecked")
         public ChunkTask(final ServiceCallJoin op,
                 final BOpContext<IBindingSet> context) {
 
@@ -222,7 +222,6 @@ public class ServiceCallJoin extends PipelineOp {
 
             serviceURI = (URI) op.getRequiredProperty(Annotations.SERVICE_URI);
 
-            @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> groupNode = (IGroupNode<IGroupMemberNode>) op
                     .getRequiredProperty(Annotations.GRAPH_PATTERN);
 
@@ -234,10 +233,10 @@ public class ServiceCallJoin extends PipelineOp {
 
             constraints = op.getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
-            final AbstractTripleStore db = (AbstractTripleStore) context
+            this.db = (AbstractTripleStore) context
                     .getResource(namespace, timestamp);
 
-            this.valueFactory = db.getValueFactory();
+//            this.valueFactory = db.getValueFactory();
             
             // Lookup a class to "talk" to that Service URI.
             this.serviceCall = ServiceRegistry.toServiceCall(db, serviceURI,
@@ -247,10 +246,11 @@ public class ServiceCallJoin extends PipelineOp {
             this.silent = op.getProperty(Annotations.SILENT, false);
 
             /*
-             * FIXME We MUST use the projected variables for the SERVICE since
+             * Note: We MUST use the projected variables for the SERVICE since
              * we can otherwise break the variable scope.
              */
-            this.projectedVars = null;
+            this.projectedVars = (Set<IVariable<?>>) op
+                    .getRequiredProperty(Annotations.PROJECTED_VARS);
             
         }
 
@@ -347,7 +347,13 @@ public class ServiceCallJoin extends PipelineOp {
                      * SERVICEs running in the same JVM, not just for those
                      * which are external to the JVM. Remote SERVICEs receive
                      * their vectored inputs through a BINDINGS clause rather
-                     * than a IBindingSet[].
+                     * than a IBindingSet[]. This class MUST handle that
+                     * vectored remote service invocation by generating an
+                     * appropriate SPARQL query (with BINDINGS) and an
+                     * appropriate HTTP request. [We may want to have
+                     * annotations for services which can not handle BINDINGS
+                     * and services which require authentication flow through,
+                     * etc.]
                      * 
                      * FIXME Support external service invocation. This might be
                      * best done through a vectored bridge to the openrdf
@@ -450,7 +456,7 @@ public class ServiceCallJoin extends PipelineOp {
                 final BindingSet left2 = bigdata2Openrdf(projectedVars, left);
 
                 ICloseableIterator<BindingSet> results = null;
-                final List<IBindingSet> serviceResults = new LinkedList<IBindingSet>();
+                final List<BindingSet> serviceResults = new LinkedList<BindingSet>();
                 try {
                     
                     results = serviceCall.call(new BindingSet[] { left2 });
@@ -459,18 +465,58 @@ public class ServiceCallJoin extends PipelineOp {
 
                         final BindingSet bset = results.next();
                         
-                        /*
-                         * Convert the solution into a bigdata IBindingSet.
-                         */
-                        final IBindingSet bset2 = openrdf2Bigdata(projectedVars,
-                                valueFactory, bset);
+//                        /*
+//                         * Convert the solution into a bigdata IBindingSet.
+//                         */
+//                        final IBindingSet bset2 = openrdf2Bigdata(projectedVars,
+//                                valueFactory, bset);
                         
-                        serviceResults.add(bset2);
+                        serviceResults.add(bset);
 
                     }
 
-                    return new CloseableIteratorWrapper<IBindingSet>(
-                            serviceResults.iterator());
+                    /*
+                     * Batch resolve BigdataValues to IVs. This is necessary in
+                     * order to have subsequent JOINs succeed when they join on
+                     * variables which are bound to terms which are in the
+                     * lexicon.
+                     * 
+                     * Note: This will be a distributed operation on a cluster.
+                     */
+                    final BindingSet[] resolvedServiceResults;
+                    {
+
+                        final BindingSet[] a = serviceResults
+                                .toArray(new BindingSet[serviceResults.size()]);
+
+                        final Object[] b = new BigdataValueReplacer(db)
+                                .replaceValues(null/* dataset */, a/* bindings */);
+
+                        resolvedServiceResults = (BindingSet[]) b[1];
+
+                    }
+
+                    /*
+                     * Convert the openrdf BindingSet[] into a bigdata IBindingSet[].
+                     */
+                    final IBindingSet[] bigdataSolutions = new IBindingSet[resolvedServiceResults.length];
+                    {
+
+                        for (int i = 0; i < resolvedServiceResults.length; i++) {
+                            
+                            final BindingSet bset = resolvedServiceResults[i];
+                        
+                            final IBindingSet bset2 = openrdf2Bigdata(
+                                    projectedVars, /*valueFactory,*/ bset);
+                            
+                            bigdataSolutions[i] = bset2;
+                            
+                        }
+                        
+                    }
+
+                    return new ChunkedArrayIterator<IBindingSet>(
+                            bigdataSolutions);
 
                 } finally {
 
@@ -497,10 +543,6 @@ public class ServiceCallJoin extends PipelineOp {
      *            {@link BindingSet}.
      * @param in
      *            A bigdata {@link IBindingSet} with materialized values.
-     * 
-     *            TODO Move these methods to a utility class and add test suites
-     *            for them.  In particular, look at the handling of new bindings
-     *            from an openrdf aware SERVICE which do not have IVs.
      */
     static private BindingSet bigdata2Openrdf(final Set<IVariable<?>> vars,
             final IBindingSet in) {
@@ -541,9 +583,9 @@ public class ServiceCallJoin extends PipelineOp {
     
     /**
      * Convert an openrdf {@link BindingSet} into a bigdata {@link IBindingSet}.
-     * {@link BigdataValue}s associated with {@link IV}s will be turned into
-     * those {@link IV}s. RDF {@link Value}s and {@link BigdataValue}s NOT
-     * associated with {@link IV}s will be turned into mock {@link IV}.
+     * The {@link BindingSet} MUST contain {@link BigdataValue}s and the
+     * {@link IV}s for those {@link BigdataValue}s MUST have been resolved
+     * against the database and the {@link IVCache} association set.
      * 
      * @param vars
      *            The variables to be projected (optional). When given, only the
@@ -554,9 +596,11 @@ public class ServiceCallJoin extends PipelineOp {
      * @return The bigdata {@link IBindingSet}.
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static private IBindingSet openrdf2Bigdata(final Set<IVariable<?>> vars,
-            final BigdataValueFactory valueFactory,
-            final BindingSet in) {
+    static private IBindingSet openrdf2Bigdata(//
+            final Set<IVariable<?>> vars,//
+//            final BigdataValueFactory valueFactory,
+            final BindingSet in//
+            ) {
 
         final IBindingSet out = new ListBindingSet();
         
@@ -577,25 +621,42 @@ public class ServiceCallJoin extends PipelineOp {
 
             }
 
-            final Value value = e.getValue();
+            // Note: MUST already be BigdataValues.
+            final BigdataValue value = (BigdataValue) e.getValue();
 
-            if (value instanceof BigdataValue
-                    && ((BigdataValue) value).getIV() != null) {
-
-                final IV iv = ((BigdataValue) value).getIV();
-
-                out.set(var, new Constant<IV>(iv));
-
-            } else {
-
-                final IV iv = TermId.mockIV(VTE.valueOf(value));
-
-                iv.setValue(valueFactory.asValue(value));
-
-                out.set(var, new Constant(iv));
-                
-            }
+            // Note: IVs MUST already be resolved.
+            final IV<?,?> iv = value.getIV();
             
+            if(iv == null)
+                throw new AssertionError();
+
+            // IV must have cached Value.
+            if (!iv.hasValue())
+                throw new AssertionError();
+            
+            // The cached Value must be the Value (objects point at each other)
+            if(iv.getValue() != value)
+                throw new AssertionError();
+            
+            out.set(var, new Constant(iv));
+
+//            if (value instanceof BigdataValue
+//                    && ((BigdataValue) value).getIV() != null) {
+//
+//                final IV iv = ((BigdataValue) value).getIV();
+//
+//                out.set(var, new Constant<IV>(iv));
+//
+//            } else {
+//
+//                final IV iv = TermId.mockIV(VTE.valueOf(value));
+//
+//                iv.setValue(valueFactory.asValue(value));
+//
+//                out.set(var, new Constant(iv));
+//                
+//            }
+
         }
         
         return out;

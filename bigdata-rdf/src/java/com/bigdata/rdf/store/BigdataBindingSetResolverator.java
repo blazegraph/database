@@ -18,6 +18,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.SolutionsLog;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -120,6 +122,41 @@ public class BigdataBindingSetResolverator
     private IBindingSet[] resolveChunk(//final IVariable<?>[] required,
             final LexiconRelation lex,//
             final IBindingSet[] chunk//
+            ) {
+        
+        return resolveChunk(lex, chunk, required, termsChunkSize,
+                blobsChunkSize);
+        
+    }
+    
+    /**
+     * Public entry point for batch resolution.
+     * 
+     * @param lex
+     *            The {@link LexiconRelation}.
+     * @param chunk
+     *            The {@link IBindingSet}[] chunk.
+     * @param required
+     *            The variables which need to be materialized.
+     * @param termsChunkSize
+     *            The chunk size for materialization of {@link TermId}s.
+     * @param blobsChunkSize
+     *            The chunk size for materialization of {@link BlobIV}s.
+     *            
+     * @return The resolved {@link IBindingSet}[] chunk.
+     */
+    /*
+     * Note: I've made this static to support chunked resolution outside of the
+     * producer/consumer pattern, but there never seems to be a use case for it.
+     * Each time it turns out that the BigdataValueReplacer is the right thing
+     * to use.
+     */
+    static private IBindingSet[] resolveChunk(
+            final LexiconRelation lex,//
+            final IBindingSet[] chunk,//
+            final IVariable<?>[] required,//
+            final int termsChunkSize,//
+            final int blobsChunkSize//
             ) {
     
         final long begin = System.currentTimeMillis();

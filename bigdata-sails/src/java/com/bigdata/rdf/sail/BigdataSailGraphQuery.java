@@ -7,7 +7,6 @@ import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailGraphQuery;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -35,19 +34,11 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
          * Batch resolve RDF Values to IVs and then set on the query model.
          */
 
-        try {
+        final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+                .replaceValues(dataset, null/* bindings */);
 
-            final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                    .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
-
-            astContainer.getOriginalAST().setDataset(
-                    new DatasetNode((Dataset) tmp[0]));
-
-        } catch (SailException e) {
-
-            throw new RuntimeException(e);
-
-        }
+        astContainer.getOriginalAST().setDataset(
+                new DatasetNode((Dataset) tmp[0]));
         
     }
     
