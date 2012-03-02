@@ -98,9 +98,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     public void test_oneChunk() {
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
         
         final int capacity = 10;
         final int nentries = capacity;
@@ -120,7 +120,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
         }
 
-        ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(btree,
+        final ChunkedLocalRangeIterator<?> itr = new ChunkedLocalRangeIterator(btree,
                 null/* fromKey */, null/* toKey */, capacity,
                 IRangeQuery.DEFAULT, null/*filter*/);
         
@@ -154,9 +154,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * visit the entries in the result set.
          */
-        for(int i=0; i<capacity; i++) {
+        for (int i = 0; i < capacity; i++) {
 
-            ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
 
             assertEquals(keys[i],tuple.getKey());
 
@@ -192,9 +192,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     public void test_twoChunks() {
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
         
         final int capacity = 5;
         final int nentries = 10;
@@ -214,7 +214,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
         }
 
-        ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(btree,
+        final ChunkedLocalRangeIterator<?> itr = new ChunkedLocalRangeIterator(btree,
                 null/* fromKey */, null/* toKey */, capacity,
                 IRangeQuery.DEFAULT, null/*filter*/);
         
@@ -248,9 +248,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * visit the entries in the 1st result set.
          */
-        for(int i=0; i<capacity; i++) {
+        for (int i = 0; i < capacity; i++) {
 
-            ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
 
             assertEquals(keys[i],tuple.getKey());
 
@@ -285,9 +285,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * visit the entries in the 2nd result set.
          */
-        for(int i=0; i<capacity; i++) {
+        for (int i = 0; i < capacity; i++) {
 
-            ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
 
             assertEquals(keys[i+capacity],tuple.getKey());
 
@@ -327,9 +327,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     public void test_removeAll_limit1() {
         
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
         
         final int nentries = 10;
         
@@ -354,7 +354,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
          * Range delete the keys w/ limit of ONE (1).
          */
         {
-            ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
+            final ChunkedLocalRangeIterator<?> itr = new ChunkedLocalRangeIterator(
                     btree,//
                     null,// fromKey,
                     null,// toKey
@@ -380,17 +380,17 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
             int nremaining = 0;
             
-            ITupleIterator itr = btree.rangeIterator();
+            final ITupleIterator<?> itr = btree.rangeIterator();
             
             while(itr.hasNext()) {
                 
-                ITuple tuple = itr.next();
+                final ITuple<?> tuple = itr.next();
 
-                byte[] key = tuple.getKey();
+                final byte[] key = tuple.getKey();
 
-                int i = KeyBuilder.decodeInt(key, 0);
+                final int i = KeyBuilder.decodeInt(key, 0);
 
-                byte[] val = tuple.getValue();
+                final byte[] val = tuple.getValue();
 
                 assertEquals(keys[i], key);
 
@@ -412,11 +412,11 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     public void test_removeAll() {
         
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setTupleSerializer(NOPTupleSerializer.INSTANCE);
         
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
         
         final int capacity = 5;
         final int nentries = 10;
@@ -463,7 +463,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
          * Range delete the keys matching the filter.
          */
         {
-            ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
+            final ChunkedLocalRangeIterator<?> itr = new ChunkedLocalRangeIterator(
                     btree,
                     null/* fromKey */,
                     null/* toKey */,
@@ -475,7 +475,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
             while (itr.hasNext()) {
 
-                final ITuple tuple = itr.next();
+                final ITuple<?> tuple = itr.next();
 
                 final byte[] key = tuple.getKey();
 
@@ -510,7 +510,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
             while(itr.hasNext()) {
                 
-                final ITuple tuple = itr.next();
+                final ITuple<?> tuple = itr.next();
 
                 final byte[] key = tuple.getKey();
 
@@ -573,11 +573,11 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
          */
         {
 
-            final ITupleIterator itr = ndx.rangeIterator(null, null,
+            final ITupleIterator<?> itr = ndx.rangeIterator(null, null,
                     1/* capacity */, IRangeQuery.DEFAULT
                             | IRangeQuery.REVERSE, null/* filter */);
 
-            ITuple tuple;
+            ITuple<?> tuple;
 
             assertTrue("hasNext", itr.hasNext());
             tuple = itr.next();
@@ -784,7 +784,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         final int n1; // the #of tuples that were deleted.
         {
 
-            final ITupleIterator itr = ndx
+            final ITupleIterator<?> itr = ndx
                     .rangeIterator(null/* fromKey */, null/* toKey */,
                             0/* capacity */, IRangeQuery.DEFAULT
                                     | IRangeQuery.REMOVEALL/* flags */, null/* filter */);
@@ -868,11 +868,13 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             final IFilter filterCtor) {
 
         // the ground truth iterator.
+        @SuppressWarnings("unchecked")
         final ITupleIterator<String> itre = ndx.rangeIterator(fromKey, toKey, capacity,
                 flags, filterCtor);
 
-        final ITupleIterator<String> itre2 = ndx.rangeIterator(fromKey, toKey, capacity,
-                flags, filterCtor);
+//        @SuppressWarnings("unchecked")
+//        final ITupleIterator<String> itre2 = ndx.rangeIterator(fromKey, toKey, capacity,
+//                flags, filterCtor);
 
 //        if(true) return assertSameIterator(itre, itre2);
         
@@ -925,8 +927,8 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      * 
      * @todo refactor into base class for B+Tree unit tests.
      */
-    protected int assertSameIterator(final ITupleIterator itre,
-            final ITupleIterator itra) {
+    private int assertSameIterator(final ITupleIterator<?> itre,
+            final ITupleIterator<?> itra) {
         
         int i = 0;
 
@@ -934,9 +936,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
             assertTrue(itra.hasNext());
 
-            final ITuple te = itre.next();
+            final ITuple<?> te = itre.next();
 
-            final ITuple ta = itra.next();
+            final ITuple<?> ta = itra.next();
 
             assertEquals("flags", te.flags(), ta.flags());
 

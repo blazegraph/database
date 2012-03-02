@@ -2,16 +2,16 @@ package com.bigdata.rdf.sail;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Iteration construct wraps an {@link IRunningQuery} with logic to (a) verify
- * that the {@link IRunningQuery} has not encountered an error; and (b) to cancel
- * the {@link IRunningQuery} when the iteration is {@link #close() closed}.
+ * that the {@link IRunningQuery} has not encountered an error; and (b) to
+ * cancel the {@link IRunningQuery} when the iterator draining the
+ * {@link IRunningQuery} is {@link #close() closed}.
  */
-public class RunningQueryCloseableIterator<E extends IBindingSet> 
+public class RunningQueryCloseableIterator<E> 
         implements ICloseableIterator<E> {
 
     private final IRunningQuery runningQuery;

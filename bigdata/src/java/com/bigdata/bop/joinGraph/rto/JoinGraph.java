@@ -48,7 +48,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.relation.accesspath.BufferClosedException;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
 
 /**
@@ -352,7 +352,7 @@ public class JoinGraph extends PipelineOp {
          * vertices.
          */
 
-        IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
+        ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
 
         final IRunningQuery runningQuery = queryEngine.eval(queryOp);
 

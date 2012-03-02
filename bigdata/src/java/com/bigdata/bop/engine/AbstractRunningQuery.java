@@ -67,6 +67,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.IHaltable;
@@ -234,7 +235,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * The iterator draining the {@link #queryBuffer} and <code>null</code> iff
      * the {@link #queryBuffer} is <code>null</code>.
      */
-    final private IAsynchronousIterator<IBindingSet[]> queryIterator;
+    final private ICloseableIterator<IBindingSet[]> queryIterator;
 
 //    /**
 //     * The #of solutions delivered to the {@link #queryBuffer}.
@@ -1147,7 +1148,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     abstract protected void consumeChunk();
     
-    final public IAsynchronousIterator<IBindingSet[]> iterator() {
+    final public ICloseableIterator<IBindingSet[]> iterator() {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);

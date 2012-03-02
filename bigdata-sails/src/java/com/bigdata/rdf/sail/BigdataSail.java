@@ -3129,7 +3129,9 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * {@inheritDoc}
          * 
-         * FIXME SPARQL 1.1 update. 
+         * FIXME SPARQL 1.1 update.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/448
          */
         @Override
         public void executeUpdate(final UpdateExpr updateExpr,
@@ -3197,26 +3199,6 @@ public class BigdataSail extends SailBase implements Sail {
             final QueryRoot originalQuery = astContainer.getOriginalAST();
 
             originalQuery.setIncludeInferred(includeInferred);
-
-// Note: This is done by ASTEvalHelper.
-//            
-//            /*
-//             * Batch resolve RDF Values to IVs and then set on the query model.
-//             */
-//
-//            try {
-//
-//                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-//                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
-//
-//                astContainer.getOriginalAST().setDataset(
-//                        new DatasetNode((Dataset) tmp[0]));
-//
-//            } catch (SailException e) {
-//
-//                throw new RuntimeException(e);
-//
-//            }
             
             try {
 
@@ -3226,8 +3208,7 @@ public class BigdataSail extends SailBase implements Sail {
                         astContainer, new QueryBindingSet(bindings));
             
             } catch (QueryEvaluationException e) {
-                
-                
+                                
                 throw new SailException(e);
                 
             }

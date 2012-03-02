@@ -44,7 +44,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -352,7 +351,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             public IRunningQuery call() throws Exception {
 
             	IRunningQuery runningSubquery = null;
-                IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
+                ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
                     final QueryEngine queryEngine = parentContext.getRunningQuery()

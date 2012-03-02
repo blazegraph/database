@@ -47,6 +47,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Stress test for {@link SliceOp} in which a large number of small chunks are
@@ -205,9 +206,13 @@ public class TestQueryEngine_Slice extends TestCase2 {
 
         // consume solutions.
         int nsolutions = 0;
-        final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
-        while (itr.hasNext()) {
-            nsolutions += itr.next().length;
+        final ICloseableIterator<IBindingSet[]> itr = q.iterator();
+        try {
+            while (itr.hasNext()) {
+                nsolutions += itr.next().length;
+            }
+        } finally {
+            itr.close();
         }
 
         // wait for the query to terminate.
