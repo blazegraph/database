@@ -14,6 +14,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,14 +63,12 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
-import org.semanticweb.yars.nx.parser.NxParser;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
@@ -3134,6 +3133,42 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
 
     }
 
+    /**
+     * Unit test of the SPARQL 1.1 Service Description of the end point.
+     * 
+     * @throws Exception 
+     */
+    public void test_describeService() throws Exception {
+
+        final QueryOptions opts = new QueryOptions();
+        opts.serviceURL = m_serviceURL;
+        opts.queryStr = null;
+        opts.method = "GET";
+        opts.acceptHeader = RDFFormat.RDFXML.getDefaultMIMEType();
+
+        final Graph g = buildGraph(doSparqlQuery(opts, requestPath));
+
+        if (log.isInfoEnabled()) {
+
+            final RDFFormat format = RDFFormat.NTRIPLES;
+
+            final StringWriter w = new StringWriter();
+            final RDFWriter writer = RDFWriterRegistry.getInstance()
+                    .get(format).getWriter(w);
+            writer.startRDF();
+            final Iterator<Statement> itr = g.iterator();
+            while (itr.hasNext()) {
+                final Statement stmt = itr.next();
+                writer.handleStatement(stmt);
+            }
+            writer.endRDF();
+
+            log.info("RESPONSE: \n" + w.getBuffer());
+            
+        }
+        
+    }
+    
 //    /**
 //     * Unit test for ACID UPDATE using PUT. This test is for the operation where
 //     * the request body is a multi-part MIME document conveying both the

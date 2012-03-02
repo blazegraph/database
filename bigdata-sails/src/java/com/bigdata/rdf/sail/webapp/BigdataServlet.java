@@ -54,7 +54,7 @@ abstract public class BigdataServlet extends HttpServlet {
 //        HTTP_ACCEPTED = HttpServletResponse.SC_ACCEPTED,
 //		HTTP_REDIRECT = HttpServletResponse.SC_TEMPORARY_REDIRECT,
 //		HTTP_FORBIDDEN = HttpServletResponse.SC_FORBIDDEN,
-//		HTTP_NOTFOUND = HttpServletResponse.SC_NOT_FOUND,
+		HTTP_NOTFOUND = HttpServletResponse.SC_NOT_FOUND,
         HTTP_BADREQUEST = HttpServletResponse.SC_BAD_REQUEST,
         HTTP_METHOD_NOT_ALLOWED = HttpServletResponse.SC_METHOD_NOT_ALLOWED,
 		HTTP_INTERNALERROR = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,

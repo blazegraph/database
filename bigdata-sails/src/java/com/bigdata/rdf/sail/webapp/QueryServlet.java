@@ -17,10 +17,16 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -40,6 +46,7 @@ import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -84,10 +91,105 @@ public class QueryServlet extends BigdataRDFServlet {
         } else if (req.getParameter("SHARDS") != null) {
             doShardReport(req, resp);
         } else {
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
+            doServiceDescription(req, resp);
+//            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
             return;
         }
         
+    }
+
+    /**
+     * Generate a SPARQL 1.1 Service Description for the addressed triple store
+     * or quad store.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/500
+     */
+    private void doServiceDescription(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+        
+        final String namespace = getNamespace(req);
+
+        final long timestamp = getTimestamp(req);
+
+        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                .getTripleStore(namespace, timestamp);
+        
+        if (tripleStore == null) {
+            /*
+             * There is no such triple/quad store instance.
+             */
+            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+            return;
+        }
+
+        final Graph g = SD.describeService(tripleStore);
+
+        /*
+         * Add the service end point.
+         * 
+         * TODO Report alternative end points?
+         */
+        {
+            final StringBuffer sb = req.getRequestURL();
+
+            final int indexOf = sb.indexOf("?");
+
+            final String serviceURI;
+            if (indexOf == -1) {
+                serviceURI = sb.toString();
+            } else {
+                serviceURI = sb.substring(0, indexOf);
+            }
+
+            g.add(SD.Service, SD.endpoint,
+                    g.getValueFactory().createURI(serviceURI));
+
+        }
+        
+        /*
+         * CONNEG for the MIME type.
+         * 
+         * Note: An attempt to CONNEG for a MIME type which can not be used with
+         * a give type of query will result in a response using a default MIME
+         * Type for that query.
+         * 
+         * TODO This is a hack which will obey an Accept header IF the header
+         * contains a single well-formed MIME Type. Complex accept headers will
+         * not be matched and quality parameters (q=...) are ignored. (Sesame
+         * has some stuff related to generating Accept headers in their
+         * RDFFormat which could bear some more looking into in this regard.)
+         * 
+         * TODO We could also do RDFa embedded in XHTML.
+         */
+        {
+            final String acceptStr = req.getHeader("Accept");
+
+            final RDFFormat format = RDFFormat.forMIMEType(acceptStr,
+                    RDFFormat.RDFXML);
+
+            resp.setStatus(HTTP_OK);
+
+            resp.setContentType(format.getDefaultMIMEType());
+
+            final OutputStream os = resp.getOutputStream();
+            try {
+                final RDFWriter writer = RDFWriterRegistry.getInstance()
+                        .get(format).getWriter(os);
+                writer.startRDF();
+                final Iterator<Statement> itr = g.iterator();
+                while (itr.hasNext()) {
+                    final Statement stmt = itr.next();
+                    writer.handleStatement(stmt);
+                }
+                writer.endRDF();
+                os.flush();
+            } catch (RDFHandlerException e) {
+                log.error(e, e);
+                throw launderThrowable(e, resp, "");
+            } finally {
+                os.close();
+            }
+        }
     }
 
     /**
