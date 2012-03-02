@@ -272,7 +272,6 @@ public class SD {
     /*
      * SPARQL results
      */
-    // TODO SPARQL BINARY (openrdf)
 
     /**
      * Unique URI for SPARQL Results in XML
