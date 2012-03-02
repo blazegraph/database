@@ -669,47 +669,73 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             /*
              * Rechunk in order to have a nice fat vector size for ordered
              * inserts.
+             * 
+             * TODO This should probably be eliminated in favor of the existing
+             * chunk size. That allows us to control the vectoring directly from
+             * the pipeline annotations for the query engine. If 1000 (the
+             * current [chunkSize] hard wired into this class) makes a
+             * significant difference over 100 (the current default pipeline
+             * chunk capacity) then we should simply override the default chunk
+             * capacity for the htree hash join operators (i.e., analytic
+             * operators always imply a larger default chunk capacity, as could
+             * operators running on a cluster). This change should be verified
+             * against the GOVTRACK dataset and also by using BSBM with JVM and
+             * HTree hash joins and measuring the change in the performance
+             * delta when the HTree hash join vector size is changed.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/483
+             * (Eliminate unnecessary dechunking and rechunking)
              */
-            final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
+
+            final ICloseableIterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
                     new Dechunkerator<IBindingSet>(itr), chunkSize,
                     IBindingSet.class);
-
-            final AtomicInteger vectorSize = new AtomicInteger();
-            while (it.hasNext()) {
-
-                // Vector a chunk of solutions.
-                final BS[] a = vector(it.next(), joinVars,
-                        null/* selectVars */,
-                        false/* ignoreUnboundVariables */, vectorSize);
-
-                final int n = vectorSize.get();
-
-                stats.chunksIn.increment();
-                stats.unitsIn.add(a.length);
-
-                // Insert solutions into HTree in key order.
-                for (int i = 0; i < n; i++) {
-
-                    final BS tmp = a[i];
-
-                    // Encode the key.
-                    final byte[] key = keyBuilder.reset().append(tmp.hashCode)
-                            .getKey();
-
-                    // Encode the solution.
-                    final byte[] val = encoder.encodeSolution(tmp.bset);
-
-                    // Insert binding set under hash code for that key.
-                    htree.insert(key, val);
-
+            
+            try {
+                
+                final AtomicInteger vectorSize = new AtomicInteger();
+                
+                while (it.hasNext()) {
+    
+                    // Vector a chunk of solutions.
+                    final BS[] a = vector(it.next(), joinVars,
+                            null/* selectVars */,
+                            false/* ignoreUnboundVariables */, vectorSize);
+    
+                    final int n = vectorSize.get();
+    
+                    stats.chunksIn.increment();
+                    stats.unitsIn.add(a.length);
+    
+                    // Insert solutions into HTree in key order.
+                    for (int i = 0; i < n; i++) {
+    
+                        final BS tmp = a[i];
+    
+                        // Encode the key.
+                        final byte[] key = keyBuilder.reset().append(tmp.hashCode)
+                                .getKey();
+    
+                        // Encode the solution.
+                        final byte[] val = encoder.encodeSolution(tmp.bset);
+    
+                        // Insert binding set under hash code for that key.
+                        htree.insert(key, val);
+    
+                    }
+    
+                    naccepted += a.length;
+    
+                    // Vectored update of the IV Cache.
+    //                encoder.updateIVCache(cache);
+                    encoder.flush();
+    
                 }
 
-                naccepted += a.length;
-
-                // Vectored update of the IV Cache.
-//                encoder.updateIVCache(cache);
-                encoder.flush();
-
+            } finally {
+            
+                it.close();
+                
             }
 
             return naccepted;
