@@ -53,8 +53,8 @@ import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NamedSolutionSetStats;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.SingleValueIterator;
 
@@ -361,7 +361,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             	// The subquery
                 IRunningQuery runningSubquery = null;
             	// The iterator draining the subquery
-                IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
+                ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
                     final QueryEngine queryEngine = parentContext.getRunningQuery()

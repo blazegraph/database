@@ -62,7 +62,6 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -435,6 +434,24 @@ public class ASTEvalHelper {
          * FIXME We should not dechunk just to rechunk here. This is not very
          * efficient.
          * 
+         * The basic API alignment problem is that the IRunningQuery#iterator()
+         * visits IBindingSet[] chunks while the BigdataBindingSetResolverator
+         * and Bigdata2SesameBindingSetIterator are IChunked(Ordered)Iterators.
+         * That is, they implement #nextChunk(). A very simple class could be
+         * used to align an IBindingSet[] returned by next() with nextChunk(). I
+         * would be suprised if this class did not already exist (in fact, the
+         * class is ChunkedArraysIterator).
+         * 
+         * The other issue is that RunningQueryCloseableIterator would APPEAR to
+         * be redundant with QueryResultIterator. However, correct termination
+         * is a tricky business and the current layering obviously works. The
+         * differences in those two classes appear to be (a) whether or not we
+         * invoke cancel() on the IRunningQuery when the iterator is closed and
+         * (b) whether or not we are buffering the last element visited. It is
+         * quite possible that RunningQueryCloseableIterator simply layers on
+         * one or two fixes which SHOULD be incorporated into the
+         * QueryResultIterator.
+         * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/483 (Eliminate
          * unnecessary chunking and dechunking)
          */
@@ -544,7 +561,7 @@ public class ASTEvalHelper {
             final IRunningQuery runningQuery) {
 
         // The iterator draining the query solutions.
-        final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+        final ICloseableIterator<IBindingSet[]> it1 = runningQuery
                 .iterator();
 
         // Dechunkify the original iterator

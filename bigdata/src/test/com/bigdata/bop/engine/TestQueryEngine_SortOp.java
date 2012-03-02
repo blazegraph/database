@@ -54,8 +54,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite ORDER BY operators when integrated with the query engine. This
@@ -252,7 +251,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 		 */
 		int nsolutions = 0;
 		IBindingSet lastSolution = null;
-		final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
+		final ICloseableIterator<IBindingSet[]> itr = q.iterator();
 		try {
             final BindingSetComparator<?> c = new BindingSetComparator(
                     sortOrder, valueComparator);

@@ -37,7 +37,6 @@ import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.IHaltable;
@@ -192,6 +191,6 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
      * @throws UnsupportedOperationException
      *             if this is not the query controller.
      */
-    IAsynchronousIterator<IBindingSet[]> iterator();
+    ICloseableIterator<IBindingSet[]> iterator();
     
 }

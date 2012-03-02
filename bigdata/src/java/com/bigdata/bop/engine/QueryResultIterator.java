@@ -1,9 +1,8 @@
 package com.bigdata.bop.engine;
 
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Delegate pattern cancels the {@link IRunningQuery} when the iterator is
@@ -13,16 +12,16 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class QueryResultIterator<E> implements IAsynchronousIterator<E> {
+class QueryResultIterator<E> implements ICloseableIterator<E> {
 
     private final IRunningQuery runningQuery;
 
-    private final IAsynchronousIterator<E> src;
+    private final ICloseableIterator<E> src;
     
     private final AtomicBoolean open = new AtomicBoolean(true);
 
     public QueryResultIterator(final IRunningQuery runningQuery,
-            final IAsynchronousIterator<E> src) {
+            final ICloseableIterator<E> src) {
 
         if (runningQuery == null)
             throw new IllegalArgumentException();
@@ -61,15 +60,6 @@ class QueryResultIterator<E> implements IAsynchronousIterator<E> {
         }
     }
     
-    public boolean isExhausted() {
-//        return src.isExhausted();
-        if (src.isExhausted()) {
-            normalCompletion();
-            return true;
-        }
-        return false;
-    }
-
     public boolean hasNext() {
 //        return src.hasNext();
         if (!src.hasNext()) {
@@ -79,21 +69,13 @@ class QueryResultIterator<E> implements IAsynchronousIterator<E> {
         return true;
     }
 
-    public boolean hasNext(long timeout, TimeUnit unit)
-            throws InterruptedException {
-        return src.hasNext(timeout, unit);
-    }
-
-    public E next(long timeout, TimeUnit unit) throws InterruptedException {
-        return src.next(timeout, unit);
-    }
-
     public E next() {
         return src.next();
     }
 
     public void remove() {
-        src.remove();
+//        src.remove();
+        throw new UnsupportedOperationException();
     }
 
 }

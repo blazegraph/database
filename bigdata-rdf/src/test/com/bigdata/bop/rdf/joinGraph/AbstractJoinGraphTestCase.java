@@ -58,9 +58,9 @@ import com.bigdata.bop.joinGraph.rto.JGraph;
 import com.bigdata.bop.joinGraph.rto.Path;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -465,7 +465,7 @@ abstract public class AbstractJoinGraphTestCase extends TestCase2 {
         final IRunningQuery q = queryEngine.eval(queryOp);
         try {
             // drain the query results.
-            final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
+            final ICloseableIterator<IBindingSet[]> itr = q.iterator();
             try {
                 while (itr.hasNext()) {
                     final IBindingSet[] chunk = itr.next();

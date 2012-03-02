@@ -52,7 +52,6 @@ import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -399,7 +398,7 @@ public class SubqueryOp extends PipelineOp {
             	// The subquery
                 IRunningQuery runningSubquery = null;
             	// The iterator draining the subquery
-                IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
+                ICloseableIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
                     final QueryEngine queryEngine = parentContext

@@ -55,7 +55,6 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-//import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
@@ -70,9 +69,9 @@ import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -245,7 +244,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
             new ListBindingSet() //
             };
 
-            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
         }
         
     }
@@ -312,7 +311,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 //                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -391,7 +390,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 //                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -570,8 +569,8 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 //        runningQuery.get();
         
         // verify solutions.
-        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
-                runningQuery.iterator()));
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -718,7 +717,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         assertFalse(runningQuery.isDone());
         
-        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
+        final ICloseableIterator<IBindingSet[]> itr = runningQuery.iterator();
         assertFalse(runningQuery.isDone());
         
         // eagerly terminate the query.
@@ -845,8 +844,8 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         final IBindingSet[] expected = source;
 
         // verify solutions.
-        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
-                runningQuery.iterator()));
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -986,7 +985,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 //                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -1167,7 +1166,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                runningQuery);
 
         // Wait until the query is done.
         runningQuery.get();
@@ -1307,7 +1306,8 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                             new Constant<String>("Leon") }//
             ) };
 
-            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected,
+                    runningQuery);
         
         }
 
@@ -1653,7 +1653,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
             };
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                    new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+                    runningQuery);
         
 //            new E("John", "Mary"),// [0]
 //            new E("Leon", "Paul"),// [1]
@@ -1754,7 +1754,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                             new Constant<String>("Leon")}//
             ) };
 
-            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
         
         }
 
@@ -1835,7 +1835,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                     new IConstant[] { new Constant<String>("Mary")}//
             ) };
 
-            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery);
         
         }
 

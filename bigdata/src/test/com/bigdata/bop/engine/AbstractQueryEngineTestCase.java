@@ -131,7 +131,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
      */
     static public void assertSameSolutions(
                 final IBindingSet[] expected,
-                final IAsynchronousIterator<IBindingSet[]> itr,
+                final ICloseableIterator<IBindingSet[]> itr,
                 final Future<Void> ft
             ) {
         try {
@@ -312,7 +312,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
     static public void assertSameSolutionsAnyOrder(final String msg,
             final IBindingSet[] expected, final IRunningQuery runningQuery) {
     
-    	final IAsynchronousIterator<IBindingSet[]> itr = runningQuery
+    	final ICloseableIterator<IBindingSet[]> itr = runningQuery
     			.iterator();
     
     	assertSameSolutionsAnyOrder(msg, expected, itr, runningQuery/* future */);
@@ -321,7 +321,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
 
     static public void assertSameSolutionsAnyOrder(
             final IBindingSet[] expected,
-            final IAsynchronousIterator<IBindingSet[]> itr,
+            final ICloseableIterator<IBindingSet[]> itr,
             final Future<?> future) {
     
         assertSameSolutionsAnyOrder("", expected, itr, future);
@@ -330,7 +330,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
 
     static public void assertSameSolutionsAnyOrder(final String msg,
     		final IBindingSet[] expected,
-    		final IAsynchronousIterator<IBindingSet[]> itr,
+    		final ICloseableIterator<IBindingSet[]> itr,
     		final Future<?> runningQuery) {
     
         try {
