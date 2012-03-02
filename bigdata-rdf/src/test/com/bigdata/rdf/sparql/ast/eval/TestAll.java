@@ -116,6 +116,7 @@ public class TestAll extends TestCase {
         // Test suites for SPARQL 1.1 Federated Query
         suite.addTestSuite(TestServiceInternal.class);
         suite.addTestSuite(TestServiceExternal.class);
+        suite.addTestSuite(TestRemoteServiceCallImpl.class);
         
         // Full text search
         suite.addTestSuite(TestSearch.class);
