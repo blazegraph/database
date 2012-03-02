@@ -33,6 +33,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -40,6 +41,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
@@ -91,6 +94,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
     private final URI serviceURI;
     private final String exprImage;
     private final Map<String,String> prefixDecls;
+    private final Map<String,String> namespaces;
     
     public RemoteServiceCallImpl(final AbstractTripleStore store,
             final IGroupNode<IGroupMemberNode> groupNode, final URI serviceURI,
@@ -118,6 +122,18 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         
         this.prefixDecls = prefixDecls;
         
+        if (prefixDecls != null) {
+            /*
+             * Build up a reverse map from namespace to prefix.
+             */
+            namespaces = new HashMap<String, String>();
+            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
+                namespaces.put(e.getValue(), e.getKey());
+            }
+        } else {
+            namespaces = null;
+        }
+
     }
 
     /**
@@ -200,6 +216,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
 
                 sb.append("\n");
+                sb.append("prefix ");
                 sb.append(e.getKey());
                 sb.append(":");
                 sb.append(" <");
@@ -233,7 +250,11 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         {
             // clip out just the graph pattern from the SERVICE clause.
             final int beginIndex = exprImage.indexOf("{");
-            final int endIndex = exprImage.lastIndexOf("}");
+            if (beginIndex == -1)
+                throw new RuntimeException();
+            final int endIndex = exprImage.lastIndexOf("}") + 1;
+            if (endIndex < beginIndex)
+                throw new RuntimeException();
             final String tmp = exprImage.substring(beginIndex, endIndex);
             sb.append("WHERE\n");
             sb.append(tmp);
@@ -260,9 +281,10 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
                     sb.append(" ?");
                     sb.append(v);
                 }
-                sb.append("\n");
             }
 
+            // Bindings.
+            sb.append(" {\n"); //
             for (BindingSet bindingSet : bindingSets) {
                 sb.append("(");
                 for (String v : vars) {
@@ -272,17 +294,14 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
                         sb.append("UNDEF");
                     } else {
                         final Value val = b.getValue();
-                        /*
-                         * FIXME Make this more compact by leveraging the prefix
-                         * declarations from the original query (which are also
-                         * present on the query that we are generating).
-                         */
-                        sb.append(val.stringValue());
+                        final String ext = toExternal(val);
+                        sb.append(ext);
                     }
                 }
                 sb.append(" )");
                 sb.append("\n");
             }
+            sb.append("}\n");
 
         }
 
@@ -290,6 +309,97 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
     }
     
+    /**
+     * Return an external form for the {@link Value} suitable for direct
+     * embedding into a SPARQL query.
+     * 
+     * @param val
+     *            The value.
+     * 
+     * @return The external form.
+     * 
+     *         TODO This should be lifted out into a utility class and should
+     *         have its own test suite.
+     */
+    private String toExternal(final Value val) {
+        
+        if (val instanceof URI) {
+
+            return toExternal((URI) val);
+        
+        } else if (val instanceof Literal) {
+        
+            return toExternal((Literal)val);
+            
+        } else if (val instanceof BNode) {
+            
+            /*
+             * Note: The SPARQL 1.1 GRAMMAR does not permit blank nodes in the
+             * BINDINGS clause.
+             */
+            
+            throw new UnsupportedOperationException(
+                    "Blank node not permitted in BINDINGS");
+            
+        } else {
+            
+            throw new AssertionError();
+            
+        }
+
+    }
+    
+    private String toExternal(final URI uri) {
+
+        if (prefixDecls != null) {
+
+            final String prefix = namespaces.get(uri.getNamespace());
+
+            if (prefix != null) {
+
+                return prefix + ":" + uri.getLocalName();
+
+            }
+
+        }
+
+        return "<" + uri.stringValue() + ">";
+
+    }
+    
+    private String toExternal(final Literal lit) {
+
+        final String label = lit.getLabel();
+        
+        final String languageCode = lit.getLanguage();
+        
+        final URI datatypeURI = lit.getDatatype();
+
+        final String datatypeStr = datatypeURI == null ? null
+                : toExternal(datatypeURI);
+
+        final StringBuilder sb = new StringBuilder((label.length() + 2)
+                + (languageCode != null ? (languageCode.length() + 1) : 0)
+                + (datatypeURI != null ? datatypeStr.length() + 2 : 0));
+
+        sb.append('"');
+        sb.append(label);
+        sb.append('"');
+
+        if (languageCode != null) {
+            sb.append('@');
+            sb.append(languageCode);
+        }
+
+        if (datatypeURI != null) {
+            sb.append("^^");
+            sb.append(datatypeStr);
+        }
+
+        return sb.toString();
+
+    }
+
     @Override
     public ICloseableIterator<BindingSet> call(final BindingSet[] bindingSets)
             throws Exception {
