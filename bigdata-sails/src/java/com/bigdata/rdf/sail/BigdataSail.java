@@ -3163,7 +3163,7 @@ public class BigdataSail extends SailBase implements Sail {
         ) throws SailException {
 
             throw new SailException(
-                    "Support is not longer provided for TupleExpr evaluation, please make sure you are using a BigdataSailRepository");
+                    "Support is no longer provided for TupleExpr evaluation, please make sure you are using a BigdataSailRepository");
             
         }
 
