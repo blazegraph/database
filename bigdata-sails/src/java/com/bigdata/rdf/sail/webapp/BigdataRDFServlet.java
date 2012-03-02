@@ -131,7 +131,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      */
     protected static RuntimeException launderThrowable(final Throwable t,
             final HttpServletResponse resp, final String queryStr)
-            throws Exception {
+            throws IOException {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
             // log an error for the service.
@@ -162,6 +162,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                 w.flush();
     			// flush the output stream.
     			os.flush();
+    		} catch(IOException ex) {
+    		    // Could not write on output stream.
     		} finally {
     			// ignore any problems here.
             }
@@ -178,8 +180,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     		return (RuntimeException) t;
     	} else if (t instanceof Error) {
     		throw (Error) t;
-    	} else if (t instanceof Exception) {
-    		throw (Exception) t;
+    	} else if (t instanceof IOException) {
+    		throw (IOException) t;
     	} else
     		throw new RuntimeException(t);
     }
