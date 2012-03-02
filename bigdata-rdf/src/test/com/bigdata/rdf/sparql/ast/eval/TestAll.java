@@ -81,6 +81,11 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestDefaultGraphs.class);
 
+        /*
+         * Test suite for virtual graphs support.
+         */
+        suite.addTestSuite(TestVirtualGraphs.class);
+
         // Test suite for OPTIONAL groups.
         suite.addTestSuite(TestOptionals.class);
 

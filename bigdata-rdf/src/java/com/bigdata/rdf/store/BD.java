@@ -302,6 +302,47 @@ public interface BD {
      * @see com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)
      */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
+
+    /**
+     * <p>
+     * A predicate used to model the membership of a virtual graph. The
+     * following assertions declare the membership of a virtual graph as the
+     * graphs (:g1,:g2).
+     * </p>
+     * 
+     * <pre>
+     * :vg bd:virtualGraph :g1
+     * :vg bd:virtualGraph :g2
+     * </pre>
+     * 
+     * </p>
+     * <p>
+     * Virtual graphs are addressed through a SPARQL syntax extension:
+     * </p>
+     * 
+     * <pre>
+     * FROM VIRTUAL GRAPH
+     * FROM NAMED VIRTUAL GRAPH
+     * </pre>
+     * 
+     * <p>
+     * If <code>:vg</code> as declared above is addressed using
+     * <code>FROM VIRTUAL GRAPH</code> then its member graphs (:g1,:g2) are
+     * added to the default graph for the query.
+     * </p>
+     * <p>
+     * If <code>:vg</code> as declared above is addressed using
+     * <code>FROM NAMED VIRTUAL GRAPH</code> then its member graphs (:g1,:g2)
+     * are added to the named graphs for the query.
+     * </p>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/493">
+     *      Virtual Graphs (ticket)</a>
+     * @see <a
+     *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=VirtualGraphs">
+     *      Virtual Graphs (wiki)</a>
+     */
+    URI VIRTUAL_GRAPH = new URIImpl(NAMESPACE + "virtualGraph");
     
 //    /**
 //     * We need the ability to do atomic add+drop in one operation via the

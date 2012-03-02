@@ -64,6 +64,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTString;
 import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Class performs efficient batch resolution of RDF Values against the database.
@@ -158,6 +159,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             vocab.put(RDF.FIRST, f.asValue(RDF.FIRST));
             vocab.put(RDF.REST, f.asValue(RDF.REST));
             vocab.put(RDF.NIL, f.asValue(RDF.NIL));
+            vocab.put(BD.VIRTUAL_GRAPH, f.asValue(BD.VIRTUAL_GRAPH));
  
             /*
              * RDF Values actually appearing in the parse tree.
@@ -184,6 +186,14 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                     new BigdataValue[0]);
 
             context.lexicon.addTerms(values, values.length, true/* readOnly */);
+
+            // Cache the Value on the IV.
+            for (BigdataValue v : values) {
+                final IV iv = v.getIV();
+                if (iv != null) {
+                    iv.setValue(v);
+                }
+            }
 
             // cache the BigdataValues on the IVs for later
             for (BigdataValue value : values) {

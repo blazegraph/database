@@ -21,6 +21,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTQName;
 import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -100,7 +101,9 @@ public class PrefixDeclProcessor {
                 /*
                  * Provide silent declaration for some well known namspaces.
                  */
-                if (prefix.equals("hint")) {
+                if (prefix.equals("bd")) {
+                    prefixMap.put("bd", namespace = BD.NAMESPACE);
+                } else if (prefix.equals("hint")) {
                     prefixMap.put("hint", namespace = QueryHints.NAMESPACE);
                 } else if (prefix.equals("rdf")) {
                     prefixMap.put("rdf", namespace = RDF.NAMESPACE);
