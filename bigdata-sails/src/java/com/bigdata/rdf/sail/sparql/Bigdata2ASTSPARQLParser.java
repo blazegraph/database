@@ -37,7 +37,6 @@ import java.util.UUID;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
-import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.parser.ParsedQuery;
@@ -140,11 +139,16 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
                     final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
 
-                    // Handle dataset declaration
-                    Dataset dataset = DatasetDeclProcessor.process(uc);
-                    if (dataset != null) {
-                        update.setDataset(dataset);
-                    }
+//                    FIXME Restore when implementing UPDATE.
+//                    // Handle dataset declaration
+//                    final DatasetNode dataSetNode = new DatasetDeclProcessor(
+//                            context).process(qc);
+//    
+//                    if (dataSetNode != null) {
+//    
+//                        queryRoot.setDataset(dataSetNode);
+//    
+//                    }
 
                     ASTUpdate updateNode = uc.getUpdate();
                     update.addUpdateExpr((UpdateExpr)updateNode.jjtAccept(updateExprBuilder, null));
@@ -256,13 +260,16 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              * needs to be an authenticated identity to make this work and that
              * could be done via an integration within the NanoSparqlServer web
              * application container.
+             * 
+             * Note: This handles VIRTUAL GRAPH resolution.
              */
-            final Dataset dataset = DatasetDeclProcessor.process(qc);
-            
-            if (dataset != null) {
-            
-                queryRoot.setDataset(new DatasetNode(dataset));
-                
+            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
+                    .process(qc);
+
+            if (dataSetNode != null) {
+
+                queryRoot.setDataset(dataSetNode);
+
             }
 
             return ast;

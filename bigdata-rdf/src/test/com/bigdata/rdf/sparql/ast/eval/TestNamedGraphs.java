@@ -76,8 +76,7 @@ public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
      * the query is against the named graphs then there are no solutions. The
      * other test verifies that the opposite is also true - that when the data
      * are from the named graphs and the query is against the default graph that
-     * there are no solutions. This test is currently failing because it
-     * contradicts that prediction. The test is probably wrong.
+     * there are no solutions.
      */
     public void test_namedGraphs_01b() throws Exception {
 

@@ -259,7 +259,9 @@ public class DataSetSummary {
     public String toString() {
 
         return "DataSetSummary{ngraphs=" + graphs.size() + ", nknown=" + nknown
-                + "}";
+                + ", graphs="+graphs
+                + "}"
+                ;
         
     }
 

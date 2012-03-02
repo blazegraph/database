@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
@@ -65,10 +66,34 @@ public class DatasetNode extends QueryNodeBase {
     }
 
     @SuppressWarnings("rawtypes")
+    private static final DataSetSummary asDataSetSummary(final Set<IV> ivs) {
+        /*
+         * Note: This will cause named-graphs-01b to fail.
+         */
+        // if (ivs == null)
+        // return null;
+
+        /*
+         * Note: Per DAWG tests graph-02 and graph-04, a query against an empty
+         * default graph collection or an empty named graph collection should
+         * be constrained to NO graphs.  This is different from the case where
+         * the dataset is simply not specified, which is interpreted as having
+         * no constraint on the visited graphs.  
+         * 
+         * See DataSetSummary#toInternalValues()
+         */
+//        if (ivs.isEmpty())
+//            return null;
+        
+        return new DataSetSummary((Set) (ivs == null ? Collections.emptySet()
+                : ivs));
+        
+    }
+    
+    @SuppressWarnings("rawtypes")
 	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs) {
 
-        this(defaultGraphs != null ? new DataSetSummary(defaultGraphs) : null,
-                namedGraphs != null ? new DataSetSummary(namedGraphs) : null);
+        this(asDataSetSummary(defaultGraphs), asDataSetSummary(namedGraphs));
 
 	}
 	
@@ -77,8 +102,7 @@ public class DatasetNode extends QueryNodeBase {
 	        final IElementFilter<ISPO> defaultGraphFilter, 
             final IElementFilter<ISPO> namedGraphFilter) {
         
-        this(defaultGraphs != null ? new DataSetSummary(defaultGraphs) : null,
-                namedGraphs != null ? new DataSetSummary(namedGraphs) : null,
+        this(asDataSetSummary(defaultGraphs), asDataSetSummary(namedGraphs),
                 defaultGraphFilter, namedGraphFilter);
         
     }

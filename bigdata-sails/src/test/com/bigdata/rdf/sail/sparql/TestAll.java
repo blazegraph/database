@@ -90,6 +90,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestBigdataExprBuilder.class);
 
+        // Test suite for the VIRTUAL GRAPHS extension.
+        suite.addTestSuite(TestVirtualGraphs.class);
+
         // TODO Test suite for property paths.
 
         return suite;
