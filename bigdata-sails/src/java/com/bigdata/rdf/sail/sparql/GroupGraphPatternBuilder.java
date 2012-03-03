@@ -620,13 +620,13 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
     /**
      * SPARQL 1.1 SERVICE.
-     * 
+     * <p> 
+     * Note: The prefix declarations are attached to the
+     * {@link ASTServiceGraphPattern} by the {@link PrefixDeclProcessor}.
+     * <p>
      * TODO Do we need to pass through the baseURI? Can this be used to
      * abbreviate serialized IRIs? (I would think that we would use the prefix
      * declarations for that.)
-     * 
-     * FIXME The prefix declarations are not being attached. We need
-     * a new visitor to attach them?
      */
     @Override
     final public Void visit(final ASTServiceGraphPattern node, Object data)

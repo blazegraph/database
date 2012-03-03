@@ -18,6 +18,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQName;
+import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -125,5 +126,18 @@ public class PrefixDeclProcessor {
 
 			return null;
 		}
+    
+		/**
+		 * Attach the prefix declarations to the SERVICE node.
+		 */
+		@Override
+        public Object visit(final ASTServiceGraphPattern node, Object data)
+            throws VisitorException
+        {
+            node.setPrefixDeclarations(prefixMap);
+            return super.visit(node, data);
+        }
+
 	}
+	
 }

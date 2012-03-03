@@ -159,6 +159,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     @SuppressWarnings("unchecked")
     protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
 
+        @SuppressWarnings("rawtypes")
         IV iv = tripleStore.getLexiconRelation().getInlineIV(value);
 
         if (iv == null) {

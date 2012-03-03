@@ -187,15 +187,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
             context.lexicon.addTerms(values, values.length, true/* readOnly */);
 
-            // Cache the Value on the IV.
-            for (BigdataValue v : values) {
-                final IV iv = v.getIV();
-                if (iv != null) {
-                    iv.setValue(v);
-                }
-            }
-
-            // cache the BigdataValues on the IVs for later
+            // Cache the BigdataValues on the IVs for later
             for (BigdataValue value : values) {
 
                 final IV iv = value.getIV();
