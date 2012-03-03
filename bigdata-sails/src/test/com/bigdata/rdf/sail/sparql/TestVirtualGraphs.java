@@ -164,10 +164,10 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
             tripleStore.getLexiconRelation().addTerms(values, values.length,
                     false/* readOnly */);
             
-            // Cache the Value on the IV.
-            for(BigdataValue v : values) {
-                v.getIV().setValue(v);
-            }
+//            // Cache the Value on the IV.
+//            for(BigdataValue v : values) {
+//                v.getIV().setValue(v);
+//            }
             
         }
 
@@ -318,10 +318,10 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
             tripleStore.getLexiconRelation().addTerms(values, values.length,
                     false/* readOnly */);
             
-            // Cache the Value on the IV.
-            for(BigdataValue v : values) {
-                v.getIV().setValue(v);
-            }
+//            // Cache the Value on the IV.
+//            for(BigdataValue v : values) {
+//                v.getIV().setValue(v);
+//            }
             
         }
 

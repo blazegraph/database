@@ -233,12 +233,14 @@ public class BigdataOpenRDFBindingSetsResolverator
 
             if (outVal.getIV() == null) {
 
-               	final IV dummy = TermId.mockIV(VTE.valueOf(outVal));
+               	@SuppressWarnings("rawtypes")
+                final IV dummy = TermId.mockIV(VTE.valueOf(outVal));
             	
             	outVal.setIV(dummy);
             	
             }
 
+            @SuppressWarnings("rawtypes")
             final IV iv = outVal.getIV();
 
             /*
@@ -247,6 +249,7 @@ public class BigdataOpenRDFBindingSetsResolverator
              */
             iv.setValue(outVal);
             
+            @SuppressWarnings("rawtypes")
             final Constant<?> c = new Constant(iv);
             
             out.set(Var.var(name), c);

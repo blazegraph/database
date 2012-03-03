@@ -92,10 +92,9 @@ public class BigdataValueReplacer {
      *         dataset is [0], binding set is [1]
      */
     public Object[] replaceValues(//
-            final Dataset dataset,
-//            final TupleExpr tupleExpr,
+            final Dataset dataset,//
             final BindingSet[] bindingSets//
-    ) {//throws SailException {
+    ) {
 
         if(dataset == null && bindingSets == null) {
 
@@ -113,11 +112,6 @@ public class BigdataValueReplacer {
          * one or more required terms are unknown to the database.
          */
         final Map<Value, BigdataValue> values = new LinkedHashMap<Value, BigdataValue>();
-        
-//        /*
-//         * The set of variables encountered in the query.
-//         */
-//        final Map<String/* name */, Var> vars = new LinkedHashMap<String, Var>();
 
         final BigdataValueFactory valueFactory = database.getValueFactory();
 
@@ -131,62 +125,6 @@ public class BigdataValueReplacer {
             
         }
 
-//        if(tupleExpr != null) {
-//        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
-//
-//            @Override
-//            public void meet(final Var var) {
-//                
-//                vars.put(var.getName(), var);
-//                
-//                if (var.hasValue()) {
-//
-//                    final Value val = var.getValue();
-//
-//                    // add BigdataValue variant of the var's Value.
-//                    values.put(val, valueFactory.asValue(val));
-//                    
-//                }
-//                
-//            }
-//            
-//            @Override
-//            public void meet(final ValueConstant constant) {
-//                
-//            	/*
-//            	 * I fixed this over in BigdataEvaluationStrategyImpl3.
-//            	 * ValueExpr nodes used in constraints are allowed to use
-//            	 * values not actually in the database. MP
-//            	 */
-////                if (constant.getParentNode() instanceof LangMatches) {
-////                    /* Don't try to resolve for lang matches.
-////                     * 
-////                     * Note: Sesame will sometimes use a Literal to represent
-////                     * a constant parameter to a function, such as LangMatches.
-////                     * For such uses, we DO NOT want to attempt to resolve the
-////                     * Literal against the lexicon.  Instead, it should just be
-////                     * passed through.  BigdataSailEvaluationStrategy is then
-////                     * responsible for recognizing cases where the lack of an
-////                     * IV on a constant is associated with such function calls
-////                     * rather than indicating that the Value is not known to
-////                     * the KB. 
-////                     */
-////                    return;
-////                }
-//            	
-//            	if (log.isInfoEnabled()) {
-//            		log.info("meeting: " + constant);
-//            	}
-//
-//                final Value val = constant.getValue();
-//
-//                // add BigdataValue variant of the var's Value.
-//                values.put(val, valueFactory.asValue(val));
-//                
-//            }
-//            
-//        });
-//        } // tupleExpr != null
         if (bindingSets != null && bindingSets.length > 0) {
         
             for(BindingSet bindings : bindingSets) {
@@ -258,91 +196,7 @@ public class BigdataValueReplacer {
 			}
 
         }
-        
-//        /*
-//         * Replace the values with BigdataValues having their resolve term
-//         * identifiers.
-//         */
-//        if(tupleExpr!=null) {
-//        tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
-//
-//            @Override
-//            public void meet(Var var) {
-//                
-//                if (var.hasValue()) {
-//
-//                    // the Sesame Value object.
-//                    final Value val = var.getValue();
-//
-//                    // Lookup the resolve BigdataValue object.
-//                    final BigdataValue val2 = values.get(val);
-//
-//                    assert val2 != null : "value not found: "+var.getValue();
-//                    
-//                    if (log.isDebugEnabled())
-//                        log.debug("value: " + val + " : " + val2 + " ("
-//                                + val2.getIV() + ")");
-//
-//                    if (val2.getIV() == null) {
-//
-//                        /*
-//                         * Since the term identifier is NULL this value is
-//                         * not known to the kb.
-//                         */
-//                        
-//                        if(log.isInfoEnabled())
-//                            log.info("Not in knowledge base: " + val2);
-//                        
-//                    }
-//                    
-//                    // replace the constant in the query.
-//                    var.setValue(val2);
-//
-//                }
-//            }
-//            
-//            @Override
-//            public void meet(ValueConstant constant) {
-//                
-////                if (constant.getParentNode() instanceof LangMatches) {
-////                    /* Note: This is parallel to the meet in the visit
-////                     * pattern above.
-////                     */
-////                   return;
-////                }
-//
-//                 // the Sesame Value object.
-//                final Value val = constant.getValue();
-//
-//                // Lookup the resolved BigdataValue object.
-//                final BigdataValue val2 = values.get(val);
-//
-//                assert val2 != null : "value not found: "+constant.getValue();
-//                
-//                if (log.isDebugEnabled())
-//                    log.debug("value: " + val + " : " + val2 + " ("
-//                            + val2.getIV() + ")");
-//
-//                if (val2.getIV() == null) {
-//
-//                    /*
-//                     * Since the term identifier is NULL this value is
-//                     * not known to the kb.
-//                     */
-//                    
-//                    if(log.isInfoEnabled())
-//                        log.info("Not in knowledge base: " + val2);
-//                    
-//                }
-//                
-//                // replace the constant in the query.
-//                constant.setValue(val2);
-//                
-//            }
-//            
-//        });
-//        } // tupleExpr != null
-        
+                
         final BindingSet[] bindingSets2;
         
         if (bindingSets == null) {
@@ -432,7 +286,6 @@ public class BigdataValueReplacer {
                 }
 
             }
-//            bindings = bindings2;
             
         }
 
