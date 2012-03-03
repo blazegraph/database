@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,31 +22,46 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 8, 2011
+ * Created on Mar 3, 2012
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.service;
 
-import com.bigdata.striterator.ICloseableIterator;
+import org.openrdf.query.BindingSet;
+
+import com.bigdata.bop.IBindingSet;
 
 /**
- * Service invocation interface.
+ * Service options base class for with JVM services which handle openrdf
+ * {@link BindingSet}s rather than bigdata {@link IBindingSet}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ServiceCall<E> {
+public class ExternalServiceOptions implements IServiceOptions {
 
     /**
-     * Invoke an service.
-     * 
-     * @param bindingSets
-     *            The binding sets flowing into the service.
-     * 
-     * @return An iterator from which the solutions can be drained. If the
-     *         iterator is closed, the service invocation must be cancelled.
-     * @throws Exception 
+     * Always returns <code>false</code>.
      */
-    ICloseableIterator<E> call(E[] bindingSets) throws Exception;
+    @Override
+    final public boolean isBigdataService() {
+        return false;
+    }
+
+    /**
+     * Always returns <code>false</code>.
+     */
+    @Override
+    final public boolean isRemoteService() {
+        return false;
+    }
+
+    /**
+     * Always returns <code>false</code> (response is ignored).
+     */
+    @Override
+    final public boolean isBindingsClause() {
+        return false;
+    }
 
 }

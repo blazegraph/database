@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 1, 2012
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.service;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -33,19 +33,11 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -55,10 +47,8 @@ import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
+import com.bigdata.rdf.sail.sparql.service.RemoteSparqlQueryBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -66,18 +56,14 @@ import com.bigdata.striterator.ICloseableIterator;
  * This class handleS vectored remote service invocation by generating an
  * appropriate SPARQL query (with BINDINGS) and an appropriate HTTP request.
  * 
- * TODO Do a version of this which does not vector solutions through the
- * BINDINGS clause? The purpose would be compatibility with service end points
- * which do not support BINDINGS, e.g., SPARQL 1.0 end points or non-conforming
- * SPARQL 1.1 end points).
- * 
- * TODO Annotations for additional URL query parameters (defaultGraph, etc),
- * authentication, HTTP METHOD (GET/POST), preferred result format (SPARQL,
- * BINARY, etc.), etc.  Those things are most extensibly expressed in SPARQL
- * using query hints.
+ * TODO Add {@link RemoteServiceOptions} options for additional URL query
+ * parameters (defaultGraph, etc), authentication, HTTP METHOD (GET/POST),
+ * preferred result format (SPARQL, BINARY, etc.), etc. This can be configured
+ * for a service URI configured using the {@link ServiceRegistry}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: RemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
+ *          thompsonbry $
  */
 public class RemoteServiceCallImpl implements RemoteServiceCall {
 
@@ -90,314 +76,45 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
     static private final String UTF8 = "UTF-8";
     
 //    private final AbstractTripleStore store;
-    private final IGroupNode<IGroupMemberNode> groupNode;
+//    private final IGroupNode<IGroupMemberNode> groupNode;
     private final URI serviceURI;
-    private final String exprImage;
-    private final Map<String,String> prefixDecls;
-    private final Map<String,String> namespaces;
+    private final ServiceNode serviceNode;
+    private final RemoteServiceOptions serviceOptions;
+//    private final String exprImage;
+//    private final Map<String,String> prefixDecls;
+//    private final Set<IVariable<?>> projectedVars;
     
     public RemoteServiceCallImpl(final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode, final URI serviceURI,
-            final String exprImage, final Map<String, String> prefixDecls) {
+            final URI serviceURI, final ServiceNode serviceNode,
+            final RemoteServiceOptions serviceOptions) {
 
 //        if (store == null)
 //            throw new IllegalArgumentException();
 
-        if (groupNode == null)
-            throw new IllegalArgumentException();
-
         if (serviceURI == null)
             throw new IllegalArgumentException();
 
-        if (exprImage == null)
+        if (serviceNode == null)
+            throw new IllegalArgumentException();
+
+        if (serviceOptions == null)
             throw new IllegalArgumentException();
 
 //        this.store = store;
         
-        this.groupNode = groupNode;
-        
         this.serviceURI = serviceURI;
         
-        this.exprImage = exprImage;
+        this.serviceNode = serviceNode;
         
-        this.prefixDecls = prefixDecls;
-        
-        if (prefixDecls != null) {
-            /*
-             * Build up a reverse map from namespace to prefix.
-             */
-            namespaces = new HashMap<String, String>();
-            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
-                namespaces.put(e.getValue(), e.getKey());
-            }
-        } else {
-            namespaces = null;
-        }
-
-    }
-
-    /**
-     * Return the distinct variables "projected" by the SERVICE group graph
-     * pattern. The order of this set is not important, but the variables must
-     * be distinct.
-     * 
-     * FIXME This is not quite correct. It will find variables inside of
-     * subqueries which are not visible. We should compute the projected
-     * variables in the query plan generator and just attach them to the
-     * ServiceCall JOIN and then pass them into this class (yet another
-     * attribute for the service call and the {@link ServiceFactory}).
-     */
-    private Set<IVariable<?>> getProjectedVars() {
-
-        final LinkedHashSet<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
-        
-        final Iterator<IVariable<?>> itr = BOpUtility
-                .getSpannedVariables((BOp) groupNode);
-        
-        while (itr.hasNext()) {
-        
-            projectedVars.add(itr.next());
-            
-        }
-
-        return projectedVars;
-        
-    }
-
-    /**
-     * Return an ordered collection of the distinct variable names used in the
-     * given caller's solution set.
-     * 
-     * @param bindingSets
-     *            The solution set.
-     * 
-     * @return The distinct, ordered collection of variables used.
-     */
-    private LinkedHashSet<String> getDistinctVars(final BindingSet[] bindingSets) {
-
-        final LinkedHashSet<String> vars = new LinkedHashSet<String>();
-
-        for (BindingSet bindingSet : bindingSets) {
-
-            for (Binding binding : bindingSet) {
-
-                vars.add(binding.getName());
-
-            }
-
-        }
-
-        return vars;
-
-    }
-
-    /**
-     * Return the SPARQL query that will be sent to the remote SPARQL end point.
-     * 
-     * @param bindingSets
-     *            The source solutions. These will be used to create a BINDINGS
-     *            clause for the query.
-     *            
-     * @return The query.
-     */
-    public String getSparqlQuery(final BindingSet[] bindingSets) {
-        
-        final StringBuilder sb = new StringBuilder();
-
-        /*
-         * Prefix declarations.
-         * 
-         * Note: The prefix declarations need to be harvested and passed along
-         * since we are using the text image of the SERVICE group graph pattern
-         * in the WHERE clause.
-         */
-        if (prefixDecls != null) {
-
-            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
-
-                sb.append("\n");
-                sb.append("prefix ");
-                sb.append(e.getKey());
-                sb.append(":");
-                sb.append(" <");
-                sb.append(e.getValue());
-                sb.append(">");
-                sb.append("\n");
-                
-            }
-            
-        }
-
-        /*
-         * SELECT clause.
-         */
-        {
-            final Set<IVariable<?>> projectedVars = getProjectedVars();
-            sb.append("SELECT ");
-            for (IVariable<?> v : projectedVars) {
-                sb.append(" ?");
-                sb.append(v.getName());
-            }
-            sb.append("\n");
-        }
-
-        /*
-         * WHERE clause.
-         * 
-         * Note: This uses the actual SPARQL text image for the SERVICE's graph
-         * pattern.
-         */
-        {
-            // clip out just the graph pattern from the SERVICE clause.
-            final int beginIndex = exprImage.indexOf("{");
-            if (beginIndex == -1)
-                throw new RuntimeException();
-            final int endIndex = exprImage.lastIndexOf("}") + 1;
-            if (endIndex < beginIndex)
-                throw new RuntimeException();
-            final String tmp = exprImage.substring(beginIndex, endIndex);
-            sb.append("WHERE\n");
-            sb.append(tmp);
-            sb.append("\n");
-        }
-
-        /*
-         * BINDINGS clause.
-         * 
-         * Note: The BINDINGS clause is used to vector the SERVICE request.
-         * 
-         * BINDINGS ?book ?title { (:book1 :title1) (:book2 UNDEF) }
-         */
-        {
-            // Variables in a known stable order.
-            final LinkedHashSet<String> vars = getDistinctVars(bindingSets);
-
-            sb.append("BINDINGS");
-
-            // Variable declarations.
-            {
-
-                for (String v : vars) {
-                    sb.append(" ?");
-                    sb.append(v);
-                }
-            }
-
-            // Bindings.
-            sb.append(" {\n"); //
-            for (BindingSet bindingSet : bindingSets) {
-                sb.append("(");
-                for (String v : vars) {
-                    sb.append(" ");
-                    final Binding b = bindingSet.getBinding(v);
-                    if (b == null) {
-                        sb.append("UNDEF");
-                    } else {
-                        final Value val = b.getValue();
-                        final String ext = toExternal(val);
-                        sb.append(ext);
-                    }
-                }
-                sb.append(" )");
-                sb.append("\n");
-            }
-            sb.append("}\n");
-
-        }
-
-        return sb.toString();
+        this.serviceOptions = serviceOptions;
 
     }
     
-    /**
-     * Return an external form for the {@link Value} suitable for direct
-     * embedding into a SPARQL query.
-     * 
-     * @param val
-     *            The value.
-     * 
-     * @return The external form.
-     * 
-     *         TODO This should be lifted out into a utility class and should
-     *         have its own test suite.
-     */
-    private String toExternal(final Value val) {
+    @Override
+    public RemoteServiceOptions getServiceOptions() {
         
-        if (val instanceof URI) {
-
-            return toExternal((URI) val);
+        return serviceOptions;
         
-        } else if (val instanceof Literal) {
-        
-            return toExternal((Literal)val);
-            
-        } else if (val instanceof BNode) {
-            
-            /*
-             * Note: The SPARQL 1.1 GRAMMAR does not permit blank nodes in the
-             * BINDINGS clause.
-             */
-            
-            throw new UnsupportedOperationException(
-                    "Blank node not permitted in BINDINGS");
-            
-        } else {
-            
-            throw new AssertionError();
-            
-        }
-
-    }
-    
-    private String toExternal(final URI uri) {
-
-        if (prefixDecls != null) {
-
-            final String prefix = namespaces.get(uri.getNamespace());
-
-            if (prefix != null) {
-
-                return prefix + ":" + uri.getLocalName();
-
-            }
-
-        }
-
-        return "<" + uri.stringValue() + ">";
-
-    }
-    
-    private String toExternal(final Literal lit) {
-
-        final String label = lit.getLabel();
-        
-        final String languageCode = lit.getLanguage();
-        
-        final URI datatypeURI = lit.getDatatype();
-
-        final String datatypeStr = datatypeURI == null ? null
-                : toExternal(datatypeURI);
-
-        final StringBuilder sb = new StringBuilder((label.length() + 2)
-                + (languageCode != null ? (languageCode.length() + 1) : 0)
-                + (datatypeURI != null ? datatypeStr.length() + 2 : 0));
-
-        sb.append('"');
-        sb.append(label);
-        sb.append('"');
-
-        if (languageCode != null) {
-            sb.append('@');
-            sb.append(languageCode);
-        }
-
-        if (datatypeURI != null) {
-            sb.append("^^");
-            sb.append(datatypeStr);
-        }
-
-        return sb.toString();
-
     }
 
     @Override
@@ -406,8 +123,13 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         final QueryOptions opts = new QueryOptions(serviceURI.stringValue());
 
-        opts.queryStr = getSparqlQuery(bindingSets);
-        
+        /*
+         * FIXME Use factory here to handle each of the possible ways in which
+         * we have to vector solutions to the service end point.
+         */
+        opts.queryStr = new RemoteSparqlQueryBuilder(serviceNode, bindingSets)
+                .getSparqlQuery();
+
         final TupleQueryResultFormat resultFormat = TupleQueryResultFormat.BINARY;
 
         opts.acceptHeader = //
@@ -437,7 +159,13 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
              */
             
         }
-        
+
+        /*
+         * FIXME transform in reverse here using the same factory. this will
+         * require materialization of the result set, but the ServiceCallJoin
+         * already has that requirement.  Maybe change ServiceCall#call() to
+         * return an IBindingSet or BindingSet[]?
+         */
         return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
                 queryResult);
 

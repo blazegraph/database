@@ -22,29 +22,46 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Feb 29, 2012
+ * Created on Mar 3, 2012
  */
 
-package com.bigdata.rdf.sparql.ast;
-
-import java.util.Map;
-
-import org.openrdf.model.URI;
-
-import com.bigdata.rdf.store.AbstractTripleStore;
+package com.bigdata.rdf.sparql.ast.service;
 
 /**
- * Factory for service calls against bigdata aware services.
+ * Configurable options for a remote service end point.
+ * 
+ * @see RemoteServiceCallImpl
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BigdataServiceFactory.java 6053 2012-02-29 18:47:54Z
- *          thompsonbry $
+ * @version $Id$
  */
-public interface BigdataServiceFactory extends ServiceFactory {
+public class RemoteServiceOptions implements IServiceOptions {
+
+    private boolean isBindingsClause = true;
+
+    public RemoteServiceOptions() {
+
+    }
 
     @Override
-    BigdataServiceCall create(final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode, final URI serviceURI,
-            final String exprImage, final Map<String, String> prefixDecls);
+    final public boolean isBigdataService() {
+        return false;
+    }
+
+    @Override
+    final public boolean isRemoteService() {
+        return true;
+    }
+
+    @Override
+    public boolean isBindingsClause() {
+        return isBindingsClause;
+    }
+
+    public void setBindingsClause(final boolean isBindingsClause) {
+
+        this.isBindingsClause = isBindingsClause;
+
+    }
 
 }

@@ -87,7 +87,6 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
-import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -110,10 +109,6 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.ServiceCall;
-import com.bigdata.rdf.sparql.ast.ServiceCallUtility;
-import com.bigdata.rdf.sparql.ast.ServiceNode;
-import com.bigdata.rdf.sparql.ast.ServiceRegistry;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -126,6 +121,11 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -808,14 +808,15 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final BigdataURI serviceURI = ServiceCallUtility
                     .getConstantServiceURI(serviceRef);
             
-            final ServiceCall<?> serviceCall = ServiceRegistry.toServiceCall(
-                    ctx.db, serviceURI, serviceGraphPattern);
+            final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
+                    .toServiceCall(ctx.db, serviceURI, serviceNode);
 
             /*
              * true IFF this is a registered bigdata aware service running in
              * the same JVM.
              */
-            final boolean isBigdata = serviceCall instanceof BigdataServiceCall;
+            final boolean isBigdata = serviceCall.getServiceOptions()
+                    .isBigdataService();
 
             isMaterialize = !isBigdata;
 
@@ -862,6 +863,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // Anything which can flow out of the SERVICE is "projected".
         final Set<IVariable<?>> projectedVars = ctx.sa
                 .getMaybeProducedBindings(serviceNode);
+        // Set on the ServiceNode
+        serviceNode.setProjectedVars(projectedVars);
         
         final int rightId = ctx.nextId();
         
@@ -940,28 +943,28 @@ public class AST2BOpUtility extends AST2BOpJoins {
         anns.put(PipelineOp.Annotations.PIPELINED, false);
 //      anns.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
         anns.put(PipelineOp.Annotations.SHARED_STATE, true);// live stats.
-        anns.put(ServiceCallJoin.Annotations.SERVICE_REF, serviceRef);
-        anns.put(ServiceCallJoin.Annotations.GRAPH_PATTERN, serviceGraphPattern);
-        {
-            /*
-             * Additional metadata only used for a REMOTE SPARQL end point
-             * SERVICE request.
-             */
-            final String exprImage = serviceNode.getExprImage();
-            if (exprImage != null) {
-                anns.put(ServiceCallJoin.Annotations.EXPR_IMAGE, exprImage);
-                final Map<String, String> prefixDecls = serviceNode
-                        .getPrefixDecls();
-                if (prefixDecls != null && !prefixDecls.isEmpty()) {
-                    anns.put(ServiceCallJoin.Annotations.PREFIX_DECLS,
-                            prefixDecls);
-                }
-            }
-        }
+        anns.put(ServiceCallJoin.Annotations.SERVICE_NODE, serviceNode);
+//        anns.put(ServiceCallJoin.Annotations.GRAPH_PATTERN, serviceGraphPattern);
+//        {
+//            /*
+//             * Additional metadata only used for a REMOTE SPARQL end point
+//             * SERVICE request.
+//             */
+//            final String exprImage = serviceNode.getExprImage();
+//            if (exprImage != null) {
+//                anns.put(ServiceCallJoin.Annotations.EXPR_IMAGE, exprImage);
+//                final Map<String, String> prefixDecls = serviceNode
+//                        .getPrefixDecls();
+//                if (prefixDecls != null && !prefixDecls.isEmpty()) {
+//                    anns.put(ServiceCallJoin.Annotations.PREFIX_DECLS,
+//                            prefixDecls);
+//                }
+//            }
+//        }
         anns.put(ServiceCallJoin.Annotations.NAMESPACE, ctx.db.getNamespace());
         anns.put(ServiceCallJoin.Annotations.TIMESTAMP, ctx.db.getTimestamp());
-        anns.put(ServiceCallJoin.Annotations.SILENT, silent);
-        anns.put(ServiceCallJoin.Annotations.PROJECTED_VARS, projectedVars);
+//        anns.put(ServiceCallJoin.Annotations.SILENT, silent);
+//        anns.put(ServiceCallJoin.Annotations.PROJECTED_VARS, projectedVars);
         anns.put(ServiceCallJoin.Annotations.JOIN_VARS,
                 joinVarSet.toArray(new IVariable[] {}));
         anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);

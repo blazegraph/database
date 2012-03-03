@@ -52,7 +52,6 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
@@ -61,6 +60,7 @@ import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * Query hints are identified applied to AST nodes based on the specified scope

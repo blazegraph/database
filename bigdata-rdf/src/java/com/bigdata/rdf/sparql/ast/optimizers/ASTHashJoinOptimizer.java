@@ -46,9 +46,9 @@ import com.bigdata.rdf.sparql.ast.JoinSetUtil.VertexJoinSet;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * Rewrites join groups having one or more joins which would involve a full

@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.service;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;

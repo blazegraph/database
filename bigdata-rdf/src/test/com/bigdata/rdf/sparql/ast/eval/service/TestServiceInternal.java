@@ -25,11 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 4, 2011
  */
 
-package com.bigdata.rdf.sparql.ast.eval;
+package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -39,17 +38,21 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.ServiceFactory;
-import com.bigdata.rdf.sparql.ast.ServiceRegistry;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ExternalServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Data driven test suite for SPARQL 1.1 Federated Query.
+ * Data driven test suite for SPARQL 1.1 Federated Query against an internal,
+ * bigdata "aware" service (similar to our integrated full text search
+ * facility).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestServiceInternal.java 6053 2012-02-29 18:47:54Z thompsonbry
@@ -75,6 +78,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
      * single solution which restricts the set of solutions for the overall
      * query.
      */
+    @SuppressWarnings("rawtypes")
     public void test_service_001() throws Exception {
         
         /*
@@ -101,7 +105,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
         final URI serviceURI = new URIImpl(
                 "http://www.bigdata.com/mockService/" + getName());
 
-        ServiceRegistry.add(serviceURI,
+        ServiceRegistry.getInstance().add(serviceURI,
                 new MockServiceFactory(serviceSolutions));
 
         try {
@@ -115,7 +119,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
             
         } finally {
             
-            ServiceRegistry.remove(serviceURI);
+            ServiceRegistry.getInstance().remove(serviceURI);
             
         }
         
@@ -128,6 +132,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
      * Note: Since the SERVICE is not actually doing joins, we wind up with
      * duplicate solutions.
      */
+    @SuppressWarnings("rawtypes")
     public void test_service_002() throws Exception {
         
         /*
@@ -161,7 +166,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
         final URI serviceURI = new URIImpl(
                 "http://www.bigdata.com/mockService/" + getName());
 
-        ServiceRegistry.add(serviceURI,
+        ServiceRegistry.getInstance().add(serviceURI,
                 new MockServiceFactory(serviceSolutions));
 
         try {
@@ -175,7 +180,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
             
         } finally {
             
-            ServiceRegistry.remove(serviceURI);
+            ServiceRegistry.getInstance().remove(serviceURI);
             
         }
         
@@ -206,7 +211,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * TODO Test queries where the evaluation order does not place the service
+     * FIXME Test queries where the evaluation order does not place the service
      * first (or does not lift it out into a named subquery).
      */
     public void test_service_006() {
@@ -223,6 +228,8 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
     private static class MockServiceFactory implements ServiceFactory
     {
 
+        private final ExternalServiceOptions serviceOptions = new ExternalServiceOptions();
+
         private final List<IBindingSet> serviceSolutions;
         
         public MockServiceFactory(final List<IBindingSet> serviceSolutions) {
@@ -233,18 +240,21 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
         
         @Override
         public BigdataServiceCall create(final AbstractTripleStore store,
-                final IGroupNode<IGroupMemberNode> groupNode,
-                final URI serviceURI, final String exprImage,
-                final Map<String, String> prefixDecls) {
+                final URI serviceURI, final ServiceNode serviceNode) {
 
             assertNotNull(store);
             
-            assertNotNull(groupNode);
+            assertNotNull(serviceNode);
 
             return new MockBigdataServiceCall();
             
         }
         
+        @Override
+        public IServiceOptions getServiceOptions() {
+            return serviceOptions;
+        }
+
         private class MockBigdataServiceCall implements BigdataServiceCall {
 
             @Override
@@ -260,6 +270,11 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
                 return new CloseableIteratorWrapper<IBindingSet>(
                         serviceSolutions.iterator());
 
+            }
+
+            @Override
+            public IServiceOptions getServiceOptions() {
+                return serviceOptions;
             }
             
         }

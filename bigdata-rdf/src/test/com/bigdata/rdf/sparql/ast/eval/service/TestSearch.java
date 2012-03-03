@@ -25,9 +25,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 4, 2011
  */
 
-package com.bigdata.rdf.sparql.ast.eval;
+package com.bigdata.rdf.sparql.ast.eval.service;
 
-import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
 
 /**

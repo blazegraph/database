@@ -8,6 +8,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * An optional or non-optional collection of query nodes that run together in
