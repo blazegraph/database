@@ -25,28 +25,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 8, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
-
-import java.util.Map;
+package com.bigdata.rdf.sparql.ast.service;
 
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Factory for creating {@link ExternalServiceCall}s from registered service
- * URIs. These SERVICE calls are "external" in the sense that they require us to
- * present materialized RDF {@link Value}s and resolve RDF {@link Value}s which
- * against the lexicon before passing the solutions into the remainder of the
- * query. However, they live inside the same JVM in which the query is being
- * evaluated.
+ * Factory for creating objects which can talk to SPARQL service end points.
  */
-public interface ExternalServiceFactory extends ServiceFactory {
+public interface ServiceFactory {
 
-    @Override
-    ExternalServiceCall create(final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode, final URI serviceURI,
-            final String exprImage, final Map<String, String> prefixDecls);
+    /**
+     * Return options for the service end point. Depending on the
+     * implementation, these options MAY be configurable.
+     */
+    IServiceOptions getServiceOptions();
+    
+    /**
+     * Create a service invocation object.
+     * 
+     * @param store
+     *            The {@link AbstractTripleStore}.
+     * @param serviceURI
+     *            The as-bound URI of the service end point.
+     * @param serviceNode
+     *            The SERVICE clause.
+     * 
+     * @return The object which can be used to evaluate the SERVICE clause.
+     */
+    ServiceCall<?> create(final AbstractTripleStore store,
+            final URI serviceURI, final ServiceNode serviceNode);
 
 }

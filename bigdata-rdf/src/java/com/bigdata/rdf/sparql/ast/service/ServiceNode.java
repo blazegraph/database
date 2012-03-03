@@ -25,13 +25,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
+import com.bigdata.rdf.sparql.ast.IGraphPatternContainer;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeBase;
+import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -70,6 +82,11 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         boolean DEFAULT_SILENT = false;
         
         /**
+         * The timeout in milliseconds before a SERVICE request is failed.
+         */
+        String TIMEOUT = "timeout";
+
+        /**
          * The text "image" of the original SPARQL SERVICE clause. The "image"
          * of the original graph pattern is what gets sent to a remote SPARQL
          * end point when we evaluate the SERVICE node. Because the original
@@ -86,6 +103,13 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
          */
         String PREFIX_DECLS = "prefixDecls";
         
+        /**
+         * The set of variables which can flow in/out of the SERVICE.
+         * 
+         * TODO Use the {@link QueryBase.Annotations#PROJECTION} for this?
+         */
+        String PROJECTED_VARS = "projectedVars";
+
     }
 
     /**
@@ -241,7 +265,38 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         setProperty(Annotations.PREFIX_DECLS, prefixDecls);
 
     }
+    
+    public void setProjectedVars(final Set<IVariable<?>> projectedVars) {
+        
+        setProperty(Annotations.PROJECTED_VARS, projectedVars);
+        
+    }
 
+    /**
+     * @see Annotations#PROJECTED_VARS
+     */
+    @SuppressWarnings("unchecked")
+    public Set<IVariable<?>>  getProjectedVars() {
+
+        return (Set<IVariable<?>>) getProperty(Annotations.PROJECTED_VARS);
+
+    }
+
+    public void setTimeout(final Long timeout) {
+
+        setProperty(Annotations.TIMEOUT, timeout);
+        
+    }
+
+    /**
+     * @see Annotations#TIMEOUT
+     */
+    public long getTimeout() {
+
+        return getProperty(Annotations.TIMEOUT, Long.MAX_VALUE);
+
+    }
+    
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -263,6 +318,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     }
 
+    // TODO toString() for all attributes.
     @Override
     public String toString(int indent) {
 

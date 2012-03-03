@@ -25,22 +25,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 4, 2011
  */
 
-package com.bigdata.rdf.sparql.ast.eval;
+package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.impl.MapBindingSet;
 
-import com.bigdata.rdf.sparql.ast.ExternalServiceCall;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.ServiceFactory;
-import com.bigdata.rdf.sparql.ast.ServiceRegistry;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ExternalServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.ServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
@@ -68,9 +70,8 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A simple SERVICE query against an EXTERNAL service. The service adds in a
-     * single solution which restricts the set of solutions for the overall
-     * query.
+     * A simple SERVICE query. The service adds in a single solution which
+     * restricts the set of solutions for the overall query.
      */
     public void test_service_001() throws Exception {
         
@@ -100,7 +101,7 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
         final URI serviceURI = new URIImpl(
                 "http://www.bigdata.com/mockService/" + getName());
 
-        ServiceRegistry.add(serviceURI,
+        ServiceRegistry.getInstance().add(serviceURI,
                 new MockServiceFactory(serviceSolutions));
 
         try {
@@ -114,15 +115,15 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
             
         } finally {
             
-            ServiceRegistry.remove(serviceURI);
+            ServiceRegistry.getInstance().remove(serviceURI);
             
         }
         
     }
     
     /**
-     * A simple SERVICE query against an INTERNAL service. The service provides
-     * three solutions, two of which join with the remainder of the query.
+     * A simple SERVICE query. The service provides three solutions, two of
+     * which join with the remainder of the query.
      * <p>
      * Note: Since the SERVICE is not actually doing joins, we wind up with
      * duplicate solutions.
@@ -173,7 +174,7 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
         final URI serviceURI = new URIImpl(
                 "http://www.bigdata.com/mockService/" + getName());
 
-        ServiceRegistry.add(serviceURI,
+        ServiceRegistry.getInstance().add(serviceURI,
                 new MockServiceFactory(serviceSolutions));
 
         try {
@@ -187,7 +188,7 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
             
         } finally {
             
-            ServiceRegistry.remove(serviceURI);
+            ServiceRegistry.getInstance().remove(serviceURI);
             
         }
         
@@ -203,6 +204,8 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
     private static class MockServiceFactory implements ServiceFactory
     {
 
+        private final ExternalServiceOptions serviceOptions = new ExternalServiceOptions();
+        
         private final List<BindingSet> serviceSolutions;
         
         public MockServiceFactory(final List<BindingSet> serviceSolutions) {
@@ -212,19 +215,22 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
         }
         
         @Override
-        public ExternalServiceCall create(final AbstractTripleStore store,
-                final IGroupNode<IGroupMemberNode> groupNode,
-                final URI serviceURI, final String exprImage,
-                final Map<String, String> prefixDecls) {
+        public ServiceCall<?> create(final AbstractTripleStore store,
+                final URI serviceURI, final ServiceNode serviceNode) {
 
             assertNotNull(store);
             
-            assertNotNull(groupNode);
+            assertNotNull(serviceNode);
 
             return new MockExternalServiceCall();
             
         }
         
+        @Override
+        public IServiceOptions getServiceOptions() {
+            return serviceOptions;
+        }
+
         private class MockExternalServiceCall implements ExternalServiceCall {
 
             @Override
@@ -241,9 +247,14 @@ public class TestServiceExternal extends AbstractDataDrivenSPARQLTestCase {
                         serviceSolutions.iterator());
 
             }
-            
+
+            @Override
+            public IServiceOptions getServiceOptions() {
+                return serviceOptions;
+            }
+
         }
-        
+
     }
     
 }

@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 7, 2007
  */
 
-package com.bigdata.rdf.sail.sparql;
+package com.bigdata.rdf.sail.sparql.service;
 
 
 import junit.framework.Test;
@@ -58,51 +58,13 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
-        // Test suite for building up value expressions.
-        suite.addTestSuite(TestValueExprBuilder.class);
-
-        /*
-         * Test suite for building up triple patterns, including those which are
-         * covered by the property paths extension in SPARQL 1.1 (a triple
-         * pattern which a constant in the predicate position is treated by the
-         * sesame SPARQL grammar as a degenerate case of a property path.)
-         */
-        suite.addTestSuite(TestTriplePatternBuilder.class);
-        
-        /*
-         * Test suite for group graph patterns (join groups, unions, optional,
-         * etc.) and filters in those graph patterns. Subquery is tested in a
-         * separate test suite.
-         */
-        suite.addTestSuite(TestGroupGraphPatternBuilder.class);
-
-        /*
-         * Test suite for various kinds of subquery patterns.
-         */
-        suite.addTestSuite(TestSubqueryPatterns.class);
-        
-        // Test suite for the BINDINGs clause.
-        suite.addTestSuite(TestBindingsClause.class);
-
-        /*
-         * Test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT),
-         * including DISTINCT/REDUCED, GROUP BY, HAVING, ORDER BY, and
-         * LIMIT/OFFSET.
-         */
-        suite.addTestSuite(TestBigdataExprBuilder.class);
-
-        // Test suite for the VIRTUAL GRAPHS extension.
-        suite.addTestSuite(TestVirtualGraphs.class);
-
-        // TODO Test suite for property paths.
-
         /*
          * Test suite for building a valid SPARQL expression for a remote
          * service end point. This test suite includes validation of the parsed
          * AST model in order to verify that the expected SPARQL query was
          * generated.
          */
-        suite.addTest(com.bigdata.rdf.sail.sparql.service.TestAll.suite());
+        suite.addTestSuite(TestRemoteSparqlQueryBuilder.class);
 
         return suite;
 

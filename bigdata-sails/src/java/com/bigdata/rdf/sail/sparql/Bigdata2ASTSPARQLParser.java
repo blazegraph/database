@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
@@ -75,6 +76,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
+    private static final Logger log = Logger
+            .getLogger(Bigdata2ASTSPARQLParser.class);
+
     static private final URI queryScope = new URIImpl(QueryHints.NAMESPACE
             + QueryHintScope.Query);
 
@@ -95,6 +99,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ParsedUpdate parseUpdate(String updateStr, String baseURI)
             throws MalformedQueryException
         {
+        
+        if(log.isInfoEnabled())
+            log.info(updateStr);
+        
             try {
 
                 ParsedUpdate update = new ParsedUpdate();
@@ -199,6 +207,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
         
+        if(log.isInfoEnabled())
+            log.info(queryStr);
+
         try {
             
             final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);

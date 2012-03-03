@@ -54,15 +54,13 @@ import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
-import com.bigdata.rdf.sparql.ast.ExternalServiceCall;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.RemoteServiceCall;
-import com.bigdata.rdf.sparql.ast.RemoteServiceFactoryImpl;
-import com.bigdata.rdf.sparql.ast.ServiceCall;
-import com.bigdata.rdf.sparql.ast.ServiceCallUtility;
-import com.bigdata.rdf.sparql.ast.ServiceRegistry;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
+import com.bigdata.rdf.sparql.ast.service.RemoteServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -115,36 +113,49 @@ public class ServiceCallJoin extends PipelineOp {
         String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
 
         /**
-         * The {@link IVariableOrConstant} which will evaluate to the URI of the
-         * SERVICE.
+         * The {@link ServiceNode} modeling the SERVICE clause to be invoked.
+         * <p>
+         * Note: This presence of the {@link ServiceNode} as an attribute on the
+         * {@link ServiceCallJoin} blends the bop (physical query plan) and the
+         * AST (logical query plan). However, we basically need all of the data
+         * from the {@link ServiceNode} in order to handle remote service end
+         * points so it is much simpler to reuse the encapsulation here.
          * 
          * @see ServiceRegistry
          */
-        String SERVICE_REF = ServiceCallJoin.class.getName() + ".serviceRef";
+        String SERVICE_NODE = ServiceCallJoin.class.getName() + ".serviceNode";
 
-        /**
-         * The <code>group graph pattern</code> used to invoke the service.
-         */
-        String GRAPH_PATTERN = ServiceCallJoin.class.getName()
-                + ".graphPattern";
-
-        /**
-         * The text "image" of the original SPARQL SERVICE clause. The "image"
-         * of the original group graph pattern is what gets sent to a remote
-         * SPARQL end point when we evaluate the SERVICE node. Because the
-         * original "image" of the graph pattern is being used, we also need to
-         * have the prefix declarations so we can generate a valid SPARQL
-         * request.
-         */
-        String EXPR_IMAGE = ServiceCallJoin.class.getName() + ".exprImage";
-
-        /**
-         * The prefix declarations for the SPARQL query from which the
-         * {@link #EXPR_IMAGE} was taken. This is needed in order to generate a
-         * valid SPARQL query for a remote SPARQL end point when we evaluate the
-         * SERVICE request.
-         */
-        String PREFIX_DECLS = ServiceCallJoin.class.getName() + ".prefixDecls";
+//        /**
+//         * The {@link IVariableOrConstant} which will evaluate to the URI of the
+//         * SERVICE.
+//         * 
+//         * @see ServiceRegistry
+//         */
+//        String SERVICE_REF = ServiceCallJoin.class.getName() + ".serviceRef";
+//
+//        /**
+//         * The <code>group graph pattern</code> used to invoke the service.
+//         */
+//        String GRAPH_PATTERN = ServiceCallJoin.class.getName()
+//                + ".graphPattern";
+//
+//        /**
+//         * The text "image" of the original SPARQL SERVICE clause. The "image"
+//         * of the original group graph pattern is what gets sent to a remote
+//         * SPARQL end point when we evaluate the SERVICE node. Because the
+//         * original "image" of the graph pattern is being used, we also need to
+//         * have the prefix declarations so we can generate a valid SPARQL
+//         * request.
+//         */
+//        String EXPR_IMAGE = ServiceCallJoin.class.getName() + ".exprImage";
+//
+//        /**
+//         * The prefix declarations for the SPARQL query from which the
+//         * {@link #EXPR_IMAGE} was taken. This is needed in order to generate a
+//         * valid SPARQL query for a remote SPARQL end point when we evaluate the
+//         * SERVICE request.
+//         */
+//        String PREFIX_DECLS = ServiceCallJoin.class.getName() + ".prefixDecls";
 
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
@@ -158,21 +169,21 @@ public class ServiceCallJoin extends PipelineOp {
          */
         String TIMESTAMP = ServiceCallJoin.class.getName() + ".timestamp";
 
-        /**
-         * Service errors will be ignored when <code>true</code>.
-         */
-        String SILENT = ServiceCallJoin.class.getName() + ".silent";
+//        /**
+//         * Service errors will be ignored when <code>true</code>.
+//         */
+//        String SILENT = ServiceCallJoin.class.getName() + ".silent";
+//
+//        /**
+//         * The timeout in milliseconds before a SERVICE request is failed.
+//         */
+//        String TIMEOUT = ServiceCallJoin.class.getName() + ".timeout";
 
-        /**
-         * The timeout in milliseconds before a SERVICE request is failed.
-         */
-        String TIMEOUT = ServiceCallJoin.class.getName() + ".timeout";
-
-        /**
-         * The set of variables which can flow in/out of the SERVICE.
-         */
-        String PROJECTED_VARS = ServiceCallJoin.class.getName()
-                + ".projectedVars";
+//        /**
+//         * The set of variables which can flow in/out of the SERVICE.
+//         */
+//        String PROJECTED_VARS = ServiceCallJoin.class.getName()
+//                + ".projectedVars";
 
         /**
          * The join variables. This is used to establish a correlation between
@@ -203,15 +214,13 @@ public class ServiceCallJoin extends PipelineOp {
 
         super(args, annotations);
 
-        getRequiredProperty(Annotations.SERVICE_REF);
-
-        getRequiredProperty(Annotations.GRAPH_PATTERN);
+        getRequiredProperty(Annotations.SERVICE_NODE);
 
         getRequiredProperty(Annotations.NAMESPACE);
 
         getRequiredProperty(Annotations.TIMESTAMP);
 
-        getRequiredProperty(Annotations.PROJECTED_VARS);
+//        getRequiredProperty(Annotations.PROJECTED_VARS);
 
         getRequiredProperty(Annotations.JOIN_VARS);
         
@@ -247,7 +256,9 @@ public class ServiceCallJoin extends PipelineOp {
         
         private final IVariableOrConstant<?> serviceRef;
 
-        final IGroupNode<IGroupMemberNode> groupNode;
+        private final ServiceNode serviceNode;
+        
+//        final IGroupNode<IGroupMemberNode> groupNode;
         
         private final boolean silent;
 
@@ -274,11 +285,13 @@ public class ServiceCallJoin extends PipelineOp {
 //            this.constraints = op
 //                    .getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
-            this.serviceRef = (IVariableOrConstant<?>) op
-                    .getRequiredProperty(Annotations.SERVICE_REF);
+            this.serviceNode = (ServiceNode) op
+                    .getRequiredProperty(Annotations.SERVICE_NODE);
+            
+            this.serviceRef = serviceNode.getServiceRef().getValueExpression();
 
-            this.groupNode  = (IGroupNode<IGroupMemberNode>) op
-                    .getRequiredProperty(Annotations.GRAPH_PATTERN);
+//            this.groupNode  = (IGroupNode<IGroupMemberNode>) op
+//                    .getRequiredProperty(Annotations.GRAPH_PATTERN);
             
             final String namespace = (String) op
                     .getRequiredProperty(Annotations.NAMESPACE);
@@ -292,17 +305,19 @@ public class ServiceCallJoin extends PipelineOp {
 //            this.valueFactory = db.getValueFactory();
 
             // Service errors are ignored when true.
-            this.silent = op.getProperty(Annotations.SILENT, false);
+            this.silent = serviceNode.isSilent();//op.getProperty(Annotations.SILENT, false);
 
             // The service request timeout.
-            this.timeout = op.getProperty(Annotations.TIMEOUT, Long.MAX_VALUE);
+            this.timeout = serviceNode.getTimeout();//op.getProperty(Annotations.TIMEOUT, Long.MAX_VALUE);
             
             /*
              * Note: We MUST use the projected variables for the SERVICE since
              * we can otherwise break the variable scope.
              */
-            this.projectedVars = (Set<IVariable<?>>) op
-                    .getRequiredProperty(Annotations.PROJECTED_VARS);
+            this.projectedVars = serviceNode.getProjectedVars();
+//            (Set<IVariable<?>>) op.getRequiredProperty(Annotations.PROJECTED_VARS);
+            if(projectedVars == null)
+                throw new AssertionError();
 
 //            this.joinVars = (Set<IVariable<?>>) op
 //                    .getRequiredProperty(Annotations.JOIN_VARS);
@@ -555,26 +570,8 @@ public class ServiceCallJoin extends PipelineOp {
         private ServiceCall<? extends Object> resolveService(
                 final BigdataURI serviceURI) {
 
-            ServiceCall<?> serviceCall = ServiceRegistry.toServiceCall(db,
-                    serviceURI, groupNode);
-
-            if (serviceCall == null) {
-
-                final String exprImage = (String) op
-                        .getProperty(Annotations.EXPR_IMAGE);
-
-                if (exprImage == null)
-                    throw new RuntimeException(
-                            "Remote SERVICE request graph pattern image.");
-                
-                @SuppressWarnings({ "unchecked", "rawtypes" })
-                final Map<String, String> prefixDecls = (Map) op
-                        .getProperty(Annotations.PREFIX_DECLS);
-                
-                serviceCall = RemoteServiceFactoryImpl.DEFAULT.create(db,
-                        groupNode, serviceURI, exprImage, prefixDecls);
-
-            }
+            final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
+                    .toServiceCall(db, serviceURI, serviceNode);
 
             return serviceCall;
 

@@ -156,9 +156,41 @@ public class FunctionNode extends ValueExpressionNode {
      */
 
     /**
-     * Return <code>SameTerm(t1,t2)</code> (aka EQ).
+     * Return <code>t1 AND t2</code> (aka EQ).
+     */
+    static public FunctionNode AND(final ValueExpressionNode t1,
+            final ValueExpressionNode t2) {
+
+        return new FunctionNode(FunctionRegistry.AND, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>t1 OR t2</code> (aka EQ).
+     */
+    static public FunctionNode OR(final ValueExpressionNode t1,
+            final ValueExpressionNode t2) {
+
+        return new FunctionNode(FunctionRegistry.OR, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>sameTerm(t1,t2)</code> (aka EQ).
      */
     static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.SAME_TERM, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>t1 = t2</code> (aka EQ aka RDFTERM-EQUALS).
+     */
+    static public FunctionNode EQ(final TermNode t1, final TermNode t2) {
 
         return new FunctionNode(FunctionRegistry.EQ, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });

@@ -22,17 +22,41 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 1, 2012
+ * Created on Mar 3, 2012
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.service;
 
 /**
- * A factory for objects which handle remote SPARQL SERVICE requests.
+ * Service options base class for bigdata aware services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface RemoteServiceFactory extends ServiceFactory {
+public class BigdataServiceOptions implements IServiceOptions {
+
+    /**
+     * Always returns <code>true</code>.
+     */
+    @Override
+    final public boolean isBigdataService() {
+        return true;
+    }
+
+    /**
+     * Always returns <code>false</code>.
+     */
+    @Override
+    final public boolean isRemoteService() {
+        return false;
+    }
+
+    /**
+     * Always returns <code>false</code> (response is ignored).
+     */
+    @Override
+    final public boolean isBindingsClause() {
+        return false;
+    }
 
 }

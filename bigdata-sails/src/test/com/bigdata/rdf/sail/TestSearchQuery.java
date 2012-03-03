@@ -63,7 +63,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sparql.ast.eval.TestSearch;
+import com.bigdata.rdf.sparql.ast.eval.service.TestSearch;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;

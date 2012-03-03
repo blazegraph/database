@@ -48,15 +48,17 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
-import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.search.Hiterator;
@@ -82,16 +84,31 @@ public class SearchServiceFactory implements ServiceFactory {
 //    private static final Logger log = Logger
 //            .getLogger(SearchServiceFactory.class);
 
-    public BigdataServiceCall create(final AbstractTripleStore store,
-            final IGroupNode<IGroupMemberNode> groupNode,
-            final URI serviceUriIsIgnored, final String exprImageIsIgnored,
-            final Map<String, String> prefixDeclsIsIgnored) {
+    /*
+     * Note: This could extend the base class to allow for search service
+     * configuration options.
+     */
+    private final BigdataServiceOptions serviceOptions = new BigdataServiceOptions();
+    
+    @Override
+    public BigdataServiceOptions getServiceOptions() {
 
+        return serviceOptions;
+        
+    }
+    
+    public BigdataServiceCall create(final AbstractTripleStore store,
+            final URI serviceUriIsIgnored, final ServiceNode serviceNode) {
+
+        if (serviceNode == null)
+            throw new IllegalArgumentException();
+        
         /*
          * Validate the search predicates for a given search variable.
          */
+        
         final Map<IVariable<?>, Map<URI, StatementPatternNode>> map = verifyGraphPattern(
-                store, (GroupNodeBase<IGroupMemberNode>) groupNode);
+                store, serviceNode.getGraphPattern());
 
         if (map == null)
             throw new RuntimeException("Not a search request.");
@@ -114,7 +131,8 @@ public class SearchServiceFactory implements ServiceFactory {
          * query.
          */
 
-        return new SearchCall(store, searchVar, statementPatterns);
+        return new SearchCall(store, searchVar, statementPatterns,
+                getServiceOptions());
         
     }
 
@@ -295,7 +313,7 @@ public class SearchServiceFactory implements ServiceFactory {
     private static class SearchCall implements BigdataServiceCall {
 
         private final AbstractTripleStore store;
-        
+        private final IServiceOptions serviceOptions;
         private final Literal query;
         private final IVariable<?>[] vars;
         private final Literal minRank;
@@ -307,7 +325,8 @@ public class SearchServiceFactory implements ServiceFactory {
         public SearchCall(
                 final AbstractTripleStore store,
                 final IVariable<?> searchVar,
-                final Map<URI, StatementPatternNode> statementPatterns) {
+                final Map<URI, StatementPatternNode> statementPatterns,
+                final IServiceOptions serviceOptions) {
 
             if(store == null)
                 throw new IllegalArgumentException();
@@ -318,7 +337,12 @@ public class SearchServiceFactory implements ServiceFactory {
             if(statementPatterns == null)
                 throw new IllegalArgumentException();
 
+            if(serviceOptions == null)
+                throw new IllegalArgumentException();
+
             this.store = store;
+            
+            this.serviceOptions = serviceOptions;
             
             /*
              * Unpack the "search" magic predicate:
@@ -496,6 +520,13 @@ public class SearchServiceFactory implements ServiceFactory {
             }
 
         } // class HitConverter
+
+        @Override
+        public IServiceOptions getServiceOptions() {
+            
+            return serviceOptions;
+            
+        }
         
     }
 
