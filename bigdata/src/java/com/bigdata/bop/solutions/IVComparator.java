@@ -87,7 +87,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
         final boolean b1 = o1.isBNode();
         final boolean b2 = o2.isBNode();
         if (b1 && b2) {
-            return 0;
+            return compareBNodes(o1, o2);
         }
         if (b1) {
             return -1;
@@ -113,6 +113,20 @@ public class IVComparator implements Comparator<IV>, Serializable {
         return compareLiterals((IV<BigdataLiteral, ?>) o1,
                 (IV<BigdataLiteral, ?>) o2);
     
+    }
+
+    /**
+     * Use the natural ordering of the {@link IV}s when they are both blank
+     * nodes. This causes the solutions for the same blank node to be "grouped".
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-873"> Order the
+     *      same Blank Nodes together in ORDER BY</a>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private int compareBNodes(final IV leftBNode, final IV rightBNode) {
+
+        return leftBNode.compareTo(rightBNode);
+        
     }
 
     /**
