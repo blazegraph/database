@@ -268,7 +268,7 @@ public class ServiceCallJoin extends PipelineOp {
         
 //        private final Set<IVariable<?>> joinVars;
 
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         public ChunkTask(final ServiceCallJoin op,
                 final BOpContext<IBindingSet> context) {
 

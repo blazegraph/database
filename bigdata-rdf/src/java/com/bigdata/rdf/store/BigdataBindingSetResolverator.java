@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -42,6 +43,7 @@ public class BigdataBindingSetResolverator
     private final static Logger log = Logger
             .getLogger(BigdataBindingSetResolverator.class);
 
+    private final UUID queryId;
     @SuppressWarnings("rawtypes")
     private final IVariable[] required;
     private final int termsChunkSize;
@@ -54,6 +56,9 @@ public class BigdataBindingSetResolverator
      * @param src
      *            The source iterator (will be closed when this iterator is
      *            closed).
+     * @param queryId
+     *            The query {@link UUID} (for logging on the
+     *            {@link SolutionsLog}).
      * @param required
      *            The variables to be resolved (optional). When
      *            <code>null</code>, all variables will be resolved.
@@ -64,6 +69,7 @@ public class BigdataBindingSetResolverator
      */
     public BigdataBindingSetResolverator(final AbstractTripleStore db,
             final IChunkedOrderedIterator<IBindingSet> src,
+            final UUID queryId,//
             final IVariable[] required, final int chunkOfChunksCapacity,
             final int chunkCapacity, final long chunkTimeout,
             final int termsChunkSize,
@@ -72,6 +78,7 @@ public class BigdataBindingSetResolverator
         super(db, src, new BlockingBuffer<IBindingSet[]>(chunkOfChunksCapacity,
                 chunkCapacity, chunkTimeout, TimeUnit.MILLISECONDS));
 
+        this.queryId = queryId;
         this.required = required;
         this.termsChunkSize = termsChunkSize;
         this.blobsChunkSize = blobsChunkSize;
@@ -124,7 +131,7 @@ public class BigdataBindingSetResolverator
             final IBindingSet[] chunk//
             ) {
         
-        return resolveChunk(lex, chunk, required, termsChunkSize,
+        return resolveChunk(queryId, lex, chunk, required, termsChunkSize,
                 blobsChunkSize);
         
     }
@@ -132,6 +139,9 @@ public class BigdataBindingSetResolverator
     /**
      * Public entry point for batch resolution.
      * 
+     * @param queryId
+     *            The query {@link UUID} (for logging on the
+     *            {@link SolutionsLog}).
      * @param lex
      *            The {@link LexiconRelation}.
      * @param chunk
@@ -152,6 +162,7 @@ public class BigdataBindingSetResolverator
      * to use.
      */
     static private IBindingSet[] resolveChunk(
+            final UUID queryId,
             final LexiconRelation lex,//
             final IBindingSet[] chunk,//
             final IVariable<?>[] required,//
@@ -264,7 +275,7 @@ public class BigdataBindingSetResolverator
 
             if (SolutionsLog.solutionsLog.isInfoEnabled()) {
 
-                SolutionsLog.log(null/* queryId */, null/* bop */,
+                SolutionsLog.log(queryId, null/* bop */,
                         -1/* bopId */, -1/* partitionId */, chunk2);
 
             }

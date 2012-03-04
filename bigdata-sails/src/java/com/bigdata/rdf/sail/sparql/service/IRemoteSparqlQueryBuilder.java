@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql.service;
 
-import com.bigdata.bop.IBindingSet;
+import org.openrdf.query.BindingSet;
 
 /**
  * Interface for objects which can construct a valid SPARQL query for execution
@@ -55,6 +55,6 @@ public interface IRemoteSparqlQueryBuilder {
      * 
      * @return The solutions.
      */
-    IBindingSet[] getSolutions(final IBindingSet[] serviceSolutions);
+    BindingSet[] getSolutions(final BindingSet[] serviceSolutions);
     
 }

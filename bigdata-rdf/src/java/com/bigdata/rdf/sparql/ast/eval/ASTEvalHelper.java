@@ -538,8 +538,9 @@ public class ASTEvalHelper {
             // Convert bigdata binding sets to Sesame binding sets.
             it3 = new Bigdata2Sesame2BindingSetIterator(
                     // Materialize IVs as RDF Values.
-                    new BigdataBindingSetResolverator(db, it2, required,
-                            chunkCapacity, chunkOfChunksCapacity, chunkTimeout,
+                    new BigdataBindingSetResolverator(db, it2,
+                            runningQuery.getQueryId(), required, chunkCapacity,
+                            chunkOfChunksCapacity, chunkTimeout,
                             termsChunkSize, blobsChunkSize).start(db
                             .getExecutorService()));
 

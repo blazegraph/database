@@ -34,6 +34,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
@@ -48,8 +50,10 @@ import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
-import com.bigdata.rdf.sail.sparql.service.RemoteSparqlQueryBuilder;
+import com.bigdata.rdf.sail.sparql.service.IRemoteSparqlQueryBuilder;
+import com.bigdata.rdf.sail.sparql.service.RemoteSparqlBuilderFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -124,11 +128,13 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         final QueryOptions opts = new QueryOptions(serviceURI.stringValue());
 
         /*
-         * FIXME Use factory here to handle each of the possible ways in which
-         * we have to vector solutions to the service end point.
+         * Note: This uses a factory pattern to handle each of the possible ways
+         * in which we have to vector solutions to the service end point.
          */
-        opts.queryStr = new RemoteSparqlQueryBuilder(serviceNode, bindingSets)
-                .getSparqlQuery();
+        final IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory
+                .get(getServiceOptions(), serviceNode, bindingSets);
+
+        opts.queryStr = queryBuilder.getSparqlQuery();
 
         final TupleQueryResultFormat resultFormat = TupleQueryResultFormat.BINARY;
 
@@ -161,13 +167,47 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         }
 
         /*
-         * FIXME transform in reverse here using the same factory. this will
-         * require materialization of the result set, but the ServiceCallJoin
-         * already has that requirement.  Maybe change ServiceCall#call() to
-         * return an IBindingSet or BindingSet[]?
+         * Apply a transform in reverse here using the same builder object.
+         * 
+         * TODO This requires materialization of the result set, but the
+         * ServiceCallJoin already has that requirement. Maybe change
+         * ServiceCall#call() to return an IBindingSet or BindingSet[]? We can
+         * then limit the size of the materialized solution set (indirectly) by
+         * controlling the vector size into the ServiceCallJoin. That is how we
+         * do it for everything else, so it seems like a good idea to follow the
+         * same pattern here.
          */
-        return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-                queryResult);
+        {
+
+            final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+
+            final ICloseableIterator<BindingSet> itr = new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+                    queryResult);
+            
+            try {
+                
+                while(itr.hasNext()) {
+                    
+                    serviceSolutions.add(itr.next());
+                    
+                }
+                
+            } finally {
+                
+                itr.close();
+                
+            }
+
+            // Convert to array.
+            final BindingSet[] a = serviceSolutions
+                    .toArray(new BindingSet[serviceSolutions.size()]);
+            
+            // Possible undo a UNION rewrite of the SERVICE call.
+            final BindingSet[] b = queryBuilder.getSolutions(a);
+            
+            return new ChunkedArrayIterator<BindingSet>(b);
+
+        }
 
     }
 

@@ -30,10 +30,17 @@ package com.bigdata.rdf.sparql.ast.service;
 /**
  * Configurable options for a remote service end point.
  * 
- * @see RemoteServiceCallImpl
+ * @see RemoteServiceFactoryImpl
+ * 
+ *      TODO Add option to indicate that the service supports the ESTCARD
+ *      feature ( fast range count for a triple pattern)? The feature should be
+ *      disclosed through the service description, but we will need to publish a
+ *      unique URI for that feature. Maybe we can get openrdf to implement the
+ *      feature as well?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: RemoteServiceOptions.java 6068 2012-03-03 21:34:31Z thompsonbry
+ *          $
  */
 public class RemoteServiceOptions implements IServiceOptions {
 
