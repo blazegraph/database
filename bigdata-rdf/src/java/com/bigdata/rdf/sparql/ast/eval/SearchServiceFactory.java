@@ -440,7 +440,7 @@ public class SearchServiceFactory implements ServiceFactory {
         /**
          * {@inheritDoc}
          * 
-         * TODO The bindingsClause is ignored. If someone were to bind the
+         * FIXME The bindingsClause is ignored. If someone were to bind the
          * subject, rank, or relevance variables then we would to notice that
          * here.  We would also have to produce one solution for each binding
          * set input to the service.
@@ -449,6 +449,28 @@ public class SearchServiceFactory implements ServiceFactory {
         public ICloseableIterator<IBindingSet> call(
                 final IBindingSet[] bindingsClause) {
 
+            if (bindingsClause.length > 1) {
+
+                /*
+                 * FIXME This case is not supported.  We need to run
+                 * the search engine for each of the source solutions.
+                 */
+
+                throw new UnsupportedOperationException();
+
+            }
+
+            if (bindingsClause.length == 1 && !bindingsClause[0].isEmpty()) {
+
+                /*
+                 * FIXME This case is not supported.  We need to propagate
+                 * the bindings into the search engine.
+                 */
+
+                throw new UnsupportedOperationException();
+
+            }
+            
             return new HitConverter(getHiterator());
 
         }

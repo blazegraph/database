@@ -32,10 +32,17 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * A factory for service calls against remote SPARQL end points.
+ * A factory for service calls against remote SPARQL end points. You can control
+ * the way in which bigdata handles SPARQL 1.1 Federated Query for a remote
+ * SPARQL end point by: (1) create an instance of this class for the SPARQL end
+ * point; (2) customize the {@link RemoteServiceOptions}; and (3) add it to this
+ * {@link ServiceRegistry}. You can also subclass this class if you want to
+ * support configuration options which are not already supported by
+ * {@link RemoteServiceOptions} and {@link RemoteServiceCallImpl}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: RemoteServiceFactoryImpl.java 6068 2012-03-03 21:34:31Z
+ *          thompsonbry $
  */
 public class RemoteServiceFactoryImpl implements ServiceFactory {
 

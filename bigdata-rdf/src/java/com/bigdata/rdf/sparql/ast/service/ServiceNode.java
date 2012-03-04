@@ -41,9 +41,7 @@ import com.bigdata.rdf.sparql.ast.IGraphPatternContainer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
-import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.rdf.sparql.ast.IJoinNode.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -83,9 +81,13 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         
         /**
          * The timeout in milliseconds before a SERVICE request is failed.
+         * 
+         * @see #DEFAULT_TIMEOUT
          */
         String TIMEOUT = "timeout";
-
+        
+        final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+        
         /**
          * The text "image" of the original SPARQL SERVICE clause. The "image"
          * of the original graph pattern is what gets sent to a remote SPARQL
@@ -248,7 +250,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Map<String, String> getPrefixDecls() {
 
         return (Map) getProperty(Annotations.PREFIX_DECLS);
@@ -289,11 +291,16 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
     }
 
     /**
+     * Return the timeout for evaluation of this SERVICE request.
+     * 
+     * @return The timeout -or- {@link Annotations#DEFAULT_TIMEOUT} if the
+     *         timeout was not explicitly configured.
+     * 
      * @see Annotations#TIMEOUT
      */
     public long getTimeout() {
 
-        return getProperty(Annotations.TIMEOUT, Long.MAX_VALUE);
+        return getProperty(Annotations.TIMEOUT, Annotations.DEFAULT_TIMEOUT);
 
     }
     
@@ -325,6 +332,8 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         final StringBuilder sb = new StringBuilder();
 
         final TermNode serviceRef = getServiceRef();
+        
+        final long timeout = getTimeout();
 
         sb.append("\n");
         sb.append(indent(indent));
@@ -339,6 +348,10 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         } else {
             sb.append(" ?");
             sb.append(serviceRef);
+        }
+        
+        if (timeout != Long.MAX_VALUE) {
+            sb.append(" [timeout=" + timeout + "ms]");
         }
 
         if (getGraphPattern() != null) {

@@ -121,7 +121,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
-import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
@@ -787,11 +786,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(serviceNode), needsMaterialization);
 
-        final boolean silent = serviceNode.isSilent();
-        
-        final GraphPatternGroup<IGroupMemberNode> serviceGraphPattern = serviceNode
-                .getGraphPattern();
-
         /*
          * Note: If the serviceRef is a Variable then we MUST add the
          * materialization step since we can not know in advance whether any
@@ -974,6 +968,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
+         * 
+         * FIXME Look at this carefully. Is this for join filters which require
+         * materialization? If so, then are those join filters being attached
+         * here or by the caller? Look at other places where we do similar
+         * things, for example, adding an INCLUDE. Also, make sure that we are
+         * maintaining the doneSet, etc. throughout this method.
          */
         left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
                 serviceNode.getQueryHints());

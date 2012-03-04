@@ -40,7 +40,6 @@ import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
@@ -491,7 +490,7 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
      * This implementation returns it's argument.
      */
     @Override
-    public IBindingSet[] getSolutions(final IBindingSet[] serviceSolutions) {
+    public BindingSet[] getSolutions(final BindingSet[] serviceSolutions) {
 
         return serviceSolutions;
 
