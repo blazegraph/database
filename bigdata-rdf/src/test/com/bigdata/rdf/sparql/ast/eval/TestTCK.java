@@ -654,7 +654,73 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * TCK query we picked up with <code>Sesame 2.6.3</code>
+     * TCK (non-DAWG) query we picked up with <code>Sesame 2.6.3</code>. I've
+     * modified the test slightly to report the aggregate used in the ORDER BY
+     * through the SELECT.
+     * 
+     * <pre>
+     * SELECT ?type (count(?subj) as ?cnt)
+     * WHERE { ?subj a ?type } 
+     * GROUP BY ?type 
+     * ORDER BY (count(?subj))
+     * </pre>
+     * 
+     * <pre>
+     * @prefix : <http://example.org/> .
+     * 
+     * :one a :Number .
+     * :two a :Number .
+     * :three a :Number .
+     * :four a :Number .
+     * :five a :Number .
+     * :six a :Number .
+     * :seven a :Number .
+     * :eight a :Number .
+     * :nine a :Number .
+     * :ten a :Number .
+     * :a a :Letter .
+     * :b a :Letter .
+     * :c a :Letter .
+     * :Sunday a :Day .
+     * :Monday a :Day .
+     * :Tuesday a :Day .
+     * :Wednesday a :Day .
+     * :Thursday a :Day .
+     * :Friday a :Day .
+     * :Saturday a :Day .
+     * </pre>
+     * 
+     * <pre>
+     * <?xml version='1.0' encoding='UTF-8'?>
+     * <sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+     *     <head>
+     *         <variable name='type'/>
+     *     </head>
+     *     <results>
+     *         <result>
+     *             <binding name='type'>
+     *                 <uri>http://example.org/Letter</uri>
+     *             </binding>
+     *         </result>
+     *         <result>
+     *             <binding name='type'>
+     *                 <uri>http://example.org/Day</uri>
+     *             </binding>
+     *         </result>
+     *         <result>
+     *             <binding name='type'>
+     *                 <uri>http://example.org/Number</uri>
+     *             </binding>
+     *         </result>
+     *     </results>
+     * </sparql>
+     * </pre>
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-822"> ORDER by
+     *      GROUP aggregate </a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/502"> Allow
+     *      aggregates in ORDER BY clause </a>
      */
     public void test_sparql11_order_02() throws Exception {
 
@@ -669,7 +735,41 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * TCK query we picked up with <code>Sesame 2.6.3</code>
+     * Variant of {@link #test_sparql11_order_02()} which works around the LCWC
+     * change in SPARQL ORDER BY semantics.
+     * 
+     * <pre>
+     * SELECT  ?type (count(?subj) as ?cnt)
+     * WHERE { ?subj a ?type } 
+     * GROUP BY ?type 
+     * ORDER BY ?cnt
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_sparql11_order_02_workaround() throws Exception {
+
+        new TestHelper("sparql11-order-02-workaround", // testURI,
+                "sparql11-order-02-workaround.rq",// queryFileURL
+                "sparql11-order-02.ttl",// dataFileURL
+                "sparql11-order-02.srx"// resultFileURL
+                ,false// laxCardinality
+                ,true// checkOrder
+        ).runTest();
+
+    }
+
+    /**
+     * TCK (non-DAWG) query we picked up with <code>Sesame 2.6.3</code>
+     * 
+     * <pre>
+     * SELECT  ?type 
+     * WHERE { ?subj a ?type } 
+     * GROUP BY ?type 
+     * ORDER BY DESC(count(?subj))
+     * </pre>
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-822"> ORDER by GROUP aggregate </a>
      */
     public void test_sparql11_order_03() throws Exception {
 
