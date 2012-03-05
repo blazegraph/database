@@ -769,7 +769,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
 
     /**
-     * Add an operator to evaluate a {@link ServiceCall}.
+     * Add an operator to evaluate a {@link ServiceCall}. This handles both
+     * services which are evaluated by direct method call within the same JVM
+     * and SPARQL 1.1 Federated Query.
      * 
      * @param left
      * @param serviceNode
@@ -938,27 +940,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //      anns.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
         anns.put(PipelineOp.Annotations.SHARED_STATE, true);// live stats.
         anns.put(ServiceCallJoin.Annotations.SERVICE_NODE, serviceNode);
-//        anns.put(ServiceCallJoin.Annotations.GRAPH_PATTERN, serviceGraphPattern);
-//        {
-//            /*
-//             * Additional metadata only used for a REMOTE SPARQL end point
-//             * SERVICE request.
-//             */
-//            final String exprImage = serviceNode.getExprImage();
-//            if (exprImage != null) {
-//                anns.put(ServiceCallJoin.Annotations.EXPR_IMAGE, exprImage);
-//                final Map<String, String> prefixDecls = serviceNode
-//                        .getPrefixDecls();
-//                if (prefixDecls != null && !prefixDecls.isEmpty()) {
-//                    anns.put(ServiceCallJoin.Annotations.PREFIX_DECLS,
-//                            prefixDecls);
-//                }
-//            }
-//        }
         anns.put(ServiceCallJoin.Annotations.NAMESPACE, ctx.db.getNamespace());
         anns.put(ServiceCallJoin.Annotations.TIMESTAMP, ctx.db.getTimestamp());
-//        anns.put(ServiceCallJoin.Annotations.SILENT, silent);
-//        anns.put(ServiceCallJoin.Annotations.PROJECTED_VARS, projectedVars);
         anns.put(ServiceCallJoin.Annotations.JOIN_VARS,
                 joinVarSet.toArray(new IVariable[] {}));
         anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);
@@ -968,12 +951,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * For each filter which requires materialization steps, add the
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
-         * 
-         * FIXME Look at this carefully. Is this for join filters which require
-         * materialization? If so, then are those join filters being attached
-         * here or by the caller? Look at other places where we do similar
-         * things, for example, adding an INCLUDE. Also, make sure that we are
-         * maintaining the doneSet, etc. throughout this method.
          */
         left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
                 serviceNode.getQueryHints());

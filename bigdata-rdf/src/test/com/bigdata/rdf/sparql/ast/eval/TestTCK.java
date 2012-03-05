@@ -612,10 +612,14 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * This is sesame TCK test <code>sparql11-subquery-04</code>. We picked it
-     * up with Sesame 2.6.3.  It fails in the TCK run, but it appears to be Ok
+     * up with Sesame 2.6.3. It fails in the TCK run, but it appears to be Ok
      * when run at this layer.
+     * <p>
+     * Ah. This is using ORDER BY on an aggregate, so this is the same as
+     * {@link #test_sparql11_order_02()}.
      * 
      * Query:
+     * 
      * <pre>
      * PREFIX ex: <http://example.org/>
      * SELECT ?friend
@@ -634,6 +638,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * </pre>
      * 
      * Data:
+     * 
      * <pre>
      * @prefix ex: <http://example.org/> .
      * 
@@ -643,6 +648,8 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * </pre>
      */
     public void test_sparql11_subquery_04() throws Exception {
+        
+        assertTrue(store.isQuads());
         
         new TestHelper(
                 "sparql11-subquery-04", // testURI,
