@@ -104,14 +104,6 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
             return false;
 
-        } catch (NoSuchElementException t) {
-
-            /*
-             * Note: This exception should not be wrapped per the ticket above.
-             */
-
-            throw t;
-            
         } catch (Throwable t) {
 
             if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
@@ -140,6 +132,14 @@ public class Bigdata2Sesame2BindingSetIterator implements
                 throw new NoSuchElementException();
 
             return getBindingSet(src.next());
+            
+        } catch (NoSuchElementException t) {
+
+            /*
+             * Note: This exception should not be wrapped per the ticket above.
+             */
+
+            throw t;
             
         } catch (Throwable t) {
 
