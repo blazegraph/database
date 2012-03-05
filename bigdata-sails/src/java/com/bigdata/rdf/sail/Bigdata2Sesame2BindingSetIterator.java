@@ -86,6 +86,13 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
     }
     
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/503">
+     *      Bigdata2Sesame2BindingSetIterator throws QueryEvaluationException
+     *      were it should throw NoSuchElementException. </a>
+     */
     public boolean hasNext() throws QueryEvaluationException {
 
         try {
@@ -97,6 +104,14 @@ public class Bigdata2Sesame2BindingSetIterator implements
 
             return false;
 
+        } catch (NoSuchElementException t) {
+
+            /*
+             * Note: This exception should not be wrapped per the ticket above.
+             */
+
+            throw t;
+            
         } catch (Throwable t) {
 
             if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
