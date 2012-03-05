@@ -32,6 +32,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.parser.sparql.DC;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
@@ -1690,4 +1691,94 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
     }
 
+    /**
+     * A test case where we can not eliminate an empty join group in a UNION.
+     * 
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book
+     * {
+     *    {}
+     *    UNION
+     *    { ?book dc:title ?title }
+     * }
+     * </pre>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/504"> UNION
+     *      with Empty Group Pattern </a>
+     */
+    @SuppressWarnings("unchecked")
+    public void test_union_01() {
+        
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV dcTitle = TermId.mockIV(VTE.URI);
+        dcTitle.setValue(store.getValueFactory().createURI(
+                DC.TITLE.stringValue()));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("book"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            final UnionNode union = new UnionNode();
+            whereClause.addChild(union);
+
+            final JoinGroupNode emptyGroup = new JoinGroupNode();
+
+            final JoinGroupNode otherGroup = new JoinGroupNode();
+            otherGroup.addChild(new StatementPatternNode(new VarNode("book"),
+                    new ConstantNode(dcTitle), new VarNode("title")));
+
+            union.addChild(emptyGroup);
+            union.addChild(otherGroup);
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("book"));
+            
+            final UnionNode union = new UnionNode();
+            expected.setWhereClause(union);
+
+            final JoinGroupNode emptyGroup = new JoinGroupNode();
+
+            final JoinGroupNode otherGroup = new JoinGroupNode();
+            otherGroup.addChild(new StatementPatternNode(new VarNode("book"),
+                    new ConstantNode(dcTitle), new VarNode("title")));
+
+            union.addChild(emptyGroup);
+            union.addChild(otherGroup);
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+    
 }

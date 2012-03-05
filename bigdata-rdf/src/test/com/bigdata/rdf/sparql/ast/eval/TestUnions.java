@@ -182,4 +182,31 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+    /**
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book
+     * {
+     *    {}
+     *    UNION
+     *    { ?book dc:title ?title }
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/504">
+     *      UNION with Empty Group Pattern </a>
+     */
+    public void test_union_with_empty() throws Exception {
+        
+        new TestHelper(
+                "union_with_empty", // testURI,
+                "union_with_empty.rq",// queryFileURL
+                "union_with_empty.ttl",// dataFileURL
+                "union_with_empty.srx"// resultFileURL
+                ).runTest();
+        
+    }    
 }
