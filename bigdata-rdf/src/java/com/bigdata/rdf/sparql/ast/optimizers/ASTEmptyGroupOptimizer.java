@@ -86,8 +86,8 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 //            .getLogger(ASTEmptyGroupOptimizer.class);
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
@@ -209,15 +209,20 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
         if (arity == 0 && 
         		op.getContext() == null &&
-        		op.getParent() != null) {
+        		op.getParent() != null &&
+        		!isUnion(op.getParent())) {
         	
-    		/*
-    		 * If this is an empty graph pattern group then we can just prune
-    		 * it out entirely, unless it is the where clause.
-    		 *  
-             * Also, do not prune GRAPH ?g {} or GRAPH uri {}. Those 
+            /*
+             * If this is an empty graph pattern group then we can just prune it
+             * out entirely, unless it is the where clause.
+             * 
+             * Also, do not prune GRAPH ?g {} or GRAPH uri {}. Those
              * constructions have special semantics.
-    		 */
+             * 
+             * Note: Do not eliminate an empty join group which is the child of
+             * a UNION. See http://sourceforge.net/apps/trac/bigdata/ticket/504
+             * (UNION with Empty Group Pattern)
+             */
     		
     		final IGroupNode<IGroupMemberNode> parent = 
     			op.getParent();
