@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 4, 2011
  */
 
-package com.bigdata.rdf.sail.sparql.service;
+package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,51 +39,37 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.query.parser.sparql.DC;
 
-import com.bigdata.bop.Constant;
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.AbstractBigdataExprBuilderTestCase;
-import com.bigdata.rdf.sail.sparql.service.IRemoteSparqlQueryBuilder;
-import com.bigdata.rdf.sail.sparql.service.RemoteSparqlBuilderFactory;
-import com.bigdata.rdf.sail.sparql.service.RemoteSparqlQueryBuilder;
-import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.FilterNode;
-import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.service.IRemoteSparqlQueryBuilder;
 import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.RemoteSparql10QueryBuilder;
+import com.bigdata.rdf.sparql.ast.service.RemoteSparql11QueryBuilder;
+import com.bigdata.rdf.sparql.ast.service.RemoteSparqlBuilderFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
- * Test suite for generating the SPARQL query for SPARQL 1.1 Federated Query
- * against a REMOTE SERVICE end point.
- * 
- * @see RemoteSparqlQueryBuilder
+ * Test suite the {@link RemoteSparqlBuilderFactory}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestRemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
  *          thompsonbry $
  */
-public class TestRemoteSparqlQueryBuilder extends
+public class TestRemoteSparqlBuilderFactory extends
         AbstractBigdataExprBuilderTestCase {
 
 //    private static final Logger log = Logger
@@ -92,13 +78,13 @@ public class TestRemoteSparqlQueryBuilder extends
     /**
      * 
      */
-    public TestRemoteSparqlQueryBuilder() {
+    public TestRemoteSparqlBuilderFactory() {
     }
 
     /**
      * @param name
      */
-    public TestRemoteSparqlQueryBuilder(String name) {
+    public TestRemoteSparqlBuilderFactory(String name) {
         super(name);
     }
     
@@ -123,23 +109,23 @@ public class TestRemoteSparqlQueryBuilder extends
 
     }
 
-    /**
-     * Wrap as an {@link IConstant}.
-     * 
-     * @param iv
-     *            The {@link IV}.
-     *            
-     * @return The {@link IConstant}.
-     */
-    private IConstant<?> asConstant(final IV<?,?> iv) {
-        
-        return new Constant<IV<?,?>>(iv);
-        
-    }
+//    /**
+//     * Wrap as an {@link IConstant}.
+//     * 
+//     * @param iv
+//     *            The {@link IV}.
+//     *            
+//     * @return The {@link IConstant}.
+//     */
+//    private IConstant<?> asConstant(final IV<?,?> iv) {
+//        
+//        return new Constant<IV<?,?>>(iv);
+//        
+//    }
 
     /**
-     * A simple test with nothing bound and NO source solution. For this case
-     * the BINDINGS clause should be omitted.
+     * A simple test with nothing bound and NO source solution. This can be
+     * handled by either {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_001() throws Exception {
         
@@ -176,49 +162,29 @@ public class TestRemoteSparqlQueryBuilder extends
         
         final List<BindingSet> bindingSets = new LinkedList<BindingSet>();
         
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-        final String queryStr = fixture.getSparqlQuery();
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        if (queryStr.toUpperCase().indexOf("BINDINGS") != -1) {
-            /*
-             * The bindings clause should be suppressed for this case so we can
-             * use the same query builder logic against end points which do and
-             * do not support BINDINGS.
-             */
-            fail("BINDINGS clause should be suppressed.");
-        }
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        options.setSparql11(false);
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
+        options.setSparql11(true);
 
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
-        
+
     /**
      * A simple test with nothing bound and a single <em>empty</em> source
-     * solution. For this case the BINDINGS clause should be omitted.
+     * solution. This can be handled by either {@link IRemoteSparqlQueryBuilder}
+     * .
      */
     public void test_service_001b() throws Exception {
         
@@ -258,51 +224,28 @@ public class TestRemoteSparqlQueryBuilder extends
             bindingSets.add(new MapBindingSet());
         }
         
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-        final String queryStr = fixture.getSparqlQuery();
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-        if (queryStr.toUpperCase().indexOf("BINDINGS") != -1) {
-            /*
-             * The bindings clause should be suppressed for this case so we can
-             * use the same query builder logic against end points which do and
-             * do not support BINDINGS.
-             */
-            fail("BINDINGS clause should be suppressed.");
-        }
+        options.setSparql11(false);
+
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
+
+        options.setSparql11(true);
+
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
         
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
-
     }
         
     /**
-     * A test where a single fully bound triple pattern is presented.
-     * <p>
-     * Note: It is possible to optimize this as an ASK query, but only when
-     * there is a single solution flowing into the service end point.
+     * A test where a single fully bound triple pattern is presented. This can
+     * be handled by either {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_002() throws Exception {
 
@@ -364,66 +307,22 @@ public class TestRemoteSparqlQueryBuilder extends
             bindingSets.add(bset);
         }
 
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        options.setSparql11(false);
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                    vars.add(Var.var("p"));
-                    vars.add(Var.var("o"));
-                }
-                
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("s"), asConstant(book1.getIV()));
-                    bset.set(Var.var("p"), asConstant(dcCreator.getIV()));
-                    bset.set(Var.var("o"), asConstant(author1.getIV()));
-                    solutionsIn.add(bset);
-                }
-                
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("s"), asConstant(book2.getIV()));
-                    bset.set(Var.var("p"), asConstant(dcCreator.getIV()));
-                    bset.set(Var.var("o"), asConstant(author2.getIV()));
-                    solutionsIn.add(bset);
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            }
+        options.setSparql11(true);
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
         
@@ -431,7 +330,8 @@ public class TestRemoteSparqlQueryBuilder extends
      * A variant test in which there are some BINDINGS to be passed through. The
      * set of bindings covers the different types of RDF {@link Value} and also
      * exercises the prefix declarations. This test does NOT use blank nodes in
-     * the BINDINGS.
+     * the BINDINGS. This can be handled by either
+     * {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_003() throws Exception {
         
@@ -510,80 +410,23 @@ public class TestRemoteSparqlQueryBuilder extends
             bset.addBinding("book", book6);
             bindingSets.add(bset);
         }
-        
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("book"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("book"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("book"));
-                }
-                
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book1.getIV()));
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book2.getIV()));
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book3.getIV()));
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book4.getIV()));
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book5.getIV()));
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    bset.set(Var.var("book"), asConstant(book6.getIV()));
-                    solutionsIn.add(bset);
-                }
+        options.setSparql11(false);
 
-            }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
+        options.setSparql11(true);
 
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 
@@ -591,6 +434,7 @@ public class TestRemoteSparqlQueryBuilder extends
      * A variant test in there is a blank node in the BINDINGS to be flowed
      * through to the remote SERVICE.  In this test the blank nodes are not
      * correlated so we do not need to impose a FILTER on the remote service.
+     * This can be handled by either {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_004() throws Exception {
         
@@ -635,65 +479,30 @@ public class TestRemoteSparqlQueryBuilder extends
             bindingSets.add(bset);
         }
 
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        options.setSparql11(false);
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-                /*
-                 * Note: The blank node should be sent across as a variable
-                 * without a bound value (UNDEF).
-                 */
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
+        options.setSparql11(true);
 
-            }
-
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 
     /**
      * A variant test in there is a blank node in the BINDINGS to be flowed
      * through to the remote SERVICE. In this test the blank nodes are
-     * correlated but there is only one solution to be vectored so we will
-     * impose a FILTER on the remote service to enforce that correlation.
+     * correlated but there is only one solution to be vectored. This can be
+     * handled by either {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_005() throws Exception {
         
@@ -744,65 +553,23 @@ public class TestRemoteSparqlQueryBuilder extends
             bset.addBinding("o", tmp);
             bindingSets.add(bset);
         }
-        
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            
-            // A FILTER to enforce variable correlation.
-            whereClause.addChild(new FilterNode(FunctionNode.sameTerm(
-                    new VarNode("s"), new VarNode("o"))));
-            
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                    vars.add(Var.var("o"));
-                }
+        options.setSparql11(false);
 
-                /*
-                 * Note: The blank node should be sent across as a variable
-                 * without a bound value (UNDEF).
-                 */
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            }
+        options.setSparql11(true);
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 
@@ -814,7 +581,8 @@ public class TestRemoteSparqlQueryBuilder extends
      * test differs from the previous test by making more than two variables in
      * the SERVICE clause correlated through shared blank nodes. We need to use
      * a more complex SERVICE graph pattern to accomplish this since the
-     * predicate can not be a blank node.
+     * predicate can not be a blank node. This can be handled by either
+     * {@link IRemoteSparqlQueryBuilder}.
      */
     public void test_service_006() throws Exception {
         
@@ -871,88 +639,35 @@ public class TestRemoteSparqlQueryBuilder extends
             bset.addBinding("o1", tmp);
             bindingSets.add(bset);
         }
-        
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            projection.addProjectionVar(new VarNode("o1"));
-            expected.setProjection(projection);
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            
-            // A FILTER to enforce variable correlation.
-            whereClause.addChild(new FilterNode(FunctionNode.AND(//
-                    FunctionNode.sameTerm(new VarNode("s"), new VarNode("o")),//
-                    FunctionNode.sameTerm(new VarNode("s"), new VarNode("o1"))//
-                    )));
-            
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o1"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                    vars.add(Var.var("o"));
-                    vars.add(Var.var("o1"));
-                }
+        options.setSparql11(false);
 
-                /*
-                 * Note: The blank node should be sent across as a variable
-                 * without a bound value (UNDEF).
-                 */
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            }
+        options.setSparql11(true);
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        assertEquals(RemoteSparql11QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 
     /**
      * A variant test in there is a blank node in the BINDINGS to be flowed
      * through to the remote SERVICE. In this test the blank nodes are
-     * correlated and there is more than one solution to be vectored so we MUST
-     * impose a FILTER on the remote service to enforce that correlation.
-     * 
-     * FIXME Ensure FILTER is imposed, but not in a manner which could cause the
-     * correlation constraint to be imposed across solutions in which the blank
-     * nodes are not correlated.
+     * correlated and there is more than one solution to be vectored.
+     * <p>
+     * This case is only handled by the {@link RemoteSparql10QueryBuilder}.
      */
     public void test_service_007() throws Exception {
-        
+
         final BigdataURI serviceURI = valueFactory
                 .createURI("http://www.bigdata.com/myService");
 
@@ -961,10 +676,10 @@ public class TestRemoteSparqlQueryBuilder extends
             groupNode.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
         }
-        
+
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
-        
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+
+        final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -1006,58 +721,27 @@ public class TestRemoteSparqlQueryBuilder extends
             bindingSets.add(bset);
         }
 
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                    vars.add(Var.var("o"));
-                }
+        options.setSparql11(false);
 
-                /*
-                 * Note: The blank node should be sent across as a variable
-                 * without a bound value (UNDEF).
-                 */
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            }
+        options.setSparql11(true);
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        /*
+         * Still uses the SPARQL 1.0 query builder since it will not rely on the
+         * BINDINGS clause.
+         */
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 
@@ -1070,10 +754,8 @@ public class TestRemoteSparqlQueryBuilder extends
      * across all such solutions. Therefore the SERVICE class will be vectored
      * by rewriting it into a UNION with different variable names in each
      * variant of the UNION.
-     * 
-     * FIXME Ensure FILTER is imposed, but not in a manner which could cause the
-     * correlation constraint to be imposed across solutions in which the blank
-     * nodes are not correlated.
+     * <p>
+     * This case is only handled by the {@link RemoteSparql10QueryBuilder}.
      */
     public void test_service_008() throws Exception {
         
@@ -1089,7 +771,6 @@ public class TestRemoteSparqlQueryBuilder extends
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
         final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
-
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -1133,63 +814,27 @@ public class TestRemoteSparqlQueryBuilder extends
             bset.addBinding("o", tmp2);
             bindingSets.add(bset);
         }
-        
-        final IRemoteSparqlQueryBuilder fixture = RemoteSparqlBuilderFactory
-                .get(new RemoteServiceOptions(), serviceNode,
-                        bindingSets.toArray(new BindingSet[bindingSets.size()]));
 
-        final String queryStr = fixture.getSparqlQuery();
-        
-        // Verify the structure of the rewritten query.
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
+        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+                .size()]);
 
-            expected.setPrefixDecls(prefixDecls);
-            
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            projection.addProjectionVar(new VarNode("p"));
-            projection.addProjectionVar(new VarNode("o"));
-            expected.setProjection(projection);
+        final RemoteServiceOptions options = new RemoteServiceOptions();
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-            
-            {
-                final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-                final List<IBindingSet> solutionsIn = new LinkedList<IBindingSet>();
-                final BindingsClause bindingsClause = new BindingsClause(vars,
-                        solutionsIn);
-                expected.setBindingsClause(bindingsClause);
-                
-                {
-                    vars.add(Var.var("s"));
-                    vars.add(Var.var("o"));
-                }
+        options.setSparql11(false);
 
-                /*
-                 * Note: The blank node should be sent across as a variable
-                 * without a bound value (UNDEF).
-                 */
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
-                {
-                    final ListBindingSet bset = new ListBindingSet();
-                    solutionsIn.add(bset);
-                }
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
-            }
+        options.setSparql11(true);
 
-        }
-        
-        final QueryRoot actual = parse(queryStr, baseURI);
-
-        assertSameAST(queryStr, expected, actual);
+        /*
+         * Still uses the SPARQL 1.0 query builder since it will not rely on the
+         * BINDINGS clause.
+         */
+        assertEquals(RemoteSparql10QueryBuilder.class,
+                RemoteSparqlBuilderFactory.get(options, serviceNode, a)
+                        .getClass());
 
     }
 

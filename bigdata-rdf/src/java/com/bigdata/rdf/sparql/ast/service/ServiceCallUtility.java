@@ -59,6 +59,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class ServiceCallUtility {
 
+    private static final String ERR_NOT_BOUND = "Service reference variable is not bound";
+
     private static final String ERR_NOT_URI = "Service reference does not evaluate to a URI";
 
     private static final String ERR_NOT_MATERIALIZED = "Service reference is not materialized";
@@ -111,6 +113,8 @@ public class ServiceCallUtility {
      * @return
      * 
      * @throws RuntimeException
+     *             if the service reference is not bound.
+     * @throws RuntimeException
      *             if the service reference does not evaluate to a {@link URI}.
      * @throws NotMaterializedException
      *             if the service reference evaluates to an {@link IV} which is
@@ -122,6 +126,9 @@ public class ServiceCallUtility {
         // Evaluate the serviceRef expression.
         @SuppressWarnings("rawtypes")
         final IV<?, ?> serviceRefIV = (IV) serviceRef.get(bset);
+
+        if (serviceRefIV == null)
+            throw new RuntimeException(ERR_NOT_BOUND);
 
         if (!serviceRefIV.isURI())
             throw new RuntimeException(ERR_NOT_URI);

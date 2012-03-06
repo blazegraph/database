@@ -56,9 +56,11 @@ public interface IServiceOptions {
     boolean isRemoteService();
 
     /**
-     * Return <code>true</code> iff the <code>SPARQL 1.1 BINDINGS</code> clause
-     * should be preferred to vector solutions to the remote service end point.
+     * Return <code>true</code> iff the end point supports
+     * <code>SPARQL 1.1</code> (including the <code>SPARQL 1.1 BINDINGS</code>).
+     * When <code>false</code>, the solutions will be vectored to the end point
+     * using a technique which is compatible with <code>SPARQL 1.0</code>.
      */
-    boolean isBindingsClause();
+    boolean isSparql11();
 
 }

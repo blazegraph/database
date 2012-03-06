@@ -153,19 +153,19 @@ public class QueryServlet extends BigdataRDFServlet {
          * a give type of query will result in a response using a default MIME
          * Type for that query.
          * 
-         * TODO This is a hack which will obey an Accept header IF the header
-         * contains a single well-formed MIME Type. Complex accept headers will
-         * not be matched and quality parameters (q=...) are ignored. (Sesame
-         * has some stuff related to generating Accept headers in their
-         * RDFFormat which could bear some more looking into in this regard.)
-         * 
          * TODO We could also do RDFa embedded in XHTML.
          */
         {
+
             final String acceptStr = req.getHeader("Accept");
 
-            final RDFFormat format = RDFFormat.forMIMEType(acceptStr,
-                    RDFFormat.RDFXML);
+            final ConnegUtil util = new ConnegUtil(acceptStr);
+
+            // The best RDFFormat for that Accept header. 
+            RDFFormat format = util.getRDFFormat();
+            
+            if (format == null)
+                format = RDFFormat.RDFXML;
 
             resp.setStatus(HTTP_OK);
 

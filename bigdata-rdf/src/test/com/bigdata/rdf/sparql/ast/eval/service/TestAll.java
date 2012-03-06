@@ -65,20 +65,50 @@ public class TestAll extends TestCase {
          * Data driven tests.
          */
         
-        // Test suites for SPARQL 1.1 Federated Query
-        suite.addTestSuite(TestServiceInternal.class);
-        suite.addTestSuite(TestServiceExternal.class);
         /*
-         * FIXME Test suite for REMOTE SPARQL SERVICE evaluation against
-         * embedded HTTP end points.
-         * 
-         * TODO We could also issue some remote requests against well known
-         * service end points (dbPedia, LOD cloud, etc).
+         * Internal service support (bigdata aware services in the same JVM).
          */
-       
+
+        suite.addTestSuite(TestServiceInternal.class);
+
+        /*
+         * Bundled "internal" services.
+         */
+
         // Full text search
         suite.addTestSuite(TestSearch.class);
 
+        /*
+         * External service support (openrdf services in the same JVM).
+         */
+
+        suite.addTestSuite(TestServiceExternal.class);
+        
+        /*
+         * Test suite for building a valid SPARQL expression for a remote
+         * service end point. This test suite includes validation of the parsed
+         * AST model in order to verify that the expected SPARQL query was
+         * generated.
+         */
+        
+        suite.addTestSuite(TestRemoteSparql10QueryBuilder.class);
+        
+        suite.addTestSuite(TestRemoteSparql11QueryBuilder.class);
+        
+        /*
+         * Test suite for choosing the right implementation to vector solutions
+         * to a remote end point. This decision depends on the capabilities of
+         * the end point as well as factors such as the presence of blank nodes
+         * in the solutions to be vectored to the end point.
+         */
+
+        suite.addTestSuite(TestRemoteSparqlBuilderFactory.class);
+
+        /*
+         * Note: See the NanoSparqlServer test suite for REMOTE SPARQL SERVICE
+         * evaluation against embedded HTTP end points.
+         */
+       
         return suite;
         
     }

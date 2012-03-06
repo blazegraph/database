@@ -60,7 +60,7 @@ public class ExternalServiceOptions implements IServiceOptions {
      * Always returns <code>false</code> (response is ignored).
      */
     @Override
-    final public boolean isBindingsClause() {
+    final public boolean isSparql11() {
         return false;
     }
 

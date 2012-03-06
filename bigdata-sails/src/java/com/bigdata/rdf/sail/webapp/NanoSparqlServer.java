@@ -434,7 +434,7 @@ public class NanoSparqlServer {
         context.addServlet(new ServletHolder(new StatusServlet()), "/status");
 
         // Core RDF REST API, including SPARQL query and update.
-        context.addServlet(new ServletHolder(new RESTServlet()), "/sparql");
+        context.addServlet(new ServletHolder(new RESTServlet()), "/sparql/*");
 
 //        context.setResourceBase("bigdata-war/src/html");
 //        
