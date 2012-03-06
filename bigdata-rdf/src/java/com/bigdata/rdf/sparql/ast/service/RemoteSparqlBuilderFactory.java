@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 3, 2012
  */
 
-package com.bigdata.rdf.sail.sparql.service;
+package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -35,8 +35,7 @@ import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 
-import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+
 
 /**
  * Factory encapsulates the logic required to decide on the manner in which
@@ -99,8 +98,13 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * a pretty minor optimization and a very special case since we are more likely
  * to have a vector of fully bound soltuions.)
  * 
+ * TODO If any of the source solutions is fully unbound, then the other source
+ * solutions could be eliminated since we will be running the service fully
+ * unbound anyway.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: RemoteSparqlBuilderFactory.java 6068 2012-03-03 21:34:31Z
+ *          thompsonbry $
  */
 public class RemoteSparqlBuilderFactory {
 
@@ -127,28 +131,24 @@ public class RemoteSparqlBuilderFactory {
          * When true, there is only one binding set to be vectored and it is
          * empty. We DO NOT use the BINDINGS clause for this case in order to be
          * compatible with services which do and do not support BINDINGS.
-         * 
-         * TODO If any of the source solutions is fully unbound, then the other
-         * source solutions could be eliminated since we will be running the
-         * service fully unbound anyway.
          */
 
+        if(!serviceOptions.isSparql11()) {
+            
+            return new RemoteSparql10QueryBuilder(serviceNode);
+
+        }
+        
         final boolean singleEmptyBindingSet = (bindingSets.length == 0)
                 || (bindingSets.length == 1 && bindingSets[0].size() == 0);
         
-        if (singleEmptyBindingSet
-                || (serviceOptions.isBindingsClause() && !hasCorrelatedBlankNodeBindings(bindingSets))) {
+        if (!singleEmptyBindingSet && hasCorrelatedBlankNodeBindings(bindingSets)) {
 
-            return new RemoteSparqlQueryBuilder(serviceNode, bindingSets);
+            return new RemoteSparql10QueryBuilder(serviceNode);
 
         }
 
-        /*
-         * FIXME End point does not support "BINDINGS" -or- (there is a
-         * correlation in the variable bindings through shared blank nodes AND
-         * there are multiple solutions to be vectored).
-         */
-        throw new UnsupportedOperationException();
+        return new RemoteSparql11QueryBuilder(serviceNode);
 
     }
 

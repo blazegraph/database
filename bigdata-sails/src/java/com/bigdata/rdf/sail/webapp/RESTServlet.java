@@ -91,7 +91,6 @@ public class RESTServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        // Note: Will report BadRequest if "?query" not present.
         m_queryServlet.doGet(req, resp);
         
     }

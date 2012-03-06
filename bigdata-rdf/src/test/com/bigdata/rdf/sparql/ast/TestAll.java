@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -78,7 +79,10 @@ public class TestAll extends TestCase {
         // Test suite for AST query rewriters/optimizers.
         suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());
 
-        // Test suite for AST evaluation helpers.
+//        // Test suite for building a SPARQL expressions from the AST.
+//        suite.addTestSuite(TestAST2SparqlGenerator.class);
+
+        // Test suite for AST evaluation (SPARQL query).
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.TestAll.suite());
 
         // Unit tests for named solution set references.

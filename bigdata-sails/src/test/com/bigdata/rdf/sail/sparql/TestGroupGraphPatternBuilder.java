@@ -468,13 +468,92 @@ public class TestGroupGraphPatternBuilder extends
                 union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
                         p1, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
 
-                final UnionNode union2 = new UnionNode();
-                union1.addChild(new JoinGroupNode(union2));
+//                final UnionNode union2 = new UnionNode();
+//                union1.addChild(new JoinGroupNode(union2));
                 
-                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
                         p2, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
-                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
                         p3, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+                
+            }
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Test union of four groups.
+     * 
+     * <pre>
+     * select ?s where { { ?s ?p1 ?o } UNION  { ?s ?p2 ?o } UNION  { ?s ?p3 ?o } UNION  { ?s ?p4 ?o } }
+     * </pre>
+     */
+    public void test_union_four_groups() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "select ?s" +
+                " where {" +
+                "   {" +
+                "     ?s ?p1 ?o" +
+                "   } UNION {" +
+                "     ?s ?p2 ?o" +
+                "   } UNION {" +
+                "     ?s ?p3 ?o" +
+                "   } UNION {" +
+                "     ?s ?p4 ?o" +
+                "   } " +
+                "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final VarNode s = new VarNode("s");
+            final VarNode p1 = new VarNode("p1");
+            final VarNode p2 = new VarNode("p2");
+            final VarNode p3 = new VarNode("p3");
+            final VarNode p4 = new VarNode("p4");
+            final VarNode o = new VarNode("o");
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final UnionNode union1 = new UnionNode();
+                whereClause.addChild(union1);
+
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p1, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+
+//                final UnionNode union2 = new UnionNode();
+//                union1.addChild(new JoinGroupNode(union2));
+                
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p2, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+                
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p3, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+                
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p4, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
                 
             }
 

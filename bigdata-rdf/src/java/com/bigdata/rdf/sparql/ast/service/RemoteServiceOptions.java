@@ -44,7 +44,7 @@ package com.bigdata.rdf.sparql.ast.service;
  */
 public class RemoteServiceOptions implements IServiceOptions {
 
-    private boolean isBindingsClause = true;
+    private boolean isSparql11 = true;
 
     public RemoteServiceOptions() {
 
@@ -61,13 +61,13 @@ public class RemoteServiceOptions implements IServiceOptions {
     }
 
     @Override
-    public boolean isBindingsClause() {
-        return isBindingsClause;
+    public boolean isSparql11() {
+        return isSparql11;
     }
 
-    public void setBindingsClause(final boolean isBindingsClause) {
+    public void setSparql11(final boolean newValue) {
 
-        this.isBindingsClause = isBindingsClause;
+        this.isSparql11 = newValue;
 
     }
 

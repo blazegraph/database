@@ -409,7 +409,7 @@ abstract public class CoreBaseBOp implements BOp {
      * 
      * @return A string suitable for indent at that height.
      */
-    protected static String indent(final int depth) {
+    public static String indent(final int depth) {
 
         if (depth < 0) {
 

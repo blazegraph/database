@@ -96,14 +96,6 @@ public class TestAll extends TestCase {
 
         // TODO Test suite for property paths.
 
-        /*
-         * Test suite for building a valid SPARQL expression for a remote
-         * service end point. This test suite includes validation of the parsed
-         * AST model in order to verify that the expected SPARQL query was
-         * generated.
-         */
-        suite.addTest(com.bigdata.rdf.sail.sparql.service.TestAll.suite());
-
         return suite;
 
     }

@@ -30,7 +30,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.sail.webapp.TestNanoSparqlServerWithProxyIndexManager.TestMode;
 
 /**
  * Test suite.
@@ -68,6 +67,11 @@ public class TestAll extends TestCase {
          * interchange via the REST API.
          */
         suite.addTestSuite(TestEncodeDecodeValue.class);
+        
+        /*
+         * Test suite for content negotiation.
+         */
+        suite.addTestSuite(TestConneg.class);
         
         /*
          * Core test suite for REST API behavior. This test suite is run for

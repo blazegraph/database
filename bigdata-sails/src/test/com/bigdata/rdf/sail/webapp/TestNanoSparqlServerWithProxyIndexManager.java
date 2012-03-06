@@ -49,9 +49,6 @@ import com.bigdata.service.jini.JiniFederation;
  *       writer, but not a parser) before we can test queries which CONNEG for a
  *       JSON result set.
  * 
- * @todo Add tests for TRIPLES mode (the tests are running against a quads mode
- *       KB instance).
- * 
  * @todo Add tests for SIDS mode interchange of RDF XML.
  * 
  * @todo Tests which verify the correct rejection of illegal or ill-formed
@@ -202,8 +199,15 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
         // tests defined by this class (if any).
 //        suite.addTestSuite(TestNanoSparqlServerOnFederation.class);
 
-        // proxied test suites.
+        /*
+         * Proxied test suites.
+         */
+        
+        // Basic NSS REST API.
         suite.addTestSuite(TestNanoSparqlServer2.class);
+
+        // SPARQL 1.1 Federated Query.
+//        suite.addTestSuite(TestFederatedQuery.class);
 
         return suite;
     
@@ -214,15 +218,6 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
 		return (S) m_indexManager;
 
 	}
-    
-    /**
-	 * The test mode.
-	 */
-    static enum TestMode {
-    	triples,
-    	sids,
-    	quads;
-    }
     
     @Override
 	public Properties getProperties() {

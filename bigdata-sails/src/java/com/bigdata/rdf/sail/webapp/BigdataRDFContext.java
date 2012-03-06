@@ -873,21 +873,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * Note: An attempt to CONNEG for a MIME type which can not be used with
          * a give type of query will result in a response using a default MIME
          * Type for that query.
-         * 
-         * TODO This is a hack which will obey an Accept header IF the header
-         * contains a single well-formed MIME Type. Complex accept headers will
-         * not be matched and quality parameters (q=...) are ignored. (Sesame
-         * has some stuff related to generating Accept headers in their
-         * RDFFormat which could bear some more looking into in this regard.)
          */
         final String acceptStr = explain ? "text/html"
                 : acceptOverride != null ? acceptOverride : req.getHeader("Accept");
 
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+        
         switch (queryType) {
         case ASK: {
 
-            final BooleanQueryResultFormat format = BooleanQueryResultFormat
-                    .forMIMEType(acceptStr, BooleanQueryResultFormat.SPARQL);
+            final BooleanQueryResultFormat format = util
+                    .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
 
             return new AskQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);
@@ -896,8 +892,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         case DESCRIBE:
         case CONSTRUCT: {
 
-            final RDFFormat format = RDFFormat.forMIMEType(acceptStr,
-                    RDFFormat.RDFXML);
+            final RDFFormat format = util.getRDFFormat(RDFFormat.RDFXML);
 
             return new GraphQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);
@@ -905,8 +900,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
         }
         case SELECT: {
 
-            final TupleQueryResultFormat format = TupleQueryResultFormat
-                    .forMIMEType(acceptStr, TupleQueryResultFormat.SPARQL);
+            final TupleQueryResultFormat format = util
+                    .getTupleQueryResultFormat(TupleQueryResultFormat.SPARQL);
 
             return new TupleQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);

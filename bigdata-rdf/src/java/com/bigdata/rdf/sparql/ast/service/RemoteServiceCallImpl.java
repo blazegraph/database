@@ -28,14 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.service;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
@@ -50,10 +51,7 @@ import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
-import com.bigdata.rdf.sail.sparql.service.IRemoteSparqlQueryBuilder;
-import com.bigdata.rdf.sail.sparql.service.RemoteSparqlBuilderFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -127,15 +125,6 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         final QueryOptions opts = new QueryOptions(serviceURI.stringValue());
 
-        /*
-         * Note: This uses a factory pattern to handle each of the possible ways
-         * in which we have to vector solutions to the service end point.
-         */
-        final IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory
-                .get(getServiceOptions(), serviceNode, bindingSets);
-
-        opts.queryStr = queryBuilder.getSparqlQuery();
-
         final TupleQueryResultFormat resultFormat = TupleQueryResultFormat.BINARY;
 
         opts.acceptHeader = //
@@ -145,72 +134,161 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         ;
 
         /*
+         * Note: This uses a factory pattern to handle each of the possible ways
+         * in which we have to vector solutions to the service end point.
+         */
+        final IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory
+                .get(getServiceOptions(), serviceNode, bindingSets);
+
+//        final BindingSet[] b;
+//
+////        if (queryBuilder.isVectored()) {
+//
+//            b = doRemoteQuery(opts, queryBuilder, bindingSets);
+//
+////        } else {
+////
+////            b = doRemoteNonVectoredQuery(opts, queryBuilder, bindingSets);
+////
+////        }
+//
+//        return new ChunkedArrayIterator<BindingSet>(b);
+//        
+//    }
+
+//    /**
+//     * We can not vector the solutions to the remote service end point. This
+//     * will issue one remote query per source solution. It gathers together all
+//     * such responses and then returns them in a single chunk to the caller.
+//     */
+//    private BindingSet[] doRemoteNonVectoredQuery(final QueryOptions opts,
+//            final IRemoteSparqlQueryBuilder queryBuilder,
+//            final BindingSet[] bindingSets) throws Exception {
+//     
+//        final List<BindingSet[]> chunks = new LinkedList<BindingSet[]>();
+//        
+//        int nsolutions = 0;
+//        
+//        for (int i = 0; i < bindingSets.length; i++) {
+//
+//            final BindingSet[] b = doRemoteQuery(opts, queryBuilder,
+//                    new BindingSet[] { bindingSets[i] });
+//            
+//            chunks.add(b);
+//            
+//            nsolutions += b.length;
+//
+//        }
+//
+//        /*
+//         * Flatten out all of the individual results from the service.
+//         */
+//        final BindingSet[] b = new BindingSet[nsolutions];
+//        
+//        int index = 0;
+//        for (BindingSet[] chunk : chunks) {
+//         
+//            System.arraycopy(chunk/* src */, 0/* srcPos */, b/* dest */,
+//                    index/* destPos */, chunk.length);
+//            
+//            index += chunk.length;
+//            
+//        }
+//        
+//        return b;
+//
+//    }
+//
+//    /**
+//     * Execute a remote SPARQL query, returning the solutions for that query.
+//     * 
+//     * @param bindingSets
+//     *            The solutions to flow into the query.
+//     *            
+//     * @return The solutions received for that query.
+//     */
+//    private BindingSet[] doRemoteQuery(final QueryOptions opts,
+//            final IRemoteSparqlQueryBuilder queryBuilder,
+//            final BindingSet[] bindingSets) throws Exception {
+
+//        if (queryBuilder.isVectored() && bindingSets.length > 1) {
+//        
+//            throw new UnsupportedOperationException();
+//
+//        }
+        
+        opts.queryStr = queryBuilder.getSparqlQuery(bindingSets);
+
+        /*
          * Note: This does not stream chunks back. The ServiceCallJoin currently
          * materializes all solutions from the service in a single chunk, so
          * there is no point doing something incremental here unless it is
          * coordinated with the ServiceCallJoin.
          */
 
-        final TupleQueryResult queryResult; 
-        
+        final TupleQueryResult queryResult;
+
         try {
 
-            queryResult = parseResults(doSparqlQuery(opts));
-            
+            queryResult = parseResults(checkResponseCode(doSparqlQuery(opts)));
+
         } finally {
 
             /*
              * Note: HttpURLConnection.disconnect() is not a "close". close() is
              * an implicit action for this class.
              */
-            
-        }
-
-        /*
-         * Apply a transform in reverse here using the same builder object.
-         * 
-         * TODO This requires materialization of the result set, but the
-         * ServiceCallJoin already has that requirement. Maybe change
-         * ServiceCall#call() to return an IBindingSet or BindingSet[]? We can
-         * then limit the size of the materialized solution set (indirectly) by
-         * controlling the vector size into the ServiceCallJoin. That is how we
-         * do it for everything else, so it seems like a good idea to follow the
-         * same pattern here.
-         */
-        {
-
-            final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
-
-            final ICloseableIterator<BindingSet> itr = new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-                    queryResult);
-            
-            try {
-                
-                while(itr.hasNext()) {
-                    
-                    serviceSolutions.add(itr.next());
-                    
-                }
-                
-            } finally {
-                
-                itr.close();
-                
-            }
-
-            // Convert to array.
-            final BindingSet[] a = serviceSolutions
-                    .toArray(new BindingSet[serviceSolutions.size()]);
-            
-            // Possible undo a UNION rewrite of the SERVICE call.
-            final BindingSet[] b = queryBuilder.getSolutions(a);
-            
-            return new ChunkedArrayIterator<BindingSet>(b);
 
         }
+
+        return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+                        queryResult);
+
+//        /*
+//         * Apply a transform in reverse here using the same builder object.
+//         * 
+//         * TODO This requires materialization of the result set, but the
+//         * ServiceCallJoin already has that requirement. Maybe change
+//         * ServiceCall#call() to return an IBindingSet or BindingSet[]? We can
+//         * then limit the size of the materialized solution set (indirectly) by
+//         * controlling the vector size into the ServiceCallJoin. That is how we
+//         * do it for everything else, so it seems like a good idea to follow the
+//         * same pattern here.
+//         */
+//        {
+//
+//            final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+//
+//            final ICloseableIterator<BindingSet> itr = new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+//                    queryResult);
+//
+//            try {
+//
+//                while (itr.hasNext()) {
+//
+//                    serviceSolutions.add(itr.next());
+//
+//                }
+//
+//            } finally {
+//
+//                itr.close();
+//
+//            }
+//
+//            // Convert to array.
+//            final BindingSet[] a = serviceSolutions
+//                    .toArray(new BindingSet[serviceSolutions.size()]);
+//
+//            // Possible undo a UNION rewrite of the SERVICE call.
+//            final BindingSet[] b = queryBuilder.getSolutions(a);
+//
+//            return b;
+//
+//        }
 
     }
-
+        
     /**
      * Extracts the solutions from a SPARQL query.
      * 
@@ -233,7 +311,8 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         if (format == null)
             throw new IOException(
                     "Could not identify format for service response: serviceURI="
-                            + serviceURI + ", contentType=" + contentType);
+                            + serviceURI + ", contentType=" + contentType
+                            + " : response=" + getResponseBody(conn));
 
         final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
                 .getInstance().get(format);
@@ -249,6 +328,32 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         // done.
         return handler.getQueryResult();
 
+    }
+    
+    protected static String getResponseBody(final HttpURLConnection conn)
+            throws IOException {
+
+        final Reader r = new InputStreamReader(conn.getInputStream());
+    
+        try {
+    
+            final StringWriter w = new StringWriter();
+    
+            int ch;
+            while ((ch = r.read()) != -1) {
+    
+                w.append((char) ch);
+    
+            }
+    
+            return w.toString();
+        
+        } finally {
+            
+            r.close();
+            
+        }
+        
     }
 
     /**
@@ -346,16 +451,24 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             conn.setUseCaches(false);
             conn.setReadTimeout(opts.timeout);
             conn.setRequestProperty("Accept", opts.acceptHeader);
-
+            if (log.isDebugEnabled())
+                log.debug("Accept: " + opts.acceptHeader);
+            
             if (opts.contentType != null) {
 
                 if (opts.data == null)
                     throw new AssertionError();
 
+                final String contentLength = Integer.toString(opts.data.length);
+                
                 conn.setRequestProperty("Content-Type", opts.contentType);
 
-                conn.setRequestProperty("Content-Length",
-                        Integer.toString(opts.data.length));
+                conn.setRequestProperty("Content-Length", contentLength);
+
+                if (log.isDebugEnabled()) {
+                    log.debug("Content-Type: " + opts.contentType);
+                    log.debug("Content-Length: " + contentLength);
+                }
 
                 final OutputStream os = conn.getOutputStream();
                 try {
@@ -384,7 +497,8 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             } catch (Throwable t2) {
                 // ignored.
             }
-            throw new RuntimeException(t);
+            throw new RuntimeException("serviceUrl=" + opts.serviceURL + " : "
+                    + t, t);
         }
 
     }
@@ -393,8 +507,10 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             throws IOException {
         final int rc = conn.getResponseCode();
         if (rc < 200 || rc >= 300) {
-            conn.disconnect();
-            throw new IOException(conn.getResponseMessage());
+            // conn.disconnect();
+            throw new IOException("Status Code=" + rc + ", Status Line="
+                    + conn.getResponseMessage() + ", Response="
+                    + getResponseBody(conn));
         }
 
         if (log.isDebugEnabled()) {

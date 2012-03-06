@@ -201,21 +201,52 @@ class GroupGraphPattern {
         // mark the GroupGraphPattern as consumed.
         invalid = true;
 
-        /*
-         * If we are building a union node, then we will wrap any
-         * non-JoinGroupNode with a JoinGroupNode.
-         */
         final boolean isUnion = groupNode instanceof UnionNode;
 
-        for (IGroupMemberNode child : children) {
+        if (isUnion) {
 
-            groupNode.addChild((isUnion && !(child instanceof JoinGroupNode)) //
-                    ? new JoinGroupNode(child) //
-                    : child//
-                    );
+            /*
+             * If we are building a union node, then we will (A) flatten nested
+             * UNIONs into a single UNION; and (b) wrap any non-JoinGroupNode
+             * with a JoinGroupNode.
+             */
+            for (IGroupMemberNode child : children) {
+
+                if(child instanceof JoinGroupNode) {
+                    
+                    groupNode.addChild(child);
+                    
+                } else if(child instanceof UnionNode) {
+                    
+                    /*
+                     * Lift children out of the child UNION.
+                     */
+                    final UnionNode childUnion = (UnionNode) child;
+                    
+                    for(IGroupMemberNode child2 : childUnion) {
+                        
+                        groupNode.addChild(child2);
+                        
+                    }
+                    
+                } else {
+                
+                    groupNode.addChild(new JoinGroupNode(child));
+                    
+                }
+                
+            }
+            
+        } else {
+
+            for (IGroupMemberNode child : children) {
+
+                groupNode.addChild(child);
+
+            }
 
         }
-
+        
         return groupNode;
 
     }

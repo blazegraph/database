@@ -113,9 +113,6 @@ public class TestAll extends TestCase {
         // Test suite for SPARQL 1.1 BINDINGS clause
         suite.addTestSuite(TestBindings.class);
 
-        // Test suites for SPARQL 1.1 Federated Query (including search)
-        suite.addTest(com.bigdata.rdf.sparql.ast.eval.service.TestAll.suite());
-
         // Complex queries.
         suite.addTestSuite(TestComplexQuery.class);
         
@@ -138,6 +135,11 @@ public class TestAll extends TestCase {
         
         // test suite for inline constraints: GT, LT, GTE, LTE
         suite.addTestSuite(TestInlineConstraints.class);
+
+        /*
+         * SPARQL 1.1 Federated Query.
+         */
+        suite.addTest(com.bigdata.rdf.sparql.ast.eval.service.TestAll.suite());
 
         return suite;
         

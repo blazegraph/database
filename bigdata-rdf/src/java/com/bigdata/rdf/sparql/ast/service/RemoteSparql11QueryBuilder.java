@@ -25,33 +25,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 3, 2012
  */
 
-package com.bigdata.rdf.sail.sparql.service;
+package com.bigdata.rdf.sparql.ast.service;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.AST2SPARQLUtil;
 
 /**
- * Utility class constructs a valid SPARQL query for a remote SERVICE end point.
+ * Utility class constructs a valid SPARQL query for a remote
+ * <code>SPARQL 1.1</code> using the <code>BINDINGS</code> clause to vector
+ * solutions into that remote end point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: RemoteSparqlQueryBuilder.java 6071 2012-03-04 18:08:57Z
+ *          thompsonbry $
  */
-public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
+public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
 
-    private final ServiceNode serviceNode;
+    private static final Logger log = Logger
+            .getLogger(RemoteSparql10QueryBuilder.class);
+
+//    private final ServiceNode serviceNode;
 
     /** The text "image" of the SERVICE clause. */
     private final String exprImage;
@@ -62,9 +66,8 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
      */
     private final Map<String, String> prefixDecls;
 
-    /** Reverse map for {@link #prefixDecls}. */
-    private final Map<String, String> namespaces;
-
+    private final AST2SPARQLUtil util;
+    
     /**
      * The distinct variables "projected" by the SERVICE group graph pattern.
      * The order of this set is not important, but the variables must be
@@ -72,29 +75,27 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
      * */
     private final Set<IVariable<?>> projectedVars;
 
-    private final BindingSet[] bindingSets;
+//    private final BindingSet[] bindingSets;
 
+//    /**
+//     * This is a vectored implementation.
+//     */
+//    @Override
+//    public boolean isVectored() {
+//        
+//        return true;
+//        
+//    }
+    
     /**
      * 
      * @param serviceNode
      *            The SERVICE clause.
-     * @param bindingSets
-     *            The source solutions. These will be used to create a BINDINGS
-     *            clause for the query.
      */
-    public RemoteSparqlQueryBuilder(
-            final ServiceNode serviceNode,
-            final BindingSet[] bindingSets) {
+    public RemoteSparql11QueryBuilder(final ServiceNode serviceNode) {
 
         if (serviceNode == null)
             throw new IllegalArgumentException();
-
-        if (bindingSets == null)
-            throw new IllegalArgumentException();
-
-        this.serviceNode = serviceNode;
-        
-        this.bindingSets = bindingSets;
         
         this.exprImage = serviceNode.getExprImage();
         
@@ -108,61 +109,27 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
         if (projectedVars == null)
             throw new IllegalArgumentException();
 
-        if (prefixDecls != null) {
+        this.util = new AST2SPARQLUtil(prefixDecls) {
 
-            /*
-             * Build up a reverse map from namespace to prefix.
-             */
-            
-            namespaces = new HashMap<String, String>();
+            @Override
+            public String toExternal(final BNode val) {
 
-            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
-   
-                namespaces.put(e.getValue(), e.getKey());
-                
+                /*
+                 * Note: The SPARQL 1.1 GRAMMAR does not permit blank nodes in
+                 * the BINDINGS clause. Blank nodes are sent across as an
+                 * unbound variable (UNDEF). If there is more than one variable
+                 * which takes on the same blank node in a given solution, then
+                 * there must be a FILTER imposed when verifies that those
+                 * variables have the same bound value for *that* solution (the
+                 * constraint can not apply across solutions in which that
+                 * correlation is not present).
+                 */
+                return "UNDEF";
+
             }
-            
-        } else {
-            
-            namespaces = null;
-            
-        }
+        };
 
     }
-
-//    /**
-//     * Return the distinct variables "projected" by the SERVICE group graph
-//     * pattern. The order of this set is not important, but the variables must
-//     * be distinct.
-//     * 
-//     * Note: This is not quite correct. It will find variables inside of
-//     * subqueries which are not visible. We should compute the projected
-//     * variables in the query plan generator and just attach them to the
-//     * ServiceCall JOIN and then pass them into this class (yet another
-//     * attribute for the service call and the {@link ServiceFactory}).
-//     * <p>
-//     * Develop a unit test for this. It would wind up flowing back undefined
-//     * bindings for variable which were not in scope. That should be Ok so long
-//     * as the correct projection of those solutions is performed by the
-//     * {@link ServiceCallJoin}, but we need an AST evaluation test suite to
-//     * verify that.
-//     */
-//    private Set<IVariable<?>> getProjectedVars() {
-//
-//        final LinkedHashSet<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
-//        
-//        final Iterator<IVariable<?>> itr = BOpUtility
-//                .getSpannedVariables((BOp) groupNode);
-//        
-//        while (itr.hasNext()) {
-//        
-//            projectedVars.add(itr.next());
-//            
-//        }
-//
-//        return projectedVars;
-//        
-//    }
 
     /**
      * Return an ordered collection of the distinct variable names used in the
@@ -191,7 +158,7 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
 
     }
 
-    public String getSparqlQuery() {
+    public String getSparqlQuery(final BindingSet[] bindingSets) {
 
         final StringBuilder sb = new StringBuilder();
 
@@ -249,43 +216,7 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
          */
         Map<BNode,Set<String/*vars*/>> bnodes = null;
         if (!singleEmptyBindingSet) {
-            for (BindingSet bindingSet : bindingSets) {
-                for (Binding b : bindingSet) {
-                    final Value v = b.getValue();
-                    if (!(v instanceof BNode))
-                        continue;
-                    if (bnodes == null)
-                        bnodes = new LinkedHashMap<BNode, Set<String>>();
-                    final BNode bnd = (BNode) v;
-                    // Set of correlated variables.
-                    Set<String> cvars = bnodes.get(bnd);
-                    if (cvars == null) {
-                        bnodes.put(bnd, cvars = new LinkedHashSet<String>());
-                    } else {
-                        /*
-                         * Correlated. This blank node is already the binding
-                         * for some other variable in this solution.
-                         * 
-                         * Note: A FILTER can be used to enforce a same-term
-                         * constraint for variables correlated via blank nodes,
-                         * but only for a single solution. If there is more than
-                         * one solution then you CAN NOT use the BINDINGS clause
-                         * to communicate the binding sets without also
-                         * rewriting the SERVICE clause as a UNION of the
-                         * original SERVICE class for each source binding set.
-                         */
-                        if (bindingSets.length > 1)
-                            throw new UnsupportedOperationException();
-                    }
-                    if (!cvars.add(b.getName())) {
-                        /*
-                         * This would imply the same variable was bound more
-                         * than once in the solution.
-                         */
-                        throw new AssertionError();
-                    }
-                }
-            }
+            bnodes = getCorrelatedVariables(bindingSets);
         }
 
         /*
@@ -327,16 +258,16 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
                             .toArray(new String[nSameTerm]);
                     sb.append("FILTER (");
                     for (int i = 1; i < names.length; i++) {
-                        if (i > 1)
+                        if (i > 1) {
                             sb.append(" &&");
-//                        sb.append(" ?" + names[0] + " = ?" + names[i]);
+                        }
                         sb.append(" sameTerm( ?" + names[0] + ", ?" + names[i]
                                 + ")");
                     }
                     sb.append(" ).\n");
                 }
             }
-            sb.append(tmp);
+            sb.append(tmp); // append SERVICE's graph pattern.
             sb.append("\n}\n");
         }
 
@@ -375,7 +306,7 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
                             sb.append("UNDEF");
                         } else {
                             final Value val = b.getValue();
-                            final String ext = toExternal(val);
+                            final String ext = util.toExternal(val);
                             sb.append(ext);
                         }
                     }
@@ -387,113 +318,85 @@ public class RemoteSparqlQueryBuilder implements IRemoteSparqlQueryBuilder {
 
         }
 
-        return sb.toString();
+        final String q = sb.toString();
 
-    }
-    
-    /**
-     * Return an external form for the {@link Value} suitable for direct
-     * embedding into a SPARQL query.
-     * 
-     * @param val
-     *            The value.
-     * 
-     * @return The external form.
-     */
-    private String toExternal(final Value val) {
+        if (log.isInfoEnabled())
+            log.info("\n" + q);
+
+        return q;
         
-        if (val instanceof URI) {
-
-            return toExternal((URI) val);
-        
-        } else if (val instanceof Literal) {
-        
-            return toExternal((Literal)val);
-            
-        } else if (val instanceof BNode) {
-            
-            /*
-             * Note: The SPARQL 1.1 GRAMMAR does not permit blank nodes in the
-             * BINDINGS clause. Blank nodes are sent across as an unbound
-             * variable (UNDEF). If there is more than one variable which takes
-             * on the same blank node in a given solution, then there must be a
-             * FILTER imposed when verifies that those variables have the same
-             * bound value for *that* solution (the constraint can not apply
-             * across solutions in which that correlation is not present).
-             */
-            return "UNDEF";
-//            throw new UnsupportedOperationException(
-//                    "Blank node not permitted in BINDINGS");
-            
-        } else {
-            
-            throw new AssertionError();
-            
-        }
-
-    }
-    
-    private String toExternal(final URI uri) {
-
-        if (prefixDecls != null) {
-
-            final String prefix = namespaces.get(uri.getNamespace());
-
-            if (prefix != null) {
-
-                return prefix + ":" + uri.getLocalName();
-
-            }
-
-        }
-
-        return "<" + uri.stringValue() + ">";
-
-    }
-    
-    private String toExternal(final Literal lit) {
-
-        final String label = lit.getLabel();
-        
-        final String languageCode = lit.getLanguage();
-        
-        final URI datatypeURI = lit.getDatatype();
-
-        final String datatypeStr = datatypeURI == null ? null
-                : toExternal(datatypeURI);
-
-        final StringBuilder sb = new StringBuilder((label.length() + 2)
-                + (languageCode != null ? (languageCode.length() + 1) : 0)
-                + (datatypeURI != null ? datatypeStr.length() + 2 : 0));
-
-        sb.append('"');
-        sb.append(label);
-        sb.append('"');
-
-        if (languageCode != null) {
-            sb.append('@');
-            sb.append(languageCode);
-        }
-
-        if (datatypeURI != null) {
-            sb.append("^^");
-            sb.append(datatypeStr);
-        }
-
-        return sb.toString();
-
     }
 
     /**
-     * {@inheritDoc}
+     * Return a correlated blank node / variables map.
      * <p>
-     * This implementation returns it's argument.
+     * Note: This is necessary because the BINDINGS clause does not permit blank
+     * nodes.
+     * 
+     * @return The correlated variable bindings map -or- <code>null</code> iff
+     *         there are no variables which are correlated through shared blank
+     *         nodes.
+     * 
+     * @throws UnsupportedOperationException
+     *             If there are correlated variables and there is more than one
+     *             source solution (for this case you need to use the SPARQL 1.0
+     *             compatible query generator).
+     * 
+     * @see RemoteSparql10QueryBuilder
      */
-    @Override
-    public BindingSet[] getSolutions(final BindingSet[] serviceSolutions) {
-
-        return serviceSolutions;
-
+    static private Map<BNode, Set<String>> getCorrelatedVariables(
+           final BindingSet[] bindingSets) {
+        Map<BNode, Set<String/* vars */>> bnodes = null;
+        for (BindingSet bindingSet : bindingSets) {
+            for (Binding b : bindingSet) {
+                final Value v = b.getValue();
+                if (!(v instanceof BNode))
+                    continue;
+                if (bnodes == null)
+                    bnodes = new LinkedHashMap<BNode, Set<String>>();
+                final BNode bnd = (BNode) v;
+                // Set of correlated variables.
+                Set<String> cvars = bnodes.get(bnd);
+                if (cvars == null) {
+                    bnodes.put(bnd, cvars = new LinkedHashSet<String>());
+                } else {
+                    /*
+                     * Correlated. This blank node is already the binding
+                     * for some other variable in this solution.
+                     * 
+                     * Note: A FILTER can be used to enforce a same-term
+                     * constraint for variables correlated via blank nodes,
+                     * but only for a single solution. If there is more than
+                     * one solution then you CAN NOT use the BINDINGS clause
+                     * to communicate the binding sets without also
+                     * rewriting the SERVICE clause as a UNION of the
+                     * original SERVICE class for each source binding set.
+                     */
+                    if (bindingSets.length > 1)
+                        throw new UnsupportedOperationException();
+                }
+                if (!cvars.add(b.getName())) {
+                    /*
+                     * This would imply the same variable was bound more
+                     * than once in the solution.
+                     */
+                    throw new AssertionError();
+                }
+            }
+        }
+        return bnodes;
     }
+    
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * This implementation returns it's argument.
+//     */
+//    @Override
+//    public BindingSet[] getSolutions(final BindingSet[] serviceSolutions) {
+//
+//        return serviceSolutions;
+//
+//    }
 
 }
