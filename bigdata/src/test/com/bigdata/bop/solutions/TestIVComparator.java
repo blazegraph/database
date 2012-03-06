@@ -186,7 +186,12 @@ public class TestIVComparator extends TestCase2 {
     }
     
     /**
-     * Unit test of the relative ordering of blank nodes (they compare as EQ).
+     * Unit test of the relative ordering of blank nodes (they are ordered by
+     * the {@link IV}'s natural order in order to cause the same {@link IV}s to
+     * be groups).
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-873"> Order the
+     *      same Blank Nodes together in ORDER BY</a>
      */
     public void test_bnode_ordering() {
         
@@ -197,9 +202,15 @@ public class TestIVComparator extends TestCase2 {
         // These are not the same bnode.
         assertNotSame(v.inline_bnode1, v.inline_bnode2);
 
-        // But they still compare as EQ.
-        assertEQ(c.compare(v.inline_bnode1, v.inline_bnode2));
-    
+        // The do not compare as EQ.
+        assertTrue(0 != c.compare(v.inline_bnode1, v.inline_bnode2));
+
+        if(v.inline_bnode1.compareTo(v.inline_bnode2)<0) {
+            assertLT(c.compare(v.inline_bnode1, v.inline_bnode2));
+        } else {
+            assertGT(c.compare(v.inline_bnode1, v.inline_bnode2));
+        }
+        
     }
     
     /**
@@ -316,9 +327,9 @@ public class TestIVComparator extends TestCase2 {
         assertTrue(ret < 0);
     }
 
-//    private void assertGT(final int ret) {
-//        assertTrue(ret > 0);
-//    }
+    private void assertGT(final int ret) {
+        assertTrue(ret > 0);
+    }
 
     private void assertEQ(final int ret) {
         assertTrue(ret == 0);
