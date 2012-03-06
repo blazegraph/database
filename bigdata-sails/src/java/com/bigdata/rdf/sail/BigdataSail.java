@@ -112,6 +112,7 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -1059,6 +1060,17 @@ public class BigdataSail extends SailBase implements Sail {
 
                     if (log.isInfoEnabled())
                         log.info("Closing the backing database");
+
+                    /*
+                     * Discard the value factory for the lexicon's namespace.
+                     * iff the backing Journal will also be closed.
+                     * 
+                     * Note: This is only possible when the Journal will also be
+                     * closed since there could otherwise be concurrently open
+                     * AbstractTripleStore instances for the same namespace and
+                     * database instance.
+                     */
+                    ((BigdataValueFactoryImpl)getValueFactory()).remove();
 
                     database.close();
 
