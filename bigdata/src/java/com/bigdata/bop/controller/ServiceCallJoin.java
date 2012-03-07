@@ -62,6 +62,9 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -566,36 +569,131 @@ public class ServiceCallJoin extends PipelineOp {
 
                 final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                         op.getChunkCapacity(), context.getSink());
-                
-            	// The iterator draining the subquery
+
+                final IBlockingBuffer<IBindingSet[]> sink2 = context.getSink();
+
+                // Thread-local buffer iff optional sink is in use.
+                final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? null
+                        : new UnsyncLocalOutputBuffer<IBindingSet>(
+                                op.getChunkCapacity(), sink2);
+
+                final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
+                        silent ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
+
+                // Pump the solutions into the hash map.
+                state.acceptSolutions(new SingleValueIterator<IBindingSet[]>(
+                        chunk), null/* stats */);
+
+                // The iterator draining the subquery
                 ICloseableIterator<IBindingSet> serviceSolutionItr = null;
                 try {
 
-                    final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
-                            JoinTypeEnum.Normal);
-
-                    // Pump the solutions into the hash map.
-                    state.acceptSolutions(
-                            new SingleValueIterator<IBindingSet[]>(chunk), null/* stats */);
-
                     /*
                      * Invoke the service.
+                     * 
+                     * Note: Returns [null] IFF SILENT and SERVICE ERROR.
                      */
+                    
                     serviceSolutionItr = doServiceCall(serviceCall, chunk);
 
-                    /*
-                     * Do a hash join of the source solutions with the solutions
-                     * from the service, outputting any solutions which join.
-                     */
-                    state.hashJoin(serviceSolutionItr, unsyncBuffer);
-                    
-                    unsyncBuffer.flush();
-                    
-                    // done.
-                    return null;
+                    if (serviceSolutionItr != null) {
+                       
+                        /*
+                         * Do a hash join of the source solutions with the
+                         * solutions from the service, outputting any solutions
+                         * which join.
+                         */
+                        
+                        state.hashJoin(serviceSolutionItr, unsyncBuffer);
+                        
+                    }
 
-                } catch (Throwable t) {
+                } finally {
+
+                    // ensure the service call iterator is closed.
+                    if (serviceSolutionItr != null)
+                        serviceSolutionItr.close();
+
+                }
                     
+                /*
+                 * Note: This only handles Normal and Optional. Normal is used
+                 * unless the SERVICE is SILENT.
+                 * 
+                 * The semantics of SILENT are that it returns an "empty"
+                 * solution. An empty solution joins with anything (it is the
+                 * identity solution). Since there may have been join variables,
+                 * we need to use an OPTIONAL join to ensure that the original
+                 * solutions are passed through.
+                 */
+                if (state.getJoinType().isOptional()) {
+
+                    final IBuffer<IBindingSet> outputBuffer;
+                    if (unsyncBuffer2 == null) {
+                        // use the default sink.
+                        outputBuffer = unsyncBuffer;
+                    } else {
+                        // use the alternative sink.
+                        outputBuffer = unsyncBuffer2;
+                    }
+
+                    state.outputOptionals(outputBuffer);
+
+                    if (sink2 != null) {
+                        unsyncBuffer2.flush();
+                        sink2.flush();
+                    }
+
+                } // if(optional)
+
+                unsyncBuffer.flush();
+
+                // done.
+                return null;
+
+            }
+
+            /**
+             * Invoke the SERVICE.
+             * 
+             * @param serviceCall
+             * @param left
+             * 
+             * @return An iterator from which solutions may be drained -or-
+             *         <code>null</code> if the SERVICE invocation failed and
+             *         SILENT is <code>true</code>.
+             * 
+             * @throws Exception
+             */
+            private ICloseableIterator<IBindingSet> doServiceCall(
+                    final ServiceCall<? extends Object> serviceCall,
+                    final IBindingSet[] left) throws Exception {
+
+                try {
+                    
+                    if (serviceCall instanceof BigdataServiceCall) {
+
+                        return doBigdataServiceCall(
+                                (BigdataServiceCall) serviceCall, left);
+
+                    } else if (serviceCall instanceof ExternalServiceCall) {
+
+                        return doExternalServiceCall(
+                                (ExternalServiceCall) serviceCall, left);
+
+                    } else if (serviceCall instanceof RemoteServiceCall) {
+
+                        return doRemoteServiceCall(
+                                (RemoteServiceCall) serviceCall, left);
+
+                    } else {
+
+                        throw new AssertionError();
+
+                    }
+                    
+                } catch (Throwable t) {
+
                     if (silent
                             && !InnerCause.isInnerCause(t,
                                     InterruptedException.class)) {
@@ -608,48 +706,15 @@ public class ServiceCallJoin extends PipelineOp {
                          */
 
                         log.warn("Service call: serviceUri=" + serviceURI
-                                + " : " + t);
+                                + " :" + t);
 
                         // Done.
                         return null;
-                        
+
                     }
 
                     throw new RuntimeException(t);
-                    
-                } finally {
 
-                    // ensure the service call iterator is closed.
-                    if (serviceSolutionItr != null)
-                        serviceSolutionItr.close();
-
-                }
-
-            }
-
-            private ICloseableIterator<IBindingSet> doServiceCall(
-                    final ServiceCall<? extends Object> serviceCall,
-                    final IBindingSet[] left) throws Exception {
-
-                if (serviceCall instanceof BigdataServiceCall) {
-
-                    return doBigdataServiceCall(
-                            (BigdataServiceCall) serviceCall, left);
-
-                } else if(serviceCall instanceof ExternalServiceCall){
-
-                    return doExternalServiceCall(
-                            (ExternalServiceCall) serviceCall, left);
-                
-                } else if(serviceCall instanceof RemoteServiceCall) {
-                    
-                    return doRemoteServiceCall(
-                            (RemoteServiceCall) serviceCall, left);
-
-                } else {
-                    
-                    throw new AssertionError();
-                    
                 }
                 
             }

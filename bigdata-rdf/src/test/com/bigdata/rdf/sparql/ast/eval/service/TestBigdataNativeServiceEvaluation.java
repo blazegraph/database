@@ -70,6 +70,21 @@ public class TestBigdataNativeServiceEvaluation extends
      * A simple SERVICE query against an INTERNAL service. The service adds in a
      * single solution which restricts the set of solutions for the overall
      * query.
+     * 
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/mockService/test_service_001> {
+     *        ?book :foo :bar
+     *    }.
+     *    ?book dc:title ?title ;
+     *          ns:price ?price .
+     * }
+     * </pre>
      */
     @SuppressWarnings("rawtypes")
     public void test_service_001() throws Exception {
@@ -124,6 +139,22 @@ public class TestBigdataNativeServiceEvaluation extends
      * <p>
      * Note: Since the SERVICE is not actually doing joins, we wind up with
      * duplicate solutions.
+     * 
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/mockService/test_service_002> {
+     *        ?book :foo :bar
+     *    }.
+     *    hint:Prior hint:runFirst true .
+     *    ?book dc:title ?title ;
+     *          ns:price ?price .
+     * }
+     * </pre>
      */
     @SuppressWarnings("rawtypes")
     public void test_service_002() throws Exception {

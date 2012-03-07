@@ -45,6 +45,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.query.BindingSet;
@@ -79,6 +80,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
  * Proxied test suite for SPARQL 1.1 Federated Query. In general, each test
@@ -396,10 +398,53 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         execute(PREFIX+"service04.rq", PREFIX+"service04.srx", false);          
     }
     
-//  @Test
-    public void test5() throws Exception {      
-        prepareTest(PREFIX+"data05.ttl", Arrays.asList(PREFIX+"data05endpoint1.ttl", PREFIX+"data05endpoint2.ttl"));
-        execute(PREFIX+"service05.rq", PREFIX+"service05.srx", false);          
+    // @Test
+    public void test5() throws Exception {
+        
+        final URI serviceURI1 = new URIImpl(getRepositoryUrl(1));
+        
+        final URI serviceURI2 = new URIImpl(getRepositoryUrl(2));
+        
+        final URI serviceURI1_alias = new URIImpl(
+                "http://localhost:18080/openrdf/repositories/endpoint1");
+        
+        final URI serviceURI2_alias = new URIImpl(
+                "http://localhost:18080/openrdf/repositories/endpoint2");
+        
+        try {
+            
+            /*
+             * Explicitly register aliases for the service URIs used in the
+             * data05.ttl file.
+             */
+
+//            ServiceRegistry.getInstance().add(serviceURI1,
+//                    new RemoteServiceFactoryImpl());
+//
+//            ServiceRegistry.getInstance().add(serviceURI2,
+//                    new RemoteServiceFactoryImpl());
+
+            ServiceRegistry.getInstance().addAlias(serviceURI1,
+                    serviceURI1_alias);
+
+            ServiceRegistry.getInstance().addAlias(serviceURI2,
+                    serviceURI2_alias);
+
+            prepareTest(
+                    PREFIX + "data05.ttl",
+                    Arrays.asList(PREFIX + "data05endpoint1.ttl", PREFIX
+                            + "data05endpoint2.ttl"));
+
+            execute(PREFIX + "service05.rq", PREFIX + "service05.srx", false);
+
+        } finally {
+        
+            // De-register those service URIs.
+            ServiceRegistry.getInstance().remove(serviceURI1);
+            ServiceRegistry.getInstance().remove(serviceURI2);
+            
+        }
+        
     }
     
 //  @Test

@@ -125,8 +125,8 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
              * group, but even then that would not apply for the top-level of
              * the WHERE clause.
              */
-            assertNull(whereClause
-                    .getQueryHint(PipelineOp.Annotations.MAX_PARALLEL));
+//            assertNull(whereClause
+//                    .getQueryHint(PipelineOp.Annotations.MAX_PARALLEL));
             assertNull(whereClause
                     .getQueryHint(PipelineOp.Annotations.PIPELINE_QUEUE_CAPACITY));
             assertNull(whereClause
@@ -830,6 +830,78 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
                 assertFalse(itr.hasNext());
 
                 assertEquals(join.toString(), 1001, join.getChunkCapacity());
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Unit test for {@link QueryHints#MAX_PARALLEL} when applied to a SERVICE node.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x
+     * WHERE {
+     *   
+     *   SERVICE ?x {
+     *      ?x rdf:type foaf:Person .
+     *   }
+     *   hint:Prior hint:maxParallel 1001 .
+     * 
+     * }
+     * </pre>
+     * 
+     * TODO Test for PipelineJoin and other things as well.
+     */
+    public void test_query_hints_10() throws Exception {
+
+        final URI serviceURI = new URIImpl("http://www.bigdata.com/mockService");
+        
+        final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Mike"));
+            serviceSolutions.add(bset);
+        }
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Bryan"));
+            serviceSolutions.add(bset);
+        }
+        
+        ServiceRegistry.getInstance().add(serviceURI,
+                new OpenrdfNativeMockServiceFactory(serviceSolutions));
+
+        final ASTContainer astContainer;
+        try {
+
+            astContainer = new TestHelper("query-hints-10").runTest();
+
+        } finally {
+
+            ServiceRegistry.getInstance().remove(serviceURI);
+
+        }
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        {
+
+            final Iterator<ServiceCallJoin> itr = BOpUtility.visitAll(
+                    queryPlan, ServiceCallJoin.class);
+
+            {
+
+                final ServiceCallJoin join = itr.next();
+
+                assertFalse(itr.hasNext());
+
+                assertEquals(join.toString(), 13, join.getMaxParallel());
 
             }
 

@@ -9,7 +9,7 @@ WHERE {
   hint:Group hint:optimizer "None" .
 
   # query hint binds for the group.
-  hint:Group hint:com.bigdata.bop.PipelineOp.maxParallel 10 .
+  hint:Group hint:maxParallel 10 .
 
   # query hint binds for the group and any subgroups.
   hint:GroupAndSubGroups hint:com.bigdata.bop.PipelineOp.pipelineQueueCapacity 20 .

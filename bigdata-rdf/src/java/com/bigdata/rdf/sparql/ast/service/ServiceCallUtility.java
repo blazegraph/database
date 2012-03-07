@@ -142,12 +142,11 @@ public class ServiceCallUtility {
 
     }
 
-
     /**
      * Convert the {@link IBindingSet} into an openrdf {@link BindingSet}.
      * <p>
-     * Note: The {@link IV} MUST have the cache set. An exception WILL be thrown
-     * if the {@link IV} has not been materialized.
+     * Note: The {@link IVCache} MUST be set. An exception WILL be thrown if the
+     * {@link IV} has not been materialized.
      * 
      * @param vars
      *            The set of variables which are to be projected (optional).
@@ -179,14 +178,29 @@ public class ServiceCallUtility {
             }
             
             final String name = var.getName();
-            
+
             @SuppressWarnings("rawtypes")
             final IV iv = (IV) e.getValue().get();
+
+            final BigdataValue value;
             
-            final BigdataValue value = iv.getValue();
+            try {
             
+                value = iv.getValue();
+
+            } catch (NotMaterializedException ex) {
+        
+                /*
+                 * Add the variable name to the stack trace.
+                 */
+                
+                throw new NotMaterializedException("var=" + name + ", val="
+                        + iv, ex);
+                
+            }
+
             out.addBinding(name, value);
-            
+
         }
         
         return out;

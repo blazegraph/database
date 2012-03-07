@@ -31,12 +31,15 @@ public class ServiceRegistry {
     }
 
     private ConcurrentMap<URI, ServiceFactory> services;
+    private ConcurrentMap<URI/*from*/, URI/*to*/> aliases;
 
     private AtomicReference<ServiceFactory> defaultServiceFactoryRef;
     
     protected ServiceRegistry() {
 
         services = new ConcurrentHashMap<URI, ServiceFactory>();
+
+        aliases = new ConcurrentHashMap<URI, URI>();
 
         add(BD.SEARCH, new SearchServiceFactory());
 
@@ -70,50 +73,104 @@ public class ServiceRegistry {
         
     }
     
-    public boolean containsService(final URI functionUri){
-        
-        return services.containsKey(functionUri);
-        
-    }
-
     public final void add(final URI serviceURI, final ServiceFactory factory) {
+
+        if (aliases.containsKey(serviceURI)) {
+
+            throw new UnsupportedOperationException("Already declared.");
+
+        }
 
         if (services.putIfAbsent(serviceURI, factory) != null) {
 
             throw new UnsupportedOperationException("Already declared.");
 
-	    }
+        }
 
 	}
 
     /**
-     * Return <code>true</code> iff a service for that URI was removed.
+     * Remove a service from the registry and/or set of known aliases.
      * 
      * @param serviceURI
      *            The service URI.
+     * 
+     * @return <code>true</code> iff a service for that URI was removed.
      */
     public final boolean remove(final URI serviceURI) {
 
-        return services.remove(serviceURI) != null;
+        boolean modified = false;
+
+        if (aliases.remove(serviceURI) != null) {
+
+            modified = true;
+
+        }
+
+        if (services.remove(serviceURI) != null) {
+
+            modified = true;
+
+        }
+
+        return modified;
 
     }
 
+    /**
+     * 
+     * @param serviceURI
+     *            The URI of a service which is already declared.
+     * @param aliasURI
+     *            The URI of an alias under which that service may be accessed.
+     */
     public final void addAlias(final URI serviceURI, final URI aliasURI) {
 
-        if (!services.containsKey(serviceURI)) {
+        if (serviceURI == null)
+            throw new IllegalArgumentException();
+
+        if (aliasURI == null)
+            throw new IllegalArgumentException();
+
+        if (services.containsKey(serviceURI)) {
 
             throw new UnsupportedOperationException("ServiceURI:" + serviceURI
-                    + " not present.");
+                    + " already registered.");
 
         }
 
-        if (services.putIfAbsent(aliasURI, services.get(serviceURI)) != null) {
-
-            throw new UnsupportedOperationException("Already declared.");
-
-        }
+        aliases.put(aliasURI, serviceURI);
+        
     }
 
+    /**
+     * Return the {@link ServiceFactory} for that URI. If the {@link URI} is a
+     * known alias, then it is resolved before looking up the
+     * {@link ServiceFactory}.
+     * 
+     * @param serviceURI
+     *            The {@link URI}.
+     * 
+     * @return The {@link ServiceFactory} if one is registered for that
+     *         {@link URI}.
+     */
+    public ServiceFactory get(final URI serviceURI) {
+
+        if (serviceURI == null)
+            throw new IllegalArgumentException();
+    
+        final URI alias = aliases.get(serviceURI);
+
+        if (alias != null) {
+
+            return services.get(alias);
+
+        }
+        
+        return services.get(serviceURI);
+        
+    }
+    
     /**
      * Resolve a {@link ServiceCall} for a service {@link URI}. If a
      * {@link ServiceFactory} was registered for that <i>serviceURI</i>, then it
@@ -131,25 +188,35 @@ public class ServiceRegistry {
      * @return A {@link ServiceCall} for that service.
      */
     public final ServiceCall<? extends Object> toServiceCall(
-            final AbstractTripleStore store, final URI serviceURI,
+            final AbstractTripleStore store, URI serviceURI,
             final ServiceNode serviceNode) {
 
         if (serviceURI == null)
-            throw new IllegalArgumentException("serviceURI is null");
+            throw new IllegalArgumentException();
 
+        // Resolve URI in case it was an alias.
+        final URI dealiasedServiceURI = aliases.get(serviceURI);
+
+        if (dealiasedServiceURI != null) {
+            
+            // Use the de-aliased URI.
+            serviceURI = dealiasedServiceURI;
+
+        }
+        
         ServiceFactory f = services.get(serviceURI);
 
         if (f == null) {
 
             f = getDefaultServiceFactory();
 
-            if( f == null ) {
+            if (f == null) {
 
                 // Should never be null at this point.
                 throw new AssertionError();
-                
+
             }
-            
+
         }
 
         return f.create(store, serviceURI, serviceNode);
