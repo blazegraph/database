@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.service;
 
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
 
@@ -65,11 +64,71 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A simple full text search query.
+     * A simple full text search query. The query is transformed from
+     * 
+     * <pre>
+     * PREFIX bd: <http://www.bigdata.com/rdf/search#>
+     * 
+     * SELECT ?subj ?score 
+     * 
+     *   WITH {
+     *    SELECT ?subj ?score
+     *     WHERE {
+     *       ?lit bd:search "mike" .
+     *       ?lit bd:relevance ?score .
+     *       ?subj ?p ?lit .
+     *       }
+     *     ORDER BY DESC(?score)
+     *     LIMIT 10
+     *     OFFSET 0
+     *   } as %searchSet1
+     * 
+     * WHERE {
+     *    
+     *    include %searchSet1
+     *    
+     * }
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX bd: <http://www.bigdata.com/rdf/search#>
+     * WITH {
+     *   QueryType: SELECT
+     *   SELECT ( VarNode(subj) AS VarNode(subj) ) ( VarNode(score) AS VarNode(score) )
+     *     JoinGroupNode {
+     *       SERVICE <ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#search])> {
+     *         JoinGroupNode {
+     *           StatementPatternNode(VarNode(lit), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#search]), ConstantNode(TermId(0L)[mike]), DEFAULT_CONTEXTS)
+     *           StatementPatternNode(VarNode(lit), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#relevance]), VarNode(score), DEFAULT_CONTEXTS)
+     *         }
+     *       }
+     *       StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), DEFAULT_CONTEXTS)
+     *         com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.estimatedCardinality=5
+     *         com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.originalIndex=SPOC
+     *     }
+     *   order by com.bigdata.rdf.sparql.ast.OrderByExpr(VarNode(score))[ ascending=false]
+     *   slice(limit=10)
+     * } AS %searchSet1 JOIN ON () DEPENDS ON ()
+     * QueryType: SELECT
+     * SELECT ( VarNode(subj) AS VarNode(subj) ) ( VarNode(score) AS VarNode(score) )
+     *   JoinGroupNode {
+     *     INCLUDE %searchSet1 JOIN ON ()
+     *   }
+     * </pre>
      */
     public void test_search_1() throws Exception {
         
         new TestHelper("search-1").runTest();
+        
+    }
+
+    /**
+     * A simple full text search query (variant of the above using the
+     * <code>SPARQL 1.1</code> SERVICE syntax).
+     */
+    public void test_search_service_1() throws Exception {
+        
+        new TestHelper("search-service-1").runTest();
         
     }
 
@@ -103,7 +162,7 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Unit test for a search where all tokens in the query much match.
+     * Unit test for a search where all tokens in the query must match.
      */
     public void test_search_match_all_terms() throws Exception {
         
@@ -136,8 +195,8 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Variant of the test above in which the graph variable is bound graph in
-     * which the search result is not visible.
+     * Variant of the test above in which the graph variable is bound to a graph
+     * in which the search result is not visible.
      */
     public void test_search_named_graphs3() throws Exception {
         

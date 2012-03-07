@@ -215,6 +215,9 @@ abstract public class CoreBaseBOp implements BOp {
             if (defaultValue.getClass() == Double.class) {
                 return (T) Double.valueOf("" + val);
             }
+            if (defaultValue.getClass() == Boolean.class) {
+                return (T) Boolean.valueOf("" + val);
+            }
 
         }
 

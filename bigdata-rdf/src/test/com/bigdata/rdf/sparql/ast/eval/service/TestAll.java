@@ -69,7 +69,7 @@ public class TestAll extends TestCase {
          * Internal service support (bigdata aware services in the same JVM).
          */
 
-        suite.addTestSuite(TestServiceInternal.class);
+        suite.addTestSuite(TestBigdataNativeServiceEvaluation.class);
 
         /*
          * Bundled "internal" services.
@@ -82,7 +82,7 @@ public class TestAll extends TestCase {
          * External service support (openrdf services in the same JVM).
          */
 
-        suite.addTestSuite(TestServiceExternal.class);
+        suite.addTestSuite(TestOpenrdfNativeServiceEvaluation.class);
         
         /*
          * Test suite for building a valid SPARQL expression for a remote

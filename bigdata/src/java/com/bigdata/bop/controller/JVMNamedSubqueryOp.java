@@ -43,7 +43,6 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -119,6 +118,9 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                             + getMaxParallel());
         }
 
+        if (!isAtOnceEvaluation())
+            throw new IllegalArgumentException();
+
         getRequiredProperty(Annotations.SUBQUERY);
 
         getRequiredProperty(Annotations.NAMED_SET_REF);
@@ -151,37 +153,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
     }
 
-//    /**
-//     * Adds reporting for the size of the named solution set.
-//     */
-//    public static class NamedSolutionSetStats extends BOpStats {
-//        
-//        private static final long serialVersionUID = 1L;
-//        
-//        final AtomicLong solutionSetSize = new AtomicLong();
-//
-//        public void add(final BOpStats o) {
-//
-//            super.add(o);
-//
-//            if (o instanceof NamedSolutionSetStats) {
-//
-//                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
-//
-//                solutionSetSize.addAndGet(t.solutionSetSize.get());
-//
-//            }
-//
-//        }
-//
-//        @Override
-//        protected void toString(final StringBuilder sb) {
-//            super.toString(sb);
-//            sb.append(",solutionSetSize=" + solutionSetSize.get());
-//        }
-//
-//    }
-    
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ControllerTask(this, context));
@@ -292,31 +263,28 @@ public class JVMNamedSubqueryOp extends PipelineOp {
         public Void call() throws Exception {
             
             try {
-                
-                final IBindingSet[] a = BOpUtility.toArray(context.getSource(),
-                        stats);
-                
+
+                final IBindingSet[] bindingSets = BOpUtility.toArray(
+                        context.getSource(), stats);
+
                 if(first) {
 
-                    final IBindingSet tmp;
-                    if(a.length != 1) {
-                        // Unbound if more than one source solution (should not happen).
-                        tmp = new ListBindingSet();
-                    } else {
-                        // Only one solution.
-                        tmp = a[0];
-                    }
+//                    final IBindingSet tmp;
+//                    if(a.length != 1) {
+//                        // Unbound if more than one source solution (should not happen).
+//                        tmp = new ListBindingSet();
+//                    } else {
+//                        // Only one solution.
+//                        tmp = a[0];
+//                    }
                     
                     // Generate the result set and write it on the HTree.
-                    new SubqueryTask(tmp, subquery, context).call();
+                    new SubqueryTask(bindingSets, subquery, context).call();
 
                 }
 
                 // source.
-//                final IAsynchronousIterator<IBindingSet[]> source = context
-//                        .getSource();
-                @SuppressWarnings("unchecked")
-                final Iterator<IBindingSet[]> source = new SingleValueIterator(a);
+                final Iterator<IBindingSet[]> source = new SingleValueIterator<IBindingSet[]>(bindingSets);
 
                 // default sink
                 final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
@@ -361,19 +329,20 @@ public class JVMNamedSubqueryOp extends PipelineOp {
             private final BOpContext<IBindingSet> parentContext;
 
             /**
-             * The source binding set.
+             * The source binding sets
              */
-            private final IBindingSet bset;
+            private final IBindingSet[] bindingSets;
 
             /**
              * The root operator for the subquery.
              */
             private final BOp subQueryOp;
 
-            public SubqueryTask(final IBindingSet bset, final BOp subQuery,
+            public SubqueryTask(final IBindingSet[] bindingSets,
+                    final BOp subQuery,
                     final BOpContext<IBindingSet> parentContext) {
 
-                this.bset = bset;
+                this.bindingSets = bindingSets;
                 
                 this.subQueryOp = subQuery;
 
@@ -393,7 +362,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                             .getQueryEngine();
                     
                     runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
-                            bset);
+                            bindingSets);
 
 					try {
 

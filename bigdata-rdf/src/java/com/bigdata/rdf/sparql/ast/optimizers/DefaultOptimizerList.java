@@ -61,7 +61,7 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * 
  * FIXME {@link ConstantOptimizer}. Rewrites the query replacing any aspect
  * which can be statically evaluated to a constant with that constant. The
- * implementation considers variables, functions, and constants.
+ * implementation should consider variables, functions, and constants.
  * 
  * FIXME {@link CompareOptimizer}. Replaces Compare with SameTerm whenever
  * possible. (I think that we handle this in the {@link FunctionRegistry}, but

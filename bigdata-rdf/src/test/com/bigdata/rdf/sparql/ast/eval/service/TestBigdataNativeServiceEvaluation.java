@@ -39,15 +39,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
-import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
-import com.bigdata.rdf.sparql.ast.service.ExternalServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Data driven test suite for SPARQL 1.1 Federated Query against an internal,
@@ -58,18 +50,19 @@ import com.bigdata.striterator.ICloseableIterator;
  * @version $Id: TestServiceInternal.java 6053 2012-02-29 18:47:54Z thompsonbry
  *          $
  */
-public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
+public class TestBigdataNativeServiceEvaluation extends
+        AbstractDataDrivenSPARQLTestCase {
 
     /**
      * 
      */
-    public TestServiceInternal() {
+    public TestBigdataNativeServiceEvaluation() {
     }
 
     /**
      * @param name
      */
-    public TestServiceInternal(String name) {
+    public TestBigdataNativeServiceEvaluation(String name) {
         super(name);
     }
 
@@ -106,7 +99,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
                 "http://www.bigdata.com/mockService/" + getName());
 
         ServiceRegistry.getInstance().add(serviceURI,
-                new MockServiceFactory(serviceSolutions));
+                new BigdataNativeMockServiceFactory(serviceSolutions));
 
         try {
 
@@ -167,7 +160,7 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
                 "http://www.bigdata.com/mockService/" + getName());
 
         ServiceRegistry.getInstance().add(serviceURI,
-                new MockServiceFactory(serviceSolutions));
+                new BigdataNativeMockServiceFactory(serviceSolutions));
 
         try {
 
@@ -187,14 +180,6 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * FIXME Write test which vectors multiple source solutions into the
-     * service.
-     */
-    public void test_service_004() {
-        fail("write test");
-    }
-    
-    /**
      * FIXME Write test which uses a variable for the service reference, but
      * where the service always resolves to a known service. Verify evaluation
      * with an empty solution in. Maybe write an alternative test which does the
@@ -210,75 +195,4 @@ public class TestServiceInternal extends AbstractDataDrivenSPARQLTestCase {
         fail("write test");
     }
     
-    /**
-     * FIXME Test queries where the evaluation order does not place the service
-     * first (or does not lift it out into a named subquery).
-     */
-    public void test_service_006() {
-        fail("write test");
-    }
-    
-    /**
-     * Mock service reports the solutions provided in the constructor.
-     * <p>
-     * Note: This can not be used to test complex queries because the caller
-     * needs to know the order in which the query will be evaluated in order to
-     * know the correct response for the mock service.
-     */
-    private static class MockServiceFactory implements ServiceFactory
-    {
-
-        private final ExternalServiceOptions serviceOptions = new ExternalServiceOptions();
-
-        private final List<IBindingSet> serviceSolutions;
-        
-        public MockServiceFactory(final List<IBindingSet> serviceSolutions) {
-
-            this.serviceSolutions = serviceSolutions;
-            
-        }
-        
-        @Override
-        public BigdataServiceCall create(final AbstractTripleStore store,
-                final URI serviceURI, final ServiceNode serviceNode) {
-
-            assertNotNull(store);
-            
-            assertNotNull(serviceNode);
-
-            return new MockBigdataServiceCall();
-            
-        }
-        
-        @Override
-        public IServiceOptions getServiceOptions() {
-            return serviceOptions;
-        }
-
-        private class MockBigdataServiceCall implements BigdataServiceCall {
-
-            @Override
-            public ICloseableIterator<IBindingSet> call(
-                    final IBindingSet[] bindingSets) {
-
-                assertNotNull(bindingSets);
-
-//                System.err.println("ServiceCall: in="+Arrays.toString(bindingSets));
-//                
-//                System.err.println("ServiceCall: out="+serviceSolutions);
-                
-                return new CloseableIteratorWrapper<IBindingSet>(
-                        serviceSolutions.iterator());
-
-            }
-
-            @Override
-            public IServiceOptions getServiceOptions() {
-                return serviceOptions;
-            }
-            
-        }
-        
-    }
-
 }

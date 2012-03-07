@@ -137,12 +137,17 @@ public class BindingsClause extends ASTBase {
      */
     public final int getBindingSetsCount() {
 
-        return getBindingSets().size();
+        final List<IBindingSet> bindingSets = getBindingSets();
+
+        if (bindingSets == null)
+            return 0;
+
+        return bindingSets.size();
 
     }
 
     /**
-     * The binding sets.
+     * The binding sets -or- <code>null</code>.
      */
     @SuppressWarnings("unchecked")
     public final List<IBindingSet> getBindingSets() {

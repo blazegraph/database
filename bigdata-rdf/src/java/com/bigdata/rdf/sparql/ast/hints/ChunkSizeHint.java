@@ -29,18 +29,22 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
+ * This is identical to the {@link BufferChunkCapacityHint}, but it is accessed
+ * through the well known name {@link QueryHints#CHUNK_SIZE}.
+ * <p>
  * Sets the capacity of the {@link IBindingSet}[]s used to accumulate a chunk of
  * {@link IBindingSet}s (default {@value #DEFAULT_CHUNK_CAPACITY}). Partial
  * chunks may be automatically combined into full chunks.
  * 
  * @see BufferAnnotations#CHUNK_CAPACITY
  */
-final class BufferChunkCapacityHint extends AbstractChunkSizeHint {
+final class ChunkSizeHint extends AbstractChunkSizeHint {
 
-    protected BufferChunkCapacityHint() {
-        super(BufferAnnotations.CHUNK_CAPACITY,
+    protected ChunkSizeHint() {
+        super(QueryHints.CHUNK_SIZE,
                 BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
     }
 

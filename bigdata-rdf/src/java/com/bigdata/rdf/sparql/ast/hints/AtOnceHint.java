@@ -29,34 +29,41 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Sets the maximum #of operator evaluation tasks which can execute
- * concurrently.
+ * Query hint marks the operator as requiring "at-once" evaluation. All
+ * solutions will be buffered by the query engine before the operator is
+ * evaluated. When it is evaluated, it will receive all solutions in a single
+ * "chunk".
+ * <p>
+ * Note: The "at-once" hint is basically turned into <code>NOT(PIPELINED)</code>.
  * 
- * @see PipelineOp.Annotations#MAX_PARALLEL
+ * @see PipelineOp.Annotations#PIPELINED
  */
-final class PipelineMaxParallelHint extends AbstractIntQueryHint {
+final class AtOnceHint extends AbstractBooleanQueryHint {
 
-    protected PipelineMaxParallelHint() {
-        super(PipelineOp.Annotations.MAX_PARALLEL,
-                PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
+    protected AtOnceHint() {
+        
+        super(QueryHints.AT_ONCE, !PipelineOp.Annotations.DEFAULT_PIPELINED);
+
     }
 
     @Override
     public void handle(final AST2BOpContext context,
-            final QueryHintScope scope, final ASTBase op, final Integer value) {
+            final QueryHintScope scope, final ASTBase op, final Boolean value) {
 
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof IJoinNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
              * transferred to the pipeline operator when it is generated.
              */
 
-            _setQueryHint(context, scope, op, getName(), value);
+            _setQueryHint(context, scope, op, PipelineOp.Annotations.PIPELINED,
+                    !value);
 
         }
 

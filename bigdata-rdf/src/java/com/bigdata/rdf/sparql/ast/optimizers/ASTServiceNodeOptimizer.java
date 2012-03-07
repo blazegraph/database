@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -46,26 +47,36 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.store.BD;
 
 /**
- * Rewrites the WHERE clause of each query by lifting out any
- * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause of any
- * named subquery such that there is no more than one {@link ServiceNode} in
- * that subquery by lifting out additional {@link ServiceNode}s into new named
+ * Rewrites the WHERE clause of each query by lifting out {@link ServiceNode}s
+ * into a named subquery. Recursively rewrites the WHERE clause of any named
+ * subquery such that there is no more than one {@link ServiceNode} in that
+ * subquery by lifting out additional {@link ServiceNode}s into new named
  * subqueries.
  * <p>
- * Note: This rewrite step is necessary to preserve the "run-once" contract for
- * a SERVICE call. If a {@link ServiceNode} appears in any position other than
- * the head of a named subquery, it will be invoked once for each solution which
- * flows through that part of the query plan. This is wasteful since the SERVICE
- * call does not run "as-bound" (source solutions are not propagated to the
- * SERVICE when it is invoked).
+ * Note: This rewrite step is useful when it is desirable to run the service
+ * once (it is also possible to annotate the {@link ServiceCall} operator as
+ * {@link PipelineOp.Annotations#PIPELINED} <code>:= false</code>.
+ * <p>
+ * By default, if a {@link ServiceNode} appears in any position other than the
+ * head of a {@link NamedSubqueryRoot}, then it will be invoked once for each
+ * chunk of solutions which flows through that part of the query plan.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTServiceNodeOptimizer.java 6068 2012-03-03 21:34:31Z
+ *          thompsonbry $
+ * 
+ *          FIXME This has been modified to ONLY apply to {@link BD#SEARCH}. It
+ *          may well be that we want to take this out entirely.  Our internal
+ *          search service runs well when lifted out.  However, it might run
+ *          just as well if we specified it as an "at-once" operator.
  */
 public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
@@ -75,8 +86,8 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
     private int nrewrites = 0;
     
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
@@ -92,11 +103,17 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
          * named subquery root and a named subquery include.
          */
 
-        if (queryRoot.getWhereClause() != null) {
+        {
+        
+            @SuppressWarnings("unchecked")
+            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
+                    .getWhereClause();
 
-            liftOutServiceNodes(queryRoot,
-                    (GroupNodeBase<IGroupMemberNode>) queryRoot
-                            .getWhereClause(), true/* all */);
+            if (whereClause != null) {
+
+                liftOutServiceNodes(queryRoot, whereClause, true/* all */);
+
+            }
 
         }
 
@@ -120,12 +137,14 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
                 final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                         .get(i);
 
-                if (namedSubquery.getWhereClause() == null)
+                @SuppressWarnings("unchecked")
+                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+                        .getWhereClause();
+
+                if (whereClause == null)
                     continue;
 
-                liftOutServiceNodes(queryRoot,
-                        (GroupNodeBase<IGroupMemberNode>) namedSubquery
-                                .getWhereClause(), false/* all */);
+                liftOutServiceNodes(queryRoot, whereClause, false/* all */);
 
             }
 
@@ -167,20 +186,31 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
             if (child instanceof ServiceNode) {
 
-                if (all || !first) {
+                final ServiceNode serviceNode = (ServiceNode) child;
 
-                    liftOutServiceNode(queryRoot, parent, (ServiceNode) child);
+                final TermNode serviceRef = serviceNode.getServiceRef();
+
+                if (serviceRef.isConstant()
+                        && serviceRef.getValue().equals(BD.SEARCH)) {
+
+                    if (all || !first) {
+
+                        liftOutServiceNode(queryRoot, parent, serviceNode);
+
+                    }
+
+                    first = false;
 
                 }
-
-                first = false;
 
             }
 
             if (child instanceof GroupNodeBase<?>) {
 
-                liftOutServiceNodes(queryRoot,
-                        (GroupNodeBase<IGroupMemberNode>) child, true/* all */);
+                @SuppressWarnings("unchecked")
+                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
+                
+                liftOutServiceNodes(queryRoot, childGroup, true/* all */);
 
             }
 

@@ -124,6 +124,7 @@ public class QueryHintRegistry {
          */
         add(new BufferChunkOfChunksCapacityHint());
         add(new BufferChunkCapacityHint());
+        add(new ChunkSizeHint());
 
         /*
          * PipelineOp annotations.
@@ -136,6 +137,7 @@ public class QueryHintRegistry {
          * TODO Support MAX_MEMORY, but it should only be applied if the
          * operator in question is running against the native heap.
          */
+        add(new AtOnceHint());
         add(new PipelineMaxParallelHint());
         add(new PipelineMaxMessagesPerTaskHint());
         add(new PipelineQueueCapacityHint());

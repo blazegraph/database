@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.UUID;
 
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -47,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
  * interface. (Query hints declared elsewhere are generally for internal use
  * only.) Note that not all query hints are permitted in all scopes.
  * 
+ * @see QueryHintScope
  * @see QueryHintRegistry
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -300,11 +302,16 @@ public interface QueryHints {
 
     /**
      * Query hint indicating whether or not a Sub-Select should be transformed
-     * into a named subquery, lifting its evaluation out of the main body of the
-     * query and replacing the subquery with an INCLUDE. When <code>true</code>,
-     * the subquery will be lifted out. When <code>false</code>, the subquery
-     * will not be lifted unless other semantics require that it be lifted out
-     * regardless.
+     * into a <em>named subquery</em>, lifting its evaluation out of the main
+     * body of the query and replacing the subquery with an INCLUDE. This is
+     * similar to {@link #AT_ONCE 'at-once'} evaluation, but creates a different
+     * query plan by lifting out a named subquery. It is also only supported for
+     * a Sub-Select. The {@link #AT_ONCE} query hint can be applied to other
+     * things as well.
+     * <p>
+     * When <code>true</code>, the subquery will be lifted out. When
+     * <code>false</code>, the subquery will not be lifted unless other
+     * semantics require that it be lifted out regardless.
      * <p>
      * For example, the following may be used to lift out the sub-select in
      * which it appears into a {@link NamedSubqueryRoot}. The lifted expression
@@ -313,9 +320,47 @@ public interface QueryHints {
      * <pre>
      * hint:SubQuery hint:runOnce "true" .
      * </pre>
+     * 
+     * @see #AT_ONCE
      */
     String RUN_ONCE = "runOnce";//QueryHints.class.getName() + ".runOnce";
 
+    /**
+     * Query hint indicating whether or not a JOIN (including SERVICE,
+     * SUB-SELECT, etc) should be run as an "at-once" operator. All solutions
+     * for an "at-once" operator are materialized before the operator is
+     * evaluated. It is then evaluated against those materialized solutions
+     * exactly once.
+     * <p>
+     * Note: "At-once" evaluation is a general property of the query engine.
+     * This query hint does not change the structure of the query plan, but
+     * simply serves as a directive to the query engine that it should buffer
+     * all source solutions before running the operator. This is more general
+     * purpose than the {@link #RUN_ONCE} query hint.
+     * 
+     * @see #RUN_ONCE
+     * 
+     *      TODO "Blocked" evaluation. Blocked evaluation is similar to at-once
+     *      evaluation but lacks the strong guarantee of that the operator will
+     *      run exactly once. For blocked evaluation, the solutions to be fed to
+     *      the operator are buffered up to a memory limit. If that memory limit
+     *      is reached, then the buffered solutions are vectored through the
+     *      operator. If all solutions can be buffered within the memory limit
+     *      then "at-once" and "blocked" evaluation amount to the same thing.
+     */
+    String AT_ONCE = "atOnce";
+
+    /**
+     * The target chunk (aka vector size) for the operator.
+     * <p>
+     * Note: The vectored query engine will buffer multiple chunks for an
+     * operator before the producer(s) (the operator(s) feeding into the
+     * annotated operator) must block.
+     * 
+     * @see BufferAnnotations#CHUNK_CAPACITY
+     */
+    String CHUNK_SIZE = "chunkSize";
+    
     /**
      * Query hint to use a hash join against the access path for a given
      * predicate. Hash joins should be enabled once it is recognized that
@@ -330,7 +375,6 @@ public interface QueryHints {
      * order.
      */
     String HASH_JOIN = "hashJoin";
-//            AST2BOpBase.class.getPackage().getName()+ ".hashJoin";
 
     boolean DEFAULT_HASH_JOIN = false;
 

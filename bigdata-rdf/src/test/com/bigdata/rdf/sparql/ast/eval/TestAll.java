@@ -95,8 +95,11 @@ public class TestAll extends TestCase {
         // Test suite for different combinations of joins.
         suite.addTestSuite(TestComboJoins.class);
 
-        // Different kinds of subqueries.
+        // Test suite for SPARQL subqueries.
         suite.addTestSuite(TestSubQuery.class);
+        
+        // Test suite for NAMED SUBQUERIES
+        suite.addTestSuite(TestNamedSubQuery.class);
 
         // Test suite for negation (EXISTS, NOT EXISTS, MINUS).
         suite.addTestSuite(TestNegation.class);

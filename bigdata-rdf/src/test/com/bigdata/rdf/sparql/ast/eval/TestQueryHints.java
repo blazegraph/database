@@ -28,15 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.join.AbstractHashJoinOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.internal.IV;
@@ -47,9 +55,13 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.service.OpenrdfNativeMockServiceFactory;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.service.ServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.util.InnerCause;
 
@@ -450,4 +462,379 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
         
     }
     
+    /**
+     * Unit test for {@link QueryHints#CHUNK_SIZE}.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x ?o
+     * WHERE {
+     *   
+     *   # Turn off the join order optimizer.
+     *   hint:Query hint:optimizer "None".
+     *   
+     *   # Disable analytic query for the test.
+     *   hint:Query hint:analytic "false".
+     *   
+     *   ?x rdfs:label ?o .
+     *   # Override the vector size for the previous join.
+     *   hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1001 .
+     *   
+     *   { 
+     *      SELECT ?x {
+     *           ?x rdf:type foaf:Person .
+     *           # Override the vector size for previous join.
+     *           hint:Prior hint:chunkSize 251 .
+     *          }
+     *   }
+     * 
+     * }
+     * </pre>
+     * 
+     * TODO We have no tests for {@link QueryHints#CHUNK_SIZE} for anything
+     * other than {@link PipelineJoin} and {@link ServiceCall}. Work through the
+     * code and tests required to get the query hint into place for other kinds
+     * of joins as well.
+     */
+    public void test_query_hints_06() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("query-hints-06")
+                .runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        // Check the PipelineJoins.
+        {
+            @SuppressWarnings("rawtypes")
+            final Iterator<PipelineJoin> itr = BOpUtility.visitAll(queryPlan,
+                    PipelineJoin.class);
+
+            {
+                final PipelineJoin<?> join = itr.next();
+
+                // Make sure this is the right join.
+                assertTrue(join.getPredicate().get(2/* s */).isConstant());
+
+                assertEquals(join.toString(), 251, join.getChunkCapacity());
+            }
+
+            {
+                final PipelineJoin<?> join = itr.next();
+
+                // Make sure this is the right join.
+                assertEquals(Var.var("o"), join.getPredicate().get(2/* o */));
+
+                assertEquals(join.toString(), 1001,
+                        join.getChunkCapacity());
+            }
+        }
+
+    }
+    
+    /**
+     * Unit test for {@link QueryHints#AT_ONCE} when applied to a
+     * {@link PipelineJoin}.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x ?o
+     * WHERE {
+     *   
+     *   # Turn off the join order optimizer.
+     *   hint:Query hint:optimizer "None".
+     *   
+     *   # Disable analytic query for the test.
+     *   hint:Query hint:analytic false.
+     *   
+     *   ?x rdfs:label ?o .
+     *   hint:Prior hint:atOnce true .
+     *   
+     *   { 
+     *      SELECT ?x {
+     *           ?x rdf:type foaf:Person .
+     *           hint:Prior hint:atOnce false .
+     *          }
+     *   }
+     * 
+     * }
+     * </pre>
+     * 
+     * TODO We have no tests for {@link QueryHints#AT_ONCE} for anything other
+     * than {@link PipelineJoin} (this test) and {@link ServiceNode} (below).
+     * Work through the code and tests required to get the query hint into place
+     * for other kinds of joins as well.
+     */
+    public void test_query_hints_07() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("query-hints-07")
+                .runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        // Check the PipelineJoins.
+        {
+            @SuppressWarnings("rawtypes")
+            final Iterator<PipelineJoin> itr = BOpUtility.visitAll(queryPlan,
+                    PipelineJoin.class);
+
+            {
+
+                final PipelineJoin<?> join = itr.next();
+
+                // Make sure this is the right join.
+                assertTrue(join.getPredicate().get(2/* s */).isConstant());
+
+                assertEquals(join.toString(), true,
+                        join.isPipelinedEvaluation());
+
+            }
+
+            {
+
+                final PipelineJoin<?> join = itr.next();
+
+                // Make sure this is the right join.
+                assertEquals(Var.var("o"), join.getPredicate().get(2/* o */));
+
+                assertEquals(join.toString(), false,
+                        join.isPipelinedEvaluation());
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Unit test for {@link QueryHints#AT_ONCE} when applied to a SERVICE node.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x
+     * WHERE {
+     *   
+     *   SERVICE ?x {
+     *      ?x rdf:type foaf:Person .
+     *   }
+     *   hint:Prior hint:atOnce true.
+     * 
+     * }
+     * </pre>
+     */
+    public void test_query_hints_08() throws Exception {
+
+        /*
+         * The assumption is that operators are pipelined unless explicitly
+         * overridden.
+         */
+        assertTrue(PipelineOp.Annotations.DEFAULT_PIPELINED);
+
+        final URI serviceURI = new URIImpl("http://www.bigdata.com/mockService");
+        
+        final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Mike"));
+            serviceSolutions.add(bset);
+        }
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Bryan"));
+            serviceSolutions.add(bset);
+        }
+        
+        ServiceRegistry.getInstance().add(serviceURI,
+                new OpenrdfNativeMockServiceFactory(serviceSolutions));
+
+        final ASTContainer astContainer;
+        try {
+
+            astContainer = new TestHelper("query-hints-08").runTest();
+
+        } finally {
+
+            ServiceRegistry.getInstance().remove(serviceURI);
+
+        }
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        {
+
+            final Iterator<ServiceCallJoin> itr = BOpUtility.visitAll(
+                    queryPlan, ServiceCallJoin.class);
+
+            {
+
+                final ServiceCallJoin join = itr.next();
+
+                assertFalse(itr.hasNext());
+
+                assertEquals(join.toString(), false,
+                        join.isPipelinedEvaluation());
+
+            }
+
+        }
+
+    }
+
+    
+    /**
+     * Unit test for {@link QueryHints#AT_ONCE} when applied to a SERVICE node.
+     * This verifies that we can turn off "at-once" evaluation for a SERVICE.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x
+     * WHERE {
+     *   
+     *   SERVICE ?x {
+     *      ?x rdf:type foaf:Person .
+     *   }
+     *   hint:Prior hint:atOnce false.
+     * 
+     * }
+     * </pre>
+     */
+    public void test_query_hints_08b() throws Exception {
+
+        /*
+         * The assumption is that operators are pipelined unless explicitly
+         * overridden.
+         */
+        assertTrue(PipelineOp.Annotations.DEFAULT_PIPELINED);
+
+        final URI serviceURI = new URIImpl("http://www.bigdata.com/mockService");
+        
+        final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Mike"));
+            serviceSolutions.add(bset);
+        }
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Bryan"));
+            serviceSolutions.add(bset);
+        }
+        
+        ServiceRegistry.getInstance().add(serviceURI,
+                new OpenrdfNativeMockServiceFactory(serviceSolutions));
+
+        final ASTContainer astContainer;
+        try {
+
+            astContainer = new TestHelper("query-hints-08b").runTest();
+
+        } finally {
+
+            ServiceRegistry.getInstance().remove(serviceURI);
+
+        }
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        {
+
+            final Iterator<ServiceCallJoin> itr = BOpUtility.visitAll(
+                    queryPlan, ServiceCallJoin.class);
+
+            {
+
+                final ServiceCallJoin join = itr.next();
+
+                assertFalse(itr.hasNext());
+
+                assertEquals(join.toString(), true,
+                        join.isPipelinedEvaluation());
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Unit test for {@link QueryHints#CHUNK_SIZE} when applied to a SERVICE node.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x
+     * WHERE {
+     *   
+     *   SERVICE ?x {
+     *      ?x rdf:type foaf:Person .
+     *   }
+     *   hint:Prior hint:chunkSize 1001 .
+     * 
+     * }
+     * </pre>
+     */
+    public void test_query_hints_09() throws Exception {
+
+        final URI serviceURI = new URIImpl("http://www.bigdata.com/mockService");
+        
+        final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Mike"));
+            serviceSolutions.add(bset);
+        }
+        {
+            final MapBindingSet bset = new MapBindingSet();
+            bset.addBinding("x",new URIImpl("http://www.bigdata.com/Bryan"));
+            serviceSolutions.add(bset);
+        }
+        
+        ServiceRegistry.getInstance().add(serviceURI,
+                new OpenrdfNativeMockServiceFactory(serviceSolutions));
+
+        final ASTContainer astContainer;
+        try {
+
+            astContainer = new TestHelper("query-hints-09").runTest();
+
+        } finally {
+
+            ServiceRegistry.getInstance().remove(serviceURI);
+
+        }
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        {
+
+            final Iterator<ServiceCallJoin> itr = BOpUtility.visitAll(
+                    queryPlan, ServiceCallJoin.class);
+
+            {
+
+                final ServiceCallJoin join = itr.next();
+
+                assertFalse(itr.hasNext());
+
+                assertEquals(join.toString(), 1001, join.getChunkCapacity());
+
+            }
+
+        }
+
+    }
+
 }

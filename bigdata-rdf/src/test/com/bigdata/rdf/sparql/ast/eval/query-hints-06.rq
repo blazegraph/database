@@ -1,0 +1,26 @@
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+SELECT ?x ?o
+WHERE {
+  
+  # Turn off the join order optimizer.
+  hint:Query hint:optimizer "None".
+  
+  # Disable analytic query for the test.
+  hint:Query hint:analytic "false".
+  
+  ?x rdfs:label ?o .
+  # Override the vector size for the previous join.
+  hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1001 .
+  
+  { 
+     SELECT ?x {
+          ?x rdf:type foaf:Person .
+     	  # Override the vector size for previous join.
+  		  hint:Prior hint:chunkSize 251 .
+    	 }
+  }
+
+}

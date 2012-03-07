@@ -22,41 +22,37 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 3, 2012
+ * Created on Mar 7, 2012
  */
 
 package com.bigdata.rdf.sparql.ast.service;
 
+
 /**
- * Service options base class for bigdata aware services.
+ * Additional options for native services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataServiceOptions implements IServiceOptions {
+public interface INativeServiceOptions extends IServiceOptions {
 
-    /**
-     * Always returns <code>true</code>.
-     */
-    @Override
-    final public boolean isBigdataService() {
-        return true;
-    }
-
-    /**
-     * Always returns <code>false</code>.
-     */
-    @Override
-    final public boolean isRemoteService() {
-        return false;
-    }
-
-    /**
-     * Always returns <code>false</code> (response is ignored).
-     */
-    @Override
-    final public boolean isSparql11() {
-        return false;
-    }
+//    /**
+//     * When <code>true</code>, the {@link ServiceNode} will be lifted into a
+//     * {@link NamedSubqueryRoot}. {@link NamedSubqueryRoot}s are evaluated first
+//     * against a single empty input solution.
+//     * 
+//     * @see QueryHints#RUN_ONCE
+//     */
+//    boolean isRunOnce();
+//
+//    /**
+//     * When <code>true</code>, the {@link ServiceNode} will always be annotated
+//     * as an "at-once" operator. All inputs to the {@link ServiceNode} will be
+//     * materialized and the {@link ServiceNode} will run exactly once against
+//     * those inputs.
+//     * 
+//     * @see QueryHints#AT_ONCE
+//     */
+//    boolean isAtOnce();
 
 }
