@@ -57,6 +57,7 @@ import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.StrcontainsBOp;
 import com.bigdata.rdf.internal.constraints.StrdtBOp;
 import com.bigdata.rdf.internal.constraints.StrendsBOp;
 import com.bigdata.rdf.internal.constraints.StrlangBOp;
@@ -153,6 +154,7 @@ public class FunctionRegistry {
     public static final URI ENCODE_FOR_URI = FN.ENCODE_FOR_URI;//new URIImpl(SPARQL_FUNCTIONS+"encodeForUri");
     public static final URI STR_LEN = FN.STRING_LENGTH;//new URIImpl(XPATH_FUNCTIONS+"string-length");
     public static final URI SUBSTR = FN.SUBSTRING;//new URIImpl(SPARQL_FUNCTIONS+"substr");
+    public static final URI CONTAINS = FN.CONTAINS;
     public static final URI STARTS_WITH = FN.STARTS_WITH; 
     public static final URI ENDS_WITH = FN.ENDS_WITH;
     public static final URI STR_AFTER = FN.SUBSTRING_AFTER; // FIXME implement. See StrAfter
@@ -505,6 +507,23 @@ public class FunctionRegistry {
 
             }
         });
+        add(CONTAINS,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class,
+                        ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> x = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                final IValueExpression<? extends IV> y = AST2BOpUtility.toVE(
+                        lex, args[1]);
+
+                return new StrcontainsBOp(x, y, lex);
+
+            }
+        });
 		add(LANG, new Factory() {
 			public IValueExpression<? extends IV> create(final String lex,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
@@ -853,13 +872,13 @@ public class FunctionRegistry {
         add(EXISTS, new ExistsFactory(true));
 
         add(NOT_EXISTS, new ExistsFactory(false));
-
-        
-        
+       
     }
 
     public static boolean containsFunction(URI functionUri){
+        
         return factories.containsKey(functionUri);
+        
     }
 
     /**

@@ -32,9 +32,14 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
+/**
+ * @see http://www.w3.org/2005/xpath-functions#contains
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class StrcontainsBOp extends LiteralBooleanBOp {
 
     /**
@@ -42,14 +47,23 @@ public class StrcontainsBOp extends LiteralBooleanBOp {
      */
     private static final long serialVersionUID = -8277059116677497632L;
 
-    public StrcontainsBOp(IValueExpression<IV> x, IValueExpression<IV> y, String lex) {
+    public StrcontainsBOp(//
+            final IValueExpression<? extends IV> x,//
+            final IValueExpression<? extends IV> y, //
+            final String lex//
+            ) {
+
         this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+
     }
 
-    public StrcontainsBOp(BOp[] args, Map anns) {
+    public StrcontainsBOp(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+        
         if (args.length != 2 || args[0] == null || args[1] == null)
             throw new IllegalArgumentException();
+    
     }
 
     public StrcontainsBOp(LiteralBooleanBOp op) {
@@ -61,16 +75,21 @@ public class StrcontainsBOp extends LiteralBooleanBOp {
     }
 
     @Override
-    boolean _accept(BigdataValueFactory vf, IV value, IBindingSet bs) throws SparqlTypeErrorException {
-        IV compare = get(1).get(bs);
+    boolean _accept(final BigdataValueFactory vf, final IV value,
+            final IBindingSet bs) throws SparqlTypeErrorException {
+
+        final IV compare = get(1).get(bs);
+
         if (compare == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
         if (!compare.isInline() && !compare.hasValue())
             throw new NotMaterializedException();
 
-        String v = literalValue(value).getLabel();
-        String c = literalValue(compare).getLabel();
+        final String v = literalValue(value).getLabel();
+
+        final String c = literalValue(compare).getLabel();
+
         return v.contains(c);
 
     }
