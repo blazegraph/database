@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,46 +20,48 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
- * Created on Nov 27, 2011
+ * Created on Mar 7, 2012
  */
 
 package com.bigdata.rdf.sparql.ast.hints;
 
-import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Sets the maximum #of operator evaluation tasks which can execute
- * concurrently.
- * 
- * @see PipelineOp.Annotations#MAX_PARALLEL
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-final class PipelineMaxParallelHint extends AbstractIntQueryHint {
+public abstract class AbstractChunkSizeHint extends AbstractIntQueryHint {
 
-    protected PipelineMaxParallelHint() {
-        super(PipelineOp.Annotations.MAX_PARALLEL,
-                PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
+    /**
+     * @param name
+     * @param defaultValue
+     */
+    public AbstractChunkSizeHint(String name, Integer defaultValue) {
+        super(name, defaultValue);
     }
 
     @Override
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof IJoinNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
              * transferred to the pipeline operator when it is generated.
              */
-
-            _setQueryHint(context, scope, op, getName(), value);
+    
+            _setQueryHint(context, scope, op, BufferAnnotations.CHUNK_CAPACITY,
+                    value);
 
         }
-
+    
     }
 
 }

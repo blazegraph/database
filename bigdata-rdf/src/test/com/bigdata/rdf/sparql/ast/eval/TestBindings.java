@@ -32,13 +32,6 @@ package com.bigdata.rdf.sparql.ast.eval;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME Work through the presentation of multiple solutions to the
- *          query, including the static analysis of those source solutions. One
- *          way to handle this is to just dump them into a named solution set.
- *          The solutions do not have to run first. They can be INCLUDEd in the
- *          top-level join group and then just run in the best order (which is
- *          typically going to be first...).
  */
 public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
 

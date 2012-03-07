@@ -38,13 +38,13 @@ import com.bigdata.bop.IBindingSet;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ExternalServiceOptions implements IServiceOptions {
+public class OpenrdfNativeServiceOptions implements INativeServiceOptions {
 
     /**
      * Always returns <code>false</code>.
      */
     @Override
-    final public boolean isBigdataService() {
+    final public boolean isBigdataNativeService() {
         return false;
     }
 

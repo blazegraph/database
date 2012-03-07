@@ -43,7 +43,6 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -129,6 +128,9 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                     PipelineOp.Annotations.MAX_PARALLEL + "="
                             + getMaxParallel());
         }
+
+        if (!isAtOnceEvaluation())
+            throw new IllegalArgumentException();
 
         getRequiredProperty(Annotations.SUBQUERY);
 
@@ -268,30 +270,27 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             
             try {
 
-                final IBindingSet[] a = BOpUtility.toArray(context.getSource(),
-                        stats);
+                final IBindingSet[] bindingSets = BOpUtility.toArray(
+                        context.getSource(), stats);
 
                 if(first) {
 
-                    final IBindingSet tmp;
-                    if(a.length != 1) {
-                        // Unbound if more than one source solution (should not happen).
-                        tmp = new ListBindingSet();
-                    } else {
-                        // Only one solution.
-                        tmp = a[0];
-                    }
+//                    final IBindingSet tmp;
+//                    if(bindingSets.length != 1) {
+//                        // Unbound if more than one source solution (should not happen).
+//                        tmp = new ListBindingSet();
+//                    } else {
+//                        // Only one solution.
+//                        tmp = bindingSets[0];
+//                    }
 
                     // Generate the result set and write it on the HTree.
-                    new SubqueryTask(tmp, subquery, context).call();
+                    new SubqueryTask(bindingSets, subquery, context).call();
 
                 }
 
                 // source.
-//                final IAsynchronousIterator<IBindingSet[]> source = context
-//                        .getSource();
-                @SuppressWarnings("unchecked")
-                final Iterator<IBindingSet[]> source = new SingleValueIterator(a);
+                final Iterator<IBindingSet[]> source = new SingleValueIterator<IBindingSet[]>(bindingSets);
 
                 // default sink
                 final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
@@ -336,19 +335,20 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             private final BOpContext<IBindingSet> parentContext;
 
             /**
-             * The source binding set.
+             * The source binding sets.
              */
-            private final IBindingSet bset;
+            private final IBindingSet[] bindingSets;
 
             /**
              * The root operator for the subquery.
              */
             private final BOp subQueryOp;
 
-            public SubqueryTask(final IBindingSet bset, final BOp subQuery,
+            public SubqueryTask(final IBindingSet[] bindingSets,
+                    final BOp subQuery,
                     final BOpContext<IBindingSet> parentContext) {
 
-                this.bset = bset;
+                this.bindingSets = bindingSets;
                 
                 this.subQueryOp = subQuery;
 
@@ -368,7 +368,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                             .getQueryEngine();
                     
                     runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
-                            bset);
+                            bindingSets);
 
 					try {
 

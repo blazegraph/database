@@ -125,38 +125,6 @@ public class ServiceCallJoin extends PipelineOp {
          */
         String SERVICE_NODE = ServiceCallJoin.class.getName() + ".serviceNode";
 
-//        /**
-//         * The {@link IVariableOrConstant} which will evaluate to the URI of the
-//         * SERVICE.
-//         * 
-//         * @see ServiceRegistry
-//         */
-//        String SERVICE_REF = ServiceCallJoin.class.getName() + ".serviceRef";
-//
-//        /**
-//         * The <code>group graph pattern</code> used to invoke the service.
-//         */
-//        String GRAPH_PATTERN = ServiceCallJoin.class.getName()
-//                + ".graphPattern";
-//
-//        /**
-//         * The text "image" of the original SPARQL SERVICE clause. The "image"
-//         * of the original group graph pattern is what gets sent to a remote
-//         * SPARQL end point when we evaluate the SERVICE node. Because the
-//         * original "image" of the graph pattern is being used, we also need to
-//         * have the prefix declarations so we can generate a valid SPARQL
-//         * request.
-//         */
-//        String EXPR_IMAGE = ServiceCallJoin.class.getName() + ".exprImage";
-//
-//        /**
-//         * The prefix declarations for the SPARQL query from which the
-//         * {@link #EXPR_IMAGE} was taken. This is needed in order to generate a
-//         * valid SPARQL query for a remote SPARQL end point when we evaluate the
-//         * SERVICE request.
-//         */
-//        String PREFIX_DECLS = ServiceCallJoin.class.getName() + ".prefixDecls";
-
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
          * namespace of the lexicon relation). This resource will be located and
@@ -168,22 +136,6 @@ public class ServiceCallJoin extends PipelineOp {
          * The timestamp of the {@link AbstractTripleStore} view to be located.
          */
         String TIMESTAMP = ServiceCallJoin.class.getName() + ".timestamp";
-
-//        /**
-//         * Service errors will be ignored when <code>true</code>.
-//         */
-//        String SILENT = ServiceCallJoin.class.getName() + ".silent";
-//
-//        /**
-//         * The timeout in milliseconds before a SERVICE request is failed.
-//         */
-//        String TIMEOUT = ServiceCallJoin.class.getName() + ".timeout";
-
-//        /**
-//         * The set of variables which can flow in/out of the SERVICE.
-//         */
-//        String PROJECTED_VARS = ServiceCallJoin.class.getName()
-//                + ".projectedVars";
 
         /**
          * The join variables. This is used to establish a correlation between
@@ -289,9 +241,6 @@ public class ServiceCallJoin extends PipelineOp {
                     .getRequiredProperty(Annotations.SERVICE_NODE);
             
             this.serviceRef = serviceNode.getServiceRef().getValueExpression();
-
-//            this.groupNode  = (IGroupNode<IGroupMemberNode>) op
-//                    .getRequiredProperty(Annotations.GRAPH_PATTERN);
             
             final String namespace = (String) op
                     .getRequiredProperty(Annotations.NAMESPACE);
@@ -315,7 +264,7 @@ public class ServiceCallJoin extends PipelineOp {
              * we can otherwise break the variable scope.
              */
             this.projectedVars = serviceNode.getProjectedVars();
-//            (Set<IVariable<?>>) op.getRequiredProperty(Annotations.PROJECTED_VARS);
+
             if(projectedVars == null)
                 throw new AssertionError();
 

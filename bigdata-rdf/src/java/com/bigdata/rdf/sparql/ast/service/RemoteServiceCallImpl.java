@@ -55,13 +55,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * This class handleS vectored remote service invocation by generating an
- * appropriate SPARQL query (with BINDINGS) and an appropriate HTTP request.
- * 
- * TODO Add {@link RemoteServiceOptions} options for additional URL query
- * parameters (defaultGraph, etc), authentication, HTTP METHOD (GET/POST),
- * preferred result format (SPARQL, BINARY, etc.), etc. This can be configured
- * for a service URI configured using the {@link ServiceRegistry}.
+ * This class handles vectored remote service invocation by generating an
+ * appropriate SPARQL query (with BINDINGS) and an appropriate HTTP request. The
+ * behavior of this class may be configured in the {@link ServiceRegistry} by
+ * adjusting the {@link RemoteServiceOptions} for the service URI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: RemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
@@ -77,14 +74,9 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
      */
     static private final String UTF8 = "UTF-8";
     
-//    private final AbstractTripleStore store;
-//    private final IGroupNode<IGroupMemberNode> groupNode;
     private final URI serviceURI;
     private final ServiceNode serviceNode;
     private final RemoteServiceOptions serviceOptions;
-//    private final String exprImage;
-//    private final Map<String,String> prefixDecls;
-//    private final Set<IVariable<?>> projectedVars;
     
     public RemoteServiceCallImpl(final AbstractTripleStore store,
             final URI serviceURI, final ServiceNode serviceNode,
@@ -123,99 +115,18 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
     public ICloseableIterator<BindingSet> call(final BindingSet[] bindingSets)
             throws Exception {
 
+        final RemoteServiceOptions serviceOptions = getServiceOptions();
+        
         final QueryOptions opts = new QueryOptions(serviceURI.stringValue());
 
-        final TupleQueryResultFormat resultFormat = TupleQueryResultFormat.BINARY;
-
-        opts.acceptHeader = //
-        resultFormat.getDefaultMIMEType() + ";q=1" + //
-                "," + //
-                TupleQueryResultFormat.SPARQL.getDefaultMIMEType() + ";q=1"//
-        ;
-
+        opts.acceptHeader = serviceOptions.getAcceptHeader();
+        
         /*
          * Note: This uses a factory pattern to handle each of the possible ways
          * in which we have to vector solutions to the service end point.
          */
         final IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory
-                .get(getServiceOptions(), serviceNode, bindingSets);
-
-//        final BindingSet[] b;
-//
-////        if (queryBuilder.isVectored()) {
-//
-//            b = doRemoteQuery(opts, queryBuilder, bindingSets);
-//
-////        } else {
-////
-////            b = doRemoteNonVectoredQuery(opts, queryBuilder, bindingSets);
-////
-////        }
-//
-//        return new ChunkedArrayIterator<BindingSet>(b);
-//        
-//    }
-
-//    /**
-//     * We can not vector the solutions to the remote service end point. This
-//     * will issue one remote query per source solution. It gathers together all
-//     * such responses and then returns them in a single chunk to the caller.
-//     */
-//    private BindingSet[] doRemoteNonVectoredQuery(final QueryOptions opts,
-//            final IRemoteSparqlQueryBuilder queryBuilder,
-//            final BindingSet[] bindingSets) throws Exception {
-//     
-//        final List<BindingSet[]> chunks = new LinkedList<BindingSet[]>();
-//        
-//        int nsolutions = 0;
-//        
-//        for (int i = 0; i < bindingSets.length; i++) {
-//
-//            final BindingSet[] b = doRemoteQuery(opts, queryBuilder,
-//                    new BindingSet[] { bindingSets[i] });
-//            
-//            chunks.add(b);
-//            
-//            nsolutions += b.length;
-//
-//        }
-//
-//        /*
-//         * Flatten out all of the individual results from the service.
-//         */
-//        final BindingSet[] b = new BindingSet[nsolutions];
-//        
-//        int index = 0;
-//        for (BindingSet[] chunk : chunks) {
-//         
-//            System.arraycopy(chunk/* src */, 0/* srcPos */, b/* dest */,
-//                    index/* destPos */, chunk.length);
-//            
-//            index += chunk.length;
-//            
-//        }
-//        
-//        return b;
-//
-//    }
-//
-//    /**
-//     * Execute a remote SPARQL query, returning the solutions for that query.
-//     * 
-//     * @param bindingSets
-//     *            The solutions to flow into the query.
-//     *            
-//     * @return The solutions received for that query.
-//     */
-//    private BindingSet[] doRemoteQuery(final QueryOptions opts,
-//            final IRemoteSparqlQueryBuilder queryBuilder,
-//            final BindingSet[] bindingSets) throws Exception {
-
-//        if (queryBuilder.isVectored() && bindingSets.length > 1) {
-//        
-//            throw new UnsupportedOperationException();
-//
-//        }
+                .get(serviceOptions, serviceNode, bindingSets);
         
         opts.queryStr = queryBuilder.getSparqlQuery(bindingSets);
 
@@ -243,49 +154,6 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
                         queryResult);
-
-//        /*
-//         * Apply a transform in reverse here using the same builder object.
-//         * 
-//         * TODO This requires materialization of the result set, but the
-//         * ServiceCallJoin already has that requirement. Maybe change
-//         * ServiceCall#call() to return an IBindingSet or BindingSet[]? We can
-//         * then limit the size of the materialized solution set (indirectly) by
-//         * controlling the vector size into the ServiceCallJoin. That is how we
-//         * do it for everything else, so it seems like a good idea to follow the
-//         * same pattern here.
-//         */
-//        {
-//
-//            final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
-//
-//            final ICloseableIterator<BindingSet> itr = new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-//                    queryResult);
-//
-//            try {
-//
-//                while (itr.hasNext()) {
-//
-//                    serviceSolutions.add(itr.next());
-//
-//                }
-//
-//            } finally {
-//
-//                itr.close();
-//
-//            }
-//
-//            // Convert to array.
-//            final BindingSet[] a = serviceSolutions
-//                    .toArray(new BindingSet[serviceSolutions.size()]);
-//
-//            // Possible undo a UNION rewrite of the SERVICE call.
-//            final BindingSet[] b = queryBuilder.getSolutions(a);
-//
-//            return b;
-//
-//        }
 
     }
         

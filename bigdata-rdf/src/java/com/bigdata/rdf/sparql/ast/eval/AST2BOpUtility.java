@@ -168,27 +168,14 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *            outside of the query evaluation).
      * 
      * @return The query plan which may be used to evaluate the query.
+     * 
+     *         TODO We could handle the IBindingSet[] by stuffing the data into
+     *         a named solution set during the query rewrite and attaching that
+     *         named solution set to the AST. This could allow for very large
+     *         solution sets to be passed into a query.
      */
     static PipelineOp convert(final AST2BOpContext ctx,
-            final IBindingSet bset) {
-
-        /*
-         * TODO Do we still want the ability to pass in an IBindingSet[] to
-         * query evaluation for the BindingsClause or we are planning to handle
-         * this entirely via a "java" service interface (or by stuffing the data
-         * into a named solution set during the query rewrite and attaching that
-         * named solution set to the AST).
-         * 
-         * TODO Do we need the ability to run the optimizer once we have
-         * evaluated that service request in order to do things like set an IN
-         * filter based on the returned solution set?
-         * 
-         * If we model this with an "inline access path", then that is really
-         * very close to the Htree / hash join. The IN constraint could just be
-         * the evaluation of the join. We could also do column projections,
-         * which would give us something like the hash-set based IN constraint.
-         */
-        final IBindingSet[] bindingSets = new IBindingSet[] { bset };
+            final IBindingSet[] bindingSets) {
 
         // The AST query model.
         final ASTContainer astContainer = ctx.astContainer;
@@ -479,13 +466,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
             // The variables projected by the subquery.
             final IVariable<?>[] projectedVars = projection.getProjectionVars();
 
-            left = new ProjectionOp(leftOrEmpty(left), //
+            left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            );
+            ), query.getQueryHints());
             
             if(materializeProjection) {
                 
@@ -743,6 +730,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.PIPELINED, false),// at-once evaluation
+                new NV(PipelineOp.Annotations.MAX_MEMORY, Long.MAX_VALUE),// at-once evaluation
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeNamedSubqueryOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
@@ -755,6 +744,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.PIPELINED, false),// at-once evaluation
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
@@ -812,7 +802,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * the same JVM.
              */
             final boolean isBigdata = serviceCall.getServiceOptions()
-                    .isBigdataService();
+                    .isBigdataNativeService();
 
             isMaterialize = !isBigdata;
 
@@ -922,12 +912,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * originated on the data services in a cluster.
          * 
          * Note: In order to have better throughput, this operator is annotated
-         * as "at-once" (PIPELINED:=false). This will force the query engine to
-         * wait until all source solutions are available and then run the
-         * ServiceCallJoin exactly once. The ServiceCallJoin will internally
-         * vector the solutions per target service and will use limited
-         * parallelism (based on MAX_PARALLEL) to reduce the latency of the
-         * service requests across multiple service targets.
+         * as "at-once" (PIPELINED:=false) by default (it can be overridden by
+         * QueryHints#AT_ONCE). This forces the query engine to wait until all
+         * source solutions are available and then run the ServiceCallJoin
+         * exactly once. The ServiceCallJoin will internally vector the
+         * solutions per target service and will use limited parallelism (based
+         * on MAX_PARALLEL) to reduce the latency of the service requests across
+         * multiple service targets.
          * 
          * TODO Unit test where join constraints wind up attached to the
          * ServiceCallJoin operator.
@@ -936,7 +927,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         anns.put(BOp.Annotations.BOP_ID, rightId);
         anns.put(BOp.Annotations.EVALUATION_CONTEXT,
                 BOpEvaluationContext.CONTROLLER);
-        anns.put(PipelineOp.Annotations.PIPELINED, false);
+        anns.put(PipelineOp.Annotations.PIPELINED, false); // at-once by default.
 //      anns.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
         anns.put(PipelineOp.Annotations.SHARED_STATE, true);// live stats.
         anns.put(ServiceCallJoin.Annotations.SERVICE_NODE, serviceNode);
@@ -945,7 +936,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
         anns.put(ServiceCallJoin.Annotations.JOIN_VARS,
                 joinVarSet.toArray(new IVariable[] {}));
         anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);
-        left = new ServiceCallJoin(leftOrEmpty(left), anns);
+
+        left = applyQueryHints(new ServiceCallJoin(leftOrEmpty(left), anns),
+                serviceNode.getQueryHints());
 
         /*
          * For each filter which requires materialization steps, add the

@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.internal.IV;
 
 /**
  * Options and metadata for service end points.
@@ -40,12 +42,14 @@ import com.bigdata.bop.IBindingSet;
 public interface IServiceOptions {
 
     /**
-     * Return <code>true</code> iff the service is "bigdata" aware. When
-     * <code>true</code>, the {@link ServiceCall} implementation is expected to
-     * exchange {@link IBindingSet}s rather than {@link BindingSet}s containing
-     * materialized RDF Values.
+     * Return <code>true</code> iff the service is a native (aka "bigdata"
+     * aware) internal service. When <code>true</code>, the {@link ServiceCall}
+     * implementation is expected to exchange {@link IBindingSet}s containing
+     * {@link IV}s and those {@link IV}s are NOT guaranteed to be materialized.
+     * When <code>false</code>, the service is expected to exchange
+     * {@link BindingSet}s containing materialized RDF {@link Value}s.
      */
-    boolean isBigdataService();
+    boolean isBigdataNativeService();
 
     /**
      * Return <code>true</code> iff the service is "remote". A remote service is

@@ -179,38 +179,6 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * This is a version of {@link #test_sparql_subselect()} which uses the same
-     * data and has the same results, but which uses a named subquery rather
-     * than a SPARQL 1.1 subselect.
-     * 
-     * <pre>
-     * select ?x ?o
-     *   with {
-     *     select ?x where { ?x rdf:type foaf:Person }
-     *   } AS %namedSet1
-     * where {
-     *   ?x rdfs:label ?o
-     *   INCLUDE %namedSet1 
-     * }
-     * </pre>
-     */
-    public void test_named_subquery() throws Exception {
-
-        new TestHelper("named-subquery").runTest();
-
-    }
-
-//    /**
-//     * This is a variant {@link #test_named_subquery()} in which the JOIN ON
-//     * query hint is used to explicitly specify NO join variables.
-//     */
-//    public void test_named_subquery_noJoinVars() throws Exception {
-//
-//        new TestHelper("named-subquery-noJoinVars").runTest();
-//
-//    }
-
-    /**
      * Test that only projected variables are included in subquery results.
      * 
      * <pre>
@@ -232,55 +200,4 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    /**
-     * Test that only projected variables are included in named-subquery
-     * results.
-     * 
-     * <pre>
-     * PREFIX : <http://example.org/>
-     * SELECT ?s ?x
-     * WITH{
-     *     SELECT ?s ?x { ?s :p ?x }
-     * }as %set1
-     * WITH{
-     *     SELECT ?s ?fake1 ?fake2 { ?x :q ?s . LET (?fake1 := 1) . LET (?fake2 := 2) . }
-     * }as %set2
-     * WHERE {
-     *      INCLUDE %set1
-     *      INCLUDE %set2
-     * }
-     * </pre>
-     */
-    public void test_named_subquery_scope() throws Exception {
-
-        new TestHelper("named-subquery-scope").runTest();
-
-    }
-
-    /**
-     * <pre>
-     * prefix : <http://www.bigdata.com/>
-     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-     * SELECT ?a ?x ?y
-     * WITH {
-     *   SELECT ?a ?x {?a :x ?x}
-     * } as %set1
-     * WITH {
-     *   SELECT ?a ?y {?a :y ?y}
-     * } as %set2
-     * WHERE {
-     *    OPTIONAL {INCLUDE %set1}.
-     *    OPTIONAL {INCLUDE %set2}.
-     * }
-     * </pre>
-     * 
-     * @throws Exception
-     */
-    public void test_double_optional_include() throws Exception {
-
-        new TestHelper("double-optional-include").runTest();
-        
-    }
-    
 }

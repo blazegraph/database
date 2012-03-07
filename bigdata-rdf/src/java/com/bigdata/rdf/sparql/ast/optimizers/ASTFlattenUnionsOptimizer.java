@@ -52,6 +52,11 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * 
  * Note: This must run before the {@link ASTEmptyGroupOptimizer} in order to
  * eliminate certain UNION/group combinations.
+ * <p>
+ * Note: The bigdata SPARQL parser no longer produces this nested UNION
+ * construction. However, it is possible that other SPARQL parsers or hand
+ * construction can still produce this nesting pattern, in which case this
+ * optimizer will flatten out that pattern.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTFlattenUnionsOptimizer.java 5314 2011-10-12 12:51:13Z

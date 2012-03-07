@@ -43,9 +43,9 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -59,6 +59,7 @@ import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
@@ -82,40 +83,6 @@ public class ASTEvalHelper {
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
     
     /**
-     * Setup the input binding set which will be fed into the query pipeline.
-     * 
-     * @param bs
-     *            The given source binding set (optional).
-     * 
-     * @return Either the argument or an empty {@link IBindingSet} if the
-     *         argument was <code>null</code>.
-     */
-    static private IBindingSet wrapSource(final IBindingSet bs)
-            throws SailException {
-
-        if (bs != null) {
-        
-            /*
-             * A single input binding set will be fed into the query pipeline
-             * using the supplied bindings.
-             */
-
-            return bs;
-
-        } else {
-            
-            /*
-             * A single empty input binding set will be fed into the query
-             * pipeline.
-             */
-            
-            return new ListBindingSet();
-            
-        }
-        
-    }
-    
-    /**
      * Batch resolve {@link Value}s to {@link IV}s.
      * 
      * @param store
@@ -127,17 +94,14 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-    static private BindingSet batchResolveIVs(final AbstractTripleStore store,
+    static private IBindingSet batchResolveIVs(final AbstractTripleStore store,
             final BindingSet bs) throws QueryEvaluationException {
 
-        if (bs == null) {
-            // Use an empty binding set.
-            return new QueryBindingSet();
-        }
+        if (bs == null || bs.size() == 0) {
 
-        if (bs.size() == 0) {
-            // Fast path if empty.
-            return bs;
+            // Use an empty binding set.
+            return new ListBindingSet();
+            
         }
 
         final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
@@ -145,7 +109,9 @@ public class ASTEvalHelper {
 
         final BindingSet[] a = (BindingSet[]) tmp[1];
 
-        return a[0];
+        final BindingSet tmp2 = a[0];
+        
+        return toBindingSet(tmp2);
 
     }
     
@@ -174,10 +140,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
+                batchResolveIVs(store, bs));
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bindingSets);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -191,7 +158,7 @@ public class ASTEvalHelper {
             itr = ASTEvalHelper.evaluateQuery(
                     astContainer,
                     context,
-                    bset
+                    bindingSets
                     , materializeProjectionInQuery//
                     , new IVariable[0]// required
                     );
@@ -227,10 +194,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
+                batchResolveIVs(store, bs));
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bindingSets);
 
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -251,7 +219,7 @@ public class ASTEvalHelper {
                 ASTEvalHelper.evaluateQuery(
                         astContainer,
                         context,
-                        bset
+                        bindingSets
                         ,materializeProjectionInQuery//
                         , projected//
                         ));
@@ -280,10 +248,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
-        
+        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
+                batchResolveIVs(store, bs));
+
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bindingSets);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -298,7 +267,7 @@ public class ASTEvalHelper {
                         ASTEvalHelper.evaluateQuery(
                                 astContainer,
                                 context,
-                                bset//
+                                bindingSets//
                                 ,materializeProjectionInQuery//
                                 ,optimizedQuery.getProjection()
                                         .getProjectionVars()//
@@ -336,7 +305,7 @@ public class ASTEvalHelper {
     static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final ASTContainer astContainer,
             final AST2BOpContext ctx,            
-            final IBindingSet bs, 
+            final IBindingSet[] bindingSets, 
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
@@ -351,7 +320,7 @@ public class ASTEvalHelper {
         try {
 
             // Submit query for evaluation.
-            runningQuery = ctx.queryEngine.eval(queryPlan,wrapSource(bs));
+            runningQuery = ctx.queryEngine.eval(queryPlan, bindingSets);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
@@ -371,6 +340,97 @@ public class ASTEvalHelper {
     }
 
     /**
+     * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}
+     * and merges it with the BINDINGS clause (if any) attached to the
+     * {@link QueryRoot}.
+     * 
+     * @param astContainer
+     *            The query container.
+     * @param src
+     *            The {@link BindingSet}.
+     * 
+     * @return The {@link IBindingSet}.
+     */
+    private static IBindingSet[] mergeBindingSets(
+            final ASTContainer astContainer, final IBindingSet src) {
+
+        if (astContainer == null)
+            throw new IllegalArgumentException();
+
+        if (src == null)
+            throw new IllegalArgumentException();
+        
+        final List<IBindingSet> bindingsClause;
+        {
+            
+            final BindingsClause x = astContainer.getOriginalAST()
+                    .getBindingsClause();
+         
+            if (x == null) {
+            
+                bindingsClause = null;
+                
+            } else {
+                
+                bindingsClause = x.getBindingSets();
+                
+            }
+
+        }
+
+        if (bindingsClause == null || bindingsClause.isEmpty()) {
+
+            // Just the solution provided through the API.
+            return new IBindingSet[] { src };
+            
+        }
+        
+        if (src.isEmpty()) {
+
+            /*
+             * No source solution, so just use the BINDINGS clause solutions.
+             */
+            
+            return bindingsClause
+                    .toArray(new IBindingSet[bindingsClause.size()]);
+            
+        }
+
+        /*
+         * We have to merge the source solution given through the openrdf API
+         * with the solutions in the BINDINGS clause. This "merge" is a join. If
+         * the join fails for any solution, then that solution is dropped. Since
+         * there is only one solution from the API, the cardinality of the join
+         * is at most [1 x |BINDINGS|].
+         */
+        final List<IBindingSet> out = new LinkedList<IBindingSet>();
+        {
+        
+            final Iterator<IBindingSet> itr = bindingsClause.iterator();
+
+            while (itr.hasNext()) {
+
+                final IBindingSet right = itr.next();
+
+                final IBindingSet tmp = BOpContext.bind(src/* left */, right,
+                        null/* constraints */, null/* varsToKeep */);
+
+                if (tmp != null) {
+
+                    out.add(tmp);
+
+                }
+
+            }
+
+        }
+
+        // Return the results of that join.
+        return out.toArray(new IBindingSet[bindingsClause.size()]);
+        
+    }
+    
+    /**
      * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}.
      * 
      * @param src
@@ -380,7 +440,7 @@ public class ASTEvalHelper {
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static IBindingSet toBindingSet(final BindingSet src) {
-
+        
         if (src == null)
             throw new IllegalArgumentException();
 
@@ -403,8 +463,9 @@ public class ASTEvalHelper {
         }
         
         return bindingSet;
-        
+
     }
+    
     
     /**
      * Wrap {@link IRunningQuery} with the logic to materialize {@link IV}s as

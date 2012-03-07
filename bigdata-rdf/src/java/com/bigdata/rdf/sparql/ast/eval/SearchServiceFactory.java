@@ -55,7 +55,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
-import com.bigdata.rdf.sparql.ast.service.BigdataServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
@@ -88,10 +88,18 @@ public class SearchServiceFactory implements ServiceFactory {
      * Note: This could extend the base class to allow for search service
      * configuration options.
      */
-    private final BigdataServiceOptions serviceOptions = new BigdataServiceOptions();
+    private final BigdataNativeServiceOptions serviceOptions;
+
+    public SearchServiceFactory() {
+        
+        serviceOptions = new BigdataNativeServiceOptions();
+        
+//        serviceOptions.setRunOnce(true);
+        
+    }
     
     @Override
-    public BigdataServiceOptions getServiceOptions() {
+    public BigdataNativeServiceOptions getServiceOptions() {
 
         return serviceOptions;
         
