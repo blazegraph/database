@@ -31,8 +31,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import javax.swing.Icon;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -475,11 +473,6 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 		        
 		        /*
 		         * Add the LET assignments to the pipeline.
-		         * 
-		         * TODO Review as generated query plans: Make sure that we do not
-		         * reorder LET/BIND in a join group. I believe that we are supposed to
-		         * run them in the given order, just not in the given location (they
-		         * run last).
 		         */
 		    	for (AssignmentNode n : assignments) {
 		    		
