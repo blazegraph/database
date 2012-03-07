@@ -56,6 +56,8 @@ final class RunFirstHint extends AbstractBooleanQueryHint {
 
             _setAnnotation(context, scope, op, getName(), value);
 
+            return;
+            
         }
 
         throw new QueryHintException(scope, op, getName(), value);
