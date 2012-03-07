@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.UUID;
 
 import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -360,6 +361,13 @@ public interface QueryHints {
      * @see BufferAnnotations#CHUNK_CAPACITY
      */
     String CHUNK_SIZE = "chunkSize";
+    
+    /**
+     * The maximum parallelism for the operator within the query.
+     * 
+     * @see PipelineOp.Annotations#MAX_PARALLEL
+     */
+    String MAX_PARALLEL = "maxParallel";
     
     /**
      * Query hint to use a hash join against the access path for a given

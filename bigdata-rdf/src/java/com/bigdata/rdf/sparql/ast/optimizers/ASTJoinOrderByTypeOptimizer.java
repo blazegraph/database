@@ -27,13 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.swing.Icon;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -46,10 +54,14 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.store.BD;
 
 /**
  * This optimizer simply puts each type of {@link IGroupMemberNode} within a
- * {@link JoinGroupNode} in the right order w.r.t. to the other types.
+ * {@link JoinGroupNode} in the right order with respect to the other types.
+ * 
+ * TODO TEST SUITE!
  */
 public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
@@ -119,10 +131,11 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * <pre> 
      * 1. Pre-filters
      * 2. In-filters
-     * 3. Service calls
-     * 4. Subquery-includes
-     * 5. Statement patterns
-     * 6. Join filters
+     *    Required joins:
+     * 3.   Service calls (Bigdata SEARCH)
+     * 4.   Subquery-includes
+     * 5.   Statement patterns
+     * 
      * 7. Sparql11 subqueries
      * 8. Non-optional subgroups
      * 9. Simple optionals & optional subgroups
@@ -130,6 +143,8 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * 11. Post-conditionals
      * </pre> 
      * Most of this logic was lifted out of {@link AST2BOpUtility}.
+     * <p>
+     * Note: Join filters are now attached to {@link IJoinNode}s.
      */
     private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
     		final GraphPatternGroup<?> op) {
@@ -141,7 +156,40 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
     		if (ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup)) {
     	
 		    	final List<IGroupMemberNode> ordered = new LinkedList<IGroupMemberNode>();
-		    	
+
+		    	final List<AssignmentNode> assignments = joinGroup.getAssignments();
+
+                /*
+                 * Assignments for a constant.
+                 * 
+                 * Note: This supports query engines which use BIND() to convey
+                 * a binding into a remote SPARQL end point (openrdf does this).
+                 * For example, see their service09 test.
+                 */
+                {
+
+                    final Iterator<AssignmentNode> aitr = assignments
+                            .iterator();
+
+                    while (aitr.hasNext()) {
+
+                        final AssignmentNode n = aitr.next();
+
+                        final IValueExpression<? extends IV> valExpr = n
+                                .getValueExpression();
+
+                        if (valExpr instanceof IConstant) {
+
+                            ordered.add(n);
+
+                            aitr.remove();
+
+                        }
+
+                    }
+
+                }
+
 		        /*
 		         * Add the pre-conditionals to the pipeline.
 		         * 
@@ -224,15 +272,35 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 		         * pipeline generation) needs to be deferred until we actually evaluate
 		         * the join graph (at least for the RTO).
 		         */
+		    	final List<ServiceNode> serviceNodes = joinGroup.getServiceNodes();
 		        {
 	
 		            /*
-		             * Run service calls first.
+		             * Run some service calls first.
+		             * 
+		             * TODO This is hard-coded to BD.SEARCH.
 		             */
-			    	for (IGroupMemberNode n : joinGroup.getServiceNodes()) {
-			    		
-			    		ordered.add(n);
-			    		
+			    	{
+
+                        final Iterator<ServiceNode> sitr = serviceNodes
+                                .iterator();
+
+                        while (sitr.hasNext()) {
+
+                            final ServiceNode n = sitr.next();
+
+                            if (n.getServiceRef().isConstant()
+                                    && n.getServiceRef().getValue()
+                                            .equals(BD.SEARCH)) {
+
+                                ordered.add(n);
+
+                                sitr.remove();
+
+                            }
+
+			    	    }
+			    	    
 			    	}
 	
 		            /*
@@ -276,6 +344,11 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 			    		}
 			    		
 			    	}
+			    	
+                    /*
+                     * TODO Why is this here?!? It should either be empty or run
+                     * after the last required join, right?
+                     */
 			    	for (IGroupMemberNode n : sa.getJoinFilters(joinGroup)) {
 			    		
 			    		ordered.add(n);
@@ -292,32 +365,69 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 		                }
 		            }
 	
+                    /*
+                     * Do the non-optional sub-groups (Join groups and UNION).
+                     */
+                    for (IGroupMemberNode child : joinGroup) {
+
+                        if (!(child instanceof GraphPatternGroup<?>)) {
+                            continue;
+                        }
+
+                        @SuppressWarnings("unchecked")
+                        final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
+
+                        if (subgroup.isOptional()) {
+                            continue;
+                        }
+
+                        ordered.add(subgroup);
+
+                    }
+
+                    /*
+                     * Run services which have constant URIs next.
+                     * 
+                     * TODO These could be ordered by the #of unbound variables
+                     * or some such. Simple triple patterns for which we can use
+                     * ESTCARD could be ordered more precisely.
+                     */
+                    {
+
+                        final Iterator<ServiceNode> sitr = serviceNodes
+                                .iterator();
+
+                        while (sitr.hasNext()) {
+
+                            final ServiceNode n = sitr.next();
+
+                            if (!n.getServiceRef().isConstant())
+                                continue;
+
+                            sitr.remove();
+                            
+                            ordered.add(n);
+
+                        }
+
+                    }
+
+                    /*
+                     * Run remaining service calls (those with a variable
+                     * service ref).
+                     */
+                    for (ServiceNode n : serviceNodes) {
+
+                        ordered.add(n);
+
+                    }
+
 		        }
 	
-		        /*
-		         * Add the subqueries (individual optional statement patterns, optional
-		         * join groups, and nested union).
-		         */
-	
-		        /*
-		         * First do the non-optional subgroups
-		         */
-		        for (IGroupMemberNode child : joinGroup) {
-	
-		            if (!(child instanceof GraphPatternGroup<?>)) {
-		                continue;
-		            }
-	
-		            @SuppressWarnings("unchecked")
-		            final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
-	
-		            if (subgroup.isOptional()) {
-		                continue;
-		            }
-	
-					ordered.add(subgroup);
-	
-		        }
+//		        /*
+//		         * Add the subqueries (individual optional statement patterns, optional
+//		         * join groups, and nested union).
+//		         */
 	
 		        /*
 		         * Next do the optional sub-groups.
@@ -363,7 +473,6 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 	
 		        }
 		        
-		        
 		        /*
 		         * Add the LET assignments to the pipeline.
 		         * 
@@ -372,7 +481,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 		         * run them in the given order, just not in the given location (they
 		         * run last).
 		         */
-		    	for (IGroupMemberNode n : joinGroup.getAssignments()) {
+		    	for (AssignmentNode n : assignments) {
 		    		
 		    		ordered.add(n);
 		    		

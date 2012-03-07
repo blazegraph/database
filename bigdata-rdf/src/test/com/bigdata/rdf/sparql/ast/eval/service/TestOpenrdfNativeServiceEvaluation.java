@@ -64,24 +64,24 @@ public class TestOpenrdfNativeServiceEvaluation extends
     /**
      * A simple SERVICE query. The service adds in a single solution which
      * restricts the set of solutions for the overall query.
+     * 
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/mockService/test_service_001> {
+     *        ?book :foo :bar
+     *    }.
+     *    ?book dc:title ?title ;
+     *          ns:price ?price .
+     * }
+     * </pre>
      */
     public void test_service_001() throws Exception {
-        
-//        final BigdataValueFactory valueFactory = store.getValueFactory();
-//        
-//        /*
-//         * Note: This IV needs to be resolved in order to join against data that
-//         * loaded into the database. Since we have not yet loaded the data, the
-//         * RDF Value is being inserted into the store now. That way, when the
-//         * data are loaded, the data will use the same IV and the join will
-//         * succeed.
-//         */
-//        final BigdataValue book1 = valueFactory
-//                .createURI("http://example.org/book/book1");
-//        {
-//            store.addTerm(book1);
-//        }
-        
+ 
         final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
         {
             final MapBindingSet bset = new MapBindingSet();
@@ -119,41 +119,34 @@ public class TestOpenrdfNativeServiceEvaluation extends
      * <p>
      * Note: Since the SERVICE is not actually doing joins, we wind up with
      * duplicate solutions.
+     * 
+     * <pre>
+     * PREFIX dc:   <http://purl.org/dc/elements/1.1/> 
+     * PREFIX :     <http://example.org/book/> 
+     * PREFIX ns:   <http://example.org/ns#> 
+     * 
+     * SELECT ?book ?title ?price
+     * {
+     *    SERVICE <http://www.bigdata.com/mockService/test_service_002> {
+     *        ?book :foo :bar
+     *    }.
+     *    hint:Prior hint:runFirst true .
+     *    ?book dc:title ?title ;
+     *          ns:price ?price .
+     * }
+     * </pre>
      */
     public void test_service_002() throws Exception {
-        
-//        final BigdataValueFactory valueFactory = store.getValueFactory();
-//        
-//        /*
-//         * Note: This IV needs to be resolved in order to join against data that
-//         * loaded into the database. Since we have not yet loaded the data, the
-//         * RDF Value is being inserted into the store now. That way, when the
-//         * data are loaded, the data will use the same IV and the join will
-//         * succeed.
-//         */
-//        final BigdataValue book1 = valueFactory
-//                .createURI("http://example.org/book/book1");
-//        {
-//            store.addTerm(book1);
-//        }
-//
-//        final BigdataValue book2 = valueFactory
-//                .createURI("http://example.org/book/book2");
-//        {
-//            store.addTerm(book2);
-//        }
-
+ 
         final List<BindingSet> serviceSolutions = new LinkedList<BindingSet>();
         {
             final MapBindingSet bset = new MapBindingSet();
-//            bset.addBinding("book", book1);
             bset.addBinding("book",
                     new URIImpl("http://example.org/book/book1"));
             serviceSolutions.add(bset);
         }
         {
             final MapBindingSet bset = new MapBindingSet();
-//            bset.addBinding("book", book2);
             bset.addBinding("book",
                     new URIImpl("http://example.org/book/book2"));
             serviceSolutions.add(bset);

@@ -884,7 +884,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
             if (!vars.isEmpty()) {
 
                 // Add the materialization step.
-                addMaterializationSteps(left, rightId, (Collection) vars, ctx);
+                left = addMaterializationSteps(left, rightId, (Collection) vars, ctx);
 
                 // These variables have now been materialized.
                 doneSet.addAll(vars);

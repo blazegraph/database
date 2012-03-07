@@ -29,7 +29,8 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -41,7 +42,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 final class PipelineMaxParallelHint extends AbstractIntQueryHint {
 
     protected PipelineMaxParallelHint() {
-        super(PipelineOp.Annotations.MAX_PARALLEL,
+        super(QueryHints.MAX_PARALLEL,
                 PipelineOp.Annotations.DEFAULT_MAX_PARALLEL);
     }
 
@@ -49,14 +50,15 @@ final class PipelineMaxParallelHint extends AbstractIntQueryHint {
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof IJoinNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
              * transferred to the pipeline operator when it is generated.
              */
 
-            _setQueryHint(context, scope, op, getName(), value);
+            _setQueryHint(context, scope, op,
+                    PipelineOp.Annotations.MAX_PARALLEL, value);
 
         }
 

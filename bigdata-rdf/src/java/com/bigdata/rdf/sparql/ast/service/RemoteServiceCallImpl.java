@@ -77,6 +77,19 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
     private final URI serviceURI;
     private final ServiceNode serviceNode;
     private final RemoteServiceOptions serviceOptions;
+
+    @Override
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("{serviceURI="+serviceURI);
+        sb.append(",serviceNode="+serviceNode);
+        sb.append(",serviceOptions="+serviceOptions);
+        sb.append("}");
+        return sb.toString();
+        
+    }
     
     public RemoteServiceCallImpl(final AbstractTripleStore store,
             final URI serviceURI, final ServiceNode serviceNode,
@@ -359,14 +372,13 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
              * Otherwise, the connection will be closed by the caller.
              */
             try {
-                // clean up the connection resources
-                if (conn != null)
-                    conn.disconnect();
+//                // clean up the connection resources
+//                if (conn != null)
+//                    conn.disconnect();
             } catch (Throwable t2) {
                 // ignored.
             }
-            throw new RuntimeException("serviceUrl=" + opts.serviceURL + " : "
-                    + t, t);
+            throw new RuntimeException(toString() + " : " + t, t);
         }
 
     }

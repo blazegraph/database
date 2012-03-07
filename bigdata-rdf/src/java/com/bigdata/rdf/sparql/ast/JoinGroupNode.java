@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -300,7 +299,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      */
     public List<AssignmentNode> getAssignments(){
         
-        final List<AssignmentNode> assignments = new ArrayList<AssignmentNode>();
+        final List<AssignmentNode> assignments = new LinkedList<AssignmentNode>();
         
         for (IQueryNode node : this) {
             
