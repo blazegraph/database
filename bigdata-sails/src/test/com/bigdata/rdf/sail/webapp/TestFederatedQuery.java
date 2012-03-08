@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.sparql.ast.service.RemoteServiceFactoryImpl;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
@@ -101,6 +102,11 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         super(name);
 
     }
+
+    /**
+     * The openrdf services test suite data.
+     */
+    private static final String PREFIX = "openrdf-service/";
 
     /**
      * A local repository (NOT exposed via HTTP).
@@ -358,21 +364,12 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
             assertEquals(2, count);
 
-//        } catch (MalformedQueryException e) {
-//            fail(e.getMessage());
-//        } catch (QueryEvaluationException e) {
-//            fail(e.getMessage());
         } finally {
             conn.close();
         }
 
     }
 
-    /**
-     * The openrdf services test suite data.
-     */
-    private static final String PREFIX = "openrdf-service/";
-    
 //  @Test
     public void test1() throws Exception{
         prepareTest(PREFIX+"data01.ttl", Arrays.asList(PREFIX+"data01endpoint.ttl"));
@@ -380,11 +377,18 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
 
 //  @Test
-    public void test2() throws Exception {      
+    public void test2() throws Exception {
+//        if(false) {
+//        final BigdataValueFactory f = (BigdataValueFactory) localSail.getValueFactory();
+//        final BigdataValue[] values = new BigdataValue[] {
+//                f.createURI("http://example.org/a"),
+//                f.createURI("http://example.org/b"),
+//        };
+//        localSail.getDatabase().getLexiconRelation().addTerms(values, values.length, false/*readOnly*/);
+//        }
         prepareTest(null, Arrays.asList(PREFIX+"data02endpoint1.ttl", PREFIX+"data02endpoint2.ttl"));
         execute(PREFIX+"service02.rq", PREFIX+"service02.srx", false);          
     }
-    
     
 //  @Test
     public void test3() throws Exception {      
@@ -395,7 +399,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 //  @Test
     public void test4() throws Exception {      
         prepareTest(PREFIX+"data04.ttl", Arrays.asList(PREFIX+"data04endpoint.ttl"));
-        execute(PREFIX+"service04.rq", PREFIX+"service04.srx", false);          
+//        System.err.println(localSail.getDatabase().dumpStore());
+        execute(PREFIX+"service04.rq", PREFIX+"service04.srx", false);
     }
     
     // @Test
@@ -492,20 +497,22 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     /**
      * This is a manual test to see the Fallback in action. Query asks
      * DBpedia, which does not support BINDINGS
-     * 
-     * @throws Exception
+     *<p> 
+     * Note: Bigdata is not doing automatic fallback. You have to explicitly
+     * make a note of services which do not support SPARQL 1.1.
      */
     public void test12() throws Exception {
-        /*
-         * TODO Enable once I debug the service ASTs. It was running this query
-         * multiple times (or perhaps without appropriate constraints) for some
-         * reason and there is no reason to put that load onto dbPedia.
-         */
-        fail("Enable test");
-        /* test vectored join with more intermediate results */
-        // clears the repository and adds new data + execute
-        prepareTest(PREFIX+"data12.ttl", Collections.<String>emptyList());
-        execute(PREFIX+"service12.rq", PREFIX+"service12.srx", false);      
+        final URI serviceURI = new URIImpl("http://dbpedia.org/sparql");
+        ServiceRegistry.getInstance().add(serviceURI,
+                new RemoteServiceFactoryImpl(false/* isSparql11 */));
+        try {
+            /* test vectored join with more intermediate results */
+            // clears the repository and adds new data + execute
+            prepareTest(PREFIX + "data12.ttl", Collections.<String> emptyList());
+            execute(PREFIX + "service12.rq", PREFIX + "service12.srx", false);
+        } finally {
+            ServiceRegistry.getInstance().remove(serviceURI);
+        }
     }
     
     public void test13() throws Exception {
