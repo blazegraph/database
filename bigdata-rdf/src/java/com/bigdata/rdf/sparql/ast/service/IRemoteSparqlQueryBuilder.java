@@ -58,18 +58,19 @@ public interface IRemoteSparqlQueryBuilder {
      */
     String getSparqlQuery(final BindingSet[] bindingSets);
  
-//    /**
-//     * If necessary, decorrelate or filter the solutions from the service. For
-//     * example, this may be used to "reverse" the UNION pattern in which the
-//     * variables were rewritten. If the query was produced using the simplest
-//     * transform (no correlated blank nodes in the solutions and the end point
-//     * supports BINDINGS) then just return the argument.
-//     * 
-//     * @param bindingSets
-//     *            The solutions received from the remote SPARQL end point.
-//     *            
-//     * @return The solutions.
-//     */
-//    BindingSet[] getSolutions(final BindingSet[] serviceSolutions);
-    
+    // /**
+    // * If necessary, decorrelate, filter, or otherwise translate the solutions
+    // from the service. For
+    // * example, this may be used to "reverse" the UNION pattern in which the
+    // * variables were rewritten. If the query was produced using the simplest
+    // * transform (no correlated blank nodes in the solutions and the end point
+    // * supports BINDINGS) then just return the argument.
+    // *
+    // * @param bindingSets
+    // * The solutions received from the remote SPARQL end point.
+    // *
+    // * @return The solutions.
+    // */
+    // BindingSet[] getSolutions(final BindingSet[] serviceSolutions);
+
 }
