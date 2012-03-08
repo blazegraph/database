@@ -41,8 +41,15 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -63,11 +70,15 @@ public class ASTBindingAssigner implements IASTOptimizer {
     
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, //final DatasetNode dataset,
-            final IBindingSet[] bindingSet) {
+            final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
         if (bindingSet == null || bindingSet.length > 1) {
-            // used iff there is only one input solution.
+            /*
+             * Used iff there is only one input solution.
+             * 
+             * TODO We can still apply this when there are multiple solutions if
+             * any variable is bound to the same constant in all solutions.
+             */
             return queryNode;
         }
 
@@ -79,18 +90,69 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        // Only transform the WHERE clause.
-        final IGroupNode<?> whereClause = queryRoot.getWhereClause();
+        {
+            
+            @SuppressWarnings("unchecked")
+            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
+                    .getWhereClause();
 
-        if (whereClause == null)
-            return queryNode;
+            if (whereClause != null) {
+
+                doBindingAssignment(whereClause, bset);
+
+            }
+
+        }
 
         /*
-         * Gather the VarNodes for variables which have bindings.
+         * Examine each named subquery. If there is more than one ServiceNode,
+         * or if a ServiceNode is embedded in a subquery, then lift it out into
+         * its own named subquery root, replacing it with a named subquery
+         * include.
          */
+        if (queryRoot.getNamedSubqueries() != null) {
+
+            final NamedSubqueriesNode namedSubqueries = queryRoot
+                    .getNamedSubqueries();
+
+            /*
+             * Note: This loop uses the current size() and get(i) to avoid
+             * problems with concurrent modification during visitation.
+             */
+            for (int i = 0; i < namedSubqueries.size(); i++) {
+            
+                final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
+                        .get(i);
+
+                @SuppressWarnings("unchecked")
+                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+                        .getWhereClause();
+
+                if (whereClause == null)
+                    continue;
+
+                doBindingAssignment(whereClause, bset);
+
+            }
+
+        }
         
-        final Map<VarNode,ConstantNode> replacements = new LinkedHashMap<VarNode, ConstantNode>();
-        
+        return queryNode;
+
+    }
+    
+    /**
+     * Gather the VarNodes for variables which have bindings.
+     * <p>
+     * Gather variables which are in a FILTER(sameTerm(var,const)) or
+     * FILTER(sameTerm(const,var)) expression.
+     */
+    private void doBindingAssignment(
+            final GroupNodeBase<IGroupMemberNode> whereClause,
+            final IBindingSet bset) {
+
+        final Map<VarNode, ConstantNode> replacements = new LinkedHashMap<VarNode, ConstantNode>();
+
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIterator((BOp) whereClause);
 
@@ -98,47 +160,44 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
             final BOp node = (BOp) itr.next();
 
-            if (!(node instanceof VarNode))
-                continue;
-
-            final VarNode varNode = (VarNode) node;
-
-            if(replacements.containsKey(varNode))
-                continue;
-            
-            final IVariable<IV> var = varNode.getValueExpression();
-
-            if (bset.isBound(var)) {
+            if (node instanceof FilterNode) {
 
                 /*
-                 * Replace the variable with the constant from the binding set,
-                 * but preserve the reference to the variable on the Constant.
+                 * Gather variables which are in a FILTER(sameTerm(var,const))
+                 * or FILTER(sameTerm(const,var)) expression.
+                 */
+                tryReplace(replacements, (FilterNode) node);
+                continue;
+            }
+
+            if (node instanceof VarNode) {
+
+                /*
+                 * Gather the VarNodes for variables which have bindings.
                  */
 
-                final IV asBound = (IV) bset.get(var).get();
+                final VarNode varNode = (VarNode) node;
 
-                final ConstantNode constNode = new ConstantNode(
-                        new Constant<IV>(var, asBound));
+                if (replacements.containsKey(varNode))
+                    continue;
 
-                if (log.isInfoEnabled())
-                    log.info("Will replace: var=" + var + " with " + asBound
-                            + " (" + constNode + ")");
+                tryReplace(replacements, varNode, bset);
 
-                replacements.put(varNode, constNode);
-                
             }
 
         }
 
         int ntotal = 0;
-        
-        for(Map.Entry<VarNode, ConstantNode> e : replacements.entrySet()) {
+
+        for (Map.Entry<VarNode, ConstantNode> e : replacements.entrySet()) {
 
             final VarNode oldVal = e.getKey();
+
             final ConstantNode newVal = e.getValue();
 
-            final int nmods = ((ASTBase) whereClause).replaceAllWith(oldVal,
-                    newVal);
+            int nmods = ((ASTBase) whereClause).replaceAllWith(oldVal, newVal);
+
+            nmods += ((ASTBase) whereClause).replaceAllWith(oldVal, newVal);
 
             if (log.isInfoEnabled())
                 log.info("Replaced " + nmods + " instances of " + oldVal
@@ -147,14 +206,106 @@ public class ASTBindingAssigner implements IASTOptimizer {
             assert nmods > 0; // Failed to replace something.
 
             ntotal += nmods;
-            
+
         }
 
         if (log.isInfoEnabled())
             log.info("Replaced " + ntotal + " instances of "
                     + replacements.size() + " bound variables with constants");
 
-        return queryNode;
+    }
+
+    /**
+     * Gather the VarNodes for variables which have bindings.
+     * 
+     * @param replacements
+     * @param varNode
+     * @param bset
+     * 
+     */
+    private void tryReplace(final Map<VarNode, ConstantNode> replacements,
+            final VarNode varNode, final IBindingSet bset) {
+
+        @SuppressWarnings("rawtypes")
+        final IVariable<IV> var = varNode.getValueExpression();
+
+        if (bset.isBound(var)) {
+
+            /*
+             * Replace the variable with the constant from the binding
+             * set, but preserve the reference to the variable on the
+             * Constant.
+             */
+
+            @SuppressWarnings("rawtypes")
+            final IV asBound = (IV) bset.get(var).get();
+
+//            @SuppressWarnings("rawtypes")
+//            final ConstantNode constNode = new ConstantNode(
+//                    new Constant<IV>(var, asBound));
+
+            willReplace(replacements, varNode, asBound);
+
+        }
+
+    }
+
+    /**
+     * Gather variables which are in a FILTER(sameTerm(var,const)) or
+     * FILTER(sameTerm(const,var)) expression.
+     * 
+     * @param replacements
+     * @param o
+     */
+    private void tryReplace(final Map<VarNode, ConstantNode> replacements,
+            final FilterNode filter) {
+        
+        final IValueExpressionNode vexpr = filter.getValueExpressionNode();
+        
+        if(!(vexpr instanceof FunctionNode))
+            return;
+        
+        final FunctionNode functionNode = (FunctionNode) vexpr;
+        
+        if (!functionNode.getFunctionURI().equals(
+                FunctionRegistry.SAME_TERM))
+            return;
+
+        final IValueExpressionNode left = (IValueExpressionNode) functionNode
+                .get(0);
+        
+        final IValueExpressionNode right = (IValueExpressionNode) functionNode
+                .get(1);
+
+        if (left instanceof VarNode && right instanceof ConstantNode) {
+
+            willReplace(replacements, (VarNode) left,
+                    ((ConstantNode) right).getValueExpression().get());
+
+        } else if (left instanceof ConstantNode && right instanceof VarNode) {
+
+            willReplace(replacements, (VarNode) right,
+                    ((ConstantNode) left).getValueExpression().get());
+
+        }
+        
+    }
+
+    private void willReplace(final Map<VarNode, ConstantNode> replacements,
+            final VarNode varNode, final IV<?, ?> asBound) {
+
+        if (replacements.containsKey(varNode))
+            return;
+
+        @SuppressWarnings("rawtypes")
+        final ConstantNode constNode = new ConstantNode(new Constant<IV>(
+                varNode.getValueExpression(), asBound));
+
+        if (log.isInfoEnabled())
+            log.info("Will replace: var=" + varNode + " with (" + asBound + ") as "
+                    + constNode);
+
+        replacements.put(varNode, constNode);
 
     }
 

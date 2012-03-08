@@ -3675,7 +3675,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IValueExpression<? extends IV> ve2 = new Constant<IV>(
                 ve.get(EmptyBindingSet.INSTANCE));
 
-        System.err.println("ve=" + ve + " => " + ve2);
+//        System.err.println("ve=" + ve + " => " + ve2);
 
         return ve2;
 
