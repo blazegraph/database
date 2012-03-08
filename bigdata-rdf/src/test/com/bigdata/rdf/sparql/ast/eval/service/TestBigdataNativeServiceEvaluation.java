@@ -49,6 +49,12 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestServiceInternal.java 6053 2012-02-29 18:47:54Z thompsonbry
  *          $
+ * 
+ *          TODO Write test which uses a variable for the service reference, but
+ *          where the service always resolves to a known service. Verify
+ *          evaluation with an empty solution in. Maybe write an alternative
+ *          test which does the same thing with multiple source solutions in
+ *          (e.g., using BINDINGS in the SPARQL query).
  */
 public class TestBigdataNativeServiceEvaluation extends
         AbstractDataDrivenSPARQLTestCase {
@@ -208,22 +214,6 @@ public class TestBigdataNativeServiceEvaluation extends
             
         }
         
-    }
-    
-    /**
-     * FIXME Write test which uses a variable for the service reference, but
-     * where the service always resolves to a known service. Verify evaluation
-     * with an empty solution in. Maybe write an alternative test which does the
-     * same thing with multiple source solutions in (e.g., using BINDINGS in the
-     * SPARQL query).
-     * <p>
-     * The join variables SHOULD be a non-empty set for this case unless the
-     * incoming variables are only MAYBE bound due to an OPTIONAL construct.
-     * Write a test for that case too and write tests of the static analysis of
-     * the join and projected variables for a SERVICE call.
-     */
-    public void test_service_005() {
-        fail("write test");
     }
     
 }
