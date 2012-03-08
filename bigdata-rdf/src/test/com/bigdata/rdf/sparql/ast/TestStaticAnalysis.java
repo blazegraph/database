@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -46,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSubGroupJoinVarOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
@@ -941,10 +943,6 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
      * statement patterns below will be transformed into a {@link ServiceNode}.
      * Since there is nothing else in the main query's WHERE clause, the
      * {@link ServiceNode} is not lifted out into a named subquery.
-     * 
-     * TODO This could be redone using the SPARQL SERVICE syntax once we
-     * integrate with Sesame 2.5.1, which has support for that syntax in the
-     * parser.
      */
     public void test_static_analysis_serviceCall() throws MalformedQueryException {
 
@@ -1022,6 +1020,226 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             }
         }
         
+    }
+
+    /**
+     * Test suite for predicting the join variables for a SERVICE call.
+     * 
+     * <pre>
+     * SELECT ?s ?o1 ?o2
+     * {
+     *   SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {
+     *   ?s ?p ?o1 . }
+     *   OPTIONAL {
+     *     SERVICE <http://localhost:18080/openrdf/repositories/endpoint2> {
+     *     ?s ?p2 ?o2 }
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_static_analysis_serviceCall2() throws MalformedQueryException {
+
+        final String queryStr = "SELECT ?s ?o1 ?o2\n"//
+                + "{\n"//
+                + "  SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {\n"//
+                + "  ?s ?p ?o1 . }\n"//
+                + "  OPTIONAL {\n"//
+                + "    SERVICE <http://localhost:18080/openrdf/repositories/endpoint2> {\n"//
+                + "    ?s ?p2 ?o2 }\n"//
+                + "  }\n"//
+                + "}";
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+
+        // Assign join variables to join groups.
+        queryRoot = (QueryRoot) new ASTSubGroupJoinVarOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
+
+        if (log.isInfoEnabled())
+            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
+                    + BOpUtility.toString(queryRoot));
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        /**
+         * Locate the various pieces of the AST.
+         * 
+         * <pre>
+         * 
+         * QueryType: SELECT
+         * SELECT VarNode(s) VarNode(o1) VarNode(o2)
+         *   JoinGroupNode {
+         *     SERVICE <ConstantNode(TermId(0U)[http://localhost:18080/openrdf/repositories/endpoint1])> {
+         *       JoinGroupNode {
+         *         StatementPatternNode(VarNode(s), VarNode(p), VarNode(o1), DEFAULT_CONTEXTS)
+         *       }
+         *     }
+         *     JoinGroupNode [optional] {
+         *       SERVICE <ConstantNode(TermId(0U)[http://localhost:18080/openrdf/repositories/endpoint2])> {
+         *         JoinGroupNode {
+         *           StatementPatternNode(VarNode(s), VarNode(p2), VarNode(o2), DEFAULT_CONTEXTS)
+         *         }
+         *       }
+         *     }
+         *   }
+         * </pre>
+         */
+        final GraphPatternGroup<?> whereClause = queryRoot.getWhereClause();
+        final ServiceNode endpoint1;
+        final JoinGroupNode optionalGroup;
+        final ServiceNode endpoint2;
+        {
+         
+            endpoint1 = (ServiceNode) whereClause.get(0);
+            
+            assertEquals(endpoint1.getServiceRef().getValue(), new URIImpl(
+                    "http://localhost:18080/openrdf/repositories/endpoint1"));
+
+            optionalGroup = (JoinGroupNode) whereClause.get(1);
+            
+            assertTrue(optionalGroup.isOptional());
+
+            endpoint2 = (ServiceNode) optionalGroup.get(0);
+            
+            assertEquals(endpoint2.getServiceRef().getValue(), new URIImpl(
+                    "http://localhost:18080/openrdf/repositories/endpoint2"));
+
+//            final Iterator<ServiceNode> itr = BOpUtility.visitAll(
+//                    whereClause, ServiceNode.class);
+//            
+//            endpoint1 = itr.next();
+//            
+//            assertEquals(endpoint1.getServiceRef().getValue(), new URIImpl(
+//                    "http://localhost:18080/openrdf/repositories/endpoint1"));
+//
+//            endpoint2 = itr.next();
+//            
+//            assertEquals(endpoint2.getServiceRef().getValue(), new URIImpl(
+//                    "http://localhost:18080/openrdf/repositories/endpoint2"));
+//            
+//            assertFalse(itr.hasNext());
+
+        }
+        
+        {
+            // variables which must be bound in the top-level query's
+            // projection.
+            {
+
+                final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
+
+                expectedProjected.add(Var.var("s"));
+                expectedProjected.add(Var.var("o1"));
+
+                assertEquals(expectedProjected,
+                        sa.getDefinitelyProducedBindings(queryRoot));
+                
+            }
+
+            // variables which must be bound in the main query's where clause.
+            {
+
+                final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+                expected.add(Var.var("s"));
+                expected.add(Var.var("p"));
+                expected.add(Var.var("o1"));
+
+                assertEquals(expected, sa.getDefinitelyProducedBindings(
+                        queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+
+            // variables which may be bound in the main query's where clause.
+            {
+
+                final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+                expected.add(Var.var("s"));
+                expected.add(Var.var("p"));
+                expected.add(Var.var("o1"));
+                expected.add(Var.var("p2"));
+                expected.add(Var.var("o2"));
+
+                assertEquals(expected, sa.getMaybeProducedBindings(
+                        queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+
+        }
+
+        // variables which must be bound by endpoint1.
+        {
+
+            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+            expected.add(Var.var("s"));
+            expected.add(Var.var("p"));
+            expected.add(Var.var("o1"));
+
+            assertEquals(expected, sa.getDefinitelyProducedBindings(endpoint1,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+        
+        // variables which must be bound by endpoint2.
+        {
+
+            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+            expected.add(Var.var("s"));
+            expected.add(Var.var("p2"));
+            expected.add(Var.var("o2"));
+
+            assertEquals(expected, sa.getDefinitelyProducedBindings(endpoint2,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        // ServiceCallJoin variables for endpoint1
+        {
+            
+            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+            assertEquals(expected, sa.getJoinVars(endpoint1,
+                    new LinkedHashSet<IVariable<?>>()));
+            
+        }
+
+        // ServiceCallJoin variables for endpoint2
+        {
+            
+            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+            expected.add(Var.var("s"));
+
+            assertEquals(expected, sa.getJoinVars(endpoint2,
+                    new LinkedHashSet<IVariable<?>>()));
+            
+        }
+
+        // Join with the OPTIONAL group.
+        {
+            
+            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+            expected.add(Var.var("s"));
+
+            final Set<IVariable<?>> actual = new HashSet<IVariable<?>>();
+            for (IVariable<?> v : optionalGroup.getJoinVars()) {
+                actual.add(v);
+            }
+
+            assertEquals(expected, actual);
+            
+        }
+
     }
 
     /**

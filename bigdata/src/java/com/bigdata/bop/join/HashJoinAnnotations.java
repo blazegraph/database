@@ -44,8 +44,8 @@ public interface HashJoinAnnotations {
      * <p>
      * Note: The source solutions presented to a hash join MUST have bindings
      * for the {@link #JOIN_VARS} in order to join (source solutions can still
-     * be pass on as optionals, but they will not join unless the join variables
-     * are not bound).
+     * be passed on as optionals, but they will not join unless the join
+     * variables are not bound).
      * <p>
      * Note: If no join variables are specified, then the join will consider the
      * N x M cross product, filtering for solutions which join. This is very

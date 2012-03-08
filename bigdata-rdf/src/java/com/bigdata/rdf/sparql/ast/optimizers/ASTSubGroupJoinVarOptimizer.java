@@ -52,8 +52,9 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+        
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
@@ -96,19 +97,33 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             final GraphPatternGroup<IGroupMemberNode> group) {
 
         if (group.getParentGraphPatternGroup() != null) {
-            
+
+            /*
+             * The variables which will be definitely bound based on an analysis
+             * of the group.
+             */
+            final Set<IVariable<?>> boundByGroup = sa
+                    .getDefinitelyProducedBindings(group,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */);
+
             /*
              * Find the set of variables which will be definitely bound by the
-             * time the sub-group is evaluated.
+             * time the group is evaluated.
              */
-            final Set<IVariable<?>> incomingBound = sa
+            final Set<IVariable<?>> incomingBindings = sa
                     .getDefinitelyIncomingBindings(
                             (GraphPatternGroup<?>) group,
                             new LinkedHashSet<IVariable<?>>());
 
+            /*
+             * This is only those variables which are bound on entry into the group
+             * in which the SERVICE join appears *and* which are "must" bound
+             * variables projected by the SERVICE.
+             */
+            boundByGroup.retainAll(incomingBindings);
+
             @SuppressWarnings("rawtypes")
-            final IVariable[] joinVars = incomingBound
-                    .toArray(new IVariable[0]);
+            final IVariable[] joinVars = boundByGroup.toArray(new IVariable[0]);
 
             group.setJoinVars(joinVars);
 

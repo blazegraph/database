@@ -25,8 +25,6 @@ package com.bigdata.bop;
 
 import java.util.Collections;
 
-import com.bigdata.rdf.internal.IV;
-
 
 /**
  * A constant.
@@ -239,31 +237,6 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         if(value.equals(otherValue))
             return true;
 
-        /*
-         * Look for two MockIVs which are associated with the same variable.
-         */
-        if(value instanceof IV && otherValue instanceof IV) {
-            
-            @SuppressWarnings({ "rawtypes" })
-            final IV c1 = (IV) value;
-
-            @SuppressWarnings({ "rawtypes" })
-            final IV c2 = (IV) otherValue;
-
-            if (c1.isNullIV() && c2.isNullIV()) {
-
-                if (getProperty(Constant.Annotations.VAR) == ((Constant<?>) o)
-                        .getProperty(Constant.Annotations.VAR)) {
-
-                    // Two MockIVs associated with the same variable.
-                    return true;
-
-                }
-                
-            }
-
-        }
-        
         return false;
         
     }

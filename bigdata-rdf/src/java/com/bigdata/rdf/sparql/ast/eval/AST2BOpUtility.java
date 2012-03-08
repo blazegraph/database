@@ -855,6 +855,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // Anything which can flow out of the SERVICE is "projected".
         final Set<IVariable<?>> projectedVars = ctx.sa
                 .getMaybeProducedBindings(serviceNode);
+
         // Set on the ServiceNode
         serviceNode.setProjectedVars(projectedVars);
         
@@ -906,8 +907,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * is Ok if there are no join variables, but it means that we will do
          * a full cross product of the solutions vectored into a SERVICE call
          * and the solutions flowing out of that SERVICE call.
-         * 
-         * FIXME TEST SUITE for predicting service node join vars.
          */
         final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
                 serviceNode, new LinkedHashSet<IVariable<?>>());
