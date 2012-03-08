@@ -176,11 +176,12 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 //        final VarNode o = new VarNode("o");
 //        
 //        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
+        final IV c12 = makeIV(store.getValueFactory().createLiteral(12));
 
         final IBindingSet[] bsets = new IBindingSet[] { //
         new ListBindingSet(//
                 new IVariable[] { Var.var("s") },//
-                new IConstant[] { new Constant<IV>(TermId.mockIV(VTE.URI))}) //
+                new IConstant[] { new Constant<IV>(c12)}) //
         };
 
         // The source AST.
@@ -209,11 +210,11 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(//
-                    new ConstantNode(new Constant((IVariable) Var.var("s"),
-                            TermId.mockIV(VTE.URI))), //
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("s"), c12)), //
                     new VarNode("p"),//
-                    new ConstantNode(new Constant((IVariable) Var.var("s"),
-                            TermId.mockIV(VTE.URI))), //
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("s"), c12)), //
                     null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
@@ -317,7 +318,7 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
                 given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
-        System.err.println(actual.toString());
+//        System.err.println(actual.toString());
     }
 
 }

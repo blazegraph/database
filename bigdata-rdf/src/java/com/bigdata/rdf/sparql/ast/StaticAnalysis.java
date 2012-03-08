@@ -1449,7 +1449,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
-     * Report "MUST" bound bindings projected by the service. This involves
+     * Report "MUST" bound bindings projected by the SERVICE. This involves
      * checking the graph pattern reported by {@link ServiceNode#getGraphPattern()}
      * . Bindings visible in the parent group are NOT projected into a SERVICE.
      * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
@@ -1459,11 +1459,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * permitted, then this code needs to be reviewed.
      */
     // MUST : ServiceNode
-    public Set<IVariable<?>> getDefinitelyProducedBindings(final ServiceNode node) {
+    public Set<IVariable<?>> getDefinitelyProducedBindings(
+            final ServiceNode node) {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-        
-        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGraphPattern();
+
+        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node
+                .getGraphPattern();
 
         if (graphPattern != null) {
 
@@ -1961,33 +1963,31 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * @param serviceNode
      * @param vars
      * @return 
-     * 
-     * FIXME TEST SUITE for predicting service node join vars.
      */
     public Set<IVariable<?>> getJoinVars(final ServiceNode serviceNode,
             final Set<IVariable<?>> vars) {
 
         /*
-         * The variables which are projected by the subquery which will be
-         * definitely bound based on an analysis of the subquery.
+         * The variables which will be definitely bound based on an analysis of
+         * the SERVICE.
          */
-        final Set<IVariable<?>> boundBySubquery = getDefinitelyProducedBindings(serviceNode);
+        final Set<IVariable<?>> boundByService = getDefinitelyProducedBindings(serviceNode);
 
         /*
          * The variables which are definitely bound on entry to the join group
-         * in which the subquery appears.
+         * in which the SERVICE appears.
          */
         final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
                 serviceNode, new LinkedHashSet<IVariable<?>>());
         
         /*
          * This is only those variables which are bound on entry into the group
-         * in which the subquery join appears *and* which are "must" bound
-         * variables projected by the subquery.
+         * in which the SERVICE join appears *and* which are "must" bound
+         * variables projected by the SERVICE.
          */
-        boundBySubquery.retainAll(incomingBindings);
+        boundByService.retainAll(incomingBindings);
             
-        vars.addAll(boundBySubquery);
+        vars.addAll(boundByService);
 
         return vars;
 

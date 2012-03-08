@@ -578,7 +578,8 @@ public class ServiceCallJoin extends PipelineOp {
                                 op.getChunkCapacity(), sink2);
 
                 final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
-                        silent ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
+                        silent ? JoinTypeEnum.Optional : JoinTypeEnum.Normal
+                        );
 
                 // Pump the solutions into the hash map.
                 state.acceptSolutions(new SingleValueIterator<IBindingSet[]>(
