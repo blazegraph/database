@@ -33,10 +33,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.openrdf.model.URI;
@@ -50,8 +48,6 @@ import com.bigdata.rdf.sail.sparql.ast.ASTAggregate;
 import com.bigdata.rdf.sail.sparql.ast.ASTAnd;
 import com.bigdata.rdf.sail.sparql.ast.ASTAvg;
 import com.bigdata.rdf.sail.sparql.ast.ASTBNodeFunc;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingsClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTBound;
 import com.bigdata.rdf.sail.sparql.ast.ASTCeil;
 import com.bigdata.rdf.sail.sparql.ast.ASTCoalesce;
@@ -115,7 +111,6 @@ import com.bigdata.rdf.sail.sparql.ast.ASTSum;
 import com.bigdata.rdf.sail.sparql.ast.ASTTimezone;
 import com.bigdata.rdf.sail.sparql.ast.ASTTz;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpperCase;
-import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.ASTYear;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
