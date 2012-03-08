@@ -60,42 +60,6 @@ public class ConnegUtil {
     // private final TupleQueryResultFormat tupleQueryResultFormat;
 
     /**
-     * Extract and return the quality score for the mime type (defaults to
-     * <code>1.0</code>).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     *         TODO Lift out patterns.
-     */
-    private static class MiniMime {
-        public final float q;
-        public final String mimeType;
-        public final String[][] params;
-        public MiniMime(final String s) {
-            final String[] b = s.split(";");
-            mimeType = b[0];
-            float q = 1f;
-            params = new String[b.length][];
-            for (int i = 1; i < b.length; i++) {
-                final String c = b[i];
-                final String[] d = c.split("=");
-                if (d.length < 2)
-                    continue;
-                params[i] = d;
-//                params[i][0] = d[0];
-//                params[i][1] = d[1];
-                if (!d[0].equals("q"))
-                    continue;
-                q = Float.valueOf(d[1]);
-            }
-            if (log.isDebugEnabled())
-                log.debug("Considering: " + s + " :: q=" + q);
-            this.q = q;
-        }
-    }
-    
-    /**
      * 
      * @param acceptStr
      *            The <code>Accept</code> header.
@@ -119,7 +83,7 @@ public class ConnegUtil {
                 {
 
                     final RDFFormat rdfFormat = RDFFormat
-                            .forMIMEType(t.mimeType);
+                            .forMIMEType(t.getMimeType());
 
                     if (rdfFormat != null) {
 
@@ -133,7 +97,7 @@ public class ConnegUtil {
                 {
                 
                     final TupleQueryResultFormat tupleFormat = TupleQueryResultFormat
-                            .forMIMEType(t.mimeType);
+                            .forMIMEType(t.getMimeType());
 
                     if (tupleFormat != null) {
 
@@ -147,7 +111,7 @@ public class ConnegUtil {
                 {
                 
                     final BooleanQueryResultFormat booleanFormat = BooleanQueryResultFormat
-                            .forMIMEType(t.mimeType);
+                            .forMIMEType(t.getMimeType());
 
                     if (booleanFormat != null) {
 

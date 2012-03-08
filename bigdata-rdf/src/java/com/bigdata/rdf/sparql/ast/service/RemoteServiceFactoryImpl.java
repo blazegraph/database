@@ -46,7 +46,36 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class RemoteServiceFactoryImpl implements ServiceFactory {
 
-    private final RemoteServiceOptions serviceOptions = new RemoteServiceOptions();
+    private final RemoteServiceOptions serviceOptions;
+
+    /**
+     * Create a {@link ServiceFactory} for remote SPARQL end points.
+     * 
+     * @param isSparql11
+     *            <code>true</code> if the end points support SPARQL 1.1.
+     */
+    public RemoteServiceFactoryImpl(final boolean isSparql11) {
+        
+        this.serviceOptions = new RemoteServiceOptions();
+        
+        this.serviceOptions.setSparql11(isSparql11);
+        
+    }
+
+    /**
+     * Create a {@link ServiceFactory} for remote SPARQL end points.
+     * 
+     * @param serviceOptions
+     *            The configuration options for the end points.
+     */
+    public RemoteServiceFactoryImpl(final RemoteServiceOptions serviceOptions) {
+
+        if (serviceOptions == null)
+            throw new IllegalArgumentException();
+        
+        this.serviceOptions = serviceOptions;
+        
+    }
 
     @Override
     public RemoteServiceCall create(final AbstractTripleStore store,

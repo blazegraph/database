@@ -12,10 +12,6 @@ import com.bigdata.rdf.store.BD;
 
 /**
  * Registry for service calls.
- * 
- * TODO Should we restrict registration/management of services in the
- * {@link BD#NAMESPACE} to static initialization or otherwise secure the
- * registry?
  */
 public class ServiceRegistry {
 
@@ -44,12 +40,14 @@ public class ServiceRegistry {
         add(BD.SEARCH, new SearchServiceFactory());
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
-                new RemoteServiceFactoryImpl());
+                new RemoteServiceFactoryImpl(true/* isSparql11 */));
     }
 
     /**
      * Set the default {@link ServiceFactory}. This will be used when the
-     * serviceURI is not associated with an explicitly registered service.
+     * serviceURI is not associated with an explicitly registered service. For
+     * example, you can use this to control whether or not the service end point
+     * is assumed to support <code>SPARQL 1.0</code> or <code>SPARQL 1.1</code>.
      * 
      * @param defaultServiceFactory
      *            The default {@link ServiceFactory}.

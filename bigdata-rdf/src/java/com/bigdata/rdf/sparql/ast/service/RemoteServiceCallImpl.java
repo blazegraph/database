@@ -51,6 +51,7 @@ import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
+import com.bigdata.rdf.sail.webapp.MiniMime;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -186,8 +187,10 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
         final String contentType = conn.getContentType();
 
+        final MiniMime mimeType = new MiniMime(contentType);
+        
         final TupleQueryResultFormat format = TupleQueryResultFormat
-                .forMIMEType(contentType);
+                .forMIMEType(mimeType.getMimeType());
 
         if (format == null)
             throw new IOException(
