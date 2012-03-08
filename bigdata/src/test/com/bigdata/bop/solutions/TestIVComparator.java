@@ -38,6 +38,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -47,6 +48,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Test suite for {@link IVComparator}.
@@ -76,12 +78,6 @@ public class TestIVComparator extends TestCase2 {
                 .getInstance(namespace);
         
         /*
-         * Blank nodes.
-         */
-        final IV<BigdataBNode,Integer> inline_bnode1 = new NumericBNodeIV<BigdataBNode>(1); 
-        final IV<BigdataBNode,Integer> inline_bnode2 = new NumericBNodeIV<BigdataBNode>(2); 
-        
-        /*
          * Literals
          */
 
@@ -108,6 +104,18 @@ public class TestIVComparator extends TestCase2 {
         final IV<BigdataURI, Void> noninline_uri1 = new TermId<BigdataURI>(VTE.URI, termId++);
         final IV<BigdataURI, Void> noninline_uri2 = new TermId<BigdataURI>(VTE.URI, termId++);
         
+        /*
+         * Blank nodes.
+         */
+        final IV<BigdataBNode,Integer> inline_bnode1 = new NumericBNodeIV<BigdataBNode>(1); 
+        final IV<BigdataBNode,Integer> inline_bnode2 = new NumericBNodeIV<BigdataBNode>(2); 
+
+        final SidIV<BigdataBNode> sid1 = new SidIV<BigdataBNode>(new SPO(
+                noninline_uri1, noninline_uri2, noninline_plain_lit1));
+
+        final SidIV<BigdataBNode> sid2 = new SidIV<BigdataBNode>(new SPO(
+                inline_bnode1, noninline_uri2, inline_xsd_dateTime1));
+
         public V() {
 
             final DatatypeFactory df;
@@ -165,6 +173,8 @@ public class TestIVComparator extends TestCase2 {
 
         assertLT(c.compare(null, v.inline_xsd_byte1));
 
+        assertLT(c.compare(null, v.sid1));
+
     }
 
     /**
@@ -178,10 +188,33 @@ public class TestIVComparator extends TestCase2 {
         final IVComparator c = new IVComparator();
 
         assertLT(c.compare(null, v.inline_bnode1));
+        assertLT(c.compare(null, v.sid2));
 
         assertLT(c.compare(v.inline_bnode1, v.noninline_uri1));
+        assertLT(c.compare(v.sid2, v.noninline_uri1));
 
         assertLT(c.compare(v.noninline_uri1, v.inline_xsd_byte1));
+
+    }
+    
+    /**
+     * Unit test verifies that things compare equal to themselves.
+     */
+    public void test_equalToSelf() {
+
+        final V v = new V();
+
+        final IVComparator c = new IVComparator();
+
+        assertEQ(c.compare(null,null));
+        
+        assertEQ(c.compare(v.sid1, v.sid1));
+        
+        assertEQ(c.compare(v.inline_bnode1, v.inline_bnode1));
+        
+        assertEQ(c.compare(v.noninline_uri1, v.noninline_uri1));
+        
+        assertEQ(c.compare(v.inline_xsd_byte1, v.inline_xsd_byte1));
 
     }
     
@@ -201,16 +234,43 @@ public class TestIVComparator extends TestCase2 {
 
         // These are not the same bnode.
         assertNotSame(v.inline_bnode1, v.inline_bnode2);
+        assertNotSame(v.sid1, v.sid2);
 
         // The do not compare as EQ.
         assertTrue(0 != c.compare(v.inline_bnode1, v.inline_bnode2));
+        assertTrue(0 != c.compare(v.sid1, v.inline_bnode2));
+        assertTrue(0 != c.compare(v.sid1, v.sid2));
+        assertTrue(0 != c.compare(v.inline_bnode1, v.sid2));
 
-        if(v.inline_bnode1.compareTo(v.inline_bnode2)<0) {
+        if (v.inline_bnode1.compareTo(v.inline_bnode2) < 0) {
             assertLT(c.compare(v.inline_bnode1, v.inline_bnode2));
         } else {
             assertGT(c.compare(v.inline_bnode1, v.inline_bnode2));
         }
+
+        if (v.sid1.compareTo(v.sid2) < 0) {
+            assertLT(c.compare(v.sid1, v.sid2));
+        } else {
+            assertGT(c.compare(v.sid1, v.sid2));
+        }
+
+        /*
+         * Comparisons between SIDs and blank nodes. Order SIDs after normal
+         * blank nodes.
+         */
         
+//        if (v.inline_bnode1.compareTo(v.sid1) < 0) {
+            assertLT(c.compare(v.inline_bnode1, v.sid1));
+//        } else {
+//            assertGT(c.compare(v.inline_bnode1, v.sid1));
+//        }
+
+//        if (v.sid2.compareTo(v.inline_bnode2) < 0) {
+//            assertLT(c.compare(v.sid2, v.inline_bnode2));
+//        } else {
+            assertGT(c.compare(v.sid2, v.inline_bnode2));
+//        }
+
     }
     
     /**

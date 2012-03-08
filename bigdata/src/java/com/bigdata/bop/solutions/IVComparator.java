@@ -45,6 +45,7 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
@@ -54,6 +55,9 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * href="http://www.w3.org/TR/rdf-sparql-query/#modOrderBy">SPARQL Query
  * Language for RDF</a>. This implementation is based on the openrdf
  * {@link ValueComparator} but has been modified to work with {@link IV}s.
+ * <p>
+ * Note: {@link SidIV} are blank nodes. However, we order SIDs after normal
+ * blank nodes since they are modeling somewhat different information.
  * 
  * @author james
  * @author Arjohn Kampman
@@ -68,6 +72,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
      */
     private static final long serialVersionUID = 1L;
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public int compare(final IV o1, final IV o2) {
 
         // check equality
@@ -96,6 +101,19 @@ public class IVComparator implements Comparator<IV>, Serializable {
             return 1;
         }
 
+        // 2.5 Statement identifiers (SIDs)
+        final boolean s1 = o1.isStatement();
+        final boolean s2 = o2.isStatement();
+        if (s1 && s2) {
+            return compareSIDs(o1, o2);
+        }
+        if (s1) {
+            return -1;
+        }
+        if (s2) {
+            return 1;
+        }
+        
         // 3. IRIs
         final boolean u1 = o1.isURI();
         final boolean u2 = o2.isURI();
@@ -130,14 +148,31 @@ public class IVComparator implements Comparator<IV>, Serializable {
     }
 
     /**
+     * Use the natural ordering of the {@link SidIV}s when they are both SIDs
+     * nodes. This causes the solutions for the same {@link SidIV} to be
+     * "grouped".
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/505">
+     *      Exception when using SPARQL sort & statement identifiers </a>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private int compareSIDs(final IV leftSid, final IV rightSid) {
+
+        return leftSid.compareTo(rightSid);
+        
+    }
+
+    /**
      * Only difference here with Sesame ValueComparator is that we use
      * stringValue() instead of toString().
      */
-	private int compareURIs(URI leftURI, URI rightURI) {
-		return leftURI.stringValue().compareTo(rightURI.stringValue());
+    private int compareURIs(final URI leftURI, final URI rightURI) {
+
+        return leftURI.stringValue().compareTo(rightURI.stringValue());
+
 	}
 
-	private int compareLiterals(
+    private int compareLiterals(
 			final IV<BigdataLiteral, ?> left, final IV<BigdataLiteral, ?> right) {
 		
 		/*
@@ -147,8 +182,10 @@ public class IVComparator implements Comparator<IV>, Serializable {
     	if (left instanceof LiteralExtensionIV &&
     			right instanceof LiteralExtensionIV) {
     	
-    		final IV leftDatatype = ((LiteralExtensionIV) left).getExtensionIV();
+    		@SuppressWarnings("rawtypes")
+            final IV leftDatatype = ((LiteralExtensionIV) left).getExtensionIV();
     		
+    	    @SuppressWarnings("rawtypes")
     		final IV rightDatatype = ((LiteralExtensionIV) right).getExtensionIV();
     		
     		if (leftDatatype.equals(rightDatatype)) {
@@ -167,7 +204,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
 	 * Taken directly from Sesame's ValueComparator, no modification.  Handles
 	 * inlines nicely since they now implement the Literal interface.
 	 */
-	private int compareLiterals(Literal leftLit, Literal rightLit) {
+	private int compareLiterals(final Literal leftLit, final Literal rightLit) {
 		// Additional constraint for ORDER BY: "A plain literal is lower
 		// than an RDF literal with type xsd:string of the same lexical
 		// form."
@@ -239,7 +276,7 @@ public class IVComparator implements Comparator<IV>, Serializable {
 	/**
 	 * Taken directly from Sesame's ValueComparator, no modification.
 	 */
-	private int compareDatatypes(URI leftDatatype, URI rightDatatype) {
+    private int compareDatatypes(final URI leftDatatype, final URI rightDatatype) {
 		if (XMLDatatypeUtil.isNumericDatatype(leftDatatype)) {
 			if (XMLDatatypeUtil.isNumericDatatype(rightDatatype)) {
 				// both are numeric datatypes
