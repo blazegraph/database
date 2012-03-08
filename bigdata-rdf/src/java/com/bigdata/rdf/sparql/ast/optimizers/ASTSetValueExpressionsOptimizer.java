@@ -49,7 +49,9 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Visit all the value expression nodes and convert them into value expressions
- * using {@link AST2BOpUtility#toVE(String, IValueExpressionNode)}.
+ * using {@link AST2BOpUtility#toVE(String, IValueExpressionNode)}. If a value
+ * expression can be evaluated to a constant, then it is replaced by that
+ * constant.
  * <p>
  * Note: <code>toVE()</code> is a NOP for {@link VarNode}s and
  * {@link ConstantNode}s. In fact, in only acts on the value expression of an

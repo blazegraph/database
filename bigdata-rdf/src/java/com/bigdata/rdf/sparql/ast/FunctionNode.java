@@ -178,6 +178,16 @@ public class FunctionNode extends ValueExpressionNode {
     }
 
     /**
+     * Return <code>t1 + t2</code> (aka ADD).
+     */
+    static public FunctionNode add(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.ADD, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
      * Return <code>sameTerm(t1,t2)</code> (aka EQ).
      */
     static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
