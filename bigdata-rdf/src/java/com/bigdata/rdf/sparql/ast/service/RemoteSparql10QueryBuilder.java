@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -181,9 +180,19 @@ public class RemoteSparql10QueryBuilder implements IRemoteSparqlQueryBuilder {
          */
         {
             sb.append("SELECT ");
-            for (IVariable<?> v : projectedVars) {
-                sb.append(" ?");
-                sb.append(v.getName());
+            if (projectedVars.isEmpty()) {
+                /*
+                 * Note: This is a dubious hack for openrdf federated query
+                 * testEmptyServiceBlock. Since there are no variables in the
+                 * service clause, it was sending an invalid SELECT expression.
+                 * It is now hacked to send a "*" instead.
+                 */
+                sb.append("*");
+            } else {
+                for (IVariable<?> v : projectedVars) {
+                    sb.append(" ?");
+                    sb.append(v.getName());
+                }
             }
             sb.append("\n");
         }
