@@ -40,6 +40,8 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -54,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 
     /**
@@ -90,11 +93,6 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         /*
          * Note: DO NOT share structures in this test!!!!
          */
-//        final VarNode s = new VarNode("s");
-//        final VarNode p = new VarNode("p");
-//        final VarNode o = new VarNode("o");
-//        
-//        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
 
         final IV mockIV = TermId.mockIV(VTE.URI);
         
@@ -186,18 +184,18 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         };
 
         // The source AST.
-        final QueryRoot input = new QueryRoot(QueryType.SELECT);
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("p"));
-            input.setProjection(projection);
+            given.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("s"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
-            input.setWhereClause(whereClause);
+            given.setWhereClause(whereClause);
 
         }
 
@@ -224,10 +222,102 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                expected/* queryNode */, bsets);
+                given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
 
+    }
+
+    /**
+     * Given
+     * 
+     * <pre>
+     * SELECT ?p CONST where {?s ?p ?o. FILTER( sameTerm(?o,12) ) }
+     * </pre>
+     * 
+     * Verify that the AST is rewritten as:
+     * 
+     * <pre>
+     * SELECT ?p CONST where {?s ?p CONST . FILTER( sameTerm(CONST,12) ) }
+     * </pre>
+     * 
+     * where CONST is the binding for <code>?o</code> given by the FILTER.
+     * <p>
+     * Note: For this unit test, a variable is replaced in more than one
+     * location in the AST.
+     * 
+     * TODO Variant where the roles of the variable and the constant within the
+     * FILTER are reversed.
+     */
+    public void test_astBindingAssigner_filter_sameTerm_Const() {
+
+        /*
+         * Note: DO NOT SHARE STRUCTURES IN THIS TEST.
+         */
+        
+        final IV c12 = makeIV(store.getValueFactory().createLiteral(12));
+
+        final IBindingSet[] bsets = new IBindingSet[] { //
+        new ListBindingSet()//
+        };
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+            given.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+            
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.sameTerm(
+                    new VarNode("o"), new ConstantNode(c12))));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+//            projection.addProjectionExpression(new AssignmentNode(new VarNode(
+//                    "o"), new ConstantNode(new Constant((IVariable) Var
+//                    .var("o"), c12))));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(//
+                    new VarNode("s"), //
+                    new VarNode("p"),//
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("o"), c12)), //
+                    null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.sameTerm(
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("o"), c12)),
+                    new ConstantNode(c12))));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTBindingAssigner();
+
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+        System.err.println(actual.toString());
     }
 
 }

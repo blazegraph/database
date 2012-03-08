@@ -641,6 +641,28 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
                 // A difference in the non-BOp value of the variable or
                 // constant.
 
+//                if (o1 instanceof Constant && o2 instanceof Constant) {
+//                    
+//                    @SuppressWarnings({ "rawtypes", "unchecked" })
+//                    final Constant<IV> c1 = (Constant<IV>) o1;
+//
+//                    @SuppressWarnings({ "rawtypes", "unchecked" })
+//                    final Constant<IV> c2 = (Constant<IV>) o2;
+//
+//                    if (c1.get().isNullIV() && c2.get().isNullIV()) {
+//                        
+//                        if (c1.getProperty(Constant.Annotations.VAR) == c2
+//                                .getProperty(Constant.Annotations.VAR)) {
+//                        
+//                            // Two MockIVs associated with the same variable.
+//                            return;
+//                            
+//                        }
+//                        
+//                    }
+//
+//                }
+                
                 fail("Expecting: " + o1 + ", actual=" + o2);
                 
             }
