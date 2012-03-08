@@ -58,6 +58,13 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("AST Optimizers");
 
         /*
+         * Test suite for converting from IValueExpressionNodes to
+         * IValueExpressions. Value expressions which can be evaluated to a
+         * constant are replaced by that constant during the conversion.
+         */
+        suite.addTestSuite(TestASTSetValueExpressionOptimizer.class);
+
+        /*
          * Test suite for AST rewrite which replaces a variable bound to a
          * constant in an input solution with that constant.
          */

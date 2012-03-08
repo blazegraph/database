@@ -20,6 +20,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -31,7 +32,9 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.bset.EndOp;
@@ -73,11 +76,14 @@ import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
+import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
+import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
@@ -3544,7 +3550,10 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
     /**
      * Convert an {@link IValueExpressionNode} (recursively) to an
-     * {@link IValueExpression}.
+     * {@link IValueExpression}. If the {@link IValueExpression} can be reduced
+     * to an {@link IConstant}, then that {@link IConstant} will be be returned
+     * instead. Either way, the {@link IValueExpression} is set on the
+     * {@link IValueExpressionNode} as a side effect.
      * 
      * @param lex
      *            The lexicon namespace.
@@ -3555,8 +3564,140 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * 
      * @see ASTSetValueExpressionsOptimizer
      */
+    @SuppressWarnings("rawtypes")
     public static final IValueExpression<? extends IV> toVE(final String lex,
             final IValueExpressionNode node) {
+
+        // Convert AST value expr node => IValueExpressionNode.
+        final IValueExpression<? extends IV> ve1 = toVE1(lex, node);
+
+        // Reduce IValueExpressionNode to constant when possible.
+        try {
+
+            final IValueExpression<? extends IV> ve2 = toVE2(ve1);
+
+            if (ve2 != ve1) {
+
+                // The IValueExpression was evaluated to an IConstant.
+                node.setValueExpression(ve2);
+
+                return ve2;
+
+            }
+
+            return ve1;
+
+        } catch (SparqlTypeErrorException ex) {
+
+            /*
+             * The value expression could not be evaluated to a constant at this
+             * time.
+             */
+
+            return ve1;
+
+        }
+        
+    }
+
+    /**
+     * Attempt to evaluate complex {@link IValueExpression}s (those which are
+     * not a simple {@link IVariable} or {@link IConstant}) against an empty
+     * binding set. If we can evaluate the {@link IValueExpression}, then return
+     * the result as an {@link IConstant}. Otherwise, return the original
+     * {@link IValueExpression}.
+     * 
+     * @param ve
+     *            The {@link IValueExpression}.
+     * 
+     * @return A new {@link IConstant} if a complex {@link IValueExpression} was
+     *         an effective constant and otherwise the argument.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the evaluation of the value expression at this time
+     *             resulted in a SPARQL type error.
+     */
+    @SuppressWarnings("rawtypes")
+    private static final IValueExpression<? extends IV> toVE2(
+            final IValueExpression<? extends IV> ve) {
+
+        if (ve instanceof IVariableOrConstant) {
+
+            /*
+             * Variables and constants can not be further reduced.
+             */
+
+            return ve;
+        }
+
+        /*
+         * Look for things that we can not resolve now.
+         * 
+         * Note: We need to scan the value expression recursively before we
+         * evaluate it in order to catch things like aggregates, BOUND(), and
+         * COALESCE() when nested inside of other value expressions.
+         */
+        {
+
+            final Iterator<BOp> itr = BOpUtility.preOrderIterator((BOp) ve);
+
+            while (itr.hasNext()) {
+
+                final BOp op = itr.next();
+                
+                if (op instanceof IAggregate) {
+
+                    /*
+                     * Aggregates can not be evaluated at this time.
+                     */
+
+                    return ve;
+
+                }
+
+                if (op instanceof IsBoundBOp || op instanceof CoalesceBOp) {
+
+                    /*
+                     * These handle unbound variables with special semantics and
+                     * can not be evaluated until we have an actual solution as
+                     * they will not throw a SparqlTypeErrorException for an
+                     * unbound variable.
+                     */
+
+                    return ve;
+
+                }
+
+            }
+
+        }
+            
+        final IValueExpression<? extends IV> ve2 = new Constant<IV>(
+                ve.get(EmptyBindingSet.INSTANCE));
+
+        System.err.println("ve=" + ve + " => " + ve2);
+
+        return ve2;
+
+    }
+
+    /**
+     * Convert an {@link IValueExpressionNode} (recursively) to an
+     * {@link IValueExpression}. The {@link IValueExpression} is set on the
+     * {@link IValueExpressionNode} as a side effect.
+     * 
+     * @param lex
+     *            The lexicon namespace.
+     * @param node
+     *            The expression to convert.
+     * 
+     * @return The converted expression.
+     * 
+     * @see ASTSetValueExpressionsOptimizer
+     */
+    @SuppressWarnings("rawtypes")
+    private static final IValueExpression<? extends IV> toVE1(final String lex,
+                final IValueExpressionNode node) {
 
         /*
          * Check to see if value expression has already been created and cached
@@ -3583,7 +3724,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final IValueExpressionNode valueExpr = assignment
                     .getValueExpressionNode();
 
-            @SuppressWarnings("rawtypes")
             final IValueExpression<? extends IV> ve = toVE(lex, valueExpr);
 
             return ve;
@@ -3599,7 +3739,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final ValueExpressionNode[] args = functionNode.args().toArray(
                     new ValueExpressionNode[functionNode.arity()]);
 
-            @SuppressWarnings("rawtypes")
             final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
                     lex, functionURI, scalarValues, args);
 

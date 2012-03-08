@@ -35,7 +35,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.CompareBOp.Annotations;
 
 /**
  * Compare two terms for exact equality. 
@@ -57,6 +56,7 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
 
     }
     
+    @SuppressWarnings("rawtypes")
     public SameTermBOp(final IValueExpression<? extends IV> left, 
     		final IValueExpression<? extends IV> right) {
     	
@@ -64,6 +64,7 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
         
     }
     
+    @SuppressWarnings("rawtypes")
     public SameTermBOp(final IValueExpression<? extends IV> left,
     		final IValueExpression<? extends IV> right, final CompareOp op) {
     	
@@ -97,11 +98,18 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
 
     public boolean accept(final IBindingSet bs) {
         
-    	final IV left = get(0).get(bs);
-    	final IV right = get(1).get(bs);
+    	@SuppressWarnings("rawtypes")
+        final IV left = get(0).get(bs);
+
+        // not yet bound
+        if (left == null)
+            throw new SparqlTypeErrorException(); 
+
+        @SuppressWarnings("rawtypes")
+        final IV right = get(1).get(bs);
 
     	// not yet bound
-    	if (left == null || right == null)
+    	if (right == null)
             throw new SparqlTypeErrorException(); 
 
         final CompareOp op = (CompareOp) getRequiredProperty(Annotations.OP);

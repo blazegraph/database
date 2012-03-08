@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
@@ -58,10 +57,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * optimizerList.optimize(tupleExpr, dataset, bindings);
  * replaceValues(dataset, tupleExpr, bindings); // yes.
  * </pre>
- * 
- * FIXME {@link ConstantOptimizer}. Rewrites the query replacing any aspect
- * which can be statically evaluated to a constant with that constant. The
- * implementation should consider variables, functions, and constants.
  * 
  * FIXME {@link CompareOptimizer}. Replaces Compare with SameTerm whenever
  * possible. (I think that we handle this in the {@link FunctionRegistry}, but
@@ -146,7 +141,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
         /**
          * Visit all the value expression nodes and convert them into value
-         * expressions.
+         * expressions. If a value expression can be evaluated to a constant,
+         * then it is replaced by that constant.
          */
         add(new ASTSetValueExpressionsOptimizer());
 

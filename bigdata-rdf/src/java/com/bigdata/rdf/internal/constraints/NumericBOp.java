@@ -59,6 +59,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
      * @param op
      *            The annotation specifying the operation to be performed on those operands.
      */
+    @SuppressWarnings("rawtypes")
     public NumericBOp(final IValueExpression<? extends IV> left, final NumericOp op) {
 
         this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op)));
@@ -96,6 +97,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
 
     }
 
+    @SuppressWarnings("rawtypes")
     public IValueExpression<? extends IV> left() {
         return get(0);
     }
@@ -104,8 +106,13 @@ public class NumericBOp extends IVValueExpression<IV>  {
         return (NumericOp) getRequiredProperty(Annotations.OP);
     }
 
-    public IV get(IBindingSet bindingSet) {
-        IV iv=get(0).get(bindingSet);
+    @SuppressWarnings("rawtypes")
+    public IV get(final IBindingSet bindingSet) {
+        
+        final IV iv = get(0).get(bindingSet);
+
+        if (iv == null)
+            throw new SparqlTypeErrorException();
 
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();

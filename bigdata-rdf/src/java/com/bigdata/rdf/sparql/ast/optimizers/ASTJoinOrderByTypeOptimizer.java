@@ -129,14 +129,19 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * <pre> 
      * 1. Pre-filters
      * 2. In-filters
-     *    Required joins:
-     * 3.   Service calls (Bigdata SEARCH)
-     * 4.   Subquery-includes
-     * 5.   Statement patterns
+     * x. Assignments with a constant
      * 
-     * 7. Sparql11 subqueries
-     * 8. Non-optional subgroups
-     * 9. Simple optionals & optional subgroups
+     *    Required joins:
+     *    
+     *   3. Service calls (Bigdata SEARCH)
+     *   4. Subquery-includes
+     *   5. Statement patterns
+     *   7. Sparql11 subqueries
+     *   8. Non-optional subgroups
+     *   
+     *   Optional joins:
+     *   9. Simple optionals & optional subgroups
+     * 
      * 10. Assignments
      * 11. Post-conditionals
      * </pre> 
