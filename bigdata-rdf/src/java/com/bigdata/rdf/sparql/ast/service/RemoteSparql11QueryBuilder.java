@@ -191,9 +191,19 @@ public class RemoteSparql11QueryBuilder implements IRemoteSparqlQueryBuilder {
          */
         {
             sb.append("SELECT ");
-            for (IVariable<?> v : projectedVars) {
-                sb.append(" ?");
-                sb.append(v.getName());
+            if (projectedVars.isEmpty()) {
+                /*
+                 * Note: This is a dubious hack for openrdf federated query
+                 * testEmptyServiceBlock. Since there are no variables in the
+                 * service clause, it was sending an invalid SELECT expression.
+                 * It is now hacked to send a "*" instead.
+                 */
+                sb.append("*");
+            } else {
+                for (IVariable<?> v : projectedVars) {
+                    sb.append(" ?");
+                    sb.append(v.getName());
+                }
             }
             sb.append("\n");
         }

@@ -30,6 +30,8 @@ package com.bigdata.bop.engine;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -266,8 +268,14 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
     
             if (actual.hasNext()) {
     
-                fail("Iterator will deliver too many objects.");
-    
+                final List<T> remaining = new LinkedList<T>();
+                
+                while(actual.hasNext())
+                    remaining.add(actual.next());
+                
+                fail("Iterator will deliver too many objects: remaining="
+                        + remaining);
+
             }
     
         } finally {

@@ -52,7 +52,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
-import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
@@ -2026,4 +2025,663 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 //
 //    }
 
+    /**
+     * Setup a problem based on the following query, which is
+     * <code>service02</code> from the openrdf SPARQL 1.1 Federated Query test
+     * suite. 
+     * 
+     * <pre>
+     * SELECT ?s ?o1 ?o2
+     * {
+     *   SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {
+     *   ?s ?p ?o1 . }
+     *   OPTIONAL {
+     *     SERVICE <http://localhost:18080/openrdf/repositories/endpoint2> {
+     *     ?s ?p2 ?o2 }
+     *   }
+     * }
+     * </pre>
+     * 
+     * Solutions for endpoint1:
+     * 
+     * <pre>
+     * { s=http://example.org/a, p=http://xmlns.com/foaf/0.1/name, o1="Alan" }
+     * { s=http://example.org/b, p=http://xmlns.com/foaf/0.1/name, o1="Bob" }
+     * </pre>
+     * 
+     * Solutions for endpoint2:
+     * 
+     * <pre>
+     * { s=http://example.org/a, p2=http://xmlns.com/foaf/0.1/interest, o2="SPARQL 1.1 Basic Federated Query" }
+     * </pre>
+     */
+    static public class JoinSetup_service02 {
+
+        public final String namespace;
+
+        public final IV<?, ?> a, b, foafName, alan, bob, foafInterest, label;
+
+        public JoinSetup_service02(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+            
+            this.namespace = namespace;
+
+            a = makeIV(new URIImpl("http://example.org/a"));
+            
+            b = makeIV(new URIImpl("http://example.org/b"));
+
+            foafName = makeIV(new URIImpl("http://xmlns.com/foaf/0.1/name"));
+
+            alan = makeIV(new LiteralImpl("Alan"));
+
+            bob = makeIV(new LiteralImpl("Bob"));
+
+            foafInterest = makeIV(new URIImpl("http://xmlns.com/foaf/0.1/interest"));
+            
+            label = makeIV(new LiteralImpl("SPARQL 1.1 Basic Federated Query"));
+            
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+        /**
+         * Solutions for end point 1.
+         * 
+         * <pre>
+         * { s=http://example.org/a, p=http://xmlns.com/foaf/0.1/name, o1="Alan" }
+         * { s=http://example.org/b, p=http://xmlns.com/foaf/0.1/name, o1="Bob" }
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getLeft1() {
+
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p = Var.var("p");
+            final IVariable<?> o1 = Var.var("o1");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alan));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(b));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(bob));
+            left.add(tmp);
+
+            return left;
+        }
+
+        /**
+         * Solutions for end point 2.
+         * 
+         * <pre>
+         * { s=http://example.org/a, p2=http://xmlns.com/foaf/0.1/interest, o2="SPARQL 1.1 Basic Federated Query" }
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getRight1() {
+
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p2 = Var.var("p2");
+            final IVariable<?> o2 = Var.var("o2");
+
+            // The right solutions (the hash index).
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p2, new Constant<IV>(foafInterest));
+            tmp.set(o2, new Constant<IV>(label));
+            right.add(tmp);
+
+            return right;
+
+        }
+        
+        /**
+         * Solutions for the ServiceCallJoin with end point 2. It combines the
+         * first left solution with the first (and only) right solution.
+         * 
+         * <pre>
+         *     <result>
+         *       <binding name="s"><uri>http://example.org/a</uri></binding>
+         *       p=foaf:name
+         *       <binding name="o1"><literal>Alan</literal></binding>
+         *       p2=foaf:interest
+         *       <binding name="o2"><literal>SPARQL 1.1 Basic Federated Query</literal></binding>
+         *     </result>
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getServiceCall2JoinSolutions() {
+            
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p = Var.var("p");
+            final IVariable<?> o1 = Var.var("o1");
+            final IVariable<?> p2 = Var.var("p2");
+            final IVariable<?> o2 = Var.var("o2");
+
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alan));
+            tmp.set(p2, new Constant<IV>(foafInterest));
+            tmp.set(o2, new Constant<IV>(label));
+            right.add(tmp);
+
+            return right;
+
+        }
+
+    }
+
+    /**
+     * Unit test for the 2nd SERVICE hash join for {@link JoinSetup_service02}. 
+     */
+    public void test_service02() {
+        
+        final JoinSetup_service02 setup = new JoinSetup_service02(getName());
+        
+        final IVariable<?> s = Var.var("s");
+//        final IVariable<?> p = Var.var("p");
+//        final IVariable<?> o1 = Var.var("o1");
+//        final IVariable<?> p2 = Var.var("p2");
+//        final IVariable<?> o2 = Var.var("o2");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[] { s };
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { s, o1, o2 };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getLeft1();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getRight1();
+
+        // The expected solutions to the join.
+        final IBindingSet[] expected = setup.getServiceCall2JoinSolutions()
+                .toArray(new IBindingSet[] {});
+
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
+
+    }
+    
+    /**
+     * Unit test for the OPTIONAL GROUP hash join for {@link JoinSetup_service02}. This
+     * is the optional JOIN performed between the solutions from the 1st SERVICE
+     * and the solutions from the 2nd SERVICE. The solutions to this join are
+     * the solutions to the query, except that some variables are dropped by the
+     * projection. We model the projection here in order to compare directly to
+     * the expected solutions for the query.
+     */
+    public void test_service02b() {
+        
+        final JoinSetup_service02 setup = new JoinSetup_service02(getName());
+        
+        final IVariable<?> s = Var.var("s");
+//        final IVariable<?> p = Var.var("p");
+        final IVariable<?> o1 = Var.var("o1");
+//        final IVariable<?> p2 = Var.var("p2");
+        final IVariable<?> o2 = Var.var("o2");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[] { s };
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = new IVariable[] { s, o1, o2 };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getLeft1();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getServiceCall2JoinSolutions();
+
+        /**
+         * This is the OPTIONAL solution in the original query. It should not be
+         * produced for the problem which we are setting up here since we are
+         * modeling the ServiceCallJoin.
+         * 
+         * <pre>
+         *     <result>
+         *       <binding name="s"><uri>http://example.org/b</uri></binding>
+         *       <binding name="o1"><literal>Bob</literal></binding>
+         *     </result>
+         * </pre>
+         * 
+         * This is the non-OPTIONAL ServiceCallJoin solution. It combines the
+         * first left solution with the first (and only) right solution.
+         * 
+         * <pre>
+         *     <result>
+         *       <binding name="s"><uri>http://example.org/a</uri></binding>
+         *       <binding name="o1"><literal>Alan</literal></binding>
+         *       <binding name="o2"><literal>SPARQL 1.1 Basic Federated Query</literal></binding>
+         *     </result>
+         * </pre>
+         */
+        // The expected solutions to the join.
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ListBindingSet(//
+                new IVariable[] { s, o1 },//
+                new IConstant[] { new Constant<IV>(setup.b),
+                        new Constant<IV>(setup.bob) }//
+                ),//
+                new ListBindingSet(//
+                new IVariable[] { s, o1, o2},//
+                new IConstant[] { new Constant<IV>(setup.a),
+                        new Constant<IV>(setup.alan),
+                        new Constant<IV>(setup.label), }//
+                ),//
+        };
+
+        doHashJoinTest(JoinTypeEnum.Optional, joinVars, selectVars, constraints,
+                left, right, expected);
+
+    }
+ 
+    /**
+     * Setup a problem based on the following query, which is
+     * <code>service04</code> from the openrdf SPARQL 1.1 Federated Query test
+     * suite.
+     * 
+     * <pre>
+     * PREFIX : <http://example.org/> 
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/> 
+     * SELECT ?s ?o1 ?o2
+     * {
+     *   ?s ?p1 ?o1 
+     *   OPTIONAL { SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {?s foaf:knows ?o2 }}
+     * } BINDINGS ?o2 {
+     *  (:b)
+     * }
+     * </pre>
+     * 
+     * Solutions for the local access path (?s ?p1 ?o1):
+     * <pre>
+     * :a foaf:name "Alan" .
+     * :a foaf:mbox "alan@example.org" .
+     * :b foaf:name "Bob" .
+     * :b foaf:mbox "bob@example.org" .
+     * :c foaf:name "Alice" .
+     * :c foaf:mbox "alice@example.org" .
+     * </pre>
+     * 
+     * Solutions for endpoint1:
+     * 
+     * <pre>
+     * { o2=http://example.org/b, s=http://example.org/a }
+     * { o2=http://example.org/b, s=http://example.org/a }
+     * </pre>
+     */
+    static public class JoinSetup_service04 {
+
+        public final String namespace;
+
+        public final IV<?, ?> a, b, c, foafName, foafMbox, alan, bob, alice,
+                alanEmail, bobEmail, aliceEmail;
+
+        public JoinSetup_service04(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+            
+            this.namespace = namespace;
+
+            a = makeIV(new URIImpl("http://example.org/a"));
+            
+            b = makeIV(new URIImpl("http://example.org/b"));
+            
+            c = makeIV(new URIImpl("http://example.org/c"));
+
+            foafName = makeIV(new URIImpl("http://xmlns.com/foaf/0.1/name"));
+
+            foafMbox = makeIV(new URIImpl("http://xmlns.com/foaf/0.1/mbox"));
+            
+            alan = makeIV(new LiteralImpl("Alan"));
+
+            bob = makeIV(new LiteralImpl("Bob"));
+
+            alice = makeIV(new LiteralImpl("Alice"));
+
+            alanEmail = makeIV(new LiteralImpl("alan@example.org"));
+            
+            bobEmail = makeIV(new LiteralImpl("bob@example.org"));
+            
+            aliceEmail = makeIV(new LiteralImpl("alice@example.org"));
+            
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+        /**
+         * Solutions for the local access path (?s ?p1 ?o1)
+         * 
+         * <pre>
+         * :a foaf:name "Alan" .
+         * :a foaf:mbox "alan@example.org" .
+         * { s=TermId(2U)[http://example.org/b], p1=TermId(4U)[http://xmlns.com/foaf/0.1/name], o1=TermId(7L)[Bob] },
+         * { s=TermId(2U)[http://example.org/b], p1=TermId(5U)[http://xmlns.com/foaf/0.1/mbox], o1=TermId(10L)[bob@example.org] },
+         * { s=TermId(3U)[http://example.org/c], p1=TermId(4U)[http://xmlns.com/foaf/0.1/name], o1=TermId(8L)[Alice] },
+         * { s=TermId(3U)[http://example.org/c], p1=TermId(5U)[http://xmlns.com/foaf/0.1/mbox], o1=TermId(11L)[alice@example.org] }]
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getSolutionsLocalAP() {
+
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p = Var.var("p1");
+            final IVariable<?> o1 = Var.var("o1");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            // alan
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alan));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(alanEmail));
+            left.add(tmp);
+
+            // bob
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(b));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(bob));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(b));
+            tmp.set(p, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(bobEmail));
+            left.add(tmp);
+
+            // alice
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(c));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alice));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(c));
+            tmp.set(p, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(aliceEmail));
+            left.add(tmp);
+
+            return left;
+        }
+
+        /**
+         * Solutions for end point 1.
+         * 
+         * <pre>
+         * { o2=http://example.org/b, s=http://example.org/a }
+         * { o2=http://example.org/b, s=http://example.org/a }
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getSolutionsEndpoint1() {
+
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> o2 = Var.var("o2");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(o2, new Constant<IV>(b));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(o2, new Constant<IV>(b));
+            left.add(tmp);
+
+            return left;
+        }
+        
+        /**
+         * Solutions for the ServiceCallJoin with end point 2. It combines the
+         * solutions from the local access path (left) with the solutions from
+         * endpoint1 (right).
+         * 
+         * <pre>
+         * { o2=TermId(2U)[http://example.org/b], s=TermId(1U)[http://example.org/a], p1=TermId(5U), o1=TermId(8L) }
+         * { o2=TermId(2U)[http://example.org/b], s=TermId(1U)[http://example.org/a], p1=TermId(6U), o1=TermId(7L) }
+         * { o2=TermId(2U)[http://example.org/b], s=TermId(1U)[http://example.org/a], p1=TermId(5U), o1=TermId(8L) }
+         * { o2=TermId(2U)[http://example.org/b], s=TermId(1U)[http://example.org/a], p1=TermId(6U), o1=TermId(7L) }
+         * </pre>
+         */
+        //  5=foaf:mbox
+        //  6=foaf:name
+        //  7=Alan
+        //  9=Alice
+        // 11=Bob
+        //  8=alan@example.org
+        // 10=alice@example.org
+        // 12=bob@example.org
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getServiceCallJoinSolutions() {
+
+            final IVariable<?> o2 = Var.var("o2");
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p1 = Var.var("p1");
+            final IVariable<?> o1 = Var.var("o1");
+
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(o2, new Constant<IV>(b));
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p1, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(alanEmail));
+            right.add(tmp);
+            right.add(tmp.clone()); // twice.
+
+            tmp = new ListBindingSet();
+            tmp.set(o2, new Constant<IV>(b));
+            tmp.set(s, new Constant<IV>(a));
+            tmp.set(p1, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alan));
+            right.add(tmp);
+            right.add(tmp.clone()); // twice
+
+            return right;
+
+        }
+
+        /**
+         * The OPTIONAL group join will return the UNION the solutions from the
+         * SERVICE which did join, which is
+         * {@link #getServiceCallJoinSolutions()}, with the solutions from the
+         * local access path which did not join.
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getOptionalGroupSolutions() {
+
+            final IVariable<?> s = Var.var("s");
+            final IVariable<?> p = Var.var("p1");
+            final IVariable<?> o1 = Var.var("o1");
+
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+            
+            left.addAll(getServiceCallJoinSolutions());
+
+            IBindingSet tmp;
+            
+            // bob
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(b));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(bob));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(b));
+            tmp.set(p, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(bobEmail));
+            left.add(tmp);
+
+            // alice
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(c));
+            tmp.set(p, new Constant<IV>(foafName));
+            tmp.set(o1, new Constant<IV>(alice));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(s, new Constant<IV>(c));
+            tmp.set(p, new Constant<IV>(foafMbox));
+            tmp.set(o1, new Constant<IV>(aliceEmail));
+            left.add(tmp);
+
+            return left;
+            
+        }
+        
+    }
+
+    /**
+     * Unit test for the SERVICE hash join for {@link JoinSetup_service04}. 
+     */
+    public void test_service04a() {
+
+        final JoinSetup_service04 setup = new JoinSetup_service04(getName());
+        
+        final IVariable<?> s = Var.var("s");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[] { s };
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { s, o1, o2 };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getSolutionsLocalAP();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getSolutionsEndpoint1();
+
+        // The expected solutions to the join.
+        final IBindingSet[] expected = setup.getServiceCallJoinSolutions()
+                .toArray(new IBindingSet[] {});
+
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
+
+    }
+    
+    /**
+     * Unit test for the OPTIONAL hash join for {@link JoinSetup_service04}. The
+     * solutions for the query are just the PROJECTION of (?s ?o1 ?o2) for this
+     * join.
+     */
+    public void test_service04b() {
+
+        final JoinSetup_service04 setup = new JoinSetup_service04(getName());
+        
+        final IVariable<?> s = Var.var("s");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[] { s };
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { s, o1, o2 };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getSolutionsLocalAP();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getServiceCallJoinSolutions();
+
+        // The expected solutions to the join.
+        final IBindingSet[] expected = setup.getOptionalGroupSolutions()
+                .toArray(new IBindingSet[] {});
+
+        doHashJoinTest(JoinTypeEnum.Optional, joinVars, selectVars, constraints,
+                left, right, expected);
+
+    }
+    
 }
