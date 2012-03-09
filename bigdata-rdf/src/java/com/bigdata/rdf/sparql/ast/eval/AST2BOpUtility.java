@@ -116,6 +116,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
@@ -188,6 +189,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         // The AST model as produced by the parser.
         final QueryRoot originalQuery = astContainer.getOriginalAST();
+        
+        // Compute some summary statistics about the exogenous bindings.
+        ctx.setSolutionSetStats(new SolutionSetStats(bindingSets));
         
         // Run the AST query rewrites / query optimizers.
         final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
@@ -880,9 +884,6 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 /*
                  * If the serviceRef is a bare variable, then that variable
                  * needs to be materialized.
-                 * 
-                 * FIXME Unit test for this case. The test should be written to
-                 * verify that the materialization step is correctly generated.
                  */
                 vars.add((IVariable<?>) serviceRef);
             }

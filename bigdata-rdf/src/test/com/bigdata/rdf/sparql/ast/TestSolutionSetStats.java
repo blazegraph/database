@@ -27,17 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -49,18 +51,18 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
  * @version $Id$
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public class TestSolutionStats extends TestCase2 {
+public class TestSolutionSetStats extends TestCase2 {
 
     /**
      * 
      */
-    public TestSolutionStats() {
+    public TestSolutionSetStats() {
     }
 
     /**
      * @param name
      */
-    public TestSolutionStats(String name) {
+    public TestSolutionSetStats(String name) {
         super(name);
     }
 
@@ -68,6 +70,17 @@ public class TestSolutionStats extends TestCase2 {
      * Typed empty set.
      */
     private static final Set<IVariable> emptySet = Collections.emptySet();
+    
+    /**
+     * Typed empty map.
+     */
+    private static final Map<IVariable,IConstant> emptyMap = Collections.emptyMap();
+    
+    private <T> IConstant<T> asConst(final T val) {
+
+        return new Constant<T>(val);
+        
+    }
     
     /**
      * Turn an array of variables into a {@link Set} of variables.
@@ -90,13 +103,34 @@ public class TestSolutionStats extends TestCase2 {
         return set;
     }
     
+    private <T> T[] asArray(T... vals) {
+        return vals;
+    }
+    
+    private Map<IVariable, IConstant> asMap(final IVariable[] vars,
+            final IConstant[] vals) {
+        
+        assert vars.length == vals.length;
+        
+        final Map<IVariable,IConstant> map = new LinkedHashMap<IVariable, IConstant>();
+        
+        for(int i=0; i<vars.length; i++) {
+            
+            map.put(vars[i], vals[i]);
+            
+        }
+        
+        return map;
+        
+    }
+    
     /**
      * Correct rejection test for the constructor.
      */
     public void test_001() {
         
         try {
-            new SolutionSetStats(null/* bindingSets */);
+            new SolutionSetStats((IBindingSet[])null/* bindingSets */);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -112,8 +146,7 @@ public class TestSolutionStats extends TestCase2 {
         
         final IBindingSet[] bsets = new IBindingSet[] {};
 
-        final SolutionSetStats stats = new SolutionSetStats(Arrays
-                .asList(bsets).iterator());
+        final SolutionSetStats stats = new SolutionSetStats(bsets);
 
         assertEquals("solutionSetSize", 0, stats.getSolutionSetSize());
 
@@ -138,19 +171,21 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
+            bset.set(x, asConst("1"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 1,// nsolutions
                 asSet(x),// usedVars
                 emptySet,// notAlwaysBound
-                asSet(x) // alwaysBound
+                asSet(x), // alwaysBound
+                asMap(asArray(x),asArray(asConst("1")))// constants
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
-        
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
+
         assertSameStats(expected, actual);
         
     }
@@ -166,19 +201,21 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
-            bset.set(y, new Constant<String>("2"));
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 1,// nsolutions
                 asSet(x, y),// usedVars
                 emptySet,// notAlwaysBound
-                asSet(x, y) // alwaysBound
+                asSet(x, y), // alwaysBound
+                asMap(new IVariable[]{x,y},new IConstant[]{asConst("1"),asConst("2")})
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
         
         assertSameStats(expected, actual);
         
@@ -196,25 +233,27 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
-            bset.set(y, new Constant<String>("2"));
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("3"));
-            bset.set(y, new Constant<String>("4"));
+            bset.set(x, asConst("3"));
+            bset.set(y, asConst("4"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 2,// nsolutions
                 asSet(x, y),// usedVars
                 emptySet,// notAlwaysBound
-                asSet(x, y) // alwaysBound
+                asSet(x, y), // alwaysBound
+                emptyMap// constants
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
         
         assertSameStats(expected, actual);
         
@@ -234,26 +273,28 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
-            bset.set(y, new Constant<String>("2"));
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("3"));
-            bset.set(y, new Constant<String>("4"));
-            bset.set(z, new Constant<String>("5"));
+            bset.set(x, asConst("3"));
+            bset.set(y, asConst("4"));
+            bset.set(z, asConst("5"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 2,// nsolutions
                 asSet(x, y, z),// usedVars
                 asSet(z),// notAlwaysBound
-                asSet(x, y) // alwaysBound
+                asSet(x, y), // alwaysBound
+                emptyMap// constants
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
         
         assertSameStats(expected, actual);
         
@@ -275,26 +316,28 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("3"));
-            bset.set(y, new Constant<String>("4"));
-            bset.set(z, new Constant<String>("5"));
+            bset.set(x, asConst("3"));
+            bset.set(y, asConst("4"));
+            bset.set(z, asConst("5"));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
-            bset.set(y, new Constant<String>("2"));
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 2,// nsolutions
                 asSet(x, y, z),// usedVars
                 asSet(z),// notAlwaysBound
-                asSet(x, y) // alwaysBound
+                asSet(x, y), // alwaysBound
+                emptyMap// constants
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
         
         assertSameStats(expected, actual);
         
@@ -313,9 +356,9 @@ public class TestSolutionStats extends TestCase2 {
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("3"));
-            bset.set(y, new Constant<String>("4"));
-            bset.set(z, new Constant<String>("5"));
+            bset.set(x, asConst("3"));
+            bset.set(y, asConst("4"));
+            bset.set(z, asConst("5"));
             bsets.add(bset);
         }
         {
@@ -324,32 +367,84 @@ public class TestSolutionStats extends TestCase2 {
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, new Constant<String>("1"));
-            bset.set(y, new Constant<String>("2"));
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
             bsets.add(bset);
         }
 
-        final ISolutionStats expected = new MySolutionStats(//
+        final ISolutionSetStats expected = new MySolutionStats(//
                 3,// nsolutions
                 asSet(x, y, z),// usedVars
                 asSet(x, y, z),// notAlwaysBound
-                asSet() // alwaysBound
+                asSet(), // alwaysBound,
+                emptyMap// constants
         );
 
-        final SolutionSetStats actual = new SolutionSetStats(bsets.iterator());
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
         
         assertSameStats(expected, actual);
         
     }
 
     /**
-     * Compare two {@link ISolutionStats}.
+     * Unit test with three solutions having two variables which are bound in
+     * every solution to the same value plus one variable which is bound to
+     * a different value in every solution.
+     */
+    public void test_009() {
+        
+        final IVariable x = Var.var("x");
+        final IVariable y = Var.var("y");
+        final IVariable z = Var.var("z");
+        
+        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
+            bset.set(z, asConst("5"));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
+            bset.set(z, asConst("6"));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst("1"));
+            bset.set(y, asConst("2"));
+            bset.set(z, asConst("7"));
+            bsets.add(bset);
+        }
+
+        final ISolutionSetStats expected = new MySolutionStats(//
+                3,// nsolutions
+                asSet(x, y, z),// usedVars
+                asSet(),// notAlwaysBound
+                asSet(x, y, z), // alwaysBound
+                asMap(asArray(x, y),
+                        asArray(asConst("1"), asConst("2")))// constants
+        );
+
+        final SolutionSetStats actual = new SolutionSetStats(
+                bsets.toArray(new IBindingSet[] {}));
+        
+        assertSameStats(expected, actual);
+        
+    }
+
+    /**
+     * Compare two {@link ISolutionSetStats}.
      * 
      * @param expected
      * @param actual
      */
-    private static void assertSameStats(final ISolutionStats expected,
-            final ISolutionStats actual) {
+    private static void assertSameStats(final ISolutionSetStats expected,
+            final ISolutionSetStats actual) {
 
         assertEquals("solutionSetSize", expected.getSolutionSetSize(),
                 actual.getSolutionSetSize());
@@ -362,12 +457,15 @@ public class TestSolutionStats extends TestCase2 {
         assertEquals("notAlwaysBound", expected.getNotAlwaysBound(),
                 actual.getNotAlwaysBound());
 
+        assertEquals("constants", expected.getConstants(),
+                actual.getConstants());
+
     }
     
     /**
      * Helper class for tests.
      */
-    private static class MySolutionStats implements ISolutionStats {
+    private static class MySolutionStats implements ISolutionSetStats {
 
         /**
          * The #of solutions.
@@ -390,15 +488,25 @@ public class TestSolutionStats extends TestCase2 {
          */
         private final Set<IVariable> alwaysBound;
 
+        /**
+         * The set of variables which are effective constants (they are bound in
+         * every solution and always to the same value) together with their constant
+         * bindings.
+         */
+        private final Map<IVariable,IConstant> constants;
+
         public MySolutionStats(final int nsolutions,
                 final Set<IVariable> usedVars,
                 final Set<IVariable> notAlwaysBound,
-                final Set<IVariable> alwaysBound) {
+                final Set<IVariable> alwaysBound,
+                final Map<IVariable, IConstant> constants
+                ) {
 
             this.nsolutions = nsolutions;
             this.usedVars = usedVars;
             this.notAlwaysBound = notAlwaysBound;
             this.alwaysBound = alwaysBound;
+            this.constants = constants;
             
         }
         
@@ -421,6 +529,11 @@ public class TestSolutionStats extends TestCase2 {
         @Override
         public Set<IVariable<?>> getNotAlwaysBound() {
             return (Set) notAlwaysBound;
+        }
+
+        @Override
+        public Map<IVariable<?>, IConstant<?>> getConstants() {
+            return (Map) constants;
         }
         
     }

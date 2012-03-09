@@ -27,8 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
 import java.util.Set;
 
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 
 /**
@@ -37,7 +39,7 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISolutionStats {
+public interface ISolutionSetStats {
 
     /**
      * Return the #of solutions.
@@ -58,5 +60,12 @@ public interface ISolutionStats {
      * Return the subset of the variables which are NOT bound in all solutions.
      */
     Set<IVariable<?>> getNotAlwaysBound();
+
+    /**
+     * The set of variables which are effective constants (they are bound in
+     * every solution and always to the same value) together with their constant
+     * bindings.
+     */
+    Map<IVariable<?>, IConstant<?>> getConstants();
 
 }

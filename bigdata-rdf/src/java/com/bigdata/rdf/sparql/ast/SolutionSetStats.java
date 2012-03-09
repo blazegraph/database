@@ -27,12 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 
 /**
@@ -40,8 +45,21 @@ import com.bigdata.rdf.internal.impl.TermId;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Compute the distinct values for each variable for which we have
+ *          a binding, or at least the #of such values and offer a method to
+ *          obtain the distinct values which could cache them. We can do the
+ *          exact #of distinct values trivially for small solution sets. For
+ *          very large solution sets this is more expensive and approximate
+ *          techniques for obtaining the distinct set only when it is likely to
+ *          be small would be appropriate.
+ *          <p>
+ *          Note that this must correctly handle {@link TermId#mockIV(VTE)}s.
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/490"> Mock IV /
+ *      TermId hashCode()/equals() problems</a>
  */
-public class SolutionSetStats implements ISolutionStats {
+public class SolutionSetStats implements ISolutionSetStats {
 
     /**
      * The #of solutions.
@@ -65,36 +83,35 @@ public class SolutionSetStats implements ISolutionStats {
     private final Set<IVariable<?>> alwaysBound;
 
     /**
-     * 
-     * TODO Compute the distinct values for each variable for which we have a
-     * binding, or at least the #of such values and offer a method to obtain the
-     * distinct values which could cache them. We can do the exact #of distinct
-     * values trivially for small solution sets. For very large solution sets
-     * this is more expensive and approximate techniques for obtaining the
-     * distinct set only when it is likely to be small would be appropriate.
-     * <p>
-     * Note that this must correctly handle {@link TermId#mockIV(VTE)}s.
-     * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/490"> Mock
-     *      IV / TermId hashCode()/equals() problems</a>
+     * The set of variables which are effective constants (they are bound in
+     * every solution and always to the same value) together with their constant
+     * bindings.
      */
-    public SolutionSetStats(final Iterator<IBindingSet> bindingSets) {
+    private final Map<IVariable<?>,IConstant<?>> constants;
+    
+    /**
+     * @param bindingSets
+     *            The exogenous solutions flowing into the query.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if any element of the source solution array is
+     *             <code>null</code>
+     */
+    public SolutionSetStats(final IBindingSet[] bindingSets) {
 
         if (bindingSets == null)
             throw new IllegalArgumentException();
         
         int nsolutions = 0;
         
-        this.usedVars = new HashSet<IVariable<?>>();
-        
-        this.notAlwaysBound = new HashSet<IVariable<?>>();
-
+        final Set<IVariable<?>> usedVars = new HashSet<IVariable<?>>();
+        final Set<IVariable<?>> notAlwaysBound = new HashSet<IVariable<?>>();
         final Set<IVariable<?>> currentVars = new HashSet<IVariable<?>>();
         final Set<IVariable<?>> notBoundThisSolution = new HashSet<IVariable<?>>();
 
-        while (bindingSets.hasNext()) {
-            
-            final IBindingSet bset = bindingSets.next();
+        for(IBindingSet bset : bindingSets) {
             
             if(bset == null)
                 throw new IllegalArgumentException();
@@ -145,8 +162,61 @@ public class SolutionSetStats implements ISolutionStats {
         this.nsolutions = nsolutions;
         
         // Figure out which variables were bound in every solution.
-        this.alwaysBound = new HashSet<IVariable<?>>(usedVars);
-        this.alwaysBound.removeAll(notAlwaysBound);
+        final Set<IVariable<?>> alwaysBound = new HashSet<IVariable<?>>(usedVars);
+        alwaysBound.removeAll(notAlwaysBound);
+        
+        /*
+         * Figure out which bindings are the same in every solution. These are
+         * effective constants.
+         */
+        if (alwaysBound.isEmpty()) {
+        
+            constants = Collections.emptyMap();
+            
+        } else {
+            
+            final Map<IVariable<?>, IConstant<?>> constants = new HashMap<IVariable<?>, IConstant<?>>(
+                    alwaysBound.size());
+
+            for (IVariable<?> v : alwaysBound) {
+
+                final IConstant<?> firstValue = bindingSets[0].get(v);
+
+                boolean isConstant = true;
+
+                for (int i = 1; i < bindingSets.length; i++) {
+
+                    final IBindingSet bset = bindingSets[i];
+
+                    if (!firstValue.equals(bset.get(v))) {
+
+                        // Proven not a constant.
+                        isConstant = false;
+
+                        break;
+
+                    }
+
+                } // next solution
+
+                if(isConstant) {
+
+                    // This variable is always bound to the same value.
+                    constants.put(v, firstValue);
+                    
+                }
+                
+            } // next always bound variable.
+       
+            // Expose immutable version of this collection.
+            this.constants = Collections.unmodifiableMap(constants);
+            
+        }
+
+        // Expose immutable versions of these collections.
+        this.usedVars = Collections.unmodifiableSet(usedVars);
+        this.alwaysBound = Collections.unmodifiableSet(alwaysBound);
+        this.notAlwaysBound = Collections.unmodifiableSet(notAlwaysBound);
         
     }
     
@@ -171,6 +241,13 @@ public class SolutionSetStats implements ISolutionStats {
     public final Set<IVariable<?>> getNotAlwaysBound() {
         
         return notAlwaysBound;
+        
+    }
+
+    @Override
+    public final Map<IVariable<?>, IConstant<?>> getConstants() {
+        
+        return constants;
         
     }
 
