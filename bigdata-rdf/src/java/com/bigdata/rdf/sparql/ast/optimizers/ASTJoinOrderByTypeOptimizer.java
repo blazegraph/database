@@ -31,6 +31,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -52,8 +54,9 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
  * This optimizer simply puts each type of {@link IGroupMemberNode} within a
@@ -279,9 +282,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 		        {
 	
 		            /*
-		             * Run some service calls first.
-		             * 
-		             * TODO This is hard-coded to BD.SEARCH.
+		             * Run some service calls first (or as early as possible).
 		             */
 			    	{
 
@@ -292,13 +293,21 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
                             final ServiceNode n = sitr.next();
 
-                            if (n.getServiceRef().isConstant()
-                                    && n.getServiceRef().getValue()
-                                            .equals(BD.SEARCH)) {
+                            if (n.getServiceRef().isConstant()) {
 
-                                ordered.add(n);
+                                final URI serviceURI = (URI) n.getServiceRef()
+                                        .getValue();
 
-                                sitr.remove();
+                                final ServiceFactory f = ServiceRegistry
+                                        .getInstance().get(serviceURI);
+
+                                if (f.getServiceOptions().isRunFirst()) {
+
+                                    ordered.add(n);
+
+                                    sitr.remove();
+
+                                }
 
                             }
 

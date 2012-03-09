@@ -94,7 +94,7 @@ public class SearchServiceFactory implements ServiceFactory {
         
         serviceOptions = new BigdataNativeServiceOptions();
         
-//        serviceOptions.setRunOnce(true);
+        serviceOptions.setRunFirst(true);
         
     }
     
