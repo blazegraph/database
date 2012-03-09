@@ -62,7 +62,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestAST.class);
 
         // Test suite for static analysis of a set of solutions.
-        suite.addTestSuite(TestSolutionStats.class);
+        suite.addTestSuite(TestSolutionSetStats.class);
 
         // Test suite for methods which determine must/may/not bound vars.
         suite.addTestSuite(TestStaticAnalysis.class);

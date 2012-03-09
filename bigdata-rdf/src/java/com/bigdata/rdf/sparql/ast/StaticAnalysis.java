@@ -28,17 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
@@ -49,6 +46,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
@@ -200,55 +198,22 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
     
     /**
-     * TODO This is here as a placeholder which will be used when we address the
-     * ticket for handling exogenous variables in the static analysis of a
-     * query.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
-     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
-     */
-    final private Set<IVariable<?>> exogenousVars;
-
-    /**
      * 
      * @param queryRoot
      *            The root of the query. We need to have this on hand in order
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
      * 
-     *            TODO Drop this constructor version in favor of
-     *            {@link #StaticAnalysis(QueryRoot, IBindingSet[])} which makes
-     *            the exogenous bindings available.
+     *            FIXME The constructor should have access to the
+     *            {@link SolutionSetStats}, which are on the
+     *            {@link AST2BOpContext}.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     public StaticAnalysis(final QueryRoot queryRoot) {
      
-        this(queryRoot, null/* bindingSet */);
-        
-    }
-
-    /**
-     * 
-     * @param queryRoot
-     *            The root of the query. We need to have this on hand in order
-     *            to resolve {@link NamedSubqueryInclude}s during static
-     *            analysis.
-     * @param bindingSets
-     *            The exogenous bindings.
-     */
-    public StaticAnalysis(final QueryRoot queryRoot,
-            final IBindingSet[] bindingSets) {
-
         super(queryRoot);
-
-        if (bindingSets == null) {
-            this.exogenousVars = Collections.emptySet();
-        } else {
-            this.exogenousVars = getExogenousVars(bindingSets,
-                    new LinkedHashSet<IVariable<?>>());
-        }
 
     }
 
@@ -1251,7 +1216,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * constant on a variable. Variables which are not projected by the query
      * will NOT be reported.
      * 
-     * TODO For a top-level query, any exogenously bound variables are also
+     * FIXME For a top-level query, any exogenously bound variables are also
      * definitely bound (in a subquery they are definitely bound if they are
      * projected into the subquery).
      * 
@@ -2148,66 +2113,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         projectedVars.addAll(afterVars);
         
         return projectedVars;
-
-    }
-
-    /**
-     * Extract any variables which are bound in any of the given solutions.
-     * 
-     * @param bindingSets
-     *            The given solutions (optional).
-     * @param vars
-     *            The exogenous variables are added to the caller's set.
-     * 
-     * @return The caller's set.
-     * 
-     *         TODO We might want to compile this information, and perhaps even
-     *         statistics about IBindingSet[] and put it on the [context]. Note
-     *         that the context does not currently have that information
-     *         available, but maybe it should.
-     */
-    static public Set<IVariable<?>> getExogenousVars(
-            final IBindingSet[] bindingSets, final Set<IVariable<?>> vars) {
-
-        if (bindingSets == null)
-            return vars;
-
-        for (IBindingSet bset : bindingSets) {
-
-            @SuppressWarnings("rawtypes")
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = bset
-                    .iterator();
-
-            while (itr.hasNext()) {
-
-                vars.add(itr.next().getKey());
-
-            }
-
-        }
-
-        return vars;
-
-    }
-
-    /**
-     * Return the exogenous bindings.
-     * 
-     * @param bindingSets
-     *            The given solutions (optional).
-     * 
-     *            TODO The exogenous bindings are passed around as an
-     *            {@link IBindingSet}[] for historical reasons, but we are only
-     *            passing in a single {@link IBindingSet} which is what is
-     *            returned from this method.
-     */
-    static public IBindingSet getExogenousBindings(
-            final IBindingSet[] bindingSets) {
-
-        if (bindingSets == null || bindingSets.length == 0)
-            return null;
-
-        return bindingSets[0];
 
     }
 

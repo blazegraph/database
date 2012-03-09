@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -13,13 +14,16 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.EmptySolutionSetStats;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -190,6 +194,50 @@ public class AST2BOpContext implements IdFactory {
 
     private int varIdFactory = 0;
 
+    /**
+     * Some summary statistics about the exogenous solution sets. These are
+     * computed by {@link AST2BOpUtility#convert(AST2BOpContext, IBindingSet[])}
+     * before it begins to run the {@link #optimizers}.
+     */
+    private ISolutionSetStats sss = null;
+    
+    /**
+     * Some summary statistics about the exogenous solution sets. These are
+     * computed by {@link AST2BOpUtility#convert(AST2BOpContext, IBindingSet[])}
+     * before it begins to run the {@link IASTOptimizer}s.
+     */
+    public ISolutionSetStats getSolutionSetStats() {
+    
+        if(sss == null)
+            return EmptySolutionSetStats.INSTANCE;
+        
+        return sss;
+        
+    }
+    
+    /**
+     * Set the statistics summary for the exogenous solution sets.
+     * 
+     * @param stats
+     *            The summary statistics.
+     *            
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>
+     * @throws IllegalStateException
+     *             if the property has already been set.
+     */
+    public void setSolutionSetStats(final ISolutionSetStats stats) {
+        
+        if (stats == null)
+            throw new IllegalArgumentException();
+        
+        if(sss != null)
+            throw new IllegalStateException();
+        
+        this.sss = stats;
+        
+    }
+    
     /**
      * Static analysis object initialized once we apply the AST optimizers and
      * used by {@link AST2BOpUtility}.

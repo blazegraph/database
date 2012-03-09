@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -150,7 +151,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * Used for the prefix of the generated named set name.
      */
     static String NAMED_SET_PREFIX = "%-bottom-up-";
-    
+
     /**
      * 
      */
@@ -165,10 +166,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
-
-        // All exogenous variables (given in the source solutions).
-        final Set<IVariable<?>> exogenousVars = StaticAnalysis.getExogenousVars(
-                bindingSets, new LinkedHashSet<IVariable<?>>());
 
         /*
          * Rewrite badly designed left joins by lifting them into a named
@@ -236,37 +233,21 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
             final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
-            // Map for renamed variables.
-            final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
-
             // Handle named subqueries.
             if (queryRoot.getNamedSubqueries() != null) {
 
                 for (NamedSubqueryRoot namedSubquery : queryRoot
                         .getNamedSubqueries()) {
 
-//                    @SuppressWarnings("unchecked")
-//                    final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
-//                            .getWhereClause();
-//
-//                    // WHERE clause for the named subquery.
-//                    handleFiltersWithVariablesNotInScope(context, sa,
-//                            queryRoot, exogenousVars, map, namedSubquery, group);
-                    handleFiltersWithVariablesNotInScope(context, sa, namedSubquery,
-                            bindingSets);
+                    handleFiltersWithVariablesNotInScope(context, sa,
+                            namedSubquery, bindingSets);
 
                 }
 
             }
 
-//            @SuppressWarnings("unchecked")
-//            final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) queryRoot
-//                    .getWhereClause();
-//
-////             The main WHERE clause.
-//            handleFiltersWithVariablesNotInScope(context, sa, queryRoot,
-//                    exogenousVars, map, queryRoot, group);
-            handleFiltersWithVariablesNotInScope(context, sa, queryRoot, bindingSets);
+            handleFiltersWithVariablesNotInScope(context, sa, queryRoot,
+                    bindingSets);
 
         }
 
@@ -384,7 +365,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      *            A list of all badly designed left joins which have been
      *            identified.
      * 
-     *            TODO This ignores the exogenous variables. unit test for this
+     *            FIXME This ignores the exogenous variables. unit test for this
      *            case and fix.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
@@ -600,11 +581,10 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             final QueryBase queryBase,
             final IBindingSet[] bindingSets) {
 
-//        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-
         // All exogenous variables (given in the source solutions).
-        final Set<IVariable<?>> exogenous = StaticAnalysis.getExogenousVars(
-                bindingSets, new LinkedHashSet<IVariable<?>>());
+        @SuppressWarnings("unchecked")
+        final Set<IVariable<?>> exogenous = (context == null ? (Set)Collections
+                .emptySet() : context.getSolutionSetStats().getUsedVars());
 
         // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();

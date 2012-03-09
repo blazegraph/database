@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -57,17 +61,18 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.TestStaticAnalysis;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -928,6 +933,8 @@ public class TestASTBottomUpOptimizer extends
                 new IVariable[] { Var.var("v") },
                 new IConstant[] { new Constant(x.getIV()) })
         };
+
+        context.setSolutionSetStats(new SolutionSetStats(bindingSets));
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
                 context, queryRoot, bindingSets);
@@ -1272,6 +1279,196 @@ public class TestASTBottomUpOptimizer extends
         assertSameAST(expected, actual);
 
     }
+
+//    /**
+//     * This is a bottom up semantics test from the openrdf services test suite.
+//     * There are no shared variables for the two SERVICE clauses. This means
+//     * that we need to lift them out into named subqueries in order to have
+//     * bottom up evaluation semantics.
+//     * 
+//     * <pre>
+//     * # Test for SES 899
+//     * 
+//     * PREFIX : <http://example.org/> 
+//     * PREFIX owl: <http://www.w3.org/2002/07/owl#> 
+//     * 
+//     * SELECT ?a ?b
+//     * {
+//     *   SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {
+//     *      ?a a ?t1 
+//     *      filter(?t1 = owl:Class) 
+//     *   }
+//     *   SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> { 
+//     *      ?b a ?t2 
+//     *      filter(?t2 = owl:Class) 
+//     *   } 
+//     *   
+//     * }
+//     * </pre>
+//     */
+//    public void test_service13() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[] {};
+//
+//        /*
+//         * Add the Values used in the query to the lexicon. This makes it
+//         * possible for us to explicitly construct the expected AST and
+//         * the verify it using equals().
+//         */
+//        final BigdataValueFactory f = store.getValueFactory();
+//        final BigdataURI rdfType = f.asValue(RDF.TYPE);
+//        final BigdataURI owlClass = f.asValue(OWL.CLASS);
+//        final BigdataURI endpoint1 = f.createURI("http://localhost:18080/openrdf/repositories/endpoint1");
+//        final BigdataValue[] values = new BigdataValue[] { rdfType, owlClass, endpoint1 };
+//        store.getLexiconRelation()
+//                .addTerms(values, values.length, false/* readOnly */);
+//        
+//        /**
+//         * The source AST.
+//         * 
+//         * <pre>
+//         * PREFIX : <http://example.org>
+//         * PREFIX owl: <http://www.w3.org/2002/07/owl#>
+//         * QueryType: SELECT
+//         * SELECT VarNode(a) VarNode(b)
+//         *   JoinGroupNode {
+//         *     SERVICE <ConstantNode(TermId(1U))> {
+//         *       JoinGroupNode {
+//         *         StatementPatternNode(VarNode(a), ConstantNode(Vocab(14)), VarNode(t1), DEFAULT_CONTEXTS)
+//         *         FILTER( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(t1),ConstantNode(Vocab(39)))[ com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#equal-to] )
+//         *       }
+//         *     }
+//         *     SERVICE <ConstantNode(TermId(1U))> {
+//         *       JoinGroupNode {
+//         *         StatementPatternNode(VarNode(b), ConstantNode(Vocab(14)), VarNode(t2), DEFAULT_CONTEXTS)
+//         *         FILTER( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(t2),ConstantNode(Vocab(39)))[ com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#equal-to] )
+//         *       }
+//         *     }
+//         *   }
+//         * </pre>
+//         */
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//            prefixDecls.put("", "http://example.org");
+//            prefixDecls.put("owl", "http://www.w3.org/2002/07/owl#");
+//            given.setPrefixDecls(prefixDecls);
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//
+//            projection.addProjectionVar(new VarNode("a"));
+//            projection.addProjectionVar(new VarNode("b"));
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            {
+//                final JoinGroupNode serviceGroup = new JoinGroupNode();
+//                serviceGroup.addChild(new StatementPatternNode(new VarNode("a"),
+//                        new ConstantNode(new Constant(rdfType.getIV())),
+//                        new VarNode("t1")));
+//                serviceGroup.addChild(new FilterNode(FunctionNode.EQ(
+//                        new VarNode("t1"), new ConstantNode(new Constant(
+//                                owlClass.getIV())))));
+//                final TermNode serviceRef = new ConstantNode(new Constant(
+//                        endpoint1.getIV()));
+//                final ServiceNode service = new ServiceNode(serviceRef,
+//                        serviceGroup);
+//                whereClause.addChild(service);
+//            }
+//            
+//            {
+//                final JoinGroupNode serviceGroup = new JoinGroupNode();
+//                serviceGroup.addChild(new StatementPatternNode(new VarNode("b"),
+//                        new ConstantNode(new Constant(rdfType.getIV())),
+//                        new VarNode("t2")));
+//                serviceGroup.addChild(new FilterNode(FunctionNode.EQ(
+//                        new VarNode("t2"), new ConstantNode(new Constant(
+//                                owlClass.getIV())))));
+//                final TermNode serviceRef = new ConstantNode(new Constant(
+//                        endpoint1.getIV()));
+//                final ServiceNode service = new ServiceNode(serviceRef,
+//                        serviceGroup);
+//                whereClause.addChild(service);
+//            }
+//            
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//            prefixDecls.put("", "http://example.org");
+//            prefixDecls.put("owl", "http://www.w3.org/2002/07/owl#");
+//            expected.setPrefixDecls(prefixDecls);
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//
+//            projection.addProjectionVar(new VarNode("a"));
+//            projection.addProjectionVar(new VarNode("b"));
+//
+//            final NamedSubqueriesNode nsn = expected.getNamedSubqueriesNotNull();
+//            final String name1 = "name1";
+//            final String name2 = "name2";
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            {
+//                final JoinGroupNode serviceGroup = new JoinGroupNode();
+//                serviceGroup.addChild(new StatementPatternNode(new VarNode("a"),
+//                        new ConstantNode(new Constant(rdfType.getIV())),
+//                        new VarNode("t1")));
+//                serviceGroup.addChild(new FilterNode(FunctionNode.EQ(
+//                        new VarNode("t1"), new ConstantNode(new Constant(
+//                                owlClass.getIV())))));
+//                final TermNode serviceRef = new ConstantNode(new Constant(
+//                        endpoint1.getIV()));
+//                final ServiceNode service = new ServiceNode(serviceRef,
+//                        serviceGroup);
+//                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+//                        QueryType.SELECT, name1);
+//                nsr.setWhereClause(new JoinGroupNode(service));
+//                nsn.add(nsr);
+//                whereClause.addChild(new NamedSubqueryInclude(name1));
+//            }
+//            
+//            {
+//                final JoinGroupNode serviceGroup = new JoinGroupNode();
+//                serviceGroup.addChild(new StatementPatternNode(new VarNode("b"),
+//                        new ConstantNode(new Constant(rdfType.getIV())),
+//                        new VarNode("t2")));
+//                serviceGroup.addChild(new FilterNode(FunctionNode.EQ(
+//                        new VarNode("t2"), new ConstantNode(new Constant(
+//                                owlClass.getIV())))));
+//                final TermNode serviceRef = new ConstantNode(new Constant(
+//                        endpoint1.getIV()));
+//                final ServiceNode service = new ServiceNode(serviceRef,
+//                        serviceGroup);
+//                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+//                        QueryType.SELECT, name2);
+//                nsr.setWhereClause(new JoinGroupNode(service));
+//                nsn.add(nsr);
+//                whereClause.addChild(new NamedSubqueryInclude(name2));
+//            }
+//
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
+//
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
 
 //    /**
 //     * The variable <code>?n</code> in the FILTER is the same as the

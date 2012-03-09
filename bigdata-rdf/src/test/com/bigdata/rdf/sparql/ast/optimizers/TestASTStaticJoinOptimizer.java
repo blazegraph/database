@@ -90,7 +90,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_simpleReorder01() {
 
         /*
@@ -98,10 +98,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
         // The source AST.
@@ -180,7 +178,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_simpleReorder02() {
 
         /*
@@ -188,10 +186,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
         // The source AST.
@@ -282,7 +278,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_simpleReorder03() {
 
         /*
@@ -290,19 +286,14 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
-        
-        @SuppressWarnings("rawtypes")
+
         final IV e = makeIV(new URIImpl("http://example/e"));
         
         // The source AST.
@@ -411,27 +402,22 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public void test_simpleReorder04() {
+    @SuppressWarnings("rawtypes")
+        public void test_simpleReorder04() {
 
         /*
          * Note: DO NOT share structures in this test!!!!
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
         // The source AST.
@@ -554,7 +540,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_simpleOptional01() {
 
         /*
@@ -562,25 +548,18 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
         final IV f = makeIV(new URIImpl("http://example/f"));
         
-        @SuppressWarnings("rawtypes")
         final IV g = makeIV(new URIImpl("http://example/g"));
         
         // The source AST.
@@ -689,7 +668,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_ServiceNode01() {
 
         /*
@@ -697,19 +676,14 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV search = makeIV(BD.SEARCH);
 
-        @SuppressWarnings("rawtypes")
         final IV foo = makeIV(new LiteralImpl("foo"));
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV serviceRef = makeIV(BD.SEARCH);
         
 //        @SuppressWarnings("rawtypes")
@@ -819,7 +793,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_ServiceNode02() {
 
         /*
@@ -827,34 +801,24 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV search = makeIV(BD.SEARCH);
 
-        @SuppressWarnings("rawtypes")
         final IV foo = makeIV(new LiteralImpl("foo"));
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
         final IV f = makeIV(new URIImpl("http://example/f"));
         
-        @SuppressWarnings("rawtypes")
         final IV g = makeIV(new URIImpl("http://example/g"));
 
-        @SuppressWarnings("rawtypes")
         final IV serviceRef = makeIV(BD.SEARCH);
 
         // The source AST.
@@ -981,7 +945,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_nestedOptionals01() {
 
         /*
@@ -989,22 +953,16 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
         final IV f = makeIV(new URIImpl("http://example/f"));
         
         // The source AST.
@@ -1090,7 +1048,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
     
     /**
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_nestedOptionals02() {
 
         /*
@@ -1098,23 +1056,17 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
-        final IV b = makeIV(new URIImpl("http://example/b"));
+//        final IV b = makeIV(new URIImpl("http://example/b"));
+//        
+//        final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
-        final IV c = makeIV(new URIImpl("http://example/c"));
-        
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
-        final IV f = makeIV(new URIImpl("http://example/f"));
+//        final IV f = makeIV(new URIImpl("http://example/f"));
         
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -1181,7 +1133,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
     
     /**
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_nestedOptionals03() {
 
         /*
@@ -1189,23 +1141,17 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
-        final IV c = makeIV(new URIImpl("http://example/c"));
+//        final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
-        final IV f = makeIV(new URIImpl("http://example/f"));
+//        final IV f = makeIV(new URIImpl("http://example/f"));
         
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -1343,7 +1289,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_NSI01() {
 
         /*
@@ -1351,25 +1297,18 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
-        final IV search = makeIV(BD.SEARCH);
+//        final IV search = makeIV(BD.SEARCH);
+//
+//        final IV foo = makeIV(new LiteralImpl("foo"));
 
-        @SuppressWarnings("rawtypes")
-        final IV foo = makeIV(new LiteralImpl("foo"));
-
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
         // The source AST.
@@ -1515,7 +1454,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_pessimistic() {
 
         /*
@@ -1615,7 +1554,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_runFirstRunLast_01() {
 
         /*
@@ -1623,22 +1562,16 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
         final IV f = makeIV(new URIImpl("http://example/f"));
         
         // The source AST.
@@ -1722,7 +1655,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
     }
         
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings("rawtypes")
     public void test_runFirstRunLast_02() {
 
         /*
@@ -1730,22 +1663,16 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        @SuppressWarnings("rawtypes")
         final IV a = makeIV(new URIImpl("http://example/a"));
 
-        @SuppressWarnings("rawtypes")
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        @SuppressWarnings("rawtypes")
         final IV c = makeIV(new URIImpl("http://example/c"));
         
-        @SuppressWarnings("rawtypes")
         final IV d = makeIV(new URIImpl("http://example/d"));
         
-        @SuppressWarnings("rawtypes")
         final IV e = makeIV(new URIImpl("http://example/e"));
         
-        @SuppressWarnings("rawtypes")
         final IV f = makeIV(new URIImpl("http://example/f"));
         
         // The source AST.

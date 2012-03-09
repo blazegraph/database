@@ -32,8 +32,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -133,19 +131,19 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  */
 public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
-    private static final Logger log = Logger
-            .getLogger(ASTComplexOptionalOptimizer.class);
+//    private static final Logger log = Logger
+//            .getLogger(ASTComplexOptionalOptimizer.class);
     
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
-        final Set<IVariable<?>> exogenousVars = sa.getExogenousVars(
-                bindingSets, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> exogenousVars = context.getSolutionSetStats()
+                .getUsedVars();
 
         // First, process any pre-existing named subqueries.
         {

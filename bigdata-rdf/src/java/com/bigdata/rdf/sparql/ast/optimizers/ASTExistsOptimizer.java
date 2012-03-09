@@ -111,9 +111,8 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
         
-        final Set<IVariable<?>> exogenousVars = StaticAnalysis
-                .getExogenousVars(bindingSets,
-                        new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> exogenousVars = context.getSolutionSetStats()
+                .getUsedVars();
         
         if (queryRoot.getNamedSubqueries() != null) {
 
