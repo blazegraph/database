@@ -64,6 +64,9 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
              * between the anonymous variable names for blank nodes in the local
              * query and the legal SPARQL variable name used for that blank node
              * in the generated query.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/510 (Blank
+             * nodes in SERVICE graph patterns)
              */
             return "-anon-" + anonVarNo++;
 		}

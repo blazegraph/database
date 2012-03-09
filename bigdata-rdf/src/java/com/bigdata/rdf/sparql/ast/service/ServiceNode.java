@@ -40,13 +40,19 @@ import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGraphPatternContainer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * An extension point for external service calls which produce solution
  * multisets (a SPARQL <code>SERVICE</code>).
+ * 
+ * TODO It would make the internal APIs significantly easier if we modeled this
+ * as a type of {@link GraphPatternGroup}, similar to {@link JoinGroupNode} and
+ * {@link UnionNode}.
  */
 public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         implements IJoinNode, IGraphPatternContainer {
@@ -268,6 +274,13 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     }
     
+    /**
+     * 
+     * @param projectedVars
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/510">
+     *      Blank nodes in SERVICE graph patterns </a>
+     */
     public void setProjectedVars(final Set<IVariable<?>> projectedVars) {
         
         setProperty(Annotations.PROJECTED_VARS, projectedVars);

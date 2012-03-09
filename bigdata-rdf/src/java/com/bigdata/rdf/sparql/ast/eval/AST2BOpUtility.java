@@ -847,20 +847,63 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * materialized (though they might use mock IVs) unless the service is
          * bigdata aware (in which case it is responsible for getting the IVs
          * right).
-         * 
-         * FIXME getDefinitelyProducedBindings(final ServiceNode node) and
-         * getMaybeProducedBindings(final ServiceNode node) MUST be revisited.
-         * They assume that SERVICEs do not run "as bound". This is not true.
-         * For example, when the serviceRef is a variable the SERVICE will often
-         * run bound.
-         * 
-         * FIXME We should prune any variables which are not used outside of the
-         * SERVICE's graph pattern by removing them from its "projection".
          */
         
         // Anything which can flow out of the SERVICE is "projected".
         final Set<IVariable<?>> projectedVars = ctx.sa
                 .getMaybeProducedBindings(serviceNode);
+        {
+
+            /*
+             * FIXME Prune any variables which are not used outside of the
+             * SERVICE's graph pattern by removing them from its "projection".
+             * To do this we need to check any downstream siblings of the
+             * SERVICE node (in its parent join group), and any downstream
+             * siblings of parents of that join group. This proceeds recursively
+             * until we reach the top level join group for the WHERE clause in
+             * question. If we pass through a Sub-Select, then we can stop if
+             * the variable(s) in question are not projected into that
+             * Sub-Select.
+             * 
+             * The same logic could be used to prune out variables which are not
+             * required by downstream joins.
+             * 
+             * There is some logic similar to this in ASTBottomUpOptimizer. Look
+             * for callers of StaticAnalysis.findParent().
+             * 
+             * There is some logic similar to this in
+             * ASTComplexOptionalOptimizer. However, I believe that it fails to
+             * recursively examine the downstream siblings of the parent
+             * group(s).
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
+             * variables during query evaluation)
+             */
+            
+            /*
+             * FIXME This is a cheap hack which fixes the problem where a blank
+             * node is used inside of a SERVICE graph.  However, this hack is
+             * WRONG if the blank node is correlated within the query outside
+             * of that SERVICE graph.
+             * 
+             * @see http://sourceforge.net/apps/trac/bigdata/ticket/510 (Blank
+             * nodes in SERVICE graph patterns)
+             */
+            final Iterator<IVariable<?>> itr = projectedVars.iterator();
+
+            while (itr.hasNext()) {
+
+                final IVariable<?> v = itr.next();
+
+                if (v.getName().startsWith("-anon-")) {
+
+                    itr.remove();
+
+                }
+
+            }
+
+        }
 
         // Set on the ServiceNode
         serviceNode.setProjectedVars(projectedVars);

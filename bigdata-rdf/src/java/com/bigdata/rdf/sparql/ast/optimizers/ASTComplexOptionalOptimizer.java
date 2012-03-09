@@ -365,8 +365,16 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
              * remain in the group (but paying attention to variable scoping for
              * sub-queries).
              * 
+             * TODO This would appear to ignore variables which are referenced
+             * in a parent group. I.e., we should recursively apply the same
+             * analysis to the downstream siblings in the parent group to make
+             * sure that the variable is not reused.
+             * 
              * TODO Make this projection DISTINCT if that does not change the
              * query semantics.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
+             * variables during query evaluation)
              */
             {
 

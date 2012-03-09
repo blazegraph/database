@@ -26,6 +26,18 @@
       <binding name="o1"><literal>Alice</literal></binding>
       <binding name="o2"><uri>http://example.org/b</uri></binding>
     </result>
+    <!-- I believe that the solutions for bob should also be present.
+    <result>
+      <binding name="s"><uri>http://example.org/b</uri></binding>
+      <binding name="o1"><literal>bob@example.org</literal></binding>
+      <binding name="o2"><uri>http://example.org/b</uri></binding>
+    </result>
+    <result>
+      <binding name="s"><uri>http://example.org/b</uri></binding>
+      <binding name="o1"><literal>Bob</literal></binding>
+      <binding name="o2"><uri>http://example.org/b</uri></binding>
+    </result>
+     -->
   </results>
 </sparql>
 
