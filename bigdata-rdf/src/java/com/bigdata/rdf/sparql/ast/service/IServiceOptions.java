@@ -67,4 +67,16 @@ public interface IServiceOptions {
      */
     boolean isSparql11();
 
+    /**
+     * Return <code>true</code> iff the service end point is one which should
+     * always be run as early as possible within the join group (default
+     * <code>false</code>).
+     * <p>
+     * Note: This option is only obeyed when the SERVICE reference is a
+     * constant. If the SERVICE reference is a variable, then it is not possible
+     * to resolve the {@link IServiceOptions} for that SERVICE until after the
+     * query planner has locked in the join evaluation order.
+     */
+    boolean isRunFirst();
+    
 }

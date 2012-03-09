@@ -22,48 +22,26 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 3, 2012
+ * Created on Mar 9, 2012
  */
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.internal.IV;
-
 /**
- * Service options base class for bigdata aware services. Such services are
- * expected to interchange {@link IBindingSet}s containing {@link IV}s. The
- * {@link IV}s are NOT guaranteed to be materialized.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BigdataServiceOptions.java 6077 2012-03-06 20:58:36Z
- *          thompsonbry $
+ * @version $Id$
  */
-public class BigdataNativeServiceOptions extends ServiceOptionsBase implements
-        INativeServiceOptions {
+abstract public class ServiceOptionsBase implements IServiceOptions {
 
-    /**
-     * Always returns <code>true</code>.
-     */
+    private boolean isRunFirst = false;
+    
     @Override
-    final public boolean isBigdataNativeService() {
-        return true;
+    public boolean isRunFirst() {
+        return isRunFirst;
     }
-
-    /**
-     * Always returns <code>false</code>.
-     */
-    @Override
-    final public boolean isRemoteService() {
-        return false;
-    }
-
-    /**
-     * Always returns <code>false</code> (response is ignored).
-     */
-    @Override
-    final public boolean isSparql11() {
-        return false;
+    
+    public void setRunFirst(final boolean newValue) { 
+        this.isRunFirst = newValue;
     }
 
 }

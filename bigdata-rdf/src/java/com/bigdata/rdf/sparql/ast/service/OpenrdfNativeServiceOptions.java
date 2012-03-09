@@ -38,7 +38,8 @@ import com.bigdata.bop.IBindingSet;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OpenrdfNativeServiceOptions implements INativeServiceOptions {
+public class OpenrdfNativeServiceOptions extends ServiceOptionsBase implements
+        INativeServiceOptions {
 
     /**
      * Always returns <code>false</code>.

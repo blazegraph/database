@@ -48,7 +48,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
  *          query parameters (defaultGraph, etc), authentication, etc.
  * 
  */
-public class RemoteServiceOptions implements IServiceOptions {
+public class RemoteServiceOptions extends ServiceOptionsBase {
 
     static private final String DEFAULT_ACCEPT_HEADER;
     
