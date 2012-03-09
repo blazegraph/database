@@ -52,8 +52,10 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
@@ -1521,15 +1523,27 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * @return The laundered exception.
      * 
      * @throws Exception
+     * 
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/508 (LIMIT causes
+     *      hash join utility to log errors)
      */
     private RuntimeException launderThrowable(final Throwable t) {
 
         final String msg = "cause=" + t + ", state=" + toString();
 
-        log.error(msg, t);
+        if (!InnerCause.isInnerCause(t, InterruptedException.class)
+                && !InnerCause.isInnerCause(t, BufferClosedException.class)) {
+
+            /*
+             * Some sort of unexpected exception.
+             */
+
+            log.error(msg, t);
+
+        }
 
         return new RuntimeException(msg, t);
 
     }
 
-}   
+}
