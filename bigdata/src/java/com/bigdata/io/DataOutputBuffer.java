@@ -299,22 +299,24 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         
     }
 
-    /**
-     * @todo This is not wildly efficient (it would be fine if
-     *       DataOutputStream#writeUTF(String str, DataOutput out)} was public)
-     *       but the use cases for serializing the nodes and leaves of a btree
-     *       do not suggest any requirement for Unicode (if you assume that the
-     *       application values are already being serialized as byte[]s - which
-     *       is always true when there is a client-server divide). It is used by
-     *       {@link Name2Addr} to store the index names. It used to be used to
-     *       write Value into the lexicon, but that is now handled using a
-     *       {@link IUnicodeCompressor}.
-     * 
-     * @todo Consider changing the access modified on the desired method using
-     *       reflection.
-     */
+    // This inefficiency has been fixed.
+//    /**
+//     * @todo This is not wildly efficient (it would be fine if
+//     *       DataOutputStream#writeUTF(String str, DataOutput out)} was public)
+//     *       but the use cases for serializing the nodes and leaves of a btree
+//     *       do not suggest any requirement for Unicode (if you assume that the
+//     *       application values are already being serialized as byte[]s - which
+//     *       is always true when there is a client-server divide). It is used by
+//     *       {@link Name2Addr} to store the index names. It used to be used to
+//     *       write Value into the lexicon, but that is now handled using a
+//     *       {@link IUnicodeCompressor}.
+//     * 
+//     * @todo Consider changing the access modified on the desired method using
+//     *       reflection.
+//     */
     public void writeUTF(final String str) throws IOException {
-        
+
+        // This is the old, inefficient version.
 //        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 //        
 //        final DataOutputStream dos = new DataOutputStream(baos);
@@ -326,6 +328,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 //        write(baos.toByteArray());
 //        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
+        // This is the new, more efficient version.
         final DataOutputStream dos = new DataOutputStream(this);
         
         dos.writeUTF(str);
