@@ -61,10 +61,12 @@ public class BigdataValueSerializer<V extends Value> {
 
     /**
      * Version zero(0) of the serialization format. This version could not write
-     * out very large Unicode strings (64k character limit). Also, there were
-     * are inefficiencies in {@link DataOutputBuffer} when writing UTF8 which
-     * caused a performance hit. See {@link DataOutputBuffer#writeUTF(String)}.
+     * out very large Unicode strings (64k character limit).
      */
+//    * Note: This inefficiency has been fixed. 
+//    * Also, there were inefficiencies in {@link DataOutputBuffer} when writing
+//    * UTF8 which caused a performance hit. See
+//    * {@link DataOutputBuffer#writeUTF(String)}.
     private static final short VERSION0 = 0x0;
 
     /**
@@ -75,6 +77,13 @@ public class BigdataValueSerializer<V extends Value> {
     
     /**
      * The current serialization version.
+     * <p>
+     * Note: Changing back to {@link #VERSION0}. It looks like it was
+     * significantly more efficient (though it might be possible to optimize the
+     * code paths for {@link #VERSION1}).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/506">
+     *      Load, closure and query performance in 1.1.x versus 1.0.x </a>
      */
     private final static short currentVersion = VERSION1;
     
