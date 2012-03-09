@@ -1415,13 +1415,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
     /**
      * Report "MUST" bound bindings projected by the SERVICE. This involves
-     * checking the graph pattern reported by {@link ServiceNode#getGraphPattern()}
-     * . Bindings visible in the parent group are NOT projected into a SERVICE.
-     * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
-     * projected bindings.
-     * <p>
-     * Note: This assumes that services do not run "as-bound". If this is
-     * permitted, then this code needs to be reviewed.
+     * checking the graph pattern reported by
+     * {@link ServiceNode#getGraphPattern()} .
      */
     // MUST : ServiceNode
     public Set<IVariable<?>> getDefinitelyProducedBindings(
@@ -1445,12 +1440,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     /**
      * Report the "MUST" and "MAYBE" bound variables projected by the service.
      * This involves checking the graph pattern reported by
-     * {@link ServiceNode#getGraphPattern()}. Bindings visible in the parent group
-     * are NOT projected into a SERVICE. A SERVICE does NOT have an explicit
-     * PROJECTION so it can not rename the projected bindings.
-     * <p>
-     * Note: This assumes that services do not run "as-bound". If this is
-     * permitted, then this code needs to be reviewed.
+     * {@link ServiceNode#getGraphPattern()}. A SERVICE does NOT have an
+     * explicit PROJECTION so it can not rename the projected bindings.
      */
     // MAY : ServiceNode
     public Set<IVariable<?>> getMaybeProducedBindings(final ServiceNode node) {
@@ -2047,7 +2038,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            is used to identify anything which is PROJECTed out of the
      *            query.
      * @param exogenousVars
-     *            Any variables which are bound outside of the query.
+     *            Any variables which are bound outside of the query AND known
+     *            to be in scope (exogenous variables in a sub-select are only
+     *            in scope if they are projected into the sub-select).
      * @param projectedVars
      *            The variables which must be projected will be added to this
      *            collection.

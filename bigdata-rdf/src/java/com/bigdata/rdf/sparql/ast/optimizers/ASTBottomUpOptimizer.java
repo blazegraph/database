@@ -49,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -196,7 +197,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                         final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
                                 .getWhereClause();
 
-                        checkForBadlyDesignedLeftJoin(sa, group,
+                        checkForBadlyDesignedLeftJoin(context, sa, group,
                                 innerOptionalGroups);
 
                     }
@@ -207,7 +208,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) queryRoot
                         .getWhereClause();
 
-                checkForBadlyDesignedLeftJoin(sa, group, innerOptionalGroups);
+                checkForBadlyDesignedLeftJoin(context, sa, group,
+                        innerOptionalGroups);
 
             }
 
@@ -292,6 +294,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * in the parent group but are bound in groups above the parent group.
      */
     private void checkForBadlyDesignedLeftJoin(
+            final AST2BOpContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> whereClause,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
@@ -303,8 +306,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         while(itr.hasNext()) {
             
             final JoinGroupNode group = itr.next();
-            
-            if(!group.isOptional()) {
+
+            if (!group.isOptional()) {
                 // Ignore non-optional join groups.
                 continue;
             }
@@ -313,8 +316,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              * This is a candidate for an inner join group of a badly designed
              * optional join pattern, so check it in depth.
              */
-            checkForBadlyDesignedLeftJoin2(sa, group, badlyDesignedLeftJoins);
-   
+            checkForBadlyDesignedLeftJoin2(context, sa, group,
+                    badlyDesignedLeftJoins);
+
         }
         
     }
@@ -366,12 +370,23 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      *            identified.
      * 
      *            FIXME This ignores the exogenous variables. unit test for this
-     *            case and fix.
+     *            case and fix. [A variable would have to be bound is all
+     *            exogenous solutions in order to allow us to avoid the rewrite
+     *            for bottom up semantics. E.g., it would have to be a member of
+     *            {@link ISolutionSetStats#getAlwaysBound()} but not a member of
+     *            {@link ISolutionSetStats#getConstants()} since it does not
+     *            have to be bound to the same value in each solution].
+     *            <p>
+     *            I have made a partial fix. However, an exogenous variable IS
+     *            NOT visible within a subquery unless it is projected into that
+     *            subquery. Thus, it is incorrect to simply consult
+     *            {@link ISolutionSetStats#getAlwaysBound()}
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     private void checkForBadlyDesignedLeftJoin2(
+            final AST2BOpContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> group,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
@@ -383,14 +398,17 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          * left-join pattern.
          */
 
-        final IGroupNode<? extends IGroupMemberNode> p = group
-                .getParentJoinGroup();
+        final IGroupNode<? extends IGroupMemberNode> p =
+//                sa.findParentJoinGroup(group)
+                group.getParentJoinGroup()
+                ;
 
         if (p == null) {
             // No parent.
             return;
         }
-
+        System.err.println("Considering: "+group);
+        
 //        if(((JoinGroupNode)p).isMinus()) return;
         
         final IGroupNode<? extends IGroupMemberNode> pp = p
@@ -413,7 +431,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          */
         final Set<IVariable<?>> topDownVars = sa.getDefinitelyIncomingBindings(
                 p, new LinkedHashSet<IVariable<?>>());
-
+        
         /*
          * Obtain the set of variables used in JOINs -OR- FILTERs within this
          * optional group.
@@ -440,6 +458,23 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          * variables which are not present in the parent but which are present
          * in the group hierarchy above that parent.
          */
+
+        /*
+         * Remove any variables which are bound in all of the exogenous
+         * solutions. These are visible everywhere (except within a subquery if
+         * they are not projected into that subquery).
+         * 
+         * FIXME This is not a 100% correct fix. The problem is that it ignores
+         * the variable scoping rules for a subquery. Variables are only visible
+         * within a subquery if they are projected into that subquery, even if
+         * the binding is exogenous.  The correct fix is to lift this into
+         * StaticAnalyis#getDefinitelyProducedBindings(), and which point the
+         * line below can be removed as it will have been correctly handled by
+         * the method on StaticAnalysis.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+         */
+        innerGroupVars.removeAll(context.getSolutionSetStats().getAlwaysBound());
 
         // remove all variables declared by the parent.
         innerGroupVars.removeAll(parentVars);
@@ -582,8 +617,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             final IBindingSet[] bindingSets) {
 
         // All exogenous variables (given in the source solutions).
-        @SuppressWarnings("unchecked")
-        final Set<IVariable<?>> exogenous = (context == null ? (Set)Collections
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        final Set<IVariable<?>> exogenous = (context == null ? (Set) Collections
                 .emptySet() : context.getSolutionSetStats().getUsedVars());
 
         // Map for renamed variables.
@@ -628,7 +663,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
             
-            // All variables appearing in the source solutions.
+            /*
+             * All variables appearing in the source solutions.
+             * 
+             * TODO This is incorrectly considering all exogenous variables. It
+             * must consider only those which are in scope. Exogenous variables
+             * are NOT visible in a Sub-Select unless they are projected into
+             * that Sub-Select.
+             */
             maybeBound.addAll(exogenous);
 
             if (group.isOptional()) {

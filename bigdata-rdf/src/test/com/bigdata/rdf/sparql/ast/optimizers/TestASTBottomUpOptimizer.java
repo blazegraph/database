@@ -27,12 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.OWL;
-import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -66,13 +61,11 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.TestStaticAnalysis;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -232,7 +225,8 @@ public class TestASTBottomUpOptimizer extends
                         Scope.DEFAULT_CONTEXTS//
                         ));
 
-                modifiedClause.addChild(new NamedSubqueryInclude(namedSet));
+                modifiedClause.addChild(new JoinGroupNode(true/* optional */,
+                        new NamedSubqueryInclude(namedSet)));
                 
             }
             
@@ -244,17 +238,90 @@ public class TestASTBottomUpOptimizer extends
         assertEquals("liftedClause", expectedNSR, nsr);
 
         /*
-         * FIXME This is failing because the INCLUDE is being wrapped by an
-         * OPTIONAL group to maintain the OPTIONAL semantics of the lifted
-         * group. The NamedSubqueryIncludeOp should be modified to support
+         * TODO The NamedSubqueryIncludeOp should be modified to support
          * OPTIONAL and ASTBottomUpOptimizer modified to mark the INCLUDE as
-         * optional, at which point this problem will go away. [It may be that
-         * we can do this now using the SolutionSetHashJoinOp.]
+         * optional. It may be that we can do this now using the
+         * SolutionSetHashJoinOp. If so, then this test could be updated (it is
+         * a one line change when we add the NSI to the [modifiedClause] up
+         * above.)
          * 
          * Note: Precisely the same issue exists for MINUS.
          */
         assertEquals("modifiedClause", modifiedClause,
                 queryRoot.getWhereClause());        
+
+    }
+
+    /**
+     * A variant of {@link #test_bottomUpOptimizer_nested_optionals_1()} where
+     * there is a binding for <code>v</code> in each exogenous solutions. This
+     * turns <code>v</code> into a "known" bound variable. At that point we no
+     * longer need to rewrite the query in order to have the correct evaluation
+     * semantics.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_bottomUpOptimizer_nested_optionals_1_correctRejection()
+            throws MalformedQueryException {
+
+        final String queryStr = "" + //
+                "PREFIX : <http://example/>\n" + //
+                "SELECT * \n" + //
+                "{ \n" + //
+                "    :x1 :p ?v . \n" + //
+                "    OPTIONAL {" +
+                "      :x3 :q ?w . \n" + //
+                "      OPTIONAL { :x2 :p ?v  } \n" + //
+                "    } \n" + //
+                "}"//
+        ;
+
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI x1 = f.createURI("http://example/x1");
+        final BigdataURI x2 = f.createURI("http://example/x2");
+        final BigdataURI x3 = f.createURI("http://example/x3");
+        final BigdataURI p = f.createURI("http://example/p");
+        final BigdataURI q = f.createURI("http://example/q");
+        final BigdataURI c1 = f.createURI("http://example/c1");
+        final BigdataURI c2 = f.createURI("http://example/c2");
+        final BigdataValue[] values = new BigdataValue[] { x1, x2, x3, p, q, c1, c2 };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        final IVariable<?> v = Var.var("v");
+        
+        final IBindingSet[] bindingSets = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[]{v},//
+                        new IConstant[]{new Constant(c1)}//
+                        ),//
+                new ListBindingSet(//
+                        new IVariable[]{v},//
+                        new IConstant[]{new Constant(c1)}//
+                        )
+        };
+        
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        context.setSolutionSetStats(new SolutionSetStats(bindingSets));
+        
+        queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
+                context, queryRoot, bindingSets);
+
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
+                context, queryRoot, bindingSets);
+
+        assertNull("should not have rewritten the query",
+                queryRoot.getNamedSubqueries());
 
     }
 
@@ -1280,6 +1347,8 @@ public class TestASTBottomUpOptimizer extends
 
     }
 
+//    Note: This was not actually a bottom up evaluation problem at all.
+//    
 //    /**
 //     * This is a bottom up semantics test from the openrdf services test suite.
 //     * There are no shared variables for the two SERVICE clauses. This means
@@ -1306,6 +1375,7 @@ public class TestASTBottomUpOptimizer extends
 //     * }
 //     * </pre>
 //     */
+//    @SuppressWarnings({ "rawtypes", "unchecked" })
 //    public void test_service13() {
 //
 //        /*

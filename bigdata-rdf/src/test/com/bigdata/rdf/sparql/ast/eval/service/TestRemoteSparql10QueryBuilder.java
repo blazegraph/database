@@ -42,6 +42,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.query.parser.sparql.DC;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.XSD;
@@ -1250,5 +1251,214 @@ public class TestRemoteSparql10QueryBuilder extends
         assertSameAST(queryStr, expected, actual);
 
     }
+
+//    /**
+//     * A variant test where a blank node is used in the graph pattern. The blank
+//     * node is translated internally into an anonymous variable. However, the
+//     * name of that anonymous variable is NOT a legal name for a SPARQL variable
+//     * (this is done in order to avoid potential conflicts with variables used
+//     * in the query). This causes a SPARQL error on the remote service when it
+//     * sees the illegal variable name.
+//     * 
+//     * TODO Port this to {@link TestRemoteSparql11QueryBuilder} also.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/510">
+//     *      Blank nodes in SERVICE graph patterns </a>
+//     */
+//    public void test_service_009() throws Exception {
+//        
+//        if (false) {
+//            
+//            /*
+//             * You can run this to demonstrate the error that the parser will
+//             * throw if it sees the untranslated name of the anonymous variable
+//             * that are using to model the blank node in the AST.
+//             */
+//            
+//            final String queryStr = "prefix : <http://example.org/>\n"//
+//                    + "prefix foaf: <http://xmlns.com/foaf/0.1/>\n"//
+//                    + "SELECT  ?-anon-2 ?t2\n"//
+//                    + "WHERE {\n"//
+//                    + "     [] foaf:name ?t2 . "//
+//                    + "}";
+//            
+//            final QueryRoot actual = parse(queryStr, baseURI);
+//
+//        }
+//        {
+//            
+//            final String queryStr = "PREFIX : <http://example.org/>\n" //
+//                    + "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n"//
+//                    + "SELECT ?t1 ?t2 {\n" //
+//                    + "  [] foaf:name ?t1 .\n"//
+//                    + "  SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> {\n"//
+//                    + "     [] foaf:name ?t2 .\n"//
+//                    + " }\n"//
+//                    + "}";
+//
+//            final QueryRoot actual = parse(queryStr, baseURI);
+//
+//            // The SERVICE node.
+//            final ServiceNode serviceNode = BOpUtility.visitAll(actual,
+//                    ServiceNode.class).next();
+//
+//            // The inner statement pattern for the SERVICE node.
+//            final StatementPatternNode sp1 = (StatementPatternNode) serviceNode
+//                    .getGraphPattern().get(0);
+//
+//            // The anonymous variable used for that blank node.
+//            final IVariable<?> anonvar2 = (IVariable<?>) sp1.s().getValueExpression();
+//            
+//            /*
+//             * We need to decorate the SERVICE node a bit with metadata which is
+//             * not attached by the parser.
+//             */
+//            final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
+//            projectedVars.add(anonvar2);
+//            projectedVars.add(Var.var("t2"));
+//            serviceNode.setProjectedVars(projectedVars);
+//
+//            final List<BindingSet> bindingSets = new LinkedList<BindingSet>();
+//
+//            final BindingSet[] a = bindingSets
+//                    .toArray(new BindingSet[bindingSets.size()]);
+//
+//            // We will now generate a SPARQL query for that SERVICE node.
+//            final IRemoteSparqlQueryBuilder fixture = newFixture(serviceNode, a);
+//
+//            final String queryStr2 = fixture.getSparqlQuery(a);
+//
+//            /*
+//             * Verify that a valid query was generated. This implies that the
+//             * anonymous variable name issue was handled during query
+//             * generation.
+//             * 
+//             * FIXME This only tests query generation. We must also test the
+//             * correlation of the results when received back from the service.
+//             */
+//System.err.println("queryStr2: "+queryStr2); // FIXME REMOVE
+//            final QueryRoot actual2 = parse(queryStr2, baseURI);
+//
+//        }
+//        
+//        /*
+//         * The name assigned by the SPARQL parser to the variable which models
+//         * the blank node.
+//         */ 
+//        final String anonvar1 = "-anon-1"; // local access path
+//        final String anonvar2 = "-anon-2"; // inside the SERVICE graph pattern.
+//        
+//        final BigdataURI serviceURI = valueFactory
+//                .createURI("http://localhost:18080/openrdf/repositories/endpoint1");
+//
+//        final GraphPatternGroup<IGroupMemberNode> groupNode = new JoinGroupNode();
+//        {
+//            groupNode.addChild(new StatementPatternNode(new VarNode(anonvar1),
+//                    new VarNode("p"), new VarNode("o")));
+//        }
+//        
+//        final String exprImage = "SERVICE <" + serviceURI + "> { [] ?p ?o }";
+//        
+//        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+//
+//        final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
+//                makeIV(serviceURI)), groupNode);
+//        {
+//            final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
+//            {
+//                projectedVars.add(Var.var("s"));
+//                projectedVars.add(Var.var("p"));
+//                projectedVars.add(Var.var("o"));
+//            }
+//
+//            serviceNode.setExprImage(exprImage);
+//            serviceNode.setPrefixDecls(prefixDecls);
+//            serviceNode.setProjectedVars(projectedVars);
+//        }
+//
+//        final List<BindingSet> bindingSets = new LinkedList<BindingSet>();
+//        /*
+//         * A blank node MAY be turned into an unbound variable as long as we
+//         * impose the constraint that all vars having that blank node for a
+//         * solution are EQ (same term).
+//         * 
+//         * Note: For this query, the *same* blank node is used for ?s and ?book.
+//         * That needs to be turned into a FILTER which is attached to the remote
+//         * SPARQL query in order to maintain the correlation between those
+//         * variables (FILTER ?s = ?book).
+//         */
+//        { // Note: Blank nodes ARE correlated for this solution.
+//            final MapBindingSet bset = new MapBindingSet();
+//            final BNode tmp = new BNodeImpl("abc");
+//            bset.addBinding("s", tmp);
+//            bset.addBinding("o", tmp);
+//            bindingSets.add(bset);
+//        }
+//        { // Note: Blank nodes are NOT correlated for this solution.
+//            final MapBindingSet bset = new MapBindingSet();
+//            final BNode tmp1 = new BNodeImpl("foo");
+//            final BNode tmp2 = new BNodeImpl("bar");
+//            bset.addBinding("s", tmp1);
+//            bset.addBinding("o", tmp2);
+//            bindingSets.add(bset);
+//        }
+//
+//        final BindingSet[] a = bindingSets.toArray(new BindingSet[bindingSets
+//                .size()]);
+//
+//        final IRemoteSparqlQueryBuilder fixture = newFixture(serviceNode, a);
+//
+//        final String queryStr = fixture.getSparqlQuery(a);
+//
+//        // Verify the structure of the rewritten query.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            expected.setPrefixDecls(prefixDecls);
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            projection.addProjectionVar(new VarNode("s"));
+//            projection.addProjectionVar(new VarNode("p"));
+//            projection.addProjectionVar(new VarNode("o"));
+//            expected.setProjection(projection);
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            final UnionNode union = new UnionNode();
+//            whereClause.addChild(union);
+//
+//            {
+//
+//                final JoinGroupNode joinGroup = new JoinGroupNode();
+//                union.addChild(joinGroup);
+//
+//                // A FILTER to enforce variable correlation.
+//                joinGroup.addChild(new FilterNode(FunctionNode.sameTerm(
+//                        new VarNode("s"), new VarNode("o"))));
+//
+//                joinGroup.addChild(new StatementPatternNode(new VarNode("s"),
+//                        new VarNode("p"), new VarNode("o"), null/* c */,
+//                        Scope.DEFAULT_CONTEXTS));
+//
+//            }
+//            {
+//
+//                final JoinGroupNode joinGroup = new JoinGroupNode();
+//                union.addChild(joinGroup);
+//
+//                joinGroup.addChild(new StatementPatternNode(new VarNode("s"),
+//                        new VarNode("p"), new VarNode("o"), null/* c */,
+//                        Scope.DEFAULT_CONTEXTS));
+//
+//            }
+//
+//        }
+//
+//        final QueryRoot actual = parse(queryStr, baseURI);
+//
+//        assertSameAST(queryStr, expected, actual);
+//
+//    }
 
 }
