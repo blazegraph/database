@@ -179,7 +179,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *         TODO We could handle the IBindingSet[] by stuffing the data into
      *         a named solution set during the query rewrite and attaching that
      *         named solution set to the AST. This could allow for very large
-     *         solution sets to be passed into a query.
+     *         solution sets to be passed into a query.  Any such change would
+     *         have to be deeply integrated with the SPARQL parser in order to
+     *         provide any benefit for the Java heap.
      */
     static PipelineOp convert(final AST2BOpContext ctx,
             final IBindingSet[] bindingSets) {
