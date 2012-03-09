@@ -301,7 +301,8 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
                                 final ServiceFactory f = ServiceRegistry
                                         .getInstance().get(serviceURI);
 
-                                if (f.getServiceOptions().isRunFirst()) {
+                                if (f != null
+                                        && f.getServiceOptions().isRunFirst()) {
 
                                     ordered.add(n);
 
