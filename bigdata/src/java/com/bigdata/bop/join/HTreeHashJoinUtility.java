@@ -1802,7 +1802,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         final String msg = "cause=" + t + ", state=" + toString();
 
-        log.error(msg);
+        log.error(msg, t);
 
         return new RuntimeException(msg, t);
 
