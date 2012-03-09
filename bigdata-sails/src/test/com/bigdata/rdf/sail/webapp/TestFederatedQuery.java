@@ -22,6 +22,37 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
+Portions of this code are:
+
+Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+    * Neither the name of the copyright holder nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+/*
  * Created on Mar 6, 2012
  */
 package com.bigdata.rdf.sail.webapp;
@@ -85,8 +116,15 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
  * Proxied test suite for SPARQL 1.1 Federated Query. In general, each test
- * loads some data into the KB and then issues a federated query. Many of the
- * test cases were imported from openrdf.
+ * loads some data into the KB and then issues a federated query. The core tests
+ * are W3C tests and have the pattern <code>serviceXX</code>. There are also
+ * tests developed for openrdf.
+ * 
+ * @see <a href="http://www.w3.org/2009/sparql/docs/tests/"> W3C Tests </a>
+ * 
+ * @see <a
+ *      href="http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/">
+ *      Federated Query Test Suite </a>
  * 
  * @param <S>
  */
@@ -520,6 +558,19 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         prepareTest(null, Arrays.asList(PREFIX+"data13.ttl"));
         execute(PREFIX+"service13.rq", PREFIX+"service13.srx", false);              
     }
+
+    /**
+     * Variant of {@link #test13()} which demonstrates a workaround for the
+     * uncorrelated SERVICE joins.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/509">
+     *      Uncorrelated SERVICE JOINs. </a>
+     */
+    public void test13b() throws Exception {
+        /* test for bug SES-899: cross product is required */
+        prepareTest(null, Arrays.asList(PREFIX+"data13.ttl"));
+        execute(PREFIX+"service13b.rq", PREFIX+"service13.srx", false);              
+    }
     
     public void testEmptyServiceBlock() throws Exception {
         /* test for bug SES-900: nullpointer for empty service block */
@@ -871,5 +922,5 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             fail(message.toString());
         }
     }
-
+    
 }

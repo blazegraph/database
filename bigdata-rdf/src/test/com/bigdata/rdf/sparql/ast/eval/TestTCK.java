@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 
@@ -38,6 +41,8 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
  */
 public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
+    private static final Logger log = Logger.getLogger(TestTCK.class);
+    
     /**
      * 
      */
@@ -787,6 +792,62 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 ,false// laxCardinality
                 ,true// checkOrder
         ).runTest();
+
+    }
+    
+    /**
+     * This is based on <code>service13</code>, which is an openrdf Federated
+     * Query test. The test was failing because the two SERVICE joins do not
+     * share any variables and use a hash join. Thus, we had two solutions from
+     * the first SERVICE and sent two <em>empty</em> solutions to the second
+     * SERVICE. This caused the 2nd SERVICE to deliver twice as many solutions
+     * as is expected. Because the hash join was not correlated through a rowId,
+     * we wind up wind a full cross product of both (empty) source solutions and
+     * all solutions coming back from the 2nd service.
+     * <p>
+     * It is interesting that this test passes without modification when run on
+     * purely local data. This suggests that the problem is not one of bottom up
+     * evaluation, but the lack of a variable to correlate the result sets from
+     * the remote services.
+     * <p>
+     * Note: This test is a rewrite of the same query to run against purely
+     * local data. All I did was comment out the SERVICE keyword and service
+     * URI.
+     * 
+     * <pre>
+     * # Test for SES 899
+     * 
+     * PREFIX : <http://example.org/> 
+     * PREFIX owl: <http://www.w3.org/2002/07/owl#> 
+     * 
+     * SELECT ?a ?b
+     * {
+     *   #SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> 
+     *   {
+     *      ?a a ?t1 
+     *      filter(?t1 = owl:Class) 
+     *   }
+     *   #SERVICE <http://localhost:18080/openrdf/repositories/endpoint1> 
+     *   { 
+     *      ?b a ?t2 
+     *      filter(?t2 = owl:Class) 
+     *   } 
+     * }
+     * </pre>
+     */
+    public void test_join_with_no_shared_variables() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "join_with_no_shared_variables", // testURI,
+                "join_with_no_shared_variables.rq",// queryFileURL
+                "join_with_no_shared_variables.ttl",// dataFileURL
+                "join_with_no_shared_variables.srx"// resultFileURL
+                ,false// laxCardinality
+                ,false// checkOrder
+        ).runTest();
+
+        if (log.isInfoEnabled())
+            log.info(astContainer.toString());
 
     }
 
