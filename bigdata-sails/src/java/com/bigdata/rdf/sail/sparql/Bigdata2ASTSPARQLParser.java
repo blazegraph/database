@@ -37,9 +37,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
@@ -60,6 +58,8 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.Update;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
@@ -93,89 +93,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         
     }
 
-    /*
-     * FIXME SPARQL 1.1 UPDATE
-     */
-    public ParsedUpdate parseUpdate(String updateStr, String baseURI)
-            throws MalformedQueryException
-        {
-        
-        if(log.isInfoEnabled())
-            log.info(updateStr);
-        
-            try {
-
-                ParsedUpdate update = new ParsedUpdate();
-
-                ASTUpdateSequence updateSequence = SyntaxTreeBuilder.parseUpdateSequence(updateStr);
-
-                List<ASTUpdateContainer> updateOperations = updateSequence.getUpdateContainers();
-
-                List<ASTPrefixDecl> sharedPrefixDeclarations = null;
-                
-                for (ASTUpdateContainer uc : updateOperations) {
-
-                    StringEscapesProcessor.process(uc);
-                    BaseDeclProcessor.process(uc, baseURI);
-                    
-                    // do a special dance to handle prefix declarations in sequences: if the current
-                    // operation has its own prefix declarations, use those. Otherwise, try and use
-                    // prefix declarations from a previous operation in this sequence.
-                    List<ASTPrefixDecl> prefixDeclList = uc.getPrefixDeclList();
-                    if (prefixDeclList == null || prefixDeclList.size() == 0) {
-                        if (sharedPrefixDeclarations != null) {
-                            for (ASTPrefixDecl prefixDecl: sharedPrefixDeclarations) {
-                                uc.jjtAppendChild(prefixDecl);
-                            }
-                        }
-                    }
-                    else {
-                        sharedPrefixDeclarations = prefixDeclList;
-                    }
-                    
-                    PrefixDeclProcessor.process(uc);
-                    /*
-                     * Note: In the query part of an update, blank nodes are treated
-                     * as anonymous vars. In the data part of the update, like in a
-                     * construct node, if a blank node is seen, for each binding set
-                     * in the solution list, a new blank node is generated. If it is
-                     * an update, that generated bnode is stored in the server, or
-                     * if it's a constructnode, that new bnode is returned as the
-                     * results.
-                     */
-                    BlankNodeVarProcessor.process(uc);
-
-                    final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
-
-//                    FIXME Restore when implementing UPDATE.
-//                    // Handle dataset declaration
-//                    final DatasetNode dataSetNode = new DatasetDeclProcessor(
-//                            context).process(qc);
-//    
-//                    if (dataSetNode != null) {
-//    
-//                        queryRoot.setDataset(dataSetNode);
-//    
-//                    }
-
-                    ASTUpdate updateNode = uc.getUpdate();
-                    update.addUpdateExpr((UpdateExpr)updateNode.jjtAccept(updateExprBuilder, null));
-                }
-                
-                return update;
-            }
-            catch (ParseException e) {
-                throw new MalformedQueryException(e.getMessage(), e);
-            }
-            catch (TokenMgrError e) {
-                throw new MalformedQueryException(e.getMessage(), e);
-            }
-            catch (VisitorException e) {
-                throw new MalformedQueryException(e.getMessage(), e);
-            }
-
-        }
-
     /**
      * {@inheritDoc}
      * <p>
@@ -190,6 +107,139 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
         return new BigdataParsedQuery(parseQuery2(queryStr, baseURI));
         
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+     *      SPARQL 1.1 Update </a>
+     */
+    public ParsedUpdate parseUpdate(final String updateStr, final String baseURI)
+            throws MalformedQueryException {
+
+        throw new UnsupportedOperationException();
+//        return new BigdataParsedUpdate(parseUpdate2(queryStr, baseURI));
+
+    }
+
+    /**
+     * Parse a SPARQL 1.1 UPDATE request.
+     * 
+     * @return The Bigdata AST model for that request.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+     *      SPARQL 1.1 Update </a>
+     */
+    public ASTContainer parseUpdate2(final String updateStr,
+            final String baseURI) throws MalformedQueryException {
+
+        if (log.isInfoEnabled())
+            log.info(updateStr);
+
+        try {
+
+            final ASTUpdateSequence updateSequence = SyntaxTreeBuilder
+                    .parseUpdateSequence(updateStr);
+
+            final UpdateRoot update = new UpdateRoot();
+
+            final ASTContainer ast = new ASTContainer(update);
+            
+            // Set the query string on the AST.
+            ast.setQueryString(updateStr);
+
+            // Set the parse tree on the AST.
+            ast.setParseTree(updateSequence);
+
+            final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(
+                    context);
+
+            final List<ASTUpdateContainer> updateOperations = updateSequence
+                    .getUpdateContainers();
+
+            List<ASTPrefixDecl> sharedPrefixDeclarations = null;
+
+            for (ASTUpdateContainer uc : updateOperations) {
+
+                StringEscapesProcessor.process(uc);
+                BaseDeclProcessor.process(uc, baseURI);
+
+                /*
+                 * Do a special dance to handle prefix declarations in
+                 * sequences: if the current operation has its own prefix
+                 * declarations, use those. Otherwise, try and use prefix
+                 * declarations from a previous operation in this sequence.
+                 */
+                final List<ASTPrefixDecl> prefixDeclList = uc
+                        .getPrefixDeclList();
+                if (prefixDeclList == null || prefixDeclList.size() == 0) {
+                    if (sharedPrefixDeclarations != null) {
+                        for (ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
+                            uc.jjtAppendChild(prefixDecl);
+                        }
+                    }
+                } else {
+                    sharedPrefixDeclarations = prefixDeclList;
+                }
+
+                PrefixDeclProcessor.process(uc);
+
+                /*
+                 * Note: In the query part of an update, blank nodes are treated
+                 * as anonymous vars. In the data part of the update, like in a
+                 * construct node, if a blank node is seen, for each binding set
+                 * in the solution list, a new blank node is generated. If it is
+                 * an update, that generated bnode is stored in the server, or
+                 * if it's a constructnode, that new bnode is returned as the
+                 * results.
+                 */
+                BlankNodeVarProcessor.process(uc);
+
+                /*
+                 * Batch resolve ASTRDFValue to BigdataValues with their
+                 * associated IVs.
+                 * 
+                 * TODO IV resolution probably needs to proceed separately for
+                 * each UPDATE operation in a sequence since some operations can
+                 * cause new IVs to be declared in the lexicon. Resolution
+                 * before those IVs have been declared would produce a different
+                 * result than resolution afterward.
+                 */
+                new BatchRDFValueResolver(context).process(uc);
+
+
+//              // Handle dataset declaration
+//                    FIXME Restore when implementing UPDATE.
+//                openrdf:
+//                Dataset dataset = DatasetDeclProcessor.process(uc);
+//                if (dataset != null) {
+//                    update.setDataset(dataset);
+//                }
+//                bigdata:
+//                final DatasetNode dataSetNode = new DatasetDeclProcessor(
+//                        context).process(qc);
+//                if (dataSetNode != null) {
+//                    queryRoot.setDataset(dataSetNode);
+//                }
+
+                final ASTUpdate updateNode = uc.getUpdate();
+                
+                update.addChild((Update) updateNode.jjtAccept(
+                        updateExprBuilder, null/* data */));
+                
+            }
+
+            return ast;
+            
+        } catch (ParseException e) {
+            throw new MalformedQueryException(e.getMessage(), e);
+        } catch (TokenMgrError e) {
+            throw new MalformedQueryException(e.getMessage(), e);
+        } catch (VisitorException e) {
+            throw new MalformedQueryException(e.getMessage(), e);
+        }
+
     }
 
     /**
@@ -223,14 +273,13 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 //            WildcardProjectionProcessor.process(qc);
 
             BlankNodeVarProcessor.process(qc);
-            
+
             /*
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
              */
-            
             new BatchRDFValueResolver(context).process(qc);
-            
+
             /*
              * Build the bigdata AST from the parse tree.
              */

@@ -42,7 +42,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
-        IJoinNode {
+        IJoinNode, IStatementContainer {
 
     private static final long serialVersionUID = 1L;
 

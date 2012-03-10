@@ -95,8 +95,8 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * CONSTRUCT (handled as a TriplesBlock).
      */
     @Override
-    final public ConstructNode visit(final ASTConstruct node, Object data)
-     throws VisitorException {
+    final public ConstructNode visit(final ASTConstruct node, final Object data)
+            throws VisitorException {
 
         final GroupGraphPattern parentGP = graphPattern;
         

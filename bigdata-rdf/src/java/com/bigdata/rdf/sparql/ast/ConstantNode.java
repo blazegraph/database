@@ -35,12 +35,14 @@ public class ConstantNode extends TermNode {
         
     }
 
+    @SuppressWarnings("rawtypes")
     public ConstantNode(final IV val) {
 
 		this(new Constant<IV>(val));
 		
 	}
 	
+    @SuppressWarnings("rawtypes")
 	public ConstantNode(final IConstant<IV> val) {
 		
         super(new BOp[] { val }, null);
@@ -50,7 +52,8 @@ public class ConstantNode extends TermNode {
 	/**
 	 * Strengthen return type.
 	 */
-	@Override
+	@SuppressWarnings("rawtypes")
+    @Override
 	public IConstant<IV> getValueExpression() {
 		
 		return (IConstant<IV>) super.getValueExpression();
@@ -60,7 +63,7 @@ public class ConstantNode extends TermNode {
     @Override
     public String toString() {
 
-        final IConstant<IV> c = getValueExpression();
+        final IConstant<?> c = getValueExpression();
         
         return "ConstantNode(" + c + ")";
 

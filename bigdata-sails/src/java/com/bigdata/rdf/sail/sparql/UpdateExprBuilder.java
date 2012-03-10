@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 10, 2012
+ */
 /*
  * Copyright Aduna (http://www.aduna-software.com/) (c) 2011.
  *
@@ -5,77 +31,73 @@
  */
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-import org.openrdf.model.ValueFactory;
-import org.openrdf.query.algebra.Add;
-import org.openrdf.query.algebra.BNodeGenerator;
-import org.openrdf.query.algebra.Clear;
-import org.openrdf.query.algebra.Copy;
-import org.openrdf.query.algebra.Create;
-import org.openrdf.query.algebra.DeleteData;
-import org.openrdf.query.algebra.EmptySet;
-import org.openrdf.query.algebra.Extension;
-import org.openrdf.query.algebra.ExtensionElem;
-import org.openrdf.query.algebra.InsertData;
-import org.openrdf.query.algebra.Load;
-import org.openrdf.query.algebra.Modify;
-import org.openrdf.query.algebra.Move;
-import org.openrdf.query.algebra.MultiProjection;
-import org.openrdf.query.algebra.Projection;
-import org.openrdf.query.algebra.ProjectionElem;
-import org.openrdf.query.algebra.ProjectionElemList;
-import org.openrdf.query.algebra.Reduced;
-import org.openrdf.query.algebra.SingletonSet;
-import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.UpdateExpr;
-import org.openrdf.query.algebra.ValueConstant;
-import org.openrdf.query.algebra.ValueExpr;
-import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.helpers.StatementPatternCollector;
 
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
 import com.bigdata.rdf.sail.sparql.ast.ASTCreate;
-import com.bigdata.rdf.sail.sparql.ast.ASTDeleteClause;
-import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
-import com.bigdata.rdf.sail.sparql.ast.ASTDeleteWhere;
 import com.bigdata.rdf.sail.sparql.ast.ASTDrop;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphOrDefault;
-import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphRefAll;
-import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
-import com.bigdata.rdf.sail.sparql.ast.ASTInsertClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTInsertData;
 import com.bigdata.rdf.sail.sparql.ast.ASTLoad;
-import com.bigdata.rdf.sail.sparql.ast.ASTModify;
 import com.bigdata.rdf.sail.sparql.ast.ASTMove;
 import com.bigdata.rdf.sail.sparql.ast.ASTQuadsNotTriples;
-import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
+import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.sparql.ast.AddGraph;
+import com.bigdata.rdf.sparql.ast.ClearGraph;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.CopyGraph;
+import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.InsertData;
+import com.bigdata.rdf.sparql.ast.LoadGraph;
+import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.QuadsData;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.spo.ISPO;
 
 /**
  * Extension of TupleExprBuilder that builds Update Expressions.
  * 
  * @author Jeen Broekstra
+ * @author Bryan Thompson
  */
-public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExprBuilder {
+public class UpdateExprBuilder extends BigdataExprBuilder {
 
-	/**
-	 * @param valueFactory
-	 */
-	public UpdateExprBuilder(ValueFactory valueFactory) {
-//		FIXME super(valueFactory);
-	}
+//    private static final Logger log = Logger.getLogger(UpdateExprBuilder.class);
+
+//  private Set<Var> getProjectionVars(Collection<StatementPattern> statementPatterns) {
+//  Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
+//
+//  for (StatementPattern sp : statementPatterns) {
+//      vars.add(sp.getSubjectVar());
+//      vars.add(sp.getPredicateVar());
+//      vars.add(sp.getObjectVar());
+//      if (sp.getContextVar() != null) {
+//          vars.add(sp.getContextVar());
+//      }
+//  }
+//
+//  return vars;
+//}
+    
+    public UpdateExprBuilder(final BigdataASTContext context) {
+        
+        super(context);
+    }
 
 //	@Override
 //	public UpdateExpr visit(ASTUpdate node, Object data)
@@ -90,38 +112,76 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //
 //		return null;
 //	}
-//
-//	@Override
-//	public InsertData visit(ASTInsertData node, Object data)
-//		throws VisitorException
-//	{
-//
-//		TupleExpr result = new SingletonSet();
-//
-//		// Collect construct triples
-//		GraphPattern parentGP = graphPattern;
-//		graphPattern = new GraphPattern();
-//
-//		// inherit scope & context
-//		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-//		graphPattern.setContextVar(parentGP.getContextVar());
-//
-//		Object algebraExpr = node.jjtGetChild(0).jjtAccept(this, data);
-//
-//		if (algebraExpr instanceof ValueExpr) { // named graph identifier
-//			Var contextVar = valueExpr2Var((ValueExpr)algebraExpr);
-//			graphPattern.setContextVar(contextVar);
-//			graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-//		}
-//
-//		for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
-//
-//		TupleExpr insertExpr = graphPattern.buildTupleExpr();
-//
-//		graphPattern = parentGP;
-//
+
+    /**
+     * Note: Variables in QuadDatas are disallowed in INSERT DATA requests (see
+     * Notes 8 in the grammar). That is, the INSERT DATA statement only allows
+     * to insert ground triples. Blank nodes in QuadDatas are assumed to be
+     * disjoint from the blank nodes in the Graph Store, i.e., will be inserted
+     * with "fresh" blank nodes.
+     */
+	@Override
+    public InsertData visit(final ASTInsertData node, final Object data)
+            throws VisitorException
+	{
+
+	    final InsertData op = new InsertData();
+	    
+        /*
+         * Collect QuadsData.
+         */
+		final GroupGraphPattern parentGP = graphPattern;
+		graphPattern = new GroupGraphPattern();
+
+		// inherit scope & context : TODO When would it ever be non-null?
+		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+		graphPattern.setContextVar(parentGP.getContext());
+
+		// visit [QuadsData].
+		/* TODO This seems wrong to me. If we have QUADS then TRIPLEs, won't
+		 this attach the GRAPH context to the TRIPLES also? I've put together several tests which examine this. */
+		{
+
+		    // first child.
+            final Node child0 = node.jjtGetChild(0);
+            
+            final Object algebraExpr = child0.jjtAccept(this, data);
+
+            if (algebraExpr instanceof ConstantNode) { // named graph identifier
+
+                final ConstantNode context = (ConstantNode) algebraExpr;
+                graphPattern.setContextVar(context);
+                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+                
+            }
+
+            // remaining children (i=1...).
+            for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+
+                node.jjtGetChild(i).jjtAccept(this, data);
+
+            }
+
+		}
+		
+		final QuadsData insertExpr = graphPattern.buildGroup(new QuadsData());
+
+		graphPattern = parentGP;
+
+		final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>(); 
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                insertExpr, StatementPatternNode.class);
+        while (itr.hasNext()) {
+            final StatementPatternNode sp = itr.next();
+            final BigdataStatement spo = context.valueFactory.createStatement(
+                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
+                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
+                            .c().getValue() : null), StatementEnum.Explicit);
+            stmts.add(spo);
+        }
+        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
+        op.setData(a);
+//      TupleExpr insertExpr = graphPattern.buildTupleExpr();
 //		// Retrieve all StatementPatterns from the insert expression
 //		List<StatementPattern> statementPatterns = StatementPatternCollector.process(insertExpr);
 //
@@ -144,6 +204,8 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //				extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
 //			}
 //		}
+//
+//      TupleExpr result = new SingletonSet();
 //
 //		if (!extElemMap.isEmpty()) {
 //			result = new Extension(result, extElemMap.values());
@@ -178,10 +240,17 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //		}
 //
 //		result = new Reduced(result);
-//
+
 //		return new InsertData(result);
-//	}
-//
+		return op;
+	}
+
+    /**
+     * Note: For DELETE DATA, QuadData denotes triples to be removed and is as
+     * described in INSERT DATA, with the difference that in a DELETE DATA
+     * operation neither variables nor blank nodes are allowed (see Notes 8+9 in
+     * the grammar).
+     */
 //	@Override
 //	public DeleteData visit(ASTDeleteData node, Object data)
 //		throws VisitorException
@@ -272,32 +341,63 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //
 //		return new DeleteData(result);
 //	}
+
+//    @Override
+//    public TupleExpr visit(ASTQuadsNotTriples node, Object data)
+//        throws VisitorException
+//    {
+//        GraphPattern parentGP = graphPattern;
+//        graphPattern = new GraphPattern();
 //
-//	@Override
-//	public TupleExpr visit(ASTQuadsNotTriples node, Object data)
-//		throws VisitorException
-//	{
-//		GraphPattern parentGP = graphPattern;
-//		graphPattern = new GraphPattern();
+//        ValueExpr contextNode = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, data);
 //
-//		ValueExpr contextNode = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, data);
+//        Var contextVar = valueExpr2Var(contextNode);
+//        graphPattern.setContextVar(contextVar);
+//        graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
 //
-//		Var contextVar = valueExpr2Var(contextNode);
-//		graphPattern.setContextVar(contextVar);
-//		graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+//        for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+//            node.jjtGetChild(i).jjtAccept(this, data);
+//        }
 //
-//		for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
+//        TupleExpr result = graphPattern.buildTupleExpr();
+//        parentGP.addRequiredTE(result);
 //
-//		TupleExpr result = graphPattern.buildTupleExpr();
-//		parentGP.addRequiredTE(result);
+//        graphPattern = parentGP;
 //
-//		graphPattern = parentGP;
-//
-//		return result;
-//	}
-//
+//        return result;
+//    }
+    
+	@Override
+	public QuadsData visit(final ASTQuadsNotTriples node, Object data)
+		throws VisitorException
+	{
+		
+	    final GroupGraphPattern parentGP = graphPattern;
+		
+	    graphPattern = new GroupGraphPattern();
+
+        final ConstantNode contextNode = (ConstantNode) node.jjtGetChild(0)
+                .jjtAccept(this, data);
+
+		graphPattern.setContextVar(contextNode);
+
+		graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+
+        for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+
+            node.jjtGetChild(i).jjtAccept(this, data);
+
+        }
+
+        final QuadsData group = graphPattern.buildGroup(new QuadsData());
+
+        parentGP.add(group);
+        
+		graphPattern = parentGP;
+
+		return group;
+	}
+
 //	@Override
 //	public Modify visit(ASTDeleteWhere node, Object data)
 //		throws VisitorException
@@ -322,150 +422,247 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //
 //		return modify;
 //	}
-//
-//	@Override
-//	public Load visit(ASTLoad node, Object data)
-//		throws VisitorException
-//	{
-//
-//		ValueConstant source = (ValueConstant)node.jjtGetChild(0).jjtAccept(this, data);
-//
-//		Load load = new Load(source);
-//		load.setSilent(node.isSilent());
-//		if (node.jjtGetNumChildren() > 1) {
-//			ValueConstant graph = (ValueConstant)node.jjtGetChild(1).jjtAccept(this, data);
-//			load.setGraph(graph);
-//		}
-//
-//		return load;
-//	}
-//
-//	@Override
-//	public Clear visit(ASTClear node, Object data)
-//		throws VisitorException
-//	{
-//		Clear clear = new Clear();
-//		clear.setSilent(node.isSilent());
-//
-//		ASTGraphRefAll graphRef = node.jjtGetChild(ASTGraphRefAll.class);
-//
-//		if (graphRef.jjtGetNumChildren() > 0) {
-//			ValueConstant graph = (ValueConstant)graphRef.jjtGetChild(0).jjtAccept(this, data);
-//			clear.setGraph(graph);
-//		}
-//		else {
-//			if (graphRef.isDefault()) {
-//				clear.setScope(Scope.DEFAULT_CONTEXTS);
-//			}
-//			else if (graphRef.isNamed()) {
-//				clear.setScope(Scope.NAMED_CONTEXTS);
-//			}
-//		}
-//		return clear;
-//	}
-//
-//	@Override
-//	public Clear visit(ASTDrop node, Object data)
-//		throws VisitorException
-//	{
-//		// implementing drop as a synonym of clear, in Sesame this is really the
-//		// same thing, as empty
-//		// graphs are not recorded.
-//
-//		Clear clear = new Clear();
-//		clear.setSilent(node.isSilent());
-//
-//		ASTGraphRefAll graphRef = node.jjtGetChild(ASTGraphRefAll.class);
-//
-//		if (graphRef.jjtGetNumChildren() > 0) {
-//			ValueConstant graph = (ValueConstant)graphRef.jjtGetChild(0).jjtAccept(this, data);
-//			clear.setGraph(graph);
-//		}
-//		else {
-//			if (graphRef.isDefault()) {
-//				clear.setScope(Scope.DEFAULT_CONTEXTS);
-//			}
-//			else if (graphRef.isNamed()) {
-//				clear.setScope(Scope.NAMED_CONTEXTS);
-//			}
-//		}
-//		return clear;
-//	}
-//
-//	@Override
-//	public Create visit(ASTCreate node, Object data)
-//		throws VisitorException
-//	{
-//		ValueConstant graph = (ValueConstant)node.jjtGetChild(0).jjtAccept(this, data);
-//
-//		Create create = new Create(graph);
-//		create.setSilent(node.isSilent());
-//		return create;
-//	}
-//
-//	@Override
-//	public Copy visit(ASTCopy node, Object data)
-//		throws VisitorException
-//	{
-//		Copy copy = new Copy();
-//		copy.setSilent(node.isSilent());
-//
-//		ASTGraphOrDefault sourceNode = (ASTGraphOrDefault)node.jjtGetChild(0);
-//		if (sourceNode.jjtGetNumChildren() > 0) {
-//			ValueConstant sourceGraph = (ValueConstant)sourceNode.jjtGetChild(0).jjtAccept(this, data);
-//			copy.setSourceGraph(sourceGraph);
-//		}
-//
-//		ASTGraphOrDefault destinationNode = (ASTGraphOrDefault)node.jjtGetChild(1);
-//		if (destinationNode.jjtGetNumChildren() > 0) {
-//			ValueConstant destinationGraph = (ValueConstant)destinationNode.jjtGetChild(0).jjtAccept(this, data);
-//			copy.setDestinationGraph(destinationGraph);
-//		}
-//		return copy;
-//	}
-//
-//	@Override
-//	public Move visit(ASTMove node, Object data)
-//		throws VisitorException
-//	{
-//		Move move = new Move();
-//		move.setSilent(node.isSilent());
-//
-//		ASTGraphOrDefault sourceNode = (ASTGraphOrDefault)node.jjtGetChild(0);
-//		if (sourceNode.jjtGetNumChildren() > 0) {
-//			ValueConstant sourceGraph = (ValueConstant)sourceNode.jjtGetChild(0).jjtAccept(this, data);
-//			move.setSourceGraph(sourceGraph);
-//		}
-//
-//		ASTGraphOrDefault destinationNode = (ASTGraphOrDefault)node.jjtGetChild(1);
-//		if (destinationNode.jjtGetNumChildren() > 0) {
-//			ValueConstant destinationGraph = (ValueConstant)destinationNode.jjtGetChild(0).jjtAccept(this, data);
-//			move.setDestinationGraph(destinationGraph);
-//		}
-//		return move;
-//	}
-//
-//	@Override
-//	public Add visit(ASTAdd node, Object data)
-//		throws VisitorException
-//	{
-//		Add add = new Add();
-//		add.setSilent(node.isSilent());
-//
-//		ASTGraphOrDefault sourceNode = (ASTGraphOrDefault)node.jjtGetChild(0);
-//		if (sourceNode.jjtGetNumChildren() > 0) {
-//			ValueConstant sourceGraph = (ValueConstant)sourceNode.jjtGetChild(0).jjtAccept(this, data);
-//			add.setSourceGraph(sourceGraph);
-//		}
-//
-//		ASTGraphOrDefault destinationNode = (ASTGraphOrDefault)node.jjtGetChild(1);
-//		if (destinationNode.jjtGetNumChildren() > 0) {
-//			ValueConstant destinationGraph = (ValueConstant)destinationNode.jjtGetChild(0).jjtAccept(this, data);
-//			add.setDestinationGraph(destinationGraph);
-//		}
-//		return add;
-//	}
-//
+
+	@Override
+	public LoadGraph visit(final ASTLoad node, Object data)
+		throws VisitorException
+	{
+
+        final ConstantNode sourceGraph = (ConstantNode) node.jjtGetChild(0)
+                .jjtAccept(this, data);
+
+		final LoadGraph op = new LoadGraph();
+		
+		op.setSourceGraph(sourceGraph);
+
+        if (node.isSilent())
+            op.setSilent(true);
+		
+		if (node.jjtGetNumChildren() > 1) {
+
+		    final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)
+                    .jjtAccept(this, data);
+		    
+			op.setTargetGraph(targetGraph);
+			
+		}
+
+		return op;
+	}
+
+    /**
+     * Note: DROP and CLEAR have the identical semantics for bigdata since it
+     * does not support empty graphs.
+     */
+	@Override
+	public ClearGraph visit(final ASTClear node, Object data)
+		throws VisitorException
+	{
+	
+	    final ClearGraph op = new ClearGraph();
+		
+		if(node.isSilent())
+		    op.setSilent(true);
+
+        final ASTGraphRefAll graphRef = node.jjtGetChild(ASTGraphRefAll.class);
+
+		if (graphRef.jjtGetNumChildren() > 0) {
+
+		    final ConstantNode targetGraph = (ConstantNode) graphRef
+                    .jjtGetChild(0).jjtAccept(this, data);
+			
+		    op.setTargetGraph(targetGraph);
+
+        } else {
+            
+            if (graphRef.isDefault()) {
+            
+                op.setScope(Scope.DEFAULT_CONTEXTS);
+                
+            } else if (graphRef.isNamed()) {
+                
+                op.setScope(Scope.NAMED_CONTEXTS);
+                
+            }
+
+        }
+		
+		return op;
+		
+	}
+
+    /**
+     * Note: DROP and CLEAR have the identical semantics for bigdata since it
+     * does not support empty graphs.
+     */
+    @Override
+    public DropGraph visit(final ASTDrop node, final Object data)
+            throws VisitorException {
+
+        final DropGraph op = new DropGraph();
+        
+        if(node.isSilent())
+            op.setSilent(true);
+
+        final ASTGraphRefAll graphRef = node.jjtGetChild(ASTGraphRefAll.class);
+
+        if (graphRef.jjtGetNumChildren() > 0) {
+
+            final ConstantNode targetGraph = (ConstantNode) graphRef
+                    .jjtGetChild(0).jjtAccept(this, data);
+            
+            op.setTargetGraph(targetGraph);
+
+        } else {
+            
+            if (graphRef.isDefault()) {
+            
+                op.setScope(Scope.DEFAULT_CONTEXTS);
+                
+            } else if (graphRef.isNamed()) {
+                
+                op.setScope(Scope.NAMED_CONTEXTS);
+                
+            }
+
+        }
+        
+        return op;
+        
+    }
+
+    @Override
+    public CreateGraph visit(final ASTCreate node, Object data)
+            throws VisitorException {
+
+        final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(0)
+                .jjtAccept(this, data);
+
+        final CreateGraph op = new CreateGraph();
+        
+        op.setTargetGraph(targetGraph);
+        
+        if (node.isSilent())
+            op.setSilent(true);
+        
+        return op;
+        
+    }
+
+    @Override
+    public CopyGraph visit(final ASTCopy node, final Object data)
+            throws VisitorException {
+
+        final CopyGraph op = new CopyGraph();
+
+        if (node.isSilent())
+            op.setSilent(true);
+
+        final ASTGraphOrDefault sourceNode = (ASTGraphOrDefault) node
+                .jjtGetChild(0);
+
+        if (sourceNode.jjtGetNumChildren() > 0) {
+
+            final ConstantNode sourceGraph = (ConstantNode) sourceNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+
+            op.setSourceGraph(sourceGraph);
+
+        }
+
+        final ASTGraphOrDefault destinationNode = (ASTGraphOrDefault) node
+                .jjtGetChild(1);
+
+        if (destinationNode.jjtGetNumChildren() > 0) {
+
+            final ConstantNode targetGraph = (ConstantNode) destinationNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+
+            op.setTargetGraph(targetGraph);
+
+        }
+
+        return op;
+
+    }
+
+    @Override
+    public MoveGraph visit(final ASTMove node, final Object data)
+            throws VisitorException {
+
+        final MoveGraph op = new MoveGraph();
+        
+        if (node.isSilent())
+            op.setSilent(true);
+
+        final ASTGraphOrDefault sourceNode = (ASTGraphOrDefault) node
+                .jjtGetChild(0);
+        
+        if (sourceNode.jjtGetNumChildren() > 0) {
+        
+            final ConstantNode sourceGraph = (ConstantNode) sourceNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+            
+            op.setSourceGraph(sourceGraph);
+        
+        }
+
+        final ASTGraphOrDefault targetNode = (ASTGraphOrDefault) node
+                .jjtGetChild(1);
+        
+        if (targetNode.jjtGetNumChildren() > 0) {
+        
+            final ConstantNode targetGraph = (ConstantNode) targetNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+            
+            op.setTargetGraph(targetGraph);
+        }
+        
+        return op;
+
+    }
+
+    @Override
+    public AddGraph visit(final ASTAdd node, final Object data)
+            throws VisitorException {
+
+        final AddGraph op = new AddGraph();
+
+        if (node.isSilent())
+            op.setSilent(true);
+
+        final ASTGraphOrDefault sourceNode = (ASTGraphOrDefault) node
+                .jjtGetChild(0);
+
+        if (sourceNode.jjtGetNumChildren() > 0) {
+
+            final ConstantNode sourceGraph = (ConstantNode) sourceNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+
+            op.setSourceGraph(sourceGraph);
+
+        }
+
+        final ASTGraphOrDefault targetNode = (ASTGraphOrDefault) node
+                .jjtGetChild(1);
+
+        if (targetNode.jjtGetNumChildren() > 0) {
+
+            final ConstantNode targetGraph = (ConstantNode) targetNode
+                    .jjtGetChild(0).jjtAccept(this, data);
+
+            op.setTargetGraph(targetGraph);
+
+        }
+
+        return op;
+
+    }
+
+    /*
+     * DELETE/INSERT
+     */
+    
 //	@Override
 //	public Modify visit(ASTModify node, Object data)
 //		throws VisitorException
@@ -614,19 +811,5 @@ public class UpdateExprBuilder extends ASTVisitorBase {//FIXME extends TupleExpr
 //
 //		*/
 //	}
-//
-//	private Set<Var> getProjectionVars(Collection<StatementPattern> statementPatterns) {
-//		Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
-//
-//		for (StatementPattern sp : statementPatterns) {
-//			vars.add(sp.getSubjectVar());
-//			vars.add(sp.getPredicateVar());
-//			vars.add(sp.getObjectVar());
-//			if (sp.getContextVar() != null) {
-//				vars.add(sp.getContextVar());
-//			}
-//		}
-//
-//		return vars;
-//	}
+
 }

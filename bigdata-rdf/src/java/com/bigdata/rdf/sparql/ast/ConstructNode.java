@@ -38,7 +38,9 @@ import com.bigdata.bop.BOp;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ConstructNode extends GroupNodeBase<StatementPatternNode> {
+public class ConstructNode extends AbstractStatementContainer<StatementPatternNode>
+//GroupNodeBase<StatementPatternNode>
+        implements IStatementContainer {
 
     /**
      * 

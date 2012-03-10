@@ -51,6 +51,7 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -238,6 +239,17 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
                 baseURI).getOriginalAST();
+
+    }
+
+    /**
+     * Applies the {@link Bigdata2ASTSPARQLParser}.
+     */
+    protected UpdateRoot parseUpdate(final String updateStr, final String baseURI)
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        return new Bigdata2ASTSPARQLParser(tripleStore).parseUpdate2(updateStr,
+                baseURI).getOriginalUpdateAST();
 
     }
 

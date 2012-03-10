@@ -41,22 +41,16 @@ import com.bigdata.bop.BOp;
  * @see OrderByNode
  * @see SliceNode
  */
-public class QueryRoot extends QueryBase {
+public class QueryRoot extends QueryBase implements IPrefixDecls {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends QueryBase.Annotations {
+    public interface Annotations extends QueryBase.Annotations,
+            IPrefixDecls.Annotations {
 
-        /**
-         * The namespace prefix declaration map. This is a {@link Map} with
-         * {@link String} keys (prefix) and {@link String} values (the uri
-         * associated with that prefix).
-         */
-        String PREFIX_DECLS = "prefixDecls";
-        
         /**
          * The {@link DatasetNode}.
          */
@@ -104,19 +98,9 @@ public class QueryRoot extends QueryBase {
     public void setParent(final IGroupNode<?> parent) {
     
         throw new UnsupportedOperationException();
-        
+
     }
-    
-    /**
-     * The namespace prefix declarations map. This is a {@link Map} with
-     * {@link String} keys (prefix) and {@link String} values (the uri
-     * associated with that prefix).
-     * 
-     * @return The namespace prefix declarations map. If this annotation was not
-     *         set, then an empty map will be returned. The returned map is
-     *         immutable to preserve the general contract for notification on
-     *         mutation.
-     */
+
     @SuppressWarnings("unchecked")
     public Map<String, String> getPrefixDecls() {
 
@@ -129,11 +113,6 @@ public class QueryRoot extends QueryBase {
 
     }
 
-    /**
-     * Set the namespace prefix declarations map. This is a {@link Map} with
-     * {@link String} keys (prefix) and {@link String} values (the uri
-     * associated with that prefix).
-     */
     public void setPrefixDecls(final Map<String, String> prefixDecls) {
 
         setProperty(Annotations.PREFIX_DECLS, prefixDecls);
