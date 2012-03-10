@@ -183,7 +183,7 @@ abstract public class CoreBaseBOp implements BOp {
 
         if (tmp == null)
             throw new IllegalStateException("Required property: " + name
-                    + " : " + this);
+                    + " : " + this.getClass());
 
         return tmp;
         

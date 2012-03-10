@@ -3141,9 +3141,8 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * {@inheritDoc}
          * 
-         * FIXME SPARQL 1.1 update.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/448
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+         *      SPARQL 1.1 Update </a>
          */
         @Override
         public void executeUpdate(final UpdateExpr updateExpr,

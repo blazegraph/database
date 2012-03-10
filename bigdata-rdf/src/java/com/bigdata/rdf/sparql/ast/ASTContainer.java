@@ -70,7 +70,8 @@ public class ASTContainer extends ASTBase {
         String PARSE_TREE = "parseTree";
 
         /**
-         * The AST as received from the parser.
+         * The AST as received from the parser. This is either a
+         * {@link QueryRoot} or an {@link UpdateRoot}.
          */
         String ORIGINAL_AST = "originalAST";
 
@@ -89,15 +90,19 @@ public class ASTContainer extends ASTBase {
     /**
      * Deep copy constructor.
      */
-    public ASTContainer(ASTContainer op) {
+    public ASTContainer(final ASTContainer op) {
+        
         super(op);
+        
     }
 
     /**
      * Shallow copy constructor.
      */
-    public ASTContainer(BOp[] args, Map<String, Object> annotations) {
+    public ASTContainer(final BOp[] args, final Map<String, Object> annotations) {
+
         super(args, annotations);
+        
     }
 
     public ASTContainer(final QueryRoot queryRoot) {
@@ -105,6 +110,14 @@ public class ASTContainer extends ASTBase {
         super(BOp.NOARGS, null/*anns*/);
         
         setOriginalAST(queryRoot);
+        
+    }
+
+    public ASTContainer(final UpdateRoot updateRoot) {
+        
+        super(BOp.NOARGS, null/*anns*/);
+        
+        setOriginalUpdateAST(updateRoot);
         
     }
     
@@ -119,9 +132,11 @@ public class ASTContainer extends ASTBase {
 
     /**
      * Set the query string used to generate the AST model.
-     * @param queryString The query string.
+     * 
+     * @param queryString
+     *            The query string.
      */
-    public void setQueryString(String queryString) {
+    public void setQueryString(final String queryString) {
         
         setProperty(Annotations.QUERY_STRING, queryString);
 
@@ -147,7 +162,45 @@ public class ASTContainer extends ASTBase {
         setProperty(Annotations.PARSE_TREE, parseTree);
         
     }
-    
+
+    /**
+     * Return <code>true</code> iff this {@link ASTContainer} models a SPARQL
+     * UPDATE operation.
+     */
+    public boolean isUpdate() {
+        
+        return getProperty(Annotations.ORIGINAL_AST) instanceof UpdateRoot;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff this {@link ASTContainer} models a SPARQL
+     * QUERY operation.
+     */
+    public boolean isQuery() {
+        
+        return getProperty(Annotations.ORIGINAL_AST) instanceof QueryRoot;
+        
+    }
+
+    /**
+     * Return the original AST model (before any optimization).
+     */
+    public UpdateRoot getOriginalUpdateAST() {
+
+        return (UpdateRoot) getProperty(Annotations.ORIGINAL_AST);
+
+    }
+
+    /**
+     * Set the original AST model (before any optimizations).
+     */
+    public void setOriginalUpdateAST(final UpdateRoot updateRoot) {
+        
+        setProperty(Annotations.ORIGINAL_AST, updateRoot);
+
+    }
+
     /**
      * Return the original AST model (before any optimization).
      */
@@ -224,9 +277,9 @@ public class ASTContainer extends ASTBase {
         
         final Object parseTree = getParseTree();
         
-        final QueryRoot originalAST = getOriginalAST();
+        final ASTBase originalAST = getOriginalAST();
         
-        final QueryRoot optimizedAST = getOptimizedAST();
+        final ASTBase optimizedAST = getOptimizedAST();
 
         final PipelineOp queryPlan = getQueryPlan();
 

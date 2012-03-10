@@ -3,6 +3,7 @@ package com.bigdata.rdf.sail;
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.Update;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
@@ -104,6 +105,21 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         throw new MalformedQueryException("Unsupported language: " + ql);
 
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+     *      SPARQL 1.1 Update </a>
+     */
+    @Override
+    public Update prepareUpdate(final QueryLanguage ql, final String update,
+            final String baseURI) throws RepositoryException,
+            MalformedQueryException {
+     
+        throw new UnsupportedOperationException();
+        
     }
 
     /**

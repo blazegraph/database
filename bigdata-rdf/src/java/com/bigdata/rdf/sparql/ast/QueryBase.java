@@ -70,11 +70,6 @@ abstract public class QueryBase extends QueryNodeBase implements
          */
         String PROJECTION = "projection";
 
-//        /**
-//         * The top-level {@link GraphPatternGroup} (aka whereClause) (optional).
-//         */
-//        String GRAPH_PATTERN = "whereClause";
-
         /**
          * The {@link GroupByNode} (optional).
          */

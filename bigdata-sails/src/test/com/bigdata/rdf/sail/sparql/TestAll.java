@@ -96,6 +96,11 @@ public class TestAll extends TestCase {
 
         // TODO Test suite for property paths.
 
+        /*
+         * Test suite for SPARQL UPDATE expressions.
+         */
+        suite.addTestSuite(TestUpdateExprBuilder.class);
+        
         return suite;
 
     }

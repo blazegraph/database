@@ -80,25 +80,4 @@ public class BigdataParsedQuery extends ParsedQuery {
         return astContainer;
     }
 
-//    /**
-//     * {@inheritDoc}
-//     * <p>
-//     * This is a little bit ambiguous. It is returning the {@link QueryType}
-//     * associated with {@link ASTContainer#getOriginalAST()}. If the AST
-//     * optimizer pipeline changes the {@link QueryType} (which happens for a
-//     * DESCRIBE query) then the new {@link QueryType} shows up on the
-//     * {@link ASTContainer#getOptimizedAST()}. However, in general this
-//     * difference does not make a difference as we evaluate CONSTRUCT and
-//     * DESCRIBE queries in the same way have they have been optimized.
-//     */
-//    @Override
-//    public QueryType getQueryType() {
-//        return astContainer.getOriginalAST().getQueryType();
-//    }
-//
-//    @Override
-//    public Properties getQueryHints() {
-//        return astContainer.getOriginalAST().getQueryHints();
-//    }
-
 }
