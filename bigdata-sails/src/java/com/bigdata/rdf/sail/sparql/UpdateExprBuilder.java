@@ -47,6 +47,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
 import com.bigdata.rdf.sail.sparql.ast.ASTCreate;
+import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
 import com.bigdata.rdf.sail.sparql.ast.ASTDrop;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphOrDefault;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphRefAll;
@@ -61,6 +62,7 @@ import com.bigdata.rdf.sparql.ast.ClearGraph;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DeleteData;
 import com.bigdata.rdf.sparql.ast.DropGraph;
 import com.bigdata.rdf.sparql.ast.InsertData;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
@@ -100,17 +102,22 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     }
 
 //	@Override
-//	public UpdateExpr visit(ASTUpdate node, Object data)
+//	public Update visit(final ASTUpdate node, Object data)
 //		throws VisitorException
 //	{
-//		if (node instanceof ASTModify) {
+//		
+//	    if (node instanceof ASTModify) {
+//		
 //			return this.visit((ASTModify)node, data);
-//		}
-//		else if (node instanceof ASTInsertData) {
-//			return this.visit((ASTInsertData)node, data);
-//		}
 //
+//		} else if (node instanceof ASTInsertData) {
+//		    
+//            return this.visit((ASTInsertData) node, data);
+//            
+//        }
+//	    
 //		return null;
+//		
 //	}
 
     /**
@@ -126,61 +133,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 	{
 
 	    final InsertData op = new InsertData();
-	    
-        /*
-         * Collect QuadsData.
-         */
-		final GroupGraphPattern parentGP = graphPattern;
-		graphPattern = new GroupGraphPattern();
 
-		// inherit scope & context : TODO When would it ever be non-null?
-		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-		graphPattern.setContextVar(parentGP.getContext());
-
-		// visit [QuadsData].
-		/* TODO This seems wrong to me. If we have QUADS then TRIPLEs, won't
-		 this attach the GRAPH context to the TRIPLES also? I've put together several tests which examine this. */
-		{
-
-		    // first child.
-            final Node child0 = node.jjtGetChild(0);
-            
-            final Object algebraExpr = child0.jjtAccept(this, data);
-
-            if (algebraExpr instanceof ConstantNode) { // named graph identifier
-
-                final ConstantNode context = (ConstantNode) algebraExpr;
-                graphPattern.setContextVar(context);
-                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-                
-            }
-
-            // remaining children (i=1...).
-            for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-
-                node.jjtGetChild(i).jjtAccept(this, data);
-
-            }
-
-		}
-		
-		final QuadsData insertExpr = graphPattern.buildGroup(new QuadsData());
-
-		graphPattern = parentGP;
-
-		final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>(); 
-        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
-                insertExpr, StatementPatternNode.class);
-        while (itr.hasNext()) {
-            final StatementPatternNode sp = itr.next();
-            final BigdataStatement spo = context.valueFactory.createStatement(
-                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
-                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
-                            .c().getValue() : null), StatementEnum.Explicit);
-            stmts.add(spo);
-        }
-        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
-        op.setData(a);
+        op.setData( doQuadsData(node, data) );
+        
 //      TupleExpr insertExpr = graphPattern.buildTupleExpr();
 //		// Retrieve all StatementPatterns from the insert expression
 //		List<StatementPattern> statementPatterns = StatementPatternCollector.process(insertExpr);
@@ -246,16 +201,95 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 	}
 
     /**
+     * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation.
+     * 
+     * @throws VisitorException
+     */
+    private ISPO[] doQuadsData(final Node node, final Object data)
+            throws VisitorException {
+
+	    final GroupGraphPattern parentGP = graphPattern;
+        graphPattern = new GroupGraphPattern();
+
+        // inherit scope & context : TODO When would it ever be non-null?
+        graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+        graphPattern.setContextVar(parentGP.getContext());
+
+        /*
+         * Visit [QuadsData].
+         * 
+         * TODO What is this doing? It is making some decision based on just the
+         * first child...
+         */
+        {
+
+            // first child.
+            final Node child0 = node.jjtGetChild(0);
+            
+            final Object algebraExpr = child0.jjtAccept(this, data);
+
+            if (algebraExpr instanceof ConstantNode) { // named graph identifier
+
+                final ConstantNode context = (ConstantNode) algebraExpr;
+                graphPattern.setContextVar(context);
+                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+                
+            }
+
+            // remaining children (i=1...).
+            for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+
+                node.jjtGetChild(i).jjtAccept(this, data);
+
+            }
+
+        }
+        
+        final QuadsData insertExpr = graphPattern.buildGroup(new QuadsData());
+
+        graphPattern = parentGP;
+
+        final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>(); 
+        
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                insertExpr, StatementPatternNode.class);
+        
+        while (itr.hasNext()) {
+        
+            final StatementPatternNode sp = itr.next();
+            
+            final BigdataStatement spo = context.valueFactory.createStatement(
+                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
+                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
+                            .c().getValue() : null), StatementEnum.Explicit);
+            
+            stmts.add(spo);
+            
+        }
+        
+        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
+        
+        return a;
+
+	}
+	
+    /**
      * Note: For DELETE DATA, QuadData denotes triples to be removed and is as
      * described in INSERT DATA, with the difference that in a DELETE DATA
      * operation neither variables nor blank nodes are allowed (see Notes 8+9 in
      * the grammar).
      */
-//	@Override
-//	public DeleteData visit(ASTDeleteData node, Object data)
-//		throws VisitorException
-//	{
-//
+	@Override
+	public DeleteData visit(final ASTDeleteData node, final Object data)
+		throws VisitorException
+	{
+	    
+        final DeleteData op = new DeleteData();
+
+        op.setData(doQuadsData(node, data));
+	    
+	    return op;
+
 //		TupleExpr result = new SingletonSet();
 //
 //		// Collect construct triples
@@ -340,7 +374,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 //		result = new Reduced(result);
 //
 //		return new DeleteData(result);
-//	}
+	    
+	}
 
 //    @Override
 //    public TupleExpr visit(ASTQuadsNotTriples node, Object data)

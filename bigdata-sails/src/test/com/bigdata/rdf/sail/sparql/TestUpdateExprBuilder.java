@@ -1187,17 +1187,33 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final UpdateRoot expected = new UpdateRoot();
         {
 
-         // FIXME prefix decls?
-//            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
-//            prefixDecls.put("ns", "http://example.org/ns#");
-//            expected.setPrefixDecls(prefixDecls);
-
             final InsertData op = new InsertData();
 
             expected.addChild(op);
 
-            // TODO Add DATA to op.
+            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
+            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
+            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
+            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
+            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
+            final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
+            final BigdataURI price = valueFactory.createURI("http://example.org/ns#price");
+            final BigdataLiteral i42 = valueFactory.createLiteral("42",XSD.INTEGER);
 
+            final ISPO[] data = new ISPO[] { //
+                    
+                    valueFactory.createStatement(
+                    book1, dcTitle, label1, null, StatementEnum.Explicit),//
+                    
+                    valueFactory.createStatement(book1, price, i42, bookstore,
+                    StatementEnum.Explicit),//
+                    
+                    valueFactory.createStatement(
+                    book1, dcCreator, label2, null, StatementEnum.Explicit),//
+            
+            };
+            op.setData(data);
+            
         }
 
         final UpdateRoot actual = parseUpdate(sparql, baseURI);
@@ -1228,37 +1244,43 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "INSERT DATA\n"
                 + "{ GRAPH <http://example/bookStore> { <http://example/book1>  dc:title  \"Fundamentals of Compiler Design\" } }";
 
+        final BigdataURI book1 = valueFactory.createURI("http://example/book1");
+        final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
+        final BigdataLiteral label1 = valueFactory.createLiteral("Fundamentals of Compiler Desing");
+        final BigdataLiteral label2 = valueFactory.createLiteral("Fundamentals of Compiler Design");
+        final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
+
         final UpdateRoot expected = new UpdateRoot();
         {
-
-            // FIXME prefix decls?
-            // final Map<String, String> prefixDecls = new LinkedHashMap<String,
-            // String>();
-            // prefixDecls.put("ns", "http://example.org/ns#");
-            // expected.setPrefixDecls(prefixDecls);
 
             final DeleteData op = new DeleteData();
 
             expected.addChild(op);
 
-            // TODO Add DATA to op.
+            final ISPO[] data = new ISPO[] { //
+                    
+                    valueFactory.createStatement(
+                    book1, dcTitle, label1, bookstore, StatementEnum.Explicit),//
+                                
+            };
+            op.setData(data);
 
         }
 
         {
 
-            // FIXME prefix decls?
-            // final Map<String, String> prefixDecls = new LinkedHashMap<String,
-            // String>();
-            // prefixDecls.put("ns", "http://example.org/ns#");
-            // expected.setPrefixDecls(prefixDecls);
-
             final InsertData op = new InsertData();
 
             expected.addChild(op);
 
-            // TODO Add DATA to op.
-
+            final ISPO[] data = new ISPO[] { //
+                    
+                    valueFactory.createStatement(
+                    book1, dcTitle, label2, bookstore, StatementEnum.Explicit),//
+                                
+            };
+            op.setData(data);
+            
         }
 
         final UpdateRoot actual = parseUpdate(sparql, baseURI);
