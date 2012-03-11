@@ -332,8 +332,6 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
      * FIXME There is an alternative form of a CONSTRUCT query which this is not
      * covering. (CONSTRUCT WHERE { TriplesTemplate? } SolutionModifier. openrdf
      * does not support this form yet.
-     * 
-     * FIXME Add support for quads (Anzo extension).
      */
     @Override
     public QueryBase visit(final ASTConstructQuery node, Object data)
