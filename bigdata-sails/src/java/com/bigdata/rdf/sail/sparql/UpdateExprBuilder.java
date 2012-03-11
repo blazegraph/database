@@ -70,6 +70,7 @@ import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadsData;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Extension of TupleExprBuilder that builds Update Expressions.
@@ -202,6 +203,12 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
     /**
      * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation.
+     * <p>
+     * Note: The QuadData is basically modeled by the bigdata AST as recursive
+     * {@link StatementPatternNode} containers. This visits the parser AST nodes
+     * and then flattens them into an {@link ISPO}[]. The {@link ISPO}s are
+     * {@link BigdataStatement}s at this point, but they can be converted to
+     * {@link SPO}s when the INSERT DATA or DELETE DATA operation runs.
      * 
      * @throws VisitorException
      */
