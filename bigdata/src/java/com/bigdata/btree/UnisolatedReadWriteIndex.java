@@ -281,7 +281,14 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * main purpose of the capacity is to reduce the contention for the
      * {@link ReadWriteLock}.
      */
-    final static protected int DEFAULT_CAPACITY = 100;//10000;
+    final static private int DEFAULT_CAPACITY = 1000;// 10000;
+
+    /**
+     * The default capacity for iterator reads against the underlying index. The
+     * main purpose of the capacity is to reduce the contention for the
+     * {@link ReadWriteLock}.
+     */
+    final private int defaultCapacity;
     
     /**
      * Creates a view of an unisolated index that will enforce the concurrency
@@ -307,7 +314,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * 
      * @param ndx
      *            The underlying unisolated index.
-     * @param capacity
+     * @param defaultCapacity
      *            The capacity for iterator reads against the underlying index.
      *            The main purpose of the capacity is to reduce the contention
      *            for the {@link ReadWriteLock}. Relatively small values should
@@ -330,18 +337,20 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *       the computed solutions onto the relations. It is likely that a
      *       read-write lock will do well for this situation.
      */
-    public UnisolatedReadWriteIndex(final BTree ndx, final int capacity) {
+    public UnisolatedReadWriteIndex(final BTree ndx, final int defaultCapacity) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
 
-        if (capacity <= 0)
+        if (defaultCapacity <= 0)
             throw new IllegalArgumentException();
 
         this.ndx = ndx;
 
-        this.readWriteLock = getReadWriteLock(ndx);
+        this.defaultCapacity = defaultCapacity;
 
+        this.readWriteLock = getReadWriteLock(ndx);
+        
     }
 
 	/**
@@ -633,11 +642,11 @@ public class UnisolatedReadWriteIndex implements IIndex {
         if (capacity == 0) {
          
             /*
-             * When the buffer capacity is not specified a relatively small
-             * capacity is choosen.
+             * When the buffer capacity is not specified, use the default from
+             * the constructor.
              */
             
-            capacity = 1000;
+            capacity = defaultCapacity;
             
         }
 
