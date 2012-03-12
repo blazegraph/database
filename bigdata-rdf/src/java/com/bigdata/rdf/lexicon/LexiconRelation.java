@@ -1090,8 +1090,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @param name
      *            The name of the index.
-     *            
+     * 
      * @return The {@link IndexMetadata}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/506">
+     *      Load, closure and query performance in 1.1.x versus 1.0.x </a>
      */
     protected IndexMetadata getId2TermIndexMetadata(final String name) {
 
@@ -1100,18 +1103,29 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         metadata.setTupleSerializer(new Id2TermTupleSerializer(
                 getNamespace(), getValueFactory()));
 
-        // enable raw record support.
-        metadata.setRawRecords(true);
-
         /*
-         * Very small RDF values can be inlined into the index, but after that
-         * threshold we want to have the values out of line on the backing
-         * store.
+         * Note: Enabling raw record support slows down the ID2TERM index
+         * significantly.
          * 
-         * TODO Tune this and the threshold at which we use the BLOBS index
-         * instead.
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/506 (Load,
+         * closure and query performance in 1.1.x versus 1.0.x)
          */
-        metadata.setMaxRecLen(16); 
+        if(true) {
+
+            // enable raw record support.
+            metadata.setRawRecords(true);
+
+            /*
+             * Very small RDF values can be inlined into the index, but after
+             * that threshold we want to have the values out of line on the
+             * backing store.
+             * 
+             * TODO Tune this and the threshold at which we use the BLOBS index
+             * instead.
+             */
+            metadata.setMaxRecLen(16);
+        
+        }
         
         return metadata;
 
@@ -1403,52 +1417,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * Return the total #of characters in the RDF {@link Value}.
-     * 
-     * @param v
-     *            The {@link Value}.
-     * 
-     * @return The character length of the data in the RDF {@link Value}.
-     */
-    static public long getStringLength(final Value v) {
-
-        if (v == null)
-            throw new IllegalArgumentException();
-        
-        if (v instanceof URI) {
-
-            return ((URI) v).stringValue().length();
-
-        } else if (v instanceof Literal) {
-
-            final Literal value = (Literal) v;
-
-            final String label = value.getLabel();
-
-            final int datatypeLength = value.getDatatype() == null ? 0 : value
-                    .getDatatype().stringValue().length();
-
-            final int languageLength = value.getLanguage() == null ? 0 : value
-                    .getLanguage().length();
-
-            final long totalLength = label.length() + datatypeLength
-                    + languageLength;
-
-            return totalLength;
-
-        } else if (v instanceof BNode) {
-
-            return ((BNode) v).getID().length();
-
-        } else {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
-    /**
      * Return <code>true</code> iff this {@link Value} would be stored in the
      * {@link LexiconKeyOrder#BLOBS} index.
      * 
@@ -1465,7 +1433,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (blobsThreshold == 0)
             return true;
         
-        return getStringLength(v) >= blobsThreshold;
+        return BigdataValueSerializer.getStringLength(v) >= blobsThreshold;
 
     }
 
@@ -2075,6 +2043,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          */
         int numNotFound = 0;
 
+        final boolean isDebugEnabled = log.isDebugEnabled();
+        
         for (IV<?,?> iv : ivs) {
             
             if (iv == null)
@@ -2082,9 +2052,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
     		if (iv.hasValue()) {
                 
-            	if (log.isDebugEnabled()) {
+            	if (isDebugEnabled)
             		log.debug("already materialized: " + iv.getValue());
-            	}
             	
             	// already materialized
             	ret.put(iv, iv.getValue());

@@ -62,6 +62,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.util.InnerCause;
@@ -517,15 +518,25 @@ public class LexiconConfiguration<V extends BigdataValue>
     private AbstractInlineIV<BigdataLiteral, ?> createInlineUnicodeLiteral(
             final Literal value) {
 
-        final long totalLength = LexiconRelation.getStringLength(value);
+        if (maxInlineTextLength > 0) {
 
-        if (totalLength <= maxInlineTextLength) {
+            /*
+             * Only check the string length if we are willing to turn this into
+             * a fully inline IV.
+             */
 
-            return new FullyInlineTypedLiteralIV<BigdataLiteral>(value.getLabel(), value
-                    .getLanguage(), value.getDatatype());
+            final long totalLength = BigdataValueSerializer.getStringLength(value);
+
+            if (totalLength <= maxInlineTextLength) {
+
+                return new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                        value.getLabel(), value.getLanguage(),
+                        value.getDatatype());
+
+            }
 
         }
-
+        
         // Will not inline as Unicode.
         return null;
         

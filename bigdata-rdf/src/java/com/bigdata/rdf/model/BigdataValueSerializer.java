@@ -81,11 +81,34 @@ public class BigdataValueSerializer<V extends Value> {
      * Note: Changing back to {@link #VERSION0}. It looks like it was
      * significantly more efficient (though it might be possible to optimize the
      * code paths for {@link #VERSION1}).
+     * <p>
+     * Note: {@link #VERSION0} can not be used with the BLOBS index since it can
+     * not handle very large {@link Value}s. When changing this to
+     * {@link #VERSION0}, that change needs to be exclusive of the version used
+     * for the BLOBS index (ie, it is good for ID2TERM and related indices such
+     * as the ivCache, but not for the BLOBS index and related indices such as
+     * the blobsCache).
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/506">
      *      Load, closure and query performance in 1.1.x versus 1.0.x </a>
      */
-    private final static short currentVersion = VERSION1;
+//    private final static short currentVersion = VERSION0;
+    private static final short getVersion(final Value val) {
+
+        if (BigdataValueSerializer.getStringLength(val) < Short.MAX_VALUE) {
+            /*
+             * This version is faster, but can only be used with UTF data LT 64k
+             * in length.
+             */
+            return VERSION0;
+        } else {
+            /*
+             * This version can be used with very large UTF strings (BLOBS).
+             */
+            return VERSION1;
+        }
+
+    }
     
     /**
      * Error message indicates that the version code in the serialized
@@ -198,8 +221,7 @@ public class BigdataValueSerializer<V extends Value> {
      */
     public byte[] serialize(final V val) {
 
-        return serialize(val, new DataOutputBuffer(128), new ByteArrayBuffer(
-                128));
+        return serialize(val, new DataOutputBuffer(128), null/* lazilyAllocated */);
         
     }
 
@@ -215,7 +237,8 @@ public class BigdataValueSerializer<V extends Value> {
      *            buffer before each invocation.
      * @param tmp
      *            A buffer used to compress the component Unicode strings. This
-     *            will be reset as necessary by this method.
+     *            will be reset as necessary by this method. It will be lazily
+     *            allocated if <code>null</code>.
      * 
      * @return The byte[] containing the serialized data record. This array is
      *         newly allocated so that a series of invocations of this method
@@ -242,24 +265,32 @@ public class BigdataValueSerializer<V extends Value> {
      *            buffer before each invocation.
      * @param tmp
      *            A buffer used to compress the component Unicode strings. This
-     *            will be reset as necessary by this method.
+     *            will be reset as necessary by this method. It will be lazily
+     *            allocated if <code>null</code>.
      */
-    public void serialize2(final V val, final DataOutputBuffer out, final
+    public void serialize2(final V val, final DataOutputBuffer out, 
             ByteArrayBuffer tmp) {
         
         try {
 
-            final short version = currentVersion;
-
+            final short version = getVersion(val);
+            
             ShortPacker.packShort(out, version);
 
             switch (version) {
             case VERSION0:
                 serializeVersion0(val, version, out);
                 break;
-            case VERSION1:
+            case VERSION1: {
+                if(tmp == null) {
+                    /*
+                     * Allocate lazily on the code path where it is necessary.
+                     */
+                    tmp = new ByteArrayBuffer(128);
+                }
                 serializeVersion1(val, version, out, tmp);
                 break;
+            }
             default:
                 throw new UnsupportedOperationException(ERR_VERSION);
             }
@@ -650,6 +681,52 @@ public class BigdataValueSerializer<V extends Value> {
 
         }
 
+    }
+
+    /**
+     * Return the total #of characters in the RDF {@link Value}.
+     * 
+     * @param v
+     *            The {@link Value}.
+     * 
+     * @return The character length of the data in the RDF {@link Value}.
+     */
+    static public long getStringLength(final Value v) {
+    
+        if (v == null)
+            throw new IllegalArgumentException();
+        
+        if (v instanceof URI) {
+    
+            return ((URI) v).stringValue().length();
+    
+        } else if (v instanceof Literal) {
+    
+            final Literal value = (Literal) v;
+    
+            final String label = value.getLabel();
+    
+            final int datatypeLength = value.getDatatype() == null ? 0 : value
+                    .getDatatype().stringValue().length();
+    
+            final int languageLength = value.getLanguage() == null ? 0 : value
+                    .getLanguage().length();
+    
+            final long totalLength = label.length() + datatypeLength
+                    + languageLength;
+    
+            return totalLength;
+    
+        } else if (v instanceof BNode) {
+    
+            return ((BNode) v).getID().length();
+    
+        } else {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
     }
 
 }
