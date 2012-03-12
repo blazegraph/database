@@ -218,6 +218,26 @@ public class FunctionNode extends ValueExpressionNode {
     }
 
     /**
+     * Return <code>t1 < t2</code>
+     */
+    static public FunctionNode LT(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.LT, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>t1 > t2</code>
+     */
+    static public FunctionNode GT(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.GT, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
      * Return a binary function <code>op(t1,t2)</code>
      */
     static public FunctionNode binary(final URI uri, final TermNode t1,

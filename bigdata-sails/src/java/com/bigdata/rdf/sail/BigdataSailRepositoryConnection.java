@@ -118,7 +118,13 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
             final String baseURI) throws RepositoryException,
             MalformedQueryException {
      
-        throw new UnsupportedOperationException();
+        if (ql == QueryLanguage.SPARQL) {
+
+            return (Update) prepareNativeSPARQLUpdate(ql, update, baseURI);
+
+        }
+
+        throw new MalformedQueryException("Unsupported language: " + ql);
         
     }
 
@@ -132,7 +138,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * @param baseURI
      *            The base URI.
      * 
-     * @return The bigdata AST model for that query.
+     * @return An object wrapping the bigdata AST model for that query.
      * 
      * @throws MalformedQueryException
      * @throws UnsupportedOperationException
@@ -174,7 +180,49 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         }
 
     }
-	   
+	 
+    /**
+     * Parse a SPARQL UPDATE request.
+     * 
+     * @param ql
+     *            The {@link QueryLanguage}.
+     * @param updateStr
+     *            The update request.
+     * @param baseURI
+     *            The base URI.
+     * 
+     * @return An object wrapping the bigdata AST model for that request.
+     * 
+     * @throws MalformedQueryException
+     * @throws UnsupportedOperationException
+     *             if the {@link QueryLanguage} is not SPARQL.
+     */
+    public BigdataSailUpdate prepareNativeSPARQLUpdate(final QueryLanguage ql,
+            final String updateStr, final String baseURI)
+            throws MalformedQueryException {
+
+        if (getTripleStore().isReadOnly())
+            throw new UnsupportedOperationException("Read only");
+
+        if (ql != QueryLanguage.SPARQL)
+            throw new UnsupportedOperationException(ql.toString());
+
+        if (log.isDebugEnabled()) {
+            log.debug(updateStr);
+        }
+        
+        // Flush buffers since we are about to resolve Values to IVs.
+        getSailConnection()
+                .flushStatementBuffers(true/* assertions */, true/* retractions */);
+
+        // Parse the UPDATE request.
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                getTripleStore()).parseUpdate2(updateStr, baseURI);
+
+        return new BigdataSailUpdate(astContainer, this);
+
+    }
+
     /**
      * Commit, returning the timestamp associated with the new commit point.
      * <p>

@@ -28,6 +28,7 @@ package com.bigdata.rdf.sail.sparql;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -39,13 +40,21 @@ import com.bigdata.rdf.sparql.ast.ClearGraph;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteData;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.InsertData;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.QuadData;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 
 /**
@@ -56,7 +65,9 @@ import com.bigdata.rdf.spo.ISPO;
  *          thompsonbry $
  * 
  *          TODO Are we going to attach prefix decls to the {@link Update}
- *          operations or the {@link UpdateRoot}?
+ *          operations or the {@link UpdateRoot}? Or at all?
+ * 
+ *          TODO What about {@link DatasetNode} attachments?
  */
 public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
@@ -1281,6 +1292,299 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             };
             op.setData(data);
             
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * WITH <http://example/addresses>
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * INSERT { ?person foaf:givenName 'William' }
+     * WHERE
+     *   { ?person foaf:givenName 'Bill'
+     *   }
+     * </pre>
+     * 
+     * TODO What about the WITH? That should be setting the data set, right?
+     * 
+     * TODO Tests with USING and USING NAMED.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "WITH <http://example/addresses>\n"//
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "WHERE\n"//
+                + "  { ?person foaf:givenName 'Bill' } ";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+//        final VarNode person = new VarNode("person");
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1)));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                insertClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label2)));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1)));
+
+                op.setWhereClause(whereClause);
+                
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * <pre>
+     * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
+     * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+     * 
+     * DELETE
+     *  { ?book ?p ?v }
+     * WHERE
+     *  { ?book dc:date ?date .
+     *    FILTER ( ?date > "1970-01-01T00:00:00-02:00"^^xsd:dateTime )
+     *    ?book ?p ?v
+     *  }
+     * </pre>
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+        "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
+                + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//
+                + "DELETE\n"//
+                + " { ?book ?p ?v }\n"//
+                + "WHERE\n"//
+                + " { ?book dc:date ?date .\n"//
+                + "  FILTER ( ?date > \"1970-01-01T00:00:00-02:00\"^^xsd:dateTime )\n"//
+                + "   ?book ?p ?v\n"//
+                + "}";
+        
+        final IV dcDate = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/date"));
+        final IV dateTime = makeIV(valueFactory.createLiteral("1970-01-01T00:00:00-02:00",XSD.DATETIME));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "book"), new VarNode("p"), new VarNode("v")));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("book"),
+                        new ConstantNode(dcDate), new VarNode("date")));
+                
+                whereClause.addChild(new FilterNode(FunctionNode.GT(
+                        new VarNode("date"), new ConstantNode(dateTime))));
+                
+                whereClause.addChild(new StatementPatternNode(new VarNode("book"),
+                        new VarNode("p"), new VarNode("v")));
+                
+                op.setWhereClause(whereClause);
+                
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * <pre>
+     * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
+     * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+     * 
+     * INSERT 
+     *   { GRAPH <http://example/bookStore2> { ?book ?p ?v } }
+     * WHERE
+     *   { GRAPH  <http://example/bookStore>
+     *        { ?book dc:date ?date .
+     *          FILTER ( ?date > "1970-01-01T00:00:00-02:00"^^xsd:dateTime )
+     *          ?book ?p ?v
+     *   } }
+     * </pre>
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_03() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+        "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
+                + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//
+                + "INSERT \n"//
+                + "   { GRAPH <http://example/bookStore2> { ?book ?p ?v } }\n"//
+                + "WHERE\n"//
+                + "   { GRAPH  <http://example/bookStore>\n"//
+                + "        { ?book dc:date ?date .\n"//
+                + "          FILTER ( ?date > \"1970-01-01T00:00:00-02:00\"^^xsd:dateTime )\n"//
+                + "          ?book ?p ?v\n"//
+                + "} }";
+        
+        final IV dcDate = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/date"));
+        final IV dateTime = makeIV(valueFactory.createLiteral("1970-01-01T00:00:00-02:00",XSD.DATETIME));
+        final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+        final IV bookstore2 = makeIV(valueFactory.createURI("http://example/bookStore2"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                final QuadData innerGraph = new QuadData();
+                
+                insertClause.addChild(innerGraph);
+                        
+                innerGraph.addChild(new StatementPatternNode(new VarNode(
+                        "book"), new VarNode("p"), new VarNode("v"),
+                        new ConstantNode(bookstore2), Scope.NAMED_CONTEXTS));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                final JoinGroupNode graphGroup = new JoinGroupNode();
+
+                whereClause.addChild(graphGroup);
+
+                graphGroup.setContext(new ConstantNode(bookstore));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new ConstantNode(dcDate),
+                        new VarNode("date"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                graphGroup.addChild(new FilterNode(FunctionNode.GT(new VarNode(
+                        "date"), new ConstantNode(dateTime))));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new VarNode("p"),
+                        new VarNode("v"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                op.setWhereClause(whereClause);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * <pre>
+     * DELETE WHERE {?x foaf:name ?y }
+     * </pre>
+     * 
+     * TODO We may need to run an AST optimizer on this to produce the DELETE
+     * clause.
+     */
+    public void test_delete_where_01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "DELETE WHERE {?x <http://xmlns.com/foaf/0.1/name> ?y }";
+
+        @SuppressWarnings("rawtypes")
+        final IV foafName = makeIV(valueFactory
+                .createURI("http://xmlns.com/foaf/0.1/name"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(foafName), new VarNode("y")));
+
+                op.setWhereClause(whereClause);
+
+            }
+
         }
 
         final UpdateRoot actual = parseUpdate(sparql, baseURI);

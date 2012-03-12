@@ -30,31 +30,32 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.spo.ISPO;
 
 /**
- * A Graph Update operation.
+ * Recursive container for ground {@link StatementPatternNode}s. This is used
+ * for {@link InsertData} and {@link DeleteData}. It gets flattened out and
+ * turned into an {@link ISPO}[].
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class GraphUpdate extends Update {
+public class QuadData extends AbstractStatementContainer<IStatementContainer>
+        implements IStatementContainer {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    /**
-     * @param updateType
-     */
-    public GraphUpdate(UpdateType updateType) {
-        super(updateType);
+    public QuadData() {
+        
     }
-
+    
     /**
      * @param op
      */
-    public GraphUpdate(GraphUpdate op) {
+    public QuadData(QuadData op) {
         super(op);
     }
 
@@ -62,7 +63,7 @@ abstract public class GraphUpdate extends Update {
      * @param args
      * @param anns
      */
-    public GraphUpdate(BOp[] args, Map<String, Object> anns) {
+    public QuadData(BOp[] args, Map<String, Object> anns) {
         super(args, anns);
     }
 

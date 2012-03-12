@@ -225,6 +225,9 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public class BigdataSail extends SailBase implements Sail {
+
+    private static final String ERR_OPENRDF_QUERY_MODEL = 
+            "Support is no longer provided for UpdateExpr or TupleExpr evaluation. Please make sure you are using a BigdataSailRepository.  It will use the bigdata native evaluation model.";
     
     /**
      * Additional parameters understood by the Sesame 2.x SAIL implementation.
@@ -2531,6 +2534,7 @@ public class BigdataSail extends SailBase implements Sail {
             flushStatementBuffers(true/* assertions */, true/* retractions */);
             
             // Visit the distinct term identifiers for the context position.
+            @SuppressWarnings("rawtypes")
             final IChunkedIterator<IV> itr = database.getSPORelation()
                     .distinctTermScan(SPOKeyOrder.CSPO);
 
@@ -2949,6 +2953,7 @@ public class BigdataSail extends SailBase implements Sail {
                     new Striterator(Arrays
                     .asList(contexts).iterator()).addFilter(new Expander() {
                 private static final long serialVersionUID = 1L;
+                @SuppressWarnings("rawtypes")
                 @Override
                 protected Iterator expand(final Object c) {
                     return getStatements(//
@@ -2964,7 +2969,6 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Returns an iterator that visits {@link BigdataStatement} objects.
          */
-        @SuppressWarnings("unchecked")
         private synchronized BigdataStatementIterator getStatements(final Resource s,
                 final URI p, final Value o, final Resource c,
                 final boolean includeInferred) {
@@ -3126,6 +3130,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
+            @SuppressWarnings("rawtypes")
             final IV NULL = null;
             
             database
@@ -3139,7 +3144,14 @@ public class BigdataSail extends SailBase implements Sail {
          */
         
         /**
-         * {@inheritDoc}
+         * Bigdata now uses an internal query model which differs significantly
+         * from the Sesame query model. Support is not provided for
+         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
+         * prepared and evaluated using a
+         * {@link BigdataSailRepositoryConnection}.
+         * 
+         * @throws SailException
+         *             <em>always</em>.
          * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
          *      SPARQL 1.1 Update </a>
@@ -3149,7 +3161,7 @@ public class BigdataSail extends SailBase implements Sail {
                 final Dataset dataset, final BindingSet bindingSet,
                 boolean includeInferred) throws SailException {
 
-            throw new UnsupportedOperationException("SPARQL 1.1 Update");
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
             
         }
         
@@ -3165,8 +3177,6 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @throws SailException
          *             <em>always</em>.
-         * 
-         * @see #evaluate(QueryRoot, Dataset, BindingSet, boolean)
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 final TupleExpr tupleExpr, //
@@ -3175,8 +3185,7 @@ public class BigdataSail extends SailBase implements Sail {
                 final boolean includeInferred//
         ) throws SailException {
 
-            throw new SailException(
-                    "Support is no longer provided for TupleExpr evaluation, please make sure you are using a BigdataSailRepository");
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
 
         }
 
@@ -3195,8 +3204,15 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @return The {@link CloseableIteration} from which the solutions may
          *         be drained.
-         *         
+         * 
          * @throws SailException
+         * 
+         * @deprecated Consider removing this method from our public API. It is
+         *             no longer in any code path for the bigdata code base.
+         *             Embedded applications requiring high level evaluation
+         *             should use {@link BigdataSailRepositoryConnection}. It
+         *             does not call through here, but goes directly to the
+         *             {@link ASTEvalHelper}.
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 final QueryRoot queryRoot, //
