@@ -26,8 +26,6 @@ package com.bigdata.bop.constraint;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
@@ -46,13 +44,16 @@ public class Constraint<X> extends BOpBase implements
 	 */
 	private static final long serialVersionUID = -9144690224260823279L;
 
-	protected static final Logger log = Logger.getLogger(Constraint.class);
+//	protected static final Logger log = Logger.getLogger(Constraint.class);
 	
 	/**
 	 * Convenience method to generate a constraint from a value expression.
 	 */
-	public static IConstraint wrap(final BooleanValueExpression ve) {
-		return new Constraint(ve);
+	@SuppressWarnings("rawtypes")
+    public static IConstraint wrap(final BooleanValueExpression ve) {
+		
+	    return new Constraint(ve);
+	    
 	}
 	
 	
@@ -78,10 +79,11 @@ public class Constraint<X> extends BOpBase implements
     /**
      * Required deep copy constructor.
      */
-    public Constraint(final Constraint op) {
+    public Constraint(final Constraint<X> op) {
         super(op);
     }
 
+    @SuppressWarnings("unchecked")
     public IValueExpression<X> getValueExpression() {
      
         return (IValueExpression<X>) get(0);
