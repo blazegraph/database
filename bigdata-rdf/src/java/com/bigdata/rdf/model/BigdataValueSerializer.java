@@ -85,7 +85,7 @@ public class BigdataValueSerializer<V extends Value> {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/506">
      *      Load, closure and query performance in 1.1.x versus 1.0.x </a>
      */
-    private final static short currentVersion = VERSION1;
+    private final static short currentVersion = VERSION0;
     
     /**
      * Error message indicates that the version code in the serialized
