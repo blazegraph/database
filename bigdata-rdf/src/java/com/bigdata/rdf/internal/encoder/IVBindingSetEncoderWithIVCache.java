@@ -184,18 +184,22 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
         // values.
         metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
 
-        // enable raw record support.
-        metadata.setRawRecords(true);
+        if (true) {
+          
+            // enable raw record support.
+            metadata.setRawRecords(true);
 
-        /*
-         * Very small RDF values can be inlined into the index, but after that
-         * threshold we want to have the values out of line on the backing
-         * store.
-         * 
-         * TODO Tune this and the threshold at which we use the BLOBS index
-         * instead.
-         */
-        metadata.setMaxRecLen(16); 
+            /*
+             * Very small RDF values can be inlined into the index, but after
+             * that threshold we want to have the values out of line on the
+             * backing store.
+             * 
+             * TODO Tune this and the threshold at which we use the BLOBS index
+             * instead.
+             */
+            metadata.setMaxRecLen(16);
+            
+        }
         
         return metadata;
 
