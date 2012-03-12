@@ -54,9 +54,6 @@ import com.bigdata.bop.BOp;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME Need deleteClause and/or insertClause in addition to the
- *          whereClause.
  */
 public class DeleteInsertGraph extends GraphUpdate implements
         IGraphPatternContainer {
@@ -69,6 +66,16 @@ public class DeleteInsertGraph extends GraphUpdate implements
     interface Annotations extends GraphUpdate.Annotations,
             IGraphPatternContainer.Annotations {
 
+        /**
+         * The optional DELETE clause.
+         */
+        String DELETE_CLAUSE = "deleteClause";
+
+        /**
+         * The optional INSERT clause.
+         */
+        String INSERT_CLAUSE = "insertClause";
+        
     }
 
     public DeleteInsertGraph() {
@@ -107,11 +114,21 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
-     
+
         return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
-        
+
     }
 
+    /**
+     * Set the WHERE clause.
+     */
+    public void setWhereClause(
+            final GraphPatternGroup<IGroupMemberNode> whereClause) {
+
+        setGraphPattern(whereClause);
+        
+    }
+    
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
@@ -126,6 +143,73 @@ public class DeleteInsertGraph extends GraphUpdate implements
         graphPattern.setParent(null);
         
         super.setProperty(Annotations.GRAPH_PATTERN, graphPattern);
+
+    }
+
+    public QuadData getDeleteClause() {
+
+        return (QuadData) getProperty(Annotations.DELETE_CLAUSE);
+
+    }
+
+    public QuadData getInsertClause() {
+
+        return (QuadData) getProperty(Annotations.INSERT_CLAUSE);
+
+    }
+
+    public void setDeleteClause(final QuadData data) {
+
+        setProperty(Annotations.DELETE_CLAUSE, data);
+
+    }
+
+    public void setInsertClause(final QuadData data) {
+
+        setProperty(Annotations.INSERT_CLAUSE, data);
+
+    }
+
+    final public String toString(final int indent) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(indent(indent));
+        
+        sb.append(getUpdateType());
+
+        final QuadData deleteClause = getDeleteClause();
+
+        final QuadData insertClause = getInsertClause();
+
+        final GraphPatternGroup<?> whereClause = getWhereClause();
+        
+        if (deleteClause != null) {
+
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append("DELETE");
+            sb.append(deleteClause.toString(indent + 2));
+        }
+
+        if (insertClause != null) {
+
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append("INSERT");
+            sb.append(insertClause.toString(indent + 2));
+        }
+
+        if (whereClause != null) {
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append("WHERE");
+            sb.append(whereClause.toString(indent + 2));
+        }
+        
+        sb.append("\n");
+
+        return sb.toString();
 
     }
 

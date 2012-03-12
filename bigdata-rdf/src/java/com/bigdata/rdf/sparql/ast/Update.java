@@ -172,14 +172,4 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
         
     }
     
-    /**
-     * FIXME Implement for all concrete classes.
-     */
-    @Override
-    public String toString(int indent) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
 }

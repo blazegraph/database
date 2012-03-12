@@ -23,23 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * Extension API for bigdata queries.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  */
-public interface BigdataSailQuery {
+public interface BigdataSailQuery extends BigdataSailOperation {
     
-    /**
-     * Return the AST model.
-     */
-    ASTContainer getASTContainer();
-    
-    /**
-     * The backing database view.
-     */
-    AbstractTripleStore getTripleStore();
 }

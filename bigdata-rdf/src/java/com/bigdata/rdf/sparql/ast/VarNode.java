@@ -53,13 +53,15 @@ public class VarNode extends TermNode {
         
     }
 
+    @SuppressWarnings("unchecked")
     public VarNode(final String var) {
     	
     	this(Var.var(var));
     	
     }
     
-	public VarNode(final IVariable<IV> var) {
+	@SuppressWarnings("rawtypes")
+    public VarNode(final IVariable<IV> var) {
 		
 		super(new BOp[]{var}, null);
 		
@@ -104,7 +106,8 @@ public class VarNode extends TermNode {
 	/**
 	 * Strengthen return type.
 	 */
-	@Override
+	@SuppressWarnings("rawtypes")
+    @Override
 	public IVariable<IV> getValueExpression() {
 		
 		return (IVariable<IV>) super.getValueExpression();

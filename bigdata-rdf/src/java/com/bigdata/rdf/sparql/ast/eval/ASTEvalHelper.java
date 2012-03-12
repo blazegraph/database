@@ -61,6 +61,8 @@ import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.Update;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -278,13 +280,12 @@ public class ASTEvalHelper {
     /**
      * Evaluate a query plan (core method).
      * 
-     * @param database
-     *            The {@link AbstractTripleStore} view against which the query
-     *            will be evaluated.
-     * @param queryPlan
-     *            The query plan.
-     * @param bs
-     *            The source binding set.
+     * @param astContainer
+     *            The query model.
+     * @param ctx
+     *            The evaluation context.
+     * @param bindingSets
+     *            The source solution set(s).
      * @param materializeProjectionInQuery
      *            When <code>true</code>, the projection was materialized within
      *            query plan. When <code>false</code>, this method will take
@@ -637,5 +638,108 @@ public class ASTEvalHelper {
         return it3;
         
     }
+
+    /**
+     * Evaluate a SPARQL UPDATE request (core method).
+     * 
+     * @param astContainer
+     *            The query model.
+     * @param ctx
+     *            The evaluation context.
+     * 
+     *            TODO Is there anything interesting to return from here?
+     * 
+     *            TODO Caller must set [includeInferred] on the update request.
+     *            Look at the query code path for this, but also consider what
+     *            it means in the context of update. It probably only effects
+     *            the WHERE clauses in UPDATE operations.
+     * 
+     *            TODO Where are the DataSet(s) for the update operations in the
+     *            sequence coming from? I assume that they will be attached to
+     *            each {@link Update}.
+     * 
+     *            TODO Do LOAD sequences (and maybe other operations) in
+     *            parallel.
+     * 
+     *            TODO We will need to run some AST optimizers. Probably once
+     *            per {@link Update} step. Those optimizers will need to handle
+     *            {@link Update} as well as {@link QueryRoot}.  We will need to
+     *            expand the AST optimizer test suite for this.
+     */
+    static public void executeUpdate(
+            final ASTContainer astContainer,
+            final AST2BOpContext ctx            
+            ) {
+        
+        /*
+         * TODO Build up the optimized AST for the UpdateRoot for each Update to
+         * be executed.  Maybe do this all up front before we run anything since
+         * we might reorder or regroup some operations (e.g., parallelized LOAD
+         * operations, parallelized INSERT data operations, etc).
+         */
+        final UpdateRoot originalUpdate = astContainer.getOriginalUpdateAST();
+
+        for(Update op : originalUpdate) {
+
+            
+            
+        }
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    // FIXME Clean up.
+//  final List<UpdateExpr> updateExprs = parsedUpdate.getUpdateExprs();
+//
+//  for (UpdateExpr updateExpr : updateExprs) {
+//      // LOAD is handled at the Repository API level because it requires
+//      // access to the Rio parser:  
+//      if (updateExpr instanceof Load) {
+//
+//          Load load = (Load)updateExpr;
+//
+//          Value source = load.getSource().getValue();
+//          Value graph = load.getGraph() != null ? load.getGraph().getValue() : null;
+//
+//          SailRepositoryConnection conn = getConnection();
+//          try {
+//              URL sourceURL = new URL(source.stringValue());
+//
+//              if (graph == null) {
+//                  conn.add(sourceURL, source.stringValue(), null);
+//              }
+//              else {
+//                  conn.add(sourceURL, source.stringValue(), null, (Resource)graph);
+//              }
+//          }
+//          catch (Exception e) {
+//              log.warn("exception during update execution: ", e);
+//              if (!load.isSilent()) {
+//                  throw new UpdateExecutionException(e);
+//              }
+//          }
+//      }
+//      else {
+//          // pass update operation to the SAIL.
+//          SailConnection conn = getConnection().getSailConnection();
+//
+//          try {
+//              conn.executeUpdate(updateExpr, getActiveDataset(), getBindings(), true);
+//              getConnection().autoCommit();
+//          }
+//          catch (SailException e) {
+//              log.warn("exception during update execution: ", e);
+//              if (!updateExpr.isSilent()) {
+//                  throw new UpdateExecutionException(e);
+//              }
+//          }
+//          catch (RepositoryException e) {
+//              log.warn("exception during update execution: ", e);
+//              if (!updateExpr.isSilent()) {
+//                  throw new UpdateExecutionException(e);
+//              }
+//          }
+//      }
+//  }
     
 }

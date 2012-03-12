@@ -47,12 +47,18 @@ import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
 import com.bigdata.rdf.sail.sparql.ast.ASTCreate;
+import com.bigdata.rdf.sail.sparql.ast.ASTDeleteClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
+import com.bigdata.rdf.sail.sparql.ast.ASTDeleteWhere;
 import com.bigdata.rdf.sail.sparql.ast.ASTDrop;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphOrDefault;
+import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphRefAll;
+import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTInsertClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTInsertData;
 import com.bigdata.rdf.sail.sparql.ast.ASTLoad;
+import com.bigdata.rdf.sail.sparql.ast.ASTModify;
 import com.bigdata.rdf.sail.sparql.ast.ASTMove;
 import com.bigdata.rdf.sail.sparql.ast.ASTQuadsNotTriples;
 import com.bigdata.rdf.sail.sparql.ast.Node;
@@ -63,12 +69,17 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DeleteData;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.InsertData;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
-import com.bigdata.rdf.sparql.ast.QuadsData;
+import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
@@ -102,21 +113,21 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         super(context);
     }
 
+    // TODO Is this necessary?
 //	@Override
-//	public Update visit(final ASTUpdate node, Object data)
-//		throws VisitorException
-//	{
-//		
-//	    if (node instanceof ASTModify) {
-//		
-//			return this.visit((ASTModify)node, data);
+//    public Update visit(final ASTUpdate node, final Object data)
+//            throws VisitorException {
 //
-//		} else if (node instanceof ASTInsertData) {
-//		    
+//        if (node instanceof ASTModify) {
+//
+//            return this.visit((ASTModify) node, data);
+//
+//        } else if (node instanceof ASTInsertData) {
+//
 //            return this.visit((ASTInsertData) node, data);
-//            
+//
 //        }
-//	    
+//
 //		return null;
 //		
 //	}
@@ -201,85 +212,6 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 		return op;
 	}
 
-    /**
-     * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation.
-     * <p>
-     * Note: The QuadData is basically modeled by the bigdata AST as recursive
-     * {@link StatementPatternNode} containers. This visits the parser AST nodes
-     * and then flattens them into an {@link ISPO}[]. The {@link ISPO}s are
-     * {@link BigdataStatement}s at this point, but they can be converted to
-     * {@link SPO}s when the INSERT DATA or DELETE DATA operation runs.
-     * 
-     * @throws VisitorException
-     */
-    private ISPO[] doQuadsData(final Node node, final Object data)
-            throws VisitorException {
-
-	    final GroupGraphPattern parentGP = graphPattern;
-        graphPattern = new GroupGraphPattern();
-
-        // inherit scope & context : TODO When would it ever be non-null?
-        graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-        graphPattern.setContextVar(parentGP.getContext());
-
-        /*
-         * Visit [QuadsData].
-         * 
-         * TODO What is this doing? It is making some decision based on just the
-         * first child...
-         */
-        {
-
-            // first child.
-            final Node child0 = node.jjtGetChild(0);
-            
-            final Object algebraExpr = child0.jjtAccept(this, data);
-
-            if (algebraExpr instanceof ConstantNode) { // named graph identifier
-
-                final ConstantNode context = (ConstantNode) algebraExpr;
-                graphPattern.setContextVar(context);
-                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-                
-            }
-
-            // remaining children (i=1...).
-            for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-
-                node.jjtGetChild(i).jjtAccept(this, data);
-
-            }
-
-        }
-        
-        final QuadsData insertExpr = graphPattern.buildGroup(new QuadsData());
-
-        graphPattern = parentGP;
-
-        final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>(); 
-        
-        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
-                insertExpr, StatementPatternNode.class);
-        
-        while (itr.hasNext()) {
-        
-            final StatementPatternNode sp = itr.next();
-            
-            final BigdataStatement spo = context.valueFactory.createStatement(
-                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
-                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
-                            .c().getValue() : null), StatementEnum.Explicit);
-            
-            stmts.add(spo);
-            
-        }
-        
-        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
-        
-        return a;
-
-	}
-	
     /**
      * Note: For DELETE DATA, QuadData denotes triples to be removed and is as
      * described in INSERT DATA, with the difference that in a DELETE DATA
@@ -410,7 +342,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 //    }
     
 	@Override
-	public QuadsData visit(final ASTQuadsNotTriples node, Object data)
+	public QuadData visit(final ASTQuadsNotTriples node, Object data)
 		throws VisitorException
 	{
 		
@@ -418,8 +350,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 		
 	    graphPattern = new GroupGraphPattern();
 
-        final ConstantNode contextNode = (ConstantNode) node.jjtGetChild(0)
-                .jjtAccept(this, data);
+        final TermNode contextNode = (TermNode) node.jjtGetChild(0).jjtAccept(
+                this, data);
 
 		graphPattern.setContextVar(contextNode);
 
@@ -431,7 +363,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         }
 
-        final QuadsData group = graphPattern.buildGroup(new QuadsData());
+        final QuadData group = graphPattern.buildGroup(new QuadData());
 
         parentGP.add(group);
         
@@ -440,22 +372,45 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 		return group;
 	}
 
-//	@Override
-//	public Modify visit(ASTDeleteWhere node, Object data)
-//		throws VisitorException
-//	{
-//		// Collect construct triples
-//		GraphPattern parentGP = graphPattern;
-//		graphPattern = new GraphPattern();
-//
-//		// inherit scope & context
-//		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-//		graphPattern.setContextVar(parentGP.getContextVar());
-//
-//		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
-//
+    /**
+     * This handles the "DELETE WHERE" syntax short hand.
+     * 
+     * <pre>
+     * DELETE WHERE  QuadPattern
+     * </pre>
+     * 
+     * This is similar to a CONSTRUCT without an explicit template. The WHERE
+     * clause provides both the pattern to match and the template for the quads
+     * to be removed.
+     */
+	@Override
+    public DeleteInsertGraph visit(final ASTDeleteWhere node, final Object data)
+            throws VisitorException {
+	    
+		// Collect construct triples
+		final GroupGraphPattern parentGP = graphPattern;
+		graphPattern = new GroupGraphPattern();
+
+		// inherit scope & context
+		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+		graphPattern.setContextVar(parentGP.getContext());
+
+		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
+
+		    node.jjtGetChild(i).jjtAccept(this, data);
+		    
+		}
+
+        final JoinGroupNode whereClause = graphPattern.buildGroup(new JoinGroupNode());
+
+        graphPattern = parentGP;
+
+        final DeleteInsertGraph op = new DeleteInsertGraph();
+
+        op.setWhereClause(whereClause);
+        
+        return op;
+        
 //		TupleExpr whereExpr = graphPattern.buildTupleExpr();
 //		graphPattern = parentGP;
 //
@@ -463,7 +418,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 //		Modify modify = new Modify(deleteExpr, null, whereExpr);
 //
 //		return modify;
-//	}
+	}
 
 	@Override
 	public LoadGraph visit(final ASTLoad node, Object data)
@@ -705,72 +660,241 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * DELETE/INSERT
      */
     
-//	@Override
-//	public Modify visit(ASTModify node, Object data)
-//		throws VisitorException
-//	{
-//
-//		ValueConstant with = null;
-//		ASTIRI withNode = node.getWithClause();
-//		if (withNode != null) {
-//			with = (ValueConstant)withNode.jjtAccept(this, data);
-//		}
-//
-//		if (with != null) {
-//			graphPattern.setContextVar(valueExpr2Var(with));
-//			graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-//		}
-//
-//		ASTGraphPatternGroup whereClause = node.getWhereClause();
-//
-//		TupleExpr where = null;
-//		if (whereClause != null) {
-//			where = (TupleExpr)whereClause.jjtAccept(this, data);
-//		}
-//
-//		TupleExpr delete = null;
-//		ASTDeleteClause deleteNode = node.getDeleteClause();
-//		if (deleteNode != null) {
-//			delete = (TupleExpr)deleteNode.jjtAccept(this, data);
-//		}
-//
-//		TupleExpr insert = null;
-//		ASTInsertClause insertNode = node.getInsertClause();
-//		if (insertNode != null) {
-//			insert = (TupleExpr)insertNode.jjtAccept(this, data);
-//		}
-//
-//		Modify modifyExpr = new Modify(delete, insert, where);
-//
-//		return modifyExpr;
-//	}
-//
-//	@Override
-//	public TupleExpr visit(ASTDeleteClause node, Object data)
-//		throws VisitorException
-//	{
-//		TupleExpr result = (TupleExpr)data;
-//
-//		// Collect construct triples
-//		GraphPattern parentGP = graphPattern;
-//
-//		graphPattern = new GraphPattern();
-//
-//		// inherit scope & context
-//		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-//		graphPattern.setContextVar(parentGP.getContextVar());
-//
-//		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
-//		TupleExpr deleteExpr = graphPattern.buildTupleExpr();
-//
-//		graphPattern = parentGP;
-//
-//		return deleteExpr;
-//
-//	}
-//
+    /**
+     * The DELETE/INSERT operation can be used to remove or add triples from/to
+     * the Graph Store based on bindings for a query pattern specified in a
+     * WHERE clause:
+     * 
+     * <pre>
+     * ( WITH IRIref )?
+     * ( ( DeleteClause InsertClause? ) | InsertClause )
+     * ( USING ( NAMED )? IRIref )*
+     * WHERE GroupGraphPattern
+     * </pre>
+     * 
+     * The DeleteClause and InsertClause forms can be broken down as follows:
+     * 
+     * <pre>
+     * DeleteClause ::= DELETE  QuadPattern 
+     * InsertClause ::= INSERT  QuadPattern
+     * </pre>
+     */
+    @Override
+    public DeleteInsertGraph visit(final ASTModify node, final Object data)
+            throws VisitorException
+	{
+
+        final DeleteInsertGraph op = new DeleteInsertGraph();
+        
+        ConstantNode with = null;
+        {
+            
+            final ASTIRI withNode = node.getWithClause();
+            
+            if (withNode != null) {
+                
+                with = (ConstantNode) withNode.jjtAccept(this, data);
+                
+                graphPattern.setContextVar(with);
+                
+                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+                
+            }
+
+        }
+
+        {
+            final ASTGraphPatternGroup whereClause = node.getWhereClause();
+
+            if (whereClause != null) {
+
+                graphPattern = new GroupGraphPattern();
+
+                final GraphPatternGroup<IGroupMemberNode> ret = (GraphPatternGroup<IGroupMemberNode>) whereClause
+                        .jjtAccept(this, null/* data */);
+
+                op.setWhereClause(ret);
+                
+            }
+            
+//          ASTGraphPatternGroup whereClause = node.getWhereClause();
+//                  TupleExpr where = null;
+//                  if (whereClause != null) {
+//                      where = (TupleExpr)whereClause.jjtAccept(this, data);
+//                  }
+
+        }
+
+        {
+            
+            final ASTDeleteClause deleteNode = node.getDeleteClause();
+            
+            if (deleteNode != null) {
+            
+                final QuadData deleteClause = (QuadData) deleteNode.jjtAccept(
+                        this, data);
+            
+                op.setDeleteClause(deleteClause);
+                
+            }
+            
+        }
+
+        {
+
+            final ASTInsertClause insertNode = node.getInsertClause();
+            
+            if (insertNode != null) {
+            
+                final QuadData deleteClause = (QuadData) insertNode.jjtAccept(
+                        this, data);
+            
+                op.setInsertClause(deleteClause);
+                
+            }
+            
+        }
+
+		return op;
+		
+	}
+
+	@Override
+	public QuadData visit(final ASTDeleteClause node, final Object data)
+		throws VisitorException
+	{
+
+	    return doQuadsPatternClause(node, data);
+	    
+    }
+
+    @Override
+    public QuadData visit(final ASTInsertClause node, final Object data)
+            throws VisitorException {
+
+        return doQuadsPatternClause(node, data);
+
+    }
+
+    /**
+     * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation. This
+     * form does not allow variables in the quads data.
+     * <p>
+     * Note: The QuadData is basically modeled by the bigdata AST as recursive
+     * {@link StatementPatternNode} containers. This visits the parser AST nodes
+     * and then flattens them into an {@link ISPO}[]. The {@link ISPO}s are
+     * {@link BigdataStatement}s at this point, but they can be converted to
+     * {@link SPO}s when the INSERT DATA or DELETE DATA operation runs.
+     * 
+     * @throws VisitorException
+     */
+    private ISPO[] doQuadsData(final Node node, final Object data)
+            throws VisitorException {
+
+        final GroupGraphPattern parentGP = graphPattern;
+        graphPattern = new GroupGraphPattern();
+
+        // inherit scope & context : TODO When would it ever be non-null?
+        graphPattern.setStatementPatternScope(parentGP
+                .getStatementPatternScope());
+        graphPattern.setContextVar(parentGP.getContext());
+
+        /*
+         * Visit [QuadsData].
+         * 
+         * TODO What is this doing? It is making some decision based on just the
+         * first child...
+         */
+        {
+
+            // first child.
+            final Node child0 = node.jjtGetChild(0);
+
+            final Object algebraExpr = child0.jjtAccept(this, data);
+
+            if (algebraExpr instanceof ConstantNode) { // named graph identifier
+
+                final ConstantNode context = (ConstantNode) algebraExpr;
+                graphPattern.setContextVar(context);
+                graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+
+            }
+
+            // remaining children (i=1...).
+            for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+
+                node.jjtGetChild(i).jjtAccept(this, data);
+
+            }
+
+        }
+
+        final QuadData quadData = graphPattern.buildGroup(new QuadData());
+
+        graphPattern = parentGP;
+
+        final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>();
+
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                quadData, StatementPatternNode.class);
+
+        while (itr.hasNext()) {
+
+            final StatementPatternNode sp = itr.next();
+
+            final BigdataStatement spo = context.valueFactory.createStatement(
+                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
+                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
+                            .c().getValue() : null), StatementEnum.Explicit);
+
+            stmts.add(spo);
+
+        }
+
+        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
+
+        return a;
+
+    }
+
+    /**
+     * Collect quads patterns for a DELETE/INSERT operation.  This form allows
+     * variables in the quads patterns.
+     * 
+     * @param data
+     * 
+     *            TODO [data] appears to be where to put the data. Look at how
+     *            this is getting passed in to the caller (ASTModify and maybe
+     *            recursively in this method).
+     */
+    private QuadData doQuadsPatternClause(final Node node, final Object data)
+            throws VisitorException {
+
+//	    TupleExpr result = (TupleExpr)data;
+
+		// Collect construct triples
+		final GroupGraphPattern parentGP = graphPattern;
+
+		graphPattern = new GroupGraphPattern();
+
+		// inherit scope & context
+		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+		graphPattern.setContextVar(parentGP.getContext());
+
+		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
+
+		    node.jjtGetChild(i).jjtAccept(this, data);
+		    
+		}
+		
+        final QuadData quadData = graphPattern.buildGroup(new QuadData());
+
+        graphPattern = parentGP;
+
+		return quadData;
+
+	}
+
 //	@Override
 //	public TupleExpr visit(ASTInsertClause node, Object data)
 //		throws VisitorException

@@ -225,8 +225,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
                 final ASTUpdate updateNode = uc.getUpdate();
                 
-                update.addChild((Update) updateNode.jjtAccept(
-                        updateExprBuilder, null/* data */));
+                final Object result = updateNode.jjtAccept(updateExprBuilder,
+                        null/* data */);
+                
+                update.addChild((Update) result);
                 
             }
 

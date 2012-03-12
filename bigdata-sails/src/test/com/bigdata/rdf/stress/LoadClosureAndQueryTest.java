@@ -55,11 +55,11 @@ import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.evaluation.QueryBindingSet;
-import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailConnection;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilter;
@@ -75,10 +75,9 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -1216,13 +1215,13 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     /**
      * Return a read-historical connection for query.
      */
-    protected BigdataSailConnection getQueryConnection() {
+    protected BigdataSailRepositoryConnection getQueryConnection() throws RepositoryException {
 
-        final long timestamp = sail.getDatabase().getIndexManager()
-                .getLastCommitTime();
-        
-        return sail.getReadOnlyConnection(timestamp);
-        
+//        final long timestamp = sail.getDatabase().getIndexManager()
+//                .getLastCommitTime();
+//        
+//        return sail.getReadOnlyConnection(timestamp);
+        return new BigdataSailRepository(sail).getReadOnlyConnection();
     }
 
     /**
@@ -1982,18 +1981,18 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * When <code>true</code> inferences will be included in the results
          * for high-level query.
          */
-        final boolean includeInferred = true;
+//        final boolean includeInferred = true;
+//        
+//        final String baseURI = null; // @todo what baseURI for queries?
         
-        final String baseURI = null; // @todo what baseURI for queries?
-        
-            final String queryString = theQuery.getQuery();
+        final String queryString = theQuery.getQuery();
 
         if (DEBUG)
             log.debug("query: " + queryString);
 
 //        final ParsedQuery query = queryParser.parseQuery(queryString, baseURI);
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                sail.getDatabase()).parseQuery2(queryString, baseURI);
+//        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+//                sail.getDatabase()).parseQuery2(queryString, baseURI);
 
         /*
          * Create a data set consisting of the contexts to be queried.
@@ -2001,15 +2000,19 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * Note: a [null] DataSet will cause context to be ignored when the
          * query is processed.
          */
-        final DatasetImpl dataSet = null; // new DatasetImpl();
+//        final DatasetImpl dataSet = null; // new DatasetImpl();
+//
+//        final BindingSet bindingSet = new QueryBindingSet();
 
-        final BindingSet bindingSet = new QueryBindingSet();
-
-        final BigdataSailConnection conn = getQueryConnection();
-
+        final BigdataSailRepositoryConnection conn = getQueryConnection();
+        
+        final TupleQuery tupleQuery = conn.prepareTupleQuery(QueryLanguage.SPARQL, queryString);
+        tupleQuery.setIncludeInferred(true);
+        
         // Note: Will close the [conn] for all outcomes.
-        final MyQueryResult result = new MyQueryResult(conn, conn.evaluate(
-                astContainer.getOriginalAST(), dataSet, bindingSet, includeInferred));
+        final MyQueryResult result = new MyQueryResult(conn, tupleQuery.evaluate());
+//        conn.evaluate(
+//                astContainer.getOriginalAST(), dataSet, bindingSet, includeInferred));
 
         long n = 0;
 
@@ -2032,14 +2035,14 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      */
     public static class MyQueryResult {
 
-        private BigdataSailConnection conn;
+        private BigdataSailRepositoryConnection conn;
 
         private CloseableIteration<? extends BindingSet, QueryEvaluationException> itr;
 
         private long nsolutions = 0;
 
         public MyQueryResult(
-                BigdataSailConnection conn,
+                BigdataSailRepositoryConnection conn,
                 CloseableIteration<? extends BindingSet, QueryEvaluationException> itr) {
 
             this.conn = conn;
@@ -2120,7 +2123,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
                     conn.close();
 
-                } catch (SailException e) {
+                } catch (RepositoryException e) {
                     
                     throw new RuntimeException(e);
                     

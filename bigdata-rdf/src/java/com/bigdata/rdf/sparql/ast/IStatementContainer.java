@@ -30,7 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 /**
  * Marker interface for things which either are statements (or statement
  * patterns) or contain statements (or statement pattern). This is used to
- * create an abstraction for {@link QuadsData} from which we can then specialize
+ * create an abstraction for {@link QuadData} from which we can then specialize
  * the {@link ConstructNode}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

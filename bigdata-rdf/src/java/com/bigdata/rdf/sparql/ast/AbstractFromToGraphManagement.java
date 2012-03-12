@@ -37,7 +37,7 @@ import com.bigdata.bop.BOp;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractFromToGraphManagement extends GraphManagement {
+abstract public class AbstractFromToGraphManagement extends GraphManagement {
 
     /**
      * 
@@ -142,7 +142,7 @@ public class AbstractFromToGraphManagement extends GraphManagement {
             sb.append(" SILENT");
 
         {
-            final ConstantNode sourceGraph = getTargetGraph();
+            final ConstantNode sourceGraph = getSourceGraph();
 
             sb.append("\n");
             sb.append(indent(indent + 1));
