@@ -36,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import com.bigdata.bop.constraint.EQ;
-
 /**
  * Abstract base class for copy-on-write {@link BOp}s. The {@link BOpBase} class
  * is used for query evaluation operators. The copy-on-write contract provides a
@@ -92,7 +90,7 @@ public class BOpBase extends CoreBaseBOp {
 	 * <p>
 	 * If we allowed mutation of the arguments (outside of the object creation
 	 * pattern) then caching of the arguments (or annotations) by classes such
-	 * as {@link EQ} will cause {@link #clone()} to fail because (a) it will do
+	 * as EQ will cause {@link #clone()} to fail because (a) it will do
 	 * a field-by-field copy on the concrete implementation class; and (b) it
 	 * will not consistently update the cached references. In order to "fix"
 	 * this problem, any classes which cache arguments or annotations would have
