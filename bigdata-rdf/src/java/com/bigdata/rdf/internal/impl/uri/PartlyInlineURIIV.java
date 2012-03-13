@@ -56,12 +56,6 @@ public class PartlyInlineURIIV<V extends BigdataURI> extends
 
         super(VTE.URI, delegate, namespace);
         
-        // TermId for namespace. (if fully inline then use URIExtensionIV).
-        assert !namespace.isInline();
-
-        // short unicode text of localName.
-        assert delegate.isInline();
-
     }
 
     /**
