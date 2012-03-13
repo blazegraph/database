@@ -43,9 +43,9 @@ import com.bigdata.rawstore.Bytes;
  * This class does not offer any compression. It merely stores byte[][] whose
  * individual elements have a fixed length specified in the constructor in a
  * manner suitable for fast random access. This is useful if the values are a
- * fixed length, application specific is either not obvious or not desired, and
- * you wish to emphasize speed of data access over compression. This class only
- * supports B+Tree values.
+ * fixed length, application specific coding is either not obvious or not desired,
+ * and you wish to emphasize speed of data access over compression. This class 
+ * only supports B+Tree values.
  * 
  * <h2>Binary Format</h2>
  * 
