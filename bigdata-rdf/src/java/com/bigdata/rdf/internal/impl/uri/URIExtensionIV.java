@@ -1,0 +1,221 @@
+package com.bigdata.rdf.internal.impl.uri;
+
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.internal.ILexiconConfiguration;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.vocab.Vocabulary;
+
+/**
+ * Class provides support for fully inline {@link URI}s for which a
+ * {@link Vocabulary} item was registered for the {@link URI} <em>namespace</em>
+ * . An {@link URIExtensionIV} <strong>always</strong> has the <em>inline</em>
+ * and <em>extension</em> bits set. {@link URIExtensionIV} are fully inline
+ * since the <code>namespace</code> can be materialized from the
+ * {@link Vocabulary} and the <code>localName</code> is directly inline.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * @param <V>
+ */
+public class URIExtensionIV<V extends BigdataURI> 
+    	extends AbstractInlineExtensionIV<V, Object> 
+		implements URI { 
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 8267554196603121194L;
+
+    /**
+     * The namespace.
+     */
+    private final AbstractInlineIV<BigdataURI, ?> namespaceIV;
+
+    /**
+     * The localName.
+     */
+    private final FullyInlineTypedLiteralIV<BigdataLiteral> delegateIV;
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The extensionIV and delegateIV are NOT cloned. The rationale is
+     * that we are only cloning to break the hard reference from the {@link IV}
+     * to to cached value. If that needs to be done for the extensionIV and
+     * delegateIV, then it will be done separately for those objects when they
+     * are inserted into the termsCache.
+     */
+    public IV<V, Object> clone(final boolean clearCache) {
+
+        final URIExtensionIV<V> tmp = new URIExtensionIV<V>(delegateIV,
+                namespaceIV);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+    
+    /**
+     * 
+     * @param localNameIV
+     *            The {@link IV} which represents the localName.
+     * @param namespaceIV
+     *            The {@link IV} which represents the namespace. This MUST be a
+     *            fully inline {@link IV} declared by the {@link Vocabulary}.
+     */
+    @SuppressWarnings("unchecked")
+    public URIExtensionIV(
+    		final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV, 
+    		final IV<?,?> namespaceIV) {
+        
+        super(VTE.URI, true/* extension */, localNameIV.getDTE());
+
+        if (namespaceIV == null)
+            throw new IllegalArgumentException();
+
+        if (!namespaceIV.isInline())
+            throw new IllegalArgumentException();
+
+        this.delegateIV = localNameIV;
+
+        this.namespaceIV = (AbstractInlineIV<BigdataURI, ?>) namespaceIV;
+
+    }
+    
+    /**
+     * Even though Literal extension IVs are fully inline (no data in the 
+     * lexicon indices), we do need materialization to answer the openrdf
+     * Literal interface correctly. We cannot properly interpret what the
+     * delegate IV means without the materialized value.
+     */
+    public boolean needsMaterialization() {
+    	return true;
+    }
+    
+    public AbstractLiteralIV<BigdataLiteral, ?> getLocalNameIV() {
+        
+        return delegateIV;
+        
+    }
+    
+    public Object getInlineValue() { // TODO TEST
+
+        return new URIImpl(stringValue());
+
+    }
+    
+    /**
+     * Extension IV is the <code>namespace</code> for the {@link URI}.
+     */
+    @Override
+    public IV<BigdataURI, ?> getExtensionIV() {
+        
+        return namespaceIV;
+        
+    }
+    
+    /**
+     * 
+     */
+    public int hashCode() {// TODO Inspect distribution.
+        
+        return namespaceIV.hashCode() ^ delegateIV.hashCode();
+        
+    }
+
+    public boolean equals(final Object o) {
+        if (this == o)
+            return true;
+        if (o instanceof URIExtensionIV<?>) {
+            return this.delegateIV.equals(((URIExtensionIV<?>) o).delegateIV)
+                    && this.namespaceIV.equals(((URIExtensionIV<?>) o).namespaceIV);
+        }
+        return false;
+    }
+    
+    @SuppressWarnings("rawtypes")
+    public int _compareTo(final IV o) {
+
+        int ret = namespaceIV.compareTo(((URIExtensionIV<?>) o).namespaceIV);
+
+        if (ret != 0)
+            return ret;
+
+        return delegateIV._compareTo(((URIExtensionIV<?>) o).delegateIV);
+
+    }
+
+    /**
+     * Return the length of the namespace IV plus the length of the localName
+     * IV.
+     */
+    public int byteLength() {
+
+        return 1/* flags */+ namespaceIV.byteLength() + delegateIV.byteLength();
+        
+    }
+
+	/**
+	 * Defer to the {@link ILexiconConfiguration} which has specific knowledge
+	 * of how to generate an RDF value from this general purpose extension IV.
+	 * <p>
+	 * {@inheritDoc}
+	 */
+	@SuppressWarnings( { "unchecked", "rawtypes" })
+	public V asValue(final LexiconRelation lex) {
+
+		V v = getValueCache();
+		
+		if (v == null) {
+			
+//			final BigdataValueFactory f = lex.getValueFactory();
+			
+			final ILexiconConfiguration config = lex.getLexiconConfiguration();
+
+			v = setValue((V) config.asValueFromVocab(this));
+
+			v.setIV(this);
+
+		}
+
+		return v;
+		
+    }
+
+	@Override
+	public String stringValue() {
+	
+        return getNamespace() + getLocalName();
+	    
+	}
+
+    @Override
+    public String getNamespace() {
+
+        return ((URI) namespaceIV.getInlineValue()).stringValue();
+        
+    }
+
+    @Override
+    public String getLocalName() {
+
+        return delegateIV.getLabel();
+        
+    }
+    
+}

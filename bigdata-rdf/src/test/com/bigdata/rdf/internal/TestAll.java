@@ -78,10 +78,13 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestBlobIV.class);
 
         // unit tests for fully inline literals.
-        suite.addTestSuite(TestInlineLiteralIV.class);
+        suite.addTestSuite(TestFullyInlineTypedLiteralIV.class);
 
         // unit tests for fully inline URIs.
-        suite.addTestSuite(TestInlineURIIV.class);
+        suite.addTestSuite(TestFullyInlineURIIV.class);
+
+        // unit tests for fully inline URIs based on a namespace + localName.
+        suite.addTestSuite(TestURIExtensionIV.class);
 
         // unit tests for inline literals with a datatype IV.
         suite.addTestSuite(TestLiteralDatatypeIV.class);

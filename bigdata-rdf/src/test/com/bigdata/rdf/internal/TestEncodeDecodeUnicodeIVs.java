@@ -39,6 +39,8 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -46,6 +48,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Unit tests for {@link IV}s which inline Unicode data.
@@ -126,6 +129,35 @@ public class TestEncodeDecodeUnicodeIVs extends
                 new FullyInlineURIIV<BigdataURI>(RDF.SUBJECT),//
                 new FullyInlineURIIV<BigdataURI>(RDF.BAG),//
                 new FullyInlineURIIV<BigdataURI>(RDF.OBJECT),//
+        };
+
+        doEncodeDecodeTest(e);
+        
+        doComparatorTest(e);
+        
+    }
+
+    /**
+     * Unit test for inlining an entire URI using {@link URIExtensionIV}. The
+     * URI is inlined as a combination of a {@link Vocabulary} item and a
+     * Unicode component using {@link DTE#XSDString}. The extension bit is set
+     * since we are factoring out the namespace component of the URI.
+     */
+    public void test_encodeDecode_Inline_Extension_URI() {
+
+        final IV<?, ?>[] e = {//
+                new URIExtensionIV<BigdataURI>(
+                        new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                "http://www.example.com/"),
+                        new VocabURIByteIV<BigdataURI>((byte) 1)),//
+                new URIExtensionIV<BigdataURI>(
+                        new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                "http://www.example.com/foo"),
+                        new VocabURIByteIV<BigdataURI>((byte) 1)),//
+                new URIExtensionIV<BigdataURI>(
+                        new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                "http://www.example.com/foobar"),
+                        new VocabURIByteIV<BigdataURI>((byte) 1)),//
         };
 
         doEncodeDecodeTest(e);

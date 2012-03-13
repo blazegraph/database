@@ -52,9 +52,11 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -549,6 +551,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * Imposes an ordering of IVs based on their natural sort ordering in the 
      * index as unsigned byte[]s.
      */
+    @SuppressWarnings("rawtypes")
     final public int compareTo(final IV o) {
 
         if (this == o)
@@ -602,6 +605,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     /**
      * Compare two {@link IV}s having the same intrinsic datatype.
      */
+    @SuppressWarnings("rawtypes")
     public abstract int _compareTo(IV o);
 
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
@@ -651,6 +655,19 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             /*
              * Handle a fully inline URI.
              */
+            if(isExtension()) {
+
+                @SuppressWarnings("unchecked")
+                final URIExtensionIV<BigdataURI> extension = (URIExtensionIV<BigdataURI>) this;
+
+                // The namespaceIV (a Vocabulary item).
+                IVUtility.encode(keyBuilder, extension.getExtensionIV());
+
+                // The inline localName (Unicode data).
+                IVUtility.encode(keyBuilder, extension.getLocalNameIV());
+
+                return keyBuilder;
+            }
             switch (getDTE()) {
             case XSDByte: {
 				keyBuilder.append(((VocabURIByteIV<?>) this).byteValue());

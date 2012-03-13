@@ -507,7 +507,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
                     inlineLiterals, inlineTextLiterals,
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
-                    rejectInvalidXSDValues, xFactory, vocab);
+                    rejectInvalidXSDValues, xFactory, vocab, valueFactory);
 
         }
         
@@ -1104,9 +1104,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 getNamespace(), getValueFactory()));
 
         /*
-         * Note: Enabling raw record support slows down the ID2TERM index
-         * significantly.
-         * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/506 (Load,
          * closure and query performance in 1.1.x versus 1.0.x)
          */
@@ -1120,8 +1117,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * that threshold we want to have the values out of line on the
              * backing store.
              * 
-             * TODO Tune this and the threshold at which we use the BLOBS index
-             * instead.
+             * Note: I have tried it at 16 and 24 on LUBM U50. Raising it to 24
+             * increases the data on the disk and might have a small negative
+             * effect on the load and query rates. No difference on closure
+             * rates was observed. It might all be in the noise, but it does
+             * seem that less data on the disk is better.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/506 (Load,
+             * closure and query performance in 1.1.x versus 1.0.x)
              */
             metadata.setMaxRecLen(16);
         

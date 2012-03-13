@@ -15,12 +15,12 @@ import com.bigdata.rdf.model.BigdataURI;
 /**
  * Test suite for {@link FullyInlineURIIV}.
  */
-public class TestInlineURIIV extends TestCase2 {
+public class TestFullyInlineURIIV extends TestCase2 {
 
-	public TestInlineURIIV() {
+	public TestFullyInlineURIIV() {
 	}
 
-	public TestInlineURIIV(String name) {
+	public TestFullyInlineURIIV(String name) {
 		super(name);
 	}
 

@@ -38,11 +38,12 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -56,6 +57,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -149,6 +151,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     private final Vocabulary vocab;
     
     /**
+     * The value factory for the lexicon.
+     */
+    private final BigdataValueFactory valueFactory;
+    
+    /**
      * Mapping from the {@link IV} for the datatype URI of a registered
      * extension to the {@link IExtension}.
      */
@@ -232,7 +239,8 @@ public class LexiconConfiguration<V extends BigdataValue>
             final boolean inlineDateTimes,//
             final boolean rejectInvalidXSDValues,
             final IExtensionFactory xFactory,//
-            final Vocabulary vocab//
+            final Vocabulary vocab,
+            final BigdataValueFactory valueFactory//
             ) {
 
 //        if (blobsThreshold < 0)
@@ -244,6 +252,9 @@ public class LexiconConfiguration<V extends BigdataValue>
         if (vocab == null)
             throw new IllegalArgumentException();
 
+        if (valueFactory == null)
+            throw new IllegalArgumentException();
+
 //        this.blobsThreshold = blobsThreshold;
         this.inlineXSDDatatypeLiterals = inlineXSDDatatypeLiterals;
         this.inlineTextLiterals = inlineTextLiterals;
@@ -253,6 +264,7 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.rejectInvalidXSDValues = rejectInvalidXSDValues;
         this.xFactory = xFactory;
         this.vocab = vocab;
+        this.valueFactory = valueFactory;
 
 		/*
 		 * Note: These collections are read-only so we do NOT need additional
@@ -297,7 +309,9 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final LiteralExtensionIV<?> iv
+//            ,final BigdataValueFactory vf
+            ) {
 
         // The datatypeIV for the ExtensionIV.
         final IV datatypeIV = iv.getExtensionIV();
@@ -308,10 +322,17 @@ public class LexiconConfiguration<V extends BigdataValue>
         if (ext == null)
             throw new RuntimeException("Unknown extension: " + datatypeIV);
 
-        return (V) ext.asValue(iv, vf);
+        return (V) ext.asValue(iv, valueFactory);
 
     }
 
+    @SuppressWarnings("unchecked")
+    public V asValueFromVocab(final IV<?, ?> iv) {
+
+        return (V) vocab.asValue(iv);
+
+    }
+    
     @SuppressWarnings("rawtypes")
     public IV createInlineIV(final Value value) {
 
@@ -331,6 +352,7 @@ public class LexiconConfiguration<V extends BigdataValue>
              * then return the IV from the Vocabulary. It will be either an
              * URIByteIV or an URIShortIV.
              */
+            
             final IV tmp = vocab.get(value);
 
             if (tmp != null) {
@@ -381,9 +403,35 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 */
     private IV<BigdataURI, ?> createInlineURIIV(final URI value) {
 
+        if (maxInlineTextLength == 0) {
+            
+            return null;
+            
+        }
+        
         if (value.stringValue().length() <= maxInlineTextLength) {
 
             return new FullyInlineURIIV<BigdataURI>(value);
+
+        }
+
+        final String localName = ((URI) value).getLocalName();
+
+        if (localName.length() < maxInlineTextLength) {
+
+            final String namespace = ((URI) value).getNamespace();
+
+            @SuppressWarnings("unchecked")
+            final IV<BigdataURI, ?> namespaceIV = vocab.get(new URIImpl(namespace));
+
+            if (namespaceIV != null) {
+
+                final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                        localName);
+
+                return new URIExtensionIV<BigdataURI>(localNameIV, namespaceIV);
+
+            }
 
         }
 

@@ -26,10 +26,11 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -54,19 +55,35 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     IV createInlineIV(final Value value);
     
     /**
-     * Create an RDF value from an {@link LiteralExtensionIV}. Looks through an
-     * internal catalog of {@link IExtension}s to find one that knows how to
-     * handle the extension datatype from the supplied {@link LiteralExtensionIV}.
+     * Create an RDF value from an {@link AbstractInlineExtensionIV}. The
+     * "extension" {@link IV} MUST be registered with the {@link Vocabulary}.
+     * <p>
+     * For {@link LiteralExtensionIV}, this through an internal catalog of
+     * {@link IExtension}s to find one that knows how to handle the extension
+     * datatype from the supplied {@link LiteralExtensionIV}. This is the
+     * historical use case.
      * 
      * @param iv
      *            the extension IV
-     * @param vf
-     *            the bigdata value factory
-     *            
+     * 
      * @return The RDF {@link Value}
      */
-    V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf);
+//    * @param vf
+//    *            the bigdata value factory
+    V asValue(final LiteralExtensionIV<?> iv);//, final BigdataValueFactory vf);
 
+    /**
+     * Return the {@link Value} for that {@link IV} iff the {@link IV} is
+     * declared in the {@link Vocabulary}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     *            
+     * @return The {@link Value} -or- <code>null</code> if the {@link IV} was
+     *         not declared in the {@link Vocabulary}.
+     */
+    V asValueFromVocab(final IV<?,?> iv);
+    
     /**
      * Initialize the extensions, which need to resolve their datatype URIs into
      * term ids.
