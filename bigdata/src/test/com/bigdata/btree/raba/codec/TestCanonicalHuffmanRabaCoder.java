@@ -614,8 +614,19 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
         for (int i = 0; i < limit; i++) {
 
-            // start of the bit slice.
-            final int sliceBitOff = r.nextInt(bitlen - 32);
+            /**
+             * Start of the bit slice.
+             * 
+             * Note: I added the max(x,1) after observing the following
+             * exception during one CI run:
+             * 
+             * <pre>
+             * java.lang.IllegalArgumentException: n must be positive
+             *     at java.util.Random.nextInt(Random.java:250)
+             *     at com.bigdata.btree.raba.codec.TestCanonicalHuffmanRabaCoder.test_stress_InputBitStream_compatible(TestCanonicalHuffmanRabaCoder.java:618)             *
+             * </pre>
+             */
+            final int sliceBitOff = r.nextInt(Math.max(bitlen - 32, 1));
 
             final int bitsremaining = bitlen - sliceBitOff;
 
