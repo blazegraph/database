@@ -85,8 +85,18 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      * @param keyBuilderFactory
      */
     public Term2IdTupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
-        
-        super(keyBuilderFactory);
+
+        /*
+         * The FixedLengthValueRabaCoder is MUCH faster than the
+         * CannonicalHuffman coder and takes the same space on the disk. An all
+         * around win.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/506 (Load,
+         * closure and query performance in 1.1.x versus 1.0.x)
+         */
+//        super(keyBuilderFactory);
+        super(keyBuilderFactory, getDefaultLeafKeysCoder(),
+                new com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder(9));
         
     }
 
