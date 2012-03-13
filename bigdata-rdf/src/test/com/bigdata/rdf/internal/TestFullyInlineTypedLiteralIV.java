@@ -16,12 +16,12 @@ import com.bigdata.rdf.model.BigdataLiteral;
 /**
  * Test suite for {@link FullyInlineTypedLiteralIV}.
  */
-public class TestInlineLiteralIV extends TestCase2 {
+public class TestFullyInlineTypedLiteralIV extends TestCase2 {
 
-	public TestInlineLiteralIV() {
+	public TestFullyInlineTypedLiteralIV() {
 	}
 
-	public TestInlineLiteralIV(String name) {
+	public TestFullyInlineTypedLiteralIV(String name) {
 		super(name);
 	}
 

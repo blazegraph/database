@@ -956,7 +956,8 @@ public class HashCollisionUtility {
 				false, // inlineDateTimes
 				false, // rejectInvalidXSDValues
 				xFactory, // extension factory
-				vocab     // predefined vocabulary
+				vocab,    // predefined vocabulary
+				vf
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

@@ -46,10 +46,10 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.internal.ColorsEnumExtension.Color;
 import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
@@ -66,6 +66,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -213,7 +214,19 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.SUBJECT));
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.BAG));
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.OBJECT));
-                }
+                    ivs.add(new URIExtensionIV<BigdataURI>(
+                            new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                    "http://www.example.com/"),
+                            new VocabURIByteIV<BigdataURI>((byte) 1)));
+                    ivs.add(new URIExtensionIV<BigdataURI>(
+                            new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                    "http://www.example.com/foo"),
+                            new VocabURIByteIV<BigdataURI>((byte) 1)));
+                    ivs.add(new URIExtensionIV<BigdataURI>(
+                            new FullyInlineTypedLiteralIV<BigdataLiteral>(
+                                    "http://www.example.com/foobar"),
+                            new VocabURIByteIV<BigdataURI>((byte) 1)));
+                    }
 
                 /*
                  * Literals

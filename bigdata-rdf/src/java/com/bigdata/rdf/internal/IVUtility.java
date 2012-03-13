@@ -74,6 +74,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
@@ -925,9 +926,9 @@ public class IVUtility {
             return new SidIV(spo);
         }
         case BNODE:
-            return decodeInlineBNode(flags,key,o);
+            return decodeInlineBNode(flags, key, o);
         case URI:
-            return decodeInlineURI(flags,key,o);
+            return decodeInlineURI(flags, key, o);
         case LITERAL:
             return decodeInlineLiteral(flags, key, o);
         default:
@@ -997,8 +998,24 @@ public class IVUtility {
      * @return The decoded {@link IV}.
      */
     static private IV decodeInlineURI(final byte flags, final byte[] key,
-            final int o) {
+            int o) {
 
+        if(AbstractIV.isExtension(flags)) {
+            
+            final IV namespaceIV = decodeFromOffset(key,o);
+            
+            o += namespaceIV.byteLength();
+            
+            final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = (FullyInlineTypedLiteralIV<BigdataLiteral>) decodeFromOffset(
+                    key, o);
+            
+            final IV iv = new URIExtensionIV<BigdataURI>(localNameIV,
+                    namespaceIV);
+            
+            return iv;
+            
+        }
+        
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
         switch (dte) {

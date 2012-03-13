@@ -10,16 +10,14 @@ import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IExtension;
-import com.bigdata.rdf.internal.IExtensionIV;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractIV;
-import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Class provides support for datatype {@link Literal}s for which an
@@ -37,8 +35,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * @param <V>
  */
 public class LiteralExtensionIV<V extends BigdataLiteral> 
-    	extends AbstractInlineIV<V, Object> 
-		implements IExtensionIV, Literal { 
+    	extends AbstractInlineExtensionIV<V, Object> 
+		implements Literal { 
 
     /**
      * 
@@ -131,15 +129,16 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
         return false;
     }
     
+    @SuppressWarnings("rawtypes")
     public int _compareTo(final IV o) {
-        
-        int ret = datatype.compareTo(((LiteralExtensionIV) o).datatype);
-        
+
+        int ret = datatype.compareTo(((LiteralExtensionIV<?>) o).datatype);
+
         if (ret != 0)
             return ret;
-        
-        return delegate._compareTo(((LiteralExtensionIV) o).delegate);
-        
+
+        return delegate._compareTo(((LiteralExtensionIV<?>) o).delegate);
+
     }
 
     /**
@@ -164,11 +163,11 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
 		
 		if (v == null) {
 			
-			final BigdataValueFactory f = lex.getValueFactory();
+//			final BigdataValueFactory f = lex.getValueFactory();
 			
 			final ILexiconConfiguration config = lex.getLexiconConfiguration();
 
-			v = setValue((V) config.asValue(this, f));
+			v = setValue((V) config.asValue(this));//, f));
 
 			v.setIV(this);
 

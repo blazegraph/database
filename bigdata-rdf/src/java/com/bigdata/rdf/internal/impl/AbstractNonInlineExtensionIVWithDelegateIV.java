@@ -22,6 +22,11 @@ abstract public class AbstractNonInlineExtensionIVWithDelegateIV<V extends Bigda
         extends AbstractNonInlineExtensionIV<V, T> {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    /**
 	 * The inline literal delegate.
 	 */
     private final AbstractLiteralIV<BigdataLiteral, ?> delegate;

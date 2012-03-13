@@ -29,32 +29,31 @@ import java.util.Set;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * {@link IExtension}s are responsible for round-tripping between an RDF
- * {@link Value} and an {@link LiteralExtensionIV} for a particular datatype. Because
- * of how {@link LiteralExtensionIV}s are encoded and decoded, the {@link IExtension}
- * will need to have on hand the {@link BlobIV} for its datatype. This is
- * accomplished via the {@link IDatatypeURIResolver} - the {@link IExtension}
- * will give the resolver the datatype {@link URI} it needs resolved and the
- * resolver will lookup (or create) the {@link BlobIV}. This is done when the
- * {@link LexiconRelation} is created since the operation must write on the
- * lexicon.
+ * {@link Value} and an {@link LiteralExtensionIV} for a particular datatype.
+ * Because of how {@link LiteralExtensionIV}s are encoded and decoded, the
+ * {@link IExtension} will need to have on hand the {@link TermId} for its
+ * datatype. This is accomplished via the {@link IDatatypeURIResolver} - the
+ * {@link IExtension} will give the resolver the datatype {@link URI} it needs
+ * resolved and the resolver will lookup (or create) the {@link TermId}. This
+ * relies on the declaration of that {@link URI} as part of the
+ * {@link Vocabulary}.
  */
 public interface IExtension<V extends BigdataValue> {
 
     /**
-     * Return the fully resolved datatype in the form of a {@link BigdataURI}
-     * with the {@link BlobIV} already set.
+     * Return the fully resolved datatype(s) handled by this interface in the
+     * form of a {@link BigdataURI} with the {@link TermId} already set.
      * 
-     * @return
-     *          the datatype
+     * @return the datatype
      */
     Set<BigdataURI> getDatatypes();
     
