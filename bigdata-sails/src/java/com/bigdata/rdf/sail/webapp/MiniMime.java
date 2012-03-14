@@ -40,7 +40,7 @@ import org.apache.log4j.Logger;
  */
 public class MiniMime {
     
-    static Logger log = Logger.getLogger(MiniMime.class);
+    static private final Logger log = Logger.getLogger(MiniMime.class);
 
     public final float q;
 
