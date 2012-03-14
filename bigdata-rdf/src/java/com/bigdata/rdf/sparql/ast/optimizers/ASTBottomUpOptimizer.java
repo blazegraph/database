@@ -407,7 +407,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             // No parent.
             return;
         }
-        System.err.println("Considering: "+group);
+//        System.err.println("Considering: "+group);
         
 //        if(((JoinGroupNode)p).isMinus()) return;
         
