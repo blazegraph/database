@@ -208,6 +208,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
 
         // SPARQL 1.1 Federated Query.
         suite.addTestSuite(TestFederatedQuery.class);
+        
+        // RemoteRepository test (nano sparql server client-wrapper)
+        suite.addTestSuite(TestNanoSparqlClient.class);
 
         return suite;
     
