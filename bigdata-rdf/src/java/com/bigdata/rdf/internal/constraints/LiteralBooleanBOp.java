@@ -36,6 +36,9 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Abstract base class for operations on literals which evaluation to a boolean.
+ * <p>
+ * Note: This class implements {@link INeedsMaterialization}. Concrete instances
+ * of this class MUST consider their materialization requirements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
