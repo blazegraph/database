@@ -15,6 +15,9 @@ import com.bigdata.rdf.model.BigdataValue;
 /**
  * Abstract base class for value expression bops operating on {@link IV}s and
  * {@link BigdataValue}s.
+ * <p>
+ * Note: This class implements {@link INeedsMaterialization}. Concrete instances
+ * of this class MUST consider their materialization requirements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
