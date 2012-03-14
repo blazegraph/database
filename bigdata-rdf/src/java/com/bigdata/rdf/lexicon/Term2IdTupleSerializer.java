@@ -38,6 +38,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -167,7 +168,9 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      */
     public IV deserialize(final ITuple tuple) {
 
-        return IVUtility.decode(tuple.getValue());
+        final ByteArrayBuffer b = tuple.getValueBuffer();
+        
+        return IVUtility.decodeFromOffset(b.array(), 0);
         
     }
 
