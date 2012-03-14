@@ -28,38 +28,74 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 
 /**
  * Base class for RDF value expression BOps that happen to evaluate to an
- * XSDBooleanIV.  These are operators such as Compare, Is*, And, Or, etc. 
+ * {@link XSDBooleanIV}. These are operators such as Compare, Is*, And, Or, etc.
  */
-public abstract class XSDBooleanIVValueExpression 
-		extends IVValueExpression<XSDBooleanIV> {
+public abstract class XSDBooleanIVValueExpression extends
+        AbstractIVValueExpressionBOp2<XSDBooleanIV> {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = -7068219781217676085L;
 
+    /**
+     * If the operand is not known to evaluate to a boolean, wrap it with an
+     * {@link EBVBOp}.
+     * 
+     * @return An operand which is known to evaluate to an {@link XSDBooleanIV}.
+     */
+    protected static final XSDBooleanIVValueExpression wrap(
+            final IValueExpression<? extends IV> ve, final String lex) {
+
+        return ve instanceof XSDBooleanIVValueExpression ? (XSDBooleanIVValueExpression) ve
+                : new EBVBOp(ve, lex);
+
+    }
+
 	/**
      * Required shallow copy constructor.
      */
-    public XSDBooleanIVValueExpression(final BOp[] args, final Map<String, Object> anns) {
+    public XSDBooleanIVValueExpression(final BOp[] args,
+            final Map<String, Object> anns) {
+     
         super(args, anns);
+        
     }
 
     /**
      * Required deep copy constructor.
      */
     public XSDBooleanIVValueExpression(final XSDBooleanIVValueExpression op) {
+        
         super(op);
+        
     }
 
-    public XSDBooleanIV get(final IBindingSet bs) {
-    	return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;        		
+    @SuppressWarnings("rawtypes")
+    @Override
+    final public XSDBooleanIV get(final IBindingSet bs) {
+    	
+        return accept(bs) ? XSDBooleanIV.TRUE : XSDBooleanIV.FALSE;
+        
     }
     
     protected abstract boolean accept(final IBindingSet bs);
-    
+
+//    /**
+//     * THIS METHOD IS NOT USED. {@link #get(IBindingSet)} is overridden and
+//     * delegates to {@link #accept(IBindingSet)} instead of to this method.
+//     */
+//    @Override
+//    protected XSDBooleanIV _get(final IBindingSet bs) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
+
 }

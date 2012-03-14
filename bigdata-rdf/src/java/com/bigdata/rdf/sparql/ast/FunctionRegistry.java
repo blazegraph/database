@@ -322,8 +322,10 @@ public class FunctionRegistry {
 
 				checkArgs(args, VarNode.class);
 
-				final IVariable<IV> var = ((VarNode)args[0]).getValueExpression();
-				return new IsBoundBOp(var);
+                final IVariable<IV> var = ((VarNode) args[0])
+                        .getValueExpression();
+
+                return new IsBoundBOp(var, lex);
 
 			}
 		});
@@ -337,7 +339,7 @@ public class FunctionRegistry {
 //              final IValueExpression ve = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-				return new IsLiteralBOp(ve);
+				return new IsLiteralBOp(ve, lex);
 
 			}
 		});
@@ -351,7 +353,7 @@ public class FunctionRegistry {
 //              final IValueExpression ve = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-				return new IsBNodeBOp(ve);
+				return new IsBNodeBOp(ve, lex);
 
 			}
 		});
@@ -365,7 +367,7 @@ public class FunctionRegistry {
 //				final IValueExpression<? extends IV> var = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-                return new IsURIBOp(ve);
+                return new IsURIBOp(ve, lex);
 
 			}
 		});
@@ -378,7 +380,7 @@ public class FunctionRegistry {
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-				return new IsURIBOp(ve);
+				return new IsURIBOp(ve, lex);
 
 			}
 		});
@@ -391,7 +393,7 @@ public class FunctionRegistry {
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-                return new IsNumericBOp(ve);
+                return new IsNumericBOp(ve, lex);
 
             }
         });
@@ -606,9 +608,11 @@ public class FunctionRegistry {
 
 				final IValueExpression<? extends IV> left =
 					AST2BOpUtility.toVE(lex, args[0]);
+
 				final IValueExpression<? extends IV> right =
 					AST2BOpUtility.toVE(lex, args[1]);
-				return new LangMatchesBOp(left, right);
+				
+				return new LangMatchesBOp(left, right, lex);
 
 			}
 		});
@@ -622,19 +626,20 @@ public class FunctionRegistry {
 
 				final IValueExpression<? extends IV> var =
 					AST2BOpUtility.toVE(lex, args[0]);
+				
 				final IValueExpression<? extends IV> pattern =
 					AST2BOpUtility.toVE(lex, args[1]);
 
 				if (args.length == 2) {
 
-					return new RegexBOp(var, pattern);
+					return new RegexBOp(var, pattern, lex);
 
 				} else {
 
 					final IValueExpression<? extends IV> flags =
 						AST2BOpUtility.toVE(lex, args[2]);
 
-					return new RegexBOp(var, pattern, flags);
+					return new RegexBOp(var, pattern, flags, lex);
 
 				}
 
@@ -650,16 +655,23 @@ public class FunctionRegistry {
 
 				IValueExpression<? extends IV> left =
 					AST2BOpUtility.toVE(lex, args[0]);
+				
 				if (!(left instanceof XSDBooleanIVValueExpression)) {
-					left = new EBVBOp(left);
+				
+				    left = new EBVBOp(left, lex);
+				    
 				}
+				
 				IValueExpression<? extends IV> right =
 					AST2BOpUtility.toVE(lex, args[1]);
+				
 				if (!(right instanceof XSDBooleanIVValueExpression)) {
-					right = new EBVBOp(right);
+				
+				    right = new EBVBOp(right, lex);
+				    
 				}
 
-				return new AndBOp(left, right);
+				return new AndBOp(left, right, lex);
 
 			}
 		});
@@ -673,16 +685,23 @@ public class FunctionRegistry {
 
 				IValueExpression<? extends IV> left =
 					AST2BOpUtility.toVE(lex, args[0]);
+				
 				if (!(left instanceof XSDBooleanIVValueExpression)) {
-					left = new EBVBOp(left);
+				
+				    left = new EBVBOp(left, lex);
+				    
 				}
+				
 				IValueExpression<? extends IV> right =
 					AST2BOpUtility.toVE(lex, args[1]);
+
 				if (!(right instanceof XSDBooleanIVValueExpression)) {
-					right = new EBVBOp(right);
+				
+				    right = new EBVBOp(right, lex);
+				    
 				}
 
-				return new OrBOp(left, right);
+				return new OrBOp(left, right, lex);
 
 			}
 		});
@@ -697,11 +716,11 @@ public class FunctionRegistry {
 
 				if (!(arg instanceof XSDBooleanIVValueExpression)) {
 				
-				    arg = new EBVBOp(arg);
+				    arg = new EBVBOp(arg, lex);
 				    
 				}
 
-				return new NotBOp(arg);
+				return new NotBOp(arg, lex);
 
 			}
 		});
@@ -1040,17 +1059,18 @@ public class FunctionRegistry {
 			this.op = op;
 		}
 
-		public IValueExpression<? extends IV> create(
-				final String lex, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+        public IValueExpression<? extends IV> create(final String lex,
+                final Map<String, Object> scalarValues,
+                final ValueExpressionNode... args) {
 
-			checkArgs(args,
+            checkArgs(args,
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
 				AST2BOpUtility.toVE(lex, args[0]);
+			
 			final IValueExpression<? extends IV> right =
 				AST2BOpUtility.toVE(lex, args[1]);
-
 
             if (left.equals(right)
                     && (left instanceof IVariable || left instanceof Constant)
@@ -1110,7 +1130,7 @@ public class FunctionRegistry {
 		    			if (!iv.isNullIV()) {
 
 			    			// if it's a real term we can use SameTermBOp
-		    				return new SameTermBOp(left, right, op);
+		    				return new SameTermBOp(left, right, op, lex);
 
 		    			} else {
 
@@ -1160,7 +1180,7 @@ public class FunctionRegistry {
 		    			if (!iv.isNullIV()) {
 
 			    			// if it's a real term we can use SameTermBOp
-		    				return new SameTermBOp(left, right, op);
+		    				return new SameTermBOp(left, right, op, lex);
 
 		    			} else {
 
@@ -1186,7 +1206,7 @@ public class FunctionRegistry {
 
 	    	}
 
-	        return new CompareBOp(left, right, op);
+	        return new CompareBOp(left, right, op, lex);
 
 		}
 
@@ -1237,7 +1257,7 @@ public class FunctionRegistry {
 
 	    			} else {
 
-	    				return new CompareBOp(left, right, CompareOp.EQ);
+	    				return new CompareBOp(left, right, CompareOp.EQ, lex);
 
 	    			}
 
@@ -1258,7 +1278,7 @@ public class FunctionRegistry {
 
 	    			} else {
 
-	    				return new CompareBOp(left, right, CompareOp.EQ);
+	    				return new CompareBOp(left, right, CompareOp.EQ, lex);
 
 	    			}
 
@@ -1266,7 +1286,7 @@ public class FunctionRegistry {
 
 	    	}
 
-	        return new SameTermBOp(left, right);
+	        return new SameTermBOp(left, right, CompareOp.EQ, lex);
 
 		}
 
@@ -1490,7 +1510,7 @@ public class FunctionRegistry {
                       lex, scalarValues, args);
 
                 if (not)
-                    return new NotBOp(ret);
+                    return new NotBOp(ret, lex);
 
                 return ret;
 
@@ -1525,7 +1545,7 @@ public class FunctionRegistry {
 
                 	}
                 	
-                	return new InHashBOp(not, arg, set);
+                	return new InHashBOp(lex, not, arg, set);
                 	
                 } catch (IllegalArgumentException ex) {
                 	
@@ -1537,18 +1557,20 @@ public class FunctionRegistry {
                 		
                 		if (ret == null) {
                 			
-                			ret = compare.create(lex, scalarValues, args[0], args[i]);
-                			
-                		} else {
-                			
-                			ret = new OrBOp(ret, compare.create(lex, scalarValues, args[0], args[i]));
-                			
+                            ret = compare.create(lex, scalarValues, args[0],
+                                    args[i]);
+
+                        } else {
+
+                            ret = new OrBOp(ret, compare.create(lex,
+                                    scalarValues, args[0], args[i]), lex);
+
                 		}
                 		
                 	}
                 	
                     if (not)
-                        return new NotBOp(ret);
+                        return new NotBOp(ret, lex);
 
                     return ret;
                     
@@ -1574,7 +1596,7 @@ public class FunctionRegistry {
 
                 }
 
-                return new ComputedIN(not, set);
+                return new ComputedIN(not, lex, set);
 
             }
 
@@ -1617,7 +1639,8 @@ public class FunctionRegistry {
 
             final VarNode anonvar = (VarNode) args[0];
 
-            return exists ? anonvar.getValueExpression() : new NotBOp(anonvar.getValueExpression());
+            return exists ? anonvar.getValueExpression() : new NotBOp(
+                    anonvar.getValueExpression(), lex);
 
         }
 

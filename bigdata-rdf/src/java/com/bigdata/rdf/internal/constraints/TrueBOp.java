@@ -41,6 +41,12 @@ public class TrueBOp extends XSDBooleanIVValueExpression {
 	
 	public static final TrueBOp INSTANCE = new TrueBOp();
 
+    protected boolean isLexiconNamespaceRequired() {
+        
+        return false;
+        
+    }
+        
 	private TrueBOp() {
 		
 		this(BOp.NOARGS, BOp.NOANNS);

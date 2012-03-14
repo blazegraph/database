@@ -47,6 +47,7 @@ public class StrcontainsBOp extends LiteralBooleanBOp {
      */
     private static final long serialVersionUID = -8277059116677497632L;
 
+    @SuppressWarnings("rawtypes")
     public StrcontainsBOp(//
             final IValueExpression<? extends IV> x,//
             final IValueExpression<? extends IV> y, //
@@ -66,14 +67,19 @@ public class StrcontainsBOp extends LiteralBooleanBOp {
     
     }
 
-    public StrcontainsBOp(LiteralBooleanBOp op) {
+    public StrcontainsBOp(final StrcontainsBOp op) {
+
         super(op);
+        
     }
 
     public Requirement getRequirement() {
+
         return Requirement.SOMETIMES;
+        
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     boolean _accept(final BigdataValueFactory vf, final IV value,
             final IBindingSet bs) throws SparqlTypeErrorException {

@@ -43,7 +43,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class IriBOp extends AbstractLiteralBOp {
+public class IriBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -67,7 +67,7 @@ public class IriBOp extends AbstractLiteralBOp {
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-    	IV iv = get(0).get(bs);
+    	final IV iv = get(0).get(bs);
     	
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
@@ -79,19 +79,19 @@ public class IriBOp extends AbstractLiteralBOp {
         }
 
         if (!iv.isLiteral())
-        	throw new SparqlTypeErrorException();
-        
+            throw new SparqlTypeErrorException();
+
         final BigdataLiteral lit = literalValue(iv);
-        
+
         final BigdataURI dt = lit.getDatatype();
-        
+
         if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
-        	
+
         final BigdataURI uri = getValueFactory().createURI(lit.getLabel());
-            
+
         return DummyConstantNode.toDummyIV(uri);
-            
+
     }
-    
+
 }

@@ -29,32 +29,32 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
- * A Digest expression involving a IValueExpression operand. The operation to be applied to the operands is specified by the {@link Digest#OP}
- * annotation.
+ * A Digest expression involving a {@link IValueExpression} operand. The
+ * operation to be applied to the operands is specified by the
+ * {@link DigestBOp.Annotations#OP} annotation.
  */
-public class DigestBOp extends AbstractLiteralBOp {
+public class DigestBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = 9136864442064392445L;
 
     public interface Annotations extends AbstractLiteralBOp.Annotations {
 
         /**
-         * The operation to be applied to the left operand (required). The value of this annotation is a
-         * {@link DigestOp}, such as {@link DigestOp#MD5}.
-         *
+         * The operation to be applied to the left operand (required). The value
+         * of this annotation is a {@link DigestOp}, such as
+         * {@link DigestOp#MD5}.
+         * 
          * @see DigestOp
          */
-        String OP = (DigestBOp.class.getName() + ".op").intern();
+        String OP = DigestBOp.class.getName() + ".op";
 
     }
 
@@ -64,33 +64,37 @@ public class DigestBOp extends AbstractLiteralBOp {
     }
 
     /**
-     *
+     * 
      * @param left
      *            The left operand.
      * @param right
      *            The right operand.
      * @param op
-     *            The annotation specifying the operation to be performed on those operands.
+     *            The annotation specifying the operation to be performed on
+     *            those operands.
      */
-    public DigestBOp(final IValueExpression<? extends IV> left, final DigestOp op, final String lex) {
+    public DigestBOp(final IValueExpression<? extends IV> left,
+            final DigestOp op, final String lex) {
 
-        this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op),new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op), new NV(
+                Annotations.NAMESPACE, lex)));
 
     }
 
     /**
      * Required shallow copy constructor.
-     *
+     * 
      * @param args
      *            The operands.
      * @param op
      *            The operation.
      */
-    public DigestBOp(final BOp[] args, Map<String, Object> anns) {
+    public DigestBOp(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
-        if (args.length != 1 || args[0] == null || getProperty(Annotations.OP) == null) {
+        if (args.length != 1 || args[0] == null
+                || getProperty(Annotations.OP) == null) {
 
             throw new IllegalArgumentException();
 
@@ -112,59 +116,69 @@ public class DigestBOp extends AbstractLiteralBOp {
     private static final char[] hexChar = { '0', '1', '2', '3', '4', '5', '6',
             '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
-    public static String toHexString(byte[] buf) {
+    public static String toHexString(final byte[] buf) {
 
         final StringBuilder strBuf = new StringBuilder(buf.length * 2);
+        
         for (int i = 0; i < buf.length; i++) {
+        
             strBuf.append(hexChar[(buf[i] & 0xf0) >>> 4]); // fill left with
+            
             // zero bits
             strBuf.append(hexChar[buf[i] & 0x0f]);
+            
         }
+
         return strBuf.toString();
+        
     }
 
     public Requirement getRequirement() {
+
         return Requirement.SOMETIMES;
+        
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
-               //Recreate since they are not thread safe
-            MessageDigest md = null;
+
+        final IV iv = getAndCheck(0, bs);
+        //Recreate since they are not thread safe
+        MessageDigest md = null;
         final BigdataLiteral lit = literalValue(iv);
-            if (lit.getLanguage() != null || lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
-                try {
-                    String label = lit.getLabel();
-                    switch (op()) {
-                    case MD5:
-                        md = MessageDigest.getInstance("MD5");
-                        break;
-                    case SHA1:
-                        md = MessageDigest.getInstance("SHA1");
-                        break;
-                    case SHA224:
-                        md = MessageDigest.getInstance("SHA224");
-                        break;
-                    case SHA256:
-                        md = MessageDigest.getInstance("SHA256");
-                        break;
-                    case SHA384:
-                        md = MessageDigest.getInstance("SHA384");
-                        break;
-                   case SHA512:
-                        md = MessageDigest.getInstance("SHA512");
-                        break;
-                    default:
-                        throw new UnsupportedOperationException();
-                    }
-                    byte[] bytes = label.getBytes("UTF-8");
-                    md.update(bytes);
-                    byte[] digest = md.digest();
-                    final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
-                    return DummyConstantNode.toDummyIV(str);
-                } catch (Exception e) {
-                    throw new SparqlTypeErrorException();
+        if (lit.getLanguage() != null || lit.getDatatype() != null
+                && lit.getDatatype().equals(XSD.STRING)) {
+            try {
+                String label = lit.getLabel();
+                switch (op()) {
+                case MD5:
+                    md = MessageDigest.getInstance("MD5");
+                    break;
+                case SHA1:
+                    md = MessageDigest.getInstance("SHA1");
+                    break;
+                case SHA224:
+                    md = MessageDigest.getInstance("SHA224");
+                    break;
+                case SHA256:
+                    md = MessageDigest.getInstance("SHA256");
+                    break;
+                case SHA384:
+                    md = MessageDigest.getInstance("SHA384");
+                    break;
+               case SHA512:
+                    md = MessageDigest.getInstance("SHA512");
+                    break;
+                default:
+                    throw new UnsupportedOperationException();
                 }
+                byte[] bytes = label.getBytes("UTF-8");
+                md.update(bytes);
+                byte[] digest = md.digest();
+                final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
+                return DummyConstantNode.toDummyIV(str);
+            } catch (Exception e) {
+                throw new SparqlTypeErrorException();
+            }
         }
         throw new SparqlTypeErrorException();
     }

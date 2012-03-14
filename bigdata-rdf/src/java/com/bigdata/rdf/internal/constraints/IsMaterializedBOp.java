@@ -44,11 +44,12 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
     /**
 	 * 
 	 */
-	private static final long serialVersionUID = -7552628930845996572L;
+    private static final long serialVersionUID = -7552628930845996572L;
 
-	private static final transient Logger log = Logger.getLogger(IsMaterializedBOp.class);
-	
-    public interface Annotations extends PipelineOp.Annotations {
+    private static final transient Logger log = Logger
+            .getLogger(IsMaterializedBOp.class);
+
+    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
 
         /**
          * If <code>true</code>, only accept variable bindings for
@@ -59,17 +60,30 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
     	
     }
     
-	public IsMaterializedBOp(final IVariable<IV> x) {
-        
-        this(x, true);
-        
-    }
-	
-	public IsMaterializedBOp(final IVariable<IV> x, final boolean materialized) {
-        
-        this(new BOp[] { x }, 
-        		NV.asMap(new NV(Annotations.MATERIALIZED, materialized)));
-        
+//	public IsMaterializedBOp(final IVariable<IV> x) {
+//        
+//        this(x, true);
+//        
+//    }
+
+    /**
+     * 
+     * @param x
+     *            The variable.
+     * @param materialized
+     *            If <code>true</code>, only accept variable bindings for
+     *            <code>x</code> that have a materialized RDF
+     *            {@link BigdataValue}. If <code>false</code>, only accept those
+     *            that don't.
+     * @param lex
+     *            The namespace of the lexicon relation.
+     */
+    public IsMaterializedBOp(final IVariable<IV> x, final boolean materialized,
+            final String lex) {
+
+        this(new BOp[] { x }, NV.asMap(new NV(Annotations.MATERIALIZED,
+                materialized), new NV(Annotations.NAMESPACE, lex)));
+
     }
     
     /**

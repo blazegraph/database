@@ -175,7 +175,7 @@ public class AST2BOpFilters extends AST2BOpBase {
          * bypass the rest of the pipeline by routing the solutions to rightId.
          */
         final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                new NeedsMaterializationBOp(ve));
+                new NeedsMaterializationBOp(ve, ctx.getLexiconNamespace()));
 
         left = applyQueryHints(new ConditionalRoutingOp(leftOrEmpty(left),
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -303,7 +303,8 @@ public class AST2BOpFilters extends AST2BOpBase {
             }
 
             final IConstraint c1 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                    new IsMaterializedBOp(v, false/* materialized */));
+                    new IsMaterializedBOp(v, false/* materialized */,
+                            ctx.getLexiconNamespace()));
 
             final PipelineOp condOp1 = applyQueryHints(
                     new ConditionalRoutingOp(leftOrEmpty(left), //

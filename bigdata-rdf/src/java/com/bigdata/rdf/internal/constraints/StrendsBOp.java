@@ -32,25 +32,35 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
+/**
+ * @see http://www.w3.org/2005/xpath-functions#ends-with
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class StrendsBOp extends LiteralBooleanBOp {
 
     private static final long serialVersionUID = 5466622630000019821L;
 
-    public StrendsBOp(IValueExpression<? extends IV> x,IValueExpression<? extends IV> y, String lex) {
-        this(new BOp[] { x,y },
-                NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    public StrendsBOp(IValueExpression<? extends IV> x,
+            IValueExpression<? extends IV> y, String lex) {
+   
+        this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        
     }
 
-    public StrendsBOp(BOp[] args, Map<String, Object> anns) {
+    public StrendsBOp(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+        
         if (args.length != 2 || args[0] == null || args[1] == null)
             throw new IllegalArgumentException();
+        
     }
 
-    public StrendsBOp(LiteralBooleanBOp op) {
+    public StrendsBOp(final StrendsBOp op) {
         super(op);
     }
 
@@ -58,22 +68,31 @@ public class StrendsBOp extends LiteralBooleanBOp {
         return Requirement.SOMETIMES;
     }
     
+    @SuppressWarnings("rawtypes")
     @Override
-    boolean _accept(BigdataValueFactory vf,IV value, IBindingSet bs) throws SparqlTypeErrorException {
-        IV compare=get(1).get(bs);
+    boolean _accept(final BigdataValueFactory vf, final IV value,
+            final IBindingSet bs) throws SparqlTypeErrorException {
+
+        final IV compare = get(1).get(bs);
+        
         if (compare == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
         if (!compare.isInline() && !compare.hasValue())
             throw new NotMaterializedException();
 
-        if(compare.isLiteral()){
-            String v=literalValue(value).getLabel();
-            String c=literalValue(compare).getLabel();
+        if (compare.isLiteral()) {
+         
+            final String v = literalValue(value).getLabel();
+            
+            final String c = literalValue(compare).getLabel();
+            
             return v.endsWith(c);
+            
         }
-        throw new SparqlTypeErrorException();
 
+        throw new SparqlTypeErrorException();
+        
     }
 
 }

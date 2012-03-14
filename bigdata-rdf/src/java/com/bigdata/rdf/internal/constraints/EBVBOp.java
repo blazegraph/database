@@ -32,6 +32,7 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
@@ -50,9 +51,25 @@ public class EBVBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-    public EBVBOp(final IValueExpression<? extends IV> x) {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This is willing to ignore the lexicon namespace. However, when
+     * doing that {@link #getLexiconConfiguration(IBindingSet)} WILL NOT work
+     * for this {@link EBVBOp} instance.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
+     *      Expose the LexiconConfiguration to function BOPs </a>
+     */
+    protected boolean isLexiconNamespaceRequired() {
+        
+        return false;
+        
+    }
 
-        this(new BOp[] { x }, null/*Annotations*/);
+    public EBVBOp(final IValueExpression<? extends IV> x, final String lex) {
+
+        this(new BOp[] { x }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
 
     }
 

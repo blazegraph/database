@@ -69,7 +69,8 @@ public class SampleRule extends Rule {
 					Constraint.wrap(new NE(var("a"), var("b"))),
         			Constraint.wrap(new NEConstant(var("t"), vocab.getConstant(RDFS.RESOURCE))),
         			// you can use SPARQL value expression bops in inference by wrapping them with an InferenceBVE
-    				Constraint.wrap(new InferenceBVE(new IsLiteralBOp(var("o"))))
+                    Constraint.wrap(new InferenceBVE(new IsLiteralBOp(
+                            var("o"), relationName + ".lex")))
                 });
 
     }

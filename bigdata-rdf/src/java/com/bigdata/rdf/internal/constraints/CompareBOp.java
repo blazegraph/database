@@ -36,7 +36,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -53,10 +52,10 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = 5661497748051783499L;
 	
-	protected static final Logger log = Logger.getLogger(CompareBOp.class);
+    private static final transient Logger log = Logger
+            .getLogger(CompareBOp.class);
 	
-    
-    public interface Annotations extends PipelineOp.Annotations {
+    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
 
         /**
          * The compare operator, which is a {@link CompareOp} enum value.
@@ -65,11 +64,14 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 
     }
 
-    public CompareBOp(final IValueExpression<? extends IV> left, 
-    		final IValueExpression<? extends IV> right, final CompareOp op) {
-    	
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
-        
+    @SuppressWarnings("rawtypes")
+    public CompareBOp(final IValueExpression<? extends IV> left,
+            final IValueExpression<? extends IV> right, final CompareOp op,
+            final String lex) {
+
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
+                new NV(Annotations.NAMESPACE, lex)));
+
     }
     
     /**

@@ -26,8 +26,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -46,8 +44,8 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 	
-    private static final transient Logger log = Logger
-            .getLogger(IsInlineBOp.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(IsInlineBOp.class);
 
     public interface Annotations extends PipelineOp.Annotations {
 
@@ -62,9 +60,15 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
     	
     }
 
-    public IsInlineBOp(final IVariable<IV> x) {
+//    public IsInlineBOp(final IVariable<IV> x) {
+//        
+//        this(x, true);
+//        
+//    }
+    
+    protected boolean isLexiconNamespaceRequired() {
         
-        this(x, true);
+        return false;
         
     }
     
@@ -103,11 +107,11 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
         
         final IV<?,?> iv = get(0).get(bs);
         
-        if (log.isDebugEnabled()) {
-        	log.debug(iv);
-        	if (iv != null) 
-        		log.debug("inline?: " + iv.isInline());
-        }
+//        if (log.isDebugEnabled()) {
+//        	log.debug(iv);
+//        	if (iv != null) 
+//        		log.debug("inline?: " + iv.isInline());
+//        }
        
         // not yet bound
         if (iv == null)

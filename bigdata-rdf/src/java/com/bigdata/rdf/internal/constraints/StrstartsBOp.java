@@ -38,18 +38,26 @@ public class StrstartsBOp extends LiteralBooleanBOp {
 
     private static final long serialVersionUID = 7680098071087046784L;
 
-    public StrstartsBOp(IValueExpression<? extends IV> x,IValueExpression<? extends IV> y, String lex) {
-        this(new BOp[] { x,y },
-                NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    @SuppressWarnings("rawtypes")
+    public StrstartsBOp(//
+            final IValueExpression<? extends IV> x,//
+            final IValueExpression<? extends IV> y, //
+            final String lex) {
+
+        this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        
     }
 
-    public StrstartsBOp(BOp[] args, Map anns) {
+    public StrstartsBOp(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
+        
         if (args.length != 2 || args[0] == null || args[1] == null)
             throw new IllegalArgumentException();
+        
     }
 
-    public StrstartsBOp(LiteralBooleanBOp op) {
+    public StrstartsBOp(StrstartsBOp op) {
         super(op);
     }
 
@@ -57,20 +65,28 @@ public class StrstartsBOp extends LiteralBooleanBOp {
         return Requirement.SOMETIMES;
     }
     
+    @SuppressWarnings("rawtypes")
     @Override
-    boolean _accept(BigdataValueFactory vf,IV value, IBindingSet bs) throws SparqlTypeErrorException {
-        IV compare=get(1).get(bs);
+    boolean _accept(final BigdataValueFactory vf, final IV value,
+            final IBindingSet bs) throws SparqlTypeErrorException {
+
+        final IV compare = get(1).get(bs);
+
         if (compare == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
         if (!compare.isInline() && !compare.hasValue())
             throw new NotMaterializedException();
 
-        if(compare.isLiteral()){
-            String v=literalValue(value).getLabel();
-            String c=literalValue(compare).getLabel();
+        if (compare.isLiteral()) {
+
+            final String v = literalValue(value).getLabel();
+
+            final String c = literalValue(compare).getLabel();
+
             return v.startsWith(c);
         }
+
         throw new SparqlTypeErrorException();
 
     }

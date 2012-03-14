@@ -60,16 +60,23 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
-     * The presumption with IVValueExpression is that its operands are always
-     * themselves IVs.
+     * The presumption with {@link IVValueExpression} is that its operands are
+     * always themselves {@link IV}s.
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public IValueExpression<? extends IV> get(final int i) {
-    	try {
-    		return (IValueExpression<? extends IV>) super.get(i);
-    	} catch (ClassCastException ex) {
-    		throw new SparqlTypeErrorException();
-    	}
+
+        try {
+
+            return (IValueExpression<? extends IV>) super.get(i);
+
+        } catch (ClassCastException ex) {
+
+            throw new SparqlTypeErrorException();
+
+        }
+
     }
-    
+
 }

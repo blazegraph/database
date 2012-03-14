@@ -48,7 +48,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SubstrBOp extends AbstractLiteralBOp {
+public class SubstrBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = -7022953617164154412L;
 

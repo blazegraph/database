@@ -29,6 +29,7 @@ package com.bigdata.bop;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -225,6 +226,7 @@ public class BOpContext<E> extends BOpContextBase {
 	 *       as part of a clean out of the IAsynchronousIterator API from the
 	 *       query engine architecture.
 	 */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public BOpContext(final IRunningQuery runningQuery,final int partitionId,
             final BOpStats stats, final ICloseableIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
@@ -243,10 +245,118 @@ public class BOpContext<E> extends BOpContextBase {
         this.runningQuery = runningQuery;
         this.partitionId = partitionId;
         this.stats = stats;
+        /*
+         * FIXME Wrap each IBindingSet to provide access to the BOpContext.
+         * 
+         * @see <a
+         * href="https://sourceforge.net/apps/trac/bigdata/ticket/513"> Expose
+         * the LexiconConfiguration to function BOPs </a>
+         */
+//        this.source = (ICloseableIterator) new SetContextIterator(this,
+//                (ICloseableIterator) source);
         this.source = source;
-//        this.source = new MultiSourceSequentialAsynchronousIterator<E[]>(source);
         this.sink = sink;
         this.sink2 = sink2; // may be null
+    }
+
+    /**
+     * Wraps each {@link IBindingSet} to provide access to the
+     * {@link BOpContext}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
+     *      Expose the LexiconConfiguration to function BOPs </a>
+     */
+    private static class SetContextIterator implements
+            ICloseableIterator<IBindingSet[]> {
+
+        private final BOpContext<?> context;
+        
+        private final ICloseableIterator<IBindingSet[]> src;
+
+        private IBindingSet[] cur = null;
+
+        private boolean open = true;
+
+        public SetContextIterator(final BOpContext<?> context,
+                final ICloseableIterator<IBindingSet[]> src) {
+
+            this.src = src;
+            
+            this.context = context;
+
+        }
+
+        @Override
+        public void close() {
+
+            if (open) {
+                
+                src.close();
+                
+                open = false;
+                
+            }
+            
+        }
+        
+        @Override
+        public boolean hasNext() {
+
+            if (!open)
+                return false;
+            
+            if (cur != null)
+                return true;
+            
+            if (!src.hasNext()) {
+            
+                close();
+                
+                return false;
+                
+            }
+
+            cur = src.next();
+            
+            for (int i = 0; i < cur.length; i++) {
+
+                final IBindingSet bset = cur[i];
+                
+                if(bset instanceof ContextBindingSet)
+                    continue;
+                
+                // Wrap the binding set.
+                cur[i] = new ContextBindingSet(context, bset);
+                
+            }
+            
+            return true;
+            
+        }
+
+        @Override
+        public IBindingSet[] next() {
+            
+            if (!hasNext())
+                throw new NoSuchElementException();
+            
+            final IBindingSet[] ret = cur;
+            
+            cur = null;
+            
+            return ret;
+            
+        }
+
+        @Override
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
     }
 
     /**
