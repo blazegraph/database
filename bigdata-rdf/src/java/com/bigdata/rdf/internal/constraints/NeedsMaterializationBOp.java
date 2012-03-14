@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.util.InnerCause;
 
@@ -49,10 +50,10 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
     private static final transient Logger log = Logger
             .getLogger(NeedsMaterializationBOp.class);
 
-	public NeedsMaterializationBOp(final IValueExpression<?> x) {
-        
-        this(new BOp[] { x }, BOp.NOANNS); 
-        
+    public NeedsMaterializationBOp(final IValueExpression<?> x, final String lex) {
+
+        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+
     }
     
     /**

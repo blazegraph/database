@@ -45,7 +45,7 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
 
     private static final long serialVersionUID = 9066209752427789308L;
 
-    public interface Annotations extends BOp.Annotations {
+    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
 
         /**
          * <code>true</code> iff this is "NOT IN" rather than "IN".
@@ -57,10 +57,12 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
     private transient boolean not = false;
 
     @SuppressWarnings("rawtypes")
-    public ComputedIN(boolean not, IValueExpression<? extends IV>... ise) {
-        
-        super(ise, NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not))));
-        
+    public ComputedIN(final boolean not, final String lex,
+            final IValueExpression<? extends IV>... ise) {
+
+        super(ise, NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not)),
+                new NV(Annotations.NAMESPACE, lex)));
+
         this.not = not;
         
     }

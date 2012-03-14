@@ -42,46 +42,69 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
 
 	private static final long serialVersionUID = -774833617971700165L;
 
-	public interface Annotations extends BOp.Annotations {
+    public interface Annotations extends
+            XSDBooleanIVValueExpression.Annotations {
 
-	    /**
-	     * <code>true</code> iff this is "NOT IN" rather than "IN".
-	     */
+        /**
+         * <code>true</code> iff this is "NOT IN" rather than "IN".
+         */
         String NOT = InBOp.class.getName() + ".not";
 
     }
 
-	private static BOp[] mergeArguments(IValueExpression<? extends IV> var,IConstant<? extends IV>...set){
-	    BOp args[]=new BOp[1+(set!=null?set.length:0)];
-	    args[0]=var;
-	    for(int i=0;i<set.length;i++){
-	        args[i+1]=set[i];
-	    }
-        return args;
-	}
+    @SuppressWarnings("rawtypes")
+    private static BOp[] mergeArguments(//
+            final IValueExpression<? extends IV> var,
+            final IConstant<? extends IV>... set) {
 
-	public InBOp(boolean not,IValueExpression<? extends IV> var,IConstant<? extends IV>...set) {
-	    this(mergeArguments(var,set),NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not) )));
-	}
+        final BOp args[] = new BOp[1 + (set != null ? set.length : 0)];
+
+        args[0] = var;
+
+        for (int i = 0; i < set.length; i++) {
+
+            args[i + 1] = set[i];
+
+        }
+
+        return args;
+
+    }
+
+    @SuppressWarnings("rawtypes")
+    public InBOp(//
+            final String lex,
+            final boolean not, //
+            final IValueExpression<? extends IV> var,//
+            final IConstant<? extends IV>... set//
+    ) {
+
+        this(mergeArguments(var, set), NV.asMap(new NV(Annotations.NOT, Boolean
+                .valueOf(not)),new NV(Annotations.NAMESPACE,lex)));
+        
+    }
 
     /**
      * @param op
      */
     public InBOp(final InBOp op) {
+
         super(op);
+
     }
 
     /**
      * @param args
      * @param annotations
      */
-    public InBOp(BOp[] args, Map<String, Object> annotations) {
+    public InBOp(final BOp[] args, final Map<String, Object> annotations) {
 
         super(args, annotations);
 
         if (getProperty(Annotations.NOT) == null)
             throw new IllegalArgumentException();
 
+        @SuppressWarnings("rawtypes")
         final IValueExpression<? extends IV> var = get(0);
 
         if (var == null)
@@ -96,7 +119,7 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
     /**
      * The value expression to be tested.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public IValueExpression<IV> getValueExpression() {
 
         return (IValueExpression<IV>) get(0);
@@ -107,7 +130,7 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
      * The remaining arguments to the IN/NOT IN function, which must be a set of
      * constants.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public IConstant<IV>[] getSet() {
 
         final IConstant<IV>[] set = new IConstant[arity() - 1];

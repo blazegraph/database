@@ -235,6 +235,8 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 	    
 	    final AbstractTripleStore database = getDatabase(namespace);
 	    
+	    final String lexnamespace = database.getLexiconRelation().getNamespace();
+	    
 		/*
 		 * Resolve terms against the lexicon.
 		 */
@@ -441,7 +443,8 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                      * (<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances
                      * /dataFromProducer1092/Product53999> != ?product)
                      */
-                    new NotBOp(new SameTermBOp(product, new Constant(product53999.getIV()))), //
+                    new NotBOp(new SameTermBOp(product, new Constant(
+                            product53999.getIV()), lexnamespace), lexnamespace), //
 
                     /*
                      * FILTER (?simProperty1 < (?origProperty1 + 120) &&
@@ -634,6 +637,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
         
         final AbstractTripleStore database = getDatabase(namespace);
         
+        final String lexnamespace = database.getLexiconRelation().getNamespace();
+
         /*
          * Resolve terms against the lexicon.
          */
@@ -802,7 +807,8 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
                     CompareBOp.Annotations.OP, CompareOp.LT) })));
 
             // FILTER (!bound(?testVar))
-            c2 = new SPARQLConstraint(new NotBOp(new IsBoundBOp(testVar)));
+            c2 = new SPARQLConstraint(new NotBOp(new IsBoundBOp(testVar,
+                    namespace), lexnamespace));
             
             // the constraints on the join graph.
             constraints = new IConstraint[] { c0, c1, c2 };

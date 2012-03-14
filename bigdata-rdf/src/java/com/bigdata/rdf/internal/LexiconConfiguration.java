@@ -168,6 +168,12 @@ public class LexiconConfiguration<V extends BigdataValue>
      */
     private final Map<String, IExtension<BigdataValue>> datatype2ext;
 
+    public final BigdataValueFactory getValueFactory() {
+        
+        return valueFactory;
+        
+    }
+    
     /**
      * Return the maximum length of a Unicode string which may be inlined into
      * the statement indices. This applies to blank node IDs, literal labels

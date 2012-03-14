@@ -30,6 +30,7 @@ import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -89,5 +90,10 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * term ids.
      */
     void initExtensions(final LexiconRelation lex);
+
+    /**
+     * Return the value factory for the lexicon.
+     */
+    BigdataValueFactory getValueFactory();
 
 }

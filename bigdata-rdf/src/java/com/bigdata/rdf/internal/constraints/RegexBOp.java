@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -37,10 +35,9 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 public class RegexBOp extends XSDBooleanIVValueExpression 
 		implements INeedsMaterialization {
@@ -51,28 +48,32 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 	private static final long serialVersionUID = 1357420268214930143L;
 	
 	private static final transient Logger log = Logger.getLogger(RegexBOp.class);
-	
 
 	/**
 	 * Construct a regex bop without flags.
 	 */
+    @SuppressWarnings("rawtypes")
 	public RegexBOp(
 			final IValueExpression<? extends IV> var, 
-			final IValueExpression<? extends IV> pattern) {
+			final IValueExpression<? extends IV> pattern,
+			final String lex) {
         
-        this(new BOp[] { var, pattern }, null/*annocations*/);
-        
+        this(new BOp[] { var, pattern }, NV.asMap(Annotations.NAMESPACE, lex));
+
     }
     
 	/**
 	 * Construct a regex bop with flags.
 	 */
-	public RegexBOp(
+	@SuppressWarnings("rawtypes")
+    public RegexBOp(
 			final IValueExpression<? extends IV> var, 
 			final IValueExpression<? extends IV> pattern,
-			final IValueExpression<? extends IV> flags) {
+			final IValueExpression<? extends IV> flags,
+			final String lex) {
         
-        this(new BOp[] { var, pattern, flags }, null/*annocations*/);
+        this(new BOp[] { var, pattern, flags }, NV.asMap(Annotations.NAMESPACE,
+                lex));
         
     }
     
@@ -106,8 +107,13 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     
     public boolean accept(final IBindingSet bs) {
         
+        @SuppressWarnings("rawtypes")
         final IV var = get(0).get(bs);
+        
+        @SuppressWarnings("rawtypes")
         final IV pattern = get(1).get(bs);
+
+        @SuppressWarnings("rawtypes")
         final IV flags = arity() > 2 ? get(2).get(bs) : null;
         
         if (log.isDebugEnabled()) {
@@ -127,6 +133,12 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     
     /**
      * Lifted directly from Sesame's EvaluationStrategyImpl.
+     * 
+     * FIXME The Pattern should be cached if the pattern argument and flags are
+     * constants.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/516">
+     *      REGEXBOp should cache the Pattern when it is a constant </a>
      */
     private boolean accept(final Value arg, final Value parg, final Value farg) {
     	
@@ -136,16 +148,16 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         	log.debug("regex flags: " + farg);
         }
         
-		if (QueryEvaluationUtil.isSimpleLiteral(arg) && QueryEvaluationUtil.isSimpleLiteral(parg)
-				&& (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg)))
-		{
-			String text = ((Literal)arg).getLabel();
-			String ptn = ((Literal)parg).getLabel();
+        if (QueryEvaluationUtil.isSimpleLiteral(arg)
+                && QueryEvaluationUtil.isSimpleLiteral(parg)
+                && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
+
+            final String text = ((Literal) arg).getLabel();
+            final String ptn = ((Literal) parg).getLabel();
 			String flags = "";
 			if (farg != null) {
 				flags = ((Literal)farg).getLabel();
 			}
-			// TODO should this Pattern be cached?
 			int f = 0;
 			for (char c : flags.toCharArray()) {
 				switch (c) {
@@ -171,10 +183,10 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 						throw new SparqlTypeErrorException();
 				}
 			}
-			Pattern pattern = Pattern.compile(ptn, f);
-			boolean result = pattern.matcher(text).find();
-			return result;
-		}
+            final Pattern pattern = Pattern.compile(ptn, f);
+            final boolean result = pattern.matcher(text).find();
+            return result;
+        }
 		
 		throw new SparqlTypeErrorException();
     	

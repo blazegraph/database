@@ -143,6 +143,26 @@ public class NV implements Serializable, Comparable<NV> {
     }
 
     /**
+     * Wrap a single name and value as a map.
+     * 
+     * @param name
+     *            The key.
+     * @param val
+     *            The value.
+     *            
+     * @return The map.
+     */
+    static public Map<String, Object> asMap(final String name, final Object val) {
+
+        final Map<String, Object> tmp = new LinkedHashMap<String, Object>(1);
+
+        tmp.put(name, val);
+
+        return tmp;
+        
+    }
+
+    /**
      * Wrap an array name/value pairs as a {@link Map}.
      * 
      * @param a
@@ -152,6 +172,15 @@ public class NV implements Serializable, Comparable<NV> {
      */
     static public Map<String, Object> asMap(final NV... a) {
 
+        /*
+         * Note: Not possible for modifiable BOps (AST).
+         */
+//        if (a.length == 1) {
+//
+//            return Collections.singletonMap(a[0].name, a[0].value);
+//
+//        }
+        
         final Map<String, Object> tmp = new LinkedHashMap<String, Object>(
                 a.length);
 

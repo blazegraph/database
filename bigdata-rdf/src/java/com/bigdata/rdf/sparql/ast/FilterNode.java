@@ -66,7 +66,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
              * Value is materialized for that TermId).
              */
             
-            return new EBVBOp(ve);
+            return new EBVBOp(ve, null/* lex */);
             
         }
         

@@ -96,10 +96,13 @@ public class InHashBOp extends InBOp {
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public InHashBOp(boolean not, IValueExpression<? extends IV> var,
-            IConstant<? extends IV>... set) {
+    @SuppressWarnings("rawtypes")
+    public InHashBOp(final String lex,//
+            final boolean not, //
+            final IValueExpression<? extends IV> var,
+            final IConstant<? extends IV>... set) {
      
-        super(not, var, set);
+        super(lex, not, var, set);
         
     }
 

@@ -30,7 +30,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -93,13 +92,18 @@ public class InBinaryBOp extends InBOp {
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public InBinaryBOp(boolean not, final IVariable var, final IConstant[] set) {
+    @SuppressWarnings("rawtypes")
+    public InBinaryBOp(//
+            final String lex,//
+            final boolean not,//
+            final IValueExpression<? extends IV> var,//
+            final IConstant<? extends IV>... set) {
      
-        super(not, var, set);
+        super(lex, not, var, set);
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     static private IV[] sort(final IConstant<IV>[] set) {
 
         final int n = set.length;

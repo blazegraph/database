@@ -29,6 +29,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -42,9 +43,9 @@ public class IsBoundBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -7408654639183330874L;
 
-    public IsBoundBOp(final IVariable<IV> x) {
+    public IsBoundBOp(final IVariable<IV> x, final String lex) {
 
-        this(new BOp[] { x }, null/*annotations*/);
+        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
 
     }
 

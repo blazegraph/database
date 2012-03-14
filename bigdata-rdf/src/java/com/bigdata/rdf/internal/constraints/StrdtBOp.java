@@ -25,8 +25,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -34,14 +32,11 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class StrdtBOp extends AbstractLiteralBOp {
+public class StrdtBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = -6571446625816081957L;
 
@@ -65,12 +60,14 @@ public class StrdtBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
+        
+        final IV iv = getAndCheck(0, bs);
 
         final IV datatype = get(1).get(bs);
-        if (datatype == null) {
+        
+        if (datatype == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-        }
+
         if (!datatype.isURI())
             throw new SparqlTypeErrorException();
 
@@ -78,9 +75,13 @@ public class StrdtBOp extends AbstractLiteralBOp {
             throw new NotMaterializedException();
 
         final BigdataURI dt = (BigdataURI) datatype.getValue();
+
         final BigdataLiteral lit = literalValue(iv);
-        String label = lit.getLabel();
+        
+        final String label = lit.getLabel();
+        
         final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
+        
         return DummyConstantNode.toDummyIV(str);
 
     }

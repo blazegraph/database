@@ -44,7 +44,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class BNodeBOp extends AbstractLiteralBOp {
+public class BNodeBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -78,25 +78,27 @@ public class BNodeBOp extends AbstractLiteralBOp {
     		
     	}
     	
-    	IV iv = get(0).get(bs);
+    	@SuppressWarnings("rawtypes")
+        final IV iv = get(0).get(bs);
     	
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
         if (!iv.isLiteral())
-        	throw new SparqlTypeErrorException();
-        
+            throw new SparqlTypeErrorException();
+
         final BigdataLiteral lit = literalValue(iv);
-        
+
         final BigdataURI dt = lit.getDatatype();
-        
+
         if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
-        	
-        final BigdataBNode bnode = getValueFactory().createBNode("-bnode-func-"+lit.getLabel());
-            
+
+        final BigdataBNode bnode = getValueFactory().createBNode(
+                "-bnode-func-" + lit.getLabel());
+
         return DummyConstantNode.toDummyIV(bnode);
-            
+
     }
     
 }

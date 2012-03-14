@@ -29,12 +29,15 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 
 /**
- * Imposes the constraint <code>x AND y</code>.
+ * Imposes the constraint <code>x AND y</code>. Each operand of this operator
+ * must evaluate to a boolean. If the operand is not known to evaluate to a
+ * boolean, it is wrapped with an {@link EBVBOp}.
  */
 public class AndBOp extends XSDBooleanIVValueExpression { 
 
@@ -43,23 +46,11 @@ public class AndBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -1217715173822304819L;
 
-	/**
-	 * Each operand of this operator must evaluate to a boolean. If the operand
-	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
-	 */
-	private static final XSDBooleanIVValueExpression wrap(
-			final IValueExpression<? extends IV> ve) {
-		
-		return ve instanceof XSDBooleanIVValueExpression  ? 
-				(XSDBooleanIVValueExpression) ve :
-					new EBVBOp(ve);
-		
-	}
-	
-	public AndBOp(final IValueExpression<? extends IV> x, 
-			final IValueExpression<? extends IV> y) {
+    public AndBOp(final IValueExpression<? extends IV> x,
+            final IValueExpression<? extends IV> y, final String lex) {
 
-        this(new BOp[] { wrap(x), wrap(y) }, null/*annocations*/);
+        this(new BOp[] { wrap(x,lex), wrap(y,lex) }, NV.asMap(new NV(
+                Annotations.NAMESPACE, lex)));
 
     }
 
@@ -90,7 +81,9 @@ public class AndBOp extends XSDBooleanIVValueExpression {
     
     @Override
     public XSDBooleanIVValueExpression get(final int i) {
-		return (XSDBooleanIVValueExpression) super.get(i);
+		
+        return (XSDBooleanIVValueExpression) super.get(i);
+        
     }
 
     /**
@@ -128,6 +121,5 @@ public class AndBOp extends XSDBooleanIVValueExpression {
     	return left.booleanValue() && right.booleanValue();
 
     }
-    
-    
+        
 }

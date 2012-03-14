@@ -71,6 +71,24 @@ public class TestGroupByState extends TestCase2 {
     public TestGroupByState(String name) {
         super(name);
     }
+    
+    /** The lexicon namespace - required for {@link CompareBOp}. */
+    private String namespace;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        namespace = getName();
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        namespace = null;
+        
+        super.tearDown();
+        
+    }
 
     private static class MockGroupByState implements IGroupByState {
 
@@ -250,6 +268,7 @@ public class TestGroupByState extends TestCase2 {
         final IVariable<?> org = Var.var("org");
         final IVariable<?> newVar = Var.var("newVar");
         
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         final IValueExpression<?>[] select = new IValueExpression[] { new Bind(
                 newVar, org) };
 
@@ -478,7 +497,8 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
+                namespace))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -525,7 +545,8 @@ public class TestGroupByState extends TestCase2 {
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(new SUM(
                 false/* distinct */, (IValueExpression<IV>) y),
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT)) //
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
+                namespace)) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -713,7 +734,8 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
+                namespace))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -763,7 +785,7 @@ public class TestGroupByState extends TestCase2 {
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
                         (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
-                        new XSDNumericIV(10)), CompareOp.LT)) //
+                        new XSDNumericIV(10)), CompareOp.LT, namespace)) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -794,13 +816,17 @@ public class TestGroupByState extends TestCase2 {
      */
     public void test_with_constant() {
 
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         final IVariable<IV> x = Var.var("x");
 
+        @SuppressWarnings({ "rawtypes", "unchecked" })
         final IValueExpression<IV> xExpr = new /* Conditional */Bind(x,
                 new Constant<IV>(new XSDNumericIV(12)));
 
+        @SuppressWarnings({ "rawtypes", "unchecked" })
         final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
 
+        @SuppressWarnings("rawtypes")
         final IValueExpression<IV>[] groupBy = null;
 
         final IConstraint[] having = null;
@@ -839,7 +865,7 @@ public class TestGroupByState extends TestCase2 {
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
                         (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
-                        new XSDNumericIV(10)), CompareOp.LT)) //
+                        new XSDNumericIV(10)), CompareOp.LT, namespace)) //
         };
 
         // SELECT may not be null.

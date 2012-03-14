@@ -24,22 +24,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -53,18 +49,18 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = 5910711647357240974L;
 	
-	private static final transient Logger log = Logger.getLogger(LangMatchesBOp.class);
-	
-	
+//    private static final transient Logger log = Logger
+//            .getLogger(LangMatchesBOp.class);
+
     public LangMatchesBOp(final IValueExpression<? extends IV> tag, 
-    		final IValueExpression<? extends IV> range) {
+    		final IValueExpression<? extends IV> range, final String lex) {
         
-        this(new BOp[] { tag, range }, null/*annocations*/);
+        this(new BOp[] { tag, range }, NV.asMap(Annotations.NAMESPACE, lex));
         
-        if (log.isDebugEnabled()) {
-        	log.info(tag);
-        	log.info(range);
-        }
+//        if (log.isDebugEnabled()) {
+//        	log.info(tag);
+//        	log.info(range);
+//        }
         
     }
     
@@ -92,10 +88,10 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
         final IV tag = get(0).get(bs);
         final IV range = get(1).get(bs);
         
-        if (log.isDebugEnabled()) {
-        	log.debug(tag);
-        	log.debug(range);
-        }
+//        if (log.isDebugEnabled()) {
+//        	log.debug(tag);
+//        	log.debug(range);
+//        }
 
         // not yet bound
         if (tag == null || range == null)
@@ -104,10 +100,10 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
         final BigdataValue tagVal = tag.getValue();
         final BigdataValue rangeVal = range.getValue();
         
-        if (log.isDebugEnabled()) {
-        	log.debug(tagVal);
-        	log.debug(rangeVal);
-        }
+//        if (log.isDebugEnabled()) {
+//        	log.debug(tagVal);
+//        	log.debug(rangeVal);
+//        }
 
         // not yet materialized
         if (tagVal == null || rangeVal == null)
@@ -116,8 +112,8 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 		if (QueryEvaluationUtil.isSimpleLiteral(tagVal)
 				&& QueryEvaluationUtil.isSimpleLiteral(rangeVal))
 		{
-			String langTag = ((Literal)tagVal).getLabel();
-			String langRange = ((Literal)rangeVal).getLabel();
+			final String langTag = ((Literal)tagVal).getLabel();
+			final String langRange = ((Literal)rangeVal).getLabel();
 
 			boolean result = false;
 			if (langRange.equals("*")) {
@@ -128,7 +124,7 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 			}
 			else if (langTag.length() > langRange.length()) {
 				// check if the range is a prefix of the tag
-				String prefix = langTag.substring(0, langRange.length());
+			    final String prefix = langTag.substring(0, langRange.length());
 				result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
 			}
 

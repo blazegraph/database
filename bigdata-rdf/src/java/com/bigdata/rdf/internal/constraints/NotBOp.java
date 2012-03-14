@@ -29,12 +29,15 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 
 /**
- * Imposes the constraint <code>!x</code>.
+ * Imposes the constraint <code>!x</code>. The operand of this operator must
+ * evaluate to a boolean. If the operand is not known to evaluate to a boolean,
+ * it is wrapped with an {@link EBVBOp}.
  */
 public class NotBOp extends XSDBooleanIVValueExpression {
 
@@ -43,22 +46,10 @@ public class NotBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-	/**
-	 * The operand of this operator must evaluate to a boolean. If the operand
-	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
-	 */
-	private static final XSDBooleanIVValueExpression wrap(
-			final IValueExpression<? extends IV> ve) {
-		
-		return ve instanceof XSDBooleanIVValueExpression  ? 
-				(XSDBooleanIVValueExpression) ve :
-					new EBVBOp(ve);
-		
-	}
-	
-	public NotBOp(final IValueExpression<? extends IV> x) {
+	public NotBOp(final IValueExpression<? extends IV> x, final String lex) {
 
-        this(new BOp[] { wrap(x) }, null/*annocations*/);
+        this(new BOp[] { wrap(x, lex) }, NV.asMap(new NV(Annotations.NAMESPACE,
+                lex)));
 
     }
 

@@ -23,46 +23,54 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
-public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression implements INeedsMaterialization {
+/**
+ * Abstract base class for operations on literals which evaluation to a boolean.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression
+        implements INeedsMaterialization {
+
     private static final long serialVersionUID = 6222270137598546840L;
+    
     static final transient Logger log = Logger.getLogger(LiteralBooleanBOp.class);
 
+//    private transient volatile BigdataValueFactory vf;
+//    
+//    public interface Annotations extends BOp.Annotations {
+//
+//        String NAMESPACE = LiteralBooleanBOp.class.getName() + ".namespace";
+//        
+//    }
 
-    private transient BigdataValueFactory vf;
+    public LiteralBooleanBOp(final BOp[] args, final Map<String, Object> anns) {
 
-    public interface Annotations extends BOp.Annotations {
-        String NAMESPACE = (LiteralBooleanBOp.class.getName() + ".namespace").intern();
-    }
-
-    public LiteralBooleanBOp(BOp[] args, Map anns) {
         super(args, anns);
-        if (getProperty(Annotations.NAMESPACE) == null)
-            throw new IllegalArgumentException();
+        
     }
 
-    public LiteralBooleanBOp(LiteralBooleanBOp op) {
+    public LiteralBooleanBOp(final LiteralBooleanBOp op) {
+
         super(op);
+        
     }
 
+    @Override
     public boolean accept(final IBindingSet bs) {
+
+        @SuppressWarnings("rawtypes")
         final IV iv = get(0).get(bs);
 
         if (log.isDebugEnabled()) {
@@ -73,17 +81,22 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression impl
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
-        if(vf==null){
-            synchronized(this){
-                if(vf==null){
-                    final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
-
-                    // use to create my simple literals
-                    vf = BigdataValueFactoryImpl.getInstance(namespace);
-
-                }
-            }
-        }
+//        if (vf == null) {
+//
+//            synchronized (this) {
+//            
+//                if (vf == null) {
+//                
+//                    final String namespace = getNamespace();
+//
+//                    // use to create my simple literals
+//                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+//
+//                }
+// 
+//            }
+//            
+//        }
 
         if(!iv.isLiteral())
             throw new SparqlTypeErrorException();
@@ -92,31 +105,35 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression impl
             throw new NotMaterializedException();
 
 
-        return _accept(vf,iv,bs);
+        return _accept(getValueFactory(), iv, bs);
 
     }
 
-    protected BigdataLiteral literalValue(IV iv) {
+//    protected BigdataLiteral literalValue(final IV iv) {
+//
+//        if (iv.isInline()) {
+//
+//            final BigdataValueFactory vf = getValueFactory();
+//            
+//            final BigdataURI datatype = vf
+//                    .asValue(iv.getDTE().getDatatypeURI());
+//
+//            return vf.createLiteral(((Value) iv).stringValue(), datatype);
+//
+//        } else if (iv.hasValue()) {
+//
+//            return ((BigdataLiteral) iv.getValue());
+//
+//        } else {
+//
+//            throw new NotMaterializedException();
+//
+//        }
+//
+//    }
 
-        if (iv.isInline()) {
-
-            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
-
-            return vf.createLiteral( (( Value)iv).stringValue(),datatype);
-
-        } else if (iv.hasValue()) {
-
-            return ((BigdataLiteral) iv.getValue());
-
-        } else {
-
-            throw new NotMaterializedException();
-
-        }
-
-    }
-
-    abstract boolean _accept(final BigdataValueFactory vf, final IV iv,final IBindingSet bs) throws SparqlTypeErrorException;
-
+    @SuppressWarnings("rawtypes")
+    abstract boolean _accept(final BigdataValueFactory vf, final IV iv,
+            final IBindingSet bs) throws SparqlTypeErrorException;
 
 }

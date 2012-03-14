@@ -102,6 +102,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         
         queryContext = new MockQueryContext(queryId);
         
+        namespace = getName();
+        
     }
     
     protected void tearDown() throws Exception {
@@ -113,6 +115,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             mmgr.clear();
             
         }
+
+        namespace = null;
         
         super.tearDown();
         
@@ -138,6 +142,11 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
      * {@link IMemoryManager} MUST explicitly setup and tear down this field.
      */
     protected IQueryContext queryContext = null;
+    
+    /**
+     * The namespace of the lexicon relation - required by {@link CompareBOp}.
+     */
+    private String namespace = null;
     
     /**
      * Factory for {@link GroupByOp} to be tested.
@@ -780,7 +789,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { org, totalPriceExpr }, // select
@@ -952,7 +961,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(5)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { org, totalPriceExpr }, // select
@@ -1286,7 +1295,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { totalPriceExpr }, // select
@@ -1446,7 +1455,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(50)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { totalPriceExpr }, // select
@@ -2287,7 +2296,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { totalPriceExpr }, // select
@@ -2477,7 +2486,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { org, totalPriceExpr }, // select
@@ -2675,7 +2684,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT));
+                        CompareOp.GT, namespace));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { totalPriceExpr, inflatedPriceExpr }, // select

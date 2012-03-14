@@ -48,8 +48,9 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 	 */
 	private static final long serialVersionUID = -5796492538735372727L;
 	
-	protected static final Logger log = Logger.getLogger(SPARQLConstraint.class);
-	
+    private static final transient Logger log = Logger
+            .getLogger(SPARQLConstraint.class);
+
 	/**
 	 * The operand of this operator must evaluate to a boolean. If the operand
 	 * is not known to evaluate to a boolean, wrap it with an {@link EBVBOp}.
@@ -57,12 +58,10 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 	private static XSDBooleanIVValueExpression wrap(
 			final IValueExpression<? extends IV> ve) {
 		
-		return ve instanceof XSDBooleanIVValueExpression ?
-			(XSDBooleanIVValueExpression) ve :
-				new EBVBOp(ve);
-		
+        return ve instanceof XSDBooleanIVValueExpression ? (XSDBooleanIVValueExpression) ve
+                : new EBVBOp(ve, null/* lex */);
+
 	}
-	
 	
 	/**
 	 * Construct a SPARQL constraint using the specified value expression.

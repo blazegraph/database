@@ -32,7 +32,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -46,30 +45,49 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
      */
     private static final long serialVersionUID = 1L;
     
-    public interface Annotations extends PipelineOp.Annotations {
+    public interface Annotations extends
+            XSDBooleanIVValueExpression.Annotations {
 
         /**
-         * The compare operator, which is a {@link CompareOp} enum value.
-         * Must be either EQ or NE.
+         * The compare operator, which is a {@link CompareOp} enum value. Must
+         * be either {@link CompareOp#EQ} or {@link CompareOp#NE}.
          */
-        String OP = (CompareBOp.class.getName() + ".op").intern();
+        String OP = CompareBOp.Annotations.OP;
 
     }
     
-    @SuppressWarnings("rawtypes")
-    public SameTermBOp(final IValueExpression<? extends IV> left, 
-    		final IValueExpression<? extends IV> right) {
-    	
-        this(left, right, CompareOp.EQ);
-        
-    }
-    
+    /**
+     * Constructor for sameTerm using {@link CompareOp#EQ}.
+     * 
+     * @param left
+     * @param right
+     * @param namespace
+     */
     @SuppressWarnings("rawtypes")
     public SameTermBOp(final IValueExpression<? extends IV> left,
-    		final IValueExpression<? extends IV> right, final CompareOp op) {
-    	
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
-        
+            final IValueExpression<? extends IV> right, final String namespace) {
+
+        this(left, right, CompareOp.EQ, namespace);
+
+    }
+    
+    /**
+     * Constructor for sameTerm using either {@link CompareOp#EQ} or
+     * {@link CompareOp#NE}.
+     * 
+     * @param left
+     * @param right
+     * @param op
+     * @param namespace
+     */
+    @SuppressWarnings("rawtypes")
+    public SameTermBOp(final IValueExpression<? extends IV> left,
+            final IValueExpression<? extends IV> right, final CompareOp op,
+            final String namespace) {
+
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
+                new NV(Annotations.NAMESPACE, namespace)));
+
     }
     
     /**
@@ -109,16 +127,18 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
         final IV right = get(1).get(bs);
 
     	// not yet bound
-    	if (right == null)
-            throw new SparqlTypeErrorException(); 
+        if (right == null)
+            throw new SparqlTypeErrorException();
 
         final CompareOp op = (CompareOp) getRequiredProperty(Annotations.OP);
-        
-        switch(op) {
-        	case NE: return !left.equals(right);
-        	default: return left.equals(right);
+
+        switch (op) {
+        case NE:
+            return !left.equals(right);
+        default:
+            return left.equals(right);
         }
-		
+
     }
     
 }

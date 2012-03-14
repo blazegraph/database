@@ -42,7 +42,13 @@ public class SparqlTypeErrorBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 2699085294332649839L;
 	
-	public static final SparqlTypeErrorBOp INSTANCE = new SparqlTypeErrorBOp();
+    protected boolean isLexiconNamespaceRequired() {
+        
+        return false;
+        
+    }
+    
+    public static final transient SparqlTypeErrorBOp INSTANCE = new SparqlTypeErrorBOp();
 
 	private SparqlTypeErrorBOp() {
 		

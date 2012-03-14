@@ -32,18 +32,26 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.util.InnerCause;
 
-public class TryBeforeMaterializationConstraint extends BOpBase implements IConstraint {
-	
-	/**
+/**
+ * This is useful when a solution can be filtered out before it goes through the
+ * materialization pipeline. Note that if a solution passes, it will still enter
+ * the materialization pipeline. It is up to the first step in the pipeline to
+ * ensure that the solution gets routed around the materialization steps. See
+ * {@link IsMaterializedBOp}.
+ */
+public class TryBeforeMaterializationConstraint extends BOpBase implements
+        IConstraint {
+
+    /**
 	 * 
 	 */
-	private static final long serialVersionUID = -761919593813838105L;
-	
-	protected static final Logger log = Logger.getLogger(TryBeforeMaterializationConstraint.class);
+    private static final long serialVersionUID = -761919593813838105L;
+
+    private static final transient Logger log = Logger
+            .getLogger(TryBeforeMaterializationConstraint.class);
 	
 	public TryBeforeMaterializationConstraint(final IConstraint x) {
 		
@@ -67,8 +75,11 @@ public class TryBeforeMaterializationConstraint extends BOpBase implements ICons
     /**
      * Required deep copy constructor.
      */
-    public TryBeforeMaterializationConstraint(final Constraint op) {
+    public TryBeforeMaterializationConstraint(
+            final TryBeforeMaterializationConstraint op) {
+
         super(op);
+        
     }
 
     /**

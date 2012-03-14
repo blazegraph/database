@@ -78,6 +78,24 @@ public class TestGroupByRewriter extends TestCase2 {
         super(name);
     }
 
+    /** The lexicon namespace - required for {@link CompareBOp}. */
+    private String namespace;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        namespace = getName();
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        namespace = null;
+        
+        super.tearDown();
+        
+    }
+
 //    private static class MockRewriteState implements IGroupByRewriteState {
 //        
 //        private final LinkedHashMap<IAggregate<?>,IVariable<?>> aggExpr;
@@ -258,11 +276,13 @@ public class TestGroupByRewriter extends TestCase2 {
         /*
          * Setup the aggregation operation.
          */
-
+        
         final IVariable<IV> x = Var.var("x");
 
-        final IConstraint constraint = new SPARQLConstraint(new CompareBOp(new SUM(
-                false/* distinct */, (IValueExpression<IV>) x),new Constant<IV>(new XSDNumericIV(10)),CompareOp.GT));
+        final IConstraint constraint = new SPARQLConstraint(
+                new CompareBOp(new SUM(false/* distinct */,
+                        (IValueExpression<IV>) x), new Constant<IV>(
+                        new XSDNumericIV(10)), CompareOp.GT, namespace));
 
         /*
          * Set up the expected answer.
@@ -274,7 +294,8 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IConstraint expectedExpr = new SPARQLConstraint(new CompareBOp(
-                _0, new Constant<IV>(new XSDNumericIV(10)), CompareOp.GT));
+                _0, new Constant<IV>(new XSDNumericIV(10)), CompareOp.GT,
+                namespace));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);

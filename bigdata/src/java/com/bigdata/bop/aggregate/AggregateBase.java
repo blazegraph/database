@@ -1,9 +1,6 @@
 package com.bigdata.bop.aggregate;
 
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.impl.LiteralImpl;
@@ -11,7 +8,6 @@ import org.openrdf.model.impl.LiteralImpl;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
