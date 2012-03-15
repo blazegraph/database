@@ -150,6 +150,29 @@ public class Depends {
     private final static Dep lucene = new ApacheDep("lucene",
             "http://lucene.apache.org/java/docs/index.html");
 
+    /*
+     * http client and its dependencies are used for remote SPARQL requests and
+     * the NanoSparqlServer's client-side API.
+     */
+
+    private final static Dep apacheCommonsCodec = new ApacheDep(
+            "commons-codec", "http://commons.apache.org/codec/");
+
+    private final static Dep apacheCommonsLogging = new ApacheDep(
+            "commons-logging", "http://commons.apache.org/logging/");
+
+    private final static Dep apacheHttpClient = new ApacheDep("httpclient",
+            "http://hc.apache.org/");
+
+    private final static Dep apacheHttpClientCache = new ApacheDep(
+            "httpclient-cache", "http://hc.apache.org/");
+
+    private final static Dep apacheHttpCore = new ApacheDep("httpcore",
+            "http://hc.apache.org/");
+
+    private final static Dep apacheHttpMime = new ApacheDep("httpmime",
+            "http://hc.apache.org/");
+
     /**
      * Note: This bigdata module is under a different license (Apache 2.0) than
      * the other bigdata modules.
@@ -239,6 +262,12 @@ public class Depends {
             dsiutils,//
             fastutil,//
             highScaleLib,//
+            apacheCommonsCodec,
+            apacheCommonsLogging,
+            apacheHttpClient,
+            apacheHttpClientCache,
+            apacheHttpCore,
+            apacheHttpMime,
 //            cweb,//
             slf4j,//
             sesame,//
