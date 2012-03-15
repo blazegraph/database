@@ -818,6 +818,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
+      <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
 
       <!-- Utility libraries -->
@@ -839,9 +840,9 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/icu4j-charset.jar" />
       <copy file="${bigdata.lib}/apache/log4j-1.2.15.jar"
             tofile="${dist.lib}/log4j.jar" />
-      <copy file="${bigdata.lib}/lucene/lucene-analyzers-3.0.0.jar"
+      <copy file="${bigdata.lib}/lucene/lucene-analyzers-${lucene.version}.jar"
             tofile="${dist.lib}/lucene-analyzer.jar" />
-      <copy file="${bigdata.lib}/lucene/lucene-core-3.0.0.jar"
+      <copy file="${bigdata.lib}/lucene/lucene-core-${lucene.version}.jar"
             tofile="${dist.lib}/lucene-core.jar" />
 
       <!-- RDF library -->
@@ -879,12 +880,25 @@ ${postInstallMessage}</echo>
       <copy file="${bigdata-rdf.lib}/nxparser-6-22-2010.jar"
             tofile="${dist.lib}/nxparser.jar" />
 
+      <!-- apache http components (SPARQL connections). -->
+      <copy file="${bigdata-http.lib}/commons-codec-${apache.commons_codec.version}.jar"
+            tofile="${dist.lib}/commons-codec.jar" />
+      <copy file="${bigdata-http.lib}/commons-logging-${apache.commons_logging.version}.jar"
+            tofile="${dist.lib}/commons-logging.jar" />
+      <copy file="${bigdata-http.lib}/httpclient-${apache.httpclient.version}.jar"
+            tofile="${dist.lib}/httpclient.jar" />
+      <copy file="${bigdata-http.lib}/httpclient-cache-${apache.httpclient_cache.version}.jar"
+            tofile="${dist.lib}/httpclient-cache.jar" />
+      <copy file="${bigdata-http.lib}/httpcore-${apache.httpcore.version}.jar"
+            tofile="${dist.lib}/httpcore.jar" />
+      <copy file="${bigdata-http.lib}/httpmime-${apache.httpmime.version}.jar"
+            tofile="${dist.lib}/httpmime.jar" />
+                          
       <!-- Zookeeper library -->
       <copy file="${bigdata-zookeeper.lib}/zookeeper-${zookeeper.version}.jar"
             tofile="${dist.lib}/zookeeper.jar" />
 
       <!-- Jini library -->
-
       <copy file="${bigdata-jini.lib}/browser.jar"
             todir="${dist.lib}" />
       <copy file="${bigdata-jini.lib}/classserver.jar"
@@ -1465,7 +1479,8 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}" />
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="javac.test.classpath"
+               value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
 
       <echo>javac
 </echo>
@@ -1821,9 +1836,16 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/jetty-security.jar" />
         <pathelement location="${dist.lib}/jetty-xml.jar" />
         <pathelement location="${dist.lib}/servlet-api.jar" />
+        <pathelement location="${dist.lib}/commons-codec.jar" />
+        <pathelement location="${dist.lib}/commons-logging.jar" />
+        <pathelement location="${dist.lib}/httpclient.jar" />
+        <pathelement location="${dist.lib}/httpclient-cache.jar" />
+        <pathelement location="${dist.lib}/httpcore.jar" />
+        <pathelement location="${dist.lib}/httpmime.jar" />
       </path>
 
-      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="run.class.path"
+               value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar" />
 
       <echo>    classpath:    ${run.class.path}
 </echo>
