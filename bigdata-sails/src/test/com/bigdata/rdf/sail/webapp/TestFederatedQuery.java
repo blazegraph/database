@@ -575,7 +575,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
 
     /*
-     * Note: I have disabled this test. For now, just workaround the problem by
+     * FIXME I have disabled this test. For now, just workaround the problem by
      * having correlated joins.  It is not too much to ask!
      */
 //    /**
