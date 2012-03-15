@@ -124,4 +124,8 @@ public class ContextBindingSet implements IBindingSet {
         return delegate.hashCode();
     }
 
+    public String toString() {
+        return delegate.toString();
+    }
+    
 }
