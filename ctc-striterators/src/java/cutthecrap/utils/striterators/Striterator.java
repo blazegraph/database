@@ -70,7 +70,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
     /**
      * 
      * @param src
-     * @param filter
+     * @param filters
      */
     public Striterator(final Iterator src, final List<IFilter> filters) {
         this.realSource = src;
