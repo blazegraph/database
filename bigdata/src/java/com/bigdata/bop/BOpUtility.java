@@ -1303,8 +1303,9 @@ public class BOpUtility {
         if (j != chunk.length) {
 
             // allocate exact size array.
-            final IBindingSet[] tmp = (IBindingSet[]) java.lang.reflect.Array
-                    .newInstance(chunk[0].getClass(), j);
+            final IBindingSet[] tmp = new IBindingSet[j];
+//            final IBindingSet[] tmp = (IBindingSet[]) java.lang.reflect.Array
+//                    .newInstance(chunk[0].getClass(), j);
 
             // make a dense copy.
             System.arraycopy(t/* src */, 0/* srcPos */, tmp/* dst */,
