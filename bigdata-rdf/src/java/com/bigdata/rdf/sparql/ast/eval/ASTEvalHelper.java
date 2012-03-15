@@ -521,9 +521,14 @@ public class ASTEvalHelper {
         // Dechunkify the running query and monitor the Sesame iterator.
         final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
         
+        final BOp query = runningQuery.getQuery();
+        final int chunkCapacity = query.getProperty(
+                PipelineOp.Annotations.CHUNK_CAPACITY,
+                PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
+
         // Wrap in an IChunkedOrderedIterator
-        final IChunkedOrderedIterator<IBindingSet> it2 = 
-            new ChunkedWrappedIterator<IBindingSet>(it1);
+        final IChunkedOrderedIterator<IBindingSet> it2 = new ChunkedWrappedIterator<IBindingSet>(
+                it1, chunkCapacity, IBindingSet.class);
 
         final CloseableIteration<BindingSet, QueryEvaluationException> it3; 
         if(materializeProjectionInQuery) {
@@ -584,10 +589,10 @@ public class ASTEvalHelper {
 //            final int blobsChunkSize = 4000;
             
             // Values set based on query hints.
-            final BOp query = runningQuery.getQuery();
-            final int chunkCapacity = query.getProperty(
-                    PipelineOp.Annotations.CHUNK_CAPACITY,
-                    PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
+//            final BOp query = runningQuery.getQuery();
+//            final int chunkCapacity = query.getProperty(
+//                    PipelineOp.Annotations.CHUNK_CAPACITY,
+//                    PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
             final int chunkOfChunksCapacity = query.getProperty(
                     PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY,
                     PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);

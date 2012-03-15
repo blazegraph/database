@@ -246,15 +246,15 @@ public class BOpContext<E> extends BOpContextBase {
         this.partitionId = partitionId;
         this.stats = stats;
         /*
-         * FIXME Wrap each IBindingSet to provide access to the BOpContext.
+         * Wrap each IBindingSet to provide access to the BOpContext.
          * 
          * @see <a
          * href="https://sourceforge.net/apps/trac/bigdata/ticket/513"> Expose
          * the LexiconConfiguration to function BOPs </a>
          */
-//        this.source = (ICloseableIterator) new SetContextIterator(this,
-//                (ICloseableIterator) source);
-        this.source = source;
+        this.source = (ICloseableIterator) new SetContextIterator(this,
+                (ICloseableIterator) source);
+//        this.source = source;
         this.sink = sink;
         this.sink2 = sink2; // may be null
     }
@@ -265,6 +265,7 @@ public class BOpContext<E> extends BOpContextBase {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
+     *         
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
      *      Expose the LexiconConfiguration to function BOPs </a>
      */
@@ -318,21 +319,52 @@ public class BOpContext<E> extends BOpContextBase {
                 
             }
 
-            cur = src.next();
+            final IBindingSet[] nxt = src.next();
             
-            for (int i = 0; i < cur.length; i++) {
+            /*
+             * Note: We need an IBindingSet[] rather than a ListBindingSet or
+             * other concrete type in order to avoid array store errors when we
+             * wrap the IBindingSet instances below. Therefore, if the component
+             * type is wrong, we have to allocate a new array.
+             */
+            this.cur = nxt.getClass().getComponentType() == IBindingSet.class ? nxt
+                    : new IBindingSet[nxt.length];
+            
+//            try {
+            
+            for (int i = 0; i < nxt.length; i++) {
 
-                final IBindingSet bset = cur[i];
-                
-                if(bset instanceof ContextBindingSet)
-                    continue;
-                
+                final IBindingSet bset = nxt[i];
+
                 // Wrap the binding set.
-                cur[i] = new ContextBindingSet(context, bset);
-                
+                cur[i] = bset instanceof ContextBindingSet ? bset
+                        : new ContextBindingSet(context, bset);
+
             }
-            
+
             return true;
+                
+//            } catch (ArrayStoreException ex) {
+//
+//                /*
+//                 * Note: This could be used to locate array store exceptions arising from a
+//                 * ListBindingSet[] or other concrete array type. Remove once I
+//                 * track down the sources of a non-IBindingSet[]. The problem
+//                 * can of course be worked around by allocating a new
+//                 * IBindingSet[] into which the ContextBindingSets will be
+//                 * copied.
+//                 * 
+//            * Likely causes are users of java.lang.reflect.Array.newInstance().
+//            * 
+//            * AbstractUnsynchronizedArrayBuffer
+//            * BlockingBuffer
+//            * UnsynchronizedUnboundedChunkBuffer
+//            * WrappedRemoteChunkedIterator
+//                 */
+//                throw new RuntimeException("cur[" + nxt.length + "]=" + nxt
+//                        + ", src=" + src, ex);
+//
+//            }
             
         }
 
