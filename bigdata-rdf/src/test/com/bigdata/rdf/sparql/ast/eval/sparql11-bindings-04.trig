@@ -1,0 +1,20 @@
+@prefix : <http://example.org/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+# The data for the local graph
+<http://localhost:18080/openrdf/repositories/localGraph> {
+:a foaf:name "Alan" .
+:a foaf:mbox "alan@example.org" .
+:b foaf:name "Bob" .
+:b foaf:mbox "bob@example.org" .
+:c foaf:name "Alice" .
+:c foaf:mbox "alice@example.org" .
+}
+
+# The data for the "service" end point.
+<http://localhost:18080/openrdf/repositories/endpoint1> {
+:a foaf:knows :b .
+:b foaf:knows :c .
+:a foaf:interest "SPARQL 1.1 Basic Federated Query" .
+:b foaf:interest "SPARQL 1.1 Query" .
+}
