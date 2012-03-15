@@ -558,7 +558,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         /**
          * The object stored in the queue.
          */
-        private final T ref;
+        /*private*/ final T ref;
 
         public T get() {
             return ref;
@@ -570,7 +570,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
          * is updated to the value of {@link System#nanoTime()} each time
          * {@link #touch()} is invoked.
          */
-        final private long ts = System.nanoTime();
+        final /*private*/ long ts = System.nanoTime();
         
         public ValueAge(final T ref) {
             

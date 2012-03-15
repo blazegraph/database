@@ -302,13 +302,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @see ConfigurationOptions#DELETE_JOB
          */
-        private transient final boolean deleteJob;
+        /*private*/ transient final boolean deleteJob;
 
         /**
          * Set <code>true</code> iff an existing job is being resumed
          * (defaults to <code>false</code> until proven otherwise).
          */
-        private boolean resumedJob = false;
+        /*private*/ boolean resumedJob = false;
 
         /**
          * Return <code>true</code> iff an existing job is being resumed.
@@ -323,13 +323,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * The time at which the job started to execute and 0L if the job has
          * not started to execute.
          */
-        private transient long beginMillis = 0L;
+        /*private*/ transient long beginMillis = 0L;
 
         /**
          * The time at which the job was done executing and 0L if the job has
          * not finished executing.
          */
-        private transient long endMillis = 0L;
+        /*private*/ transient long endMillis = 0L;
 
         /**
          * Elapsed run time for the job in milliseconds. This is ZERO (0L) until
