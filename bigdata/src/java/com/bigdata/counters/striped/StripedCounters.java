@@ -67,23 +67,23 @@ import com.bigdata.counters.CounterSet;
 public class StripedCounters<T extends StripedCounters<T>> {
 
     /** #of releases before we post the counters to the parent. */
-    private int batchSize;
+    protected /*private*/ int batchSize;
 
     /**
      * Decremented by {@link #release()} - when ZERO (0) we post the counters to
      * the {@link #parent} and reset to the {@link #batchSize}
      * 
      */
-    private int n;
+    protected /*private*/ int n;
 
     /**
      * The child counters (these are the stripes).
      */
     private final StripedCounters<?>[] a;
 
-    private final ReentrantLock[] locks;
+    protected /*private*/ final ReentrantLock[] locks;
 
-    private T parent;
+    protected /*private*/ T parent;
 
     /**
      * Return the stripe to be used by the caller's thread.
