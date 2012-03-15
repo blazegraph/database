@@ -162,6 +162,8 @@ public class RemoteRepository {
 
         final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
 
+        opts.method = "GET";
+        
         opts.addRequestParam("ESTCARD");
         if (s != null) {
         	opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
@@ -468,7 +470,7 @@ public class RemoteRepository {
 			
 	        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
 
-	        opts.method = "GET";
+	        opts.method = "POST";
 	        opts.addRequestParam("query", query);
 	        opts.addRequestParam("queryId", getQueryId().toString());
 
@@ -659,7 +661,7 @@ public class RemoteRepository {
         public String serviceURL = null;
         
         /** The HTTP method (GET, POST, etc). */
-        public String method = "GET";
+        public String method = "POST";
 
 		/** The accept header. */
         public String acceptHeader = //
@@ -716,7 +718,8 @@ public class RemoteRepository {
         
         public String getRequestParam(final String name) {
         	
-        	return requestParams != null ? requestParams.get(name)[0] : null;
+        	return (requestParams != null && requestParams.containsKey(name))
+        				? requestParams.get(name)[0] : null;
         	
         }
         
