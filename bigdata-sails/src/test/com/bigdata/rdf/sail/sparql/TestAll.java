@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -58,49 +57,33 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
-        // Test suite for building up value expressions.
-        suite.addTestSuite(TestValueExprBuilder.class);
-
         /*
-         * Test suite for building up triple patterns, including those which are
-         * covered by the property paths extension in SPARQL 1.1 (a triple
-         * pattern which a constant in the predicate position is treated by the
-         * sesame SPARQL grammar as a degenerate case of a property path.)
+         * Test suite for expected AST translation targets. This is our primary
+         * parser test suite.
          */
-        suite.addTestSuite(TestTriplePatternBuilder.class);
-        
-        /*
-         * Test suite for group graph patterns (join groups, unions, optional,
-         * etc.) and filters in those graph patterns. Subquery is tested in a
-         * separate test suite.
-         */
-        suite.addTestSuite(TestGroupGraphPatternBuilder.class);
+        suite.addTest(TestAll_AST.suite());
 
-        /*
-         * Test suite for various kinds of subquery patterns.
-         */
-        suite.addTestSuite(TestSubqueryPatterns.class);
-        
-        // Test suite for the BINDINGs clause.
-        suite.addTestSuite(TestBindingsClause.class);
+        try {
 
-        /*
-         * Test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT),
-         * including DISTINCT/REDUCED, GROUP BY, HAVING, ORDER BY, and
-         * LIMIT/OFFSET.
-         */
-        suite.addTestSuite(TestBigdataExprBuilder.class);
+            /*
+             * Manifest driven SPARQL parser compliance test suite.
+             * 
+             * Note: This is the DAWG test suite. It verifies the compliance of
+             * the SPARQL parser in terms of correct acceptance and correct
+             * rejection, but it does not check the translation targets for the
+             * parser and it is not aware of bigdata specific SPARQL extensions.
+             */
 
-        // Test suite for the VIRTUAL GRAPHS extension.
-        suite.addTestSuite(TestVirtualGraphs.class);
+            suite.addTest(Bigdata2ASTSPARQLSyntaxTest.suite());
 
-        // TODO Test suite for property paths.
+            suite.addTest(Bigdata2ASTSPARQL11SyntaxTest.suite());
 
-        /*
-         * Test suite for SPARQL UPDATE expressions.
-         */
-        suite.addTestSuite(TestUpdateExprBuilder.class);
-        
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
         return suite;
 
     }

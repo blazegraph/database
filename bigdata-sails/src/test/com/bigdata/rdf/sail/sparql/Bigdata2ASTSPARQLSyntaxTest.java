@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 24, 2011
  */
 
-package com.bigdata.rdf.sail.tck;
+package com.bigdata.rdf.sail.sparql;
 
 import java.util.Properties;
 
@@ -50,48 +50,27 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * which provides a W3C markup for the test results. The Earl report is part of
  * the Sesame compliance packages.
  * 
- * @see Bigdata2ASTSPARQLParser
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
+public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
 
-    private AbstractTripleStore store = null;
+    /**
+     * @param testURI
+     * @param name
+     * @param queryFileURL
+     * @param positiveTest
+     */
+    public Bigdata2ASTSPARQLSyntaxTest(String testURI, String name,
+            String queryFileURL, boolean positiveTest) {
 
-//    private String baseURI = null;
-
-    protected void setUp() throws Exception {
-        
-        super.setUp();
-        
-        store = getStore(getProperties());
-        
-//        /*
-//         * Note: This needs to be an absolute URI.
-//         */
-//        
-//        baseURI = "http://www.bigdata.com";
+        super(testURI, name, queryFileURL, positiveTest);
         
     }
+
+    private AbstractTripleStore tripleStore;
     
-    protected void tearDown() throws Exception {
-        
-        if (store != null) {
-        
-            store.__tearDownUnitTest();
-            
-            store = null;
-        
-        }
-        
-//        baseURI = null;
-        
-        super.tearDown();
-        
-    }
-
-    public Properties getProperties() {
+    protected Properties getProperties() {
 
         final Properties properties = new Properties();
 
@@ -106,7 +85,7 @@ public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
         properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
                 NoAxioms.class.getName());
 
-        // no persistence.
+        // Note: No persistence.
         properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
                 BufferMode.Transient.toString());
         
@@ -114,6 +93,14 @@ public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
 
     }
 
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        tripleStore = getStore(getProperties());
+
+    }
+    
     protected AbstractTripleStore getStore(final Properties properties) {
 
         final String namespace = "kb";
@@ -129,30 +116,31 @@ public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
         return lts;
 
     }
-    
-    /**
-     * @param testURI
-     * @param name
-     * @param queryFileURL
-     * @param positiveTest
-     */
-    public BigdataSPARQLSyntaxTest(String testURI, String name,
-            String queryFileURL, boolean positiveTest) {
 
-        super(testURI, name, queryFileURL, positiveTest);
+    protected void tearDown() throws Exception {
+        
+        if (tripleStore != null) {
+            
+            tripleStore.__tearDownUnitTest();
+            
+            tripleStore = null;
+            
+        }
+
+        super.tearDown();
         
     }
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Overridden to use {@link Bigdata2ASTSPARQLParser}.
+     * 
+     * This uses the {@link Bigdata2ASTSPARQLParser}. 
      */
     @Override
     protected void parseQuery(String query, String queryFileURL)
             throws MalformedQueryException {
 
-        new Bigdata2ASTSPARQLParser(store).parseQuery(query, queryFileURL);
+        new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(query, queryFileURL);
 
     }
 
@@ -164,7 +152,7 @@ public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
             public SPARQLSyntaxTest createSPARQLSyntaxTest(String testURI,
                     String testName, String testAction, boolean positiveTest) {
 
-                return new BigdataSPARQLSyntaxTest(testURI, testName, testAction,
+                return new Bigdata2ASTSPARQLSyntaxTest(testURI, testName, testAction,
                         positiveTest);
                 
             }
