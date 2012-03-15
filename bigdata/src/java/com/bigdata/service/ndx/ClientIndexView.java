@@ -1104,7 +1104,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 try {
 
                     final UnsynchronizedArrayBuffer unsyncBuffer = new UnsynchronizedArrayBuffer(
-                            queryBuffer, queryBuffer.getMinimumChunkSize());
+                            queryBuffer, Object.class, queryBuffer.getMinimumChunkSize());
 
                     while (itr.hasNext()) {
 

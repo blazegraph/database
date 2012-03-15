@@ -2309,8 +2309,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         final int chunkSize = e1.length + e2.length;
         
         // Dynamic instantiation of array of the same component type.
-        final Object[] a = (Object[]) java.lang.reflect.Array.newInstance(e1[0]
-                .getClass(), chunkSize);
+        final Object[] a = (Object[]) java.lang.reflect.Array.newInstance(//
+//                e1[0].getClass(),
+                e1.getClass().getComponentType(),//
+                chunkSize);
         
         // copy first chunk onto the new array.
         System.arraycopy(e1, 0, a, 0, e1.length);

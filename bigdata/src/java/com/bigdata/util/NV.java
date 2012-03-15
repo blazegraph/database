@@ -102,8 +102,9 @@ public class NV implements Serializable, Comparable<NV> {
         if (b == null)
             return a;
 
-        final NV[] c = (NV[]) java.lang.reflect.Array.newInstance(a.getClass()
-                .getComponentType(), a.length + b.length);
+        final NV[] c = new NV[a.length + b.length];
+//                (NV[]) java.lang.reflect.Array.newInstance(a.getClass()
+//                .getComponentType(), a.length + b.length);
 
         System.arraycopy(a, 0, c, 0, a.length);
 

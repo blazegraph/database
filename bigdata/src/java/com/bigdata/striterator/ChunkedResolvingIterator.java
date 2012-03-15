@@ -109,13 +109,13 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
         final S[] a = src.nextChunk();
         
         E[] b = null;
-        
-        for( int i=0; i<a.length; i++) {
-    
-            E e = resolve(a[i]);
-            
-            if(b == null) {
-                
+
+        for (int i = 0; i < a.length; i++) {
+
+            final E e = resolve(a[i]);
+
+            if (b == null) {
+
                 /*
                  * Dynamically instantiation an array of the same component type
                  * as the objects that we are visiting.

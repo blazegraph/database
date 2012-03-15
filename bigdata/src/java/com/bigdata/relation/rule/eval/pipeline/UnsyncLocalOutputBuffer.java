@@ -31,7 +31,7 @@ public class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
     public UnsyncLocalOutputBuffer(final JoinStats joinStats,
             final int capacity, final IBlockingBuffer<E[]> syncBuffer) {
 
-        super(capacity);
+        super(capacity, (Class<? extends E>) IBindingSet.class);
 
         this.joinStats = joinStats;
         

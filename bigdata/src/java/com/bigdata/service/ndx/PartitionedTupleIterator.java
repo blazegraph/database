@@ -64,10 +64,10 @@ import cutthecrap.utils.striterators.IFilter;
  */
 public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
-    protected static final transient Logger log = Logger
+    private static final transient Logger log = Logger
             .getLogger(PartitionedTupleIterator.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
     
 //    protected static final boolean DEBUG = log.isDebugEnabled();
     
@@ -478,7 +478,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
 
         if (!locatorItr.hasNext()) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("No more locators");
 
             return false;
@@ -487,7 +487,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
        
         locator = locatorItr.next();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("locator=" + locator);
         
         // submit query to the next partition.
@@ -539,7 +539,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
             
             final int partitionId = locator.getPartitionId();
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + ndx.getName() //
                         + ", tx=" + ts //
                         + ", reverseScan=" + reverseScan //

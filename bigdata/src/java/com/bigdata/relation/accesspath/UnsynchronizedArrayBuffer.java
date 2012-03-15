@@ -49,13 +49,15 @@ public class UnsynchronizedArrayBuffer<E> extends
     /**
      * @param target
      *            The target buffer onto which the elements will be flushed.
+     * @param cls
+     *            The component type of the backing array.
      * @param capacity
      *            The capacity of the backing buffer.
      */
     public UnsynchronizedArrayBuffer(final IBuffer<E[]> target,
-            final int capacity) {
+            final Class<? extends E> cls, final int capacity) {
 
-        this(target, capacity, null/* filter */);
+        this(target, capacity, cls, null/* filter */);
 
     }
 
@@ -63,15 +65,18 @@ public class UnsynchronizedArrayBuffer<E> extends
      * @param target
      *            The target buffer onto which chunks of elements will be
      *            flushed.
+     * @param cls
+     *            The component type of the backing array.
      * @param capacity
      *            The capacity of the backing buffer.
      * @param filter
      *            Filter to keep elements out of the buffer (optional).
      */
     public UnsynchronizedArrayBuffer(final IBuffer<E[]> target,
-            final int capacity, final IElementFilter<E> filter) {
+            final int capacity, final Class<? extends E> cls,
+            final IElementFilter<E> filter) {
 
-        super(capacity, filter);
+        super(capacity, cls, filter);
 
         if (target == null)
             throw new IllegalArgumentException();

@@ -150,7 +150,7 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
             final long timestamp,//
             final int capacity) {
 
-        super(capacity);
+        super(capacity, (Class<? extends E>) IBindingSet.class);
 
         if (fed == null)
             throw new IllegalArgumentException();

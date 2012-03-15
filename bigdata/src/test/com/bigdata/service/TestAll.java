@@ -98,7 +98,11 @@ public class TestAll extends TestCase {
         suite.addTest(TestAll_DynamicSharding.suite());
         
         // test scale-out operator semantics. 
-        suite.addTest(com.bigdata.bop.fed.TestAll.suite());
+        /*
+         * Note: this was being run 3 times (!). It is invoked out of the
+         * com.bigdata.bop test suite now.
+         */
+//        suite.addTest(com.bigdata.bop.fed.TestAll.suite());
         
         /*
          * Stress test of concurrent clients writing on a single data service.

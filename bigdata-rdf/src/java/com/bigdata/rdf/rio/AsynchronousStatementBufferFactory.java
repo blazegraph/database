@@ -4029,7 +4029,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (statements == null) {
 
                 statements = new UnsynchronizedUnboundedChunkBuffer<S>(
-                        producerChunkSize);
+                        producerChunkSize,
+                        (Class<? extends S>) BigdataStatement.class);
 
             }
 

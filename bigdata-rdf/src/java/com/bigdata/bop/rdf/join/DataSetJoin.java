@@ -176,7 +176,7 @@ public class DataSetJoin extends PipelineOp {
                 final BOpStats stats = context.getStats();
                 
                 final UnsynchronizedArrayBuffer<IBindingSet> tmp = new UnsynchronizedArrayBuffer<IBindingSet>(
-                        sink, op.getChunkCapacity());
+                        sink, IBindingSet.class, op.getChunkCapacity());
                 
                 while (source.hasNext()) {
                 

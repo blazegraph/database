@@ -114,7 +114,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.relation.rule.eval.TestAll.suite() );
         suite.addTest( com.bigdata.mdi.TestAll.suite() );
         suite.addTest( com.bigdata.service.TestAll.suite() );
-        suite.addTest( com.bigdata.bop.fed.TestAll.suite() );
+//        suite.addTest( com.bigdata.bop.fed.TestAll.suite() );//This was being run 3 times(!)
         suite.addTest( com.bigdata.sparse.TestAll.suite() );
         suite.addTest( com.bigdata.search.TestAll.suite() );
         suite.addTest( com.bigdata.bfs.TestAll.suite() );

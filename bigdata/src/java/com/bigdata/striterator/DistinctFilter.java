@@ -142,8 +142,10 @@ abstract public class DistinctFilter<E> implements IChunkConverter<E, E> {
             int j = 0;
 
             // chunk large enough if everything is distinct.
-            final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(chunk[0]
-                    .getClass(), n);
+            final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(
+//                    chunk[0].getClass(),
+                    chunk.getClass().getComponentType(),
+                    n);
 
             // always emit the first element.
             tmp[j++] = a[0].obj;
@@ -162,8 +164,10 @@ abstract public class DistinctFilter<E> implements IChunkConverter<E, E> {
 
                 // make it dense.
 
-                E[] tmp2 = (E[]) java.lang.reflect.Array.newInstance(tmp[0]
-                        .getClass(), j);
+                E[] tmp2 = (E[]) java.lang.reflect.Array.newInstance(//
+//                        tmp[0].getClass(),
+                        tmp.getClass().getComponentType(),
+                        j);
 
                 System.arraycopy(tmp, 0, tmp2, 0, j);
 
@@ -212,8 +216,10 @@ abstract public class DistinctFilter<E> implements IChunkConverter<E, E> {
             int j = 0;
 
             // chunk large enough if everything is distinct.
-            final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(chunk[0]
-                    .getClass(), n);
+            final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(
+//                    chunk[0].getClass(),
+                    chunk.getClass().getComponentType(),//
+                    n);
 
             for (int i = 0; i < n; i++) {
 
@@ -231,8 +237,10 @@ abstract public class DistinctFilter<E> implements IChunkConverter<E, E> {
 
                 // make it dense.
 
-                E[] tmp2 = (E[]) java.lang.reflect.Array.newInstance(chunk[0]
-                        .getClass(), j);
+                E[] tmp2 = (E[]) java.lang.reflect.Array.newInstance(
+//                        chunk[0].getClass(),
+                        chunk.getClass().getComponentType(),//
+                        j);
 
                 System.arraycopy(tmp, 0, tmp2, 0, j);
 

@@ -59,11 +59,16 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
      * The internal buffer -or- <code>null</code> if we need to allocate one.
      */
     private E[] buffer = null;
+
+    /**
+     * The component type for the backing array.
+     */
+    private final Class<? extends E> cls;
     
     /**
      * Optional filter to keep elements out of the buffer.
      */
-    final protected IElementFilter<E> filter;
+    private final IElementFilter<? extends E> filter;
     
     /**
      * If {@link #size()} reports zero(0).
@@ -86,33 +91,43 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param cls
+     *            The component type for the backing array.
      */
-    public AbstractUnsynchronizedArrayBuffer(final int capacity) {
+    public AbstractUnsynchronizedArrayBuffer(final int capacity,
+            final Class<? extends E> cls) {
 
-        this(capacity, null/* filter */);
+        this(capacity, cls, null/* filter */);
 
     }
     
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param cls
+     *            The component type for the backing array.
      * @param filter
      *            Filter to keep elements out of the buffer (optional).
      */
     public AbstractUnsynchronizedArrayBuffer(final int capacity,
-            final IElementFilter<E> filter) {
+            final Class<? extends E> cls, final IElementFilter<E> filter) {
 
         if (capacity <= 0)
+            throw new IllegalArgumentException();
+
+        if (cls == null)
             throw new IllegalArgumentException();
 
         this.capacity = capacity;
 
         this.filter = filter;
+
+        this.cls = cls;
         
-        /*
-         * Note: The backing array is allocated dynamically to get the array
-         * component type right.
-         */
+//        /*
+//         * Note: The backing array is allocated dynamically to get the array
+//         * component type right.
+//         */
         
     }
 
@@ -177,7 +192,8 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
         if (buffer == null) {
 
             // re-allocate on demand.
-            buffer = (E[]) java.lang.reflect.Array.newInstance(e.getClass(),
+            buffer = (E[]) java.lang.reflect.Array.newInstance(//
+                    cls,//e.getClass(),
                     capacity);
 
             size = 0;
@@ -190,7 +206,8 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
             assert buffer == null;
 
             // re-allocate so that we can store the new element.
-            buffer = (E[]) java.lang.reflect.Array.newInstance(e.getClass(),
+            buffer = (E[]) java.lang.reflect.Array.newInstance(//
+                    cls,//e.getClass(),
                     capacity);
             
             size = 0;
@@ -240,8 +257,10 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
                 assert buffer[0] != null;
                 
                 // allocate using dynamic type.
-                a = (E[]) java.lang.reflect.Array.newInstance(buffer[0]
-                        .getClass(), size);
+                a = (E[]) java.lang.reflect.Array.newInstance(
+//                        buffer[0].getClass(),
+                        cls,
+                        size);
                 
                 // copy data into new a[].
                 System.arraycopy(buffer, 0, a, 0, size);

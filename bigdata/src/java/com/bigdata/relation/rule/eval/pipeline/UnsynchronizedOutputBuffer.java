@@ -24,7 +24,7 @@ abstract class UnsynchronizedOutputBuffer<E extends IBindingSet>
     protected UnsynchronizedOutputBuffer(final JoinTask joinTask,
             final int capacity) {
 
-        super(capacity);
+        super(capacity, (Class<? extends E>) IBindingSet.class);
 
         if (joinTask == null)
             throw new IllegalArgumentException();

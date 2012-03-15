@@ -235,7 +235,9 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
              * as the objects that we are visiting.
              */
             final F[] tmp = (F[]) java.lang.reflect.Array.newInstance(
-                    chunk[index].getClass(), nremaining);
+//                    chunk[index].getClass(),
+                    chunk.getClass().getComponentType(),
+                    nremaining);
             
             for (int i = 0; i < nremaining; i++) {
 

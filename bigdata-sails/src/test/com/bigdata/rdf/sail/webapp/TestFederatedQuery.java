@@ -577,7 +577,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     /**
      * This test is failing due to an uncorrelated join between two SERVICE
      * calls. Those SERVICE calls do not share any variables. The join is a full
-     * cross product. The problem is that that we fail to do the cross product.
+     * cross product. The problem is not that we fail to do the cross product.
      * It is that we are doing it twice -- once for each empty solution flowing
      * into the 2nd SERVICE call.
      * 

@@ -176,7 +176,9 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
     	}
     	
     	final E[] a = (E[]) java.lang.reflect.Array.newInstance(
-    			e[0].getClass(), (int) limit);
+//    			e[0].getClass(),
+    	        e.getClass().getComponentType(),
+    			(int) limit);
     	
     	System.arraycopy(e, (int) offset, a, 0, (int) limit);
     	

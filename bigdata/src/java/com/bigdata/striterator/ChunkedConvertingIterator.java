@@ -208,7 +208,9 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
             final int remaining = converted.length - pos;
             
             final F[] chunk = (F[]) java.lang.reflect.Array.newInstance(
-                    converted[0].getClass(), remaining);
+//                    converted[0].getClass(),
+                    converted.getClass().getComponentType(),
+                    remaining);
             
             System.arraycopy(converted, pos, chunk, 0, remaining);
             

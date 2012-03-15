@@ -556,7 +556,9 @@ L>//
             // Dynamic instantiation of array of the same component type.
             @SuppressWarnings("unchecked")
             final E[] a = (E[]) java.lang.reflect.Array.newInstance(
-                    firstChunk[0].getClass(), chunkSize);
+//                    firstChunk[0].getClass(),
+                    firstChunk.getClass().getComponentType(),
+                    chunkSize);
 
             // Combine the chunk(s) into a single chunk.
             int dstpos = 0;

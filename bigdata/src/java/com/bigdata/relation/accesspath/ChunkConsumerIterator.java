@@ -196,7 +196,9 @@ public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
         
         // Dynamic type instantiation of array.
         final E[] a = (E[]) java.lang.reflect.Array.newInstance(
-                chunk[lastIndex + 1].getClass(), remaining);
+//                chunk[lastIndex + 1].getClass(),
+                chunk.getClass().getComponentType(),
+                remaining);
         
         // Copy remaining elements.
         System.arraycopy(chunk, index, a, 0, remaining);

@@ -65,22 +65,30 @@ public class UnsynchronizedUnboundedChunkBuffer<E> extends
     
     /**
      * From the first element visited.
+     * 
+     * TODO This is probably no longer required since the component type of the
+     * class is now declared in the constructor.
      */
     private Class<E[]> chunkClass = null;
     
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param cls
+     *            The component type of the backing array.
      */
-    public UnsynchronizedUnboundedChunkBuffer(final int capacity) {
+    public UnsynchronizedUnboundedChunkBuffer(final int capacity,
+            final Class<? extends E> cls) {
 
-        this(capacity, null/* filter */, null/* keyOrder */);
+        this(capacity, cls, null/* filter */, null/* keyOrder */);
 
     }
 
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param cls
+     *            The component type of the backing array.
      * @param filter
      *            Filter to keep elements out of the buffer (optional).
      * @param keyOrder
@@ -88,9 +96,10 @@ public class UnsynchronizedUnboundedChunkBuffer<E> extends
      *            buffer or <code>null</code> iff not known.
      */
     public UnsynchronizedUnboundedChunkBuffer(final int capacity,
+            final Class<? extends E> cls,
             final IElementFilter<E> filter, final IKeyOrder<E> keyOrder) {
 
-        super(capacity, filter);
+        super(capacity, cls, filter);
 
         this.keyOrder = keyOrder;
 

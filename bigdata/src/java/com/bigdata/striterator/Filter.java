@@ -229,7 +229,9 @@ abstract public class Filter<I extends Iterator<E>,E> implements IFilter<I,E,E> 
                 // make it dense.
                 
                 E[] tmp = (E[])java.lang.reflect.Array.newInstance(
-                        chunk[0].getClass(), n);
+//                        chunk[0].getClass(),
+                        chunk.getClass().getComponentType(),//
+                        n);
                 
                 System.arraycopy(chunk, 0, tmp, 0, n);
                 

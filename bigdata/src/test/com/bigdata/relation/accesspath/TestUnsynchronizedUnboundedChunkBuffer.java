@@ -59,7 +59,7 @@ public class TestUnsynchronizedUnboundedChunkBuffer extends TestCase2 {
     public void test_emptyIterator() {
         
         final UnsynchronizedUnboundedChunkBuffer<String> buffer = new UnsynchronizedUnboundedChunkBuffer<String>(
-                3/* chunkCapacity */);
+                3/* chunkCapacity */, String.class);
 
         // the iterator is initially empty.
         assertFalse(buffer.iterator().hasNext());
@@ -73,7 +73,7 @@ public class TestUnsynchronizedUnboundedChunkBuffer extends TestCase2 {
     public void test_bufferFlushedByIterator() {
         
         final UnsynchronizedUnboundedChunkBuffer<String> buffer = new UnsynchronizedUnboundedChunkBuffer<String>(
-                3/* chunkCapacity */);
+                3/* chunkCapacity */, String.class);
         
         buffer.add("a");
         
@@ -87,7 +87,7 @@ public class TestUnsynchronizedUnboundedChunkBuffer extends TestCase2 {
     public void test_snapshotIterator() {
         
         final UnsynchronizedUnboundedChunkBuffer<String> buffer = new UnsynchronizedUnboundedChunkBuffer<String>(
-                3/* chunkCapacity */);
+                3/* chunkCapacity */, String.class);
         
         buffer.add("a");
         buffer.add("b");
@@ -107,7 +107,7 @@ public class TestUnsynchronizedUnboundedChunkBuffer extends TestCase2 {
     public void test_chunkedIterator() {
         
         final UnsynchronizedUnboundedChunkBuffer<String> buffer = new UnsynchronizedUnboundedChunkBuffer<String>(
-                3/* chunkCapacity */);
+                3/* chunkCapacity */, String.class);
         
         buffer.add("a");
         
@@ -126,11 +126,11 @@ public class TestUnsynchronizedUnboundedChunkBuffer extends TestCase2 {
      * Test class of chunks created by the iterator (the array class should be
      * taken from the first visited chunk's class).
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public void test_chunkClass() {
 
-        final UnsynchronizedUnboundedChunkBuffer buffer = new UnsynchronizedUnboundedChunkBuffer(
-                3/* chunkCapacity */);
+        final UnsynchronizedUnboundedChunkBuffer<String> buffer = new UnsynchronizedUnboundedChunkBuffer<String>(
+                3/* chunkCapacity */, String.class);
         
         buffer.add("a");
         
