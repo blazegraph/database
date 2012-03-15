@@ -98,21 +98,35 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: There was a historical compiler problem with this method when
+     * generics were not specified.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/517"> Java
+     *      7 Compatibility </a>
+     */
     public IChunkedOrderedIterator<F> filter(final I src) {
 
         return new ChunkedFilteringIterator<I, E, F>(src, this);
 
     }
     
-    /**
-     * @todo the need for this variant is worrysome - it is required if you do
-     *       NOT specify the generic types and then try to use this class.
-     */
-    public IChunkedOrderedIterator<F> filter(final Iterator src) {
-        
-        return new ChunkedFilteringIterator<I, E, F>((I) src, this);
-        
-    }
+//    /**
+//     * TODO The need for this variant is worrysome - it is required if you do
+//     * NOT specify the generic types and then try to use this class. It is now
+//     * an error with Java 7.  I have taken this variant out.  Hopefully it is
+//     * no longer required by recent Java 6 compilers....
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/517"> Java
+//     *      7 Compatibility </a>
+//     */
+//    public IChunkedOrderedIterator<F> filter(final Iterator src) {
+//        
+//        return new ChunkedFilteringIterator<I, E, F>((I) src, this);
+//        
+//    }
 
     /**
      * Process a chunk of elements, returning another chunk of elements.
