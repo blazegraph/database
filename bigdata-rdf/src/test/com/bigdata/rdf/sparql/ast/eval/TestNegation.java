@@ -322,5 +322,38 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-
+    
+    /**
+     * <pre>
+     * SELECT ?ar
+     * WHERE {
+     *     ?ar a <os:class/AnalysisResults>.
+     *     FILTER NOT EXISTS {
+     *         ?ar <os:prop/analysis/refEntity> <os:elem/loc/Artis>.
+     *     }.
+     *     FILTER NOT EXISTS {
+     *         ?ar <os:prop/analysis/refEntity> <os:elem/loc/Kriterion>.
+     *     }.
+     * }
+     * </pre>
+     * 
+     * This query demonstrated a problem where the anonymous variables created
+     * for the evaluation of "exists" were not being taken into account when
+     * computing the variables to be projected out of a hash join.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
+     *      Query with two "FILTER NOT EXISTS" expressions returns no
+     *      results</a>
+     */
+    public void test_filter_not_exists() throws Exception {
+        new TestHelper(
+                "filter-not-exists", // testURI,
+                "filter-not-exists.rq",// queryFileURL
+                "filter-not-exists.ttl",// dataFileURL
+                "filter-not-exists.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+        }
+    
 }
