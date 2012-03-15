@@ -57,10 +57,9 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 	private static final transient Logger log = Logger.getLogger(DatatypeBOp.class);
 
-
 	public interface Annotations extends BOp.Annotations {
 
-		String NAMESPACE = (DatatypeBOp.class.getName() + ".namespace").intern();
+		String NAMESPACE = DatatypeBOp.class.getName() + ".namespace";
 
     }
 
@@ -101,22 +100,24 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    final BigdataValueFactory vf =
 	    	BigdataValueFactoryImpl.getInstance(namespace);
 
+        @SuppressWarnings("rawtypes")
         final IV iv = get(0).get(bs);
-
-        if (log.isDebugEnabled()) {
-        	log.debug(iv);
-        }
 
         // not yet bound
         if (iv == null)
         	throw new SparqlTypeErrorException();
 
-        if (iv.isInline()&&!iv.isExtension()) {
+        if (log.isDebugEnabled()) {
+            log.debug(iv);
+        }
+
+        if (iv.isInline() && !iv.isExtension()) {
 
 //            final BigdataURI datatype = vf.createURI(iv.getDTE().getDatatype());
             final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
 
-	    	IV datatypeIV = datatype.getIV();
+	    	@SuppressWarnings("rawtypes")
+            IV datatypeIV = datatype.getIV();
 
 	    	if (datatypeIV == null) {
 
@@ -159,7 +160,8 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 			}
 
-	    	IV datatypeIV = datatype.getIV();
+            @SuppressWarnings("rawtypes")
+            IV datatypeIV = datatype.getIV();
 
 	    	if (datatypeIV == null) {
 
