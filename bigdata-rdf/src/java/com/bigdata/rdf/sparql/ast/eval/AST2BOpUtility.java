@@ -1371,14 +1371,17 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *         FILTER which references the anonymous variable which is bound by
      *         the ASK subquery).
      * 
-     *      TODO isAggregate() is probably no longer necessary as we always lift
-     *      an aggregation subquery into a named subquery. Probably turn it into
-     *      an assert instead to verify that an aggregation subquery is not
-     *      being run otherwise.
+     *         TODO isAggregate() is probably no longer necessary as we always
+     *         lift an aggregation subquery into a named subquery. Probably turn
+     *         it into an assert instead to verify that an aggregation subquery
+     *         is not being run otherwise.
      * 
      * @see ASTExistsOptimizer
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
-     *      EXISTS, NOT EXISTS, and MINUS)
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/414">
+     *      SPARQL 1.1 EXISTS, NOT EXISTS, and MINUS </a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
+     *      Query with two "FILTER NOT EXISTS" expressions returns no
+     *      results</a>
      * @see http://www.w3.org/2009/sparql/wiki/Design:Negation
      */
     private static PipelineOp addExistsSubquery(PipelineOp left,
@@ -1447,16 +1450,29 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // Note: also requires lastPass.
         final boolean release = lastPass;
 
-        // The variables projected by the subquery.
-        final IVariable<?>[] projectedVars = subqueryRoot.getProjection()
-                .getProjectionVars();
-
+        /*
+         * Pass all variable bindings along.
+         * 
+         * Note: If we restrict the [select] annotation to only those variables
+         * projected by the subquery, then we will wind up pruning any variables
+         * used in the join group which are NOT projected into the subquery.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
+         */
+//        
+//        // The variables projected by the subquery.
+//        final IVariable<?>[] projectedVars = subqueryRoot.getProjection()
+//                .getProjectionVars();
+//
+        @SuppressWarnings("rawtypes")
+        final IVariable[] selectVars = null;
+        
         // The variable which gets bound if the solutions "exist".
         final IVariable<?> askVar = subqueryRoot.getAskVar();
 
         if (askVar == null)
             throw new UnsupportedOperationException();
-        
+
         if(ctx.nativeHashJoins) {
             left = new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -1469,7 +1485,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-                new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
@@ -1484,7 +1500,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-                new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ); 
@@ -2799,7 +2815,15 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //
 //        }
         
-	    // Pass all variable bindings along.
+        /*
+         * Pass all variable bindings along.
+         * 
+         * Note: If we restrict the [select] annotation to only those variables
+         * projected by the subquery, then we will wind up pruning any variables
+         * used in the join group which are NOT projected into the subquery.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
+         */
         @SuppressWarnings("rawtypes")
         final IVariable[] selectVars = null;
         
