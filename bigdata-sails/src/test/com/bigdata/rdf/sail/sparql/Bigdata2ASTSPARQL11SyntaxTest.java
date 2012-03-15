@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 24, 2011
  */
 
-package com.bigdata.rdf.sail.tck;
+package com.bigdata.rdf.sail.sparql;
 
 import java.util.Properties;
 
@@ -33,6 +33,7 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.parser.sparql.SPARQL11SyntaxTest;
 import org.openrdf.query.parser.sparql.SPARQLSyntaxTest;
 
 import com.bigdata.journal.BufferMode;
@@ -53,7 +54,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
+public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
     /**
      * @param testURI
@@ -61,7 +62,7 @@ public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
      * @param queryFileURL
      * @param positiveTest
      */
-    public Bigdata2ASTSPARQLSyntaxTest(String testURI, String name,
+    public Bigdata2ASTSPARQL11SyntaxTest(String testURI, String name,
             String queryFileURL, boolean positiveTest) {
 
         super(testURI, name, queryFileURL, positiveTest);
@@ -149,10 +150,10 @@ public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
         final Factory factory = new Factory() {
 
             @Override
-            public SPARQLSyntaxTest createSPARQLSyntaxTest(String testURI,
+            public SPARQL11SyntaxTest createSPARQLSyntaxTest(String testURI,
                     String testName, String testAction, boolean positiveTest) {
 
-                return new Bigdata2ASTSPARQLSyntaxTest(testURI, testName, testAction,
+                return new Bigdata2ASTSPARQL11SyntaxTest(testURI, testName, testAction,
                         positiveTest);
                 
             }
@@ -161,7 +162,7 @@ public class Bigdata2ASTSPARQLSyntaxTest extends SPARQLSyntaxTest {
         
         final TestSuite suite = new TestSuite();
 
-        suite.addTest(SPARQLSyntaxTest.suite(factory));
+        suite.addTest(SPARQL11SyntaxTest.suite(factory));
 
         return suite;
 
