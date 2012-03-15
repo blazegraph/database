@@ -72,5 +72,11 @@
 	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.6.3-onejar.jar" sourcepath="/org.openrdf.sesame-2.6.1"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.6.3.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.6.3.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-codec-1.4.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpclient-4.1.3.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpclient-cache-4.1.3.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpcore-4.1.4.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpmime-4.1.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
