@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.striterator;
 
-
 /**
  * An iterator that will visit a single value.
  * 
@@ -41,7 +40,7 @@ public class SingleValueChunkedIterator<E> extends ChunkedArrayIterator<E> {
      * @param e
      *            The value to be visited.
      */
-    public SingleValueChunkedIterator(E e) {
+    public SingleValueChunkedIterator(final E e) {
 
         this(e, null/* keyOrder */);
 
@@ -60,7 +59,7 @@ public class SingleValueChunkedIterator<E> extends ChunkedArrayIterator<E> {
     }
     
     @SuppressWarnings("unchecked")
-    static private <E> E[] alloc(E e) {
+    static private <E> E[] alloc(final E e) {
         
         if (e == null)
             throw new IllegalArgumentException();

@@ -111,11 +111,12 @@ public class InBinaryBOp extends InBOp {
         if (n == 0)
             throw new IllegalArgumentException();
 
-        final IV firstValue = set[0].get();
+//        final IV firstValue = set[0].get();
 
         // allocate an array of the correct type.
-        final IV[] tmp = (IV[]) java.lang.reflect.Array.newInstance(firstValue
-                .getClass(), n);
+        final IV[] tmp = new IV[n]; 
+//                (IV[]) java.lang.reflect.Array.newInstance(
+//                firstValue.getClass(), n);
 
         for (int i = 0; i < n; i++) {
 

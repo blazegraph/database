@@ -252,9 +252,9 @@ public class BOpContext<E> extends BOpContextBase {
          * href="https://sourceforge.net/apps/trac/bigdata/ticket/513"> Expose
          * the LexiconConfiguration to function BOPs </a>
          */
-//        this.source = (ICloseableIterator) new SetContextIterator(this,
-//                (ICloseableIterator) source);
-        this.source = source;
+        this.source = (ICloseableIterator) new SetContextIterator(this,
+                (ICloseableIterator) source);
+//        this.source = source;
         this.sink = sink;
         this.sink2 = sink2; // may be null
     }
@@ -346,21 +346,18 @@ public class BOpContext<E> extends BOpContextBase {
                 
 //            } catch (ArrayStoreException ex) {
 //
-//                /*
-//                 * Note: This could be used to locate array store exceptions arising from a
-//                 * ListBindingSet[] or other concrete array type. Remove once I
-//                 * track down the sources of a non-IBindingSet[]. The problem
-//                 * can of course be worked around by allocating a new
-//                 * IBindingSet[] into which the ContextBindingSets will be
-//                 * copied.
-//                 * 
-//            * Likely causes are users of java.lang.reflect.Array.newInstance().
-//            * 
-//            * AbstractUnsynchronizedArrayBuffer
-//            * BlockingBuffer
-//            * UnsynchronizedUnboundedChunkBuffer
-//            * WrappedRemoteChunkedIterator
-//                 */
+//            /*
+//             * Note: This could be used to locate array store exceptions arising
+//             * from a ListBindingSet[] or other concrete array type. Remove once
+//             * I track down the sources of a non-IBindingSet[]. The problem can
+//             * of course be worked around by allocating a new IBindingSet[] into
+//             * which the ContextBindingSets will be copied.
+//             * 
+//             * Likely causes are users of java.lang.reflect.Array.newInstance().
+//             * Whenever possible, code should either an explicit component type
+//             * for dynamically allocated arrays or use the component type of the
+//             * source array (when there is one).
+//             */
 //                throw new RuntimeException("cur[" + nxt.length + "]=" + nxt
 //                        + ", src=" + src, ex);
 //

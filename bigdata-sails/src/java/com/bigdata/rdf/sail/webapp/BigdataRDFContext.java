@@ -94,6 +94,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     protected static final String ANALYTIC = "analytic";
     
+    /**
+     * URL Query parameter used to specify a URI in the default graph.
+     */
+    protected static final String DEFAULT_GRAPH_URI = "default-graph-uri";
+
+    /**
+     * URL Query parameter used to specify a URI in the set of named graphs.
+     */
+    protected static final String NAMED_GRAPH_URI = "named-graph-uri";
+    
 	private final SparqlEndpointConfig m_config;
 
     /**
@@ -459,10 +469,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected void overrideDataset(final AbstractQuery query) {
             
             final String[] defaultGraphURIs = req
-                    .getParameterValues("default-graph-uri");
+                    .getParameterValues(DEFAULT_GRAPH_URI);
 
             final String[] namedGraphURIs = req
-                    .getParameterValues("named-graph-uri");
+                    .getParameterValues(NAMED_GRAPH_URI);
 
             if (defaultGraphURIs != null || namedGraphURIs != null) {
 

@@ -686,7 +686,7 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
         final IElementFilter<ISolution> filter = getSolutionFilter();
         
         return new UnsynchronizedArrayBuffer<ISolution>(targetBuffer,
-                chunkCapacity, filter);
+                chunkCapacity, ISolution.class, filter);
         
     }
     

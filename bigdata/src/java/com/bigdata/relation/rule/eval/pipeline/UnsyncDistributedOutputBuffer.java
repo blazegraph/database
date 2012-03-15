@@ -46,7 +46,7 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
     public UnsyncDistributedOutputBuffer(final AbstractScaleOutFederation<?> fed,
             final DistributedJoinTask joinTask, final int capacity) {
 
-        super(capacity);
+        super(capacity, (Class<? extends E>) IBindingSet.class);
 
         if (fed == null)
             throw new IllegalArgumentException();

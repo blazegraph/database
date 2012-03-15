@@ -144,7 +144,7 @@ public class JoinTaskSink {
          * JoinTask.
          */
         this.unsyncBuffer = new UnsynchronizedArrayBuffer<IBindingSet>(
-                blockingBuffer, joinNexus.getChunkCapacity());
+                blockingBuffer, IBindingSet.class, joinNexus.getChunkCapacity());
 
         /*
          * Note: The caller MUST create the task using a factory pattern on

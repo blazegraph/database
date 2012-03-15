@@ -307,7 +307,7 @@ public class SliceOp extends PipelineOp {
              * not buffer more than min(#source,#needed).
              */
             final UnsynchronizedArrayBuffer<IBindingSet> out = new UnsynchronizedArrayBuffer<IBindingSet>(
-                    sink, op.getChunkCapacity());
+                    sink, IBindingSet.class, op.getChunkCapacity());
 
             while (source.hasNext()) {
 

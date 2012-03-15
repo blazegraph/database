@@ -245,7 +245,9 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
                 // make it dense.
 
                 final E[] tmp = (E[]) java.lang.reflect.Array.newInstance(
-                        chunk[0].getClass(), n);
+//                        chunk[0].getClass(),
+                        chunk.getClass().getComponentType(),//
+                        n);
                 
                 System.arraycopy(chunk, 0, tmp, 0, n);
                 
