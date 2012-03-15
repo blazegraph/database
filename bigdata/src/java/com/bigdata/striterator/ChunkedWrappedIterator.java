@@ -59,7 +59,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     private final Iterator<E> realSource;
 
     /**
-     * If {@link #filter} is non-<code>null</code> then this is an iterator
+     * If a filter was specified to the constructor, then this is an iterator
      * that filters the {@link #realSource}.
      */
     private final Iterator<E> src;
