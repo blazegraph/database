@@ -252,9 +252,9 @@ public class BOpContext<E> extends BOpContextBase {
          * href="https://sourceforge.net/apps/trac/bigdata/ticket/513"> Expose
          * the LexiconConfiguration to function BOPs </a>
          */
-        this.source = (ICloseableIterator) new SetContextIterator(this,
-                (ICloseableIterator) source);
-//        this.source = source;
+//        this.source = (ICloseableIterator) new SetContextIterator(this,
+//                (ICloseableIterator) source);
+        this.source = source;
         this.sink = sink;
         this.sink2 = sink2; // may be null
     }
