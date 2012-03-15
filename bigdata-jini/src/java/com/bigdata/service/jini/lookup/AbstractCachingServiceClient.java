@@ -386,9 +386,6 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     /**
      * Handles a cache miss by a remote query on the managed set of service
      * registrars.
-     * 
-     * @param filter
-     *            The specific filter to be applied.
      */
     final private ServiceItem handleCacheMiss(final ServiceID serviceId) {
 
