@@ -27,9 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+
 /**
- * Test suite for tickets filed at <href
- * a="http://sourceforge.net/apps/trac/bigdata/ticket/384">trak</a>.
+ * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
+ * trac </a>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
