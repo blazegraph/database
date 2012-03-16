@@ -109,6 +109,11 @@ public class RESTServlet extends BigdataRDFServlet {
             // DELETE via POST w/ Body.
             m_deleteServlet.doPost(req, resp);
             
+        } else if (req.getParameter("update") != null) {
+            
+            // UPDATE via POST w/ Multi-part Body.
+            m_updateServlet.doPost(req, resp);
+            
         } else if (req.getParameter("query") != null) {
 
             // QUERY via POST
