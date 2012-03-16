@@ -81,6 +81,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
+import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
@@ -3654,6 +3655,20 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
             }
 
+            return ve1;
+
+        } catch (ContextNotAvailableException ex) {
+            
+            /*
+             * The value expression could not be evaluated because it could not
+             * resolve the ILexiconConfiguration from the EmptyBindingSet.
+             * 
+             * TODO This is thrown during query optimization since the necessary
+             * context is not available at that point. That should be fixed, but
+             * it is a static method invocation so we would have to touch a lot
+             * of code.
+             */
+        
             return ve1;
 
         } catch (SparqlTypeErrorException ex) {
