@@ -69,9 +69,7 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * 
      * @return The RDF {@link Value}
      */
-//    * @param vf
-//    *            the bigdata value factory
-    V asValue(final LiteralExtensionIV<?> iv);//, final BigdataValueFactory vf);
+    V asValue(final LiteralExtensionIV<?> iv);
 
     /**
      * Return the {@link Value} for that {@link IV} iff the {@link IV} is

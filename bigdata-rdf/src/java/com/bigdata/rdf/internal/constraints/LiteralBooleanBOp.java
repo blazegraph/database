@@ -48,15 +48,8 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression
 
     private static final long serialVersionUID = 6222270137598546840L;
     
-    static final transient Logger log = Logger.getLogger(LiteralBooleanBOp.class);
-
-//    private transient volatile BigdataValueFactory vf;
-//    
-//    public interface Annotations extends BOp.Annotations {
-//
-//        String NAMESPACE = LiteralBooleanBOp.class.getName() + ".namespace";
-//        
-//    }
+    static private final transient Logger log = Logger
+            .getLogger(LiteralBooleanBOp.class);
 
     public LiteralBooleanBOp(final BOp[] args, final Map<String, Object> anns) {
 
@@ -71,7 +64,7 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression
     }
 
     @Override
-    public boolean accept(final IBindingSet bs) {
+    protected boolean accept(final IBindingSet bs) {
 
         @SuppressWarnings("rawtypes")
         final IV iv = get(0).get(bs);
@@ -83,23 +76,6 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression
         // not yet bound
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-
-//        if (vf == null) {
-//
-//            synchronized (this) {
-//            
-//                if (vf == null) {
-//                
-//                    final String namespace = getNamespace();
-//
-//                    // use to create my simple literals
-//                    vf = BigdataValueFactoryImpl.getInstance(namespace);
-//
-//                }
-// 
-//            }
-//            
-//        }
 
         if(!iv.isLiteral())
             throw new SparqlTypeErrorException();

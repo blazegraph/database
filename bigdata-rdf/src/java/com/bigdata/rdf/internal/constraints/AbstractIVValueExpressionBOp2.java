@@ -29,6 +29,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.AbstractAccessPathOp;
@@ -39,6 +40,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -46,6 +48,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Class introduced when adding the ability to resolve the
@@ -70,7 +73,7 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
         /**
          * The namespace of the lexicon.
          */
-        public String NAMESPACE = AbstractLiteralBOp.class.getName()
+        public String NAMESPACE = AbstractIVValueExpressionBOp2.class.getName()
                 + ".namespace";
         
     }
@@ -112,6 +115,11 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
         
     }
     
+    /**
+     * Return the {@link BigdataValueFactory} for the {@link LexiconRelation}.
+     * <p>
+     * Note: This is lazily resolved and then cached.
+     */
     protected BigdataValueFactory getValueFactory() {
 
         if (vf == null) {
@@ -134,6 +142,9 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
         
     }
 
+    /**
+     * Return the namespace of the {@link LexiconRelation}.
+     */
     protected String getNamespace() {
         
         return (String) getRequiredProperty(Annotations.NAMESPACE);
@@ -146,8 +157,8 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
      * <p>
      * Note: It is more expensive to obtain the {@link ILexiconConfiguration}
      * than the {@link BigdataValueFactory} because we have to resolve the
-     * {@link LexiconRelation} view. However, this happens once per bop in a
-     * query per node, so the cost is amortized.
+     * {@link LexiconRelation} view. However, this happens once per function bop
+     * in a query per node, so the cost is amortized.
      * 
      * @param bset
      *            A binding set flowing through this operator.
@@ -216,15 +227,29 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
         
     }
 
+    /**
+     * Return the {@link BigdataLiteral} for the {@link IV}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return The {@link BigdataLiteral}.
+     * 
+     * @throws NotMaterializedException
+     *             if the {@link IVCache} is not set and the {@link IV} can not
+     *             be turned into a {@link Literal} without an index read.
+     */
+    @SuppressWarnings("rawtypes")
     final protected BigdataLiteral literalValue(final IV iv) {
+
+        final BigdataValueFactory vf = getValueFactory();
 
         if (iv.isInline() && !iv.isExtension()) {
 
-            final BigdataURI datatype = getValueFactory().asValue(
-                    iv.getDTE().getDatatypeURI());
+            final BigdataURI datatype = vf
+                    .asValue(iv.getDTE().getDatatypeURI());
 
-            return getValueFactory().createLiteral(((Value) iv).stringValue(),
-                    datatype);
+            return vf.createLiteral(((Value) iv).stringValue(), datatype);
 
         } else if (iv.hasValue()) {
 
@@ -238,30 +263,79 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
 
     }
 
-//  protected BigdataLiteral literalValue(final IV iv) {
-//
-//      if (iv.isInline()) {
-//
-//          final BigdataValueFactory vf = getValueFactory();
-//          
-//          final BigdataURI datatype = vf
-//                  .asValue(iv.getDTE().getDatatypeURI());
-//
-//          return vf.createLiteral(((Value) iv).stringValue(), datatype);
-//
-//      } else if (iv.hasValue()) {
-//
-//          return ((BigdataLiteral) iv.getValue());
-//
-//      } else {
-//
-//          throw new NotMaterializedException();
-//
-//      }
-//
-//  }
+    /**
+     * Return an {@link IV} for the {@link Value}.
+     * 
+     * @param value
+     *            The {@link Value}.
+     * @param bsetIsIgnored
+     *            The bindings on the solution are ignored, but the reference is
+     *            used to obtain the {@link ILexiconConfiguration}.
+     *            
+     * @return An {@link IV} for that {@link Value}.
+     */
+    final protected IV asValue(final Value value,
+            final IBindingSet bsetIsIgnored) {
 
-    final protected static String literalLabel(final IV iv) {
+        /*
+         * Convert to a BigdataValue if not already one.
+         * 
+         * If it is a BigdataValue, then make sure that it is associated with
+         * the namespace for the lexicon relation.
+         */
+        
+        final BigdataValue v = getValueFactory().asValue(value);
+
+        @SuppressWarnings("rawtypes")
+        IV iv = null;
+
+        // See if the IV is already set. 
+        iv = v.getIV();
+
+        if (iv == null) {
+
+            // Resolve the lexicon configuration.
+            final ILexiconConfiguration<BigdataValue> lexConf = getLexiconConfiguration(bsetIsIgnored);
+
+            // Obtain an Inline IV iff possible.
+            iv = lexConf.createInlineIV(v);
+
+        }
+        
+        if (iv == null) {
+
+            /*
+             * Since we can not represent this using an Inline IV, we will stamp
+             * a mock IV for the value.
+             */
+
+            iv = DummyConstantNode.toDummyIV(v);
+
+        }
+
+        return iv;
+
+    }
+    
+    /**
+     * Return the {@link String} label for the {@link IV}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return {@link Literal#getLabel()} for that {@link IV}.
+     * 
+     * @throws NullPointerException
+     *             if the argument is <code>null</code>.
+     *             
+     * @throws NotMaterializedException
+     *             if the {@link IVCache} is not set and the {@link IV} must be
+     *             materialized before it can be converted into an RDF
+     *             {@link Value}.
+     */
+    @SuppressWarnings("rawtypes")
+    final protected static String literalLabel(final IV iv)
+            throws NotMaterializedException {
 
         if (iv.isInline() && !iv.isInline()) {
 
