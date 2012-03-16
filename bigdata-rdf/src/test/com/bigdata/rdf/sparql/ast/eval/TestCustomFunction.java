@@ -41,13 +41,12 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
-import com.bigdata.rdf.internal.constraints.AbstractIVValueExpressionBOp2.Annotations;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 
 /**
  * Test suite for registering and evaluating custom functions.
@@ -127,23 +126,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
         final URI myFunctionUri = new URIImpl(
                 "http://www.bigdata.com/myFunction2");
         
-        final FunctionRegistry.Factory myFactory = new FunctionRegistry.Factory() {
-
-            @Override
-            public IValueExpression<? extends IV> create(String lex,
-                    Map<String, Object> scalarValues,
-                    ValueExpressionNode... args) {
-                
-                FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
-
-                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                        lex, args[0]);
-
-                return new MyFilterBOp(ve, lex);
-
-            }
-
-        };
+        final FunctionRegistry.Factory myFactory = new MyFilterFactory();
 
         FunctionRegistry.add(myFunctionUri, myFactory);
         
@@ -157,6 +140,52 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             
         }
                 
+    }
+    
+    /**
+     * Factory for {@link MyFunctionBOp}.
+     */
+    private static class MyFunctionFactory implements FunctionRegistry.Factory {
+
+        @Override
+        public IValueExpression<? extends IV> create(String lex,
+                Map<String, Object> scalarValues,
+                ValueExpressionNode... args) {
+
+            FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
+
+            final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
+                    lex, args[0]);
+
+            return new MyFunctionBOp(ve, lex);
+
+        }
+
+    }
+
+    /**
+     * This is a variant of {@link #test_custom_function_1()} where the function
+     * is evaluated against a constant.
+     */
+    public void test_custom_function_3() throws Exception {
+
+        final URI myFunctionUri = new URIImpl(
+                "http://www.bigdata.com/myFunction");
+        
+        final FunctionRegistry.Factory myFactory = new MyFunctionFactory();
+
+        FunctionRegistry.add(myFunctionUri, myFactory);
+        
+        try {
+
+            new TestHelper("custom-function-3").runTest();
+            
+        } finally {
+
+            FunctionRegistry.remove(myFunctionUri);
+            
+        }
+
     }
 
     /**
@@ -220,7 +249,28 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
 
         }
 
-    };
+    }
+
+    /**
+     * Factory for {@link MyFilterBOp}.
+     */
+    private static class MyFilterFactory implements FunctionRegistry.Factory {
+
+        @Override
+        public IValueExpression<? extends IV> create(String lex,
+                Map<String, Object> scalarValues,
+                ValueExpressionNode... args) {
+            
+            FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
+
+            final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
+                    lex, args[0]);
+
+            return new MyFilterBOp(ve, lex);
+
+        }
+
+    }
 
     /**
      * Simple boolean function returns <code>true</code> iff the argument is
@@ -288,6 +338,6 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             
         }
 
-    };
+    }
 
 }

@@ -38,6 +38,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
@@ -163,6 +164,9 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
      * @param bset
      *            A binding set flowing through this operator.
      * 
+     * @throws ContextNotAvailableException
+     *             if the context was not accessible on the solution.
+     * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
      *      Expose the LexiconConfiguration to function BOPs </a>
      * 
@@ -195,8 +199,7 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
                          * received at a node on a cluster.
                          */
 
-                        throw new UnsupportedOperationException(
-                                "Context is not available.");
+                        throw new ContextNotAvailableException();
 
                     }
 
@@ -235,6 +238,10 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
      * 
      * @return The {@link BigdataLiteral}.
      * 
+     * @throws SparqlTypeErrorException
+     *             if the argument is <code>null</code>.
+     * @throws SparqlTypeErrorException
+     *             if the argument does not represent a {@link Literal}.
      * @throws NotMaterializedException
      *             if the {@link IVCache} is not set and the {@link IV} can not
      *             be turned into a {@link Literal} without an index read.
@@ -242,6 +249,12 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
     @SuppressWarnings("rawtypes")
     final protected BigdataLiteral literalValue(final IV iv) {
 
+        if (iv == null)
+            throw new SparqlTypeErrorException();
+
+        if (!iv.isLiteral())
+            throw new SparqlTypeErrorException();
+        
         final BigdataValueFactory vf = getValueFactory();
 
         if (iv.isInline() && !iv.isExtension()) {
@@ -297,7 +310,7 @@ abstract public class AbstractIVValueExpressionBOp2<V extends IV> extends
             // Resolve the lexicon configuration.
             final ILexiconConfiguration<BigdataValue> lexConf = getLexiconConfiguration(bsetIsIgnored);
 
-            // Obtain an Inline IV iff possible.
+            // Obtain an inline IV iff possible.
             iv = lexConf.createInlineIV(v);
 
         }

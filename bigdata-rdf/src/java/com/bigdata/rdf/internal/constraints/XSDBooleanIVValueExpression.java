@@ -77,6 +77,9 @@ public abstract class XSDBooleanIVValueExpression extends
         
     }
 
+    /**
+     * Delegates to {@link #accept(IBindingSet)}.
+     */
     @SuppressWarnings("rawtypes")
     @Override
     final public XSDBooleanIV get(final IBindingSet bs) {
@@ -85,6 +88,13 @@ public abstract class XSDBooleanIVValueExpression extends
         
     }
     
+    /**
+     * Implement this method.
+     * 
+     * @param bs
+     *            The source solution.
+     * @return <code>true</code> iff the function accepts the solution.
+     */
     protected abstract boolean accept(final IBindingSet bs);
 
 }
