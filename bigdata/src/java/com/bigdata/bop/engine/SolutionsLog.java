@@ -195,7 +195,10 @@ public class SolutionsLog {
 
         for (IBindingSet bset : a) {
 
-            sb.append(bset.toString());
+            if (bset == null)
+                sb.append("NA");
+            else
+                sb.append(bset.toString());
 
             sb.append('\n');
 

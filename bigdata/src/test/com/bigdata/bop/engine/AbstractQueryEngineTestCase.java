@@ -436,51 +436,7 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
         }
     
     }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single,
-     * empty {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    static public ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-    
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-    
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSets
-     *            the binding sets.
-     */
-    static public ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[] bindingSets) {
-    
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bindingSets });
-    
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSetChunks
-     *            the chunks of binding sets.
-     */
-    static public ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[][] bindingSetChunks) {
-    
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
-    
-    }
-
+   
     /**
      * Throw an exception for the first operator having a ground difference
      * (different Class, different arity, or different annotation). When both

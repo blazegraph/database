@@ -70,9 +70,6 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 
 	/**
 	 * Interface declaring well known annotations.
-	 * 
-	 * FIXME All of these annotations should be in the {@link IPredicate}
-	 * namespace.
 	 */
     public interface Annotations extends BOp.Annotations, BufferAnnotations {
 
