@@ -54,6 +54,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -78,6 +79,8 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
     protected AbstractTripleStore store = null;
 
+    protected BigdataValueFactory valueFactory = null;
+
     protected String baseURI = null;
 
     protected void setUp() throws Exception {
@@ -85,6 +88,8 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         super.setUp();
         
         store = getStore(getProperties());
+        
+        valueFactory = store.getValueFactory();
         
         /*
          * Note: This needs to be an absolute URI.
@@ -103,6 +108,8 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
             store = null;
         
         }
+
+        valueFactory = null;
         
         baseURI = null;
         
