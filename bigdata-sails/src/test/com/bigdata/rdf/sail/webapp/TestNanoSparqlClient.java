@@ -1559,6 +1559,130 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
     }
 
+    /**
+     * Unit test where the "query" used to delete triples from the database
+     * consists solely of a CONSTRUCT "template" without a WHERE clause (the
+     * WHERE clause is basically optional as all elements of it are optional).
+     * This time with quads.
+     * 
+     * @throws Exception
+     */
+    public void test_PUT_UPDATE_WITH_CONSTRUCT_QUADS_MULTIPART() throws Exception {
+
+    	if (testMode != TestMode.quads)
+    		return;
+    	
+        setupQuadsDataOnServer();
+
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        
+        assertEquals(18, countAll());
+        
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+        final URI c1 = new URIImpl(BD.NAMESPACE + "c1");
+        final URI c2 = new URIImpl(BD.NAMESPACE + "c2");
+        final URI c3 = new URIImpl(BD.NAMESPACE + "c3");
+        final Literal label1 = new LiteralImpl("Mike");
+        final Literal label2 = new LiteralImpl("Bryan");
+
+        // The format used to PUT the data.
+        final RDFFormat format = RDFFormat.TRIG;
+        
+//        /*
+//         * This is the query that we will use to delete some triples from the
+//         * database.
+//         */
+//        final String deleteQueryStr =//
+//            "prefix bd: <"+BD.NAMESPACE+"> " +//
+//            "CONSTRUCT { graph bd:c2 { bd:Bryan bd:likes bd:RDFS } }" +//
+//            "{ }";
+        
+        final Graph delete = new GraphImpl();
+        {
+        	delete.add(new ContextStatementImpl(bryan, likes, rdfs, c2));
+        }
+
+        /*
+         * Setup the document containing the statement to be inserted by the
+         * UPDATE operation.
+         */
+        final Graph add = new GraphImpl();
+        {
+            // The new data.
+            add.add(new ContextStatementImpl(bryan, likes, rdf, c2));
+        }
+
+        /*
+         * Now, run the UPDATE operation.
+         */
+        {
+            final RemoveOp removeOp = new RemoveOp(delete);
+            final AddOp addOp = new AddOp(add);
+            assertEquals(2, repo.update(removeOp, addOp));
+        }
+        
+        /*
+         * Now verify the post-condition state.
+         */
+        {
+
+            /*
+             * This query verifies that we removed the right triple (nobody is
+             * left who likes 'rdfs').
+             */
+            {
+
+                final String queryStr2 = //
+                    "prefix bd: <" + BD.NAMESPACE + "> " + //
+                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
+                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
+                    "CONSTRUCT { ?x bd:likes bd:RDFS }" + //
+                    "from <" + c2 + "> " +
+                    "WHERE { " + //
+//                    "  ?x rdf:type bd:Person . " + //
+                    "  ?x bd:likes bd:RDFS " + // NB: Checks the kb!
+                    "}";
+
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
+            }
+
+            /* This query verifies that we added the right triple (two people
+             * now like 'rdf').
+             */
+            {
+
+                final String queryStr2 = //
+                    "prefix bd: <" + BD.NAMESPACE + "> " + //
+                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
+                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
+                    "CONSTRUCT { ?x bd:likes bd:RDF }" + //
+                    "WHERE { " + //
+//                    "  ?x rdf:type bd:Person . " + //
+                    "  ?x bd:likes bd:RDF " + //
+                    "}";
+                
+                // The expected results.
+                final Graph expected = new GraphImpl();
+
+                expected.add(new StatementImpl(mike, likes, rdf));
+                expected.add(new StatementImpl(bryan, likes, rdf));
+
+                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
+
+            }
+
+        }
+
+    }
+
 //    /**
 //     * Unit test for ACID UPDATE using PUT. This test is for the operation where
 //     * the request body is a multi-part MIME document conveying both the

@@ -3,16 +3,22 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedOutputStream;
+import java.util.List;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
@@ -279,5 +285,240 @@ public class UpdateServlet extends BigdataRDFServlet {
         }
 
     }
+    
+    @Override
+    protected void doPost(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+    	if (ServletFileUpload.isMultipartContent(req)) {
+    		
+    		doUpdateWithBody(req, resp);
+    		
+        } else {
+
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+        }
+
+    }
+
+    /**
+     * UPDATE request with a request body containing the statements to be
+     * removed and added as a multi-part mime request.
+     */
+    private void doUpdateWithBody(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final long begin = System.currentTimeMillis();
+
+        final DiskFileItemFactory factory = new DiskFileItemFactory();
+        
+        final ServletFileUpload upload = new ServletFileUpload(factory);
+        
+        FileItem add = null, remove = null;
+        
+        try {
+        
+        	List<FileItem> items = upload.parseRequest(req);
+        	
+        	for (FileItem item : items) {
+        	
+        		if (item.getFieldName().equals("add")) {
+        			
+        			if (!validateItem(resp, add=item)) {
+        				return;
+        			}
+        			
+        		} else if (item.getFieldName().equals("remove")) {
+
+        			if (!validateItem(resp, remove=item)) {
+        				return;
+        			}
+        			
+        		}
+        		
+        	}
+        	
+        } catch (FileUploadException ex) {
+        	
+        	throw new IOException(ex);
+        	
+        }
+        
+        final String baseURI = req.getRequestURL().toString();
+     
+        /*
+         * Allow the caller to specify the default context.
+         */
+        final Resource defaultContext;
+        {
+            final String s = req.getParameter("context-uri");
+            if (s != null) {
+                try {
+                    defaultContext = new URIImpl(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+                defaultContext = null;
+            }
+        }
+
+        final String namespace = getNamespace(req);
+
+        final AtomicLong nmodified = new AtomicLong(0L);
+
+        try {
+        
+		    BigdataSailRepositoryConnection conn = null;
+		    try {
+		
+		        conn = getBigdataRDFContext()
+		                .getUnisolatedConnection(namespace);
+		
+		        if (remove != null) {
+		        	
+		        	final String contentType = remove.getContentType();
+		        	
+		        	final InputStream is = remove.getInputStream();
+		        	
+		        	final RDFHandler handler = new RemoveStatementHandler(
+		        			conn.getSailConnection(), nmodified);
+		        	
+		        	processData(conn, contentType, is, handler, baseURI);
+		        	
+		        }
+		        
+		        if (add != null) {
+		        	
+		        	final String contentType = add.getContentType();
+		        	
+		        	final InputStream is = add.getInputStream();
+		        	
+		        	final RDFHandler handler = new AddStatementHandler(
+		        			conn.getSailConnection(), nmodified, defaultContext);
+		        	
+		        	processData(conn, contentType, is, handler, baseURI);
+		        	
+		        }
+		        
+		        conn.commit();
+
+		        final long elapsed = System.currentTimeMillis() - begin;
+		        
+                reportModifiedCount(resp, nmodified.get(), elapsed);
+		        
+		    } catch (Throwable t) {
+		    	
+		    	if (conn != null)
+		    		conn.rollback();
+		    	
+		    	throw new RuntimeException(t);
+		    	
+		    } finally {
+		    	
+		        if (conn != null)
+		            conn.close();
+		        
+		    }
+
+        } catch (Exception ex) {
+        	
+            // Will be rendered as an INTERNAL_ERROR.
+        	throw new RuntimeException();
+        	
+        }
+        
+    }
+        
+    private void processData(final BigdataSailRepositoryConnection conn, 
+    		final String contentType, 
+    		final InputStream is, 
+    		final RDFHandler handler,
+    		final String baseURI) 
+    			throws Exception {
+    
+	    final RDFFormat format = RDFFormat.forMIMEType(contentType);
+		
+        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                .getInstance().get(format);
+
+        final RDFParser rdfParser = rdfParserFactory.getParser();
+
+        rdfParser.setValueFactory(conn.getTripleStore()
+                .getValueFactory());
+
+        rdfParser.setVerifyData(true);
+
+        rdfParser.setStopAtFirstError(true);
+
+        rdfParser
+                .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+        rdfParser.setRDFHandler(handler);
+
+        /*
+         * Run the parser, which will cause statements to be deleted.
+         */
+        rdfParser.parse(is, baseURI);
+
+    }
+    
+
+	private boolean validateItem(
+			final HttpServletResponse resp, final FileItem item) 
+				throws IOException {
+		
+		final String contentType = item.getContentType();
+		
+	    if (contentType == null) {
+	    	
+	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	                "Content-Type not specified");
+	
+	        return false;
+	        
+	    }
+	
+	    final RDFFormat format = RDFFormat.forMIMEType(contentType);
+	
+	    if (format == null) {
+	
+	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	                "Content-Type not recognized as RDF: " + contentType);
+	
+	        return false;
+	
+	    }
+	    
+        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+		        .getInstance().get(format);
+		
+		if (rdfParserFactory == null) {
+		
+		    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+		            "Parser factory not found: Content-Type=" + contentType
+		                    + ", format=" + format);
+		
+		    return false;
+		
+		}
+
+	    if (item.getInputStream() == null) {
+	    	
+	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	                "No content");
+	
+	    	return false;
+	    	
+	    }
+	    
+	    return true;
+		
+	}	
+
+
 
 }

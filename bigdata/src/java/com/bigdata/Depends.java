@@ -158,6 +158,12 @@ public class Depends {
     private final static Dep apacheCommonsCodec = new ApacheDep(
             "commons-codec", "http://commons.apache.org/codec/");
 
+    private final static Dep apacheCommonsFileUpload = new ApacheDep(
+            "commons-fileupload", "http://commons.apache.org/fileupload/");
+
+    private final static Dep apacheCommonsIO = new ApacheDep(
+            "commons-io", "http://commons.apache.org/io/");
+
     private final static Dep apacheCommonsLogging = new ApacheDep(
             "commons-logging", "http://commons.apache.org/logging/");
 
@@ -263,6 +269,8 @@ public class Depends {
             fastutil,//
             highScaleLib,//
             apacheCommonsCodec,
+            apacheCommonsFileUpload,
+            apacheCommonsIO,
             apacheCommonsLogging,
             apacheHttpClient,
             apacheHttpClientCache,

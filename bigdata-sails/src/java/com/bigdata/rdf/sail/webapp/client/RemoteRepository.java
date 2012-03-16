@@ -9,7 +9,6 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,9 +20,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -31,6 +28,9 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.mime.FormBodyPart;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
@@ -218,8 +218,19 @@ public class RemoteRepository {
 		
         final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
         
-        opts.method = "POST";
+    	opts.method = "POST";
         
+        add.prepareForWire();
+        
+        if (add.format != null) {
+        	
+            final ByteArrayEntity entity = new ByteArrayEntity(add.data);
+            entity.setContentType(add.format.getDefaultMIMEType());
+            
+            opts.entity = entity;
+            
+        }
+        	
         if (add.uri != null) {
 	        // set the resource to load.
 	        opts.addRequestParam("uri", add.uri);
@@ -228,30 +239,6 @@ public class RemoteRepository {
         if (add.context != null) {
 	        // set the default context.
 	        opts.addRequestParam("context-uri", add.context);
-        }
-        
-        if (add.format != null) {
-        	// set the content type
-        	opts.contentType = add.format.getDefaultMIMEType();
-        }
-        
-        if (add.data != null) {
-        	// set the data
-        	opts.data = add.data;
-        }
-        
-        if (add.file != null) {
-        	// set the data
-        	opts.data = IOUtil.readBytes(add.file);
-        }
-        
-        if (add.stmts != null) {
-        	
-        	// set the data and content type (TRIG by default)
-        	final RDFFormat format = RDFFormat.TRIG;
-		    opts.contentType = add.format.getDefaultMIMEType();
-		    opts.data = serialize(add.stmts, format);
-
         }
         
         HttpResponse response = null;
@@ -281,61 +268,43 @@ public class RemoteRepository {
 	public long remove(RemoveOp remove) throws Exception {
 		
         final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
+
+        remove.prepareForWire();
         
-        if (remove.format == null && remove.stmts == null) {
-        	
-            opts.method = "DELETE";
-            
-        } else {
+        if (remove.format != null) {
         	
         	opts.method = "POST";
         	opts.addRequestParam("delete");
         	
-        }
-        
-        if (remove.query != null) {
-	        // set the resource to load.
-	        opts.addRequestParam("query", remove.query);
-        }
-        
-        if (remove.s != null) {
-        	opts.addRequestParam("s", EncodeDecodeValue.encodeValue(remove.s));
-        }
-        
-        if (remove.p != null) {
-        	opts.addRequestParam("p", EncodeDecodeValue.encodeValue(remove.p));
-        }
-        
-        if (remove.o != null) {
-        	opts.addRequestParam("o", EncodeDecodeValue.encodeValue(remove.o));
-        }
-        
-        if (remove.c != null) {
-        	opts.addRequestParam("c", EncodeDecodeValue.encodeValue(remove.c));
-        }
-        
-        if (remove.format != null) {
-        	// set the content type
-        	opts.contentType = remove.format.getDefaultMIMEType();
-        }
-        
-        if (remove.data != null) {
-        	// set the data
-        	opts.data = remove.data;
-        }
-        
-        if (remove.file != null) {
-        	// set the data
-        	opts.data = IOUtil.readBytes(remove.file);
-        }
-        
-        if (remove.stmts != null) {
+            final ByteArrayEntity entity = new ByteArrayEntity(remove.data);
+            entity.setContentType(remove.format.getDefaultMIMEType());
+            
+            opts.entity = entity;
+            
+        } else {
         	
-        	// set the data and content type (TRIG by default)
-        	final RDFFormat format = RDFFormat.TRIG;
-		    opts.contentType = remove.format.getDefaultMIMEType();
-		    opts.data = serialize(remove.stmts, format);
-
+            opts.method = "DELETE";
+            
+            if (remove.query != null) {
+    	        opts.addRequestParam("query", remove.query);
+            }
+            
+            if (remove.s != null) {
+            	opts.addRequestParam("s", EncodeDecodeValue.encodeValue(remove.s));
+            }
+            
+            if (remove.p != null) {
+            	opts.addRequestParam("p", EncodeDecodeValue.encodeValue(remove.p));
+            }
+            
+            if (remove.o != null) {
+            	opts.addRequestParam("o", EncodeDecodeValue.encodeValue(remove.o));
+            }
+            
+            if (remove.c != null) {
+            	opts.addRequestParam("c", EncodeDecodeValue.encodeValue(remove.c));
+            }
+            
         }
         
         HttpResponse response = null;
@@ -378,66 +347,43 @@ public class RemoteRepository {
 		
         final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
         
-        opts.method = "PUT";
+        remove.prepareForWire();
+        add.prepareForWire();
         
-        if (remove.query != null) {
-	        // set the resource to load.
+        if (remove.format != null) {
+        	
+        	opts.method = "POST";
+        	opts.addRequestParam("update");
+
+        	final MultipartEntity entity = new MultipartEntity();
+        	entity.addPart(new FormBodyPart("remove", 
+        			new ByteArrayBody(
+        					remove.data, 
+        					remove.format.getDefaultMIMEType(), 
+        					"remove")));
+        	entity.addPart(new FormBodyPart("add", 
+        			new ByteArrayBody(
+        					add.data, 
+        					add.format.getDefaultMIMEType(), 
+        					"add")));
+        	
+        	opts.entity = entity;
+        	
+        } else {
+        	
+            opts.method = "PUT";
 	        opts.addRequestParam("query", remove.query);
-        }
-        
-        if (remove.stmts != null || remove.format != null) {
-        	
-        	/*
-        	 * Need to implement reverse serialization from statements into a 
-        	 * construct query string like this:
-        	 * 
-        	 * prefix bd: <http://bigdata.com/rdf#>
-             * construct { bd:Mike bd:likes bd:RDF } {}
-             * 
-        	 */
-        	throw new UnsupportedOperationException();
-        	
-        }
-        
-        if (remove.s != null || remove.p != null || remove.o != null || remove.c != null) {
-        	
-        	throw new UnsupportedOperationException();
-        	
-        }
-        
-        if (add.uri != null) {
-        	
-        	throw new UnsupportedOperationException();
-        	
+
+	        final ByteArrayEntity entity = new ByteArrayEntity(add.data);
+	        entity.setContentType(add.format.getDefaultMIMEType());
+	        
+	        opts.entity = entity;
+	        
         }
         
         if (add.context != null) {
 	        // set the default context.
 	        opts.addRequestParam("context-uri", add.context);
-        }
-        
-        if (add.format != null) {
-        	// set the content type
-        	opts.contentType = add.format.getDefaultMIMEType();
-        }
-        
-        if (add.data != null) {
-        	// set the data
-        	opts.data = add.data;
-        }
-        
-        if (add.file != null) {
-        	// set the data
-        	opts.data = IOUtil.readBytes(add.file);
-        }
-        
-        if (add.stmts != null) {
-        	
-        	// set the data and content type (TRIG by default)
-        	final RDFFormat format = RDFFormat.TRIG;
-		    opts.contentType = add.format.getDefaultMIMEType();
-		    opts.data = serialize(add.stmts, format);
-
         }
         
         HttpResponse response = null;
@@ -545,34 +491,23 @@ public class RemoteRepository {
 	 */
 	public static class AddOp {
 
-		private final String uri;
-		private final Iterable<Statement> stmts;
-		private final byte[] data;
-		private final File file;
-		private final RDFFormat format;
+		private String uri;
+		private Iterable<Statement> stmts;
+		private byte[] data;
+		private File file;
+		private RDFFormat format;
 		
 		private String context;
 		
 		public AddOp(final String uri) {
 			this.uri = uri;
-			this.stmts = null;
-			this.data = null;
-			this.file = null;
-			this.format = null;
 		}
 		
 		public AddOp(final Iterable<Statement> stmts) {
-			this.uri = null;
 			this.stmts = stmts;
-			this.data = null;
-			this.file = null;
-			this.format = null;
 		}
 		
 		public AddOp(final File file, final RDFFormat format) {
-			this.uri = null;
-			this.stmts = null;
-			this.data = null;
 			this.file = file;
 			this.format = format;
 		}
@@ -581,15 +516,29 @@ public class RemoteRepository {
 		 * This ctor is for the test cases.
 		 */
 		public AddOp(final byte[] data, final RDFFormat format) {
-			this.uri = null;
-			this.stmts = null;
 			this.data = data;
-			this.file = null;
 			this.format = format;
 		}
 		
 		public void setContext(final String context) {
 			this.context = context;
+		}
+		
+		private void prepareForWire() throws Exception {
+			
+	        if (file != null) {
+
+	        	// set the data
+	        	data = IOUtil.readBytes(file);
+	        	
+	        } else if (stmts != null) {
+	        	
+	        	// set the data and content type (TRIG by default)
+	        	format = RDFFormat.TRIG;
+			    data = serialize(stmts, format);
+
+	        }
+	        
 		}
 		
 	}
@@ -599,53 +548,34 @@ public class RemoteRepository {
 	 */
 	public static class RemoveOp {
 		
-		private final String query;
+		private String query;
 		
-		private final Iterable<Statement> stmts;
+		private Iterable<Statement> stmts;
 		
-		private final Value s, p, o, c;
+		private Value s, p, o, c;
 		
-		private final byte[] data;
+		private byte[] data;
 		
-		private final File file;
+		private File file;
 		
-		private final RDFFormat format;
+		private RDFFormat format;
 		
 		public RemoveOp(final String query) {
 			this.query = query;
-			this.stmts = null;
-			this.s = this.p = this.o = this.c = null;
-			this.data = null;
-			this.file = null;
-			this.format = null;
 		}
 		
 		public RemoveOp(final Iterable<Statement> stmts) {
-			this.query = null;
 			this.stmts = stmts;
-			this.s = this.p = this.o = this.c = null;
-			this.data = null;
-			this.file = null;
-			this.format = null;
 		}
 		
 		public RemoveOp(final URI s, final URI p, final Value o, final URI c) {
-			this.query = null;
-			this.stmts = null;
 			this.s = s;
 			this.p = p;
 			this.o = o;
 			this.c = c;
-			this.data = null;
-			this.file = null;
-			this.format = null;
 		}
 
 		public RemoveOp(final File file, final RDFFormat format) {
-			this.query = null;
-			this.stmts = null;
-			this.s = this.p = this.o = this.c = null;
-			this.data = null;
 			this.file = file;
 			this.format = format;
 		}
@@ -654,12 +584,25 @@ public class RemoteRepository {
 		 * This ctor is for the test cases.
 		 */
 		public RemoveOp(final byte[] data, final RDFFormat format) {
-			this.query = null;
-			this.stmts = null;
-			this.s = this.p = this.o = this.c = null;
 			this.data = data;
-			this.file = null;
 			this.format = format;
+		}
+		
+		private void prepareForWire() throws Exception {
+			
+	        if (file != null) {
+
+	        	// set the data
+	        	data = IOUtil.readBytes(file);
+	        	
+	        } else if (stmts != null) {
+	        	
+	        	// set the data and content type (TRIG by default)
+	        	format = RDFFormat.TRIG;
+			    data = serialize(stmts, format);
+
+	        }
+	        
 		}
 		
 	}
@@ -685,15 +628,17 @@ public class RemoteRepository {
         /** Request parameters to be formatted as URL query parameters. */
         public Map<String,String[]> requestParams;
         
-        /**
-         * The Content-Type (iff there will be a request body).
-         */
-        public String contentType = null;
+//        /**
+//         * The Content-Type (iff there will be a request body).
+//         */
+//        public String contentType = null;
+//        
+//        /**
+//         * The data to send as the request body (optional).
+//         */
+//        public byte[] data = null;
         
-        /**
-         * The data to send as the request body (optional).
-         */
-        public byte[] data = null;
+        public HttpEntity entity = null;
         
         /** The connection timeout (ms) -or- ZERO (0) for an infinite timeout. */
         public int timeout = 0;
@@ -786,25 +731,25 @@ public class RemoteRepository {
 //            if (log.isDebugEnabled())
 //                log.debug("Accept: " + opts.acceptHeader);
             
-            if (opts.contentType != null) {
+            if (opts.entity != null) {
 
-                if (opts.data == null)
-                    throw new AssertionError();
+//                if (opts.data == null)
+//                    throw new AssertionError();
 
-                final String contentLength = Integer.toString(opts.data.length);
+//                final String contentLength = Integer.toString(opts.data.length);
 
 //                conn.setRequestProperty("Content-Type", opts.contentType);
 //                conn.setRequestProperty("Content-Length", contentLength);
 
-                if (log.isDebugEnabled()) {
-                    log.debug("Content-Type: " + opts.contentType);
-                    log.debug("Content-Length: " + contentLength);
-                }
+//                if (log.isDebugEnabled()) {
+//                    log.debug("Content-Type: " + opts.contentType);
+//                    log.debug("Content-Length: " + contentLength);
+//                }
 
-                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
-            	entity.setContentType(opts.contentType);
+//                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
+//            	entity.setContentType(opts.contentType);
 
-            	((HttpEntityEnclosingRequestBase) request).setEntity(entity);
+            	((HttpEntityEnclosingRequestBase) request).setEntity(opts.entity);
                 
 //                final OutputStream os = conn.getOutputStream();
 //                try {
