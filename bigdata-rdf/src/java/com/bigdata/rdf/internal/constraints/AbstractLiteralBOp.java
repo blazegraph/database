@@ -2,6 +2,8 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
@@ -9,6 +11,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -31,15 +34,6 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
      * 
      */
     private static final long serialVersionUID = 1L;
-
-//    static protected final transient DatatypeFactory datatypeFactory;
-//    static {
-//        try {
-//            datatypeFactory = DatatypeFactory.newInstance();
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
 
     public AbstractLiteralBOp(final String lex) {
         
@@ -88,6 +82,11 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This delegates to {@link #_get(IBindingSet)}.
+     */
     @Override
     final public V get(final IBindingSet bs) {
 
@@ -95,9 +94,42 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
 
     }
 
+    /**
+     * Core more for the implementation of your operator semantics.
+     * 
+     * @param bs
+     *            The source solution.
+     *            
+     * @return The result of evaluating this operator against its arguments in
+     *         the context of that source solution.
+     */
     abstract protected V _get(final IBindingSet bs);
 
-    protected IV getAndCheck(final int i, final IBindingSet bs) {
+    /**
+     * Get the function argument (a value expression) and evaluate it against
+     * the source solution. The evaluation of value expressions is recursive.
+     * 
+     * @param i
+     *            The index of the function argument ([0...n-1]).
+     * @param bs
+     *            The source solution.
+     * 
+     * @return The result of evaluating that argument of this function.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if the index is not the index of an operator for this
+     *             operator.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the value expression at that index can not be evaluated.
+     * 
+     * @throws NotMaterializedException
+     *             if evaluation encountered an {@link IV} whose {@link IVCache}
+     *             was not set when the value expression required a materialized
+     *             RDF {@link Value}.
+     */
+    protected IV getAndCheck(final int i, final IBindingSet bs)
+            throws SparqlTypeErrorException, NotMaterializedException {
 
         final IV iv = get(i).get(bs);
         
@@ -111,6 +143,7 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
             throw new NotMaterializedException();
 
         return iv;
+
     }
     
 }

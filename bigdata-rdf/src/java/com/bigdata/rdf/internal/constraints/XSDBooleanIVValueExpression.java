@@ -87,15 +87,4 @@ public abstract class XSDBooleanIVValueExpression extends
     
     protected abstract boolean accept(final IBindingSet bs);
 
-//    /**
-//     * THIS METHOD IS NOT USED. {@link #get(IBindingSet)} is overridden and
-//     * delegates to {@link #accept(IBindingSet)} instead of to this method.
-//     */
-//    @Override
-//    protected XSDBooleanIV _get(final IBindingSet bs) {
-//        
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
 }

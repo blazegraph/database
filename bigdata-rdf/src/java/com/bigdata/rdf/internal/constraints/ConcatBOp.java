@@ -35,7 +35,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class ConcatBOp extends AbstractLiteralBOp {
+public class ConcatBOp extends AbstractLiteralBOp<IV> {
 
     private static final long serialVersionUID = 5894411703430694650L;
 
@@ -68,12 +68,13 @@ public class ConcatBOp extends AbstractLiteralBOp {
         URI datatype = null;
         String lang = null;
         boolean allSame = true;
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < arity(); i++) {
-            IV v = getAndCheck(i, bs);
+            @SuppressWarnings("rawtypes")
+            final IV v = getAndCheck(i, bs);
             String label = null;
             if (allSame) {
-                BigdataLiteral lit = literalValue(v);
+                final BigdataLiteral lit = literalValue(v);
                 label = lit.getLabel();
                 if (lit.getDatatype() != null) {
                     if (lang != null) {
