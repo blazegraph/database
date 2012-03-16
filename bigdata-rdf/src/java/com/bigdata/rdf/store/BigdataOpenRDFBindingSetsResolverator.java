@@ -22,13 +22,14 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Efficiently resolve openrdf {@link BindingSet}s to bigdata {@link IBindingSets}s.
+ * Efficiently resolve openrdf {@link BindingSet}s to bigdata {@link IBindingSet}s.
  * 
  * @see BigdataValueReplacer
  * 

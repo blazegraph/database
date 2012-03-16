@@ -673,7 +673,7 @@ public class ASTEvalHelper {
      */
     static public void executeUpdate(
             final ASTContainer astContainer,
-            final AST2BOpContext ctx            
+            final AST2BOpContext ctx
             ) {
         
         /*
