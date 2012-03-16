@@ -1028,6 +1028,21 @@ public class FunctionRegistry {
     }
 
     /**
+     * Remove a registered function {@link Factory}.
+     * 
+     * @param functionURI
+     *            The {@link URI} of the function.
+     *            
+     * @return The factory -or- <code>null</code> if there was no function
+     *         registered for that {@link URI}.
+     */
+    public static Factory remove(final URI functionURI) {
+        
+        return factories.remove(functionURI);
+        
+    }
+    
+    /**
      * An interface for creating {@link IValueExpression}s from a function URI
      * and its arguments.
      */
