@@ -75,10 +75,15 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The default implementation returns {@link Requirement#SOMETIMES}.
+     */
     @Override
     public Requirement getRequirement() {
 
-        return INeedsMaterialization.Requirement.SOMETIMES;
+        return Requirement.SOMETIMES;
         
     }
 
