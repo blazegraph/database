@@ -100,7 +100,7 @@ public interface ISPO extends IElement {
      * @param index
      *            The legal values are: s=0, p=1, o=2, c=3.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     IV get(int index);
 
     /**
@@ -175,20 +175,6 @@ public interface ISPO extends IElement {
      * {@link StatementEnum#Axiom}.
      */
     boolean isAxiom();
-
-//    /**
-//     * Set the statement identifier. This sets the 4th position of the quad, but
-//     * some constraints are imposed on its argument.
-//     * 
-//     * @param sid
-//     *            The statement identifier.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if <i>sid</i> is {@link #NULL}.
-//     * @throws IllegalStateException
-//     *             if the statement identifier is already set.
-//     */
-//    void setStatementIdentifier(final IV sid);
 
     /**
      * Mark whether or not the {@link SPO} will permit the statement identifier

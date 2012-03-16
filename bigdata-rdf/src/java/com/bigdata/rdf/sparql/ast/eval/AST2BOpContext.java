@@ -13,6 +13,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.EmptySolutionSetStats;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -24,6 +25,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -327,9 +329,27 @@ public class AST2BOpContext implements IdFactory {
         return db.getIndexManager() instanceof IBigdataFederation<?>;
 
     }
+    
+    /**
+     * Return the namespace of the {@link AbstractTripleStore}.
+     */
+    public String getNamespace() {
+    
+        return db.getNamespace();
+        
+    }
 
     /**
-     * Return the namespace of the lexicon relation.
+     * Return the namespace of the {@link SPORelation}.
+     */
+    public String getSPONamespace() {
+
+        return db.getSPORelation().getNamespace();
+
+    }
+
+    /**
+     * Return the namespace of the {@link LexiconRelation}.
      */
     public String getLexiconNamespace() {
 
