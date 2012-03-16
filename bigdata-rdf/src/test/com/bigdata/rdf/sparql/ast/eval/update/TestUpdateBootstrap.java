@@ -134,8 +134,13 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
 
         /*
          * Turn that AST Update operation into a pipeline bop to add the terms
-         * and write the statements. This will be done by AST2BOpUtility, but
-         * I can mock the translation target up first.
+         * and write the statements. This will be done by AST2BOpUtility, but I
+         * can mock the translation target up first.
+         * 
+         * TODO When translating, the notion that we might translate either
+         * incrementally or all operations in the sequence at once is related to
+         * the notion of interactive evaluation which would help to enable the
+         * RTO.
          */
  
         final ASTContainer astContainer = new ASTContainer(updateRoot);
