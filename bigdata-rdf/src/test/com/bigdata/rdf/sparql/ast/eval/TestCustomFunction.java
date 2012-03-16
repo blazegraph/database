@@ -37,18 +37,28 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.internal.constraints.AbstractIVValueExpressionBOp2.Annotations;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 
 /**
  * Test suite for registering and evaluating custom functions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/513"> Expose
+ *      the LexiconConfiguration to Function BOPs </a>
+ * @see https
+ *      ://sourceforge.net/apps/mediawiki/bigdata/index.php?title=CustomFunction
  */
 public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
 
@@ -64,15 +74,13 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
     public TestCustomFunction(String name) {
         super(name);
     }
-
+    
     /**
-     * Unit test for access to the {@link ILexiconConfiguration} from a
-     * "function bop".
-     * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/513">
-     *      Expose the LexiconConfiguration to Function BOPs </a>
+     * Unit test for a simple custom function extending
+     * {@link AbstractLiteralBOp}, including access to the
+     * {@link ILexiconConfiguration}.
      */
-    public void test_ticket_513() throws Exception {
+    public void test_custom_function_1() throws Exception {
 
         final URI myFunctionUri = new URIImpl(
                 "http://www.bigdata.com/myFunction");
@@ -83,12 +91,13 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             public IValueExpression<? extends IV> create(String lex,
                     Map<String, Object> scalarValues,
                     ValueExpressionNode... args) {
-                
+
                 FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
-              final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(lex, args[0]);
-              
-              return new MyFunctionBOp(ve, lex);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                return new MyFunctionBOp(ve, lex);
 
             }
 
@@ -99,6 +108,48 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
         try {
 
             new TestHelper("custom-function-1").runTest();
+            
+        } finally {
+
+            FunctionRegistry.remove(myFunctionUri);
+            
+        }
+
+    }
+
+    /**
+     * Unit test for a simple custom function extending
+     * {@link XSDBooleanIVValueExpression}, including access to the
+     * {@link ILexiconConfiguration}.
+     */
+    public void test_custom_function_2() throws Exception {
+
+        final URI myFunctionUri = new URIImpl(
+                "http://www.bigdata.com/myFunction2");
+        
+        final FunctionRegistry.Factory myFactory = new FunctionRegistry.Factory() {
+
+            @Override
+            public IValueExpression<? extends IV> create(String lex,
+                    Map<String, Object> scalarValues,
+                    ValueExpressionNode... args) {
+                
+                FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                return new MyFilterBOp(ve, lex);
+
+            }
+
+        };
+
+        FunctionRegistry.add(myFunctionUri, myFactory);
+        
+        try {
+
+            new TestHelper("custom-function-2").runTest();
             
         } finally {
 
@@ -167,6 +218,74 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             // Return the function result.
             return ret;
 
+        }
+
+    };
+
+    /**
+     * Simple boolean function returns <code>true</code> iff the argument is
+     * <code>Mike</code>
+     */
+    private static class MyFilterBOp extends XSDBooleanIVValueExpression
+            implements INeedsMaterialization
+    {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Required deep copy constructor.
+         * 
+         * @param op
+         */
+        public MyFilterBOp(final MyFilterBOp op) {
+            super(op);
+        }
+
+        /**
+         * Required shallow copy constructor.
+         * 
+         * @param args
+         *            The function arguments.
+         * @param anns
+         *            The function annotations.
+         */
+        public MyFilterBOp(final BOp[] args, final Map<String, Object> anns) {
+            super(args, anns);
+        }
+
+        public MyFilterBOp(final IValueExpression<? extends IV> x,
+                final String lex) {
+
+            this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+
+        }
+
+        @Override
+        protected boolean accept(final IBindingSet bset) {
+
+            // Evaluate a value expression argument.
+            final IV arg0 = get(0).get(bset);
+
+            if (arg0 == null || !arg0.isLiteral()) {
+                // Shortcut for "SOMETIMES" evaluation.
+                throw new SparqlTypeErrorException();
+            }
+            
+            // Convert into an RDF Value.
+            final Literal lit = literalValue(arg0);
+
+            return lit.getLabel().equals("Mike");
+
+        }
+
+        @Override
+        public Requirement getRequirement() {
+            
+            return Requirement.SOMETIMES;
+            
         }
 
     };
