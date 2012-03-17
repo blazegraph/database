@@ -53,22 +53,28 @@ public class LoadGraph extends GraphUpdate {
     private static final long serialVersionUID = 1L;
 
     public LoadGraph() {
+        
         super(UpdateType.Load);
+        
     }
 
     /**
      * @param op
      */
-    public LoadGraph(LoadGraph op) {
+    public LoadGraph(final LoadGraph op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public LoadGraph(BOp[] args, Map<String, Object> anns) {
+    public LoadGraph(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
+        
     }
 
     /**

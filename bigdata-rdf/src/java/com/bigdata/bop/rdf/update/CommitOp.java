@@ -34,7 +34,7 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ITimestampAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
@@ -48,12 +48,8 @@ import com.bigdata.journal.TimestampUtility;
  */
 public final class CommitOp extends PipelineOp {
 
-    public interface Annotations extends PipelineOp.Annotations {
-
-        /**
-         * TODO Lift into a common interface shared by {@link IPredicate}.
-         */
-        public String TIMESTAMP = IPredicate.Annotations.TIMESTAMP;
+    public interface Annotations extends PipelineOp.Annotations,
+            ITimestampAnnotations {
 
     }
 
@@ -61,10 +57,14 @@ public final class CommitOp extends PipelineOp {
 
         super(args, annotations);
 
+        getRequiredProperty(Annotations.TIMESTAMP);
+        
     }
 
     public CommitOp(final CommitOp op) {
+ 
         super(op);
+        
     }
 
     /**
@@ -81,16 +81,12 @@ public final class CommitOp extends PipelineOp {
 
     static private class ChunkTask implements Callable<Void> {
 
-        private final BOpContext<IBindingSet> context;
-
         private final long timestamp;
 
         private final Journal store;
 
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final CommitOp op) {
-
-            this.context = context;
 
             timestamp = (Long) op.getRequiredProperty(Annotations.TIMESTAMP);
 

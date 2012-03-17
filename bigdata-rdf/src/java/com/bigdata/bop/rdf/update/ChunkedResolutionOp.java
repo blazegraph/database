@@ -42,7 +42,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ILocatableResourceAnnotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.journal.TimestampUtility;
@@ -66,38 +66,25 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * @version $Id: ChunkedResolutionTask.java 6153 2012-03-16 20:10:15Z
  *          thompsonbry $
  */
-public class ChunkedResolutionTask extends PipelineOp {
+public class ChunkedResolutionOp extends PipelineOp {
 
     private static final transient Logger log = Logger
-            .getLogger(ChunkedResolutionTask.class);
+            .getLogger(ChunkedResolutionOp.class);
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends PipelineOp.Annotations {
-
-        /**
-         * TODO Lift into a common interface shared by {@link IPredicate}.
-         */
-        public String TIMESTAMP = IPredicate.Annotations.TIMESTAMP;
-
-        /**
-         * TODO Lift into a common interface shared by {@link IPredicate} (and
-         * all other operations which require the NAMESPACE of the lexicon?).
-         * 
-         * Note: We need the lexicon namespace for the terms (one operator) and
-         * the spo namespace for the spo add/remove.
-         */
-        public String RELATION_NAME = IPredicate.Annotations.RELATION_NAME;
+    public interface Annotations extends PipelineOp.Annotations,
+            ILocatableResourceAnnotations {
 
         /**
          * An optional {@link IVariable}[] identifying the variables to be
          * resolved. All variables are resolved unless this annotation is
          * specified.
          */
-        String VARS = ChunkedResolutionTask.class.getName() + ".vars";
+        String VARS = ChunkedResolutionOp.class.getName() + ".vars";
 
     }
 
@@ -105,7 +92,7 @@ public class ChunkedResolutionTask extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public ChunkedResolutionTask(final BOp[] args,
+    public ChunkedResolutionOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -115,7 +102,7 @@ public class ChunkedResolutionTask extends PipelineOp {
     /**
      * @param op
      */
-    public ChunkedResolutionTask(final ChunkedResolutionTask op) {
+    public ChunkedResolutionOp(final ChunkedResolutionOp op) {
         super(op);
     }
 
@@ -141,7 +128,7 @@ public class ChunkedResolutionTask extends PipelineOp {
         private final IVariable<?>[] vars;
 
         public ChunkTask(final BOpContext<IBindingSet> context,
-                final ChunkedResolutionTask op) {
+                final ChunkedResolutionOp op) {
 
             this.context = context;
 
@@ -163,7 +150,9 @@ public class ChunkedResolutionTask extends PipelineOp {
         @Override
         public Void call() throws Exception {
 
-            // Materialize everything.
+            /*
+             * Materialize everything.
+             */
             final IBindingSet[] a = BOpUtility.toArray(context.getSource(),
                     context.getStats());
 

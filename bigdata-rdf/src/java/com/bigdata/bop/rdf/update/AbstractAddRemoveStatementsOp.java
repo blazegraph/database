@@ -35,7 +35,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ILocatableResourceAnnotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
@@ -66,22 +66,9 @@ public abstract class AbstractAddRemoveStatementsOp extends PipelineOp {
     static private final Var<?> s = Var.var("s"), p = Var.var("p"), o = Var
             .var("o"), c = Var.var("c");
 
-    public interface Annotations extends PipelineOp.Annotations {
-    
-        /**
-         * TODO Lift into a common interface shared by {@link IPredicate}.
-         */
-        public String TIMESTAMP = IPredicate.Annotations.TIMESTAMP;
-    
-        /**
-         * TODO Lift into a common interface shared by {@link IPredicate} (and
-         * all other operations which require the NAMESPACE of the lexicon?).
-         * 
-         * Note: We need the lexicon namespace for the terms (one operator) and
-         * the spo namespace for the spo add/remove.
-         */
-        public String RELATION_NAME = IPredicate.Annotations.RELATION_NAME;
-    
+    public interface Annotations extends PipelineOp.Annotations,
+            ILocatableResourceAnnotations {
+
     }
 
     /**

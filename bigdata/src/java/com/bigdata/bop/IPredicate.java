@@ -71,18 +71,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 	/**
 	 * Interface declaring well known annotations.
 	 */
-    public interface Annotations extends BOp.Annotations, BufferAnnotations {
-
-        /**
-         * The name of the relation on which the predicate will read.
-         * 
-         * FIXME Change this to be a scalar value. It is currently an array for
-         * backwards compatibility.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/180 (Migrate
-         *      the RDFS inference and truth maintenance logic to BOPs)
-         */
-        String RELATION_NAME = IPredicate.class.getName() + ".relationName";
+    public interface Annotations extends BOp.Annotations, BufferAnnotations,
+            ILocatableResourceAnnotations {
 
         /**
          * Optional property <em>overrides</em> the {@link IKeyOrder} to use for
@@ -323,32 +313,24 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //                | IRangeQuery.PARALLEL
                 ;
 
-		/**
-		 * Boolean property whose value is <code>true</code> iff this operator
-		 * writes on a database.
-		 * <p>
-		 * Most operators operate solely on streams of elements or binding sets.
-		 * Some operators read or write on the database using an access path,
-		 * which is typically described by an {@link IPredicate}. This property
-		 * MUST be <code>true</code> when access path is used to write on the
-		 * database.
-		 * <p>
-		 * Operators which read or write on the database must declare the
-		 * {@link Annotations#TIMESTAMP} associated with that operation.
-		 * 
-		 * @see #TIMESTAMP
-		 */
-		String MUTATION = IPredicate.class.getName() + ".mutation";
-
-        boolean DEFAULT_MUTATION = false;
-
-		/**
-		 * The timestamp (or transaction identifier) used by this operator if it
-		 * reads or writes on the database (no default).
-		 * 
-		 * @see #MUTATION
-		 */
-		String TIMESTAMP = IPredicate.class.getName() + ".timestamp";
+//		/**
+//		 * Boolean property whose value is <code>true</code> iff this operator
+//		 * writes on a database.
+//		 * <p>
+//		 * Most operators operate solely on streams of elements or binding sets.
+//		 * Some operators read or write on the database using an access path,
+//		 * which is typically described by an {@link IPredicate}. This property
+//		 * MUST be <code>true</code> when access path is used to write on the
+//		 * database.
+//		 * <p>
+//		 * Operators which read or write on the database must declare the
+//		 * {@link Annotations#TIMESTAMP} associated with that operation.
+//		 * 
+//		 * @see #TIMESTAMP
+//		 */
+//		String MUTATION = IPredicate.class.getName() + ".mutation";
+//
+//        boolean DEFAULT_MUTATION = false;
 
         /**
          * Note: This annotation is not currently integrated. It is intended to
@@ -723,13 +705,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     @SuppressWarnings("rawtypes")
     public IPredicate<E> setArg(int index, IVariableOrConstant arg);
 
-	/**
-	 * Return <code>true</code> iff this operator is an access path which writes
-	 * on the database.
-	 * 
-	 * @see Annotations#MUTATION
-	 */
-	boolean isMutation();
+//	/**
+//	 * Return <code>true</code> iff this operator is an access path which writes
+//	 * on the database.
+//	 * 
+//	 * @see Annotations#MUTATION
+//	 */
+//	boolean isMutation();
 
 	/**
 	 * The timestamp or transaction identifier on which the operator will read
