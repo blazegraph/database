@@ -370,17 +370,17 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             return conn;
 
         } catch (Throwable t) {
-            /*
-             * If something goes wrong, then close the http connection.
-             * Otherwise, the connection will be closed by the caller.
-             */
-            try {
-//                // clean up the connection resources
-//                if (conn != null)
-//                    conn.disconnect();
-            } catch (Throwable t2) {
-                // ignored.
-            }
+//            /*
+//             * If something goes wrong, then close the http connection.
+//             * Otherwise, the connection will be closed by the caller.
+//             */
+//            try {
+////                // clean up the connection resources
+////                if (conn != null)
+////                    conn.disconnect();
+//            } catch (Throwable t2) {
+//                // ignored.
+//            }
             throw new RuntimeException(toString() + " : " + t, t);
         }
 
