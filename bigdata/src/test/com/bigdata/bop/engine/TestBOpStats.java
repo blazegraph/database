@@ -65,9 +65,9 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("chunksOut", 0L, stats.chunksOut.get());
         assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
-        stats.chunksIn.increment();
-        stats.unitsIn.increment();
-        stats.unitsIn.increment();
+        stats.chunksIn.increment(); // 1
+        stats.unitsIn.increment(); 
+        stats.unitsIn.increment(); //2 
         
         assertEquals("chunksIn", 1L, stats.chunksIn.get());
         assertEquals("unitsIn", 2L, stats.unitsIn.get());
@@ -75,11 +75,11 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("chunksOut", 0L, stats.chunksOut.get());
         assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
-        stats.unitsOut.increment();
-        stats.chunksOut.increment();
-        stats.unitsOut.increment();
-        stats.unitsOut.increment();
-        stats.chunksOut.increment();
+        stats.unitsOut.increment(); 
+        stats.chunksOut.increment(); 
+        stats.unitsOut.increment(); 
+        stats.unitsOut.increment(); // 3
+        stats.chunksOut.increment(); // 2
         
         assertEquals("chunksIn", 1L, stats.chunksIn.get());
         assertEquals("unitsIn", 2L, stats.unitsIn.get());
@@ -95,7 +95,7 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("chunksOut", 2L, totals.chunksOut.get());
         assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
-        stats.unitsIn.increment();
+        stats.unitsIn.increment(); // 3
         
         totals.add(stats);
         
@@ -109,10 +109,10 @@ public class TestBOpStats extends TestCase2 {
         
         totals.add(stats);
         
-        assertEquals("chunksIn", 2L, totals.chunksIn.get());
-        assertEquals("unitsIn", 5L, totals.unitsIn.get());
-        assertEquals("unitsOut", 6L, totals.unitsOut.get());
-        assertEquals("chunksOut", 4L, totals.chunksOut.get());
+        assertEquals("chunksIn", 3L, totals.chunksIn.get());
+        assertEquals("unitsIn", 8L, totals.unitsIn.get());
+        assertEquals("unitsOut", 9L, totals.unitsOut.get());
+        assertEquals("chunksOut", 6L, totals.chunksOut.get());
         assertEquals("mutationCount", 1L, totals.mutationCount.get());
 
     }
