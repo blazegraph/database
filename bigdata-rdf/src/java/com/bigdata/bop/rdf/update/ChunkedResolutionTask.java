@@ -53,7 +53,6 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.rio.StatementBuffer;
 
 /**
  * Vectored operator adds and/or resolves the RDF {@link Value}s associated with
@@ -64,17 +63,8 @@ import com.bigdata.rdf.rio.StatementBuffer;
  * enabled) the newly assigned {@link IV} for the term.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- *          TODO Leverage {@link StatementBuffer} for SIDS support.
- * 
- *          TODO Should we clear the {@link IVCache} as part of this? Maybe as
- *          an annotation option? That way we could use the operator for
- *          resolution for INSERT/REMOVE and also for read-only operations which
- *          resolve {@link IV}s (and might cause errors, or drop solutions) if
- *          some IVs could not be resolved.
- * 
- *          TODO Report mutation stats.
+ * @version $Id: ChunkedResolutionTask.java 6153 2012-03-16 20:10:15Z
+ *          thompsonbry $
  */
 public class ChunkedResolutionTask extends PipelineOp {
 
@@ -109,12 +99,6 @@ public class ChunkedResolutionTask extends PipelineOp {
          */
         String VARS = ChunkedResolutionTask.class.getName() + ".vars";
 
-        /*
-         * TODO Vector size annotations are on PipelineOp already.
-         * 
-         * TODO Annotation for a read-only mode.
-         */
-
     }
 
     /**
@@ -123,7 +107,9 @@ public class ChunkedResolutionTask extends PipelineOp {
      */
     public ChunkedResolutionTask(final BOp[] args,
             final Map<String, Object> annotations) {
+
         super(args, annotations);
+        
     }
 
     /**
@@ -152,7 +138,7 @@ public class ChunkedResolutionTask extends PipelineOp {
          * The variables to resolve -or- <code>null</code> to resolve all
          * variables.
          */
-        private final IVariable[] vars;
+        private final IVariable<?>[] vars;
 
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final ChunkedResolutionTask op) {
@@ -197,6 +183,7 @@ public class ChunkedResolutionTask extends PipelineOp {
          * 
          * @return New solutions with resolved {@link IV}s.
          */
+        @SuppressWarnings({ "rawtypes", "unchecked" })
         private IBindingSet[] resolve(final IBindingSet[] bindingSets) {
 
             final Map<Value, BigdataValue> values = new LinkedHashMap<Value, BigdataValue>();
@@ -253,17 +240,24 @@ public class ChunkedResolutionTask extends PipelineOp {
              * Note: If any value does not exist in the lexicon then its term
              * identifier will be ZERO (0L).
              */
+            final long mutationCount;
             {
 
                 final BigdataValue[] terms = values.values().toArray(
                         new BigdataValue[] {});
 
-                lex.addTerms(terms, terms.length, readOnly);
+                final long ndistinct = lex.addTerms(terms, terms.length,
+                        readOnly);
+                
+                if (!readOnly) {
+                    mutationCount = ndistinct;
+                } else {
+                    mutationCount = 0;
+                }
 
                 // cache the BigdataValues on the IVs for later
                 for (BigdataValue term : terms) {
 
-                    @SuppressWarnings("rawtypes")
                     final IV iv = term.getIV();
 
                     if (iv == null) {
@@ -280,7 +274,6 @@ public class ChunkedResolutionTask extends PipelineOp {
                          * Create a dummy iv and cache the unknown value on it
                          * so that it can be used during query evalution.
                          */
-                        @SuppressWarnings("rawtypes")
                         final IV dummy = TermId.mockIV(VTE.valueOf(term));
 
                         term.setIV(dummy);
@@ -328,8 +321,9 @@ public class ChunkedResolutionTask extends PipelineOp {
                         // Lookup the resolved BigdataValue object.
                         final BigdataValue val2 = values.get(val);
 
-                        // TODO if read-only, then val2 can be null.
-                        assert val2 != null : "value not found: " + val2;
+                        // Note: if read-only, then val2 can be null.
+                        assert readOnly || val2 != null : "value not found: "
+                                + val2;
 
                         if (log.isDebugEnabled())
                             log.debug("value: " + val + " : " + val2 + " ("
@@ -357,8 +351,9 @@ public class ChunkedResolutionTask extends PipelineOp {
                         // Lookup the resolved BigdataValue object.
                         final BigdataValue val2 = values.get(val);
 
-                        // TODO if read-only, then val2 can be null.
-                        assert val2 != null : "value not found: " + val;
+                        // Note: if read-only, then val2 can be null.
+                        assert readOnly || val2 != null : "value not found: "
+                                + val2;
 
                         // Verify IVCache is set.
                         assert val2.getIV() == val2;
@@ -375,6 +370,9 @@ public class ChunkedResolutionTask extends PipelineOp {
                 }
 
             }
+
+            if (mutationCount != 0)
+                context.getStats().mutationCount.add(mutationCount);
 
             return bindingSets2;
 

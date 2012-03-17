@@ -42,7 +42,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Vectored insert operator for RDF Statements. The solutions flowing through
+ * Vectored remove operator for RDF Statements. The solutions flowing through
  * this operator MUST bind the <code>s</code>, <code>p</code>, <code>o</code>,
  * and (depending on the database mode) MAY bind the <code>c</code> variable.
  * Those variables correspond to the Subject, Predicate, Object, and
@@ -53,16 +53,16 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public final class InsertStatementsOp extends AbstractAddRemoveStatementsOp {
+public final class RemoveStatementsOp extends AbstractAddRemoveStatementsOp {
 
-    public InsertStatementsOp(final BOp[] args,
+    public RemoveStatementsOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
 
     }
 
-    public InsertStatementsOp(final InsertStatementsOp op) {
+    public RemoveStatementsOp(final RemoveStatementsOp op) {
         super(op);
     }
 
@@ -89,7 +89,7 @@ public final class InsertStatementsOp extends AbstractAddRemoveStatementsOp {
         private final boolean quads;
 
         public ChunkTask(final BOpContext<IBindingSet> context,
-                final InsertStatementsOp op) {
+                final RemoveStatementsOp op) {
 
             this.context = context;
 
@@ -120,7 +120,7 @@ public final class InsertStatementsOp extends AbstractAddRemoveStatementsOp {
             final ISPO[] stmts = b.toArray(new ISPO[b.size()]);
 
             // Write on the database.
-            final long nmodified = tripleStore.addStatements(stmts,
+            final long nmodified = tripleStore.removeStatements(stmts,
                     stmts.length);
 
             // Increment by the #of statements written.
@@ -133,4 +133,4 @@ public final class InsertStatementsOp extends AbstractAddRemoveStatementsOp {
 
     } // ChunkTask
 
-} // InsertStatements
+} // RemoveStatements

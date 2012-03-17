@@ -35,6 +35,7 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -43,6 +44,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.rdf.update.ChunkedResolutionTask;
 import com.bigdata.bop.rdf.update.CommitOp;
@@ -54,6 +56,9 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.PresortRioLoader;
+import com.bigdata.rdf.rio.RDFParserOptions;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.InsertData;
@@ -61,6 +66,9 @@ import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.store.DataLoader.CommitEnum;
 
 /**
  * Boot strapped test suite for core UPDATE functionality.
@@ -149,19 +157,24 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
 
         final long txId = ITx.UNISOLATED;
         int bopId = 1;
+        final int resolutionId = bopId++;
+        final int insertStatementsId = bopId++;
+        final int commitId = bopId++;
         PipelineOp left = null; // TODO left-or-null
+        
         /*
          * Resolve/add terms against the lexicon.
          * 
-         * TODO Must do SIDs support.  Probably pass the database mode in as
-         * an annotation.
+         * TODO Must do SIDs support. Probably pass the database mode in as an
+         * annotation.
          */
-        left = new ChunkedResolutionTask(BOp.NOARGS,NV.asMap(
-                new NV(ChunkedResolutionTask.Annotations.BOP_ID,bopId++),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP,txId),//
+        left = new ChunkedResolutionTask(BOp.NOARGS, NV.asMap(//
+                new NV(ChunkedResolutionTask.Annotations.BOP_ID, resolutionId),//
+                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId),//
                 new NV(ChunkedResolutionTask.Annotations.RELATION_NAME,
                         new String[] { context.getLexiconNamespace() })//
                 ));
+
         /*
          * Insert statements.
          * 
@@ -169,15 +182,18 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * because insert is currently on the triple store for historical SIDs
          * support.
          * 
-         * TODO Must do TM for SIDs mode.
+         * Note: This already does TM for SIDs mode.
+         * 
+         * TODO This must to TM for the subject-centric text index.
+         * 
+         * TODO This must be able to do TM for triples+inference.
          */
-        left = new InsertStatementsOp(new BOp[]{left},NV.asMap(
-                new NV(ChunkedResolutionTask.Annotations.BOP_ID,bopId++),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP,txId),//
+        left = new InsertStatementsOp(new BOp[] { left }, NV.asMap(new NV(
+                ChunkedResolutionTask.Annotations.BOP_ID, insertStatementsId),//
+                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId),//
                 new NV(ChunkedResolutionTask.Annotations.RELATION_NAME,
                         new String[] { context.getNamespace() })//
                 ));
-
         
         /*
          * Commit.
@@ -188,10 +204,10 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * checkpoint on the sequences of operations.
          */
         left = new CommitOp(new BOp[] { left }, NV.asMap(//
-                new NV(ChunkedResolutionTask.Annotations.BOP_ID, bopId++),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP,txId)//
+                new NV(ChunkedResolutionTask.Annotations.BOP_ID, commitId),//
+                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId)//
                 ));
-        
+
         /**
          * The statements to be asserted.
          * 
@@ -312,19 +328,96 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
             assertTrue(store.hasStatement(mike, rdfsLabel, mikeL, g1));
             assertTrue(store.hasStatement(bryan, rdfsLabel, bryanL, g1));
             assertTrue(store.hasStatement(dc, rdfsLabel, DCL, g1));
+
+            /*
+             * Check the mutation counters for the lexicon.
+             */
+            {
+
+                final BOpStats stats = future.getStats().get(resolutionId);
+
+                /*
+                 * Note: This assumes that rdf:type and rdfs:label are not
+                 * defined by the vocabulary.  We have to subtract out each
+                 * Value which was declared by the vocabulary or is otherwise
+                 * represented as a fully inline IV.
+                 */
+                
+                long expectedCount = values.length;
+
+                for (int i = 0; i < values.length; i++) {
+
+                    if (values[i].getIV().isInline())
+                        expectedCount--;
+
+                }
+
+                assertEquals("mutationCount", expectedCount,
+                        stats.mutationCount.get());
+            
+            }
+            
+            /*
+             * Check the mutation counters for the statements relation.
+             */
+            {
+
+                final BOpStats stats = future.getStats()
+                        .get(insertStatementsId);
+
+                final long expectedCount = 5;
+
+                assertEquals("mutationCount", expectedCount,
+                        stats.mutationCount.get());
+
+            }
+
         }
         
     }
     
-    /**
-     * Unit test for removing ground triples or quads.
-     */
-    public void test_delete_data() throws Exception {
-        fail("write test");
-    }
+//    /**
+//     * Unit test for removing ground triples or quads.
+//     */
+//    public void test_delete_data() throws Exception {
+//        fail("write test");
+//    }
 
     /**
      * Unit test for parsing and then loading ground triples or quads.
+     * 
+     * TODO The parser integration is actually going to be pretty tricky. We
+     * need to handle the {@link RDFFormat} identification, override and/or
+     * refactor the {@link PresortRioLoader} and/or the {@link StatementBuffer}
+     * to provide incremental writes plus blank node and SIDs resolution (which
+     * requires that the bnodes map has document scope and hence requires the
+     * use of shared state for the ParseOp, unless the op runs with no inputs
+     * and just parses the document identified by the annotation). We need to
+     * handle load from the classpath, URI, and the file system, but we might
+     * not expose all of those sources to SPARQL UPDATE.
+     * 
+     * TODO There are also a host of options on the {@link DataLoader} which
+     * should be exposed to LOAD, probably through a syntax extension of SPARQL.
+     * That includes whether or not to do truth maintenance during a load (vs
+     * bulk load), figuring out whether to commit after each document or after a
+     * series of documents, figuring out whether to do database at once closure
+     * after the load operations (maybe a special SPARQL UPDATE request?), the
+     * buffer capacity, whether or not to verify data when parsing, whether or
+     * not to stop at the first error or continue, whether or not to trim large
+     * values (nxparser), told bnodes semantics, datatype handling, etc. Also,
+     * whether or not to setup the assertion and retraction buffers for truth
+     * maintenance, etc.
+     * 
+     * TODO We should probably have an indirected LOAD2 for a cluster
+     * (distributes load requests for files identified by some source).
+     * 
+     * @see PresortRioLoader
+     * @see StatementBuffer
+     * @see DataLoader
+     * @see DataLoader.Options
+     * @see RDFParserOptions
+     * @see ClosureEnum
+     * @see CommitEnum
      */
     public void test_load_data() throws Exception {
         fail("write test");

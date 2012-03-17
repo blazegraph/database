@@ -28,13 +28,14 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.TripleStoreUtility;
 
 /**
  * Class for efficiently converting {@link Statement}s into
  * {@link BigdataStatement}s, including resolving term identifiers (or adding
  * entries to the lexicon for unknown terms) as required. The class does not
- * write the converted {@link BigdataStatement}s onto the database, but that
- * can be easily done using a resolving iterator pattern.
+ * write the converted {@link BigdataStatement}s onto the database, but that can
+ * be easily done using a resolving iterator pattern.
  * 
  * @todo In fact, RIO also keeps a blank node map so that it can reuse the same
  *       blank node object if it sees the same ID more than once.
@@ -63,8 +64,13 @@ import com.bigdata.rdf.store.IRawTripleStore;
  *       identifiers for blank nodes -- everything else should already have its
  *       term identifier assigned for the deferred statements.
  * 
+ *       TODO This class is nearly unused and mostly not tested. It is a write
+ *       of the {@link StatementBuffer} class with some refactoring. It is only
+ *       used by the {@link TripleStoreUtility} in one helper method.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: AbstractStatementBuffer.java 6022 2012-02-13 17:55:15Z
+ *          thompsonbry $
  * @param <F>
  *            The generic type of the source {@link Statement} added to the
  *            buffer by the callers.
@@ -211,7 +217,8 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      *            The capacity of the backing buffer.
      */
     @SuppressWarnings("unchecked")
-    public AbstractStatementBuffer(AbstractTripleStore db, boolean readOnly, int capacity) {
+    public AbstractStatementBuffer(final AbstractTripleStore db,
+            final boolean readOnly, final int capacity) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -241,7 +248,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
 
     }
 
-    public void setBNodeMap(Map<String, BigdataBNode> bnodes) {
+    public void setBNodeMap(final Map<String, BigdataBNode> bnodes) {
     
         if (bnodes == null)
             throw new IllegalArgumentException();
@@ -279,7 +286,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      *         iff the <i>value</i> is <code>null</code> (allows for the
      *         context to be undefined).
      */
-    protected BigdataValue convertValue(Value value) {
+    protected BigdataValue convertValue(final Value value) {
 
         if (value == null)
             return null;
@@ -400,7 +407,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      * RDF.
      */
     @SuppressWarnings("unchecked")
-    public void add(F e) {
+    public void add(final F e) {
 
         if (nstmts == capacity) {
             
@@ -885,8 +892,9 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
          * @param capacity
          *            The capacity of the backing buffer.
          */
-        public StatementBuffer2(AbstractTripleStore lexiconStore, boolean readOnly, int capacity) {
-        
+        public StatementBuffer2(final AbstractTripleStore lexiconStore,
+                final boolean readOnly, final int capacity) {
+
             this(lexiconStore, lexiconStore, readOnly, capacity);
             
         }
@@ -913,10 +921,10 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
          * @param capacity
          *            The capacity of the backing buffer.
          */
-        public StatementBuffer2(AbstractTripleStore lexiconStore,
-                AbstractTripleStore statementStore, boolean readOnly,
-                int capacity) {
-        
+        public StatementBuffer2(final AbstractTripleStore lexiconStore,
+                final AbstractTripleStore statementStore,
+                final boolean readOnly, final int capacity) {
+
             super(lexiconStore, readOnly, capacity);
             
             if (statementStore == null)
@@ -942,7 +950,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
          * @return The #of statements actually written on the statement indices.
          */
         @Override
-        protected int handleProcessedStatements(G[] a) {
+        protected int handleProcessedStatements(final G[] a) {
 
             if (readOnly) {
              

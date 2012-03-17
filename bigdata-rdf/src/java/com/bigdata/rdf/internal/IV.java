@@ -35,6 +35,7 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Interface for the internal representation of an RDF Value (the representation
@@ -143,6 +144,12 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
 	 */
     boolean isExtension();
 
+    /**
+     * Return <code>true</code> iff this {@link IV} is a {@link Vocabulary} 
+     * item.
+     */
+    boolean isVocabulary();
+    
     /**
      * Return the Java {@link Object} corresponding to the inline value.
      * 

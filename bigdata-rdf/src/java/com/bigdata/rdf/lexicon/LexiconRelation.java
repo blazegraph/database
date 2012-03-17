@@ -1473,13 +1473,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *            When <code>true</code>, unknown terms will not be inserted
      *            into the database. Otherwise unknown terms are inserted into
      *            the database.
+     * @return The #of distinct terms lacking a pre-assigned term identifier. If
+     *         writes were permitted, then this is also the #of terms written
+     *         onto the index.
      * 
-     *            TODO If we refactor the search index shortly to use a
-     *            [token,S,P,O,(C)] key then search will become co-threaded with
-     *            the assertion and retraction of statements (writes on the
-     *            statement indices) rather than with ID2TERM writes.
+     *         TODO If we refactor the search index shortly to use a
+     *         [token,S,P,O,(C)] key then search will become co-threaded with
+     *         the assertion and retraction of statements (writes on the
+     *         statement indices) rather than with ID2TERM writes.
      */
-    public void addTerms(final BigdataValue[] values, final int numTerms,
+    public long addTerms(final BigdataValue[] values, final int numTerms,
             final boolean readOnly) {
 
         if (log.isDebugEnabled())
@@ -1555,8 +1558,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
         }
         
-        if(nunknown == 0) 
-            return;
+        if (nunknown == 0) {
+
+            return 0;
+
+        }
 
         /*
          * Batch insert/lookup of Values against the indices. No duplicates. No
@@ -1625,7 +1631,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     + numTerms + " given");
 
         }
-
+        
+        return stats.ndistinct.get();
+        
     }
     
     // BLOBS+SEARCH

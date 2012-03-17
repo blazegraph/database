@@ -63,6 +63,7 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("unitsIn", 0L, stats.unitsIn.get());
         assertEquals("unitsOut", 0L, stats.unitsOut.get());
         assertEquals("chunksOut", 0L, stats.chunksOut.get());
+        assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
         stats.chunksIn.increment();
         stats.unitsIn.increment();
@@ -72,6 +73,7 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("unitsIn", 2L, stats.unitsIn.get());
         assertEquals("unitsOut", 0L, stats.unitsOut.get());
         assertEquals("chunksOut", 0L, stats.chunksOut.get());
+        assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
         stats.unitsOut.increment();
         stats.chunksOut.increment();
@@ -83,6 +85,7 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("unitsIn", 2L, stats.unitsIn.get());
         assertEquals("unitsOut", 3L, stats.unitsOut.get());
         assertEquals("chunksOut", 2L, stats.chunksOut.get());
+        assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
         totals.add(stats);
         
@@ -90,6 +93,7 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("unitsIn", 2L, totals.unitsIn.get());
         assertEquals("unitsOut", 3L, totals.unitsOut.get());
         assertEquals("chunksOut", 2L, totals.chunksOut.get());
+        assertEquals("mutationCount", 0L, totals.mutationCount.get());
 
         stats.unitsIn.increment();
         
@@ -99,6 +103,17 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("unitsIn", 5L, totals.unitsIn.get());
         assertEquals("unitsOut", 6L, totals.unitsOut.get());
         assertEquals("chunksOut", 4L, totals.chunksOut.get());
+        assertEquals("mutationCount", 0L, totals.mutationCount.get());
+
+        stats.mutationCount.increment();
+        
+        totals.add(stats);
+        
+        assertEquals("chunksIn", 2L, totals.chunksIn.get());
+        assertEquals("unitsIn", 5L, totals.unitsIn.get());
+        assertEquals("unitsOut", 6L, totals.unitsOut.get());
+        assertEquals("chunksOut", 4L, totals.chunksOut.get());
+        assertEquals("mutationCount", 1L, totals.mutationCount.get());
 
     }
 
@@ -141,6 +156,7 @@ public class TestBOpStats extends TestCase2 {
         expected.unitsIn.add(4);
         expected.unitsOut.add(6);
         expected.typeErrors.add(8);
+        expected.mutationCount.add(7);
 
         doSerializationTest(expected);
         
@@ -173,6 +189,9 @@ public class TestBOpStats extends TestCase2 {
         
         assertEquals("typeErrors", expected.typeErrors.get(),
                 actual.typeErrors.get());
+
+        assertEquals("mutationCount", expected.mutationCount.get(),
+                actual.mutationCount.get());
 
     }
 

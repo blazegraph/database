@@ -69,6 +69,14 @@ public class QueryLog {
     private static final String NA = "N/A";
     private static final String TD = "<td>";
     private static final String TDx = "</td\n>";
+//    // the symbol used when a count is zero.
+//    private static final String ZE = "0";
+//    
+////    // the symbol used when a count was zero, so count/sec is also zero.
+////    final String NA = "0";
+//    
+//    // the symbol used when the elapsed time was zero, so count/sec is divide by zero.
+//    private static final String DZ = "0";
     
 	protected static final transient Logger log = Logger
             .getLogger(QueryLog.class);
@@ -262,6 +270,7 @@ public class QueryLog {
         sb.append("\tchunksOut");
         sb.append("\tunitsOut");
         sb.append("\tunitsOutPerChunk"); // average #of solutions out per chunk.
+        sb.append("\tmutationCount");
         sb.append("\ttypeErrors");
         sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
         sb.append("\taccessPathDups");
@@ -580,6 +589,8 @@ public class QueryLog {
         sb.append('\t');
         sb.append(Double.toString(avg(stats.unitsOut.get(), stats.chunksOut.get())));
         sb.append('\t');
+        sb.append(stats.mutationCount.get());
+        sb.append('\t');
         sb.append(stats.typeErrors.get());
 		sb.append('\t');
 		sb.append(unitsIn == 0 ? NA : unitsOut / (double) unitsIn);
@@ -600,9 +611,9 @@ public class QueryLog {
 		// solutions/ms
 		sb.append('\t');
 		sb.append(elapsed == 0 ? 0 : stats.unitsOut.get() / elapsed);
-		// mutations/ms : @todo mutations/ms.
+		// mutations/ms
 		sb.append('\t');
-//		sb.append(elapsed==0?0:stats.unitsOut.get()/elapsed);
+        sb.append(elapsed == 0 ? 0 : stats.mutationCount.get() / elapsed);
 
         sb.append('\n');
 
@@ -755,6 +766,7 @@ public class QueryLog {
         w.write("<th>chunksOut</th>");
         w.write("<th>unitsOut</th>");
         w.write("<th>unitsOutPerChunk</th>"); // average #of solutions out per chunk.
+        w.write("<th>mutationCount</th>");
         w.write("<th>typeErrors</th>"); 
         w.write("<th>joinRatio</th>"); // expansion rate multiplier in the solution count.
         w.write("<th>accessPathDups</th>");
@@ -1198,6 +1210,9 @@ public class QueryLog {
         w.write(Double.toString(avg(stats.unitsOut.get(), stats.chunksOut.get())));
         w.write(TDx);
         w.write(TD);
+        w.write(cdata(Long.toString(stats.mutationCount.get())));
+        w.write(TDx);
+        w.write(TD);
         w.write(Long.toString(stats.typeErrors.get()));
         w.write(TDx);
         w.write(TD);
@@ -1223,15 +1238,23 @@ public class QueryLog {
          * Use the total elapsed time for the query (wall time).
          */
         // solutions/ms
-        w.write(TD);
-        w.write(cdata(elapsed == 0 ? "0" : Long.toString(stats.unitsOut.get()
-                / elapsed)));
-        w.write(TDx);
-        // mutations/ms : @todo mutations/ms.
-        w.write(TD);
-        w.write(TDx);
-//      w.write(elapsed==0?0:stats.unitsOut.get()/elapsed);
-
+        {
+            w.write(TD);
+//            final long solutionCount = stats.unitsOut.get();
+//            final String solutionsPerSec = (solutionCount == 0 ? NA //
+//                    : (elapsed == 0L ? DZ //
+//                            : "" + (long) (solutionCount * 1000d / elapsed)));
+            w.write(cdata(elapsed == 0 ? "0" : Long.toString(stats.unitsOut
+                    .get() / elapsed)));
+            w.write(TDx);
+        }
+        // mutations/ms
+        {
+            w.write(TD);
+            w.write(cdata(elapsed == 0 ? "0" : Long
+                    .toString(stats.mutationCount.get() / elapsed)));
+            w.write(TDx);
+        }
         w.write("</tr\n>");
 
     }

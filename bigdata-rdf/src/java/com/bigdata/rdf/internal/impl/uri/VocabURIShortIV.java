@@ -78,6 +78,16 @@ public class VocabURIShortIV<V extends BigdataURI> extends AbstractInlineIV<V, S
 
 	}
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to return <code>true</code>.
+     */
+    @Override
+    final public boolean isVocabulary() {
+        return true;
+    }
+    
 	@SuppressWarnings("unchecked")
 	@Override
 	public int _compareTo(final IV o) {
