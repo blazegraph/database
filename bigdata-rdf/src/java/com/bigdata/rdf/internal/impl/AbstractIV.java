@@ -499,7 +499,16 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     public boolean isExtension() {
         return isExtension(flags);
     }
-
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation returns <code>false</code>.
+     */
+    public boolean isVocabulary() {
+        return false;
+    }
+    
     /**
      * {@inheritDoc}
      * <p>

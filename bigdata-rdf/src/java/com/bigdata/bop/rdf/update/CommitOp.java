@@ -136,7 +136,10 @@ public final class CommitOp extends PipelineOp {
 
             }
 
-            // TODO Pass back the commit time via mutation stats.
+            /*
+             * TODO Pass back the commit time and/or #of commits via mutation
+             * stats.
+             */
 
             // done.
             return null;

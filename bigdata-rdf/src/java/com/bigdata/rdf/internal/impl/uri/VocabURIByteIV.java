@@ -85,6 +85,16 @@ public class VocabURIByteIV<V extends BigdataURI> extends AbstractInlineIV<V, By
 
 	}
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to return <code>true</code>.
+     */
+    @Override
+    final public boolean isVocabulary() {
+        return true;
+    }
+    
 	@SuppressWarnings("unchecked")
 	@Override
 	public int _compareTo(final IV o) {

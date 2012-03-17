@@ -171,29 +171,31 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     private final AbstractTripleStore statementStore;
 
     /**
-     * The optional store into which statements will be inserted when non-<code>null</code>.
+     * The optional store into which statements will be inserted when non-
+     * <code>null</code>.
      */
     public final AbstractTripleStore getStatementStore() {
-        
+
         return statementStore;
-        
+
     }
 
     /**
      * The database that will be used to resolve terms. When
-     * {@link #statementStore} is <code>null</code>, statements will be
-     * written into this store as well.
+     * {@link #statementStore} is <code>null</code>, statements will be written
+     * into this store as well.
      */
     protected final AbstractTripleStore database;
-    
+
     /**
      * The arity of the SPORelation for the {@link #getDatabase()}.
      */
     private final int arity;
-    
+
     /**
-     * The database that will be used to resolve terms.  When {@link #getStatementStore()}
-     * is <code>null</code>, statements will be written into this store as well.
+     * The database that will be used to resolve terms. When
+     * {@link #getStatementStore()} is <code>null</code>, statements will be
+     * written into this store as well.
      */
     public final AbstractTripleStore getDatabase() {
         
@@ -261,18 +263,16 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
     }
     
-    protected IChangeLog changeLog;
-    
+    private IChangeLog changeLog;
 
-    
     /**
-     * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}s
-     * and writes on the <i>database</i> when it is {@link #flush()}ed. This
+     * Create a buffer that converts Sesame {@link Value} objects to {@link SPO}
+     * s and writes on the <i>database</i> when it is {@link #flush()}ed. This
      * may be used to perform efficient batch write of Sesame {@link Value}s or
      * {@link Statement}s onto the <i>database</i>. If you already have
      * {@link SPO}s then use
-     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)} and
-     * friends.
+     * {@link IRawTripleStore#addStatements(IChunkedOrderedIterator, IElementFilter)}
+     * and friends.
      * 
      * @param database
      *            The database into which the termS and statements will be
@@ -408,18 +408,18 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * Deferred statements are processed as follows:
      * <ol>
      * 
-     * <li> Collect all deferred statements whose blank node bindings never show
-     * up in the context position of a statement ({@link BigdataBNode#getStatementIdentifier()}
-     * is <code>false</code>). Those blank nodes are NOT statement
-     * identifiers so we insert them into the lexicon and the insert the
-     * collected statements as well. </li>
+     * <li>Collect all deferred statements whose blank node bindings never show
+     * up in the context position of a statement (
+     * {@link BigdataBNode#getStatementIdentifier()} is <code>false</code>).
+     * Those blank nodes are NOT statement identifiers so we insert them into
+     * the lexicon and the insert the collected statements as well.</li>
      * 
-     * <li> The remaining deferred statements are processed in "cliques". Each
+     * <li>The remaining deferred statements are processed in "cliques". Each
      * clique consists of all remaining deferred statements whose {s,p,o} have
      * become fully defined by virtue of a blank node becoming bound as a
      * statement identifier. A clique is collected by a full pass over the
      * remaining deferred statements. This process repeats until no statements
-     * are identified (an empty clique or fixed point). </li>
+     * are identified (an empty clique or fixed point).</li>
      * 
      * </ol>
      * If there are remaining deferred statements then they contain cycles. This

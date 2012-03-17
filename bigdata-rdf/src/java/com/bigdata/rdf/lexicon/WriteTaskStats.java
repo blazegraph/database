@@ -14,9 +14,10 @@ import com.bigdata.counters.CAT;
 public class WriteTaskStats {
     
     /**
-     * The #of distinct terms lacking a pre-assigned term identifier in [a].
+     * The #of distinct terms lacking a pre-assigned term identifier. If writes
+     * were permitted, then this is also the #of terms written onto the index.
      */
-    final AtomicInteger ndistinct = new AtomicInteger();
+    final AtomicLong ndistinct = new AtomicLong();
 
     /** time to convert unicode terms to byte[] sort keys. */
     final CAT keyGenTime = new CAT();

@@ -48,7 +48,7 @@ import org.openrdf.rio.helpers.RDFParserBase;
  */
 public class RDFParserOptions implements Serializable {
 
-    protected static final Logger log = Logger.getLogger(RDFParserOptions.class);
+    private static final Logger log = Logger.getLogger(RDFParserOptions.class);
     
     /**
      * 

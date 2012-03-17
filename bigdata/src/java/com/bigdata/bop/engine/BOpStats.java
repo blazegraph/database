@@ -105,6 +105,27 @@ public class BOpStats implements Serializable {
     final public CAT typeErrors = new CAT();
 
     /**
+     * The #of tuples written onto a relation (not an index).
+     * <p>
+     * Note: This mutation counts should reflect the #of tuples written on a
+     * relation rather than on an index. The per-index tuple mutation count MAY
+     * also be reported, but it should be reported by extending this class and
+     * declaring additional mutation counters.
+     * <p>
+     * Note: Operations which fix point some closure depend on the correctness
+     * of the {@link #mutationCount} for their termination condition.
+     * <P>
+     * Note: Mutation operations MUST NOT overwrite existing tuples with
+     * identical state. This is important for two reasons. First, fix point
+     * operations depend on the {@link #mutationCount} being ZERO (0) in a given
+     * round if nothing was changed in order to terminate the closure. Second,
+     * due to the general MVCC and copy-on-write architecture, index writes
+     * drive IO. If the tuple state would not be changed, then the index write
+     * SHOULD NOT be performed.
+     */
+    final public CAT mutationCount = new CAT();
+
+    /**
      * Constructor.
      */
     public BOpStats() {
@@ -131,6 +152,7 @@ public class BOpStats implements Serializable {
         unitsOut.add(o.unitsOut.get());
         chunksOut.add(o.chunksOut.get());
         typeErrors.add(o.typeErrors.get());
+        mutationCount.add(o.mutationCount.get());
     }
     
     public String toString() {
@@ -143,6 +165,7 @@ public class BOpStats implements Serializable {
         sb.append(",chunksOut=" + chunksOut.get());
         sb.append(",unitsOut=" + unitsOut.get());
         sb.append(",typeErrors=" + typeErrors.get());
+        sb.append(",mutationCount=" + mutationCount.get());
         toString(sb); // extension hook
         sb.append("}");
         return sb.toString();
