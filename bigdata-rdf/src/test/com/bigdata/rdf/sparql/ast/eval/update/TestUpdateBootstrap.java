@@ -27,15 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval.update;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -46,9 +46,10 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.rdf.update.ChunkedResolutionTask;
+import com.bigdata.bop.rdf.update.ChunkedResolutionOp;
 import com.bigdata.bop.rdf.update.CommitOp;
 import com.bigdata.bop.rdf.update.InsertStatementsOp;
+import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -56,19 +57,16 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.RDFParserOptions;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.InsertData;
+import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.rdf.store.DataLoader.CommitEnum;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Boot strapped test suite for core UPDATE functionality.
@@ -105,12 +103,21 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
 
     /**
      * Unit test for inserting ground triples or quads.
+     * 
      * <pre>
-     * PREFIX dc: <http://purl.org/dc/elements/1.1/>
+     * @prefix : <http://www.bigdata.com/> .
+     * @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+     * @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+     * @prefix foaf: <http://xmlns.com/foaf/0.1/> .
      * INSERT DATA
      * { 
-     *   <http://example/book1> dc:title "A new book" ;
-     *                          dc:creator "A.N.Other" .
+     *   GRAPH :g1 {
+     *     :Mike rdf:type foaf:Person .
+     *     :Bryan rdf:type foaf:Person .
+     *     :Mike rdfs:label "Mike" .
+     *     :Bryan rdfs:label "Bryan" .
+     *     :DC rdfs:label "DC" .
+     *   }
      * }
      * </pre>
      */
@@ -118,24 +125,32 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
     public void test_insert_data() throws Exception {
 
         final UpdateRoot updateRoot = new UpdateRoot();
+        final ISPO[] data;
         {
 
             final InsertData op = new InsertData();
 
             updateRoot.addChild(op);
 
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
-            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
-            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
+            final IV g1 = makeIV(valueFactory.createURI("http://www.bigdata.com/g1"));
+            final IV mike = makeIV(valueFactory.createURI("http://www.bigdata.com/Mike"));
+            final IV bryan = makeIV(valueFactory.createURI("http://www.bigdata.com/Bryan"));
+            final IV dc = makeIV(valueFactory.createURI("http://www.bigdata.com/DC"));
+            final IV rdfType = makeIV(valueFactory.asValue(RDF.TYPE));
+            final IV rdfsLabel = makeIV(valueFactory.asValue(RDFS.LABEL));
+            final IV foafPerson = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/Person"));
+            final IV mikeL = makeIV(valueFactory.createLiteral("Mike"));
+            final IV bryanL = makeIV(valueFactory.createLiteral("Bryan"));
+            final IV dcL = makeIV(valueFactory.createLiteral("DC"));
 
-            final ISPO[] data = new ISPO[] { //
-                    valueFactory.createStatement(
-                    book1, dcTitle, label1, null, StatementEnum.Explicit),//
-                    valueFactory.createStatement(
-                    book1, dcCreator, label2, null, StatementEnum.Explicit),//
+            data = new ISPO[] { //
+                    new SPO(mike, rdfType, foafPerson, g1, StatementEnum.Explicit),//
+                    new SPO(bryan, rdfType, foafPerson, g1, StatementEnum.Explicit),//
+                    new SPO(mike, rdfsLabel, mikeL, g1, StatementEnum.Explicit),//
+                    new SPO(bryan, rdfsLabel, bryanL, g1, StatementEnum.Explicit),//
+                    new SPO(dc, rdfsLabel, dcL, g1, StatementEnum.Explicit),//
             };
+            
             op.setData(data);
             
         }
@@ -160,7 +175,7 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
         final int resolutionId = bopId++;
         final int insertStatementsId = bopId++;
         final int commitId = bopId++;
-        PipelineOp left = null; // TODO left-or-null
+        PipelineOp left = null;
         
         /*
          * Resolve/add terms against the lexicon.
@@ -168,10 +183,10 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * TODO Must do SIDs support. Probably pass the database mode in as an
          * annotation.
          */
-        left = new ChunkedResolutionTask(BOp.NOARGS, NV.asMap(//
-                new NV(ChunkedResolutionTask.Annotations.BOP_ID, resolutionId),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId),//
-                new NV(ChunkedResolutionTask.Annotations.RELATION_NAME,
+        left = new ChunkedResolutionOp(leftOrEmpty(left), NV.asMap(//
+                new NV(BOp.Annotations.BOP_ID, resolutionId),//
+                new NV(ChunkedResolutionOp.Annotations.TIMESTAMP, txId),//
+                new NV(ChunkedResolutionOp.Annotations.RELATION_NAME,
                         new String[] { context.getLexiconNamespace() })//
                 ));
 
@@ -188,10 +203,10 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * 
          * TODO This must be able to do TM for triples+inference.
          */
-        left = new InsertStatementsOp(new BOp[] { left }, NV.asMap(new NV(
-                ChunkedResolutionTask.Annotations.BOP_ID, insertStatementsId),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId),//
-                new NV(ChunkedResolutionTask.Annotations.RELATION_NAME,
+        left = new InsertStatementsOp(leftOrEmpty(left), NV.asMap(new NV(
+                BOp.Annotations.BOP_ID, insertStatementsId),//
+                new NV(ChunkedResolutionOp.Annotations.TIMESTAMP, txId),//
+                new NV(ChunkedResolutionOp.Annotations.RELATION_NAME,
                         new String[] { context.getNamespace() })//
                 ));
         
@@ -203,21 +218,13 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * TODO Not required unless the end of the UpdateRoot or we desired a
          * checkpoint on the sequences of operations.
          */
-        left = new CommitOp(new BOp[] { left }, NV.asMap(//
-                new NV(ChunkedResolutionTask.Annotations.BOP_ID, commitId),//
-                new NV(ChunkedResolutionTask.Annotations.TIMESTAMP, txId)//
+        left = new CommitOp(leftOrEmpty(left), NV.asMap(//
+                new NV(BOp.Annotations.BOP_ID, commitId),//
+                new NV(CommitOp.Annotations.TIMESTAMP, txId)//
                 ));
 
-        /**
-         * The statements to be asserted.
-         * 
-         * <pre>
-         *     :Mike rdf:type foaf:Person .
-         *     :Bryan rdf:type foaf:Person .
-         *     :Mike rdfs:label "Mike" .
-         *     :Bryan rdfs:label "Bryan" .
-         *     :DC rdfs:label "DC" .
-         * </pre>
+        /*
+         * Populate the source solutions with the statements to be asserted.
          */
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
@@ -225,57 +232,21 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
             final Var<?> s = Var.var("s"), p = Var.var("p"), o = Var
                     .var("o"), c = Var.var("c");
 
-            {
+            for(ISPO spo : data) {
+
                 final ListBindingSet bset = new ListBindingSet();
-                bset.set(s, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/Mike"))));
-                bset.set(p, new Constant(makeIV(RDF.TYPE)));
-                bset.set(o, new Constant(makeIV(new URIImpl(
-                        "http://xmlns.com/foaf/0.1/Person"))));
-                bset.set(c, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/g1"))));
+                
+                bset.set(s, new Constant(spo.s()));
+                
+                bset.set(p, new Constant(spo.p()));
+                
+                bset.set(o, new Constant(spo.o()));
+                
+                if (spo.c() != null)
+                    bset.set(c, new Constant(spo.c()));
+                
                 bsets.add(bset);
-            }
-            {
-                final ListBindingSet bset = new ListBindingSet();
-                bset.set(s, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/Bryan"))));
-                bset.set(p, new Constant(makeIV(RDF.TYPE)));
-                bset.set(o, new Constant(makeIV(new URIImpl(
-                        "http://xmlns.com/foaf/0.1/Person"))));
-                bset.set(c, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/g1"))));
-                bsets.add(bset);
-            }
-            {
-                final ListBindingSet bset = new ListBindingSet();
-                bset.set(s, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/Mike"))));
-                bset.set(p, new Constant(makeIV(RDFS.LABEL)));
-                bset.set(o, new Constant(makeIV(new LiteralImpl("Mike"))));
-                bset.set(c, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/g1"))));
-                bsets.add(bset);
-            }
-            {
-                final ListBindingSet bset = new ListBindingSet();
-                bset.set(s, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/Bryan"))));
-                bset.set(p, new Constant(makeIV(RDFS.LABEL)));
-                bset.set(o, new Constant(makeIV(new LiteralImpl("Bryan"))));
-                bset.set(c, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/g1"))));
-                bsets.add(bset);
-            }
-            {
-                final ListBindingSet bset = new ListBindingSet();
-                bset.set(s, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/DC"))));
-                bset.set(p, new Constant(makeIV(RDFS.LABEL)));
-                bset.set(o, new Constant(makeIV(new LiteralImpl("DC"))));
-                bset.set(c, new Constant(makeIV(new URIImpl(
-                        "http://www.bigdata.com/g1"))));
-                bsets.add(bset);
+                
             }
 
         }
@@ -376,51 +347,218 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
         
     }
     
-//    /**
-//     * Unit test for removing ground triples or quads.
-//     */
-//    public void test_delete_data() throws Exception {
-//        fail("write test");
-//    }
-
     /**
-     * Unit test for parsing and then loading ground triples or quads.
-     * 
-     * TODO The parser integration is actually going to be pretty tricky. We
-     * need to handle the {@link RDFFormat} identification, override and/or
-     * refactor the {@link PresortRioLoader} and/or the {@link StatementBuffer}
-     * to provide incremental writes plus blank node and SIDs resolution (which
-     * requires that the bnodes map has document scope and hence requires the
-     * use of shared state for the ParseOp, unless the op runs with no inputs
-     * and just parses the document identified by the annotation). We need to
-     * handle load from the classpath, URI, and the file system, but we might
-     * not expose all of those sources to SPARQL UPDATE.
-     * 
-     * TODO There are also a host of options on the {@link DataLoader} which
-     * should be exposed to LOAD, probably through a syntax extension of SPARQL.
-     * That includes whether or not to do truth maintenance during a load (vs
-     * bulk load), figuring out whether to commit after each document or after a
-     * series of documents, figuring out whether to do database at once closure
-     * after the load operations (maybe a special SPARQL UPDATE request?), the
-     * buffer capacity, whether or not to verify data when parsing, whether or
-     * not to stop at the first error or continue, whether or not to trim large
-     * values (nxparser), told bnodes semantics, datatype handling, etc. Also,
-     * whether or not to setup the assertion and retraction buffers for truth
-     * maintenance, etc.
-     * 
-     * TODO We should probably have an indirected LOAD2 for a cluster
-     * (distributes load requests for files identified by some source).
-     * 
-     * @see PresortRioLoader
-     * @see StatementBuffer
-     * @see DataLoader
-     * @see DataLoader.Options
-     * @see RDFParserOptions
-     * @see ClosureEnum
-     * @see CommitEnum
+     * Unit test for LOAD with quads.
      */
     public void test_load_data() throws Exception {
-        fail("write test");
+        
+        final UpdateRoot updateRoot = new UpdateRoot();
+        final LoadGraph op;
+        {
+
+            op = new LoadGraph();
+
+            updateRoot.addChild(op);
+
+            op.setSourceGraph(new ConstantNode(
+                    makeIV(new URIImpl(
+                            "file:bigdata-rdf/src/test/com/bigdata/rdf/sparql/ast/eval/update/load_01.trig"))));
+
+            /*
+             * Note: This is loading into an unspecified graph since the target
+             * was not set.
+             */
+            
+        }
+
+        /*
+         * Turn that AST Update operation into a pipeline bop to add the terms
+         * and write the statements. This will be done by AST2BOpUtility, but I
+         * can mock the translation target up first.
+         */
+ 
+        final ASTContainer astContainer = new ASTContainer(updateRoot);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        final long txId = ITx.UNISOLATED;
+        int bopId = 1;
+        final int parseId = bopId++;
+        final int resolutionId = bopId++;
+        final int insertStatementsId = bopId++;
+        final int commitId = bopId++;
+        PipelineOp left = null;
+
+        /*
+         * Parse the file.
+         * 
+         * Note: After the parse step, the remainder of the steps are just like
+         * INSERT DATA.
+         */
+        {
+            final Map<String, Object> anns = new HashMap<String, Object>();
+
+            anns.put(BOp.Annotations.BOP_ID, parseId);
+
+            // required.
+            anns.put(ParseOp.Annotations.SOURCE_URI, op.getSourceGraph()
+                    .getValue());
+
+            // optional.
+            if (op.getTargetGraph() != null)
+                anns.put(ParseOp.Annotations.TARGET_URI, op.getTargetGraph());
+
+            // required.
+            anns.put(ParseOp.Annotations.TIMESTAMP, txId);
+            anns.put(ParseOp.Annotations.RELATION_NAME,
+                    new String[] { context.getNamespace() });
+
+            /*
+             * Note: 100k is the historical default for the data loader. We
+             * generally want to parse a lot of data at once and vector it in
+             * big chunks.
+             */
+            anns.put(ParseOp.Annotations.CHUNK_CAPACITY, 100000);
+            
+            left = new ParseOp(leftOrEmpty(left), anns);
+
+        }
+
+        /*
+         * Resolve/add terms against the lexicon.
+         */
+        left = new ChunkedResolutionOp(leftOrEmpty(left), NV.asMap(//
+                new NV(ChunkedResolutionOp.Annotations.BOP_ID, resolutionId),//
+                new NV(ChunkedResolutionOp.Annotations.TIMESTAMP, txId),//
+                new NV(ChunkedResolutionOp.Annotations.RELATION_NAME,
+                        new String[] { context.getLexiconNamespace() })//
+                ));
+
+        /*
+         * Insert statements.
+         */
+        left = new InsertStatementsOp(leftOrEmpty(left), NV.asMap(new NV(
+                BOp.Annotations.BOP_ID, insertStatementsId),//
+                new NV(InsertStatementsOp.Annotations.TIMESTAMP, txId),//
+                new NV(InsertStatementsOp.Annotations.RELATION_NAME,
+                        new String[] { context.getNamespace() })//
+                ));
+        
+        /*
+         * Commit.
+         */
+        left = new CommitOp(leftOrEmpty(left), NV.asMap(//
+                new NV(BOp.Annotations.BOP_ID, commitId),//
+                new NV(CommitOp.Annotations.TIMESTAMP, txId)//
+                ));
+        
+        // Run the update.
+        final IRunningQuery future = context.queryEngine.eval(left);
+        
+        // Look for errors.
+        future.get();
+
+        if (log.isInfoEnabled())
+            log.info(store.dumpStore());
+        
+        {
+            final BigdataValueFactory f = store.getValueFactory();
+            final BigdataURI mike = f.createURI("http://www.bigdata.com/Mike");
+            final BigdataURI bryan = f.createURI("http://www.bigdata.com/Bryan");
+            final BigdataURI dc = f.createURI("http://www.bigdata.com/DC");
+            final BigdataURI g1 = f.createURI("http://www.bigdata.com/g1");
+            final BigdataURI rdfType = f.asValue(RDF.TYPE);
+            final BigdataURI rdfsLabel = f.asValue(RDFS.LABEL);
+            final BigdataURI foafPerson = f.createURI("http://xmlns.com/foaf/0.1/Person");
+            final BigdataLiteral mikeL = f.createLiteral("Mike");
+            final BigdataLiteral bryanL = f.createLiteral("Bryan");
+            final BigdataLiteral DCL = f.createLiteral("DC");
+
+            final BigdataValue[] values = new BigdataValue[] { mike, bryan, dc,
+                    g1, rdfType, rdfsLabel, foafPerson, mikeL, bryanL, DCL };
+
+            // Batch resolve (read-only).
+            store.getLexiconRelation()
+                    .addTerms(values, values.length, true/* readOnly */);
+            
+            // Verify IV assignment.
+            for (BigdataValue v : values) {
+
+                final IV<?, ?> iv = v.getIV();
+
+                // a real IV.
+                assertFalse(iv.isNullIV());
+                
+            }
+
+            /*
+             * Verify statements in the store.
+             */
+            assertTrue(store.hasStatement(mike, rdfType, foafPerson, g1));
+            assertTrue(store.hasStatement(bryan, rdfType, foafPerson, g1));
+            assertTrue(store.hasStatement(mike, rdfsLabel, mikeL, g1));
+            assertTrue(store.hasStatement(bryan, rdfsLabel, bryanL, g1));
+            assertTrue(store.hasStatement(dc, rdfsLabel, DCL, g1));
+
+            /*
+             * Check the mutation counters for the lexicon.
+             */
+            {
+
+                final BOpStats stats = future.getStats().get(resolutionId);
+
+                /*
+                 * Note: This assumes that rdf:type and rdfs:label are not
+                 * defined by the vocabulary.  We have to subtract out each
+                 * Value which was declared by the vocabulary or is otherwise
+                 * represented as a fully inline IV.
+                 */
+                
+                long expectedCount = values.length;
+
+                for (int i = 0; i < values.length; i++) {
+
+                    if (values[i].getIV().isInline())
+                        expectedCount--;
+
+                }
+
+                assertEquals("mutationCount", expectedCount,
+                        stats.mutationCount.get());
+            
+            }
+            
+            /*
+             * Check the mutation counters for the statements relation.
+             */
+            {
+
+                final BOpStats stats = future.getStats()
+                        .get(insertStatementsId);
+
+                final long expectedCount = 5;
+
+                assertEquals("mutationCount", expectedCount,
+                        stats.mutationCount.get());
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Return either <i>left</i> wrapped as the sole member of an array or
+     * {@link BOp#NOARGS} iff <i>left</i> is <code>null</code>.
+     * 
+     * @param left
+     *            The prior operator in the pipeline (optional).
+     * @return The array.
+     */
+    static protected BOp[] leftOrEmpty(final PipelineOp left) {
+
+        return left == null ? BOp.NOARGS : new BOp[] { left };
+
     }
 
 }

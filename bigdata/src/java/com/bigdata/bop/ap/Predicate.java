@@ -632,12 +632,12 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
-    public final boolean isMutation() {
-
-        return getProperty(IPredicate.Annotations.MUTATION,
-                IPredicate.Annotations.DEFAULT_MUTATION);
-
-    }
+//    public final boolean isMutation() {
+//
+//        return getProperty(IPredicate.Annotations.MUTATION,
+//                IPredicate.Annotations.DEFAULT_MUTATION);
+//
+//    }
 
     public final long getTimestamp() {
 

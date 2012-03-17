@@ -877,9 +877,39 @@ public class BOpUtility {
     static public IBindingSet[] toArray(final Iterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
-    	final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
+        if (!itr.hasNext()) {
 
-        int nchunks = 0, nelements = 0;
+            /*
+             * Fast path for an empty chunk.
+             */
+
+            return EMPTY_CHUNK;
+
+        }
+
+        final IBindingSet[] firstChunk = itr.next();
+
+        if (!itr.hasNext()) {
+
+            /*
+             * Fast path if everything is already in one chunk.
+             */
+
+            if (stats != null) {
+                stats.chunksIn.add(1);
+                stats.unitsIn.add(firstChunk.length);
+            }
+
+            return firstChunk;
+
+        }
+
+        final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
+
+        list.add(firstChunk);
+
+        int nchunks = 1, nelements = firstChunk.length;
+
         try {
 
             while (itr.hasNext()) {
@@ -950,6 +980,11 @@ public class BOpUtility {
 
     } // toArray()
 
+    /**
+     * An empty {@link IBindingSet}[].
+     */
+    public static final IBindingSet[] EMPTY_CHUNK = new IBindingSet[0];
+    
     /**
      * Pretty print a bop.
      * 
