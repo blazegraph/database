@@ -139,6 +139,14 @@ public class TestAll extends TestCase {
         // test suite for inline constraints: GT, LT, GTE, LTE
         suite.addTestSuite(TestInlineConstraints.class);
 
+        // test suite for custom functions.
+        suite.addTestSuite(TestCustomFunction.class);
+
+        /*
+         * SPARQL 1.1 UPDATE
+         */
+//        suite.addTest(com.bigdata.rdf.sparql.ast.eval.update.TestAll.suite());
+        
         /*
          * SPARQL 1.1 Federated Query.
          */
