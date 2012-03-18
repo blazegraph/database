@@ -85,7 +85,7 @@ public class SPOIndexWriter implements Callable<Long> {
 
     private final IIndex ndx;
 
-    private final SPOKeyOrder keyOrder;
+//    private final SPOKeyOrder keyOrder;
     
     private final boolean reportMutation;
 
@@ -147,7 +147,7 @@ public class SPOIndexWriter implements Callable<Long> {
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        this.keyOrder = keyOrder;
+//        this.keyOrder = keyOrder;
 		this.primaryIndex = primaryIndex;
         this.filter = filter;
         
@@ -185,7 +185,9 @@ public class SPOIndexWriter implements Callable<Long> {
         assert ndx != null;
 
         quads = keyOrder.getKeyArity() == 4;
-
+        
+//        assert quads == spoRelation.getContainer().isQuads();
+        
         sids = spoRelation.statementIdentifiers;
 
     }
@@ -281,9 +283,9 @@ public class SPOIndexWriter implements Callable<Long> {
 
             // skip duplicate records.
             if (last != null && last.equals(spo)) {
-                if (keyOrder.getKeyArity() == 4) {
+                if (quads) {
                     // must also compare context for quads.
-                    if (last.c() == spo.c())
+                    if (last.c().equals(spo.c()))
                         continue;
 
                 } else

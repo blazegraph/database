@@ -248,7 +248,7 @@ public class ASTContainer extends ASTBase {
     public void clearOptimizedAST() {
 
         clearProperty(Annotations.OPTIMIZED_AST);
-        
+           
     }
     
     /**
@@ -261,7 +261,7 @@ public class ASTContainer extends ASTBase {
     }
 
     /**
-     * Set the physical query plan (pipeline bops).
+     * Set the physical plan for query or update (pipeline bops).
      */
     public void setQueryPlan(final PipelineOp queryPlan) {
         
@@ -276,10 +276,17 @@ public class ASTContainer extends ASTBase {
         final String queryString = getQueryString();
         
         final Object parseTree = getParseTree();
-        
-        final ASTBase originalAST = getOriginalAST();
-        
-        final ASTBase optimizedAST = getOptimizedAST();
+
+        /*
+         * Note: Resolve the original AST without regard to query versus update.
+         */
+        final ASTBase originalAST = (ASTBase) getProperty(Annotations.ORIGINAL_AST);
+
+        /*
+         * Note: Resolve the optimized AST without regard to query versus
+         * update.
+         */
+        final ASTBase optimizedAST = (ASTBase) getProperty(Annotations.OPTIMIZED_AST);
 
         final PipelineOp queryPlan = getQueryPlan();
 

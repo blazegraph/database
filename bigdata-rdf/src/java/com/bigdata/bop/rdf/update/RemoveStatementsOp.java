@@ -119,6 +119,8 @@ public final class RemoveStatementsOp extends AbstractAddRemoveStatementsOp {
             // Convert into array.
             final ISPO[] stmts = b.toArray(new ISPO[b.size()]);
 
+//            System.err.println("before:\n" + tripleStore.dumpStore());
+            
             // Write on the database.
             final long nmodified = tripleStore.removeStatements(stmts,
                     stmts.length);

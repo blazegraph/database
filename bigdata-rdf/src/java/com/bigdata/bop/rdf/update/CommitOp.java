@@ -58,6 +58,19 @@ public final class CommitOp extends PipelineOp {
         super(args, annotations);
 
         getRequiredProperty(Annotations.TIMESTAMP);
+
+        if (getProperty(Annotations.PIPELINED, Annotations.DEFAULT_PIPELINED)) {
+            
+            /*
+             * Pipelined evaluation is not permitted for COMMIT. You need to
+             * know that everything upstream was successfully evaluated before
+             * you can invoke commit(). "At once" evaluation semantics given us
+             * that guarantee.
+             */
+
+            throw new IllegalArgumentException(Annotations.PIPELINED);
+            
+        }
         
     }
 

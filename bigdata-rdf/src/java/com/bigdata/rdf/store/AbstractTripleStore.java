@@ -3217,7 +3217,7 @@ abstract public class AbstractTripleStore extends
 
             final IIndex ndx = getSPORelation().getJustificationIndex();
 
-            final ITupleIterator itrj = ndx.rangeIterator();
+            final ITupleIterator<Justification> itrj = ndx.rangeIterator();
 
             while (itrj.hasNext()) {
 

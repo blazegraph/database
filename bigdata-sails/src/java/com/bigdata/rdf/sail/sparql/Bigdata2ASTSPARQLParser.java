@@ -41,6 +41,7 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
+import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
@@ -66,9 +67,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Overridden version of the openrdf 2.3 SPARQLParser class which extracts
+ * Overridden version of the openrdf {@link SPARQLParser} class which extracts
  * additional information required by bigdata and associates it with the
- * {@link ParsedQuery}.
+ * {@link ParsedQuery} or {@link ParsedUpdate}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
@@ -118,8 +119,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ParsedUpdate parseUpdate(final String updateStr, final String baseURI)
             throws MalformedQueryException {
 
-        throw new UnsupportedOperationException();
-//        return new BigdataParsedUpdate(parseUpdate2(queryStr, baseURI));
+        return new BigdataParsedUpdate(parseUpdate2(updateStr, baseURI));
 
     }
 
@@ -200,13 +200,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  * Batch resolve ASTRDFValue to BigdataValues with their
                  * associated IVs.
                  * 
-                 * TODO IV resolution probably needs to proceed separately for
+                 * FIXME IV resolution probably needs to proceed separately for
                  * each UPDATE operation in a sequence since some operations can
                  * cause new IVs to be declared in the lexicon. Resolution
                  * before those IVs have been declared would produce a different
                  * result than resolution afterward.
                  */
-                new BatchRDFValueResolver(context).process(uc);
+                new BatchRDFValueResolver(context, true/* readOnly */)
+                        .process(uc);
 
 
 //              // Handle dataset declaration
@@ -224,7 +225,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 //                }
 
                 final ASTUpdate updateNode = uc.getUpdate();
-                
+
+                /*
+                 * Translate an UPDATE operation.
+                 */
                 final Object result = updateNode.jjtAccept(updateExprBuilder,
                         null/* data */);
                 
@@ -280,7 +284,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
              */
-            new BatchRDFValueResolver(context).process(qc);
+            new BatchRDFValueResolver(context, true/* readOnly */).process(qc);
 
             /*
              * Build the bigdata AST from the parse tree.
@@ -441,54 +445,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         }
 
     }
-    
-//    /**
-//     * TODO This should be handled by an AST visitor. It is just much simpler.
-//     * That will also allow us to handle query hints embedded into comments
-//     * (actually, the syntax <code>hintURI bd:hint hintValue</code> allows us to
-//     * embed query hints into graph patterns).
-//     * 
-//     * @deprecated by https://sourceforge.net/apps/trac/bigdata/ticket/421
-//     */
-//    static private Properties getQueryHints(final ASTQueryContainer qc)
-//            throws MalformedQueryException {
-//        
-//        final Properties queryHints = new Properties();
-//        
-//        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-//        
-//        // iterate the namespaces
-//        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
-//            // if we see one that matches the magic namespace, try
-//            // to parse it
-//            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
-//                String hints = prefix.getValue();
-//                // has to have a # and it can't be at the end
-//                int i = hints.indexOf('#');
-//                if (i < 0 || i == hints.length() - 1) {
-//                    throw new MalformedQueryException("bad query hints: "
-//                            + hints);
-//                }
-//                hints = hints.substring(i + 1);
-//                // properties are separated by &
-//                final StringTokenizer st = new StringTokenizer(hints, "&");
-//                while (st.hasMoreTokens()) {
-//                    final String hint = st.nextToken();
-//                    i = hint.indexOf('=');
-//                    if (i < 0 || i == hint.length() - 1) {
-//                        throw new MalformedQueryException("bad query hint: "
-//                                + hint);
-//                    }
-//                    final String key = hint.substring(0, i);
-//                    final String val = hint.substring(i + 1);
-//                    queryHints.put(key, val);
-//                }
-//            }
-//        }
-//     
-//        return queryHints;
-//        
-//    }
     
 //    public static void main(String[] args)
 //        throws java.io.IOException

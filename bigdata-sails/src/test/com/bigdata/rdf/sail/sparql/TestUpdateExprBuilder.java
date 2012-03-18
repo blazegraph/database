@@ -30,8 +30,6 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
@@ -56,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Test suite for {@link UpdateExprBuilder}.
@@ -974,6 +973,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * }
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_insert_data() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
@@ -991,17 +991,17 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
-            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
-            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
+            final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+            final IV dcCreator = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/creator"));
+            final IV dcTitle = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/title"));
+            final IV label1 = makeIV(valueFactory.createLiteral("A new book"));
+            final IV label2 = makeIV(valueFactory.createLiteral("A.N.Other"));
 
             final ISPO[] data = new ISPO[] { //
-                    valueFactory.createStatement(
-                    book1, dcTitle, label1, null, StatementEnum.Explicit),//
-                    valueFactory.createStatement(
-                    book1, dcCreator, label2, null, StatementEnum.Explicit),//
+                    new SPO(book1, dcTitle, label1, null,
+                            StatementEnum.Explicit),//
+                    new SPO(book1, dcCreator, label2, null,
+                            StatementEnum.Explicit),//
             };
             op.setData(data);
             
@@ -1021,6 +1021,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * { GRAPH <http://example/bookStore> { <http://example/book1>  ns:price  42 } }
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_insert_data_quads() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
@@ -1036,15 +1037,15 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
-            final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI price = valueFactory.createURI("http://example.org/ns#price");
-            final BigdataLiteral i42 = valueFactory.createLiteral("42",XSD.INTEGER);
+            final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+            final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+            final IV price = makeIV(valueFactory.createURI("http://example.org/ns#price"));
+            final IV i42 = makeIV(valueFactory.createLiteral("42",XSD.INTEGER));
 
             final ISPO[] data = new ISPO[] { //
-                    valueFactory.createStatement(book1, price, i42, bookstore,
-                    StatementEnum.Explicit),//
+            new SPO(book1, price, i42, bookstore, StatementEnum.Explicit),//
             };
+
             op.setData(data);
 
         }
@@ -1067,6 +1068,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * }
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_insert_data_triples_then_quads() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
@@ -1086,23 +1088,24 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
-            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
-            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
-            final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
-            final BigdataURI price = valueFactory.createURI("http://example.org/ns#price");
-            final BigdataLiteral i42 = valueFactory.createLiteral("42",XSD.INTEGER);
+            final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+            final IV dcCreator = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/creator"));
+            final IV dcTitle = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/title"));
+            final IV label1 = makeIV(valueFactory.createLiteral("A new book"));
+            final IV label2 = makeIV(valueFactory.createLiteral("A.N.Other"));
+            final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+            final IV price = makeIV(valueFactory.createURI("http://example.org/ns#price"));
+            final IV i42 = makeIV(valueFactory.createLiteral("42",XSD.INTEGER));
 
             final ISPO[] data = new ISPO[] { //
-                    valueFactory.createStatement(
-                    book1, dcTitle, label1, null, StatementEnum.Explicit),//
-                    valueFactory.createStatement(
-                    book1, dcCreator, label2, null, StatementEnum.Explicit),//
-                    valueFactory.createStatement(book1, price, i42, bookstore,
-                    StatementEnum.Explicit),//
+                    new SPO(book1, dcTitle, label1, null,
+                            StatementEnum.Explicit),//
+                    new SPO(book1, dcCreator, label2, null,
+                            StatementEnum.Explicit),//
+                    new SPO(book1, price, i42, bookstore,
+                            StatementEnum.Explicit),//
             };
+            
             op.setData(data);
 
         }
@@ -1125,6 +1128,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * }
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_insert_data_quads_then_triples() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
@@ -1144,22 +1148,22 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
-            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
-            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
-            final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
-            final BigdataURI price = valueFactory.createURI("http://example.org/ns#price");
-            final BigdataLiteral i42 = valueFactory.createLiteral("42",XSD.INTEGER);
+            final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+            final IV dcCreator = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/creator"));
+            final IV dcTitle = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/title"));
+            final IV label1 = makeIV(valueFactory.createLiteral("A new book"));
+            final IV label2 = makeIV(valueFactory.createLiteral("A.N.Other"));
+            final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+            final IV price = makeIV(valueFactory.createURI("http://example.org/ns#price"));
+            final IV i42 = makeIV(valueFactory.createLiteral("42",XSD.INTEGER));
 
             final ISPO[] data = new ISPO[] { //
-                    valueFactory.createStatement(book1, price, i42, bookstore,
-                    StatementEnum.Explicit),//
-                    valueFactory.createStatement(
-                    book1, dcTitle, label1, null, StatementEnum.Explicit),//
-                    valueFactory.createStatement(
-                    book1, dcCreator, label2, null, StatementEnum.Explicit),//
+                    new SPO(book1, price, i42, bookstore,
+                            StatementEnum.Explicit),//
+                    new SPO(book1, dcTitle, label1, null,
+                            StatementEnum.Explicit),//
+                    new SPO(book1, dcCreator, label2, null,
+                            StatementEnum.Explicit),//
             };
             op.setData(data);
 
@@ -1183,6 +1187,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * }
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_insert_data_triples_quads_triples() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
@@ -1202,24 +1207,24 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
-            final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-            final BigdataURI dcCreator = valueFactory.createURI("http://purl.org/dc/elements/1.1/creator");
-            final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-            final BigdataLiteral label1 = valueFactory.createLiteral("A new book");
-            final BigdataLiteral label2 = valueFactory.createLiteral("A.N.Other");
-            final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
-            final BigdataURI price = valueFactory.createURI("http://example.org/ns#price");
-            final BigdataLiteral i42 = valueFactory.createLiteral("42",XSD.INTEGER);
+            final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+            final IV dcCreator = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/creator"));
+            final IV dcTitle = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/title"));
+            final IV label1 = makeIV(valueFactory.createLiteral("A new book"));
+            final IV label2 = makeIV(valueFactory.createLiteral("A.N.Other"));
+            final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+            final IV price = makeIV(valueFactory.createURI("http://example.org/ns#price"));
+            final IV i42 = makeIV(valueFactory.createLiteral("42",XSD.INTEGER));
 
             final ISPO[] data = new ISPO[] { //
                     
-                    valueFactory.createStatement(
+                    new SPO(
                     book1, dcTitle, label1, null, StatementEnum.Explicit),//
                     
-                    valueFactory.createStatement(book1, price, i42, bookstore,
+                    new SPO(book1, price, i42, bookstore,
                     StatementEnum.Explicit),//
                     
-                    valueFactory.createStatement(
+                    new SPO(
                     book1, dcCreator, label2, null, StatementEnum.Explicit),//
             
             };
@@ -1244,6 +1249,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * { GRAPH <http://example/bookStore> { <http://example/book1>  dc:title  "Fundamentals of Compiler Design" } }     *
      * </pre>
      */
+    @SuppressWarnings("rawtypes")
     public void test_delete_data_quads_insert_data_quads()
             throws MalformedQueryException, TokenMgrError, ParseException {
 
@@ -1255,11 +1261,11 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "INSERT DATA\n"
                 + "{ GRAPH <http://example/bookStore> { <http://example/book1>  dc:title  \"Fundamentals of Compiler Design\" } }";
 
-        final BigdataURI book1 = valueFactory.createURI("http://example/book1");
-        final BigdataURI dcTitle = valueFactory.createURI("http://purl.org/dc/elements/1.1/title");
-        final BigdataLiteral label1 = valueFactory.createLiteral("Fundamentals of Compiler Desing");
-        final BigdataLiteral label2 = valueFactory.createLiteral("Fundamentals of Compiler Design");
-        final BigdataURI bookstore = valueFactory.createURI("http://example/bookStore");
+        final IV book1 = makeIV(valueFactory.createURI("http://example/book1"));
+        final IV dcTitle = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/title"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Fundamentals of Compiler Desing"));
+        final IV label2 = makeIV(valueFactory.createLiteral("Fundamentals of Compiler Design"));
+        final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
 
         final UpdateRoot expected = new UpdateRoot();
         {
@@ -1270,8 +1276,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final ISPO[] data = new ISPO[] { //
                     
-                    valueFactory.createStatement(
-                    book1, dcTitle, label1, bookstore, StatementEnum.Explicit),//
+            new SPO(book1, dcTitle, label1, bookstore, StatementEnum.Explicit),//
                                 
             };
             op.setData(data);
@@ -1286,8 +1291,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final ISPO[] data = new ISPO[] { //
                     
-                    valueFactory.createStatement(
-                    book1, dcTitle, label2, bookstore, StatementEnum.Explicit),//
+            new SPO(book1, dcTitle, label2, bookstore, StatementEnum.Explicit),//
                                 
             };
             op.setData(data);

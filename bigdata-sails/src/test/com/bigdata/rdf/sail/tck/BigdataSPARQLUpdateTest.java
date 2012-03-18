@@ -100,9 +100,6 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
     /**
      * Note: This method may be overridden in order to run the test suite
      * against other variations of the bigdata backend.
-     * 
-     * @see #suiteLTSWithNestedSubquery()
-     * @see #suiteLTSWithPipelineJoins()
      */
     protected Properties getProperties() {
 

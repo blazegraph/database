@@ -64,14 +64,11 @@ import com.bigdata.rdf.sparql.ast.InsertData;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
 /**
  * Boot strapped test suite for core UPDATE functionality.
- * 
- * TODO Integrate into {@link AST2BOpUtility} (plan generation).
  * 
  * TODO Validate outcomes. For the data driven tests, we could validate a
  * post-condition with a query. Or a set of post-conditions with a set of
@@ -159,11 +156,6 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * Turn that AST Update operation into a pipeline bop to add the terms
          * and write the statements. This will be done by AST2BOpUtility, but I
          * can mock the translation target up first.
-         * 
-         * TODO When translating, the notion that we might translate either
-         * incrementally or all operations in the sequence at once is related to
-         * the notion of interactive evaluation which would help to enable the
-         * RTO.
          */
  
         final ASTContainer astContainer = new ASTContainer(updateRoot);
@@ -179,9 +171,6 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
         
         /*
          * Resolve/add terms against the lexicon.
-         * 
-         * TODO Must do SIDs support. Probably pass the database mode in as an
-         * annotation.
          */
         left = new ChunkedResolutionOp(leftOrEmpty(left), NV.asMap(//
                 new NV(BOp.Annotations.BOP_ID, resolutionId),//
@@ -198,10 +187,6 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          * support.
          * 
          * Note: This already does TM for SIDs mode.
-         * 
-         * TODO This must to TM for the subject-centric text index.
-         * 
-         * TODO This must be able to do TM for triples+inference.
          */
         left = new InsertStatementsOp(leftOrEmpty(left), NV.asMap(new NV(
                 BOp.Annotations.BOP_ID, insertStatementsId),//
@@ -212,15 +197,11 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
         
         /*
          * Commit.
-         * 
-         * TODO Not required on cluster.
-         * 
-         * TODO Not required unless the end of the UpdateRoot or we desired a
-         * checkpoint on the sequences of operations.
          */
         left = new CommitOp(leftOrEmpty(left), NV.asMap(//
                 new NV(BOp.Annotations.BOP_ID, commitId),//
-                new NV(CommitOp.Annotations.TIMESTAMP, txId)//
+                new NV(CommitOp.Annotations.TIMESTAMP, txId),//
+                new NV(CommitOp.Annotations.PIPELINED, false)//
                 ));
 
         /*
@@ -449,7 +430,8 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
          */
         left = new CommitOp(leftOrEmpty(left), NV.asMap(//
                 new NV(BOp.Annotations.BOP_ID, commitId),//
-                new NV(CommitOp.Annotations.TIMESTAMP, txId)//
+                new NV(CommitOp.Annotations.TIMESTAMP, txId),//
+                new NV(CommitOp.Annotations.PIPELINED, false)//
                 ));
         
         // Run the update.

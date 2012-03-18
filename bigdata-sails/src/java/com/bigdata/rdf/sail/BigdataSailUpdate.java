@@ -29,8 +29,6 @@ import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.repository.sail.SailUpdate;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -92,9 +90,14 @@ public class BigdataSailUpdate extends SailUpdate implements
         final Object[] tmp = new BigdataValueReplacer(getTripleStore())
                 .replaceValues(dataset, null/* bindings */);
 
-        astContainer.getOriginalAST().setDataset(
-                new DatasetNode((Dataset) tmp[0]));
-
+        /*
+         * FIXME Set the data set on the original AST, but we have to reconcile
+         * the AST models for query and update such that there is a shared
+         * interface which supports that operation.
+         */
+//        astContainer.getOriginalUpdateAST().setDataset(
+//                new DatasetNode((Dataset) tmp[0]));
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -126,8 +129,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     public void execute() throws UpdateExecutionException {
 
-        ASTEvalHelper.executeUpdate(astContainer, new AST2BOpContext(
-                astContainer, getTripleStore()));
+        ASTEvalHelper.executeUpdate(getTripleStore(), astContainer);
 
     }
 

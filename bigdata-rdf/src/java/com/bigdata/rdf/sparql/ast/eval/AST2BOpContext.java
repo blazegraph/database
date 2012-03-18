@@ -315,6 +315,15 @@ public class AST2BOpContext implements IdFactory {
 
     }
 
+    /**
+     * The timestamp or transaction identifier associated with the view.
+     */
+    public long getTimestamp() {
+
+        return db.getTimestamp();
+
+    }
+    
     public int nextId() {
 
         return idFactory.incrementAndGet();
@@ -329,7 +338,38 @@ public class AST2BOpContext implements IdFactory {
         return db.getIndexManager() instanceof IBigdataFederation<?>;
 
     }
+
+    /**
+     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
+     * quads mode.
+     */
+    public boolean isQuads() {
+
+        return db.isQuads();
+        
+    }
     
+    /**
+     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
+     * SIDS mode.
+     */
+    public boolean isSIDs() {
+
+        return db.isStatementIdentifiers();
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
+     * triples mode.
+     */
+    public boolean isTriples() {
+
+        return !db.isQuads() && !db.isStatementIdentifiers();
+        
+    }
+    
+
     /**
      * Return the namespace of the {@link AbstractTripleStore}.
      */

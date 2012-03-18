@@ -44,6 +44,7 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -94,17 +95,25 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
     private final BigdataASTContext context;
 
+    private final boolean readOnly;
+    
     private final BigdataValueFactory valueFactory;
 
     private final LinkedHashMap<ASTRDFValue, BigdataValue> nodes;
     
     /**
      * @param context
+     * @param readOnly
+     *            When <code>true</code>, unknown RDF {@link Value}s are not
+     *            recorded in the database.
      */
-    public BatchRDFValueResolver(final BigdataASTContext context) {
-        
+    public BatchRDFValueResolver(final BigdataASTContext context,
+            final boolean readOnly) {
+
         this.context = context;
 
+        this.readOnly = readOnly;
+        
         this.valueFactory = context.valueFactory;
         
         this.nodes = new LinkedHashMap<ASTRDFValue, BigdataValue>();
@@ -185,7 +194,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             final BigdataValue[] values = context.vocab.values().toArray(
                     new BigdataValue[0]);
 
-            context.lexicon.addTerms(values, values.length, true/* readOnly */);
+            context.lexicon.addTerms(values, values.length, readOnly);
 
             // Cache the BigdataValues on the IVs for later
             for (BigdataValue value : values) {
@@ -206,11 +215,11 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                      * Create a dummy iv and cache the unknown value on it so
                      * that it can be used during query evaluation.
                      */
-                    final IV dummy = TermId.mockIV(VTE.valueOf(value));
+                    final IV dummyIV = TermId.mockIV(VTE.valueOf(value));
 
-                    value.setIV(dummy);
+                    value.setIV(dummyIV);
 
-                    dummy.setValue(value);
+                    dummyIV.setValue(value);
 
                 } else {
 
@@ -253,12 +262,19 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
     }
 
+    /**
+     * FIXME Should this be using the {@link LexiconConfiguration} to create
+     * appropriate inline {@link IV}s when and where appropriate?
+     */
     private class RDFValueResolver extends ASTVisitorBase {
 
         @Override
-        public Object visit(ASTQName node, Object data) throws VisitorException {
+        public Object visit(final ASTQName node, final Object data)
+                throws VisitorException {
+
             throw new VisitorException(
                     "QNames must be resolved before resolving RDF Values");
+
         }
 
         /**
@@ -266,14 +282,16 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
          * even when we are in a told bnodes mode.
          */
         @Override
-        public Object visit(ASTBlankNode node, Object data)
+        public Object visit(final ASTBlankNode node, final Object data)
                 throws VisitorException {
+            
             throw new VisitorException(
                     "Blank nodes must be replaced with variables before resolving RDF Values");
+            
         }
 
         @Override
-        public Void visit(final ASTIRI node, Object data)
+        public Void visit(final ASTIRI node, final Object data)
                 throws VisitorException {
 
             try {
@@ -292,7 +310,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         }
 
         @Override
-        public Void visit(final ASTRDFLiteral node, Object data)
+        public Void visit(final ASTRDFLiteral node, final Object data)
                 throws VisitorException {
 
             // Note: This is handled by this ASTVisitor (see below in this
@@ -339,7 +357,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         }
 
         @Override
-        public Void visit(final ASTNumericLiteral node, Object data)
+        public Void visit(final ASTNumericLiteral node, final Object data)
                 throws VisitorException {
 
             nodes.put(
@@ -352,7 +370,8 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         }
 
         @Override
-        public Void visit(ASTTrue node, Object data) throws VisitorException {
+        public Void visit(final ASTTrue node, final Object data)
+                throws VisitorException {
 
             nodes.put(node, context.valueFactory.createLiteral(true));
 
@@ -361,7 +380,8 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         }
 
         @Override
-        public Void visit(ASTFalse node, Object data) throws VisitorException {
+        public Void visit(final ASTFalse node, final Object data)
+                throws VisitorException {
 
             nodes.put(node, context.valueFactory.createLiteral(false));
 
@@ -373,7 +393,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
          * Note: This supports the visitor method for a Literal.
          */
         @Override
-        public String visit(ASTString node, Object data)
+        public String visit(final ASTString node, final Object data)
                 throws VisitorException {
 
             return node.getValue();
