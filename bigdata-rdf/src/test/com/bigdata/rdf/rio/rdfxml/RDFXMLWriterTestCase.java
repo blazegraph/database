@@ -42,7 +42,7 @@ public abstract class RDFXMLWriterTestCase extends RDFWriterTest {
 		rep1.initialize();
 
 		RepositoryConnection con1 = rep1.getConnection();
-
+		// FIXME There appears to be a problem resolving these resources in the classpath. They are in the test jar.  we might need to modify the classpath search to find them.  See DataLoader for how.
 		URL ciaScheme = this.getClass().getResource("/cia-factbook/CIA-onto-enhanced.rdf");
 		URL ciaFacts = this.getClass().getResource("/cia-factbook/CIA-facts-enhanced.rdf");
 
