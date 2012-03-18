@@ -40,6 +40,7 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
@@ -62,7 +63,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.Update;
-import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -658,93 +659,37 @@ public class ASTEvalHelper {
      *            Look at the query code path for this, but also consider what
      *            it means in the context of update. It probably only effects
      *            the WHERE clauses in UPDATE operations.
-     * 
-     *            TODO Where are the DataSet(s) for the update operations in the
-     *            sequence coming from? I assume that they will be attached to
-     *            each {@link Update}.
-     * 
-     *            TODO Do LOAD sequences (and maybe other operations) in
-     *            parallel.
-     * 
-     *            TODO We will need to run some AST optimizers. Probably once
-     *            per {@link Update} step. Those optimizers will need to handle
-     *            {@link Update} as well as {@link QueryRoot}.  We will need to
-     *            expand the AST optimizer test suite for this.
      */
-    static public void executeUpdate(
-            final ASTContainer astContainer,
-            final AST2BOpContext ctx
-            ) {
-        
+    static public void executeUpdate(final AbstractTripleStore store,
+            final ASTContainer astContainer) throws UpdateExecutionException {
+
+        if (log.isInfoEnabled()) {
+            // Log the SPARQL UPDATE string.
+            log.info(astContainer.getQueryString());
+        }
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
         /*
-         * TODO Build up the optimized AST for the UpdateRoot for each Update to
-         * be executed.  Maybe do this all up front before we run anything since
-         * we might reorder or regroup some operations (e.g., parallelized LOAD
-         * operations, parallelized INSERT data operations, etc).
+         * Convert the query (generates an optimized AST as a side-effect).
          */
-        final UpdateRoot originalUpdate = astContainer.getOriginalUpdateAST();
+        AST2BOpUpdate.optimizeUpdateRoot(context);
 
-        for(Update op : originalUpdate) {
-
+        /*
+         * Generate and execute physical plans for the update operations.
+         */
+        try {
             
+            AST2BOpUpdate.convertUpdate(context);
+            
+        } catch (Exception e) {
+            
+            throw new UpdateExecutionException(e);
             
         }
         
-        throw new UnsupportedOperationException();
-        
+//        executeUpdate(context);
+
     }
-    // FIXME Clean up.
-//  final List<UpdateExpr> updateExprs = parsedUpdate.getUpdateExprs();
-//
-//  for (UpdateExpr updateExpr : updateExprs) {
-//      // LOAD is handled at the Repository API level because it requires
-//      // access to the Rio parser:  
-//      if (updateExpr instanceof Load) {
-//
-//          Load load = (Load)updateExpr;
-//
-//          Value source = load.getSource().getValue();
-//          Value graph = load.getGraph() != null ? load.getGraph().getValue() : null;
-//
-//          SailRepositoryConnection conn = getConnection();
-//          try {
-//              URL sourceURL = new URL(source.stringValue());
-//
-//              if (graph == null) {
-//                  conn.add(sourceURL, source.stringValue(), null);
-//              }
-//              else {
-//                  conn.add(sourceURL, source.stringValue(), null, (Resource)graph);
-//              }
-//          }
-//          catch (Exception e) {
-//              log.warn("exception during update execution: ", e);
-//              if (!load.isSilent()) {
-//                  throw new UpdateExecutionException(e);
-//              }
-//          }
-//      }
-//      else {
-//          // pass update operation to the SAIL.
-//          SailConnection conn = getConnection().getSailConnection();
-//
-//          try {
-//              conn.executeUpdate(updateExpr, getActiveDataset(), getBindings(), true);
-//              getConnection().autoCommit();
-//          }
-//          catch (SailException e) {
-//              log.warn("exception during update execution: ", e);
-//              if (!updateExpr.isSilent()) {
-//                  throw new UpdateExecutionException(e);
-//              }
-//          }
-//          catch (RepositoryException e) {
-//              log.warn("exception during update execution: ", e);
-//              if (!updateExpr.isSilent()) {
-//                  throw new UpdateExecutionException(e);
-//              }
-//          }
-//      }
-//  }
-    
+
 }

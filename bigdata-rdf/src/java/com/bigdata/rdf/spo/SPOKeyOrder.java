@@ -643,9 +643,9 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         for (int i = 0; i < a.length; i++) {
 
             IVUtility.encode(keyBuilder, spo.get(a[i]));
-            
+
         }
-        
+
         return keyBuilder.getKey();
 
     }

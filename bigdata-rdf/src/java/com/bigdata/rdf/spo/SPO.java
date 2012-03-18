@@ -62,12 +62,15 @@ public class SPO implements ISPO, java.io.Serializable {
 	private static final long serialVersionUID = 1L;
     
     /** The internal value for the subject position. */
+    @SuppressWarnings("rawtypes")
     public final IV s;
 
     /** The internal value for the predicate position. */
+    @SuppressWarnings("rawtypes")
     public final IV p;
     
     /** The internal value for the object position. */
+    @SuppressWarnings("rawtypes")
     public final IV o;
 
     /**
@@ -76,6 +79,7 @@ public class SPO implements ISPO, java.io.Serializable {
      * Note: this is not final since, for SIDs mode, we have to set it lazily
      * when adding an {@link SPO} to the database.
      */
+    @SuppressWarnings("rawtypes")
     private IV c = null;
 
 //    /**
@@ -138,7 +142,7 @@ public class SPO implements ISPO, java.io.Serializable {
     private static int SIDABLE_BIT = 6;
 	
 	
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     final public IV get(final int index) {
         switch(index) {
         case 0: return s;
@@ -149,18 +153,22 @@ public class SPO implements ISPO, java.io.Serializable {
         }
     }
     
+    @SuppressWarnings("rawtypes")
     final public IV s() {
         return s;
     }
 
+    @SuppressWarnings("rawtypes")
     final public IV p() {
         return p;
     }
 
+    @SuppressWarnings("rawtypes")
     final public IV o() {
         return o;
     }
 
+    @SuppressWarnings("rawtypes")
     final public IV c() {
     	
     	// lazy instantiate the sid if necessary
@@ -188,6 +196,7 @@ public class SPO implements ISPO, java.io.Serializable {
 
     }
 
+    @SuppressWarnings("rawtypes")
     public final IV getStatementIdentifier() {
 
     	if (!sidable())

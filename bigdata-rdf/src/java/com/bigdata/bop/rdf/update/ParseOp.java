@@ -194,6 +194,13 @@ public class ParseOp extends PipelineOp {
          * mode and the data is not quads, then it is an error.
          */
         String TARGET_URI = ParseOp.class.getName() + ".targetUri";
+
+        /**
+         * When <code>true</code>, a parse error will be ignored.
+         */
+        String SILENT = ParseOp.class.getName() + ".silent";
+        
+        boolean DEFAULT_SILENT = false;
         
 //        /**
 //         * Optional property specifying the capacity of the
@@ -307,7 +314,7 @@ public class ParseOp extends PipelineOp {
          */
         private final RDFFormat fallback;
 
-        private final boolean sids, quads;
+        private final boolean sids, quads, silent;
 
         private final boolean stripContext;
         
@@ -467,6 +474,9 @@ public class ParseOp extends PipelineOp {
 
             this.quads = database.isQuads();
 
+            this.silent = op.getProperty(Annotations.SILENT,
+                    Annotations.DEFAULT_SILENT);
+            
             /*
              * Note: This is used as the default context position for the
              * statement if the database mode is quads. It needs to be a
@@ -590,9 +600,17 @@ public class ParseOp extends PipelineOp {
         public Void call() throws Exception {
 
             InputStream is = null;
-
+            Reader reader = null;
+            RDFFormat fmt = null;
+            
             try {
 
+                /*
+                 * The expected format based on the file name component of the
+                 * URL.
+                 */
+                fmt = RDFFormat.forFileName(uriStr, fallback);
+                
                 String contentEncoding = null;
                 
                 if (allowClassPath) {
@@ -618,12 +636,6 @@ public class ParseOp extends PipelineOp {
                     
                 }
 
-                /*
-                 * The expected format based on the file name component of the
-                 * URL.
-                 */
-                RDFFormat fmt = RDFFormat.forFileName(uriStr, fallback);
-                
                 if (is == null) {
 
                     /*
@@ -721,37 +733,38 @@ public class ParseOp extends PipelineOp {
                      * Assume the default content encoding if we have no better
                      * information.
                      */
-                    
+
                     contentEncoding = fmt.getCharset().name();
 
                 }
 
-                final Reader reader = new BufferedReader(new InputStreamReader(
-                        is, contentEncoding), readBufferSize);
+                reader = new BufferedReader(new InputStreamReader(is,
+                        contentEncoding), readBufferSize);
 
-                try {
+                parse(reader, baseUri, fmt, targetUri);
 
-                    parse(reader, baseUri, fmt, targetUri);
+            } catch (Exception ex) {
 
-                } catch (Exception ex) {
+                final String msg = "While loading: " + uriStr
+                        + (fmt != null ? ", fmt=" + fmt : "");
 
-                    throw new RuntimeException("While loading: " + uriStr
-                            + ", fmt=" + fmt, ex);
+                if (silent) {
 
-                } finally {
+                    log.warn(msg);
+                    
+                } else {
 
-                    reader.close();
-
+                    throw new RuntimeException(msg, ex);
+                
                 }
 
             } finally {
 
+                if (reader != null)
+                    reader.close();
+
                 if (is != null) {
-
                     is.close();
-
-                    is = null;
-
                 }
 
             }

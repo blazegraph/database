@@ -35,9 +35,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
@@ -833,7 +830,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         graphPattern = parentGP;
 
-        final List<BigdataStatement> stmts = new LinkedList<BigdataStatement>();
+        final List<ISPO> stmts = new LinkedList<ISPO>();
 
         final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
                 quadData, StatementPatternNode.class);
@@ -842,10 +839,18 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             final StatementPatternNode sp = itr.next();
 
-            final BigdataStatement spo = context.valueFactory.createStatement(
-                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
-                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
-                            .c().getValue() : null), StatementEnum.Explicit);
+            final ISPO spo = new SPO(//
+                    sp.s().getValue().getIV(), //
+                    sp.p().getValue().getIV(), //
+                    sp.o().getValue().getIV(),//
+                    (sp.c() != null ? sp.c().getValue().getIV() : null),//
+                    StatementEnum.Explicit//
+            );
+
+//            final BigdataStatement spo = context.valueFactory.createStatement(
+//                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
+//                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
+//                            .c().getValue() : null), StatementEnum.Explicit);
 
             stmts.add(spo);
 

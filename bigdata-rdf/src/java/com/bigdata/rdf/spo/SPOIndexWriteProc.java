@@ -44,7 +44,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
- * Procedure for batch index on a single statement index (or index partition).
+ * Procedure for batch insert on a single statement index (or index partition).
  * <p>
  * The key for each statement encodes the {s:p:o} of the statement in the order
  * that is appropriate for the index (SPO, POS, OSP, etc). The key is written
@@ -340,7 +340,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                     onCount++;
             }
             
-            ResultBitBuffer rbb = new ResultBitBuffer(b.length, b, onCount);
+            final ResultBitBuffer rbb = new ResultBitBuffer(b.length, b, onCount);
             
             return rbb;
             

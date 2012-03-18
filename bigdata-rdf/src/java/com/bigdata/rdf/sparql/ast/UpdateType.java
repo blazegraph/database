@@ -62,7 +62,7 @@ public enum UpdateType {
      * Note: Bigdata does not support empty graphs, so {@link #Clear} and
      * {@link #Drop} have the same semantics.
      * 
-     * @see @see http://www.w3.org/TR/sparql11-update/#drop
+     * @see http://www.w3.org/TR/sparql11-update/#drop
      * @see DropGraph
      */
     Drop(false/* graphUpdate */), //
