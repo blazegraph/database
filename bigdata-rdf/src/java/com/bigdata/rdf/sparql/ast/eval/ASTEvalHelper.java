@@ -44,6 +44,7 @@ import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -57,13 +58,12 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.Update;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -659,36 +659,54 @@ public class ASTEvalHelper {
      *            Look at the query code path for this, but also consider what
      *            it means in the context of update. It probably only effects
      *            the WHERE clauses in UPDATE operations.
+     * 
+     * @throws SailException
      */
-    static public void executeUpdate(final AbstractTripleStore store,
+    static public void executeUpdate(
+            final BigdataSailRepositoryConnection conn,
             final ASTContainer astContainer) throws UpdateExecutionException {
 
-        if (log.isInfoEnabled()) {
-            // Log the SPARQL UPDATE string.
-            log.info(astContainer.getQueryString());
-        }
+        if(conn == null)
+            throw new IllegalArgumentException();
 
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-        /*
-         * Convert the query (generates an optimized AST as a side-effect).
-         */
-        AST2BOpUpdate.optimizeUpdateRoot(context);
-
-        /*
-         * Generate and execute physical plans for the update operations.
-         */
-        try {
-            
-            AST2BOpUpdate.convertUpdate(context);
-            
-        } catch (Exception e) {
-            
-            throw new UpdateExecutionException(e);
-            
-        }
+        if(astContainer == null)
+            throw new IllegalArgumentException();
         
-//        executeUpdate(context);
+        try {
+
+            if (log.isInfoEnabled()) {
+                // Log the SPARQL UPDATE string.
+                log.info(astContainer.getQueryString());
+            }
+
+            final AST2BOpUpdateContext context = new AST2BOpUpdateContext(
+                    astContainer, conn);
+
+            /*
+             * Convert the query (generates an optimized AST as a side-effect).
+             */
+            AST2BOpUpdate.optimizeUpdateRoot(context);
+
+            /*
+             * Generate and execute physical plans for the update operations.
+             */
+            try {
+
+                AST2BOpUpdate.convertUpdate(context);
+
+            } catch (Exception e) {
+
+                throw new UpdateExecutionException(e);
+
+            }
+
+            // executeUpdate(context);
+            
+        } catch (SailException ex) {
+
+            throw new UpdateExecutionException(ex);
+
+        }
 
     }
 

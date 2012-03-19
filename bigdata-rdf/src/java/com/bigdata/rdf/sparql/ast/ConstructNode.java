@@ -54,7 +54,7 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
     /**
      * Required deep copy constructor.
      */
-    public ConstructNode(ConstructNode op) {
+    public ConstructNode(final ConstructNode op) {
 
         super(op);
         
@@ -63,7 +63,7 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
     /**
      * Required shallow copy constructor.
      */
-    public ConstructNode(BOp[] args, Map<String, Object> anns) {
+    public ConstructNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 

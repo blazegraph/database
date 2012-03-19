@@ -53,13 +53,15 @@ public class AddGraph extends AbstractFromToGraphManagement {
     private static final long serialVersionUID = 1L;
 
     public AddGraph() {
+
         super(UpdateType.Add);
+        
     }
 
     /**
      * @param op
      */
-    public AddGraph(AddGraph op) {
+    public AddGraph(final AddGraph op) {
         super(op);
     }
 
@@ -67,7 +69,7 @@ public class AddGraph extends AbstractFromToGraphManagement {
      * @param args
      * @param anns
      */
-    public AddGraph(BOp[] args, Map<String, Object> anns) {
+    public AddGraph(final BOp[] args, final Map<String, Object> anns) {
         super(args, anns);
     }
 
