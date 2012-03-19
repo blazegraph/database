@@ -20,18 +20,27 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
@@ -85,10 +94,30 @@ public class RemoteRepository {
     private final String serviceURL;
 
 	private final DefaultHttpClient http;
-
+	
     public RemoteRepository(final String serviceURL) {
     	this.serviceURL = serviceURL;
-    	this.http = new DefaultHttpClient();
+    	
+    	final SchemeRegistry schemeRegistry = new SchemeRegistry();
+    	schemeRegistry.register(
+    	         new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
+    	schemeRegistry.register(
+    	         new Scheme("https", 443, SSLSocketFactory.getSocketFactory()));
+
+    	final ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(schemeRegistry);
+    	// Increase max total connection to 200
+    	cm.setMaxTotal(200);
+    	// Increase default max connection per route to 20
+    	cm.setDefaultMaxPerRoute(20);
+    	// Increase max connections for localhost to 50
+    	final HttpHost localhost = new HttpHost("locahost");
+    	cm.setMaxForRoute(new HttpRoute(localhost), 50);
+    	 
+    	this.http = new DefaultHttpClient(cm);
+    }
+    
+    public void shutdown() {
+    	this.http.getConnectionManager().shutdown();
     }
     
 	/**
@@ -140,17 +169,7 @@ public class RemoteRepository {
         opts.addRequestParam("queryId", queryId.toString());
         opts.addRequestParam("cancel");
 
-        HttpResponse response = null;
-        try {
-        	
-        	checkResponseCode(response = doConnect(opts));
-        	
-        } finally {
-        	
-//        	if (cxn != null)
-//        		cxn.disconnect();
-        	
-        }
+    	checkResponseCode(doConnect(opts));
 		
 	}
 
@@ -190,19 +209,23 @@ public class RemoteRepository {
         	opts.addRequestParam("c", EncodeDecodeValue.encodeValue(c));
         }
 
-        HttpResponse cxn = null;
+        HttpResponse resp = null;
         try {
         	
-        	checkResponseCode(cxn = doConnect(opts));
+        	checkResponseCode(resp = doConnect(opts));
         	
-        	final RangeCountResult result = rangeCountResults(cxn);
+        	final RangeCountResult result = rangeCountResults(resp);
         	
         	return result.rangeCount;
         	
         } finally {
         	
-//        	if (cxn != null)
-//        		cxn.disconnect();
+        	try {
+        	
+        		if (resp != null)
+        			EntityUtils.consume(resp.getEntity());
+        		
+        	} catch (Exception ex) { }
         	
         }
 
@@ -252,8 +275,12 @@ public class RemoteRepository {
         	
         } finally {
         	
-//        	if (response != null)
-//        		response.disconnect();
+        	try {
+            	
+        		if (response != null)
+        			EntityUtils.consume(response.getEntity());
+        		
+        	} catch (Exception ex) { }
         	
         }
         
@@ -318,8 +345,12 @@ public class RemoteRepository {
         	
         } finally {
         	
-//        	if (response != null)
-//        		response.disconnect();
+        	try {
+            	
+        		if (response != null)
+        			EntityUtils.consume(response.getEntity());
+        		
+        	} catch (Exception ex) { }
         	
         }
 		
@@ -397,8 +428,12 @@ public class RemoteRepository {
         	
         } finally {
         	
-//        	if (response != null)
-//        		response.disconnect();
+        	try {
+            	
+        		if (response != null)
+        			EntityUtils.consume(response.getEntity());
+        		
+        	} catch (Exception ex) { }
         	
         }
 		
@@ -424,7 +459,7 @@ public class RemoteRepository {
 			return id;
 		}
 		
-		protected HttpResponse doRemoteQuery() throws Exception {
+		protected ConnectOptions getConnectOpts() throws Exception {
 			
 	        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
 
@@ -432,20 +467,8 @@ public class RemoteRepository {
 	        opts.addRequestParam("query", query);
 	        opts.addRequestParam("queryId", getQueryId().toString());
 
-	        HttpResponse response = null;
-	        try {
+        	return opts;
 	        	
-	        	return checkResponseCode(response = doConnect(opts));
-	        	
-	        } catch (Exception ex) {
-	        	
-//	        	if (cxn != null)
-//	        		cxn.disconnect();
-	        	
-	        	throw ex;
-	        	
-	        }
-			
 		}
 		
 	}
@@ -457,7 +480,25 @@ public class RemoteRepository {
 		}
 		
 		public TupleQueryResult evaluate() throws Exception {
-            return tupleResults(doRemoteQuery());
+			
+	        HttpResponse response = null;
+	        try {
+	        	
+	        	checkResponseCode(response = doConnect(getConnectOpts()));
+	        	
+	        	return tupleResults(response);
+	        	
+	        } finally {
+	        	
+	        	try {
+	            	
+	        		if (response != null)
+	        			EntityUtils.consume(response.getEntity());
+	        		
+	        	} catch (Exception ex) { }
+	        	
+	        }
+			
 		}
 		
 	}
@@ -469,7 +510,25 @@ public class RemoteRepository {
 		}
 		
 		public Graph evaluate() throws Exception {
-            return graphResults(doRemoteQuery());
+
+	        HttpResponse response = null;
+	        try {
+	        	
+	        	checkResponseCode(response = doConnect(getConnectOpts()));
+	        	
+	        	return graphResults(response);
+	        	
+	        } finally {
+	        	
+	        	try {
+	            	
+	        		if (response != null)
+	        			EntityUtils.consume(response.getEntity());
+	        		
+	        	} catch (Exception ex) { }
+	        	
+	        }
+			
 		}
 		
 	}
@@ -481,7 +540,25 @@ public class RemoteRepository {
 		}
 		
 		public boolean evaluate() throws Exception {
-            return booleanResults(doRemoteQuery());
+            
+	        HttpResponse response = null;
+	        try {
+	        	
+	        	checkResponseCode(response = doConnect(getConnectOpts()));
+	        	
+	        	return booleanResults(response);
+	        	
+	        } finally {
+	        	
+	        	try {
+	            	
+	        		if (response != null)
+	        			EntityUtils.consume(response.getEntity());
+	        		
+	        	} catch (Exception ex) { }
+	        	
+	        }
+	        
 		}
 		
 	}
@@ -627,17 +704,8 @@ public class RemoteRepository {
         
         /** Request parameters to be formatted as URL query parameters. */
         public Map<String,String[]> requestParams;
-        
-//        /**
-//         * The Content-Type (iff there will be a request body).
-//         */
-//        public String contentType = null;
-//        
-//        /**
-//         * The data to send as the request body (optional).
-//         */
-//        public byte[] data = null;
-        
+
+        /** Request entity. */
         public HttpEntity entity = null;
         
         /** The connection timeout (ms) -or- ZERO (0) for an infinite timeout. */
@@ -652,11 +720,8 @@ public class RemoteRepository {
         public void addRequestParam(final String name, final String[] vals) {
         	
         	if (requestParams == null) {
-        	
-        		this.requestParams = new LinkedHashMap<String, String[]>();
-        		
+        		requestParams = new LinkedHashMap<String, String[]>();
         	}
-        	
         	requestParams.put(name, vals);
         	
         }
@@ -891,9 +956,10 @@ public class RemoteRepository {
     protected TupleQueryResult tupleResults(final HttpResponse response)
             throws Exception {
 
+    	HttpEntity entity = null;
     	try {
     		
-    		final HttpEntity entity = response.getEntity();
+    		entity = response.getEntity();
     		
 	        final String contentType = entity.getContentType().getValue();
 	
@@ -926,6 +992,7 @@ public class RemoteRepository {
     		
 //			// terminate the http connection.
 //    		response.disconnect();
+    		EntityUtils.consume(entity);
     		
     	}
 
@@ -944,12 +1011,13 @@ public class RemoteRepository {
 	 */
 	protected Graph graphResults(final HttpResponse response) throws Exception {
 
+    	HttpEntity entity = null;
 		try {
 
+    		entity = response.getEntity();
+    		
 			final String baseURI = "";
 
-    		final HttpEntity entity = response.getEntity();
-    		
 	        final String contentType = entity.getContentType().getValue();
 
             if (contentType == null)
@@ -995,6 +1063,7 @@ public class RemoteRepository {
 
 //			// terminate the http connection.
 //			response.disconnect();
+			EntityUtils.consume(entity);
 
 		}
 
@@ -1015,9 +1084,10 @@ public class RemoteRepository {
      */
     protected boolean booleanResults(final HttpResponse response) throws Exception {
 
+    	HttpEntity entity = null;
         try {
 
-    		final HttpEntity entity = response.getEntity();
+    		entity = response.getEntity();
     		
 	        final String contentType = entity.getContentType().getValue();
 
@@ -1048,6 +1118,7 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
+        	EntityUtils.consume(entity);
 
         }
 
@@ -1066,9 +1137,10 @@ public class RemoteRepository {
 	 */
 	protected long countResults(final HttpResponse response) throws Exception {
 
+		HttpEntity entity = null;
         try {
 
-    		final HttpEntity entity = response.getEntity();
+    		entity = response.getEntity();
     		
 	        final String contentType = entity.getContentType().getValue();
 
@@ -1123,6 +1195,7 @@ public class RemoteRepository {
 
 //			// terminate the http connection.
 //			response.disconnect();
+			EntityUtils.consume(entity);
 
 		}
 
@@ -1152,9 +1225,10 @@ public class RemoteRepository {
 
     protected MutationResult mutationResults(final HttpResponse response) throws Exception {
 
+		HttpEntity entity = null;
         try {
 
-    		final HttpEntity entity = response.getEntity();
+    		entity = response.getEntity();
     		
 	        final String contentType = entity.getContentType().getValue();
 
@@ -1202,6 +1276,7 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
+        	EntityUtils.consume(entity);
 
         }
 
@@ -1231,9 +1306,10 @@ public class RemoteRepository {
 
     protected RangeCountResult rangeCountResults(final HttpResponse response) throws Exception {
 
+		HttpEntity entity = null;
         try {
 
-    		final HttpEntity entity = response.getEntity();
+    		entity = response.getEntity();
     		
 	        final String contentType = entity.getContentType().getValue();
 
@@ -1281,6 +1357,7 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
+        	EntityUtils.consume(entity);
 
         }
 
