@@ -653,8 +653,6 @@ public class ASTEvalHelper {
      * @param ctx
      *            The evaluation context.
      * 
-     *            TODO Is there anything interesting to return from here?
-     * 
      *            TODO Caller must set [includeInferred] on the update request.
      *            Look at the query code path for this, but also consider what
      *            it means in the context of update. It probably only effects

@@ -40,6 +40,7 @@ import com.bigdata.bop.BOp;
  */
 public class AbstractStatementContainer<E extends IStatementContainer> extends
         GroupNodeBase<E> {
+    
     /**
      * 
      */
