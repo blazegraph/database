@@ -95,6 +95,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	protected String m_serviceURL;
 
 	/**
+	 * The client-API wrapper to the NSS.
+	 */
+	protected RemoteRepository m_repo;
+
+	/**
 	 * The request path for the REST API under test.
 	 */
 	final protected static String requestPath = "/sparql";
@@ -242,6 +247,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         if (log.isInfoEnabled())
             log.info("Setup done: name=" + getName() + ", namespace="
                     + namespace + ", serviceURL=" + m_serviceURL);
+        
+        m_repo = new RemoteRepository(m_serviceURL);
 
     }
 
@@ -272,6 +279,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		namespace = null;
 		
 		m_serviceURL = null;
+		
+		m_repo.shutdown();
 
 		log.info("tear down done");
 		
