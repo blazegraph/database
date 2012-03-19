@@ -58,7 +58,9 @@ public class DropGraph extends AbstractOneGraphManagement {
      * Used by {@link ClearGraph}.
      */
     protected DropGraph(final UpdateType updateType) {
+
         super(updateType);
+        
     }
 
     public DropGraph() {
@@ -68,16 +70,20 @@ public class DropGraph extends AbstractOneGraphManagement {
     /**
      * @param op
      */
-    public DropGraph(DropGraph op) {
+    public DropGraph(final DropGraph op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public DropGraph(BOp[] args, Map<String, Object> anns) {
+    public DropGraph(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+        
     }
 
     /**

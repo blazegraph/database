@@ -60,95 +60,20 @@ public class ClearGraph extends DropGraph {
     /**
      * @param op
      */
-    public ClearGraph(ClearGraph op) {
+    public ClearGraph(final ClearGraph op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public ClearGraph(BOp[] args, Map<String, Object> anns) {
+    public ClearGraph(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+        
     }
-
-//    /**
-//     * Return <code>true</code> IFF this is <code>CLEAR ALL</code>.
-//     */
-//    public boolean isAll() {
-//        
-//        return getTargetGraph() == null && getScope() == null;
-//        
-//    }
-//    
-//    @Override
-//    public ConstantNode getTargetGraph() {
-//        
-//        return (ConstantNode) getProperty(Annotations.TARGET_GRAPH);
-//        
-//    }
-//
-//    @Override
-//    public void setTargetGraph(final ConstantNode targetGraph) {
-//
-//        if (targetGraph == null)
-//            throw new IllegalArgumentException();
-//
-//        setProperty(Annotations.TARGET_GRAPH, targetGraph);
-//
-//    }
-//
-//    @Override
-//    public boolean isSilent() {
-//
-//        return getProperty(Annotations.SILENT, Annotations.DEFAULT_SILENT);
-//
-//    }
-//
-//    @Override
-//    public void setSilent(final boolean silent) {
-//
-//        setProperty(Annotations.SILENT, silent);
-//
-//    }
-//
-//    public Scope getScope() {
-//
-//        return (Scope) getProperty(Annotations.SCOPE);
-//
-//    }
-//
-//    public void setScope(final Scope scope) {
-//
-//        setProperty(Annotations.SCOPE, scope);
-//
-//    }
-//
-//    // CLEAR  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL )
-//    public String toString(final int indent) {
-//
-//        final StringBuilder sb = new StringBuilder();
-//
-//        sb.append(indent(indent));
-//        
-//        sb.append(getUpdateType());
-//
-//        if (isSilent())
-//            sb.append(" SILENT");
-//
-//        final ConstantNode targetGraph = getTargetGraph();
-//        final Scope scope = getScope();
-//
-//        if (targetGraph != null) {
-//            sb.append(" target=" + targetGraph);
-//        } else if (scope != null) {
-//            sb.append(" scope=" + scope);
-//        } else {
-//            sb.append(" all");
-//        }
-//
-//        return sb.toString();
-//
-//    }
 
 }

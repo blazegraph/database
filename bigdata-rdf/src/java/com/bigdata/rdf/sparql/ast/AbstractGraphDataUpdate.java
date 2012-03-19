@@ -55,23 +55,30 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
 
     }
 
-    public AbstractGraphDataUpdate(UpdateType updateType) {
+    public AbstractGraphDataUpdate(final UpdateType updateType) {
+        
         super(updateType);
+        
     }
 
     /**
      * @param op
      */
-    public AbstractGraphDataUpdate(AbstractGraphDataUpdate op) {
+    public AbstractGraphDataUpdate(final AbstractGraphDataUpdate op) {
+
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public AbstractGraphDataUpdate(BOp[] args, Map<String, Object> anns) {
+    public AbstractGraphDataUpdate(final BOp[] args,
+            final Map<String, Object> anns) {
+
         super(args, anns);
+        
     }
 
     public ISPO[] getData() {
