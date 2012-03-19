@@ -101,4 +101,25 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
 
     }
 
+    @Override
+    public String toString(final int indent) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        final String s = indent(indent);
+        
+        sb.append("\n").append(s).append("QUADS {");
+
+        for (IStatementContainer v : this) {
+
+            sb.append(v.toString(indent + 1));
+
+        }
+
+        sb.append("\n").append(s).append("}");
+        
+        return sb.toString();
+
+    }
+
 }

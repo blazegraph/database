@@ -73,6 +73,7 @@ import com.bigdata.bop.rdf.update.InsertStatementsOp;
 import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -399,17 +400,13 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final ASTContainer astContainer = new ASTContainer(queryRoot);
 
-            /*
-             * FIXME Data set and defaultContet.
-             */
-            final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
-
-             final QuadData insertClause = op.getInsertClause();
+            final QuadData insertClause = op.getInsertClause();
 
             final QuadData deleteClause = op.getDeleteClause();
 
             if (insertClause == null && deleteClause == null) {
                 // Must have at least one or the other.
+                // FIXME testDeleteWhereShortcut hits this.
                 throw new UnsupportedOperationException();
             }
 
@@ -434,20 +431,27 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 /*
                  * DELETE + INSERT.
                  * 
-                 * FIXME Simple CONSTRUCT semantics are not enough for this
-                 * case. We need to process each solution by feeding into the
-                 * delete template and then feeding it into the insert template.
-                 * Both templates are quads (not just triples). We might need to
+                 * FIXME testDeleteInsertWhere hits this.
+                 * 
+                 * Simple CONSTRUCT semantics are not enough for this case. We
+                 * need to process each solution by feeding into the delete
+                 * template and then feeding it into the insert template. Both
+                 * templates are quads (not just triples). We might need to
                  * fully buffer the solutions and replay them so as to run the
                  * DELETEs before the INSERTs, or we might even need to run the
                  * WHERE clause twice - once to do the DELETEs and then once
                  * more to do the INSERTs. This depends on the isolation
                  * semantics for the operation with respect to itself.
                  */
-                
+
                 throw new UnsupportedOperationException();
 
             } else {
+
+                /*
+                 * FIXME Data set and defaultContet.
+                 */
+//                final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
 
                 final QuadData quadData = insertClause == null ? deleteClause
                         : insertClause;
@@ -463,14 +467,25 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                 try {
 
-                    if (isInsertOnly) {
+                    while(result.hasNext()) {
 
-                        context.conn.add(result, contexts);
+                        final BigdataStatement stmt = (BigdataStatement) result
+                                .next();
 
-                    } else if (isDeleteOnly) {
+                        if (isInsertOnly) {
 
-                        context.conn.remove(result, contexts);
+                            context.conn.add(stmt.getSubject(),
+                                    stmt.getPredicate(), stmt.getObject(),
+                                    stmt.getContext());
 
+                        } else {
+
+                            context.conn.remove(stmt.getSubject(),
+                                    stmt.getPredicate(), stmt.getObject(),
+                                    stmt.getContext());
+
+                        }
+                        
                     }
 
                 } finally {
