@@ -783,6 +783,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * {@link BigdataStatement}s at this point, but they can be converted to
      * {@link SPO}s when the INSERT DATA or DELETE DATA operation runs.
      * 
+     * @return A flat {@link ISPO}[] modeling the quad data.
+     * 
      * @throws VisitorException
      */
     private ISPO[] doQuadsData(final Node node, final Object data)
@@ -830,6 +832,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         graphPattern = parentGP;
 
+        /*
+         * Flatten the QuadData into a simple ISPO[].
+         */
         final List<ISPO> stmts = new LinkedList<ISPO>();
 
         final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
@@ -863,14 +868,18 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     }
 
     /**
-     * Collect quads patterns for a DELETE/INSERT operation.  This form allows
+     * Collect quads patterns for a DELETE/INSERT operation. This form allows
      * variables in the quads patterns.
      * 
      * @param data
      * 
-     *            TODO [data] appears to be where to put the data. Look at how
-     *            this is getting passed in to the caller (ASTModify and maybe
-     *            recursively in this method).
+     * @return The {@link QuadData} (aka template). The {@link QuadData} as
+     *         returned by this method is not flattened, but the context has
+     *         been applied within any GRAPH section.
+     * 
+     *         TODO [data] appears to be where to put the data. Look at how this
+     *         is getting passed in to the caller (ASTModify and maybe
+     *         recursively in this method).
      */
     private QuadData doQuadsPatternClause(final Node node, final Object data)
             throws VisitorException {

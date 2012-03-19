@@ -52,22 +52,28 @@ public class MoveGraph extends AbstractFromToGraphManagement {
     private static final long serialVersionUID = 1L;
 
     public MoveGraph() {
+        
         super(UpdateType.Move);
+        
     }
 
     /**
      * @param op
      */
-    public MoveGraph(MoveGraph op) {
+    public MoveGraph(final MoveGraph op) {
+     
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public MoveGraph(BOp[] args, Map<String, Object> anns) {
+    public MoveGraph(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
+        
     }
 
 }

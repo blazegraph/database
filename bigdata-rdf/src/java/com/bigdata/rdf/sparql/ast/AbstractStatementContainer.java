@@ -52,15 +52,21 @@ public class AbstractStatementContainer<E extends IStatementContainer> extends
     /**
      * @param op
      */
-    public AbstractStatementContainer(AbstractStatementContainer<E> op) {
+    public AbstractStatementContainer(final AbstractStatementContainer<E> op) {
+    
         super(op);
+
     }
 
     /**
      * @param args
      * @param anns
      */
-    public AbstractStatementContainer(BOp[] args, Map<String,Object> anns) {
+    public AbstractStatementContainer(final BOp[] args,
+            final Map<String, Object> anns) {
+
         super(args, anns);
+
     }
+
 }

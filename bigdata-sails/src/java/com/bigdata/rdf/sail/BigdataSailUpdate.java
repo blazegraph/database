@@ -23,12 +23,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.concurrent.TimeUnit;
+
 import org.openrdf.query.Dataset;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.repository.sail.SailUpdate;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -108,6 +111,7 @@ public class BigdataSailUpdate extends SailUpdate implements
      * 
      * @return The active dataset, or <tt>null</tt> if there is no dataset.
      */
+    @Override
     public Dataset getActiveDataset() {
 
         // FIXME Review DataSet handling in parser, here, and evaluation code. 
@@ -127,9 +131,24 @@ public class BigdataSailUpdate extends SailUpdate implements
         
     }
 
+    @Override
     public void execute() throws UpdateExecutionException {
 
-        ASTEvalHelper.executeUpdate(getTripleStore(), astContainer);
+        /*
+         * FIXME Pass [includeInferred] through on the AST.
+         */
+        
+//        final QueryRoot originalQuery = astContainer.getOriginalAST();
+//
+////        if (getMaxQueryTime() > 0)
+////            originalQuery.setTimeout(TimeUnit.SECONDS
+////                    .toMillis(getMaxQueryTime()));
+//
+//        originalQuery.setIncludeInferred(getIncludeInferred());
+
+        ASTEvalHelper.executeUpdate(
+                ((BigdataSailRepositoryConnection) getConnection()),
+                astContainer);
 
     }
 

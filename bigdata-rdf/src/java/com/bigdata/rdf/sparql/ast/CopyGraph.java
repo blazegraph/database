@@ -52,22 +52,28 @@ public class CopyGraph extends AbstractFromToGraphManagement {
     private static final long serialVersionUID = 1L;
 
     public CopyGraph() {
+        
         super(UpdateType.Copy);
+        
     }
 
     /**
      * @param op
      */
-    public CopyGraph(CopyGraph op) {
+    public CopyGraph(final CopyGraph op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public CopyGraph(BOp[] args, Map<String, Object> anns) {
+    public CopyGraph(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+        
     }
 
 }

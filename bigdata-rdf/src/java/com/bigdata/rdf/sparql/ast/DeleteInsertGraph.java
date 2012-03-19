@@ -87,16 +87,20 @@ public class DeleteInsertGraph extends GraphUpdate implements
     /**
      * @param op
      */
-    public DeleteInsertGraph(DeleteInsertGraph op) {
+    public DeleteInsertGraph(final DeleteInsertGraph op) {
+
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public DeleteInsertGraph(BOp[] args, Map<String, Object> anns) {
+    public DeleteInsertGraph(final BOp[] args, final Map<String, Object> anns) {
+        
         super(args, anns);
+
     }
 
     /**

@@ -44,23 +44,30 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
      */
     private static final long serialVersionUID = 1L;
 
-    public AbstractFromToGraphManagement(UpdateType updateType) {
+    public AbstractFromToGraphManagement(final UpdateType updateType) {
+        
         super(updateType);
+        
     }
 
     /**
      * @param op
      */
-    public AbstractFromToGraphManagement(AbstractFromToGraphManagement op) {
+    public AbstractFromToGraphManagement(final AbstractFromToGraphManagement op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public AbstractFromToGraphManagement(BOp[] args, Map<String, Object> anns) {
+    public AbstractFromToGraphManagement(final BOp[] args,
+            final Map<String, Object> anns) {
+
         super(args, anns);
+
     }
 
     /**

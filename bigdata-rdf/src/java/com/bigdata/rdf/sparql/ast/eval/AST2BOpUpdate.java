@@ -27,17 +27,41 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParseException;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.helpers.RDFHandlerBase;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
@@ -50,16 +74,30 @@ import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
+import com.bigdata.rdf.sparql.ast.AddGraph;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.CopyGraph;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
+import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QuadData;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.UpdateType;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.spo.ISPO;
@@ -95,6 +133,22 @@ import com.bigdata.rdf.store.BD;
 public class AST2BOpUpdate extends AST2BOpUtility {
 
     private static final Logger log = Logger.getLogger(AST2BOpUpdate.class);
+
+    /**
+     * When <code>true</code>, convert the SPARQL UPDATE into a physical
+     * operator plan and execute it on the query engine. When <code>false</code>
+     * , the UPDATE is executed using the {@link BigdataSail} API.
+     * 
+     * FIXME By coming in through the SAIL, we automatically pick up truth
+     * maintenance and related logics. All of that needs to be integrated into
+     * the generated physical operator plan before we can run updates on the
+     * query engine. However, there will be advantages to running updates on the
+     * query engine, including declarative control of parallelism, more
+     * similarity for code paths between a single machine and cluster
+     * deployments, and a unified operator model for query and update
+     * evaluation.
+     */
+    private final static boolean runOnQueryEngine = false;
     
     /**
      * 
@@ -123,7 +177,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * TODO Focus on getting the assertion/retraction patterns right in the
      * different database modes).
      */
-    protected static void optimizeUpdateRoot(final AST2BOpContext context) {
+    protected static void optimizeUpdateRoot(final AST2BOpUpdateContext context) {
 
         final ASTContainer astContainer = context.astContainer;
 
@@ -151,13 +205,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * Generate physical plan for the update operations (attached to the AST as
      * a side-effect).
      * 
-     * FIXME Follow the general pattern of {@link AST2BOpUtility}, refactoring
-     * the update plans from TestUpdateBootstrap into this class and adding
-     * data-driven UPDATE tests as we go.
-     * 
      * @throws Exception
      */
-    protected static PipelineOp convertUpdate(final AST2BOpContext context) throws Exception {
+    protected static PipelineOp convertUpdate(final AST2BOpUpdateContext context)
+            throws Exception {
 
         final ASTContainer astContainer = context.astContainer;
 
@@ -170,7 +221,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         PipelineOp left = null;
         for (Update op : updateRoot) {
 
-            left = convert(left, op, context);
+            left = convertUpdateSwitch(left, op, context);
 
         }
 
@@ -188,12 +239,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * appropriate checkpoints in the UPDATE operation.
          */
         if (!context.isCluster()) {
-            left = new CommitOp(leftOrEmpty(left), NV.asMap(//
-                    new NV(BOp.Annotations.BOP_ID, context.nextId()),//
-                    new NV(CommitOp.Annotations.TIMESTAMP, context
-                            .getTimestamp()),//
-                    new NV(CommitOp.Annotations.PIPELINED, false)//
-                    ));
+            if (runOnQueryEngine) {
+                left = new CommitOp(leftOrEmpty(left), NV.asMap(
+                        //
+                        new NV(BOp.Annotations.BOP_ID, context.nextId()),//
+                        new NV(CommitOp.Annotations.TIMESTAMP, context
+                                .getTimestamp()),//
+                        new NV(CommitOp.Annotations.PIPELINED, false)//
+                        ));
+            } else {
+                context.conn.commit();
+            }
         }
 
         // Set as annotation on the ASTContainer.
@@ -204,28 +260,41 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
+     * Method provides the <code>switch()</code> for handling the different
+     * {@link UpdateType}s.
+     * 
      * @param left
      * @param op
      * @param context
      * @return
-     * @throws Exception 
+     * @throws Exception
      */
-    private static PipelineOp convert(PipelineOp left, final Update op,
-            final AST2BOpContext context) throws Exception {
+    private static PipelineOp convertUpdateSwitch(PipelineOp left,
+            final Update op, final AST2BOpUpdateContext context)
+            throws Exception {
 
         final UpdateType updateType = op.getUpdateType();
 
         switch (updateType) {
-//        case Add:
-//            break;
-//        case Copy:
-//            break;
         case Create: {
             left = convertCreateGraph(left, (CreateGraph) op, context);
             break;
         }
-//        case Move:
-//            break;
+        case Add: {
+            // Copy all statements from source to target.
+            left = convertAddGraph(left, (AddGraph) op, context);
+            break;
+        }
+        case Copy: {
+            // Drop() target, then Add().
+            left = convertCopyGraph(left, (CopyGraph) op, context);
+            break;
+            }
+        case Move: {
+            // Drop() target, Add(source,target), Drop(source).
+            left = convertMoveGraph(left, (MoveGraph) op, context);
+            break;
+        }
         case Clear:
         case Drop:
             left = convertClearOrDropGraph(left, (DropGraph) op, context);
@@ -238,14 +307,312 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         case Load:
             left = convertLoadGraph(left, (LoadGraph) op, context);
             break;
-//        case DeleteInsert:
-//            break;
+        case DeleteInsert:
+            left = convertDeleteInsert(left, (DeleteInsertGraph) op, context);
+            break;
         default:
             throw new UnsupportedOperationException("updateType=" + updateType);
         }
 
         return left;
         
+    }
+
+    /**
+     * <pre>
+     * ( WITH IRIref )?
+     * ( ( DeleteClause InsertClause? ) | InsertClause )
+     * ( USING ( NAMED )? IRIref )*
+     * WHERE GroupGraphPattern
+     * </pre>
+     * 
+     * @param left
+     * @param op
+     * @param context
+     * @return
+     * @throws QueryEvaluationException
+     * @throws RepositoryException 
+     */
+    private static PipelineOp convertDeleteInsert(PipelineOp left,
+            final DeleteInsertGraph op, final AST2BOpUpdateContext context)
+            throws QueryEvaluationException, RepositoryException {
+
+        if (runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
+        /*
+         * This models the DELETE/INSERT request as a QUERY. The data from the
+         * query are fed into a handler which adds or removes the statements (as
+         * appropriate) from the [conn].
+         * 
+         * FIXME The shortcut forms need to have AST translation to build the
+         * templates.
+         * 
+         * DELETE WHERE QuadPattern
+         */
+        {
+
+            /*
+             * Create a new query using the WHERE clause.
+             */
+            final JoinGroupNode whereClause = new JoinGroupNode(
+                    op.getWhereClause());
+
+            final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+
+            queryRoot.setWhereClause(whereClause);
+
+            /*
+             * Setup the PROJECTION for the new query.
+             * 
+             * TODO retainAll() for only those variables used in the template
+             * for the InsertClause or RemoveClause (less materialization, more
+             * efficient).
+             * 
+             * TODO Actually, what we really want to do is to CONSTRUCT the
+             * Statements to be INSERTED or REMOVED. Thus, if we extend
+             * CONSTRUCT to handle quads (first in the operator and then in the
+             * SPARQL syntax) then we could set this up as a CONSTRUCT query and
+             * then feed the result into a handler which adds or removed the
+             * statements on the [conn].
+             */
+            {
+
+                final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+                final Set<IVariable<?>> projectedVars = sa
+                        .getMaybeProducedBindings(whereClause,
+                                new LinkedHashSet<IVariable<?>>()/* vars */,
+                                true/* recursive */);
+
+                final ProjectionNode projection = new ProjectionNode();
+
+                for (IVariable<?> var : projectedVars) {
+
+                    projection.addProjectionVar(new VarNode(var.getName()));
+
+                }
+
+                queryRoot.setProjection(projection);
+                
+            }
+
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+
+            /*
+             * FIXME Data set and defaultContet.
+             */
+            final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
+
+             final QuadData insertClause = op.getInsertClause();
+
+            final QuadData deleteClause = op.getDeleteClause();
+
+            if (insertClause == null && deleteClause == null) {
+                // Must have at least one or the other.
+                throw new UnsupportedOperationException();
+            }
+
+            // Just the insert clause.
+            final boolean isInsertOnly = insertClause != null
+                    && deleteClause == null;
+
+            // Just the delete clause.
+            final boolean isDeleteOnly = insertClause == null
+                    && deleteClause != null;
+
+            // Both the delete clause and the insert clause.
+            final boolean isDeleteInsert = insertClause != null
+                    && deleteClause != null;
+            
+            /*
+             * Run the WHERE clause.
+             */
+
+            if (isDeleteInsert) {
+                
+                /*
+                 * DELETE + INSERT.
+                 * 
+                 * FIXME Simple CONSTRUCT semantics are not enough for this
+                 * case. We need to process each solution by feeding into the
+                 * delete template and then feeding it into the insert template.
+                 * Both templates are quads (not just triples). We might need to
+                 * fully buffer the solutions and replay them so as to run the
+                 * DELETEs before the INSERTs, or we might even need to run the
+                 * WHERE clause twice - once to do the DELETEs and then once
+                 * more to do the INSERTs. This depends on the isolation
+                 * semantics for the operation with respect to itself.
+                 */
+                
+                throw new UnsupportedOperationException();
+
+            } else {
+
+                final QuadData quadData = insertClause == null ? deleteClause
+                        : insertClause;
+                
+                final ConstructNode template = quadData.flatten();
+                
+                // Set the CONSTRUCT template (quads patterns).
+                queryRoot.setConstruct(template);
+                
+                // Run as a CONSTRUCT query.
+                final GraphQueryResult result = ASTEvalHelper
+                        .evaluateGraphQuery(context.db, astContainer, null/* bindingSets */);
+
+                try {
+
+                    if (isInsertOnly) {
+
+                        context.conn.add(result, contexts);
+
+                    } else if (isDeleteOnly) {
+
+                        context.conn.remove(result, contexts);
+
+                    }
+
+                } finally {
+
+                    result.close();
+
+                }
+
+            }
+
+        }
+
+        return null;
+        
+    }
+
+    /**
+     * Copy all statements from source to target.
+     * 
+     * @param left
+     * @param op
+     * @param context
+     * @return
+     * @throws RepositoryException 
+     */
+    private static PipelineOp convertAddGraph(PipelineOp left,
+            final AddGraph op, final AST2BOpUpdateContext context)
+            throws RepositoryException {
+
+        if (runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
+        copyStatements(//
+                context, //
+                op.isSilent(), //
+                (BigdataURI) op.getSourceGraph().getValue(), //
+                (BigdataURI) op.getTargetGraph().getValue());
+
+        return null;
+    }
+
+    /**
+     * Copy all statements from the sourceGraph to the targetGraph.
+     */
+    private static void copyStatements(final AST2BOpUpdateContext context,
+            final boolean silent, final BigdataURI sourceGraph,
+            final BigdataURI targetGraph) throws RepositoryException {
+
+        final RepositoryResult<Statement> result = context.conn.getStatements(
+                null/* s */, null/* p */, null/* o */,
+                context.isIncludeInferred(), new Resource[] { sourceGraph });
+        try {
+
+            context.conn.add(result, new Resource[] { targetGraph });
+
+        } finally {
+
+            result.close();
+
+        }
+
+    }
+
+    /**
+     * Drop() target, Add(source,target), Drop(source).
+     * 
+     * @param left
+     * @param op
+     * @param context
+     * @return
+     * @throws RepositoryException
+     */
+    private static PipelineOp convertMoveGraph(PipelineOp left,
+            final MoveGraph op, final AST2BOpUpdateContext context)
+            throws RepositoryException {
+
+        if (runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
+        final BigdataURI sourceGraph = (BigdataURI) op.getSourceGraph()
+                .getValue();
+
+        if (sourceGraph == null) {
+            // Do NOT allow this when the targetGraph is not declared.
+            throw new AssertionError();
+        }
+
+        final BigdataURI targetGraph = (BigdataURI) op.getTargetGraph()
+                .getValue();
+
+        if (targetGraph == null) {
+            // Do NOT allow this when the targetGraph is not declared.
+            throw new AssertionError();
+        }
+
+        clearGraph(targetGraph, null/* scope */, context);
+
+        copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
+
+        clearGraph(sourceGraph, null/* scope */, context);
+
+        return null;
+        
+    }
+
+    /**
+     * Drop() target, then Add().
+     * 
+     * @param left
+     * @param op
+     * @param context
+     * @return
+     * @throws RepositoryException 
+     */
+    private static PipelineOp convertCopyGraph(PipelineOp left,
+            final CopyGraph op, final AST2BOpUpdateContext context)
+            throws RepositoryException {
+
+        if (runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
+        final BigdataURI sourceGraph = (BigdataURI) op.getSourceGraph()
+                .getValue();
+
+        if (sourceGraph == null) {
+            // Do NOT allow this when the targetGraph is not declared.
+            throw new AssertionError();
+        }
+
+        final BigdataURI targetGraph = (BigdataURI) op.getTargetGraph()
+                .getValue();
+
+        if (targetGraph == null) {
+            // Do NOT allow this when the targetGraph is not declared.
+            throw new AssertionError();
+        }
+
+        clearGraph(targetGraph, null/* scope */, context);
+
+        copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
+
+        return null;
     }
 
     /**
@@ -260,8 +627,47 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @throws Exception
      */
     private static PipelineOp convertLoadGraph(PipelineOp left,
-            final LoadGraph op, final AST2BOpContext context) throws Exception {
+            final LoadGraph op, final AST2BOpUpdateContext context)
+            throws Exception {
 
+        if (!runOnQueryEngine) {
+
+            final AtomicLong nmodified = new AtomicLong();
+
+            final String urlStr = op.getSourceGraph().getValue().stringValue();
+
+            try {
+
+                final URL sourceURL = new URL(urlStr);
+
+                final BigdataURI defaultContext = (BigdataURI) (op
+                        .getTargetGraph() == null ? null : op.getTargetGraph()
+                        .getValue());
+
+                doLoad(context.conn.getSailConnection(), sourceURL,
+                        defaultContext, nmodified);
+
+            } catch (Throwable t) {
+
+                final String msg = "Could not load: url=" + urlStr + ", cause="
+                        + t;
+
+                if (op.isSilent()) {
+                 
+                    log.warn(msg);
+                    
+                } else {
+                    
+                    throw new RuntimeException(msg, t);
+                    
+                }
+
+            }
+
+            return null;
+            
+        }
+        
         /*
          * Parse the file.
          * 
@@ -321,6 +727,161 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
+     * Parse and load a document.
+     * 
+     * @param conn
+     * @param sourceURL
+     * @param defaultContext
+     * @param nmodified
+     * @return
+     * @throws IOException
+     * @throws RDFHandlerException
+     * @throws RDFParseException
+     * 
+     *             TODO See {@link ParseOp} for a significantly richer pipeline
+     *             operator which will parse a document. However, this method is
+     *             integrated into all of the truth maintenance mechanisms in
+     *             the Sail and is therefore easier to place into service.
+     */
+    private static void doLoad(final BigdataSailConnection conn,
+            final URL sourceURL, final URI defaultContext,
+            final AtomicLong nmodified) throws IOException, RDFParseException,
+            RDFHandlerException {
+
+        // Use the default context if one was given and otherwise
+        // the URI from which the data are being read.
+        final Resource defactoContext = defaultContext == null ? new URIImpl(
+                sourceURL.toExternalForm()) : defaultContext;
+
+        URLConnection hconn = null;
+        try {
+
+            hconn = sourceURL.openConnection();
+            if (hconn instanceof HttpURLConnection) {
+                ((HttpURLConnection) hconn).setRequestMethod("GET");
+            }
+            hconn.setDoInput(true);
+            hconn.setDoOutput(false);
+            hconn.setReadTimeout(0);// no timeout? http param?
+
+            /*
+             * There is a request body, so let's try and parse it.
+             */
+
+            final String contentType = hconn.getContentType();
+
+            RDFFormat format = RDFFormat.forMIMEType(contentType);
+
+            if (format == null) {
+                // Try to get the RDFFormat from the URL's file path.
+                format = RDFFormat.forFileName(sourceURL.getFile());
+            }
+            
+            if (format == null) {
+                throw new RuntimeException(
+                        "Content-Type not recognized as RDF: "
+                                + contentType);
+            }
+
+            final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                    .getInstance().get(format);
+
+            if (rdfParserFactory == null) {
+                throw new RuntimeException(
+                        "Parser not found: Content-Type=" + contentType);
+            }
+
+            final RDFParser rdfParser = rdfParserFactory
+                    .getParser();
+
+            rdfParser.setValueFactory(conn.getTripleStore()
+                    .getValueFactory());
+
+            rdfParser.setVerifyData(true);
+
+            rdfParser.setStopAtFirstError(true);
+
+            rdfParser
+                    .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+            rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified,
+                    defactoContext));
+
+            /*
+             * Run the parser, which will cause statements to be
+             * inserted.
+             */
+
+            rdfParser.parse(hconn.getInputStream(), sourceURL
+                    .toExternalForm()/* baseURL */);
+
+        } finally {
+
+            if (hconn instanceof HttpURLConnection) {
+                /*
+                 * Disconnect, but only after we have loaded all the
+                 * URLs. Disconnect is optional for java.net. It is a
+                 * hint that you will not be accessing more resources on
+                 * the connected host. By disconnecting only after all
+                 * resources have been loaded we are basically assuming
+                 * that people are more likely to load from a single
+                 * host.
+                 */
+                ((HttpURLConnection) hconn).disconnect();
+            }
+
+        }
+        
+    }
+    
+    /**
+     * Helper class adds statements to the sail as they are visited by a parser.
+     */
+    private static class AddStatementHandler extends RDFHandlerBase {
+
+        private final BigdataSailConnection conn;
+        private final AtomicLong nmodified;
+        private final Resource[] defaultContexts;
+
+        public AddStatementHandler(final BigdataSailConnection conn,
+                final AtomicLong nmodified, final Resource defaultContext) {
+            this.conn = conn;
+            this.nmodified = nmodified;
+            final boolean quads = conn.getTripleStore().isQuads();
+            if (quads && defaultContext != null) {
+                // The default context may only be specified for quads.
+                this.defaultContexts = new Resource[] { defaultContext };
+            } else {
+                this.defaultContexts = new Resource[0];
+            }
+        }
+
+        public void handleStatement(final Statement stmt)
+                throws RDFHandlerException {
+
+            try {
+
+                conn.addStatement(//
+                        stmt.getSubject(), //
+                        stmt.getPredicate(), //
+                        stmt.getObject(), //
+                        (Resource[]) (stmt.getContext() == null ?  defaultContexts
+                                : new Resource[] { stmt.getContext() })//
+                        );
+
+            } catch (SailException e) {
+
+                throw new RDFHandlerException(e);
+
+            }
+
+            nmodified.incrementAndGet();
+
+        }
+
+    }
+
+    /**
      * Note: Bigdata does not support empty graphs, so {@link UpdateType#Clear}
      * and {@link UpdateType#Drop} have the same semantics.
      * 
@@ -334,28 +895,42 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @return
      */
     private static PipelineOp convertClearOrDropGraph(PipelineOp left,
-            final DropGraph op, final AST2BOpContext context) {
+            final DropGraph op, final AST2BOpUpdateContext context) {
 
         final TermNode targetGraphNode = op.getTargetGraph();
 
+        final BigdataURI targetGraph = targetGraphNode == null ? null
+                : (BigdataURI) targetGraphNode.getValue();
+
         final Scope scope = op.getScope();
 
-        if (targetGraphNode != null) {
+        if(runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
+        clearGraph(targetGraph,scope, context);        
+
+        return left;
+        
+    }
+
+    /**
+     * Remove all statements from the target graph or the specified
+     * {@link Scope}.
+     * 
+     * @param targetGraph
+     * @param scope
+     * @param context
+     * 
+     *            FIXME DataSet is required for {@link Scope}.
+     */
+    private static void clearGraph(final URI targetGraph, final Scope scope,
+            final AST2BOpUpdateContext context) {
+
+        if (targetGraph != null) {
 
             /*
              * Addressing a specific graph.
              */
-
-            final BigdataURI targetGraph = (BigdataURI) targetGraphNode
-                    .getValue();
-
-            if (targetGraph == null) {
-                /*
-                 * Deleting with a null would remove everything, so make sure
-                 * this is a valid URI.
-                 */
-                throw new AssertionError();
-            }
 
             context.db.removeStatements(null/* s */, null/* p */, null/* o */,
                     targetGraph);
@@ -382,10 +957,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             
         }
 
-        return left;
-        
     }
-
     /**
      * If the graph already exists (context has at least one statement), then
      * this is an error (unless SILENT). Otherwise it is a NOP.
@@ -396,7 +968,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @return
      */
     private static PipelineOp convertCreateGraph(final PipelineOp left,
-            final CreateGraph op, final AST2BOpContext context) {
+            final CreateGraph op, final AST2BOpUpdateContext context) {
 
         if (!op.isSilent()) {
 
@@ -428,9 +1000,42 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @throws Exception
      */
     private static PipelineOp convertGraphDataUpdate(PipelineOp left,
-            final AbstractGraphDataUpdate op, final AST2BOpContext context)
+            final AbstractGraphDataUpdate op, final AST2BOpUpdateContext context)
             throws Exception {
+        
+        final boolean insert;
+        switch (op.getUpdateType()) {
+        case InsertData:
+            insert = true;
+            break;
+        case DeleteData:
+            insert = false;
+            break;
+        default:
+            throw new UnsupportedOperationException(op.getUpdateType().name());
+        }
 
+        if (!runOnQueryEngine) {
+            final ISPO[] stmts = op.getData();
+            final BigdataSailConnection conn = context.conn.getSailConnection();
+
+            for (ISPO spo : stmts) {
+                final Resource s = (Resource) spo.s().getValue();
+                final URI p = (URI) spo.p().getValue();
+                final Value o = (Value) spo.o().getValue();
+                final Resource c = (Resource) (spo.c() == null ? BD.NULL_GRAPH
+                        : spo.c().getValue());
+                final Resource[] contexts = (Resource[]) (c == null ? BD.NULL_GRAPH
+                        : new Resource[] { c });
+                if (insert) {
+                    conn.addStatement(s, p, o, contexts);
+                } else {
+                    conn.removeStatements(s, p, o, contexts);
+                }
+            }
+            return null;
+        }
+        
         /*
          * Convert the statements to be asserted or retracted into an
          * IBindingSet[].
@@ -454,7 +1059,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                 /*
                  * 
-                 * TODO Extract nullGraphIV into AST2BOpContext and cache.
+                 * TODO Extract nullGraphIV into AST2BOpUpdateContext and cache.
                  * Ideally, this should always be part of the Vocabulary and the
                  * IVCache should be set (which is always true for the
                  * vocabulary).
@@ -470,18 +1075,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             bindingSets = getData(op.getData(), targetGraphIV,
                     context.isQuads());
 
-        }
-
-        final boolean insert;
-        switch (op.getUpdateType()) {
-        case InsertData:
-            insert = true;
-            break;
-        case DeleteData:
-            insert = false;
-            break;
-        default:
-            throw new UnsupportedOperationException(op.getUpdateType().name());
         }
 
         /*
@@ -508,7 +1101,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @return
      */
     private static PipelineOp addInsertOrDeleteDataPipeline(PipelineOp left,
-            final boolean insert, final AST2BOpContext context) {
+            final boolean insert, final AST2BOpUpdateContext context) {
         
         /*
          * Resolve/add terms against the lexicon.
@@ -572,10 +1165,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * 
      * @return The {@link IBindingSet}[].
      * 
-     *         TODO Either we need to evaluate this as a query NOW or this needs
-     *         to be pumped into a hash index associated with the query plan in
-     *         order to be available when there is more than one INSERT DATA or
-     *         REMOVE DATA operation (or simply more than one UPDATE operation).
+     *         TODO Either we need to evaluate this NOW (rather than deferring
+     *         it to pipelined evaluation later) or this needs to be pumped into
+     *         a hash index associated with the query plan in order to be
+     *         available when there is more than one INSERT DATA or REMOVE DATA
+     *         operation (or simply more than one UPDATE operation).
      *         <p>
      *         That hash index could be joined into the solutions immediate
      *         before we undertake the chunked resolution operation which then
@@ -640,9 +1234,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @throws UpdateExecutionException
      */
     static private void executeUpdate(final PipelineOp left,
-            IBindingSet[] bindingSets, final AST2BOpContext context)
+            IBindingSet[] bindingSets, final AST2BOpUpdateContext context)
             throws Exception {
 
+        if (!runOnQueryEngine)
+            throw new UnsupportedOperationException();
+        
         if (left == null)
             throw new IllegalArgumentException();
 
