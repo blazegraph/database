@@ -27,6 +27,8 @@ import org.openrdf.rio.RDFParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+
 /**
  * Tests for SPARQL 1.1 Update functionality.
  * 
@@ -822,7 +824,40 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	}
 
-	//@Test
+    //@Test
+    public void testClearDefault()
+        throws Exception
+    {
+        logger.debug("executing testClearDefault");
+
+        String update = "CLEAR DEFAULT";
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+
+        // Verify statements exist in the named graphs.
+        assertTrue(con.hasStatement(null, null, null, false, graph1));
+        assertTrue(con.hasStatement(null, null, null, false, graph2));
+        // Verify statements exist in the default graph.
+        assertTrue(con.hasStatement(null, null, null, false, new Resource[]{null}));
+
+//        System.err
+//                .println(((BigdataSailRepositoryConnection) con)
+//                        .getSailConnection().getBigdataSail().getDatabase()
+//                        .dumpStore());
+        
+        operation.execute();
+        assertTrue(con.hasStatement(null, null, null, false, graph1));
+        assertTrue(con.hasStatement(null, null, null, false, graph2));
+        // Verify that no statements remain in the 'default' graph.
+        assertFalse(con.hasStatement(null, null, null, false, new Resource[]{null}));
+        
+//        System.err
+//                .println(((BigdataSailRepositoryConnection) con)
+//                        .getSailConnection().getBigdataSail().getDatabase()
+//                        .dumpStore());
+    }
+
+    //@Test
 	public void testDropAll()
 		throws Exception
 	{
@@ -868,6 +903,39 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertFalse(con.hasStatement(null, null, null, false, graph2));
 		assertTrue(con.hasStatement(null, null, null, false));
 	}
+
+    //@Test
+    public void testDropDefault()
+        throws Exception
+    {
+        logger.debug("executing testDropDefault");
+
+        String update = "DROP DEFAULT";
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+
+        // Verify statements exist in the named graphs.
+        assertTrue(con.hasStatement(null, null, null, false, graph1));
+        assertTrue(con.hasStatement(null, null, null, false, graph2));
+        // Verify statements exist in the default graph.
+        assertTrue(con.hasStatement(null, null, null, false, new Resource[]{null}));
+
+//        System.err
+//                .println(((BigdataSailRepositoryConnection) con)
+//                        .getSailConnection().getBigdataSail().getDatabase()
+//                        .dumpStore());
+        
+        operation.execute();
+        assertTrue(con.hasStatement(null, null, null, false, graph1));
+        assertTrue(con.hasStatement(null, null, null, false, graph2));
+        // Verify that no statements remain in the 'default' graph.
+        assertFalse(con.hasStatement(null, null, null, false, new Resource[]{null}));
+        
+//        System.err
+//                .println(((BigdataSailRepositoryConnection) con)
+//                        .getSailConnection().getBigdataSail().getDatabase()
+//                        .dumpStore());
+    }
 
 	//@Test
 	public void testUpdateSequenceDeleteInsert()

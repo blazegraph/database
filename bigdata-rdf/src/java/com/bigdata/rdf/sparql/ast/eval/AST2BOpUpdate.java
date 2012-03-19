@@ -503,11 +503,18 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
 
+        final BigdataURI sourceGraph = (BigdataURI) (op.getSourceGraph() == null ? null
+                : op.getSourceGraph().getValue());
+        
+        final BigdataURI targetGraph = (BigdataURI) (op.getTargetGraph() == null ? null
+                : op.getTargetGraph().getValue());
+        
         copyStatements(//
                 context, //
                 op.isSilent(), //
-                (BigdataURI) op.getSourceGraph().getValue(), //
-                (BigdataURI) op.getTargetGraph().getValue());
+                sourceGraph,//
+                targetGraph//
+                );
 
         return null;
     }
@@ -550,27 +557,21 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
 
-        final BigdataURI sourceGraph = (BigdataURI) op.getSourceGraph()
-                .getValue();
+        final BigdataURI sourceGraph = (BigdataURI) (op.getSourceGraph() == null ? context.f
+                .asValue(BD.NULL_GRAPH) : op.getSourceGraph().getValue());
 
-        if (sourceGraph == null) {
-            // Do NOT allow this when the targetGraph is not declared.
-            throw new AssertionError();
+        final BigdataURI targetGraph = (BigdataURI) (op.getTargetGraph() == null ? context.f
+                .asValue(BD.NULL_GRAPH) : op.getTargetGraph().getValue());
+
+        if (!sourceGraph.equals(targetGraph)) {
+
+            clearGraph(targetGraph, null/* scope */, context);
+
+            copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
+
+            clearGraph(sourceGraph, null/* scope */, context);
+            
         }
-
-        final BigdataURI targetGraph = (BigdataURI) op.getTargetGraph()
-                .getValue();
-
-        if (targetGraph == null) {
-            // Do NOT allow this when the targetGraph is not declared.
-            throw new AssertionError();
-        }
-
-        clearGraph(targetGraph, null/* scope */, context);
-
-        copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
-
-        clearGraph(sourceGraph, null/* scope */, context);
 
         return null;
         
@@ -592,25 +593,19 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
 
-        final BigdataURI sourceGraph = (BigdataURI) op.getSourceGraph()
-                .getValue();
+        final BigdataURI sourceGraph = (BigdataURI) (op.getSourceGraph() == null ? context.f
+                .asValue(BD.NULL_GRAPH) : op.getSourceGraph().getValue());
 
-        if (sourceGraph == null) {
-            // Do NOT allow this when the targetGraph is not declared.
-            throw new AssertionError();
+        final BigdataURI targetGraph = (BigdataURI) (op.getTargetGraph() == null ? context.f
+                .asValue(BD.NULL_GRAPH) : op.getTargetGraph().getValue());
+
+        if (!sourceGraph.equals(targetGraph)) {
+
+            clearGraph(targetGraph, null/* scope */, context);
+
+            copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
+
         }
-
-        final BigdataURI targetGraph = (BigdataURI) op.getTargetGraph()
-                .getValue();
-
-        if (targetGraph == null) {
-            // Do NOT allow this when the targetGraph is not declared.
-            throw new AssertionError();
-        }
-
-        clearGraph(targetGraph, null/* scope */, context);
-
-        copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
 
         return null;
     }
@@ -893,9 +888,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param op
      * @param context
      * @return
+     * @throws RepositoryException
      */
     private static PipelineOp convertClearOrDropGraph(PipelineOp left,
-            final DropGraph op, final AST2BOpUpdateContext context) {
+            final DropGraph op, final AST2BOpUpdateContext context)
+            throws RepositoryException {
 
         final TermNode targetGraphNode = op.getTargetGraph();
 
@@ -904,7 +901,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         final Scope scope = op.getScope();
 
-        if(runOnQueryEngine)
+        if (runOnQueryEngine)
             throw new UnsupportedOperationException();
 
         clearGraph(targetGraph,scope, context);        
@@ -920,11 +917,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param targetGraph
      * @param scope
      * @param context
-     * 
-     *            FIXME DataSet is required for {@link Scope}.
+     * @throws RepositoryException 
      */
     private static void clearGraph(final URI targetGraph, final Scope scope,
-            final AST2BOpUpdateContext context) {
+            final AST2BOpUpdateContext context) throws RepositoryException {
 
         if (targetGraph != null) {
 
@@ -937,14 +933,41 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         } else if (scope != null) {
 
-            /*
-             * Addressing either the defaultGraph or the named graphs.
-             * 
-             * FIXME We need access to the data set for this. Where is it
-             * attached on the UPDATE AST?
-             */
-        
-            throw new UnsupportedOperationException();
+            if (scope == Scope.DEFAULT_CONTEXTS) {
+
+                /*
+                 * Addressing the defaultGraph (Sesame nullGraph).
+                 */
+                context.db.removeStatements(null/* s */, null/* p */,
+                        null/* o */, BD.NULL_GRAPH);
+
+            } else {
+
+                /*
+                 * Addressing ALL NAMED GRAPHS.
+                 * 
+                 * Note: This is everything EXCEPT the nullGraph.
+                 */
+                final RepositoryResult<Resource> result = context.conn.getContextIDs();
+
+                try {
+
+                    while (result.hasNext()) {
+                    
+                        final Resource c = result.next();
+                        
+                        context.db.removeStatements(null/* s */, null/* p */,
+                                null/* o */, c);
+                    
+                    }
+                    
+                } finally {
+                    
+                    result.close();
+                    
+                }
+                
+            }
 
         } else {  
             
@@ -1018,14 +1041,21 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (!runOnQueryEngine) {
             final ISPO[] stmts = op.getData();
             final BigdataSailConnection conn = context.conn.getSailConnection();
-
+//System.err.println(context.db.dumpStore());
             for (ISPO spo : stmts) {
                 final Resource s = (Resource) spo.s().getValue();
                 final URI p = (URI) spo.p().getValue();
                 final Value o = (Value) spo.o().getValue();
-                final Resource c = (Resource) (spo.c() == null ? BD.NULL_GRAPH
-                        : spo.c().getValue());
-                final Resource[] contexts = (Resource[]) (c == null ? BD.NULL_GRAPH
+                /*
+                 * If [c] is not bound, then using an empty Resource[] for the
+                 * contexts. This will cause the data to be added to the null
+                 * graph on insert and will cause the statements to be removed
+                 * from all contexts (on remove it is interpreted as a
+                 * wildcard).
+                 */
+                final Resource c = (Resource) (spo.c() == null ? null : spo.c()
+                        .getValue());
+                final Resource[] contexts = (Resource[]) (c == null ? NO_CONTEXTS
                         : new Resource[] { c });
                 if (insert) {
                     conn.addStatement(s, p, o, contexts);
@@ -1272,5 +1302,5 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     private static final IBindingSet[] EMPTY_BINDING_SETS = new IBindingSet[0];
-    
+    private static final Resource[] NO_CONTEXTS = new Resource[0];
 }
