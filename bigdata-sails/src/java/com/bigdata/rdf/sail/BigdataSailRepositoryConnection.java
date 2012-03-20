@@ -10,6 +10,7 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
@@ -48,15 +49,15 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     @Override
     public BigdataSailRepository getRepository() {
 
-    	return (BigdataSailRepository)super.getRepository();
-    	
+        return (BigdataSailRepository) super.getRepository();
+
     }
-    
+
     @Override
     public BigdataSailConnection getSailConnection() {
 
-        return (BigdataSailConnection)super.getSailConnection();
-        
+        return (BigdataSailConnection) super.getSailConnection();
+
     }
 
     @Override
@@ -223,6 +224,25 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
     }
 
+    /**
+     * Return <code>true</code> if the connection does not permit mutation.
+     */
+    public final boolean isReadOnly() {
+        
+        return getSailConnection().isReadOnly();
+        
+    }
+
+    /**
+     * Return <code>true</code> if this is the {@link ITx#UNISOLATED}
+     * connection.
+     */
+    public final boolean isUnisolated() {
+        
+        return getSailConnection().isUnisolated();
+        
+    }
+    
     /**
      * Commit, returning the timestamp associated with the new commit point.
      * <p>

@@ -73,6 +73,12 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
         
     }
 
+    public QuadData(final IStatementContainer child) {
+
+        this(new BOp[]{(BOp) child}, null);
+        
+    }
+    
     /**
      * Flatten the {@link QuadData} into a simple {@link ConstructNode}. The
      * {@link ConstructNode} MAY use variables as well as constants and supports

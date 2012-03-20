@@ -688,19 +688,9 @@ public class ASTEvalHelper {
             /*
              * Generate and execute physical plans for the update operations.
              */
-            try {
+            AST2BOpUpdate.convertUpdate(context);
 
-                AST2BOpUpdate.convertUpdate(context);
-
-            } catch (Exception e) {
-
-                throw new UpdateExecutionException(e);
-
-            }
-
-            // executeUpdate(context);
-            
-        } catch (SailException ex) {
+        } catch (Exception ex) {
 
             throw new UpdateExecutionException(ex);
 

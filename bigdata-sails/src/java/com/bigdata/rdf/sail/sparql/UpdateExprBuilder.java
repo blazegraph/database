@@ -95,7 +95,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         super(context);
     }
 
-//    // TODO Is this necessary?
+    // TODO This is not required as far as I can tell.
 //	@Override
 //    public Update visit(final ASTUpdate node, final Object data)
 //            throws VisitorException {
@@ -600,9 +600,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         final GroupGraphPattern parentGP = graphPattern;
         graphPattern = new GroupGraphPattern();
 
-        // inherit scope & context
-        graphPattern.setStatementPatternScope(parentGP
-                .getStatementPatternScope());
+        // inherit scope & context (from optional WITH clause)
+        graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
  
         graphPattern.setContextVar(parentGP.getContext());
 

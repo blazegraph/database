@@ -170,10 +170,26 @@ class GroupGraphPattern {
         if (log.isInfoEnabled())
             log.info("pattern= ( " + s + " " + p + " " + o + " )");
 
+        // Fill in the inherited context and scope.
         children.add(new StatementPatternNode(s, p, o, context, spScope));
 
     }
 
+    public void addSP(final StatementPatternNode sp) {
+
+        assertValid();
+
+        if (log.isInfoEnabled())
+            log.info("pattern=" + sp);
+
+        // Fill in the inherited context and scope.
+        final StatementPatternNode t = new StatementPatternNode(sp.s(), sp.p(),
+                sp.o(), context, spScope);
+
+        children.add(t);
+
+    }
+    
     public void addConstraint(final ValueExpressionNode constraint) {
 
         assertValid();

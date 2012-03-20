@@ -166,7 +166,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         if (iv == null) {
 
             iv = (IV<BigdataValue, ?>) TermId.mockIV(VTE.valueOf(value));
-            
+
             iv.setValue(value);
 
         }

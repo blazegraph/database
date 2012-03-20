@@ -18,6 +18,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.BD;
@@ -95,6 +96,8 @@ public class DatasetDeclProcessor {
     public DatasetNode process(final ASTOperationContainer qc)
             throws MalformedQueryException {
 
+        final boolean update = qc instanceof ASTUpdateContainer;
+        
         final List<ASTDatasetClause> datasetClauses = qc.getOperation()
                 .getDatasetClauseList();
 
@@ -184,7 +187,7 @@ public class DatasetDeclProcessor {
 		}
 
         // Note: Cast required to shut up the compiler.
-        return new DatasetNode((Set) defaultGraphs, (Set) namedGraphs);
+        return new DatasetNode((Set) defaultGraphs, (Set) namedGraphs, update);
 
 	}
 

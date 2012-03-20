@@ -38,8 +38,7 @@ import com.bigdata.bop.BOp;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls,
-        IDataSetNode {
+public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls {
 
     /**
      * 
@@ -47,7 +46,7 @@ public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls,
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends QueryNodeBase.Annotations,
-            IPrefixDecls.Annotations, IDataSetNode.Annotations {
+            IPrefixDecls.Annotations {
 
     }
     
@@ -90,18 +89,6 @@ public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls,
 
     }
 
-    public void setDataset(final DatasetNode dataset) {
-
-        setProperty(Annotations.DATASET, dataset);
-
-    }
-
-    public DatasetNode getDataset() {
-
-        return (DatasetNode) getProperty(Annotations.DATASET);
-
-    }
-    
     public String toString(final int indent) {
         
         final String s = indent(indent);
@@ -109,8 +96,6 @@ public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls,
         final StringBuilder sb = new StringBuilder();
 
         final Map<String/* prefix */, String/* uri */> prefixDecls = getPrefixDecls();
-
-        final DatasetNode dataset = getDataset();
 
 //        if (getProperty(Annotations.TIMEOUT) != null) {
 //            sb.append("\n");
@@ -137,12 +122,6 @@ public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls,
                 sb.append(">");
 
             }
-
-        }
-
-        if (dataset != null) {
-
-            sb.append(dataset.toString(indent + 1));
 
         }
 

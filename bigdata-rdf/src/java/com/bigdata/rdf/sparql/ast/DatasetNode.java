@@ -50,7 +50,7 @@ public class DatasetNode extends QueryNodeBase {
     /**
      * Required deep copy constructor.
      */
-    public DatasetNode(DatasetNode op) {
+    public DatasetNode(final DatasetNode op) {
 
         super(op);
         
@@ -59,14 +59,23 @@ public class DatasetNode extends QueryNodeBase {
     /**
      * Required shallow copy constructor.
      */
-    public DatasetNode(BOp[] args, Map<String, Object> anns) {
+    public DatasetNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
     }
 
+    /**
+     * 
+     * @param ivs
+     *            The {@link IV}s.
+     * @param update
+     *            <code>true</code> iff this is a SPARQL UPDATE./
+     * @return
+     */
     @SuppressWarnings("rawtypes")
-    private static final DataSetSummary asDataSetSummary(final Set<IV> ivs) {
+    private static final DataSetSummary asDataSetSummary(final Set<IV> ivs,
+            final boolean update) {
         /*
          * Note: This will cause named-graphs-01b to fail.
          */
@@ -86,24 +95,34 @@ public class DatasetNode extends QueryNodeBase {
 //            return null;
         
         return new DataSetSummary((Set) (ivs == null ? Collections.emptySet()
-                : ivs));
+                : ivs), update);
         
     }
-    
-    @SuppressWarnings("rawtypes")
-	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs) {
 
-        this(asDataSetSummary(defaultGraphs), asDataSetSummary(namedGraphs));
+    /**
+     * 
+     * @param defaultGraphs
+     * @param namedGraphs
+     * @param update
+     *            <code>true</code> iff this is a SPARQL update.
+     */
+    @SuppressWarnings("rawtypes")
+    public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs,
+            final boolean update) {
+
+        this(asDataSetSummary(defaultGraphs, update), asDataSetSummary(
+                namedGraphs, update));
 
 	}
 	
 	@SuppressWarnings("rawtypes")
     public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs,
 	        final IElementFilter<ISPO> defaultGraphFilter, 
-            final IElementFilter<ISPO> namedGraphFilter) {
+            final IElementFilter<ISPO> namedGraphFilter,
+            final boolean update) {
         
-        this(asDataSetSummary(defaultGraphs), asDataSetSummary(namedGraphs),
-                defaultGraphFilter, namedGraphFilter);
+        this(asDataSetSummary(defaultGraphs, update), asDataSetSummary(
+                namedGraphs, update), defaultGraphFilter, namedGraphFilter);
         
     }
 	
@@ -114,11 +133,12 @@ public class DatasetNode extends QueryNodeBase {
 
     }
 	
-	public DatasetNode(final Dataset dataset) {
+	public DatasetNode(final Dataset dataset, final boolean update) {
 		
-		this(DataSetSummary.toInternalValues(dataset.getDefaultGraphs()),
-				DataSetSummary.toInternalValues(dataset.getNamedGraphs()));
-		
+        this(DataSetSummary.toInternalValues(dataset.getDefaultGraphs()),
+                DataSetSummary.toInternalValues(dataset.getNamedGraphs()),
+                update);
+
 	}
 	
     /**

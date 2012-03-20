@@ -1700,7 +1700,26 @@ public class BigdataSail extends SailBase implements Sail {
             return queryTimeExpander;
             
         }
-        
+
+        /**
+         * When <code>true</code>, the connection does not permit mutation.
+         */
+        public final boolean isReadOnly() {
+            
+            return database.isReadOnly();
+            
+        }
+
+        /**
+         * Return <code>true</code> if this is the {@link ITx#UNISOLATED}
+         * connection.
+         */
+        public final boolean isUnisolated() {
+
+            return database.getTimestamp() == ITx.UNISOLATED;
+            
+        }
+
         /**
          * Used by the RepositoryConnection to determine whether or not to allow
          * auto-commits.
@@ -2264,9 +2283,7 @@ public class BigdataSail extends SailBase implements Sail {
                     
                     return database.getStatementCount(null/* c */, false/*exact*/);
     
-                }
-    
-                if (contexts.length == 1 && contexts[0] == null) {
+                } else if (contexts.length == 1 && contexts[0] == null) {
     
                     /*
                      * Operate on just the nullGraph (or on the sole graph if not in
@@ -2276,19 +2293,22 @@ public class BigdataSail extends SailBase implements Sail {
                     return database.getStatementCount(quads ? NULL_GRAPH
                             : null/* c */, false/*exact*/);
     
+                } else {
+        
+                    // FIXME parallelize this in chunks as per getStatements()
+                    long size = 0;
+        
+                    for (Resource c : contexts) {
+        
+                        size += database.getStatementCount(
+                                (c == null && quads) ? NULL_GRAPH : c, 
+                                        false/* exact */);
+        
+                    }
+    
+                    return size;
+                
                 }
-    
-                // FIXME parallelize this in chunks as per getStatements()
-                long size = 0;
-    
-                for (Resource c : contexts) {
-    
-                    size += database.getStatementCount(
-                            (c == null && quads) ? NULL_GRAPH : c, false/*exact*/);
-    
-                }
-
-                return size;
                 
             }
             
@@ -2309,9 +2329,7 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 removeStatements(s, p, o, (Resource) null/* c */);
 
-            }
-
-            if (contexts.length == 1 && contexts[0] == null) {
+            } else if (contexts.length == 1 && contexts[0] == null) {
 
                 /*
                  * Operate on just the nullGraph, or on the sole graph if not in
@@ -2320,12 +2338,15 @@ public class BigdataSail extends SailBase implements Sail {
 
                 removeStatements(s, p, o, quads ? NULL_GRAPH : null/* c */);
 
-            }
+            } else {
 
-            // FIXME parallelize this in chunks as per getStatements()
-            for (Resource c : contexts) {
+                // FIXME parallelize this in chunks as per getStatements()
+                for (Resource c : contexts) {
 
-                removeStatements(s, p, o, (c == null && quads) ? NULL_GRAPH : c);
+                    removeStatements(s, p, o, (c == null && quads) ? NULL_GRAPH
+                            : c);
+
+                }
 
             }
             

@@ -35,12 +35,6 @@ import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME We need an extensive test suite for INSERT DATA, DELETE DATA,
- *          and LOAD DATA which cover the different database modes (triples,
- *          triples+inference, sids, sids+inference, quads) and also explore
- *          plans which batch updates, doing TM across the update set and plans
- *          which do not update TM or which do database at once closure.
  */
 public class TestAll extends TestCase {
 

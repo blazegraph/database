@@ -38,7 +38,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
                 .replaceValues(dataset, null/* bindings */);
 
         astContainer.getOriginalAST().setDataset(
-                new DatasetNode((Dataset) tmp[0]));
+                new DatasetNode((Dataset) tmp[0], false/* update */));
 
     }
 

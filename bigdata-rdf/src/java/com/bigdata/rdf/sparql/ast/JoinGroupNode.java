@@ -34,7 +34,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     /**
      * Required deep copy constructor.
      */
-    public JoinGroupNode(JoinGroupNode op) {
+    public JoinGroupNode(final JoinGroupNode op) {
 
         super(op);
         
@@ -43,7 +43,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     /**
      * Required shallow copy constructor.
      */
-    public JoinGroupNode(BOp[] args, Map<String, Object> anns) {
+    public JoinGroupNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
@@ -87,12 +87,30 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * @param child
      *            The initial child.
      */
-    public JoinGroupNode(final boolean optional, IGroupMemberNode child) {
+    public JoinGroupNode(final boolean optional, final IGroupMemberNode child) {
 
         super();
-        
+
         setOptional(optional);
-        
+
+        addChild(child);
+
+    }
+
+    /**
+     * Construct a GRAPH group having the specified child as its initial member.
+     * 
+     * @param context
+     *            The variable or constant for the GRAPH group.
+     * @param child
+     *            The initial child.
+     */
+    public JoinGroupNode(final TermNode context, final IGroupMemberNode child) {
+
+        super();
+
+        setContext(context);
+
         addChild(child);
         
     }

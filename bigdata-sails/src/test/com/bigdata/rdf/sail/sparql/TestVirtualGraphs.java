@@ -210,7 +210,7 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
                 dataset.addDefaultGraph(uri1);
                 dataset.addNamedGraph(alice);
                 dataset.addNamedGraph(bob);
-                final DatasetNode datasetNode = new DatasetNode(dataset);
+                final DatasetNode datasetNode = new DatasetNode(dataset, false/* update */);
                 expected.setDataset(datasetNode);
             }
 
@@ -383,7 +383,7 @@ public class TestVirtualGraphs extends AbstractBigdataExprBuilderTestCase {
                 defaultGraphs.add(alice.getIV().clone(true/*clearCache*/));
                 defaultGraphs.add(bob.getIV().clone(true/*clearCache*/));
                 final DatasetNode datasetNode = new DatasetNode(defaultGraphs,
-                        null/* namedGraphs */);
+                        null/* namedGraphs */, false/* update */);
                 expected.setDataset(datasetNode);
             }
 

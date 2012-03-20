@@ -76,10 +76,43 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        doQuery(req, resp);
+        if (req.getParameter("update") != null) {
+            
+            doUpdate(req, resp);
+            
+        } else {
+            
+            doQuery(req, resp);
+            
+        }
 
     }
 
+    /**
+     * Handles UPDATE.
+     * 
+     * <pre>
+     * update (required)
+     * using-graph-uri (0 or more)
+     * using-named-graph-uri (0 or more) 
+     * </pre>
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+    private void doUpdate(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+       
+        // FIXME Auto-generated method stub
+        buildResponse(resp, HTTP_NOTIMPLEMENTED, MIME_TEXT_PLAIN);
+        return;
+        
+    }
+
+    /**
+     * Handles query, ESTCARD, and SHARDS.
+     */
     @Override
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {

@@ -70,13 +70,6 @@ import com.bigdata.rdf.spo.SPO;
 /**
  * Boot strapped test suite for core UPDATE functionality.
  * 
- * TODO Validate outcomes. For the data driven tests, we could validate a
- * post-condition with a query. Or a set of post-conditions with a set of
- * queries if that is really necessary. We also need to verify things such as
- * whether or not the data are committed and support for triples, sids, quads,
- * s/o, and full transactions (on a journal). It would also be good to verify
- * support against an SPO only graph on a temporary store.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
