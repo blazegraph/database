@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.ByteArrayOutputStream;
@@ -23,7 +45,6 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -53,7 +74,6 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.BooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.GraphQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.TupleQuery;
@@ -94,15 +114,10 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 */
 	protected String m_serviceURL;
 
-	/**
-	 * The client-API wrapper to the NSS.
-	 */
-	protected RemoteRepository m_repo;
-
-	/**
-	 * The request path for the REST API under test.
-	 */
-	final protected static String requestPath = "/sparql";
+//	/**
+//	 * The request path for the REST API under test.
+//	 */
+//	final protected static String requestPath = "/sparql";
 
 	public AbstractTestNanoSparqlClient() {
 		
@@ -241,14 +256,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, ""/* file */)
+        m_serviceURL = new URL("http", hostAddr, port, "/sparql"/* file */)
                 .toExternalForm();
 
         if (log.isInfoEnabled())
             log.info("Setup done: name=" + getName() + ", namespace="
                     + namespace + ", serviceURL=" + m_serviceURL);
-        
-        m_repo = new RemoteRepository(m_serviceURL);
 
     }
 
@@ -279,8 +292,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		namespace = null;
 		
 		m_serviceURL = null;
-		
-		m_repo.shutdown();
 
 		log.info("tear down done");
 		
@@ -486,12 +497,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        opts.queryStr = queryStr;
 //        opts.method = "POST";
 
-        doInsertWithBodyTest("POST", 23, requestPath, format);
+        doInsertWithBodyTest("POST", 23, /*requestPath,*/ format);
 
 //        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(23, countAll());
 
-        doDeleteWithBody(requestPath, 23, format);
+        doDeleteWithBody(/*requestPath,*/ 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
 //        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
@@ -499,7 +510,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-	protected long doDeleteWithQuery(final String servlet, final String query) throws Exception {
+	protected long doDeleteWithQuery(/*final String servlet, */final String query) throws Exception {
 		
 //		HttpURLConnection conn = null;
 //		try {
@@ -540,7 +551,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     }
 
     protected long doDeleteWithAccessPath(//
-            final String servlet,//
+//            final String servlet,//
             final URI s,//
             final URI p,//
             final Value o,//
@@ -608,7 +619,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     	
     }
 
-    protected void doDeleteWithBody(final String servlet, final int ntriples,
+    protected void doDeleteWithBody(
+            /* final String servlet, */final int ntriples,
             final RDFFormat format) throws Exception {
 
 //        HttpURLConnection conn = null;
@@ -670,7 +682,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 * Test of POST w/ BODY having data to be loaded.
 	 */
     protected void doInsertWithBodyTest(final String method, final int ntriples,
-            final String servlet, final RDFFormat format) throws Exception {
+            /*final String servlet,*/ final RDFFormat format) throws Exception {
 
 //		HttpURLConnection conn = null;
 //		try {
@@ -755,7 +767,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * Insert a resource into the {@link NanoSparqlServer}.  This is used to
      * load resources in the test package into the server.
      */
-    protected long doInsertbyURL(final String method, final String servlet,
+    protected long doInsertbyURL(final String method, /*final String servlet,*/
             final String resource) throws Exception {
 
         final String uri = new File(resource).toURI().toString();
@@ -937,7 +949,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * @throws Exception
      */
     protected long doInsertByBody(final String method,
-            final String servlet, final RDFFormat rdfFormat, final Graph g,
+            /*final String servlet,*/ final RDFFormat rdfFormat, final Graph g,
             final URI defaultContext) throws Exception {
 
         final byte[] wireData = writeOnBuffer(rdfFormat, g);

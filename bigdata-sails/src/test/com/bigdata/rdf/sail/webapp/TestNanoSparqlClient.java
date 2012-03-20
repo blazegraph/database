@@ -2,77 +2,43 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.LineNumberReader;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
 
-import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFParseException;
-import org.openrdf.rio.RDFParser;
-import org.openrdf.rio.RDFParserFactory;
-import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
-import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.BooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.GraphQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.TupleQuery;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Proxied test suite.
  *
  * @param <S>
  */
-public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestNanoSparqlClient<S> {
+public class TestNanoSparqlClient<S extends IIndexManager> extends
+        AbstractTestNanoSparqlClient<S> {
 
     public TestNanoSparqlClient() {
-		
-	}
+
+    }
 
 	public TestNanoSparqlClient(final String name) {
 
@@ -93,7 +59,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         
         final String queryStr = "ASK where {?s ?p ?o}";
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final BooleanQuery query = repo.prepareBooleanQuery(queryStr);
         assertEquals(false, query.evaluate());
 
@@ -138,7 +104,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
 		final String queryStr = "select * where {?s ?p ?o}";
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final TupleQuery query = repo.prepareTupleQuery(queryStr);
 		assertEquals(0, countResults(query.evaluate()));
 
@@ -193,7 +159,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final TupleQuery query = repo.prepareTupleQuery(queryStr);
         
         try {
@@ -222,39 +188,39 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
     
     public void test_POST_INSERT_withBody_RDFXML() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.RDFXML);
+        doInsertWithBodyTest("POST", 23, RDFFormat.RDFXML);
         
     }
     
     public void test_POST_INSERT_withBody_NTRIPLES() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.NTRIPLES);
+        doInsertWithBodyTest("POST", 23, RDFFormat.NTRIPLES);
         
     }
     
     public void test_POST_INSERT_withBody_N3() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.N3);
+        doInsertWithBodyTest("POST", 23, RDFFormat.N3);
         
     }
     
     public void test_POST_INSERT_withBody_TURTLE() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.TURTLE);
+        doInsertWithBodyTest("POST", 23, RDFFormat.TURTLE);
         
     }
     
     // Note: quads interchange
     public void test_POST_INSERT_withBody_TRIG() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.TRIG);
+        doInsertWithBodyTest("POST", 23, RDFFormat.TRIG);
         
     }
     
     // Note: quads interchange
     public void test_POST_INSERT_withBody_TRIX() throws Exception {
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.TRIX);
+        doInsertWithBodyTest("POST", 23, RDFFormat.TRIX);
         
     }
 
@@ -262,7 +228,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //    // Note: quads interchange
 //    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
 //
-//        doInsertWithBodyTest("POST", 23, requestPath, NQuadsParser.nquads);
+//        doInsertWithBodyTest("POST", 23, NQuadsParser.nquads);
 //        
 //    }
 
@@ -280,7 +246,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         final Graph g = loadGraphFromResource(resource);
 
         // Load the resource into the KB.
-        doInsertByBody("POST", requestPath, RDFFormat.TURTLE, g, new URIImpl(
+        doInsertByBody("POST", RDFFormat.TURTLE, g, new URIImpl(
                 "http://example.org"));
         
         // Verify that the data were inserted into the appropriate context.
@@ -292,7 +258,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
         	
         	final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-            final RemoteRepository repo = m_repo;
+            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             final TupleQuery query = repo.prepareTupleQuery(queryStr);
     		assertEquals(7, countResults(query.evaluate()));
 
@@ -305,7 +271,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         // Load the resource into the KB.
         {
@@ -356,7 +322,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         // Verify nothing in the KB.
         {
@@ -440,7 +406,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         // Load the resource into the KB.
         assertEquals(
                 1L,
-                doInsertByBody("POST", requestPath, RDFFormat.RDFXML, g, null/* defaultContext */));
+                doInsertByBody("POST", RDFFormat.RDFXML, g, null/* defaultContext */));
 
         // Read back the data into a graph.
         final Graph g2;
@@ -451,7 +417,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //            opts.queryStr = "DESCRIBE <" + s.stringValue() + ">";
 //            g2 = buildGraph(doSparqlQuery(opts, requestPath));
             
-            final RemoteRepository repo = m_repo;
+            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
             final GraphQuery query = repo.prepareGraphQuery(queryStr);
             g2 = query.evaluate();
@@ -469,7 +435,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_POST_INSERT_LOAD_FROM_URIs() throws Exception {
 
-    	final RemoteRepository repo = m_repo;
+    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
     	
         // Verify nothing in the KB.
         {
@@ -541,7 +507,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_ESTCARD() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -554,7 +520,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(7, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
         		null,// s
                 null,// p
@@ -567,7 +533,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
     public void test_ESTCARD_s() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -580,7 +546,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
         		new URIImpl("http://www.bigdata.com/Mike"),// s
         		null,// p
@@ -593,7 +559,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
     
     public void test_ESTCARD_p() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -606,7 +572,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s
                 RDF.TYPE,// p
@@ -619,7 +585,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
     public void test_ESTCARD_p2() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -632,7 +598,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(2, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s
                 RDFS.LABEL,// p
@@ -645,7 +611,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
     public void test_ESTCARD_o() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -658,7 +624,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s
                 null,// p
@@ -671,7 +637,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
     public void test_ESTCARD_so() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -684,7 +650,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 RDF.TYPE,// p
@@ -703,7 +669,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -716,7 +682,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(7, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s,
                 null,// p
@@ -732,7 +698,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -745,7 +711,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s,
                 null,// p
@@ -761,7 +727,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -774,7 +740,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(2, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 null,// s,
                 null,// p
@@ -790,7 +756,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
 //        final RangeCountResult rangeCountResult = doRangeCount(//
@@ -803,7 +769,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 null,// p
@@ -826,12 +792,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //        opts.queryStr = queryStr;
 //        opts.method = "POST";
 
-        doInsertWithBodyTest("POST", 23, requestPath, RDFFormat.NTRIPLES);
+        doInsertWithBodyTest("POST", 23, RDFFormat.NTRIPLES);
 
 //        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(23, countAll());
 
-        doDeleteWithQuery(requestPath, "construct {?s ?p ?o} where {?s ?p ?o}");
+        doDeleteWithQuery("construct {?s ?p ?o} where {?s ?p ?o}");
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
 //        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
@@ -844,11 +810,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_all() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 null,// o
@@ -864,11 +830,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_s() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 new URIImpl("http://www.bigdata.com/Mike"),// s
                 null,// p
                 null,// o
@@ -884,11 +850,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_p() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 new URIImpl("http://www.w3.org/2000/01/rdf-schema#label"),// p
                 null,// o
@@ -904,11 +870,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_o_URI() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 new URIImpl("http://xmlns.com/foaf/0.1/Person"),// o
@@ -924,11 +890,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_o_Literal() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 new URIImpl("http://www.bigdata.com/Bryan"),// o
@@ -944,11 +910,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_p_o_URI() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 RDF.TYPE,// p
                 new URIImpl("http://xmlns.com/foaf/0.1/Person"),// o
@@ -964,11 +930,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_p_o_Literal() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 RDFS.LABEL,// p
                 new LiteralImpl("Bryan"),// o
@@ -984,11 +950,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
      */
     public void test_DELETE_accessPath_delete_NothingMatched() throws Exception {
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.ttl");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 new URIImpl("http://xmlns.com/foaf/0.1/XXX"),// o
@@ -1007,11 +973,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
         
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.trig");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 null,// o
@@ -1030,11 +996,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
         
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.trig");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 null,// o
@@ -1053,11 +1019,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
         if(TestMode.quads != testMode)
             return;
 
-        doInsertbyURL("POST", requestPath, packagePath
+        doInsertbyURL("POST", packagePath
                 + "test_delete_by_access_path.trig");
 
         final long mutationResult = doDeleteWithAccessPath(//
-                requestPath,//
+//                requestPath,//
                 null,// s
                 null,// p
                 null,// o
@@ -1187,7 +1153,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
         setupDataOnServer();
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1384,7 +1350,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 
         setupDataOnServer();
 
-        final RemoteRepository repo = m_repo;
+        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1550,130 +1516,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends AbstractTestN
 //
 //                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                        requestPath)));
-
-                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Unit test where the "query" used to delete triples from the database
-     * consists solely of a CONSTRUCT "template" without a WHERE clause (the
-     * WHERE clause is basically optional as all elements of it are optional).
-     * This time with quads.
-     * 
-     * @throws Exception
-     */
-    public void test_PUT_UPDATE_WITH_CONSTRUCT_QUADS_MULTIPART() throws Exception {
-
-    	if (testMode != TestMode.quads)
-    		return;
-    	
-        setupQuadsDataOnServer();
-
-        final RemoteRepository repo = m_repo;
-        
-        assertEquals(18, countAll());
-        
-        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
-        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
-        final URI person = new URIImpl(BD.NAMESPACE + "Person");
-        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
-        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
-        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
-        final URI c1 = new URIImpl(BD.NAMESPACE + "c1");
-        final URI c2 = new URIImpl(BD.NAMESPACE + "c2");
-        final URI c3 = new URIImpl(BD.NAMESPACE + "c3");
-        final Literal label1 = new LiteralImpl("Mike");
-        final Literal label2 = new LiteralImpl("Bryan");
-
-        // The format used to PUT the data.
-        final RDFFormat format = RDFFormat.TRIG;
-        
-//        /*
-//         * This is the query that we will use to delete some triples from the
-//         * database.
-//         */
-//        final String deleteQueryStr =//
-//            "prefix bd: <"+BD.NAMESPACE+"> " +//
-//            "CONSTRUCT { graph bd:c2 { bd:Bryan bd:likes bd:RDFS } }" +//
-//            "{ }";
-        
-        final Graph delete = new GraphImpl();
-        {
-        	delete.add(new ContextStatementImpl(bryan, likes, rdfs, c2));
-        }
-
-        /*
-         * Setup the document containing the statement to be inserted by the
-         * UPDATE operation.
-         */
-        final Graph add = new GraphImpl();
-        {
-            // The new data.
-            add.add(new ContextStatementImpl(bryan, likes, rdf, c2));
-        }
-
-        /*
-         * Now, run the UPDATE operation.
-         */
-        {
-            final RemoveOp removeOp = new RemoveOp(delete);
-            final AddOp addOp = new AddOp(add);
-            assertEquals(2, repo.update(removeOp, addOp));
-        }
-        
-        /*
-         * Now verify the post-condition state.
-         */
-        {
-
-            /*
-             * This query verifies that we removed the right triple (nobody is
-             * left who likes 'rdfs').
-             */
-            {
-
-                final String queryStr2 = //
-                    "prefix bd: <" + BD.NAMESPACE + "> " + //
-                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
-                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
-                    "CONSTRUCT { ?x bd:likes bd:RDFS }" + //
-                    "from <" + c2 + "> " +
-                    "WHERE { " + //
-//                    "  ?x rdf:type bd:Person . " + //
-                    "  ?x bd:likes bd:RDFS " + // NB: Checks the kb!
-                    "}";
-
-                // The expected results.
-                final Graph expected = new GraphImpl();
-
-                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
-            }
-
-            /* This query verifies that we added the right triple (two people
-             * now like 'rdf').
-             */
-            {
-
-                final String queryStr2 = //
-                    "prefix bd: <" + BD.NAMESPACE + "> " + //
-                    "prefix rdf: <" + RDF.NAMESPACE + "> " + //
-                    "prefix rdfs: <" + RDFS.NAMESPACE + "> " + //
-                    "CONSTRUCT { ?x bd:likes bd:RDF }" + //
-                    "WHERE { " + //
-//                    "  ?x rdf:type bd:Person . " + //
-                    "  ?x bd:likes bd:RDF " + //
-                    "}";
-                
-                // The expected results.
-                final Graph expected = new GraphImpl();
-
-                expected.add(new StatementImpl(mike, likes, rdf));
-                expected.add(new StatementImpl(bryan, likes, rdf));
 
                 assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
 

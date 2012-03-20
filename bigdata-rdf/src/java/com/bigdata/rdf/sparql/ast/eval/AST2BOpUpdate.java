@@ -196,7 +196,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (context.conn.isReadOnly())
             throw new UnsupportedOperationException("Not a mutable view.");
         
-        log.error("beforeUpdate:\n" + context.db.dumpStore());
+        if(log.isTraceEnabled())
+            log.trace("beforeUpdate:\n" + context.db.dumpStore());
 
         final ASTContainer astContainer = context.astContainer;
 
@@ -244,7 +245,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             }
         }
 
-        log.error("afterCommit:\n" + context.db.dumpStore());
+        if(log.isTraceEnabled())
+                log.trace("afterCommit:\n" + context.db.dumpStore());
 
         return left;
 

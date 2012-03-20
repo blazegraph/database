@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
@@ -37,6 +59,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.sail.BigdataSailQuery;
@@ -89,28 +112,6 @@ public class QueryServlet extends BigdataRDFServlet {
     }
 
     /**
-     * Handles UPDATE.
-     * 
-     * <pre>
-     * update (required)
-     * using-graph-uri (0 or more)
-     * using-named-graph-uri (0 or more) 
-     * </pre>
-     * 
-     * @param req
-     * @param resp
-     * @throws IOException
-     */
-    private void doUpdate(HttpServletRequest req, HttpServletResponse resp)
-            throws IOException {
-       
-        // FIXME Auto-generated method stub
-        buildResponse(resp, HTTP_NOTIMPLEMENTED, MIME_TEXT_PLAIN);
-        return;
-        
-    }
-
-    /**
      * Handles query, ESTCARD, and SHARDS.
      */
     @Override
@@ -118,15 +119,23 @@ public class QueryServlet extends BigdataRDFServlet {
             final HttpServletResponse resp) throws IOException {
 
         if (req.getParameter("query") != null) {
+            
             doQuery(req, resp);
+            
         } else if (req.getParameter("ESTCARD") != null) {
+            
             doEstCard(req, resp);
+            
         } else if (req.getParameter("SHARDS") != null) {
+            
             doShardReport(req, resp);
+            
         } else {
+            
             doServiceDescription(req, resp);
-//            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
+
             return;
+            
         }
         
     }
@@ -250,6 +259,175 @@ public class QueryServlet extends BigdataRDFServlet {
     }
     
     /**
+     * Handles SPARQL UPDATE.
+     * 
+     * <pre>
+     * update (required)
+     * using-graph-uri (0 or more)
+     * using-named-graph-uri (0 or more) 
+     * </pre>
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+    private void doUpdate(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final String namespace = getNamespace(req);
+
+        final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
+
+        // The SPARQL query.
+        final String queryStr = req.getParameter("update");
+
+        if (queryStr == null) {
+
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Not found: update");
+
+            return;
+
+        }
+
+        /*
+         * Setup task to execute the query. The task is executed on a thread
+         * pool. This bounds the possible concurrency of query execution (as
+         * opposed to queries accepted for eventual execution).
+         * 
+         * Note: If the client closes the connection, then the response's
+         * InputStream will be closed and the task will terminate rather than
+         * running on in the background with a disconnected client.
+         */
+        try {
+
+            final OutputStream os = resp.getOutputStream();
+
+            final BigdataRDFContext context = getBigdataRDFContext();
+
+            // final boolean explain =
+            // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
+
+            final AbstractQueryTask queryTask;
+            try {
+                /*
+                 * Attempt to construct a task which we can use to evaluate the
+                 * query.
+                 */
+                queryTask = context
+                        .getQueryTask(namespace, timestamp, queryStr,
+                                null/* acceptOverride */, req, os, true/* update */);
+            } catch (MalformedQueryException ex) {
+                /*
+                 * Send back a BAD REQUEST (400) along with the text of the
+                 * syntax error message.
+                 */
+                resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        ex.getLocalizedMessage());
+                return;
+            }
+
+            final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+
+            if (log.isTraceEnabled())
+                log.trace("Will run query: " + queryStr);
+
+            /*
+             * Setup the response headers.
+             */
+
+            resp.setStatus(HTTP_OK);
+            resp.setContentType(BigdataServlet.MIME_TEXT_PLAIN);
+
+//            if (queryTask.explain) {
+//                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
+//                final Writer w = new OutputStreamWriter(os, queryTask.charset);
+//                try {
+//                    // Begin executing the query (asynchronous)
+//                    getBigdataRDFContext().queryService.execute(ft);
+//                    // Send an explanation instead of the query results.
+//                    explainQuery(queryStr, queryTask, ft, w);
+//                } finally {
+//                    w.flush();
+//                    w.close();
+//                    os.flush();
+//                    os.close();
+//                }
+//
+//            } else {
+//                resp.setContentType(queryTask.mimeType);
+//
+//                if (queryTask.charset != null) {
+//
+//                    // Note: Binary encodings do not specify charset.
+//                    resp.setCharacterEncoding(queryTask.charset.name());
+//
+//                }
+//
+//                if (isAttachment(queryTask.mimeType)) {
+//                    /*
+//                     * Mark this as an attachment (rather than inline). This is
+//                     * just a hint to the user agent. How the user agent handles
+//                     * this hint is up to it.
+//                     */
+//                    resp.setHeader("Content-disposition",
+//                            "attachment; filename=query" + queryTask.queryId
+//                                    + "." + queryTask.fileExt);
+//                }
+//
+//                if (TimestampUtility.isCommitTime(queryTask.timestamp)) {
+//
+//                    /*
+//                     * A read against a commit time or a read-only tx. Such
+//                     * results SHOULD be cached because the data from which the
+//                     * response was constructed have snapshot isolation. (Note:
+//                     * It is possible that the commit point against which the
+//                     * query reads will be aged out of database and that the
+//                     * query would therefore fail if it were retried. This can
+//                     * happen with the RWStore or in scale-out.)
+//                     * 
+//                     * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
+//                     * requests will read against then current committed state
+//                     * of the database each time they are processed.
+//                     * 
+//                     * Note: UNISOLATED queries SHOULD NOT be cached. Such
+//                     * operations will read on (and write on) the then current
+//                     * state of the unisolated indices on the database each time
+//                     * they are processed. The results of such operations could
+//                     * be different with each request.
+//                     * 
+//                     * Note: Full read-write transaction requests SHOULD NOT be
+//                     * cached unless they are queries and the transaction scope
+//                     * is limited to the request (rather than running across
+//                     * multiple requests).
+//                     */
+//
+//                    resp.addHeader("Cache-Control", "public");
+//
+//                    // to disable caching.
+//                    // r.addHeader("Cache-Control", "no-cache");
+//
+//                }
+
+                // Begin executing the query (asynchronous)
+                getBigdataRDFContext().queryService.execute(ft);
+
+                // Wait for the Future.
+                ft.get();
+//
+//            }
+
+        } catch (Throwable e) {
+            try {
+                throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
+            } catch (Exception e1) {
+                throw new RuntimeException(e);
+            }
+        }
+        
+    }
+
+    /**
      * Run a SPARQL query.
      */
     private void doQuery(final HttpServletRequest req,
@@ -295,8 +473,9 @@ public class QueryServlet extends BigdataRDFServlet {
                  * Attempt to construct a task which we can use to evaluate the
                  * query.
                  */
-                queryTask = context.getQueryTask(namespace, timestamp,
-                        queryStr, null/* acceptOverride */, req, os);
+                queryTask = context
+                        .getQueryTask(namespace, timestamp, queryStr,
+                                null/* acceptOverride */, req, os, false/* update */);
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the

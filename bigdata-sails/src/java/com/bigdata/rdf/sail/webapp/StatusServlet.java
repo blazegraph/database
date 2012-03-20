@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
@@ -28,6 +50,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -91,7 +114,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @see #QUERY_ID
      */
-    private static final String CANCEL_QUERY = "cancelQuery";
+    static final String CANCEL_QUERY = "cancelQuery";
     
     /**
      * Handles CANCEL requests (terminate a running query).
@@ -102,57 +125,11 @@ public class StatusServlet extends BigdataRDFServlet {
 
         final boolean cancelQuery = req.getParameter(CANCEL_QUERY) != null;
 
-        if(cancelQuery) {
+        if (cancelQuery) {
 
-            final String[] a = req.getParameterValues(QUERY_ID);
+            doCancelQuery(req, resp, getIndexManager());
 
-            if (a == null || a.length == 0) {
-
-                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
-
-                return;
-                
-            }
-            
-            final Set<UUID> queryIds = new LinkedHashSet<UUID>();
-            
-            for(String s : a) {
-                
-                queryIds.add(UUID.fromString(s));
-                
-            }
-
-            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
-                    .getQueryController(getIndexManager());
-            
-            for(UUID queryId : queryIds) {
-                
-                final IRunningQuery q;
-                try {
-                    q = queryEngine.getRunningQuery(queryId);
-                } catch (RuntimeException ex) {
-                    // ignore. (typically the query has already terminated).
-                    if (log.isInfoEnabled())
-                        log.info("No such query: " + queryId);
-                    continue;
-                }
-
-                if( q == null ) {
-
-                    if (log.isInfoEnabled())
-                        log.info("No such query: " + queryId);
-
-                }
-                
-                if (q.cancel(true/* mayInterruptIfRunning */)) {
-
-                    // TODO Could paint the page with this information.
-                    if (log.isInfoEnabled())
-                        log.info("Cancelled query: " + queryId);
-
-                }
-
-            }
+            // Fall through.
             
         }
             
@@ -163,6 +140,79 @@ public class StatusServlet extends BigdataRDFServlet {
         
         return;
             
+    }
+    
+    /**
+     * Cancel a running query.
+     * 
+     * <pre>
+     * queryId=<UUID>
+     * </pre>
+     * 
+     * Note: This DOES NOT build a response unless there is an error. The caller
+     * needs to build a suitable response. This is done to support a use case
+     * where the status page is repainted as well as a remote "cancel" command.
+     * 
+     * @param req
+     * @param resp
+     * @param indexManager
+     * 
+     * @throws IOException
+     */
+    static void doCancelQuery(final HttpServletRequest req,
+            final HttpServletResponse resp, final IIndexManager indexManager)
+            throws IOException {
+
+        final String[] a = req.getParameterValues(QUERY_ID);
+
+        if (a == null || a.length == 0) {
+
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
+
+            return;
+            
+        }
+        
+        final Set<UUID> queryIds = new LinkedHashSet<UUID>();
+        
+        for(String s : a) {
+            
+            queryIds.add(UUID.fromString(s));
+            
+        }
+
+        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+                .getQueryController(indexManager);
+        
+        for(UUID queryId : queryIds) {
+            
+            final IRunningQuery q;
+            try {
+                q = queryEngine.getRunningQuery(queryId);
+            } catch (RuntimeException ex) {
+                // ignore. (typically the query has already terminated).
+                if (log.isInfoEnabled())
+                    log.info("No such query: " + queryId);
+                continue;
+            }
+
+            if( q == null ) {
+
+                if (log.isInfoEnabled())
+                    log.info("No such query: " + queryId);
+
+            }
+            
+            if (q.cancel(true/* mayInterruptIfRunning */)) {
+
+                // TODO Could paint the page with this information.
+                if (log.isInfoEnabled())
+                    log.info("Cancelled query: " + queryId);
+
+            }
+
+        }
+
     }
     
     /**
