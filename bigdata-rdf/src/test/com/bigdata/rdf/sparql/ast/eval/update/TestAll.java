@@ -75,14 +75,13 @@ public class TestAll extends TestCase {
         /*
          * Data driven tests.
          * 
-         * FIXME Openrdf does not have tests for the LOAD operation in this test
-         * suite. We need our own data driven tests for that. (And we need to
-         * cover triples, triples+inference, sids, sids+inference, and quads
-         * modes). Also test with and w/o the full text index and subject
-         * centric text index (which has its own truth maintenance).
+         * TODO Openrdf does not have tests for the LOAD operation in this test
+         * suite (or add to the NSS test suite). That test suite should cover
+         * triples, triples+inference, sids, sids+inference, and quads modes).
+         * Also test with and w/o the full text index and subject centric text
+         * index (which has its own truth maintenance).
          */
-        
-        suite.addTestSuite(TestUpdate.class);
+//        suite.addTestSuite(TestUpdate.class);
        
         /*
          * The openrdf SPARQL UPDATE test suite.

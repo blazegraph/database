@@ -47,6 +47,7 @@ import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.impl.MutableTupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
@@ -110,26 +111,6 @@ import com.bigdata.rdf.store.BD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO When translating, the notion that we might translate either
- *          incrementally or all operations in the sequence at once is related
- *          to the notion of interactive evaluation which would help to enable
- *          the RTO.
- * 
- *          FIXME Where are the DataSet(s) for the update operations in the
- *          sequence coming from? I assume that they will be attached to each
- *          {@link Update}.
- * 
- *          FIXME DELETE DATA with triples addresses the "defaultGraph". Since
- *          that is the RDF merge of all named graphs for the bigdata quads
- *          mode, the operation needs to be executed separately for each
- *          {@link ISPO} in which the context position is not bound. For such
- *          {@link ISPO}s, we need to remove everything matching the (s,p,o) in
- *          the quads store (c is unbound).
- *          <p>
- *          This is not being handled coherently right now. We are handling this
- *          by binding [c] to the nullGraph when removing data, but it looks
- *          like some triples are being allowed in without [c] being bound.
  */
 public class AST2BOpUpdate extends AST2BOpUtility {
 
@@ -174,9 +155,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * we need to work against update as well as query. (We will need a common
      * API for the WHERE clause). We will need to expand the AST optimizer test
      * suite for this.
-     * 
-     * TODO Focus on getting the assertion/retraction patterns right in the
-     * different database modes).
      */
     protected static void optimizeUpdateRoot(final AST2BOpUpdateContext context) {
 
@@ -234,9 +212,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * Note: Not required unless the end of the UpdateRoot or we desired a
          * checkpoint on the sequences of operations.
          * 
-         * TODO The commit really can not happen until the update plan(s) were
-         * known to execute successfully. We could do that with an AT_ONCE
-         * annotation on the CommitOp or we could just invoke commit() at
+         * Note: The commit really must not happen until the update plan(s) are
+         * known to execute successfully. We can do that with an AT_ONCE
+         * annotation on the CommitOp or we can just invoke commit() at
          * appropriate checkpoints in the UPDATE operation.
          */
         if (!context.isCluster()) {
@@ -249,7 +227,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         new NV(CommitOp.Annotations.PIPELINED, false)//
                         ));
             } else {
-                context.conn.commit();
+                context.conn.commit2();
             }
         }
 
@@ -331,6 +309,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param op
      * @param context
      * @return
+     * 
      * @throws QueryEvaluationException
      * @throws RepositoryException 
      */
@@ -405,9 +384,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final QuadData deleteClause = op.getDeleteClause();
 
             if (insertClause == null && deleteClause == null) {
-                // Must have at least one or the other.
-                // FIXME testDeleteWhereShortcut hits this.
+                
+                /*
+                 * FIXME testDeleteWhereShortcut hits this. We need to build the
+                 * appropriate CONSTRUCT clause from the WHERE clause. This
+                 * might be the same AST optimizer which is used for the
+                 * CONSTRUCT shortcut form.
+                 */
+
                 throw new UnsupportedOperationException();
+                
             }
 
             // Just the insert clause.
@@ -424,34 +410,92 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             
             /*
              * Run the WHERE clause.
+             * 
+             * FIXME Data set and defaultContet.
              */
+//            final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
 
             if (isDeleteInsert) {
                 
                 /*
                  * DELETE + INSERT.
                  * 
-                 * FIXME testDeleteInsertWhere hits this.
+                 * Note: The semantics of DELETE + INSERT are that the WHERE
+                 * clause is executed once. The solutions to that need to be fed
+                 * once through the DELETE clause. After the DELETE clauss has
+                 * been processed for all solutions to the WHERE clause, the
+                 * INSERT clause is then processed. So, we need to materalize
+                 * the WHERE clause results when both the DELETE clause and the
+                 * INSERT clause are present.
                  * 
-                 * Simple CONSTRUCT semantics are not enough for this case. We
-                 * need to process each solution by feeding into the delete
-                 * template and then feeding it into the insert template. Both
-                 * templates are quads (not just triples). We might need to
-                 * fully buffer the solutions and replay them so as to run the
-                 * DELETEs before the INSERTs, or we might even need to run the
-                 * WHERE clause twice - once to do the DELETEs and then once
-                 * more to do the INSERTs. This depends on the isolation
-                 * semantics for the operation with respect to itself.
+                 * TODO For large intermediate results, we would be much better
+                 * off putting the data onto an HTree and processing the
+                 * bindings as IVs rather than materializing them as RDF Values.
                  */
 
-                throw new UnsupportedOperationException();
+                // Run as a SELECT query.
+                final MutableTupleQueryResult result = new MutableTupleQueryResult(
+                        ASTEvalHelper.evaluateTupleQuery(context.db,
+                                astContainer, null/* bindingSets */));
+
+                try {
+
+                    // Play it once through the DELETE clause.
+                    {
+
+                        // rewind.
+                        result.beforeFirst();
+
+                        final ConstructNode template = op.getDeleteClause()
+                                .flatten();
+
+                        final ASTConstructIterator itr = new ASTConstructIterator(
+                                context.conn.getTripleStore(), template, result);
+
+                        while (itr.hasNext()) {
+
+                            final Statement stmt = itr.next();
+System.err.println("DELETE: "+stmt);
+                            context.conn.remove(stmt.getSubject(),
+                                    stmt.getPredicate(), stmt.getObject(),
+                                    stmt.getContext());
+
+                        }
+                        
+                    }
+
+                    // Play it once through the INSERT clause.
+                    {
+
+                        // rewind.
+                        result.beforeFirst();
+
+                        final ConstructNode template = op.getInsertClause()
+                                .flatten();
+
+                        final ASTConstructIterator itr = new ASTConstructIterator(
+                                context.conn.getTripleStore(), template, result);
+
+                        while (itr.hasNext()) {
+
+                            final Statement stmt = itr.next();
+System.err.println("INSERT: "+stmt);
+                            context.conn.add(stmt.getSubject(),
+                                    stmt.getPredicate(), stmt.getObject(),
+                                    stmt.getContext());
+
+                        }
+                        
+                    }
+
+                } finally {
+
+                    // Close the result set.
+                    result.close();
+
+                }
 
             } else {
-
-                /*
-                 * FIXME Data set and defaultContet.
-                 */
-//                final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
 
                 final QuadData quadData = insertClause == null ? deleteClause
                         : insertClause;

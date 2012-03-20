@@ -81,7 +81,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
 /**
- * Extension of TupleExprBuilder that builds Update Expressions.
+ * Extension of {@link BigdataExprBuilder} that builds Update Expressions.
  * 
  * @author Jeen Broekstra
  * @author Bryan Thompson
@@ -90,27 +90,12 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
 //    private static final Logger log = Logger.getLogger(UpdateExprBuilder.class);
 
-//  private Set<Var> getProjectionVars(Collection<StatementPattern> statementPatterns) {
-//  Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
-//
-//  for (StatementPattern sp : statementPatterns) {
-//      vars.add(sp.getSubjectVar());
-//      vars.add(sp.getPredicateVar());
-//      vars.add(sp.getObjectVar());
-//      if (sp.getContextVar() != null) {
-//          vars.add(sp.getContextVar());
-//      }
-//  }
-//
-//  return vars;
-//}
-    
     public UpdateExprBuilder(final BigdataASTContext context) {
         
         super(context);
     }
 
-    // TODO Is this necessary?
+//    // TODO Is this necessary?
 //	@Override
 //    public Update visit(final ASTUpdate node, final Object data)
 //            throws VisitorException {
@@ -136,78 +121,17 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * disjoint from the blank nodes in the Graph Store, i.e., will be inserted
      * with "fresh" blank nodes.
      */
-	@Override
+    @Override
     public InsertData visit(final ASTInsertData node, final Object data)
-            throws VisitorException
-	{
+            throws VisitorException {
 
-	    final InsertData op = new InsertData();
+        final InsertData op = new InsertData();
 
-        op.setData( doQuadsData(node, data) );
-        
-//      TupleExpr insertExpr = graphPattern.buildTupleExpr();
-//		// Retrieve all StatementPatterns from the insert expression
-//		List<StatementPattern> statementPatterns = StatementPatternCollector.process(insertExpr);
-//
-//		Set<Var> projectionVars = getProjectionVars(statementPatterns);
-//
-//		// Create BNodeGenerators for all anonymous variables
-//		Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
-//
-//		for (Var var : projectionVars) {
-//			if (var.isAnonymous() && !extElemMap.containsKey(var)) {
-//				ValueExpr valueExpr;
-//
-//				if (var.hasValue()) {
-//					valueExpr = new ValueConstant(var.getValue());
-//				}
-//				else {
-//					valueExpr = new BNodeGenerator();
-//				}
-//
-//				extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
-//			}
-//		}
-//
-//      TupleExpr result = new SingletonSet();
-//
-//		if (!extElemMap.isEmpty()) {
-//			result = new Extension(result, extElemMap.values());
-//		}
-//
-//		// Create a Projection for each StatementPattern in the clause
-//		List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
-//
-//		for (StatementPattern sp : statementPatterns) {
-//			ProjectionElemList projElemList = new ProjectionElemList();
-//
-//			projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
-//			projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
-//			projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
-//
-//			if (sp.getContextVar() != null) {
-//				projElemList.addElement(new ProjectionElem(sp.getContextVar().getName(), "context"));
-//			}
-//
-//			projList.add(projElemList);
-//		}
-//
-//		if (projList.size() == 1) {
-//			result = new Projection(result, projList.get(0));
-//		}
-//		else if (projList.size() > 1) {
-//			result = new MultiProjection(result, projList);
-//		}
-//		else {
-//			// Empty constructor
-//			result = new EmptySet();
-//		}
-//
-//		result = new Reduced(result);
+        op.setData(doQuadsData(node, data));
 
-//		return new InsertData(result);
-		return op;
-	}
+        return op;
+
+    }
 
     /**
      * Note: For DELETE DATA, QuadData denotes triples to be removed and is as
@@ -215,131 +139,20 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * operation neither variables nor blank nodes are allowed (see Notes 8+9 in
      * the grammar).
      */
-	@Override
-	public DeleteData visit(final ASTDeleteData node, final Object data)
-		throws VisitorException
-	{
-	    
+    @Override
+    public DeleteData visit(final ASTDeleteData node, final Object data)
+            throws VisitorException {
+
         final DeleteData op = new DeleteData();
 
         op.setData(doQuadsData(node, data));
-	    
-	    return op;
 
-//		TupleExpr result = new SingletonSet();
-//
-//		// Collect construct triples
-//		GraphPattern parentGP = graphPattern;
-//		graphPattern = new GraphPattern();
-//
-//		// inherit scope & context
-//		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-//		graphPattern.setContextVar(parentGP.getContextVar());
-//
-//		Object algebraExpr = node.jjtGetChild(0).jjtAccept(this, data);
-//
-//		if (algebraExpr instanceof ValueExpr) { // named graph identifier
-//			Var contextVar = valueExpr2Var((ValueExpr)algebraExpr);
-//			graphPattern.setContextVar(contextVar);
-//			graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-//		}
-//
-//		for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
-//
-//		TupleExpr deleteExpr = graphPattern.buildTupleExpr();
-//
-//		graphPattern = parentGP;
-//
-//		// Retrieve all StatementPatterns from the insert expression
-//		List<StatementPattern> statementPatterns = StatementPatternCollector.process(deleteExpr);
-//
-//		Set<Var> projectionVars = getProjectionVars(statementPatterns);
-//
-//		// Create BNodeGenerators for all anonymous variables
-//		Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
-//
-//		for (Var var : projectionVars) {
-//			if (var.isAnonymous() && !extElemMap.containsKey(var)) {
-//				ValueExpr valueExpr;
-//
-//				if (var.hasValue()) {
-//					valueExpr = new ValueConstant(var.getValue());
-//				}
-//				else {
-//					valueExpr = new BNodeGenerator();
-//				}
-//
-//				extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
-//			}
-//		}
-//
-//		if (!extElemMap.isEmpty()) {
-//			result = new Extension(result, extElemMap.values());
-//		}
-//
-//		// Create a Projection for each StatementPattern in the clause
-//		List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
-//
-//		for (StatementPattern sp : statementPatterns) {
-//			ProjectionElemList projElemList = new ProjectionElemList();
-//
-//			projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
-//			projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
-//			projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
-//
-//			if (sp.getContextVar() != null) {
-//				projElemList.addElement(new ProjectionElem(sp.getContextVar().getName(), "context"));
-//			}
-//
-//			projList.add(projElemList);
-//		}
-//
-//		if (projList.size() == 1) {
-//			result = new Projection(result, projList.get(0));
-//		}
-//		else if (projList.size() > 1) {
-//			result = new MultiProjection(result, projList);
-//		}
-//		else {
-//			// Empty constructor
-//			result = new EmptySet();
-//		}
-//
-//		result = new Reduced(result);
-//
-//		return new DeleteData(result);
-	    
+	    return op;
+   
 	}
 
-//    @Override
-//    public TupleExpr visit(ASTQuadsNotTriples node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//        graphPattern = new GraphPattern();
-//
-//        ValueExpr contextNode = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, data);
-//
-//        Var contextVar = valueExpr2Var(contextNode);
-//        graphPattern.setContextVar(contextVar);
-//        graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-//
-//        for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-//            node.jjtGetChild(i).jjtAccept(this, data);
-//        }
-//
-//        TupleExpr result = graphPattern.buildTupleExpr();
-//        parentGP.addRequiredTE(result);
-//
-//        graphPattern = parentGP;
-//
-//        return result;
-//    }
-    
 	@Override
-	public QuadData visit(final ASTQuadsNotTriples node, Object data)
+	public QuadData visit(final ASTQuadsNotTriples node, final Object data)
 		throws VisitorException
 	{
 		
@@ -367,6 +180,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 		graphPattern = parentGP;
 
 		return group;
+		
 	}
 
     /**
@@ -408,75 +222,68 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         
         return op;
         
-//		TupleExpr whereExpr = graphPattern.buildTupleExpr();
-//		graphPattern = parentGP;
-//
-//		TupleExpr deleteExpr = whereExpr.clone();
-//		Modify modify = new Modify(deleteExpr, null, whereExpr);
-//
-//		return modify;
 	}
 
 	@Override
-	public LoadGraph visit(final ASTLoad node, Object data)
-		throws VisitorException
-	{
+    public LoadGraph visit(final ASTLoad node, final Object data)
+            throws VisitorException {
 
         final ConstantNode sourceGraph = (ConstantNode) node.jjtGetChild(0)
                 .jjtAccept(this, data);
 
-		final LoadGraph op = new LoadGraph();
-		
-		op.setSourceGraph(sourceGraph);
+        final LoadGraph op = new LoadGraph();
+
+        op.setSourceGraph(sourceGraph);
 
         if (node.isSilent())
             op.setSilent(true);
-		
-		if (node.jjtGetNumChildren() > 1) {
 
-		    final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)
+        if (node.jjtGetNumChildren() > 1) {
+
+            final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)
                     .jjtAccept(this, data);
-		    
-			op.setTargetGraph(targetGraph);
-			
-		}
 
-		return op;
-	}
+            op.setTargetGraph(targetGraph);
+
+        }
+
+        return op;
+
+    }
 
     /**
      * Note: DROP and CLEAR have the identical semantics for bigdata since it
      * does not support empty graphs.
      */
 	@Override
-	public ClearGraph visit(final ASTClear node, Object data)
+	public ClearGraph visit(final ASTClear node, final Object data)
 		throws VisitorException
 	{
 	
-	    final ClearGraph op = new ClearGraph();
-		
-		if(node.isSilent())
-		    op.setSilent(true);
+        final ClearGraph op = new ClearGraph();
+
+        if (node.isSilent())
+            op.setSilent(true);
 
         final ASTGraphRefAll graphRef = node.jjtGetChild(ASTGraphRefAll.class);
 
-		if (graphRef.jjtGetNumChildren() > 0) {
+        if (graphRef.jjtGetNumChildren() > 0) {
 
-		    final ConstantNode targetGraph = (ConstantNode) graphRef
+            final ConstantNode targetGraph = (ConstantNode) graphRef
                     .jjtGetChild(0).jjtAccept(this, data);
-			
-		    op.setTargetGraph(targetGraph);
+
+            op.setTargetGraph(targetGraph);
 
         } else {
-            
+
             if (graphRef.isDefault()) {
-            
+
                 op.setScope(Scope.DEFAULT_CONTEXTS);
-                
+
             } else if (graphRef.isNamed()) {
-                
+
                 op.setScope(Scope.NAMED_CONTEXTS);
-                
+
             }
 
         }
@@ -526,7 +333,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     }
 
     @Override
-    public CreateGraph visit(final ASTCreate node, Object data)
+    public CreateGraph visit(final ASTCreate node, final Object data)
             throws VisitorException {
 
         final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(0)
@@ -692,6 +499,11 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
                 
                 with = (ConstantNode) withNode.jjtAccept(this, data);
                 
+                /*
+                 * Set the default context for the WHERE clause, DELETE clause,
+                 * and/or INSERT clauser.
+                 */
+                
                 graphPattern.setContextVar(with);
                 
                 graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
@@ -705,8 +517,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             if (whereClause != null) {
 
-                graphPattern = new GroupGraphPattern();
-
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> ret = (GraphPatternGroup<IGroupMemberNode>) whereClause
                         .jjtAccept(this, null/* data */);
 
@@ -714,40 +525,36 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
                 
             }
             
-//          ASTGraphPatternGroup whereClause = node.getWhereClause();
-//                  TupleExpr where = null;
-//                  if (whereClause != null) {
-//                      where = (TupleExpr)whereClause.jjtAccept(this, data);
-//                  }
-
         }
 
         {
-            
+
             final ASTDeleteClause deleteNode = node.getDeleteClause();
-            
+
             if (deleteNode != null) {
-            
+
+                // This is a QuadPattern (versus ground data)
                 final QuadData deleteClause = (QuadData) deleteNode.jjtAccept(
                         this, data);
-            
+
                 op.setDeleteClause(deleteClause);
-                
+
             }
-            
+
         }
 
         {
 
             final ASTInsertClause insertNode = node.getInsertClause();
-            
+
             if (insertNode != null) {
-            
+
+                // This is a QuadPattern (versus ground data)
                 final QuadData deleteClause = (QuadData) insertNode.jjtAccept(
                         this, data);
-            
+
                 op.setInsertClause(deleteClause);
-                
+
             }
             
         }
@@ -774,8 +581,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     }
 
     /**
-     * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation. This
-     * form does not allow variables in the quads data.
+     * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation. This form
+     * does not allow variables in the quads data.
      * <p>
      * Note: The QuadData is basically modeled by the bigdata AST as recursive
      * {@link StatementPatternNode} containers. This visits the parser AST nodes
@@ -793,9 +600,10 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         final GroupGraphPattern parentGP = graphPattern;
         graphPattern = new GroupGraphPattern();
 
-        // inherit scope & context : TODO When would it ever be non-null?
+        // inherit scope & context
         graphPattern.setStatementPatternScope(parentGP
                 .getStatementPatternScope());
+ 
         graphPattern.setContextVar(parentGP.getContext());
 
         /*
@@ -852,11 +660,6 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
                     StatementEnum.Explicit//
             );
 
-//            final BigdataStatement spo = context.valueFactory.createStatement(
-//                    (Resource) sp.s().getValue(), (URI) sp.p().getValue(),
-//                    (Value) sp.o().getValue(), (Resource) (sp.c() != null ? sp
-//                            .c().getValue() : null), StatementEnum.Explicit);
-
             stmts.add(spo);
 
         }
@@ -876,120 +679,31 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * @return The {@link QuadData} (aka template). The {@link QuadData} as
      *         returned by this method is not flattened, but the context has
      *         been applied within any GRAPH section.
-     * 
-     *         TODO [data] appears to be where to put the data. Look at how this
-     *         is getting passed in to the caller (ASTModify and maybe
-     *         recursively in this method).
      */
     private QuadData doQuadsPatternClause(final Node node, final Object data)
             throws VisitorException {
 
-//	    TupleExpr result = (TupleExpr)data;
+        // Collect construct triples
+        final GroupGraphPattern parentGP = graphPattern;
 
-		// Collect construct triples
-		final GroupGraphPattern parentGP = graphPattern;
+        graphPattern = new GroupGraphPattern();
 
-		graphPattern = new GroupGraphPattern();
+        // inherit scope & context
+        graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+        graphPattern.setContextVar(parentGP.getContext());
 
-		// inherit scope & context
-		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-		graphPattern.setContextVar(parentGP.getContext());
+        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
 
-		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
+            node.jjtGetChild(i).jjtAccept(this, data);
 
-		    node.jjtGetChild(i).jjtAccept(this, data);
-		    
-		}
-		
+        }
+
         final QuadData quadData = graphPattern.buildGroup(new QuadData());
 
         graphPattern = parentGP;
 
-		return quadData;
+        return quadData;
 
-	}
-
-//	@Override
-//	public TupleExpr visit(ASTInsertClause node, Object data)
-//		throws VisitorException
-//	{
-//		TupleExpr result = (TupleExpr)data;
-//
-//		// Collect construct triples
-//		GraphPattern parentGP = graphPattern;
-//		graphPattern = new GraphPattern();
-//
-//		// inherit scope & context
-//		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-//		graphPattern.setContextVar(parentGP.getContextVar());
-//
-//		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-//			node.jjtGetChild(i).jjtAccept(this, data);
-//		}
-//
-//		TupleExpr insertExpr = graphPattern.buildTupleExpr();
-//
-//		graphPattern = parentGP;
-//
-//		return insertExpr;
-//
-//		/*
-//		// Retrieve all StatementPatterns from the insert expression
-//		List<StatementPattern> statementPatterns = StatementPatternCollector.process(insertExpr);
-//
-//		Set<Var> projectionVars = getProjectionVars(statementPatterns);
-//
-//		// Create BNodeGenerators for all anonymous variables
-//		Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
-//
-//		for (Var var : projectionVars) {
-//			if (var.isAnonymous() && !extElemMap.containsKey(var)) {
-//				ValueExpr valueExpr;
-//
-//				if (var.hasValue()) {
-//					valueExpr = new ValueConstant(var.getValue());
-//				}
-//				else {
-//					valueExpr = new BNodeGenerator();
-//				}
-//
-//				extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
-//			}
-//		}
-//
-//		if (!extElemMap.isEmpty()) {
-//			result = new Extension(result, extElemMap.values());
-//		}
-//
-//		// Create a Projection for each StatementPattern in the clause
-//		List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
-//
-//		for (StatementPattern sp : statementPatterns) {
-//			ProjectionElemList projElemList = new ProjectionElemList();
-//
-//			projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
-//			projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
-//			projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
-//
-//			if (sp.getContextVar() != null) {
-//				projElemList.addElement(new ProjectionElem(sp.getContextVar().getName(), "context"));
-//			}
-//
-//			projList.add(projElemList);
-//		}
-//
-//		if (projList.size() == 1) {
-//			result = new Projection(result, projList.get(0));
-//		}
-//		else if (projList.size() > 1) {
-//			result = new MultiProjection(result, projList);
-//		}
-//		else {
-//			// Empty constructor
-//			result = new EmptySet();
-//		}
-//
-//		*/
-//	}
+    }
 
 }

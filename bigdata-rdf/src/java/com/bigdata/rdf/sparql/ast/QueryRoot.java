@@ -41,7 +41,7 @@ import com.bigdata.bop.BOp;
  * @see OrderByNode
  * @see SliceNode
  */
-public class QueryRoot extends QueryBase implements IPrefixDecls {
+public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
 
     /**
      * 
@@ -49,13 +49,8 @@ public class QueryRoot extends QueryBase implements IPrefixDecls {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends QueryBase.Annotations,
-            IPrefixDecls.Annotations {
+            IPrefixDecls.Annotations, IDataSetNode.Annotations {
 
-        /**
-         * The {@link DatasetNode}.
-         */
-        String DATASET = "dataset";
-        
         /**
          * The {@link NamedSubqueriesNode} (optional).
          */
@@ -144,20 +139,12 @@ public class QueryRoot extends QueryBase implements IPrefixDecls {
 //        
 //    }
 
-    /**
-     * Set the dataset.
-     * 
-     * @param dataset
-     */
     public void setDataset(final DatasetNode dataset) {
 
         setProperty(Annotations.DATASET, dataset);
 
     }
 
-    /**
-     * Return the dataset.
-     */
     public DatasetNode getDataset() {
 
         return (DatasetNode) getProperty(Annotations.DATASET);

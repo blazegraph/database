@@ -123,7 +123,7 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
 //        // auto-commit only there for TCK
 //        props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
-        // exact size only there for TCK
+        // exact size only the for TCK
         props.setProperty(Options.EXACT_SIZE, "true");
         
 //        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());

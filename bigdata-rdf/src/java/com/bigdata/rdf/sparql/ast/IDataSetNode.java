@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,42 +22,38 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 7, 2011
+ * Created on Mar 10, 2012
  */
 
-package com.bigdata.rdf.sparql.ast.eval.update;
-
-import org.apache.log4j.Logger;
-
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+package com.bigdata.rdf.sparql.ast;
 
 /**
- * Test driver for debugging Sesame or DAWG manifest tests.
+ * Interface for data set declarations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestUpdate extends AbstractDataDrivenSPARQLTestCase {
+public interface IDataSetNode {
 
-    private static final Logger log = Logger.getLogger(TestUpdate.class);
-    
+    public interface Annotations {
+
+        /**
+         * The {@link DatasetNode}.
+         */
+        String DATASET = "dataset";
+
+    }
+
     /**
+     * Set the dataset.
      * 
+     * @param dataset
      */
-    public TestUpdate() {
-    }
+    public void setDataset(final DatasetNode dataset);
 
     /**
-     * @param name
+     * Return the dataset.
      */
-    public TestUpdate(String name) {
-        super(name);
-    }
-
-    public void test_load_01() throws Exception {
-
-        new TestHelper("load_01").runTest();
-
-    }
+    public DatasetNode getDataset();
 
 }
