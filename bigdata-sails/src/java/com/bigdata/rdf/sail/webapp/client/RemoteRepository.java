@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp.client;
 
 import info.aduna.io.IOUtil;
@@ -22,7 +44,6 @@ import javax.xml.parsers.SAXParserFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -94,11 +115,22 @@ public class RemoteRepository {
     private final String serviceURL;
 
 	private final DefaultHttpClient http;
-	
+
+    /**
+     * Create a connection to a remote repository.
+     * <p>
+     * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
+     * operations against the same end point.
+     * 
+     * @param serviceURL
+     *            The SPARQL http end point.
+     */
     public RemoteRepository(final String serviceURL) {
-    	this.serviceURL = serviceURL;
+    	
+        this.serviceURL = serviceURL;
     	
     	final SchemeRegistry schemeRegistry = new SchemeRegistry();
+
     	schemeRegistry.register(
     	         new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
     	schemeRegistry.register(
@@ -156,6 +188,22 @@ public class RemoteRepository {
 		return new BooleanQuery(UUID.randomUUID(), query);
 	}
 
+    /**
+     * Prepare a SPARQL UPDATE request.
+     * 
+     * @param updateStr
+     *            The SPARQL UPDATE request.
+     * 
+     * @return The {@link SparqlUpdate} opertion.
+     * 
+     * @throws Exception
+     */
+    public SparqlUpdate prepareUpdate(final String updateStr) throws Exception {
+        
+        return new SparqlUpdate(UUID.randomUUID(), updateStr);
+        
+    }
+
 	/**
 	 * Cancel a query running remotely on the server.
 	 * 
@@ -164,13 +212,14 @@ public class RemoteRepository {
 	 */
 	public void cancel(final UUID queryId) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL+"/status");
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
+
+        opts.addRequestParam("cancelQuery");
 
         opts.addRequestParam("queryId", queryId.toString());
-        opts.addRequestParam("cancel");
 
     	checkResponseCode(doConnect(opts));
-		
+        	
 	}
 
 	/**
@@ -191,7 +240,7 @@ public class RemoteRepository {
 	public long rangeCount(final URI s, final URI p, final Value o, final URI c) 
 			throws Exception {
 
-        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
 
         opts.method = "GET";
         
@@ -231,17 +280,19 @@ public class RemoteRepository {
 
 	}
 
-	/**
-	 * Adds RDF data to the remote repository.
-	 * 
-	 * @param add
-	 *        The RDF data to be added.
-	 */
-	public long add(AddOp add) throws Exception {
+    /**
+     * Adds RDF data to the remote repository.
+     * 
+     * @param add
+     *            The RDF data to be added.
+     * 
+     * @return The mutation count.
+     */
+    public long add(final AddOp add) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
         
-    	opts.method = "POST";
+        opts.method = "POST";
         
         add.prepareForWire();
         
@@ -294,10 +345,10 @@ public class RemoteRepository {
 	 */
 	public long remove(RemoveOp remove) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
-
-        remove.prepareForWire();
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
         
+        remove.prepareForWire();
+        	
         if (remove.format != null) {
         	
         	opts.method = "POST";
@@ -311,27 +362,27 @@ public class RemoteRepository {
         } else {
         	
             opts.method = "DELETE";
-            
-            if (remove.query != null) {
-    	        opts.addRequestParam("query", remove.query);
-            }
-            
-            if (remove.s != null) {
-            	opts.addRequestParam("s", EncodeDecodeValue.encodeValue(remove.s));
-            }
-            
-            if (remove.p != null) {
-            	opts.addRequestParam("p", EncodeDecodeValue.encodeValue(remove.p));
-            }
-            
-            if (remove.o != null) {
-            	opts.addRequestParam("o", EncodeDecodeValue.encodeValue(remove.o));
-            }
-            
-            if (remove.c != null) {
-            	opts.addRequestParam("c", EncodeDecodeValue.encodeValue(remove.c));
-            }
-            
+        
+        if (remove.query != null) {
+	        opts.addRequestParam("query", remove.query);
+        }
+        
+        if (remove.s != null) {
+        	opts.addRequestParam("s", EncodeDecodeValue.encodeValue(remove.s));
+        }
+        
+        if (remove.p != null) {
+        	opts.addRequestParam("p", EncodeDecodeValue.encodeValue(remove.p));
+        }
+        
+        if (remove.o != null) {
+        	opts.addRequestParam("o", EncodeDecodeValue.encodeValue(remove.o));
+        }
+        
+        if (remove.c != null) {
+        	opts.addRequestParam("c", EncodeDecodeValue.encodeValue(remove.c));
+        }
+        
         }
         
         HttpResponse response = null;
@@ -376,16 +427,16 @@ public class RemoteRepository {
 	 */
 	public long update(final RemoveOp remove, final AddOp add) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
         
         remove.prepareForWire();
         add.prepareForWire();
         
         if (remove.format != null) {
-        	
+        
         	opts.method = "POST";
         	opts.addRequestParam("update");
-
+        	
         	final MultipartEntity entity = new MultipartEntity();
         	entity.addPart(new FormBodyPart("remove", 
         			new ByteArrayBody(
@@ -399,17 +450,17 @@ public class RemoteRepository {
         					"add")));
         	
         	opts.entity = entity;
-        	
+        
         } else {
         	
             opts.method = "PUT";
 	        opts.addRequestParam("query", remove.query);
-
+        	
 	        final ByteArrayEntity entity = new ByteArrayEntity(add.data);
 	        entity.setContentType(add.format.getDefaultMIMEType());
-	        
+        
 	        opts.entity = entity;
-	        
+        	
         }
         
         if (add.context != null) {
@@ -450,29 +501,65 @@ public class RemoteRepository {
 		
 		protected final String query;
 		
-		public Query(final UUID id, final String query) {
-			this.id = id;
-			this.query = query;
+		private final boolean update;
+		
+        public Query(final UUID id, final String query) {
+         
+            this(id, query, false/* update */);
+            
+        }
+
+        /**
+         * 
+         * @param id
+         *            The query id.
+         * @param query
+         *            The SPARQL query or update string.
+         * @param update
+         *            <code>true</code> iff this is a SPARQL update.
+         */
+        public Query(final UUID id, final String query, final boolean update) {
+            if (query == null)
+                throw new IllegalArgumentException();
+            this.id = id;
+            this.query = query;
+            this.update = update;
+        }
+
+		final public UUID getQueryId() {
+			
+		    return id;
+		    
 		}
 		
-		public UUID getQueryId() {
-			return id;
+		/**
+		 * Return <code>true</code> iff this is a SPARQL UPDATE request.
+		 */
+		public final boolean isUpdate() {
+		    
+		    return update;
+		    
 		}
 		
 		protected ConnectOptions getConnectOpts() throws Exception {
 			
-	        final ConnectOptions opts = new ConnectOptions(serviceURL+"/sparql");
+	        final ConnectOptions opts = new ConnectOptions(serviceURL);
 
 	        opts.method = "POST";
-	        opts.addRequestParam("query", query);
-	        opts.addRequestParam("queryId", getQueryId().toString());
+	        if(update) {
+                opts.addRequestParam("update", query);
+	        } else {
+                opts.addRequestParam("query", query);
+	        }
+            if (id != null)
+                opts.addRequestParam("queryId", getQueryId().toString());
 
         	return opts;
 	        	
+	        }
+			
 		}
 		
-	}
-	
 	public final class TupleQuery extends Query {
 		
 		public TupleQuery(final UUID id, final String query) {
@@ -563,6 +650,36 @@ public class RemoteRepository {
 		
 	}
 
+   public final class SparqlUpdate extends Query {
+        
+        public SparqlUpdate(final UUID id, final String updateStr) {
+
+            super(id, updateStr, true/*update*/);
+
+        }
+        
+        public void evaluate() throws Exception {
+         
+	        HttpResponse response = null;
+	        try {
+	        	
+	        	checkResponseCode(response = doConnect(getConnectOpts()));
+	        	
+	        } finally {
+	        	
+	        	try {
+	            	
+	        		if (response != null)
+	        			EntityUtils.consume(response.getEntity());
+	        		
+	        	} catch (Exception ex) { }
+	        	
+	        }
+	        
+        }
+        
+    }
+   
 	/**
 	 * Add by URI, statements, or file.
 	 */
@@ -664,7 +781,7 @@ public class RemoteRepository {
 			this.data = data;
 			this.format = format;
 		}
-		
+			        
 		private void prepareForWire() throws Exception {
 			
 	        if (file != null) {
@@ -704,7 +821,7 @@ public class RemoteRepository {
         
         /** Request parameters to be formatted as URL query parameters. */
         public Map<String,String[]> requestParams;
-
+        
         /** Request entity. */
         public HttpEntity entity = null;
         
@@ -722,6 +839,7 @@ public class RemoteRepository {
         	if (requestParams == null) {
         		requestParams = new LinkedHashMap<String, String[]>();
         	}
+        	
         	requestParams.put(name, vals);
         	
         }
@@ -751,9 +869,7 @@ public class RemoteRepository {
      * Connect to a SPARQL end point (GET or POST query only).
      * 
      * @param opts
-     *            The query request.
-     * @param requestPath
-     *            The request path, including the leading "/".
+     *            The connection options.
      * 
      * @return The connection.
      */
