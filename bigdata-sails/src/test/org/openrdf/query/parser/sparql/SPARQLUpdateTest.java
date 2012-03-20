@@ -139,7 +139,11 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 
+//		System.err.println(dumpStore());
+
 		operation.execute();
+
+//		System.err.println(dumpStore());
 
 		assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
@@ -208,6 +212,11 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph2));
+        /*
+         * Note: I added the following line to verify that <alice, rdfs:label,
+         * "Alice"> is not asserted into the default graph either.
+         */
+        assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph2));
 		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
 	}
@@ -840,10 +849,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
         // Verify statements exist in the default graph.
         assertTrue(con.hasStatement(null, null, null, false, new Resource[]{null}));
 
-//        System.err
-//                .println(((BigdataSailRepositoryConnection) con)
-//                        .getSailConnection().getBigdataSail().getDatabase()
-//                        .dumpStore());
+//        System.err.println(dumpStore());
         
         operation.execute();
         assertTrue(con.hasStatement(null, null, null, false, graph1));
@@ -851,10 +857,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
         // Verify that no statements remain in the 'default' graph.
         assertFalse(con.hasStatement(null, null, null, false, new Resource[]{null}));
         
-//        System.err
-//                .println(((BigdataSailRepositoryConnection) con)
-//                        .getSailConnection().getBigdataSail().getDatabase()
-//                        .dumpStore());
+//      System.err.println(dumpStore());
     }
 
     //@Test
@@ -1165,4 +1168,11 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	 */
 	protected abstract Repository newRepository()
 		throws Exception;
+	
+    private StringBuilder dumpStore() {
+        
+        return ((BigdataSailRepositoryConnection) con).getSailConnection()
+                .getBigdataSail().getDatabase().dumpStore();
+        
+	}
 }

@@ -25,6 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -50,7 +54,6 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
@@ -62,11 +65,6 @@ import com.bigdata.rdf.spo.SPO;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestBigdataExprBuilder.java 5073 2011-08-23 00:33:54Z
  *          thompsonbry $
- * 
- *          TODO Are we going to attach prefix decls to the {@link Update}
- *          operations or the {@link UpdateRoot}? Or at all?
- * 
- *          TODO What about {@link DatasetNode} attachments?
  */
 public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
@@ -1305,18 +1303,133 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * DELETE/INSERT w/o WITH.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * INSERT { ?person foaf:givenName 'William' }
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH <http://example/addresses> {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: Since WITH is not given, the context position is <code>null</code>
+     * and the {@link Scope} is {@link Scope#DEFAULT_CONTEXTS} for any
+     * {@link StatementPatternNode} which is outside of a GRAPH group. Within a
+     * GRAPH group, the context is, of course, the constant IRI or variable
+     * specified by the GRAPH group and the {@link Scope} is
+     * {@link Scope#NAMED_CONTEXTS}.
+     * 
+     * @see StatementPatternNode
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_00() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                insertClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group.
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,//new ConstantNode(addresses),
+                        Scope.DEFAULT_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new ConstantNode(
+                        addresses), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * DELETE/INSERT plus WITH to specify the graph.
+     * 
      * <pre>
      * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
      * 
      * WITH <http://example/addresses>
      * DELETE { ?person foaf:givenName 'Bill' }
      * INSERT { ?person foaf:givenName 'William' }
-     * WHERE
-     *   { ?person foaf:givenName 'Bill'
-     *   }
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH <http://example/addresses> {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
      * </pre>
      * 
-     * TODO Tests with USING and USING NAMED.
+     * Note: The context position on the {@link StatementPatternNode} outside of
+     * the GRAPH group is bound to the constant specified by the WITH clause.
+     * <code>WITH uri</code> is a syntactic sugar for
+     * <code>GRAPH uri {...}</code>, so the {@link StatementPatternNode} is also
+     * marked as {@link Scope#NAMED_CONTEXTS}.
      */
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_01() throws MalformedQueryException,
@@ -1326,8 +1439,12 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "WITH <http://example/addresses>\n"//
                 + "DELETE { ?person foaf:givenName 'Bill' }\n"//
                 + "INSERT { ?person foaf:givenName 'William' }\n"//
-                + "WHERE\n"//
-                + "  { ?person foaf:givenName 'Bill' } ";
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
         
         final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
         final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
@@ -1368,14 +1485,28 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             }
 
             {
+
                 final JoinGroupNode whereClause = new JoinGroupNode();
 
+                op.setWhereClause(whereClause);
+
+                /*
+                 * Outside the GRAPH group. This is still marked as
+                 * NAMED_CONTEXTS because WITH creates an implicit top-level
+                 * GRAPH group wrapping the INSERT clause, DELETE clause, and
+                 * WHERE clause.
+                 */
                 whereClause.addChild(new StatementPatternNode(new VarNode(
                         "person"), new ConstantNode(givenName),
                         new ConstantNode(label1), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
 
-                op.setWhereClause(whereClause);
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new ConstantNode(
+                        addresses), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
                 
             }
 
@@ -1388,6 +1519,623 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
     
     /**
+     * DELETE/INSERT and USING.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * INSERT { ?person foaf:givenName 'William' }
+     * USING <http://example/addresses2>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH <http://example/addresses> {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: WITH is not used, so there is no implicit GRAPH wrapping the INSERT
+     * clause, DELETE clause, and WHERE clause. Therefore, the context will be
+     * <code>null</code> for the statement patterns in the DELETE clause and
+     * INSERT clause and outside of the GRAPH clause in the WHERE clause. 
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "USING <http://example/addresses2>\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV addresses2 = makeIV(valueFactory.createURI("http://example/addresses2"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+            
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                insertClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group.
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new ConstantNode(
+                        addresses), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
+                
+            }
+
+            @SuppressWarnings("unchecked")
+            final DatasetNode dataset = new DatasetNode(
+                    (Set<IV>)Collections.singleton(addresses2),// defaultGraph
+                    (Set)Collections.emptySet(),// namedGraphs
+                    true // update
+                    );
+            
+            op.setDataset(dataset);
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * DELETE/INSERT and USING NAMED.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * INSERT { ?person foaf:givenName 'William' }
+     * USING NAMED <http://example/addresses>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: WITH is not used, so there is no implicit GRAPH wrapping the INSERT
+     * clause, DELETE clause, and WHERE clause. Therefore, the context will be
+     * <code>null</code> for the statement patterns in the DELETE clause and
+     * INSERT clause and outside of the GRAPH clause in the WHERE clause.
+     * <p> 
+     * Note: For this test, the GRAPH group is also using a variable.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_03() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "USING NAMED <http://example/addresses>\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH ?graph {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+            
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                insertClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group.
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new VarNode(
+                        "graph"), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new VarNode("graph"),
+                        Scope.NAMED_CONTEXTS)));
+                
+            }
+
+            @SuppressWarnings("unchecked")
+            final DatasetNode dataset = new DatasetNode(
+                    (Set)Collections.emptySet(),// defaultGraph
+                    (Set<IV>)Collections.singleton(addresses),// namedGraphs
+                    true // update
+                    );
+            
+            op.setDataset(dataset);
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+      
+    /**
+     * DELETE/INSERT, WITH, USING, and USING NAMED.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * WITH <http://example/addresses>
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * INSERT { ?person foaf:givenName 'William' }
+     * USING NAMED <http://example/addresses>
+     * USING NAMED <http://example/addresses2>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Since WITH is used, the DELETE, INSERT, and WHERE clause is each wrapped
+     * by an implicit <code>GRAPH uri</code>.
+     * <p>
+     * Note: For this test, the GRAPH group is also using a variable. However,
+     * that variable will be constrained by the WITH clause to a constant.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_04() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "WITH <http://example/addresses>\n"//
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "USING NAMED <http://example/addresses>\n"//
+                + "USING NAMED <http://example/addresses2>\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH ?graph {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV addresses2 = makeIV(valueFactory.createURI("http://example/addresses2"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+            
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                insertClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group.
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new VarNode(
+                        "graph"), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new VarNode("graph"),
+                        Scope.NAMED_CONTEXTS)));
+                
+            }
+
+            final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+            namedGraphs.add(addresses);
+            namedGraphs.add(addresses2);
+            
+            @SuppressWarnings("unchecked")
+            final DatasetNode dataset = new DatasetNode(
+                    (Set)Collections.emptySet(),// defaultGraph
+                    namedGraphs,//
+                    true // update
+                    );
+            
+            op.setDataset(dataset);
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * DELETE/INSERT w/o WITH but using a GRAPH in the DELETE and INSERT
+     * clauses.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { 
+     *   GRAPH <http://example/addresses> {?person foaf:givenName 'Bill'} .
+     *   ?person foaf:givenName 'Bill'
+     * }
+     * INSERT {
+     *   ?person foaf:givenName 'William'
+     *   GRAPH <http://example/addresses> {?person foaf:givenName 'William'}
+     * }
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH <http://example/addresses> {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: Since WITH is not given, the context position is <code>null</code>
+     * and the {@link Scope} is {@link Scope#DEFAULT_CONTEXTS} for any
+     * {@link StatementPatternNode} which is outside of a GRAPH group. Within a
+     * GRAPH group, the context is, of course, the constant IRI or variable
+     * specified by the GRAPH group and the {@link Scope} is
+     * {@link Scope#NAMED_CONTEXTS}.
+     * 
+     * @see StatementPatternNode
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_10() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE {\n"//
+                + "  GRAPH <http://example/addresses> { ?person foaf:givenName 'Bill' } .\n" //
+                + "  ?person foaf:givenName 'Bill'\n"
+                + "}\n"//
+                + "INSERT {\n"//
+                + "  ?person foaf:givenName 'William'\n"
+                + "  GRAPH <http://example/addresses> { ?person foaf:givenName 'William' } .\n" //
+                + "}\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+ 
+                // inside the GRAPH group
+                deleteClause.addChild(new QuadData(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
+
+                // outside the GRAPH group
+                deleteClause.addChild(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,
+                        Scope.DEFAULT_CONTEXTS));
+                        
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                // outside the GRAPH group
+                insertClause.addChild(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), null,
+                        Scope.DEFAULT_CONTEXTS));
+
+                // inside the GRAPH group
+                insertClause.addChild(new QuadData(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group.
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), null,//new ConstantNode(addresses),
+                        Scope.DEFAULT_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new ConstantNode(
+                        addresses), new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS)));
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * DELETE/INSERT with WITH and a GRAPH in the DELETE and INSERT clauses.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * WITH <http://example/addresses2>
+     * DELETE { 
+     *   GRAPH ?graph {?person foaf:givenName 'Bill'} .
+     *   ?person foaf:givenName 'Bill'
+     * }
+     * INSERT {
+     *   ?person foaf:givenName 'William'
+     *   GRAPH ?graph {?person foaf:givenName 'William'}
+     * }
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: Since WITH is given, there is an implicit GRAPH wrapping the
+     * INSERT, DELETE, and WHERE clauses.
+     * 
+     * @see StatementPatternNode
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_11() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                +"WITH <http://example/addresses>\n"
+                + "DELETE {\n"//
+                + "  GRAPH ?graph { ?person foaf:givenName 'Bill' } .\n" //
+                + "  ?person foaf:givenName 'Bill'\n"
+                + "}\n"//
+                + "INSERT {\n"//
+                + "  ?person foaf:givenName 'William'\n"
+                + "  GRAPH ?graph { ?person foaf:givenName 'William' } .\n" //
+                + "}\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH ?group {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+        
+        final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+ 
+                // inside the GRAPH group
+                deleteClause.addChild(new QuadData(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new VarNode("graph"),
+                        Scope.NAMED_CONTEXTS)));
+
+                // outside the GRAPH group (bound by WITH).
+                deleteClause.addChild(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+                        
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+
+                final QuadData insertClause = new QuadData();
+
+                // outside the GRAPH group (bound by WITH)
+                insertClause.addChild(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+
+                // inside the GRAPH group
+                insertClause.addChild(new QuadData(new StatementPatternNode(
+                        new VarNode("person"), new ConstantNode(givenName),
+                        new ConstantNode(label2), new VarNode("graph"),
+                        Scope.NAMED_CONTEXTS)));
+
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                op.setWhereClause(whereClause);
+
+                // Outside the GRAPH group (bound by with).
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "person"), new ConstantNode(givenName),
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
+
+                // The GRAPH group.
+                whereClause.addChild(new JoinGroupNode(new VarNode("group"),
+                        new StatementPatternNode(new VarNode("person"),
+                                new ConstantNode(givenName), new ConstantNode(
+                                        label1), new VarNode("group"),
+                                Scope.NAMED_CONTEXTS)));
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * DELETE/INSERT with default graph.
+     * 
      * <pre>
      * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
      * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -1402,7 +2150,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * </pre>
      */
     @SuppressWarnings("rawtypes")
-    public void test_delete_insert_02() throws MalformedQueryException,
+    public void test_delete_insert_20() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
         final String sparql = //
@@ -1462,6 +2210,8 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * DELETE/INSERT plus GRAPH in INSERT and WHERE clauses.
+     * 
      * <pre>
      * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
      * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -1477,7 +2227,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * </pre>
      */
     @SuppressWarnings("rawtypes")
-    public void test_delete_insert_03() throws MalformedQueryException,
+    public void test_delete_insert_21() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
         final String sparql = //
@@ -1586,6 +2336,327 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(foafName), new VarNode("y")));
 
                 op.setWhereClause(whereClause);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+  /**
+   * A sequences of DELETE/INSERT operations with different data sets and no
+   * WITH clause.
+   * 
+   * <pre>
+   * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+   * 
+   * DELETE { ?person foaf:givenName 'Bill' }
+   * WHERE {
+   *   ?person foaf:givenName 'Bill' .
+   *   GRAPH ?graph {
+   *     ?person foaf:givenName 'Bill'
+   *     }
+   * };
+   * INSERT { ?person foaf:givenName 'William' }
+   * USING NAMED <http://example/addresses>
+   * WHERE {
+   *   ?person foaf:givenName 'Bill' .
+   *   GRAPH ?graph {
+   *     ?person foaf:givenName 'Bill'
+   *     }
+   * }
+   * </pre>
+   */
+  @SuppressWarnings("rawtypes")
+  public void test_delete_insert_30() throws MalformedQueryException,
+          TokenMgrError, ParseException {
+
+      final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+              + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+              + "WHERE {\n"//
+              + "  ?person foaf:givenName 'Bill'. \n"//
+              + "  GRAPH ?graph {\n"//
+              + "    ?person foaf:givenName 'Bill'\n"//
+              + "    }\n"//
+              + "};"//
+              + "INSERT { ?person foaf:givenName 'William' }\n"//
+              + "USING NAMED <http://example/addresses>\n"//
+              + "WHERE {\n"//
+              + "  ?person foaf:givenName 'Bill'. \n"//
+              + "  GRAPH ?graph {\n"//
+              + "    ?person foaf:givenName 'Bill'\n"//
+              + "    }\n"//
+              + "}";
+      
+      final IV addresses = makeIV(valueFactory.createURI("http://example/addresses"));
+      final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
+      final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+      final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+      final UpdateRoot expected = new UpdateRoot();
+      {
+          
+            {
+
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData deleteClause = new QuadData();
+
+                    deleteClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setDeleteClause(deleteClause);
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
+
+            }
+
+            {
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData insertClause = new QuadData();
+
+                    insertClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label2), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setInsertClause(insertClause);
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
+
+                final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+                namedGraphs.add(addresses);
+
+                @SuppressWarnings("unchecked")
+                final DatasetNode dataset = new DatasetNode(
+                        (Set) Collections.emptySet(),// defaultGraph
+                        namedGraphs,//
+                        true // update
+                );
+
+                op.setDataset(dataset);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A sequences of DELETE/INSERT operations with different data sets and no
+     * WITH clause.
+     * 
+     * <pre>
+     * PREFIX foaf:  <http://xmlns.com/foaf/0.1/>
+     * 
+     * DELETE { ?person foaf:givenName 'Bill' }
+     * USING NAMED <http://example/addresses>
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * };
+     * INSERT { ?person foaf:givenName 'William' }
+     * WHERE {
+     *   ?person foaf:givenName 'Bill' .
+     *   GRAPH ?graph {
+     *     ?person foaf:givenName 'Bill'
+     *     }
+     * }
+     * </pre>
+     * 
+     * Note: This is the same operations, but the first one has the data set
+     * while the second one does not.
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert_31() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { ?person foaf:givenName 'Bill' }\n"//
+                + "USING NAMED <http://example/addresses>\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH ?graph {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "};"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH ?graph {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+
+        final IV addresses = makeIV(valueFactory
+                .createURI("http://example/addresses"));
+        final IV givenName = makeIV(valueFactory
+                .createURI("http://xmlns.com/foaf/0.1/givenName"));
+        final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
+        final IV label2 = makeIV(valueFactory.createLiteral("William"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            {
+
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData deleteClause = new QuadData();
+
+                    deleteClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setDeleteClause(deleteClause);
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
+
+                final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+                namedGraphs.add(addresses);
+
+                @SuppressWarnings("unchecked")
+                final DatasetNode dataset = new DatasetNode(
+                        (Set) Collections.emptySet(),// defaultGraph
+                        namedGraphs,//
+                        true // update
+                );
+
+                op.setDataset(dataset);
+
+            }
+
+            {
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData insertClause = new QuadData();
+
+                    insertClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label2), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    op.setInsertClause(insertClause);
+
+                }
+
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    op.setWhereClause(whereClause);
+
+                    // Outside the GRAPH group.
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "person"), new ConstantNode(givenName),
+                            new ConstantNode(label1), null,
+                            Scope.DEFAULT_CONTEXTS));
+
+                    // The GRAPH group.
+                    whereClause.addChild(new JoinGroupNode(
+                            new VarNode("graph"), new StatementPatternNode(
+                                    new VarNode("person"), new ConstantNode(
+                                            givenName),
+                                    new ConstantNode(label1), new VarNode(
+                                            "graph"), Scope.NAMED_CONTEXTS)));
+
+                }
 
             }
 

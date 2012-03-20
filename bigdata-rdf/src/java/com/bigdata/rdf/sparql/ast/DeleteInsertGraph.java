@@ -56,7 +56,7 @@ import com.bigdata.bop.BOp;
  * @version $Id$
  */
 public class DeleteInsertGraph extends GraphUpdate implements
-        IGraphPatternContainer {
+        IGraphPatternContainer, IDataSetNode {
 
     /**
      * 
@@ -64,7 +64,7 @@ public class DeleteInsertGraph extends GraphUpdate implements
     private static final long serialVersionUID = 1L;
 
     interface Annotations extends GraphUpdate.Annotations,
-            IGraphPatternContainer.Annotations {
+            IGraphPatternContainer.Annotations, IDataSetNode.Annotations {
 
         /**
          * The optional DELETE clause.
@@ -103,6 +103,26 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The data set can only be specified for the general case of
+     * DELETE/INSERT. The data set is specific to the DELETE/INSERT operation to
+     * which it is attached (it is not inherited or combined with the data set
+     * for later operations in a sequence).
+     */
+    public void setDataset(final DatasetNode dataset) {
+
+        setProperty(Annotations.DATASET, dataset);
+
+    }
+
+    public DatasetNode getDataset() {
+
+        return (DatasetNode) getProperty(Annotations.DATASET);
+
+    }
+    
     /**
      * Return the {@link GraphPatternGroup} for the WHERE clause.
      * 
@@ -182,12 +202,20 @@ public class DeleteInsertGraph extends GraphUpdate implements
         
         sb.append(getUpdateType());
 
+        final DatasetNode dataset = getDataset();
+
         final QuadData deleteClause = getDeleteClause();
 
         final QuadData insertClause = getInsertClause();
 
         final GraphPatternGroup<?> whereClause = getWhereClause();
         
+        if (dataset != null) {
+
+            sb.append(dataset.toString(indent + 1));
+
+        }
+
         if (deleteClause != null) {
 
             sb.append("\n");

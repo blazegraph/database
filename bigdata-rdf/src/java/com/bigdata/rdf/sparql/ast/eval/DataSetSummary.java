@@ -87,8 +87,18 @@ public class DataSetSummary {
     public final int nknown;
 
     /**
-     * The term identifier for the first graph and {@link IRawTripleStore#NULL}
-     * if no graphs were specified having a term identifier.
+     * The #of graphs in {@link #graphs} whose term identifier is not known. For
+     * QUERY, this is proof that there is no data in the quad store for a graph
+     * having the corresponding {@link URI}. However, for UPDATE it is possible
+     * that a graph could be created for that {@link URI} during an UPDATE
+     * operation.
+     */
+    public final int nunknown;
+
+    /**
+     * The {@link IV} for the first graph having a known {@link IV} and
+     * {@link IRawTripleStore#NULL} if no graphs were specified having a known
+     * {@link IV}.
      */
     public final IV firstContext;
 
@@ -100,44 +110,61 @@ public class DataSetSummary {
      *            the {@link URI}s are not {@link BigdataURI}s. If
      *            <code>graphs := null</code>, then the set of named graphs is
      *            understood to be ALL graphs in the quad store.
+     * @param update
+     *            When <code>true</code>, unknown {@link IV}s WILL NOT be pruned
+     *            from the {@link DataSetSummary}. This is because those graphs
+     *            might be implicitly created during an UPDATE operation.
      */
-    public DataSetSummary(final Set<IV> graphs) {
+    public DataSetSummary(final Set<IV> graphs, final boolean update) {
 
         IV firstContext = null;
 
         if (graphs == null) {
 
             nknown = Integer.MAX_VALUE;
+            nunknown = Integer.MAX_VALUE;
 
         } else {
 
             final Iterator<IV> itr = graphs.iterator();
 
             int nknown = 0;
+            int nunknown = 0;
 
             while (itr.hasNext()) {
 
                 final IV iv = itr.next();
 
-                if (iv != null && !iv.isNullIV()) {
+                if (iv == null)
+                    continue;
+
+                if (iv.isNullIV()) {
+
+                    nunknown++;
+
+                } else {
 
                     if (++nknown == 1) {
 
                         firstContext = iv;
 
                     }
-                    
+
                 }
 
             } // while
 
             this.nknown = nknown;
+            this.nunknown = nunknown;
 
         }
 
         this.firstContext = firstContext;
-        
-        final IV[] a = new IV[nknown];
+
+        /*
+         * Note: Includes unknown IVs iff [update:=true].
+         */
+        final IV[] a = new IV[nknown + (update ? nunknown : 0)];
 
         final Iterator<IV> itr = graphs.iterator();
 
@@ -147,11 +174,15 @@ public class DataSetSummary {
 
             final IV iv = itr.next();
 
-            if (iv != null && !iv.isNullIV()) {
+            if (iv == null)
+                continue;
 
-                a[nknown++] = iv;
-
+            if (iv.isNullIV() && !update) {
+                // Drop unknown IVs unless [update:=true].
+                continue;
             }
+
+            a[nknown++] = iv;
 
         } // while
 
@@ -259,8 +290,7 @@ public class DataSetSummary {
     public String toString() {
 
         return "DataSetSummary{ngraphs=" + graphs.size() + ", nknown=" + nknown
-                + ", graphs="+graphs
-                + "}"
+                + ", nunknown=" + nunknown + ", graphs=" + graphs + "}"
                 ;
         
     }

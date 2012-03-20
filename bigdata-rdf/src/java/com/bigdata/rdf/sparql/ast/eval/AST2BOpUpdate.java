@@ -31,13 +31,16 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -60,6 +63,7 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -85,8 +89,10 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
 import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
+import com.bigdata.rdf.sparql.ast.IStatementContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
@@ -100,8 +106,6 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.UpdateType;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
-import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -121,7 +125,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * operator plan and execute it on the query engine. When <code>false</code>
      * , the UPDATE is executed using the {@link BigdataSail} API.
      * 
-     * FIXME By coming in through the SAIL, we automatically pick up truth
+     * TODO By coming in through the SAIL, we automatically pick up truth
      * maintenance and related logics. All of that needs to be integrated into
      * the generated physical operator plan before we can run updates on the
      * query engine. However, there will be advantages to running updates on the
@@ -147,36 +151,33 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             .var("o"), c = Var.var("c");
 
     /**
-     * Convert the query (generates an optimized AST as a side-effect).
-     * 
-     * TODO Top-level optimization pass over the {@link UpdateRoot}. We have to
-     * resolve IVs, etc., etc. See if we can just use the
-     * {@link DefaultOptimizerList} and modify the {@link IASTOptimizer}s that
-     * we need to work against update as well as query. (We will need a common
-     * API for the WHERE clause). We will need to expand the AST optimizer test
-     * suite for this.
+     * Convert the query
+     * <p>
+     * Note: This is currently a NOP.
      */
     protected static void optimizeUpdateRoot(final AST2BOpUpdateContext context) {
 
-        final ASTContainer astContainer = context.astContainer;
-
-        // TODO Clear the optimized AST.
-        // astContainer.clearOptimizedUpdateAST();
-
-        /*
-         * TODO Build up the optimized AST for the UpdateRoot for each Update to
-         * be executed. Maybe do this all up front before we run anything since
-         * we might reorder or regroup some operations (e.g., parallelized LOAD
-         * operations, parallelized INSERT data operations, etc).
-         */
-        final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
-
-        /*
-         * Evaluate each update operation in the optimized UPDATE AST in turn.
-         */
-        for (Update op : updateRoot) {
-
-        }
+//        final ASTContainer astContainer = context.astContainer;
+//
+//        // Clear the optimized AST.
+//        // astContainer.clearOptimizedUpdateAST();
+//
+//        /*
+//         * Build up the optimized AST for the UpdateRoot for each Update to
+//         * be executed. Maybe do this all up front before we run anything since
+//         * we might reorder or regroup some operations (e.g., parallelized LOAD
+//         * operations, parallelized INSERT data operations, etc).
+//         */
+//        final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
+//
+//        /*
+//         * Evaluate each update operation in the optimized UPDATE AST in turn.
+//         */
+//        for (Update op : updateRoot) {
+//  
+//            ...
+//        
+//        }
 
     }
 
@@ -189,10 +190,22 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     protected static PipelineOp convertUpdate(final AST2BOpUpdateContext context)
             throws Exception {
 
+        if (context.db.isReadOnly())
+            throw new UnsupportedOperationException("Not a mutable view.");
+       
+        if (context.conn.isReadOnly())
+            throw new UnsupportedOperationException("Not a mutable view.");
+        
+        log.error("beforeUpdate:\n" + context.db.dumpStore());
+
         final ASTContainer astContainer = context.astContainer;
 
-        // FIXME Change this to the optimized AST.
+        // * Note: Change this to the optimized AST if we start doing AST
+        // optimizations for UPDATE. */
         final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
+        
+        // Set as annotation on the ASTContainer.
+        // astContainer.setQueryPlan(left);
 
         /*
          * Evaluate each update operation in the optimized UPDATE AST in turn.
@@ -231,9 +244,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             }
         }
 
-        // Set as annotation on the ASTContainer.
-        astContainer.setQueryPlan(left);
-        
+        log.error("afterCommit:\n" + context.db.dumpStore());
+
         return left;
 
     }
@@ -280,7 +292,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             break;
         case InsertData:
         case DeleteData:
-            left = convertGraphDataUpdate(left, (AbstractGraphDataUpdate) op,
+            left = convertInsertOrDeleteData(left, (AbstractGraphDataUpdate) op,
                     context);
             break;
         case Load:
@@ -312,10 +324,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * 
      * @throws QueryEvaluationException
      * @throws RepositoryException 
+     * @throws SailException 
      */
     private static PipelineOp convertDeleteInsert(PipelineOp left,
             final DeleteInsertGraph op, final AST2BOpUpdateContext context)
-            throws QueryEvaluationException, RepositoryException {
+            throws QueryEvaluationException, RepositoryException, SailException {
 
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
@@ -324,11 +337,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * This models the DELETE/INSERT request as a QUERY. The data from the
          * query are fed into a handler which adds or removes the statements (as
          * appropriate) from the [conn].
-         * 
-         * FIXME The shortcut forms need to have AST translation to build the
-         * templates.
-         * 
-         * DELETE WHERE QuadPattern
          */
         {
 
@@ -342,19 +350,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             queryRoot.setWhereClause(whereClause);
 
+            final DatasetNode dataset = op.getDataset();
+
+            if (dataset != null)
+                queryRoot.setDataset(dataset);
+
             /*
              * Setup the PROJECTION for the new query.
              * 
              * TODO retainAll() for only those variables used in the template
              * for the InsertClause or RemoveClause (less materialization, more
              * efficient).
-             * 
-             * TODO Actually, what we really want to do is to CONSTRUCT the
-             * Statements to be INSERTED or REMOVED. Thus, if we extend
-             * CONSTRUCT to handle quads (first in the operator and then in the
-             * SPARQL syntax) then we could set this up as a CONSTRUCT query and
-             * then feed the result into a handler which adds or removed the
-             * statements on the [conn].
              */
             {
 
@@ -381,28 +387,43 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final QuadData insertClause = op.getInsertClause();
 
-            final QuadData deleteClause = op.getDeleteClause();
-
-            if (insertClause == null && deleteClause == null) {
+            if (insertClause == null && op.getDeleteClause() == null) {
                 
                 /*
-                 * FIXME testDeleteWhereShortcut hits this. We need to build the
-                 * appropriate CONSTRUCT clause from the WHERE clause. This
-                 * might be the same AST optimizer which is used for the
-                 * CONSTRUCT shortcut form.
+                 * DELETE WHERE QuadPattern
+                 * 
+                 * We need to build the appropriate CONSTRUCT clause from the
+                 * WHERE clause.
+                 * 
+                 * Note: This could be lifted into an AST optimizer, but we are
+                 * not yet running those against the UPDATE AST.
                  */
 
-                throw new UnsupportedOperationException();
+                final QuadData deleteClause = new QuadData();
+                
+                final Iterator<IStatementContainer> itr = BOpUtility.visitAll(whereClause, IStatementContainer.class);
+
+                while(itr.hasNext()) {
+                    
+                    final IStatementContainer t = itr.next();
+                    
+                    deleteClause.addChild(t);
+                
+                }
+                
+                op.setDeleteClause(deleteClause);
                 
             }
+
+            final QuadData deleteClause = op.getDeleteClause();
 
             // Just the insert clause.
             final boolean isInsertOnly = insertClause != null
                     && deleteClause == null;
 
-            // Just the delete clause.
-            final boolean isDeleteOnly = insertClause == null
-                    && deleteClause != null;
+//            // Just the delete clause.
+//            final boolean isDeleteOnly = insertClause == null
+//                    && deleteClause != null;
 
             // Both the delete clause and the insert clause.
             final boolean isDeleteInsert = insertClause != null
@@ -410,10 +431,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             
             /*
              * Run the WHERE clause.
-             * 
-             * FIXME Data set and defaultContet.
              */
-//            final Resource[] contexts = new Resource[] { BD.NULL_GRAPH };
 
             if (isDeleteInsert) {
                 
@@ -454,14 +472,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                         while (itr.hasNext()) {
 
-                            final Statement stmt = itr.next();
-System.err.println("DELETE: "+stmt);
-                            context.conn.remove(stmt.getSubject(),
-                                    stmt.getPredicate(), stmt.getObject(),
-                                    stmt.getContext());
+                            final BigdataStatement stmt = itr.next();
+
+                            addOrRemoveStatement(
+                                    context.conn.getSailConnection(), stmt,
+                                    false/* insert */);
 
                         }
-                        
+
                     }
 
                     // Play it once through the INSERT clause.
@@ -478,14 +496,14 @@ System.err.println("DELETE: "+stmt);
 
                         while (itr.hasNext()) {
 
-                            final Statement stmt = itr.next();
-System.err.println("INSERT: "+stmt);
-                            context.conn.add(stmt.getSubject(),
-                                    stmt.getPredicate(), stmt.getObject(),
-                                    stmt.getContext());
+                            final BigdataStatement stmt = itr.next();
+
+                            addOrRemoveStatement(
+                                    context.conn.getSailConnection(), stmt,
+                                    true/* insert */);
 
                         }
-                        
+
                     }
 
                 } finally {
@@ -504,31 +522,20 @@ System.err.println("INSERT: "+stmt);
                 
                 // Set the CONSTRUCT template (quads patterns).
                 queryRoot.setConstruct(template);
-                
+
                 // Run as a CONSTRUCT query.
                 final GraphQueryResult result = ASTEvalHelper
                         .evaluateGraphQuery(context.db, astContainer, null/* bindingSets */);
 
                 try {
 
-                    while(result.hasNext()) {
+                    while (result.hasNext()) {
 
                         final BigdataStatement stmt = (BigdataStatement) result
                                 .next();
 
-                        if (isInsertOnly) {
-
-                            context.conn.add(stmt.getSubject(),
-                                    stmt.getPredicate(), stmt.getObject(),
-                                    stmt.getContext());
-
-                        } else {
-
-                            context.conn.remove(stmt.getSubject(),
-                                    stmt.getPredicate(), stmt.getObject(),
-                                    stmt.getContext());
-
-                        }
+                        addOrRemoveStatement(context.conn.getSailConnection(),
+                                stmt, isInsertOnly);
                         
                     }
 
@@ -580,14 +587,22 @@ System.err.println("INSERT: "+stmt);
 
     /**
      * Copy all statements from the sourceGraph to the targetGraph.
+     * 
+     * TODO Review SILENT semantics for this operation (the argument is being
+     * ignored).
      */
     private static void copyStatements(final AST2BOpUpdateContext context,
             final boolean silent, final BigdataURI sourceGraph,
             final BigdataURI targetGraph) throws RepositoryException {
 
+        if (log.isDebugEnabled())
+            log.debug("sourceGraph=" + sourceGraph + ", targetGraph="
+                    + targetGraph);
+        
         final RepositoryResult<Statement> result = context.conn.getStatements(
                 null/* s */, null/* p */, null/* o */,
                 context.isIncludeInferred(), new Resource[] { sourceGraph });
+        
         try {
 
             context.conn.add(result, new Resource[] { targetGraph });
@@ -608,10 +623,11 @@ System.err.println("INSERT: "+stmt);
      * @param context
      * @return
      * @throws RepositoryException
+     * @throws SailException 
      */
     private static PipelineOp convertMoveGraph(PipelineOp left,
             final MoveGraph op, final AST2BOpUpdateContext context)
-            throws RepositoryException {
+            throws RepositoryException, SailException {
 
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
@@ -621,6 +637,10 @@ System.err.println("INSERT: "+stmt);
 
         final BigdataURI targetGraph = (BigdataURI) (op.getTargetGraph() == null ? context.f
                 .asValue(BD.NULL_GRAPH) : op.getTargetGraph().getValue());
+
+        if (log.isDebugEnabled())
+            log.debug("sourceGraph=" + sourceGraph + ", targetGraph="
+                    + targetGraph);
 
         if (!sourceGraph.equals(targetGraph)) {
 
@@ -644,10 +664,11 @@ System.err.println("INSERT: "+stmt);
      * @param context
      * @return
      * @throws RepositoryException 
+     * @throws SailException 
      */
     private static PipelineOp convertCopyGraph(PipelineOp left,
             final CopyGraph op, final AST2BOpUpdateContext context)
-            throws RepositoryException {
+            throws RepositoryException, SailException {
 
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
@@ -657,6 +678,10 @@ System.err.println("INSERT: "+stmt);
 
         final BigdataURI targetGraph = (BigdataURI) (op.getTargetGraph() == null ? context.f
                 .asValue(BD.NULL_GRAPH) : op.getTargetGraph().getValue());
+
+        if (log.isDebugEnabled())
+            log.debug("sourceGraph=" + sourceGraph + ", targetGraph="
+                    + targetGraph);
 
         if (!sourceGraph.equals(targetGraph)) {
 
@@ -698,6 +723,10 @@ System.err.println("INSERT: "+stmt);
                         .getTargetGraph() == null ? null : op.getTargetGraph()
                         .getValue());
 
+                if (log.isDebugEnabled())
+                    log.debug("sourceURI=" + urlStr + ", defaultContext="
+                            + defaultContext);
+                
                 doLoad(context.conn.getSailConnection(), sourceURL,
                         defaultContext, nmodified);
 
@@ -948,10 +977,11 @@ System.err.println("INSERT: "+stmt);
      * @param context
      * @return
      * @throws RepositoryException
+     * @throws SailException 
      */
     private static PipelineOp convertClearOrDropGraph(PipelineOp left,
             final DropGraph op, final AST2BOpUpdateContext context)
-            throws RepositoryException {
+            throws RepositoryException, SailException {
 
         final TermNode targetGraphNode = op.getTargetGraph();
 
@@ -977,17 +1007,26 @@ System.err.println("INSERT: "+stmt);
      * @param scope
      * @param context
      * @throws RepositoryException 
+     * @throws SailException 
      */
     private static void clearGraph(final URI targetGraph, final Scope scope,
-            final AST2BOpUpdateContext context) throws RepositoryException {
+            final AST2BOpUpdateContext context) throws RepositoryException, SailException {
 
+        if (log.isDebugEnabled())
+            log.debug("targetGraph=" + targetGraph + ", scope=" + scope);
+
+        /*
+         * Note: removeStatements() is not exposed by the RepositoryConnection.
+         */
+        final BigdataSailConnection sailConn = context.conn.getSailConnection();
+        
         if (targetGraph != null) {
 
             /*
              * Addressing a specific graph.
              */
 
-            context.db.removeStatements(null/* s */, null/* p */, null/* o */,
+            sailConn.removeStatements(null/* s */, null/* p */, null/* o */,
                     targetGraph);
 
         } else if (scope != null) {
@@ -997,7 +1036,7 @@ System.err.println("INSERT: "+stmt);
                 /*
                  * Addressing the defaultGraph (Sesame nullGraph).
                  */
-                context.db.removeStatements(null/* s */, null/* p */,
+                sailConn.removeStatements(null/* s */, null/* p */,
                         null/* o */, BD.NULL_GRAPH);
 
             } else {
@@ -1007,17 +1046,18 @@ System.err.println("INSERT: "+stmt);
                  * 
                  * Note: This is everything EXCEPT the nullGraph.
                  */
-                final RepositoryResult<Resource> result = context.conn.getContextIDs();
+                final RepositoryResult<Resource> result = context.conn
+                        .getContextIDs();
 
                 try {
 
                     while (result.hasNext()) {
-                    
+
                         final Resource c = result.next();
-                        
-                        context.db.removeStatements(null/* s */, null/* p */,
+
+                        sailConn.removeStatements(null/* s */, null/* p */,
                                 null/* o */, c);
-                    
+
                     }
                     
                 } finally {
@@ -1032,11 +1072,17 @@ System.err.println("INSERT: "+stmt);
             
             /*
              * Addressing ALL graphs.
+             * 
+             * TODO This should be optimized. If we are doing truth maintenance,
+             * then we need to discard the buffers, drop all statements and also
+             * drop the proof chains. If we are not doing truth maintenance and
+             * this is the unisolated connection, then delete all statements and
+             * also clear the lexicon. (We should really catch this optimization
+             * in the BigdataSailConnection.)
              */
 
-            context.db.removeStatements(null/* s */, null/* p */, null/* o */,
-                    null/* c */);
-            
+            sailConn.removeStatements(null/* s */, null/* p */, null/* o */);
+
         }
 
     }
@@ -1054,13 +1100,16 @@ System.err.println("INSERT: "+stmt);
 
         if (!op.isSilent()) {
 
-            final IV<?, ?> c = ((CreateGraph) op).getTargetGraph().getValue()
-                    .getIV();
+            final BigdataURI c = (BigdataURI) ((CreateGraph) op)
+                    .getTargetGraph().getValue();
+
+            if (log.isDebugEnabled())
+                log.debug("targetGraph=" + c);
 
             if (context.db.getAccessPath(null/* s */, null/* p */, null/* o */,
-                    c).rangeCount(false/* exact */) != 0) {
+                    c.getIV()).rangeCount(false/* exact */) != 0) {
 
-                throw new RuntimeException("Graph exists: " + c.getValue());
+                throw new RuntimeException("Graph exists: " + c);
 
             }
 
@@ -1081,10 +1130,10 @@ System.err.println("INSERT: "+stmt);
      * @return
      * @throws Exception
      */
-    private static PipelineOp convertGraphDataUpdate(PipelineOp left,
+    private static PipelineOp convertInsertOrDeleteData(PipelineOp left,
             final AbstractGraphDataUpdate op, final AST2BOpUpdateContext context)
             throws Exception {
-        
+
         final boolean insert;
         switch (op.getUpdateType()) {
         case InsertData:
@@ -1098,31 +1147,23 @@ System.err.println("INSERT: "+stmt);
         }
 
         if (!runOnQueryEngine) {
+
             final ISPO[] stmts = op.getData();
+
+            if (log.isDebugEnabled())
+                log.debug((insert ? "INSERT" : "DELETE") + " DATA: #stmts="
+                        + stmts.length);
+
             final BigdataSailConnection conn = context.conn.getSailConnection();
-//System.err.println(context.db.dumpStore());
+            
             for (ISPO spo : stmts) {
-                final Resource s = (Resource) spo.s().getValue();
-                final URI p = (URI) spo.p().getValue();
-                final Value o = (Value) spo.o().getValue();
-                /*
-                 * If [c] is not bound, then using an empty Resource[] for the
-                 * contexts. This will cause the data to be added to the null
-                 * graph on insert and will cause the statements to be removed
-                 * from all contexts (on remove it is interpreted as a
-                 * wildcard).
-                 */
-                final Resource c = (Resource) (spo.c() == null ? null : spo.c()
-                        .getValue());
-                final Resource[] contexts = (Resource[]) (c == null ? NO_CONTEXTS
-                        : new Resource[] { c });
-                if (insert) {
-                    conn.addStatement(s, p, o, contexts);
-                } else {
-                    conn.removeStatements(s, p, o, contexts);
-                }
+ 
+                addOrRemoveStatement(conn, spo, insert);
+                
             }
+
             return null;
+            
         }
         
         /*
@@ -1146,18 +1187,7 @@ System.err.println("INSERT: "+stmt);
 
             if (targetGraphIV == null && context.isQuads()) {
 
-                /*
-                 * 
-                 * TODO Extract nullGraphIV into AST2BOpUpdateContext and cache.
-                 * Ideally, this should always be part of the Vocabulary and the
-                 * IVCache should be set (which is always true for the
-                 * vocabulary).
-                 */
-                final BigdataURI nullGraph = context.db.getValueFactory()
-                        .asValue(BD.NULL_GRAPH);
-                context.db.addTerm(nullGraph);
-                targetGraphIV = nullGraph.getIV();
-                targetGraphIV.setValue(nullGraph);
+                targetGraphIV = context.getNullGraph().getIV();
 
             }
 
@@ -1180,6 +1210,119 @@ System.err.println("INSERT: "+stmt);
         
         // Return null since pipeline was evaluated.
         return null;
+
+    }
+
+    /**
+     * Insert or remove a statement.
+     * 
+     * @param conn
+     *            The connection on which to write the mutation.
+     * @param spo
+     *            The statement.
+     * @param insert
+     *            <code>true</code> iff the statement is to be inserted and
+     *            <code>false</code> iff the statement is to be removed.
+     * @throws SailException
+     */
+    private static void addOrRemoveStatement(final BigdataSailConnection conn,
+            final BigdataStatement spo, final boolean insert) throws SailException {
+
+        final Resource s = (Resource) spo.getSubject();
+
+        final URI p = (URI) spo.getPredicate();
+        
+        final Value o = (Value) spo.getObject();
+        
+        /*
+         * If [c] is not bound, then using an empty Resource[] for the contexts.
+         * 
+         * On insert, this will cause the data to be added to the null graph.
+         * 
+         * On remove, this will cause the statements to be removed from all
+         * contexts (on remove it is interpreted as a wildcard).
+         */
+        
+        final Resource c = (Resource) (spo.getContext() == null ? null : spo
+                .getContext());
+        
+        final Resource[] contexts = (Resource[]) (c == null ? NO_CONTEXTS
+                : new Resource[] { c });
+        
+        if(log.isTraceEnabled())
+            log.trace((insert ? "INSERT" : "DELETE") + ": <" + s + "," + p
+                    + "," + o + "," + Arrays.toString(contexts));
+        
+        if (insert) {
+        
+            conn.addStatement(s, p, o, contexts);
+            
+        } else {
+
+            /*
+             * We need to handle blank nodes (which can appear in the subject or
+             * object position) as unbound variables.
+             */
+            
+            final Resource s1 = s instanceof BNode ? null : s;
+
+            final Value o1 = o instanceof BNode ? null : o;
+            
+            conn.removeStatements(s1, p, o1, contexts);
+            
+        }
+
+    }
+
+    /**
+     * Insert or remove a statement.
+     * 
+     * @param conn
+     *            The connection on which to write the mutation.
+     * @param spo
+     *            The statement.
+     * @param insert
+     *            <code>true</code> iff the statement is to be inserted and
+     *            <code>false</code> iff the statement is to be removed.
+     * @throws SailException
+     */
+    private static void addOrRemoveStatement(final BigdataSailConnection conn,
+            final ISPO spo, final boolean insert) throws SailException {
+
+        final Resource s = (Resource) spo.s().getValue();
+
+        final URI p = (URI) spo.p().getValue();
+        
+        final Value o = (Value) spo.o().getValue();
+        
+        /*
+         * If [c] is not bound, then using an empty Resource[] for the contexts.
+         * 
+         * On insert, this will cause the data to be added to the null graph.
+         * 
+         * On remove, this will cause the statements to be removed from all
+         * contexts (on remove it is interpreted as a wildcard).
+         */
+        
+        final Resource c = (Resource) (spo.c() == null ? null : spo.c()
+                .getValue());
+        
+        final Resource[] contexts = (Resource[]) (c == null ? NO_CONTEXTS
+                : new Resource[] { c });
+        
+        if(log.isTraceEnabled())
+            log.trace((insert ? "INSERT" : "DELETE") + ": <" + s + "," + p
+                    + "," + o + "," + Arrays.toString(contexts));
+        
+        if (insert) {
+        
+            conn.addStatement(s, p, o, contexts);
+            
+        } else {
+            
+            conn.removeStatements(s, p, o, contexts);
+            
+        }
 
     }
 
@@ -1362,4 +1505,5 @@ System.err.println("INSERT: "+stmt);
 
     private static final IBindingSet[] EMPTY_BINDING_SETS = new IBindingSet[0];
     private static final Resource[] NO_CONTEXTS = new Resource[0];
+
 }

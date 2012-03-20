@@ -56,6 +56,7 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -85,7 +86,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
             + QueryHints.QUERYID);
-    
+
     private final BigdataASTContext context;
 
     public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
@@ -103,11 +104,11 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @return An object which aligns the {@link ASTContainer} with the
      *         {@link ParsedQuery} interface.
      */
-    public BigdataParsedQuery parseQuery(final String queryStr, final String baseURI)
-            throws MalformedQueryException {
+    public BigdataParsedQuery parseQuery(final String queryStr,
+            final String baseURI) throws MalformedQueryException {
 
         return new BigdataParsedQuery(parseQuery2(queryStr, baseURI));
-        
+
     }
 
     /**
@@ -139,30 +140,43 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
         try {
 
+            /*
+             * Note: The update sequence is *above* the update container. We
+             * turn the ASTUpdateSequence into an UpdateRoot and each
+             * ASTUpdateContainer into a bigdata Update which is a child of that
+             * UpdateRoot. The bigdata Update is an abstract class. There is a
+             * concrete implementation of Update for each of the SPARQL UPDATE
+             * operations (ADD, DROP, CREATE, MOVE, COPY, INSERT DATA, REMOVE
+             * DATA, DELETE/INSERT, etc).
+             */
             final ASTUpdateSequence updateSequence = SyntaxTreeBuilder
                     .parseUpdateSequence(updateStr);
 
-            final UpdateRoot update = new UpdateRoot();
+            final UpdateRoot updateRoot = new UpdateRoot();
 
-            final ASTContainer ast = new ASTContainer(update);
+            final ASTContainer astContainer = new ASTContainer(updateRoot);
             
             // Set the query string on the AST.
-            ast.setQueryString(updateStr);
+            astContainer.setQueryString(updateStr);
 
             // Set the parse tree on the AST.
-            ast.setParseTree(updateSequence);
+            astContainer.setParseTree(updateSequence);
 
+            // Class builds bigdata Update operators from SPARQL UPDATE ops.
             final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(
                     context);
 
+            // The sequence of UPDATE operations to be processed.
             final List<ASTUpdateContainer> updateOperations = updateSequence
                     .getUpdateContainers();
 
             List<ASTPrefixDecl> sharedPrefixDeclarations = null;
 
+            // For each UPDATE operation in the sequence.
             for (ASTUpdateContainer uc : updateOperations) {
 
                 StringEscapesProcessor.process(uc);
+
                 BaseDeclProcessor.process(uc, baseURI);
 
                 /*
@@ -173,14 +187,26 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  */
                 final List<ASTPrefixDecl> prefixDeclList = uc
                         .getPrefixDeclList();
-                if (prefixDeclList == null || prefixDeclList.size() == 0) {
-                    if (sharedPrefixDeclarations != null) {
-                        for (ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
-                            uc.jjtAppendChild(prefixDecl);
+                {
+
+                    if (prefixDeclList == null || prefixDeclList.isEmpty()) {
+                 
+                        if (sharedPrefixDeclarations != null) {
+                        
+                            for (ASTPrefixDecl prefixDecl : sharedPrefixDeclarations) {
+                            
+                                uc.jjtAppendChild(prefixDecl);
+                                
+                            }
+
                         }
+                    
+                    } else {
+                        
+                        sharedPrefixDeclarations = prefixDeclList;
+
                     }
-                } else {
-                    sharedPrefixDeclarations = prefixDeclList;
+                
                 }
 
                 PrefixDeclProcessor.process(uc);
@@ -200,55 +226,51 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  * Batch resolve ASTRDFValue to BigdataValues with their
                  * associated IVs.
                  * 
-                 * FIXME IV resolution probably needs to proceed separately for
-                 * each UPDATE operation in a sequence since some operations can
+                 * TODO IV resolution might need to proceed separately for each
+                 * UPDATE operation in a sequence since some operations can
                  * cause new IVs to be declared in the lexicon. Resolution
                  * before those IVs have been declared would produce a different
-                 * result than resolution afterward.
+                 * result than resolution afterward (it will be a null IV before
+                 * the Value is added to the lexicon and a TermId or BlobIV
+                 * afterward).
                  */
                 new BatchRDFValueResolver(context, true/* readOnly */)
                         .process(uc);
 
-
                 /*
-                 * Handle dataset declaration.
-                 * 
-                 * FIXME This is a little bit different than query since we are
-                 * applying the DATA SET to UpdateRoot (?) rather than to the
-                 * individual Update operations. It would seem to me that there
-                 * needs to be a hook which brings that information from the
-                 * UpdateRoot into the Update node. In particular, it would seem
-                 * that this needs to get into the defaultGraph (for the INSERT
-                 * clause of a DELETE/INSERT operation) and into the definition
-                 * of the graphs in the named and default contexts.
+                 * Handle dataset declaration. It only appears for DELETE/INSERT
+                 * (aka ASTModify). It is attached to each DeleteInsertNode for
+                 * which it is given.
                  */
-//                openrdf:
-//                Dataset dataset = DatasetDeclProcessor.process(uc);
-//                if (dataset != null) {
-//                    update.setDataset(dataset);
-//                }
                 final DatasetNode dataSetNode = new DatasetDeclProcessor(
                         context).process(uc);
                 
-                if (dataSetNode != null) {
-                
-                    update.setDataset(dataSetNode);
-                    
-                }
-
                 final ASTUpdate updateNode = uc.getUpdate();
 
                 /*
                  * Translate an UPDATE operation.
                  */
-                final Object result = updateNode.jjtAccept(updateExprBuilder,
-                        null/* data */);
+                final Update updateOp = (Update) updateNode.jjtAccept(
+                        updateExprBuilder, null/* data */);
                 
-                update.addChild((Update) result);
+                if (dataSetNode != null) {
+
+                    /*
+                     * Attach the data set (if present)
+                     * 
+                     * Note: The data set can only be attached to a
+                     * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                     */
+                    
+                    ((IDataSetNode) updateOp).setDataset(dataSetNode);
+                    
+                }
+
+                updateRoot.addChild(updateOp);
                 
             }
 
-            return ast;
+            return astContainer;
             
         } catch (ParseException e) {
             throw new MalformedQueryException(e.getMessage(), e);

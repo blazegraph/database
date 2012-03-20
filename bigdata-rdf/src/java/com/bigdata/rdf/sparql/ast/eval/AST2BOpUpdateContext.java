@@ -30,11 +30,14 @@ package com.bigdata.rdf.sparql.ast.eval;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Extended to expose the connection used to execute the SPARQL UPDATE request.
@@ -91,4 +94,30 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
 
     }
 
+    /**
+     * Return the {@link BD#NULL_GRAPH} with the {@link IVCache} resolved and
+     * set.
+     * 
+     * FIXME This should always be part of the Vocabulary and the IVCache should
+     * be set (which is always true for the vocabulary).
+     */
+    @SuppressWarnings("unchecked")
+    public BigdataURI getNullGraph() {
+
+        if (nullGraph == null) {
+
+            nullGraph = db.getValueFactory().asValue(BD.NULL_GRAPH);
+            
+            db.addTerm(nullGraph);
+            
+            nullGraph.getIV().setValue(nullGraph);
+            
+        }
+
+        return nullGraph;
+        
+    }
+    
+    private BigdataURI nullGraph = null;
+        
 }

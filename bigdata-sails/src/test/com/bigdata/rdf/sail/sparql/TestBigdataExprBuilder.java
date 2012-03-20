@@ -940,7 +940,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 dataset.addDefaultGraph(uri1);
                 dataset.addNamedGraph(uri2);
                 dataset.addNamedGraph(uri3);
-                final DatasetNode datasetNode = new DatasetNode(dataset);
+                final DatasetNode datasetNode = new DatasetNode(dataset, false/* update */);
                 expected.setDataset(datasetNode);
             }
 
@@ -1037,7 +1037,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 dataset.addDefaultGraph(uri1);
                 dataset.addNamedGraph(uri2);
                 dataset.addNamedGraph(uri3);
-                final DatasetNode datasetNode = new DatasetNode(dataset);
+                final DatasetNode datasetNode = new DatasetNode(dataset, false/* update */);
                 expected.setDataset(datasetNode);
             }
 

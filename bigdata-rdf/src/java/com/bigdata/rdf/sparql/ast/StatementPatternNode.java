@@ -164,7 +164,7 @@ public class StatementPatternNode extends
     /**
      * Required deep copy constructor.
      */
-    public StatementPatternNode(StatementPatternNode op) {
+    public StatementPatternNode(final StatementPatternNode op) {
 
         super(op);
         
@@ -173,18 +173,22 @@ public class StatementPatternNode extends
     /**
      * Required shallow copy constructor.
      */
-    public StatementPatternNode(BOp[] args, Map<String, Object> anns) {
+    public StatementPatternNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
     }
 
     /**
-     * A triple pattern.
+     * A triple pattern. The {@link Scope} will be
+     * {@link Scope#DEFAULT_CONTEXTS}, the context will be <code>null</code>.
      * 
      * @param s
      * @param p
      * @param o
+     * 
+     * @see StatementPatternNode#StatementPatternNode(TermNode, TermNode,
+     *      TermNode, TermNode, Scope)
      */
     public StatementPatternNode(final TermNode s, final TermNode p,
             final TermNode o) {
@@ -195,46 +199,93 @@ public class StatementPatternNode extends
 
     /**
      * A quad pattern.
+     * <p>
+     * Note: When a {@link StatementPatternNode} appears in a WHERE clause, the
+     * {@link Scope} should be marked as {@link Scope#DEFAULT_CONTEXTS} if it is
+     * NOT embedded within a GRAPH clause and otherwise as
+     * {@link Scope#NAMED_CONTEXTS}.
+     * <p>
+     * The context position of the statement should be <code>null</code> unless
+     * it is embedded within a GRAPH clause, in which case the context is the
+     * context specified for the parent GRAPH clause.
+     * <p>
+     * The SPARQL UPDATE <code>WITH uri</code> is a syntactic sugar for
+     * <code>GRAPH uri {...}</code>. Therefore, when present, any
+     * {@link StatementPatternNode} outside of an explicit GRAPH group is also
+     * marked as {@link Scope#NAMED_CONTEXTS} and the context position will be
+     * bound to the <i>uri</i> specified in the <code>WITH</code> clause.
+     * <p>
+     * A <code>null</code> context in {@link Scope#DEFAULT_CONTEXTS} is
+     * interpreted as the RDF merge of the graphs in the defaultGraph (as
+     * specified by the {@link DatasetNode}). When non-<code>null</code> (it can
+     * be bound by the SPARQL UPDATE <em>WITH</em> clause), the defaultGraph
+     * declared by the {@link DatasetNode} is ignored and the context is bound
+     * to the constant specified in that <em>WITH</em> clause.
+     * <p>
+     * Absent any other constraints on the query, an unbound variable context in
+     * {@link Scope#NAMED_CONTEXTS} may be bound to any named graph specified by
+     * the {@link DatasetNode}.
      * 
      * @param s
+     *            The subject (variable or constant; required).
      * @param p
+     *            The subject (variable or constant; required).
      * @param o
+     *            The subject (variable or constant; required).
      * @param c
+     *            The context (variable or constant; optional).
      * @param scope
      *            Either {@link Scope#DEFAULT_CONTEXTS} or
-     *            {@link Scope#NAMED_CONTEXTS}.
+     *            {@link Scope#NAMED_CONTEXTS} (required).
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>s</i>, <i>p</i>, or <i>o</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>scope</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>scope</i> is {@link Scope#NAMED_CONTEXTS} and <i>c</i>
+     *             is <code>null</code>.
      */
-//	@SuppressWarnings("unchecked")
-    public StatementPatternNode(
-			final TermNode s, final TermNode p, final TermNode o, 
-			final TermNode c, final Scope scope) {
+    public StatementPatternNode(final TermNode s, final TermNode p,
+            final TermNode o, final TermNode c, final Scope scope) {
 
         super(new BOp[] { s, p, o, c }, scope == null ? null/* anns */: NV
                 .asMap(new NV(Annotations.SCOPE, scope)));
 
-		if (s == null || p == null || o == null) {
-		
+        if (scope == null)
+            throw new IllegalArgumentException();
+        
+		if (s == null || p == null || o == null)
 		    throw new IllegalArgumentException();
-		    
-		}
 
-	}
-	
-	public TermNode s() {
-		return (TermNode) get(0);
+        if (scope == Scope.NAMED_CONTEXTS && c == null)
+            throw new IllegalArgumentException();
+		
 	}
 
-	public TermNode p() {
-	    return (TermNode) get(1);
-	}
+    final public TermNode s() {
 
-	public TermNode o() {
-	    return (TermNode) get(2);
-	}
+        return (TermNode) get(0);
 
-	public TermNode c() {
-	    return (TermNode) get(3);
-	}
+    }
+
+    final public TermNode p() {
+
+        return (TermNode) get(1);
+
+    }
+
+    final public TermNode o() {
+
+        return (TermNode) get(2);
+
+    }
+
+    final public TermNode c() {
+
+        return (TermNode) get(3);
+
+    }
 	
     /**
      * The scope for this statement pattern (either named graphs or default
@@ -243,9 +294,9 @@ public class StatementPatternNode extends
      * @see Annotations#SCOPE
      * @see Scope
      */
-    public Scope getScope() {
+    final public Scope getScope() {
 
-        return (Scope) getProperty(Annotations.SCOPE);
+        return (Scope) getRequiredProperty(Annotations.SCOPE);
         
     }
 
