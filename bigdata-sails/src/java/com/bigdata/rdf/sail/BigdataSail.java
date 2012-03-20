@@ -2355,7 +2355,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Note: The CONTEXT is ignored when in statementIdentifier mode!
          */
-        private synchronized int removeStatements(final Resource s, final URI p,
+        public synchronized int removeStatements(final Resource s, final URI p,
                 final Value o, final Resource c) throws SailException {
             
             assertWritableConn();
