@@ -1316,8 +1316,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      *   }
      * </pre>
      * 
-     * TODO What about the WITH? That should be setting the data set, right?
-     * 
      * TODO Tests with USING and USING NAMED.
      */
     @SuppressWarnings("rawtypes")
@@ -1335,7 +1333,6 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final IV givenName = makeIV(valueFactory.createURI("http://xmlns.com/foaf/0.1/givenName"));
         final IV label1 = makeIV(valueFactory.createLiteral("Bill"));
         final IV label2 = makeIV(valueFactory.createLiteral("William"));
-//        final VarNode person = new VarNode("person");
 
         final UpdateRoot expected = new UpdateRoot();
         {
@@ -1350,7 +1347,8 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 
                 deleteClause.addChild(new StatementPatternNode(new VarNode(
                         "person"), new ConstantNode(givenName),
-                        new ConstantNode(label1)));
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
 
                 op.setDeleteClause(deleteClause);
 
@@ -1362,7 +1360,8 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
                 insertClause.addChild(new StatementPatternNode(new VarNode(
                         "person"), new ConstantNode(givenName),
-                        new ConstantNode(label2)));
+                        new ConstantNode(label2), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
 
                 op.setInsertClause(insertClause);
 
@@ -1373,7 +1372,8 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
                 whereClause.addChild(new StatementPatternNode(new VarNode(
                         "person"), new ConstantNode(givenName),
-                        new ConstantNode(label1)));
+                        new ConstantNode(label1), new ConstantNode(addresses),
+                        Scope.NAMED_CONTEXTS));
 
                 op.setWhereClause(whereClause);
                 

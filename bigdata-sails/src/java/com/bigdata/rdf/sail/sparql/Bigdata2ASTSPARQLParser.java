@@ -210,19 +210,31 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                         .process(uc);
 
 
-//              // Handle dataset declaration
-//                    FIXME Restore when implementing UPDATE.
+                /*
+                 * Handle dataset declaration.
+                 * 
+                 * FIXME This is a little bit different than query since we are
+                 * applying the DATA SET to UpdateRoot (?) rather than to the
+                 * individual Update operations. It would seem to me that there
+                 * needs to be a hook which brings that information from the
+                 * UpdateRoot into the Update node. In particular, it would seem
+                 * that this needs to get into the defaultGraph (for the INSERT
+                 * clause of a DELETE/INSERT operation) and into the definition
+                 * of the graphs in the named and default contexts.
+                 */
 //                openrdf:
 //                Dataset dataset = DatasetDeclProcessor.process(uc);
 //                if (dataset != null) {
 //                    update.setDataset(dataset);
 //                }
-//                bigdata:
-//                final DatasetNode dataSetNode = new DatasetDeclProcessor(
-//                        context).process(qc);
-//                if (dataSetNode != null) {
-//                    queryRoot.setDataset(dataSetNode);
-//                }
+                final DatasetNode dataSetNode = new DatasetDeclProcessor(
+                        context).process(uc);
+                
+                if (dataSetNode != null) {
+                
+                    update.setDataset(dataSetNode);
+                    
+                }
 
                 final ASTUpdate updateNode = uc.getUpdate();
 
