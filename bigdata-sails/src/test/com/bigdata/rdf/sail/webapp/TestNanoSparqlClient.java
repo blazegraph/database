@@ -20,12 +20,12 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
+import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
+import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.BooleanQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.GraphQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.TupleQuery;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -60,7 +60,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         final String queryStr = "ASK where {?s ?p ?o}";
         
         final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final BooleanQuery query = repo.prepareBooleanQuery(queryStr);
+        final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
         assertEquals(false, query.evaluate());
 
 //        final QueryOptions opts = new QueryOptions();
@@ -105,7 +105,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		final String queryStr = "select * where {?s ?p ?o}";
 
         final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final TupleQuery query = repo.prepareTupleQuery(queryStr);
+        final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
 		assertEquals(0, countResults(query.evaluate()));
 
         
@@ -160,7 +160,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
         final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final TupleQuery query = repo.prepareTupleQuery(queryStr);
+        final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
         
         try {
 		
@@ -259,7 +259,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         	
         	final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
             final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-            final TupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
     		assertEquals(7, countResults(query.evaluate()));
 
         }
@@ -306,7 +306,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
             
             final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-            final TupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
             assertEquals(7, countResults(query.evaluate()));
             
         }
@@ -337,7 +337,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                    .getDefaultMIMEType();
 //            assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
             
-            final BooleanQuery query = repo.prepareBooleanQuery(queryStr);
+            final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
             assertEquals(false, query.evaluate());
             
             
@@ -383,7 +383,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, countResults(doSparqlQuery(
 //                    opts, requestPath)));
             
-            final TupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
             
         }
@@ -419,7 +419,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             
             final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
-            final GraphQuery query = repo.prepareGraphQuery(queryStr);
+            final IPreparedGraphQuery query = repo.prepareGraphQuery(queryStr);
             g2 = query.evaluate();
             
         }
@@ -450,7 +450,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                    .getDefaultMIMEType();
 //            assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
             
-            final BooleanQuery query = repo.prepareBooleanQuery(queryStr);
+            final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
             assertEquals(false, query.evaluate());
             
         }
@@ -495,7 +495,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, countResults(doSparqlQuery(
 //                    opts, requestPath)));
             
-            final TupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
             
         }
@@ -1202,7 +1202,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                    requestPath)));
 
-            final GraphQuery query = repo.prepareGraphQuery(deleteQueryStr);
+            final IPreparedGraphQuery query = repo.prepareGraphQuery(deleteQueryStr);
             assertSameGraph(expected, query.evaluate());
             
         }

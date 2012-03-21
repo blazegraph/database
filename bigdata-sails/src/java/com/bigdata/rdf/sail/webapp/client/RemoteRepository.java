@@ -110,13 +110,14 @@ import com.bigdata.rdf.store.BD;
  */
 public class RemoteRepository {
 
-	private static final transient Logger log = Logger.getLogger(RemoteRepository.class);
-	
+    private static final transient Logger log = Logger
+            .getLogger(RemoteRepository.class);
+
     /**
      * The name of the <code>UTF-8</code> character encoding.
      */
     static private final String UTF8 = "UTF-8";
-    
+
     /**
      * The service end point.
      */
@@ -164,48 +165,50 @@ public class RemoteRepository {
         this.httpClient = httpClient;
 
     }
-    
-	/**
-	 * Prepare a tuple (select) query.
-	 * 
-	 * @param query
-	 * 			the query string
-	 * @return
-	 * 			the {@link TupleQuery}
-	 */
-	public TupleQuery prepareTupleQuery(final String query) throws Exception {
-		
-	    return new TupleQuery(UUID.randomUUID(), query);
-	    
-	}
 
-	/**
-	 * Prepare a graph query.
-	 * 
-	 * @param query
-	 * 			the query string
-	 * @return
-	 * 			the {@link GraphQuery}
-	 */
-	public GraphQuery prepareGraphQuery(final String query) throws Exception {
-		
-	    return new GraphQuery(UUID.randomUUID(), query);
-	    
-	}
+    /**
+     * Prepare a tuple (select) query.
+     * 
+     * @param query
+     *            the query string
+     * @return the {@link TupleQuery}
+     */
+    public IPreparedTupleQuery prepareTupleQuery(final String query)
+            throws Exception {
 
-	/**
-	 * Prepare a boolean (ask) query.
-	 * 
-	 * @param query
-	 * 			the query string
-	 * @return
-	 * 			the {@link BooleanQuery}
-	 */
-	public BooleanQuery prepareBooleanQuery(final String query) throws Exception {
+        return new TupleQuery(UUID.randomUUID(), query);
 
-	    return new BooleanQuery(UUID.randomUUID(), query);
-	    
-	}
+    }
+
+    /**
+     * Prepare a graph query.
+     * 
+     * @param query
+     *            the query string
+     *            
+     * @return the {@link IPreparedGraphQuery}
+     */
+    public IPreparedGraphQuery prepareGraphQuery(final String query)
+            throws Exception {
+
+        return new GraphQuery(UUID.randomUUID(), query);
+
+    }
+
+    /**
+     * Prepare a boolean (ask) query.
+     * 
+     * @param query
+     *            the query string
+     *            
+     * @return the {@link IPreparedBooleanQuery}
+     */
+    public IPreparedBooleanQuery prepareBooleanQuery(final String query)
+            throws Exception {
+
+        return new BooleanQuery(UUID.randomUUID(), query);
+
+    }
 
     /**
      * Prepare a SPARQL UPDATE request.
@@ -217,10 +220,11 @@ public class RemoteRepository {
      * 
      * @throws Exception
      */
-    public SparqlUpdate prepareUpdate(final String updateStr) throws Exception {
-        
+    public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
+            throws Exception {
+
         return new SparqlUpdate(UUID.randomUUID(), updateStr);
-        
+
     }
 
     /**
@@ -235,32 +239,28 @@ public class RemoteRepository {
      * @throws Exception
      * 
      *             TODO includeInferred is currently ignored.
-     *             
-     *             TODO Should return an closeable iteration (or iterator) so
-     *             we do not have to eagerly materialize all the solutions.
+     * 
+     *             FIXME Should return an closeable iteration (or iterator) so
+     *             we do not have to eagerly materialize all the solutions. (The
+     *             same comment applies to {@link #prepareGraphQuery(String)}
+     *             and {@link #prepareTupleQuery(String)}).
      */
-    public Graph getStatements(final Resource subj,
-            final URI pred, final Value obj, final boolean includeInferred,
+    public Graph getStatements(final Resource subj, final URI pred,
+            final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
 
         OpenRDFUtil.verifyContextNotNull(contexts);
 
-        final Map<String,String> prefixDecls = Collections.emptyMap();
-        
+        final Map<String, String> prefixDecls = Collections.emptyMap();
+
         final AST2SPARQLUtil util = new AST2SPARQLUtil(prefixDecls);
-        
+
         final StringBuilder sb = new StringBuilder();
-        
+
         /*
          * Note: You can not use the CONSTRUCT WHERE shortcut with a data set
          * declaration (FROM, FROM NAMED)....
          */
-
-//        // Count the non-null entries.
-//        int ncontexts = 0;
-//        for (int i = 0; i < contexts.length; i++)
-//            if (contexts[i] != null)
-//                ncontexts++;
 
         if (contexts.length > 0) {
 
@@ -316,14 +316,12 @@ public class RemoteRepository {
         
         final String queryStr = sb.toString();
         
-        final GraphQuery query = prepareGraphQuery(queryStr);
+        final IPreparedGraphQuery query = prepareGraphQuery(queryStr);
         
         final Graph result = query.evaluate();
 
         return result;
-        
-//        return new StatementVisitor(subj, pred, obj, result);
-        
+                
     }
 
     private String asConstOrVar(final AST2SPARQLUtil util, final String var,
@@ -333,75 +331,10 @@ public class RemoteRepository {
             return var;
 
         return util.toExternal(val);
-//        return "<" + val.stringValue() + ">";
         
     }
     
     
-//    /**
-//     * @param subj
-//     * @param pred
-//     * @param obj
-//     * @param result
-//     * @return
-//     */
-//    private static class StatementVisitor implements
-//            CloseableIteration<Statement, Exception> {
-//
-//        private final Resource subj;
-//
-//        private final URI pred;
-//
-//        private final Value obj;
-//
-//        private final TupleQueryResult src;
-//        
-//        private boolean open = true;
-//        
-//        StatementVisitor(final Resource subj, final URI pred, final Value obj,
-//                final TupleQueryResult src) {
-//
-//            if(src == null)
-//                throw new IllegalArgumentException();
-//            
-//            this.subj = subj;
-//            this.pred = pred;
-//            this.obj = obj;
-//            this.src = src;
-//            
-//        }
-//
-//        @Override
-//        public void close() throws Exception {
-//            if(open) {
-//                open = false;
-//                src.close();
-//            }
-//        }
-//
-//        @Override
-//        public boolean hasNext() throws Exception {
-//            if (open && src.hasNext()) {
-//                return true;
-//            }
-//            close();
-//            return false;
-//        }
-//
-//        @Override
-//        public Statement next() throws Exception {
-//            
-//            // TODO Auto-generated method stub
-//            return null;
-//        }
-//
-//        @Override
-//        public void remove() throws Exception {
-//            throw new UnsupportedOperationException();
-//        }
-//
-//    }
-
 	/**
 	 * Cancel a query running remotely on the server.
 	 * 
@@ -615,9 +548,6 @@ public class RemoteRepository {
 	 * by post (Iterable<Statement> and File). You can embed statements you
 	 * want to delete inside a construct query without a where clause.
 	 * 
-	 * TODO write utility to generate construct query without a where clause
-	 * 		from an iteration of statements
-	 * 
 	 * @param remove
 	 *        The RDF data to be removed.
 	 * @param add
@@ -693,7 +623,7 @@ public class RemoteRepository {
 	 * <p>
 	 * Right now, the only metadata is the query ID.
 	 */
-	private abstract class Query {
+    private abstract class Query implements IPreparedOperation {
 		
 		protected final UUID id;
 		
@@ -730,9 +660,6 @@ public class RemoteRepository {
 		    
 		}
 		
-		/**
-		 * Return <code>true</code> iff this is a SPARQL UPDATE request.
-		 */
 		public final boolean isUpdate() {
 		    
 		    return update;
@@ -754,11 +681,11 @@ public class RemoteRepository {
 
         	return opts;
 	        	
-	        }
-			
-		}
-		
-	public final class TupleQuery extends Query {
+        }
+
+    }
+
+    private final class TupleQuery extends Query implements IPreparedTupleQuery {
 		
 		public TupleQuery(final UUID id, final String query) {
 			super(id, query);
@@ -790,18 +717,16 @@ public class RemoteRepository {
 			
 		}
 		
-	}
+    }
 
-	public final class GraphQuery extends Query {
-		
-		public GraphQuery(final UUID id, final String query) {
+    private final class GraphQuery extends Query implements IPreparedGraphQuery {
+
+        public GraphQuery(final UUID id, final String query) {
 			super(id, query);
 		}
 		
-		/*
-		 * FIXME Change to GraphQueryResult.
-		 */
-		public Graph evaluate() throws Exception {
+		@Override
+        public Graph evaluate() throws Exception {
 
 	        HttpResponse response = null;
 	        try {
@@ -829,13 +754,15 @@ public class RemoteRepository {
 		
 	}
 
-	public final class BooleanQuery extends Query {
+    private final class BooleanQuery extends Query implements
+            IPreparedBooleanQuery {
 		
 		public BooleanQuery(final UUID id, final String query) {
 			super(id, query);
 		}
 		
-		public boolean evaluate() throws Exception {
+		@Override
+        public boolean evaluate() throws Exception {
             
 	        HttpResponse response = null;
 	        try {
@@ -863,7 +790,8 @@ public class RemoteRepository {
 		
 	}
 
-   public final class SparqlUpdate extends Query {
+    private final class SparqlUpdate extends Query implements
+            IPreparedSparqlUpdate {
         
         public SparqlUpdate(final UUID id, final String updateStr) {
 
@@ -871,6 +799,7 @@ public class RemoteRepository {
 
         }
         
+        @Override
         public void evaluate() throws Exception {
          
 	        HttpResponse response = null;
@@ -1193,12 +1122,13 @@ public class RemoteRepository {
             } catch (Throwable t2) {
                 // ignored.
             }
-            throw new RuntimeException(toString() + " : " + t, t);
+            throw new RuntimeException(serviceURL + " : " + t, t);
         }
 
     }
     
-    protected HttpUriRequest newRequest(final String uri, final String method) {
+    static protected HttpUriRequest newRequest(final String uri,
+            final String method) {
     	if (method.equals("GET")) {
     		return new HttpGet(uri);
     	} else if (method.equals("POST")) {
@@ -1212,14 +1142,27 @@ public class RemoteRepository {
     	}
     }
 
-    protected HttpResponse checkResponseCode(final HttpResponse response)
+    /**
+     * Throw an exception if the status code does not indicate success.
+     * 
+     * @param response
+     *            The response.
+     *            
+     * @return The response.
+     * 
+     * @throws IOException
+     */
+    static protected HttpResponse checkResponseCode(final HttpResponse response)
             throws IOException {
+        
         final int rc = response.getStatusLine().getStatusCode();
+        
         if (rc < 200 || rc >= 300) {
-            // conn.disconnect();
+        
             throw new IOException("Status Code=" + rc + ", Status Line="
                     + response.getStatusLine() + ", Response="
                     + getResponseBody(response));
+
         }
 
         if (log.isDebugEnabled()) {
@@ -1229,7 +1172,9 @@ public class RemoteRepository {
             log.debug("*** Response ***");
             log.debug("Status Line: " + response.getStatusLine());
         }
+
         return response;
+        
     }
 
     /**
@@ -1345,7 +1290,7 @@ public class RemoteRepository {
 
     }
     
-	    /**
+    /**
      * Builds a graph from an RDF result set (statements, not binding sets).
      * 
      * @param response
@@ -1557,29 +1502,8 @@ public class RemoteRepository {
 
 	}
 
-    /**
-     * Class representing the result of a mutation operation against the REST
-     * API.
-     * 
-     * TODO Refactor into the non-test code base along with the XML generation
-     * and XML parsing?
-     */
-    private static class MutationResult {
-
-        /** The mutation count. */
-        public final long mutationCount;
-
-        /** The elapsed time for the operation. */
-        public final long elapsedMillis;
-
-        public MutationResult(final long mutationCount, final long elapsedMillis) {
-            this.mutationCount = mutationCount;
-            this.elapsedMillis = elapsedMillis;
-        }
-
-    }
-
-    protected MutationResult mutationResults(final HttpResponse response) throws Exception {
+    static private MutationResult mutationResults(final HttpResponse response)
+            throws Exception {
 
 		HttpEntity entity = null;
         try {
@@ -1638,29 +1562,8 @@ public class RemoteRepository {
 
     }
 
-    /**
-     * Class representing the result of a fast range count operation against 
-     * the REST API.
-     * 
-     * TODO Refactor into the non-test code base along with the XML generation
-     * and XML parsing?
-     */
-    private static class RangeCountResult {
-
-        /** The range count. */
-        public final long rangeCount;
-
-        /** The elapsed time for the operation. */
-        public final long elapsedMillis;
-
-        public RangeCountResult(final long rangeCount, final long elapsedMillis) {
-            this.rangeCount = rangeCount;
-            this.elapsedMillis = elapsedMillis;
-        }
-
-    }
-
-    protected RangeCountResult rangeCountResults(final HttpResponse response) throws Exception {
+    static protected RangeCountResult rangeCountResults(
+            final HttpResponse response) throws Exception {
 
 		HttpEntity entity = null;
         try {
@@ -1718,25 +1621,32 @@ public class RemoteRepository {
         }
 
     }
-	
-	/**
-	 * Serialize an iteration of statements into a byte[] to send across the
-	 * wire.
-	 */
-	protected static byte[] serialize(
-			final Iterable<Statement> stmts, final RDFFormat format) 
-				throws Exception {
+
+    /**
+     * Serialize an iteration of statements into a byte[] to send across the
+     * wire.
+     */
+    protected static byte[] serialize(final Iterable<Statement> stmts,
+            final RDFFormat format) throws Exception {
         
 		final RDFWriterFactory writerFactory = 
         	RDFWriterRegistry.getInstance().get(format);
-	    final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    final RDFWriter writer = writerFactory.getWriter(baos);
-	    writer.startRDF();
-	    for (Statement stmt : stmts) {
-	        writer.handleStatement(stmt);
+
+		final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    
+		final RDFWriter writer = writerFactory.getWriter(baos);
+	    
+		writer.startRDF();
+	    
+		for (Statement stmt : stmts) {
+	    
+		    writer.handleStatement(stmt);
+		    
 	    }
-	    writer.endRDF();
-	    final byte[] data = baos.toByteArray();
+
+		writer.endRDF();
+	    
+		final byte[] data = baos.toByteArray();
 	    
 	    return data;
 
