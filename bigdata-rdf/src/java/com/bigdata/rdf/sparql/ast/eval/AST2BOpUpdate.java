@@ -902,7 +902,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             if (format == null) {
                 // Try to get the RDFFormat from the URL's file path.
-                format = RDFFormat.forFileName(sourceURL.getFile());
+                format = RDFFormat.forFileName(sourceURL.getFile(),
+                        RDFFormat.RDFXML// fallback
+                        );
             }
             
             if (format == null) {

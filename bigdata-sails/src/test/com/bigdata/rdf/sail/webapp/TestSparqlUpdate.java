@@ -221,6 +221,21 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
         repo.prepareUpdate(update.toString()).evaluate();
 
+        /**
+         * FIXME getStatements() is hitting a problem in the ASTConstruct
+         * iterator where a blank node is being reported without a letter (_:18
+         * versus _:B18). However, there are a number of DAWG tests which fail
+         * if we just wrap any blank node with the canonicalizing mapping (those
+         * which deal with reification) so this change needs to be implemented
+         * carefully. One of the test failures that can be created this way is
+         * in TestTCK. The others show up when you run the full TCK. They are:
+         * 
+         * <pre>
+         * dawg-construct-identity
+         * dawg-construct-reification-1
+         * dawg-construct-reification-2
+         * </pre>
+         */
         assertTrue(hasStatement(bob, RDFS.LABEL, null, true));
         assertTrue(hasStatement(alice, RDFS.LABEL, null, true));
     }
@@ -1153,6 +1168,57 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true, graph2));
         assertTrue(msg, hasStatement(bob, FOAF.MBOX, null, true, graph2));
         assertTrue(msg, hasStatement(bob, FOAF.KNOWS, alice, true, graph2));
+    }
+
+    public void testLoad()
+            throws Exception
+        {
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        repo.prepareUpdate(update).evaluate();
+        
+        assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
+
+    //@Test
+    public void testLoadSilent()
+        throws Exception
+    {
+        final String update = "LOAD SILENT <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/NOT-FOUND.rdf>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        repo.prepareUpdate(update).evaluate();
+
+        assertFalse(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
+
+    //@Test
+    public void testLoadIntoGraph()
+        throws Exception
+    {
+
+        final URI g1 = f.createURI("http://www.bigdata.com/g1");
+
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf> "
+                + "INTO GRAPH <" + g1.stringValue() + ">";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        repo.prepareUpdate(update).evaluate();
+
+        assertFalse(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true, (Resource)null));
+
+        assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true, g1));
+
     }
 
 //    //@Test
