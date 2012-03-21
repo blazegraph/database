@@ -72,11 +72,11 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
+import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.GraphQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.TupleQuery;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -756,7 +756,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //
 //			assertEquals(ntriples, countResults(doSparqlQuery(opts, requestPath)));
 			
-			final TupleQuery query = repo.prepareTupleQuery(queryStr);
+			final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+			
 			assertEquals(ntriples, countResults(query.evaluate()));
 			
 		}
@@ -1134,7 +1135,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
                 "}";
 
         	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
-            final GraphQuery query = remote.prepareGraphQuery(queryStr);
+            final IPreparedGraphQuery query = remote.prepareGraphQuery(queryStr);
             final Graph actual = query.evaluate();
 
             assertSameGraph(expected, actual);
@@ -1333,7 +1334,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
                 "}";
 
         	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
-            final GraphQuery query = remote.prepareGraphQuery(queryStr);
+            final IPreparedGraphQuery query = remote.prepareGraphQuery(queryStr);
             final Graph actual = query.evaluate();
 
             assertSameGraph(expected, actual);
