@@ -35,7 +35,6 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.store.BD;
 
@@ -53,14 +52,18 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
 
     public final BigdataSailRepositoryConnection conn;
 
-    /**
-     * FIXME This is just a marker for this attribute. The attribute needs to be
-     * passed through from {@link BigdataSailUpdate} on the AST.
-     * 
-     * @return
-     */
+    private boolean includeInferred;
+    
     public final boolean isIncludeInferred() {
-        return false;
+        
+        return includeInferred;
+        
+    }
+    
+    public final void setIncludeInferred(final boolean includeInferred) {
+        
+        this.includeInferred = includeInferred;
+        
     }
     
     /**

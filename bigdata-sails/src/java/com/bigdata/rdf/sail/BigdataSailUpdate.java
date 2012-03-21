@@ -23,22 +23,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.util.concurrent.TimeUnit;
-
 import org.openrdf.query.Dataset;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.repository.sail.SailUpdate;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.IDataSetNode;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Extension API for bigdata queries.
  * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class BigdataSailUpdate extends SailUpdate implements
         BigdataSailOperation {
@@ -83,61 +83,43 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The openrdf API here is somewhat at odds with the current LCWD for SPARQL
+     * UPDATE. In order to align them, setting the {@link Dataset} here causes
+     * it to be applied to each {@link DeleteInsertGraph} operation in the
+     * {@link UpdateRoot}. Note that the {@link Dataset} has no effect exception
+     * for the {@link DeleteInsertGraph} operation in SPARQL 1.1 UPDATE (that is
+     * the only operation which has a WHERE clause and which implements the
+     * {@link IDataSetNode} interface).
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
+     *      assignment in update sequences not properly scoped </a>
+     */
     @Override
     public void setDataset(final Dataset dataset) {
 
-        /*
-         * Batch resolve RDF Values to IVs and then set on the query model.
-         */
+        this.dataset = dataset;
 
-        final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                .replaceValues(dataset, null/* bindings */);
-
-        /*
-         * FIXME Set the data set on the original AST, but we have to reconcile
-         * the AST models for query and update such that there is a shared
-         * interface which supports that operation.
-         */
-//        astContainer.getOriginalUpdateAST().setDataset(
-//                new DatasetNode((Dataset) tmp[0]));
-        throw new UnsupportedOperationException();
     }
 
     /**
-     * Gets the "active" dataset for this update. The active dataset is either
-     * the dataset that has been specified using {@link #setDataset(Dataset)} or
-     * the dataset that has been specified in the update, where the former takes
-     * precedence over the latter.
+     * {@inheritDoc}
      * 
-     * @return The active dataset, or <tt>null</tt> if there is no dataset.
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
+     *      assignment in update sequences not properly scoped </a>
      */
     @Override
     public Dataset getActiveDataset() {
 
-        // FIXME Review DataSet handling in parser, here, and evaluation code. 
-//        return astContainer.getOriginalAST().getDataset();
-        
-//        if (dataset != null) {
-//        
-//            return dataset;
-//
-//        }
-//
-//        // No external dataset specified, use update operation's own dataset (if
-//        // any)
-//        return parsedUpdate.getDataset();
-        
-        throw new UnsupportedOperationException();
+        return dataset;
         
     }
 
     @Override
     public void execute() throws UpdateExecutionException {
 
-        /*
-         * FIXME Pass [includeInferred] through on the AST.
-         */
-        
 //        final QueryRoot originalQuery = astContainer.getOriginalAST();
 //
 ////        if (getMaxQueryTime() > 0)
@@ -148,7 +130,10 @@ public class BigdataSailUpdate extends SailUpdate implements
 
         ASTEvalHelper.executeUpdate(
                 ((BigdataSailRepositoryConnection) getConnection()),
-                astContainer);
+                astContainer,//
+                dataset,//
+                getIncludeInferred()//
+                );
 
     }
 

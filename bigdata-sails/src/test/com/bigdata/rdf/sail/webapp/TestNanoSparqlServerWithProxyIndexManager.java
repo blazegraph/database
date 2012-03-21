@@ -225,14 +225,26 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
          * Proxied test suites.
          */
         
-        // Basic NSS REST API (old version before RemoteRepository).
-        suite.addTestSuite(TestNanoSparqlServer2.class);
+//         Basic NSS REST API (old version before RemoteRepository).
+//        suite.addTestSuite(TestNanoSparqlServer2.class);
 
         // RemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestNanoSparqlClient.class);
 
         // SPARQL UPDATE test suite.
-//        suite.addTestSuite(TestSparqlUpdate.class);
+        switch(testMode) {
+        case triples:
+            // TODO TRIPLES mode UPDATE test suite.
+            break;
+        case sids:
+            // TODO SIDS mode UPDATE test suite.
+            break;
+        case quads:
+            // QUADS mode UPDATE test suite. 
+            suite.addTestSuite(TestSparqlUpdate.class);
+            break;
+        default: throw new UnsupportedOperationException();
+        }
 
         // SPARQL 1.1 Federated Query.
         suite.addTestSuite(TestFederatedQuery.class);

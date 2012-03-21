@@ -93,7 +93,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     /**
      * Used by {@link BigdataValueFactoryImpl}.
      */
-    BigdataBNodeImpl(BigdataValueFactory valueFactory, String id) {
+    BigdataBNodeImpl(final BigdataValueFactory valueFactory, final String id) {
 
         super(valueFactory, null);
 
@@ -105,8 +105,8 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
     }
 
     public String toString() {
-        
-        return "_:"+id;
+
+        return "_:" + id;
         
     }
     
@@ -116,7 +116,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 
     }
 
-    final public boolean equals(Object o) {
+    final public boolean equals(final Object o) {
 
         if (!(o instanceof BNode))
             return false;
@@ -125,7 +125,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
 
     }
 
-    final public boolean equals(BNode o) {
+    final public boolean equals(final BNode o) {
 
         if (this == o)
             return true;
@@ -157,10 +157,16 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
         return id;
         
     }
-    final public void setStatementIdentifier(boolean isStmtIdentifier) {
-        this.statementIdentifier=isStmtIdentifier;
+
+    final public void setStatementIdentifier(final boolean isStmtIdentifier) {
+
+        this.statementIdentifier = isStmtIdentifier;
+        
     }
+
     final public boolean isStatementIdentifier() {
+        
         return this.statementIdentifier;
+        
     }
 }

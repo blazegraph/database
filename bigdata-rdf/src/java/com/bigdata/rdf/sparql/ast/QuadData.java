@@ -97,7 +97,8 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
 
         while (itr.hasNext()) {
 
-            final StatementPatternNode sp = itr.next();
+            final StatementPatternNode sp = (StatementPatternNode) (itr.next()
+                    .clone());
 
             template.addChild(sp);
 

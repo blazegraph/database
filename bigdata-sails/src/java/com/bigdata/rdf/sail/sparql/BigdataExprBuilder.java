@@ -86,6 +86,7 @@ import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
@@ -95,6 +96,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -327,14 +329,11 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
      * patterns in the construct template and attaches the where clause and
      * solution modifiers. However, this is NOT a complete description of the
      * semantics of the query. An {@link IASTOptimizer} will intercept the
-     * CONSTRUCT query and rewrite it before it is executed.
-     * 
-     * FIXME There is an alternative form of a CONSTRUCT query which this is not
-     * covering. (CONSTRUCT WHERE { TriplesTemplate? } SolutionModifier. openrdf
-     * does not support this form yet.
+     * CONSTRUCT query and rewrite it before it is executed in order to provide
+     * an appropriate {@link ProjectionNode}.
      */
     @Override
-    public QueryBase visit(final ASTConstructQuery node, Object data)
+    public QueryBase visit(final ASTConstructQuery node, final Object data)
             throws VisitorException {
 
         final QueryBase queryRoot = getQueryBase(node, data,
@@ -356,9 +355,45 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         final ConstructNode tmp = (ConstructNode) constructNode.jjtAccept(
                 this, null/* data */);
 
-        queryRoot.setConstruct(tmp);
-
+        // Accept the WHERE clause.
         handleWhereClause(node, queryRoot);
+
+        if (tmp.isEmpty()) {
+            
+            /*
+             * This is the CONSTRUCT WHERE shortcut. We create the CONSTRUCT
+             * node now from the WHERE clause. The WHERE clause must consist of
+             * only simple statement patterns (no graphs, no filters, no
+             * sub-groups, sub-selects, etc).
+             */
+
+            final JoinGroupNode whereClause = (JoinGroupNode) queryRoot
+                    .getWhereClause();
+
+            for (IGroupMemberNode child : whereClause) {
+
+                if (!(child instanceof StatementPatternNode)) {
+
+                    throw new VisitorException(
+                            "CONSTRUCT WHERE only permits statement patterns in the WHERE clause.");
+
+                }
+                
+                /*
+                 * Add a copy of each statement pattern into the CONSTRUCT node.
+                 */
+
+                final StatementPatternNode sp = (StatementPatternNode) ((StatementPatternNode) child)
+                        .clone();
+
+                tmp.addChild(sp);
+
+            }
+
+        }
+
+        // Set the construct template.
+        queryRoot.setConstruct(tmp);
 
         handleGroupBy(node, queryRoot);
 

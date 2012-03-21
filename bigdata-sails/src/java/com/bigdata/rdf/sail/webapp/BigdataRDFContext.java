@@ -1011,7 +1011,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return the task which will execute the query.
+     * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
      * <p>
      * Note: The {@link OutputStream} is passed in rather than the
      * {@link HttpServletResponse} in order to permit operations such as

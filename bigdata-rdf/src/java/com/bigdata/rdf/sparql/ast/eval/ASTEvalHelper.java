@@ -34,9 +34,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -55,6 +57,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
@@ -63,7 +66,12 @@ import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.Update;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -311,10 +319,7 @@ public class ASTEvalHelper {
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
-        if(log.isInfoEnabled()) {
-            // Log the SPARQL query string.
-            log.info(astContainer.getQueryString());
-        }
+        doSparqlLogging(ctx);
         
         final PipelineOp queryPlan = astContainer.getQueryPlan();
         
@@ -652,17 +657,23 @@ public class ASTEvalHelper {
      *            The query model.
      * @param ctx
      *            The evaluation context.
-     * 
-     *            TODO Caller must set [includeInferred] on the update request.
-     *            Look at the query code path for this, but also consider what
-     *            it means in the context of update. It probably only effects
-     *            the WHERE clauses in UPDATE operations.
-     * 
+     * @param dataset
+     *            A dataset which will override the data set declaration for
+     *            each {@link DeleteInsertGraph} operation in the update
+     *            sequence (optional).
+     * @param includeInferred
+     *            if inferences should be included in various operations.
+     *            
      * @throws SailException
+     * 
+     * TODO timeout for update?
      */
-    static public void executeUpdate(
-            final BigdataSailRepositoryConnection conn,
-            final ASTContainer astContainer) throws UpdateExecutionException {
+    static public void executeUpdate(//
+            final BigdataSailRepositoryConnection conn,//
+            final ASTContainer astContainer,//
+            final Dataset dataset,
+            final boolean includeInferred//
+            ) throws UpdateExecutionException {
 
         if(conn == null)
             throw new IllegalArgumentException();
@@ -672,23 +683,33 @@ public class ASTEvalHelper {
         
         try {
 
-            if (log.isInfoEnabled()) {
-                // Log the SPARQL UPDATE string.
-                log.info(astContainer.getQueryString());
+            if (dataset != null) {
+
+                /*
+                 * Apply the optional data set override.
+                 */
+
+                applyDataSet(conn.getTripleStore(), astContainer, dataset);
+                
             }
 
-            final AST2BOpUpdateContext context = new AST2BOpUpdateContext(
+            final AST2BOpUpdateContext ctx = new AST2BOpUpdateContext(
                     astContainer, conn);
+
+            doSparqlLogging(ctx);
+
+            // Propagate attribute.
+            ctx.setIncludeInferred(includeInferred);
 
             /*
              * Convert the query (generates an optimized AST as a side-effect).
              */
-            AST2BOpUpdate.optimizeUpdateRoot(context);
+            AST2BOpUpdate.optimizeUpdateRoot(ctx);
 
             /*
              * Generate and execute physical plans for the update operations.
              */
-            AST2BOpUpdate.convertUpdate(context);
+            AST2BOpUpdate.convertUpdate(ctx);
 
         } catch (Exception ex) {
 
@@ -698,4 +719,132 @@ public class ASTEvalHelper {
 
     }
 
+    /**
+     * Apply the {@link Dataset} to each {@link DeleteInsertGraph} in the UPDATE
+     * request.
+     * <p>
+     * The openrdf API here is somewhat at odds with the current LCWD for SPARQL
+     * UPDATE. In order to align them, setting the {@link Dataset} here causes
+     * it to be applied to each {@link DeleteInsertGraph} operation in the
+     * {@link UpdateRoot}. Note that the {@link Dataset} has no effect exception
+     * for the {@link DeleteInsertGraph} operation in SPARQL 1.1 UPDATE (that is
+     * the only operation which has a WHERE clause and which implements the
+     * {@link IDataSetNode} interface).
+     * 
+     * @param tripleStore
+     * @param astContainer
+     * @param dataset
+     * 
+     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
+     *      assignment in update sequences not properly scoped </a>
+     */
+    static private void applyDataSet(final AbstractTripleStore tripleStore,
+            final ASTContainer astContainer, final Dataset dataset) {
+
+        if (tripleStore == null)
+            throw new IllegalArgumentException();
+        
+        if (astContainer == null)
+            throw new IllegalArgumentException();
+
+        if (dataset == null)
+            throw new IllegalArgumentException();
+        
+        /*
+         * Batch resolve RDF Values to IVs and then set on the query model.
+         */
+
+        final Object[] tmp = new BigdataValueReplacer(tripleStore)
+                .replaceValues(dataset, null/* bindings */);
+
+        /*
+         * Set the data set on the original AST.
+         */
+        
+        final Dataset resolvedDataset = (Dataset) tmp[0];
+
+        final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
+        
+        for (Update op : updateRoot) {
+        
+            if (op instanceof IDataSetNode) {
+            
+                final IDataSetNode node = ((IDataSetNode) op);
+
+                node.setDataset(new DatasetNode(resolvedDataset, true/* update */));
+                
+            }
+            
+        }
+
+    }
+
+    /**
+     * Log SPARQL Query and SPARQL UPDATE requests.
+     * <p>
+     * Note: The SPARQL syntax is logged whenever possible. However, we
+     * sometimes generate the AST directly, in which case the SPARQL syntax is
+     * not available and the AST is logged instead.
+     * 
+     * @param ctx
+     */
+    private static void doSparqlLogging(final AST2BOpContext ctx) {
+
+        if (!log.isInfoEnabled())
+            return;
+
+        /*
+         * Log timestamp of the view and the SPARQL query string.
+         */
+
+        setupLoggingContext(ctx);
+
+        final ASTContainer astContainer = ctx.astContainer;
+
+        final String queryString = astContainer.getQueryString();
+
+        if (queryString != null) {
+
+            /*
+             * Log the query string when it is available.
+             * 
+             * Note: We sometimes generate the AST directly, in which case there
+             * is no query string.
+             */
+            
+            log.info(queryString);
+            
+        } else {
+
+            /*
+             * If there is no query string, then log the AST instead.
+             */
+            
+            if (astContainer.isQuery()) {
+            
+                log.info(astContainer.getOriginalAST());
+                
+            } else {
+                
+                log.info(astContainer.getOriginalUpdateAST());
+                
+            }
+            
+        }
+
+        clearLoggingContext();
+
+    }
+
+    private static void setupLoggingContext(final AST2BOpContext context) {
+
+        MDC.put("tx", TimestampUtility.toString(context.getTimestamp()));
+
+    }
+    
+    private static void clearLoggingContext() {
+        
+        MDC.remove("tx");
+    }
+    
 }

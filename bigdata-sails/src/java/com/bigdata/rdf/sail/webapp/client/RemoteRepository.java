@@ -32,6 +32,7 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,13 +64,16 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
+import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.TupleQueryResultHandlerBase;
 import org.openrdf.query.impl.TupleQueryResultBuilder;
@@ -95,13 +99,14 @@ import org.xml.sax.ext.DefaultHandler2;
 import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
 import com.bigdata.rdf.sail.webapp.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.MiniMime;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sparql.ast.AST2SPARQLUtil;
+import com.bigdata.rdf.store.BD;
 
 /**
- * Java API to the NanoSparqlServer. See 
- * 
- * <a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer">this page</a> 
- * 
- * for more information on the HTTP API.
+ * Java API to the {@link NanoSparqlServer} (see <a href=
+ * "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
+ * > this page </a> for more information on the HTTP API)
  */
 public class RemoteRepository {
 
@@ -149,7 +154,9 @@ public class RemoteRepository {
     }
     
     public void shutdown() {
-    	this.http.getConnectionManager().shutdown();
+    	
+        this.http.getConnectionManager().shutdown();
+        
     }
     
 	/**
@@ -161,7 +168,9 @@ public class RemoteRepository {
 	 * 			the {@link TupleQuery}
 	 */
 	public TupleQuery prepareTupleQuery(final String query) throws Exception {
-		return new TupleQuery(UUID.randomUUID(), query);
+		
+	    return new TupleQuery(UUID.randomUUID(), query);
+	    
 	}
 
 	/**
@@ -173,7 +182,9 @@ public class RemoteRepository {
 	 * 			the {@link GraphQuery}
 	 */
 	public GraphQuery prepareGraphQuery(final String query) throws Exception {
-		return new GraphQuery(UUID.randomUUID(), query);
+		
+	    return new GraphQuery(UUID.randomUUID(), query);
+	    
 	}
 
 	/**
@@ -185,7 +196,9 @@ public class RemoteRepository {
 	 * 			the {@link BooleanQuery}
 	 */
 	public BooleanQuery prepareBooleanQuery(final String query) throws Exception {
-		return new BooleanQuery(UUID.randomUUID(), query);
+
+	    return new BooleanQuery(UUID.randomUUID(), query);
+	    
 	}
 
     /**
@@ -203,6 +216,185 @@ public class RemoteRepository {
         return new SparqlUpdate(UUID.randomUUID(), updateStr);
         
     }
+
+    /**
+     * Return all matching statements.
+     * 
+     * @param subj
+     * @param pred
+     * @param obj
+     * @param includeInferred
+     * @param contexts
+     * @return
+     * @throws Exception
+     * 
+     *             TODO includeInferred is currently ignored.
+     *             
+     *             TODO Should return an closeable iteration (or iterator) so
+     *             we do not have to eagerly materialize all the solutions.
+     */
+    public Graph getStatements(final Resource subj,
+            final URI pred, final Value obj, final boolean includeInferred,
+            final Resource... contexts) throws Exception {
+
+        OpenRDFUtil.verifyContextNotNull(contexts);
+
+        final Map<String,String> prefixDecls = Collections.emptyMap();
+        
+        final AST2SPARQLUtil util = new AST2SPARQLUtil(prefixDecls);
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        /*
+         * Note: You can not use the CONSTRUCT WHERE shortcut with a data set
+         * declaration (FROM, FROM NAMED)....
+         */
+
+//        // Count the non-null entries.
+//        int ncontexts = 0;
+//        for (int i = 0; i < contexts.length; i++)
+//            if (contexts[i] != null)
+//                ncontexts++;
+
+        if (contexts.length > 0) {
+
+            sb.append("CONSTRUCT {\n");
+
+            sb.append(asConstOrVar(util, "?s", subj));
+            
+            sb.append(" ");
+            
+            sb.append(asConstOrVar(util, "?p", pred));
+            
+            sb.append(" ");
+            
+            sb.append(asConstOrVar(util, "?o", obj));
+
+            sb.append("\n}\n");
+
+            // Add FROM clause for each context to establish the defaultGraph.
+            for (int i = 0; i < contexts.length; i++) {
+
+                /*
+                 * Interpret a [null] entry in contexts[] as a reference to the
+                 * openrdf nullGraph.
+                 */
+
+                final Resource c = contexts[i] == null ? BD.NULL_GRAPH
+                        : contexts[i];
+
+                sb.append("FROM " + util.toExternal(c) + "\n");
+
+            }
+            
+            sb.append("WHERE {\n");
+
+        } else {
+            
+            // CONSTRUCT WHERE shortcut form.
+            sb.append("CONSTRUCT WHERE {\n");
+            
+        }
+
+        sb.append(asConstOrVar(util, "?s", subj));
+        
+        sb.append(" ");
+        
+        sb.append(asConstOrVar(util, "?p", pred));
+        
+        sb.append(" ");
+        
+        sb.append(asConstOrVar(util, "?o", obj));
+
+        sb.append("\n}");
+        
+        final String queryStr = sb.toString();
+        
+        final GraphQuery query = prepareGraphQuery(queryStr);
+        
+        final Graph result = query.evaluate();
+
+        return result;
+        
+//        return new StatementVisitor(subj, pred, obj, result);
+        
+    }
+
+    private String asConstOrVar(final AST2SPARQLUtil util, final String var,
+            final Value val) {
+
+        if (val == null)
+            return var;
+
+        return util.toExternal(val);
+//        return "<" + val.stringValue() + ">";
+        
+    }
+    
+    
+//    /**
+//     * @param subj
+//     * @param pred
+//     * @param obj
+//     * @param result
+//     * @return
+//     */
+//    private static class StatementVisitor implements
+//            CloseableIteration<Statement, Exception> {
+//
+//        private final Resource subj;
+//
+//        private final URI pred;
+//
+//        private final Value obj;
+//
+//        private final TupleQueryResult src;
+//        
+//        private boolean open = true;
+//        
+//        StatementVisitor(final Resource subj, final URI pred, final Value obj,
+//                final TupleQueryResult src) {
+//
+//            if(src == null)
+//                throw new IllegalArgumentException();
+//            
+//            this.subj = subj;
+//            this.pred = pred;
+//            this.obj = obj;
+//            this.src = src;
+//            
+//        }
+//
+//        @Override
+//        public void close() throws Exception {
+//            if(open) {
+//                open = false;
+//                src.close();
+//            }
+//        }
+//
+//        @Override
+//        public boolean hasNext() throws Exception {
+//            if (open && src.hasNext()) {
+//                return true;
+//            }
+//            close();
+//            return false;
+//        }
+//
+//        @Override
+//        public Statement next() throws Exception {
+//            
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        @Override
+//        public void remove() throws Exception {
+//            throw new UnsupportedOperationException();
+//        }
+//
+//    }
 
 	/**
 	 * Cancel a query running remotely on the server.
@@ -582,7 +774,11 @@ public class RemoteRepository {
 	        		if (response != null)
 	        			EntityUtils.consume(response.getEntity());
 	        		
-	        	} catch (Exception ex) { }
+	        	} catch (Exception ex) {
+
+	        	    log.warn(ex);
+
+	        	}
 	        	
 	        }
 			
@@ -596,6 +792,9 @@ public class RemoteRepository {
 			super(id, query);
 		}
 		
+		/*
+		 * FIXME Change to GraphQueryResult.
+		 */
 		public Graph evaluate() throws Exception {
 
 	        HttpResponse response = null;
@@ -612,7 +811,11 @@ public class RemoteRepository {
 	        		if (response != null)
 	        			EntityUtils.consume(response.getEntity());
 	        		
-	        	} catch (Exception ex) { }
+	        	} catch (Exception ex) { 
+	        	    
+	                  log.warn(ex);
+
+	        	}
 	        	
 	        }
 			
@@ -642,7 +845,11 @@ public class RemoteRepository {
 	        		if (response != null)
 	        			EntityUtils.consume(response.getEntity());
 	        		
-	        	} catch (Exception ex) { }
+	        	} catch (Exception ex) { 
+	        	    
+	                  log.warn(ex);
+
+	        	}
 	        	
 	        }
 	        
@@ -672,7 +879,11 @@ public class RemoteRepository {
 	        		if (response != null)
 	        			EntityUtils.consume(response.getEntity());
 	        		
-	        	} catch (Exception ex) { }
+	        	} catch (Exception ex) {
+	        	    
+	        	    log.warn(ex);
+	        	    
+	        	}
 	        	
 	        }
 	        
@@ -820,12 +1031,15 @@ public class RemoteRepository {
 	        ;
         
         /** Request parameters to be formatted as URL query parameters. */
-        public Map<String,String[]> requestParams;
+        public Map<String, String[]> requestParams;
         
         /** Request entity. */
         public HttpEntity entity = null;
-        
-        /** The connection timeout (ms) -or- ZERO (0) for an infinite timeout. */
+
+        /**
+         * TODO The connection timeout (ms) -or- ZERO (0) for an infinite
+         * timeout (how is this communicated using http components?).
+         */
         public int timeout = 0;
 
         public ConnectOptions(final String serviceURL) {
@@ -888,7 +1102,7 @@ public class RemoteRepository {
             log.debug("*** Request ***");
             log.debug(serviceURL);
             log.debug(opts.method);
-            log.debug("query="+opts.getRequestParam("query"));
+            log.debug("query=" + opts.getRequestParam("query"));
         }
 
         HttpUriRequest request = null;
@@ -896,9 +1110,14 @@ public class RemoteRepository {
 
             request = newRequest(urlString.toString(), opts.method);
             
-            request.addHeader("Accept", opts.acceptHeader);
-            if (log.isDebugEnabled())
-                log.debug("Accept: " + opts.acceptHeader);
+            if (opts.acceptHeader != null) {
+            
+                request.addHeader("Accept", opts.acceptHeader);
+                
+                if (log.isDebugEnabled())
+                    log.debug("Accept: " + opts.acceptHeader);
+                
+            }
             
 //        	// conn = doConnect(urlString.toString(), opts.method);
 //            final URL url = new URL(urlString.toString());
@@ -1068,6 +1287,12 @@ public class RemoteRepository {
      * 
      * @throws Exception
      *             If anything goes wrong.
+     * 
+     *             FIXME This should be modified to provide incremental parsing
+     *             of the solutions. Right now they are materialized eagerly.
+     *             However, we do not need to change the API for this since the
+     *             {@link TupleQueryResult} already supports that within its
+     *             abstraction.
      */
     protected TupleQueryResult tupleResults(final HttpResponse response)
             throws Exception {
@@ -1089,9 +1314,9 @@ public class RemoteRepository {
 	                    "Could not identify format for service response: serviceURI="
 	                            + serviceURL + ", contentType=" + contentType
 	                            + " : response=" + getResponseBody(response));
-	
-	        final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
-	                .getInstance().get(format);
+
+            final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
+                    .getInstance().get(format);
 	
 	        final TupleQueryResultParser parser = parserFactory.getParser();
 	
@@ -1114,17 +1339,24 @@ public class RemoteRepository {
 
     }
     
-	/**
-	 * Builds a graph from an RDF result set (statements, not binding sets).
-	 * 
-	 * @param response
-	 *            The connection from which to read the results.
-	 * 
-	 * @return The graph
-	 * 
-	 * @throws Exception
-	 *             If anything goes wrong.
-	 */
+	    /**
+     * Builds a graph from an RDF result set (statements, not binding sets).
+     * 
+     * @param response
+     *            The connection from which to read the results.
+     * 
+     * @return The graph
+     * 
+     * @throws Exception
+     *             If anything goes wrong.
+     * 
+     *             FIXME This should be modified to return a
+     *             {@link GraphQueryResult}. That abstraction supports
+     *             incremental materialization. The implementation should
+     *             then be modified to perform incremental materialization.
+     *             Right now it materializes everything before returning.
+     *             This will cause an API change on {@link GraphQuery}.
+     */
 	protected Graph graphResults(final HttpResponse response) throws Exception {
 
     	HttpEntity entity = null;
@@ -1153,13 +1385,15 @@ public class RemoteRepository {
 			final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
 
             if (factory == null)
-                throw new RuntimeException("RDFParserFactory not found: Content-Type=" + contentType
-                        + ", format=" + format);
-            
+                throw new RuntimeException(
+                        "RDFParserFactory not found: Content-Type="
+                                + contentType + ", format=" + format);
+
             final Graph g = new GraphImpl();
 
 			final RDFParser rdfParser = factory.getParser();
 			
+			// TODO These options should be configurable using RDFParserOptions.
 			rdfParser.setValueFactory(new ValueFactoryImpl());
 
 			rdfParser.setVerifyData(true);

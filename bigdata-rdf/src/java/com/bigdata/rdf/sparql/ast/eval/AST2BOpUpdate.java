@@ -92,7 +92,6 @@ import com.bigdata.rdf.sparql.ast.CreateGraph;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DropGraph;
-import com.bigdata.rdf.sparql.ast.IStatementContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
@@ -100,6 +99,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -196,7 +196,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (context.conn.isReadOnly())
             throw new UnsupportedOperationException("Not a mutable view.");
         
-        if(log.isTraceEnabled())
+        if (log.isTraceEnabled())
             log.trace("beforeUpdate:\n" + context.db.dumpStore());
 
         final ASTContainer astContainer = context.astContainer;
@@ -219,20 +219,37 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         }
 
         /*
-         * Commit.
-         * 
-         * Note: Not required on cluster.
-         * 
-         * Note: Not required unless the end of the UpdateRoot or we desired a
-         * checkpoint on the sequences of operations.
-         * 
-         * Note: The commit really must not happen until the update plan(s) are
-         * known to execute successfully. We can do that with an AT_ONCE
-         * annotation on the CommitOp or we can just invoke commit() at
-         * appropriate checkpoints in the UPDATE operation.
+         * Commit mutation.
          */
+        left = convertCommit(left, context);
+
+        if (log.isTraceEnabled())
+            log.trace("afterCommit:\n" + context.db.dumpStore());
+
+        return left;
+
+    }
+
+    /**
+     * Commit.
+     * <p>
+     * Note: Not required on cluster (Shard-wise ACID updates).
+     * <p>
+     * Note: Not required unless the end of the update sequence or we desire a
+     * checkpoint on the sequences of operations.
+     * <p>
+     * Note: The commit really must not happen until the update plan(s) are
+     * known to execute successfully. We can do that with an AT_ONCE annotation
+     * on the {@link CommitOp} or we can just invoke commit() at appropriate
+     * checkpoints in the UPDATE operation.
+     */
+    private static PipelineOp convertCommit(PipelineOp left,
+            final AST2BOpUpdateContext context) throws Exception {
+
         if (!context.isCluster()) {
+
             if (runOnQueryEngine) {
+            
                 left = new CommitOp(leftOrEmpty(left), NV.asMap(
                         //
                         new NV(BOp.Annotations.BOP_ID, context.nextId()),//
@@ -240,18 +257,22 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                                 .getTimestamp()),//
                         new NV(CommitOp.Annotations.PIPELINED, false)//
                         ));
+            
             } else {
-                context.conn.commit2();
+
+                final long commitTime = context.conn.commit2();
+                
+                if (log.isDebugEnabled())
+                    log.debug("COMMIT: commitTime=" + commitTime);
+                
             }
+            
         }
-
-        if(log.isTraceEnabled())
-                log.trace("afterCommit:\n" + context.db.dumpStore());
-
+        
         return left;
 
     }
-
+    
     /**
      * Method provides the <code>switch()</code> for handling the different
      * {@link UpdateType}s.
@@ -400,15 +421,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  * Note: This could be lifted into an AST optimizer, but we are
                  * not yet running those against the UPDATE AST.
                  */
-
+                
                 final QuadData deleteClause = new QuadData();
                 
-                final Iterator<IStatementContainer> itr = BOpUtility.visitAll(whereClause, IStatementContainer.class);
+                final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(whereClause, StatementPatternNode.class);
 
                 while(itr.hasNext()) {
                     
-                    final IStatementContainer t = itr.next();
-                    
+                    final StatementPatternNode t = (StatementPatternNode) itr
+                            .next().clone();
+
                     deleteClause.addChild(t);
                 
                 }
@@ -450,7 +472,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  * 
                  * TODO For large intermediate results, we would be much better
                  * off putting the data onto an HTree and processing the
-                 * bindings as IVs rather than materializing them as RDF Values.
+                 * bindings as IVs rather than materializing them as RDF Values
+                 * (and even for small data sets, we would be better off
+                 * avoiding materialization of the RDF Values and using an
+                 * ASTConstructIterator which builds ISPOs using IVs rather than
+                 * Values).
                  */
 
                 // Run as a SELECT query.
@@ -562,7 +588,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param op
      * @param context
      * @return
-     * @throws RepositoryException 
+     * @throws RepositoryException
      */
     private static PipelineOp convertAddGraph(PipelineOp left,
             final AddGraph op, final AST2BOpUpdateContext context)
@@ -589,9 +615,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
     /**
      * Copy all statements from the sourceGraph to the targetGraph.
-     * 
-     * TODO Review SILENT semantics for this operation (the argument is being
-     * ignored).
+     * <p>
+     * Note: The SILENT keyword for ADD, COPY, and MOVE indicates that the
+     * implementation SHOULD/MAY report an error if the source graph does not
+     * exist (the spec is not consistent here across those operations). Further,
+     * there is no explicit create/drop of graphs in bigdata so it WOULD be Ok
+     * if we just ignored the SILENT keyword.
      */
     private static void copyStatements(final AST2BOpUpdateContext context,
             final boolean silent, final BigdataURI sourceGraph,
@@ -600,6 +629,20 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (log.isDebugEnabled())
             log.debug("sourceGraph=" + sourceGraph + ", targetGraph="
                     + targetGraph);
+        
+        if (!silent) {
+
+            if (context.conn
+                    .getTripleStore()
+                    .getAccessPath(null/* s */, null/* p */, null/* o */,
+                            sourceGraph).isEmpty()) {
+
+                throw new RuntimeException("Source graph is empty: "
+                        + sourceGraph);
+
+            }
+
+        }
         
         final RepositoryResult<Statement> result = context.conn.getStatements(
                 null/* s */, null/* p */, null/* o */,

@@ -111,7 +111,12 @@ public class AST2SPARQLUtil {
     
     public String toExternal(final BNode bnd) {
 
-        return "_:" + bnd.stringValue();
+        final String id = bnd.stringValue();
+
+//        final boolean isLetter = Character.isLetter(id.charAt(0));
+
+//        return "_:" + (isLetter ? "" : "B") + id;
+        return "_:B" + id;
 
     }
     
