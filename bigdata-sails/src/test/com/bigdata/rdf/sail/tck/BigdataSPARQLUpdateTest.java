@@ -140,6 +140,8 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         // disable truth maintenance in the SAIL
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");
         
+        props.setProperty(Options.TEXT_INDEX, "true");
+        
         return props;
         
     }

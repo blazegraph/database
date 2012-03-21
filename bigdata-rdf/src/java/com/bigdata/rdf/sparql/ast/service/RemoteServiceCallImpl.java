@@ -52,6 +52,7 @@ import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.MiniMime;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -64,6 +65,10 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: RemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
  *          thompsonbry $
+ * 
+ *          FIXME Rewrite to use http components per the
+ *          {@link RemoteRepository} and to share the same backing connection
+ *          manager by default.
  */
 public class RemoteServiceCallImpl implements RemoteServiceCall {
 
@@ -81,12 +86,12 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 
     @Override
     public String toString() {
-        
+
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getName());
-        sb.append("{serviceURI="+serviceURI);
-        sb.append(",serviceNode="+serviceNode);
-        sb.append(",serviceOptions="+serviceOptions);
+        sb.append("{serviceURI=" + serviceURI);
+        sb.append(",serviceNode=" + serviceNode);
+        sb.append(",serviceOptions=" + serviceOptions);
         sb.append("}");
         return sb.toString();
         

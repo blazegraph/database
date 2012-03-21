@@ -780,13 +780,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * CONSTRUCT ?s where {?s ?p ?o}
      * </pre>
      * 
-     * TODO CONSTRUCT has two forms which we need to test. In the first form a
-     * ConstructTemplate appears before the DatasetClause. In the second form a
-     * TriplesTemplate appears after the WhereClause and before the optional
-     * SolutionModifier (the second form is a short form where the construct
-     * template and the WHERE clause are identical). Openrdf has not yet
-     * implemented the 2nd form.
-     * 
      * TODO Anzo has an extension of CONSTRUCT for quads which we should also
      * support. It allows a GRAPH graph pattern to be mixed in with the triple
      * patterns.
@@ -824,7 +817,9 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
-     * A construct query with some constants in the template.
+     * A construct query with some constants in the template (not ground
+     * triples, just RDF Values).
+     * 
      * @throws MalformedQueryException
      * @throws TokenMgrError
      * @throws ParseException
@@ -836,6 +831,50 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         		"PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
         		"construct { ?s rdf:type ?o }\n" +
         		"where {?s rdf:type ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdf", RDF.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ConstructNode construct = new ConstructNode();
+            expected.setConstruct(construct);
+            construct.addChild(new StatementPatternNode(new VarNode("s"),
+                    new ConstantNode(makeIV(valueFactory.createURI(RDF.TYPE
+                            .toString()))), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new ConstantNode(makeIV(valueFactory.createURI(RDF.TYPE
+                            .toString()))), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * The construct where shortcut form.
+     * 
+     * @throws MalformedQueryException
+     * @throws TokenMgrError
+     * @throws ParseException
+     */
+    public void test_construct_where_shortcut()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+                "construct where {?s rdf:type ?o}";
 
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
         {

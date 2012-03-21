@@ -77,7 +77,7 @@ import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.util.InnerCause;
 
 /**
- * SPARQL query handler for GET or POST verbs.
+ * SPARQL Query (GET/POST) and SPARQL UPDATE handler (POST).
  * 
  * @author martyncutcher
  * @author thompsonbry
@@ -101,10 +101,12 @@ public class QueryServlet extends BigdataRDFServlet {
 
         if (req.getParameter("update") != null) {
             
+            // SPARQL 1.1 UPDATE.
             doUpdate(req, resp);
             
         } else {
             
+            // SPARQL Query.
             doQuery(req, resp);
             
         }
@@ -279,9 +281,9 @@ public class QueryServlet extends BigdataRDFServlet {
         final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
 
         // The SPARQL query.
-        final String queryStr = req.getParameter("update");
+        final String updateStr = req.getParameter("update");
 
-        if (queryStr == null) {
+        if (updateStr == null) {
 
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Not found: update");
@@ -315,7 +317,7 @@ public class QueryServlet extends BigdataRDFServlet {
                  * query.
                  */
                 queryTask = context
-                        .getQueryTask(namespace, timestamp, queryStr,
+                        .getQueryTask(namespace, timestamp, updateStr,
                                 null/* acceptOverride */, req, os, true/* update */);
             } catch (MalformedQueryException ex) {
                 /*
@@ -330,7 +332,7 @@ public class QueryServlet extends BigdataRDFServlet {
             final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
 
             if (log.isTraceEnabled())
-                log.trace("Will run query: " + queryStr);
+                log.trace("Will run update: " + updateStr);
 
             /*
              * Setup the response headers.
@@ -338,6 +340,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
             resp.setStatus(HTTP_OK);
             resp.setContentType(BigdataServlet.MIME_TEXT_PLAIN);
+            
+            // No caching for UPDATE.
+            resp.addHeader("Cache-Control", "no-cache");
 
 //            if (queryTask.explain) {
 //                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
@@ -419,7 +424,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
         } catch (Throwable e) {
             try {
-                throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
+                throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
             } catch (Exception e1) {
                 throw new RuntimeException(e);
             }

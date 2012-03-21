@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-
 /**
  * Data driven test suite.
  * 
@@ -78,14 +77,74 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * A simple CONSTRUCT query.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * CONSTRUCT {
+     *   <http://www.bigdata.com/DC> rdfs:label "DC" .
+     *   ?x rdf:type foaf:Person . 
+     * } where {
+     *   ?x rdf:type foaf:Person 
+     * }
+     * </pre>
      */
-    public void test_construct() throws Exception {
+    public void test_construct_1() throws Exception {
 
         new TestHelper(
-                "construct", // testURI,
-                "construct.rq",// queryFileURL
-                "construct.trig",// dataFileURL
-                "construct-result.trig"// resultFileURL
+                "construct-1", // testURI,
+                "construct-1.rq",// queryFileURL
+                "construct-1.trig",// dataFileURL
+                "construct-1-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    /**
+     * A CONSTRUCT without a template and having a ground triple in the WHERE
+     * clause. For this variant of the test, the triple is not in the KB.
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * 
+     * CONSTRUCT WHERE {
+     *   <http://www.bigdata.com/DC> rdfs:label "MD" 
+     * }
+     * </pre>
+     */
+    public void test_construct_2() throws Exception {
+
+        new TestHelper(
+                "construct-2", // testURI,
+                "construct-2.rq",// queryFileURL
+                "construct-2.trig",// dataFileURL
+                "construct-2-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    /**
+     * A CONSTRUCT without a template and having a ground triple in the WHERE
+     * clause. For this variant of the test, the triple is in the KB and should
+     * be in the CONSTRUCT result.
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * 
+     * CONSTRUCT WHERE {
+     *   <http://www.bigdata.com/DC> rdfs:label "DC" 
+     * }
+     * </pre>
+     */
+    public void test_construct_3() throws Exception {
+
+        new TestHelper(
+                "construct-3", // testURI,
+                "construct-3.rq",// queryFileURL
+                "construct-3.trig",// dataFileURL
+                "construct-3-result.trig"// resultFileURL
                 ).runTest();
         
     }
@@ -93,6 +152,15 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
     /**
      * A construct with told triples in the CONSTRUCT clause and no WHERE
      * clause.
+     * 
+     * <pre>
+     * PREFIX : <http://www.bigdata.com/>
+     * 
+     * CONSTRUCT {
+     *   :Bryan :likes :RDFS
+     * } where {
+     * }
+     * </pre>
      */
     public void test_construct_without_where_clause() throws Exception {
        
@@ -104,6 +172,29 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
     }
     
+    /**
+     * A CONSTRUCT query where the constructed statements can have blank nodes
+     * because a variable becomes bound to a blank node in the data.
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * 
+     * CONSTRUCT WHERE {
+     * <http://example.org/bob> rdfs:label ?o
+     * }
+     * </pre>
+     */
+    public void test_construct_5() throws Exception {
+
+        new TestHelper(
+                "construct-5", // testURI,
+                "construct-5.rq",// queryFileURL
+                "construct-5.trig",// dataFileURL
+                "construct-5-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
     /**
      * A simple DESCRIBE query of a constant.
      */

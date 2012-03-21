@@ -3043,7 +3043,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * @param r
          * @param src
          *            The visits chunks of distinct {@link Value}s.
-         * @param buffer
+         * @param bufferTerm2Id
+         * @param bufferBlobs
          */
         public AsyncTerm2IdIndexWriteTask(final KVOLatch latch,
                 final LexiconRelation r,

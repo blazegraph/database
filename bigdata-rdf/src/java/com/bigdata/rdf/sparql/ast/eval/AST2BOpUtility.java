@@ -320,7 +320,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * with respect to the projection of a subquery.
      * 
      * @param left
-     * @param query
+     * @param queryBase
      *            The query.
      * @param doneSet
      *            The set of variables which are already known to be
@@ -333,10 +333,10 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * @return The query plan.
      */
     private static PipelineOp convertQueryBaseWithScopedVars(PipelineOp left,
-            final QueryBase query, final Set<IVariable<?>> doneSet,
+            final QueryBase queryBase, final Set<IVariable<?>> doneSet,
             final boolean materializeProjection, final AST2BOpContext ctx) {
         
-        final GraphPatternGroup<?> root = query.getWhereClause();
+        final GraphPatternGroup<?> root = queryBase.getWhereClause();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");
@@ -350,16 +350,16 @@ public class AST2BOpUtility extends AST2BOpJoins {
         /*
          * Named subqueries.
          */
-        if (query instanceof QueryRoot) {
+        if (queryBase instanceof QueryRoot) {
 
-            final NamedSubqueriesNode namedSubqueries = ((QueryRoot) query)
+            final NamedSubqueriesNode namedSubqueries = ((QueryRoot) queryBase)
                     .getNamedSubqueries();
 
             if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
                 // WITH ... AS [name] ... INCLUDE style subquery declarations.
                 left = addNamedSubqueries(left, namedSubqueries,
-                        (QueryRoot) query, doneSet, ctx);
+                        (QueryRoot) queryBase, doneSet, ctx);
 
             }
 
@@ -368,8 +368,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // The top-level "WHERE" clause.
         left = convertJoinGroupOrUnion(left, root, doneSet, ctx);
 
-        final ProjectionNode projection = query.getProjection() == null ? null
-                : query.getProjection().isEmpty() ? null : query
+        final ProjectionNode projection = queryBase.getProjection() == null ? null
+                : queryBase.getProjection().isEmpty() ? null : queryBase
                         .getProjection();
 
         if (projection != null) {
@@ -402,11 +402,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 throw new AssertionError(
                         "Wildcard projection was not rewritten.");
 
-            final GroupByNode groupBy = query.getGroupBy() == null ? null
-                    : query.getGroupBy().isEmpty() ? null : query.getGroupBy();
+            final GroupByNode groupBy = queryBase.getGroupBy() == null ? null
+                    : queryBase.getGroupBy().isEmpty() ? null : queryBase.getGroupBy();
 
-            final HavingNode having = query.getHaving() == null ? null : query
-                    .getHaving().isEmpty() ? null : query.getHaving();
+            final HavingNode having = queryBase.getHaving() == null ? null : queryBase
+                    .getHaving().isEmpty() ? null : queryBase.getHaving();
 
             // true if this is an aggregation query.
             final boolean isAggregate = StaticAnalysis.isAggregate(projection,
@@ -447,13 +447,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
             if (projection.isDistinct() || projection.isReduced()) {
 
-                left = addDistinct(left, query, ctx);
+                left = addDistinct(left, queryBase, ctx);
 
             }
 
         }
 
-        final OrderByNode orderBy = query.getOrderBy();
+        final OrderByNode orderBy = queryBase.getOrderBy();
 
         if (orderBy != null && !orderBy.isEmpty()) {
 
@@ -485,7 +485,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            ), query.getQueryHints());
+            ), queryBase.getQueryHints());
             
             if(materializeProjection) {
                 
@@ -540,9 +540,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         }
         
-        if(query.hasSlice()) {
+        if(queryBase.hasSlice()) {
 
-            left = addSlice(left, query.getSlice(), ctx);
+            left = addSlice(left, queryBase.getSlice(), ctx);
 
         }
 
@@ -553,7 +553,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
          */
         {
 
-            final long timeout = query.getTimeout();
+            final long timeout = queryBase.getTimeout();
 
             if (timeout > 0 && timeout != Long.MAX_VALUE) {
 
@@ -572,7 +572,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
          */
 
         if (log.isInfoEnabled())
-            log.info("\nsubquery: " + query + "\nplan="
+            log.info("\nqueryOrSubquery:\n" + queryBase + "\nplan:\n"
                     + BOpUtility.toString(left));
 
         return left;

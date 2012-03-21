@@ -42,6 +42,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.impl.EmptyBindingSet;
 
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -59,15 +60,12 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * a {@link ConstructNode}. Ground triples in the template are output
  * immediately. Any non-ground triples are output iff they are fully (and
  * validly) bound for a given solution. Blank nodes are scoped to a solution.
+ * <p>
+ * Note: This supports construct of quads, but the SPARQL grammar does not.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTConstructIterator.java 5131 2011-09-05 20:48:48Z thompsonbry
  *          $
- * 
- *          TODO Quads extensions for CONSTRUCT template.
- * 
- *          TODO Was there a feature in native construct for the statement type
- *          (inferred, explicit, axioms)?
  */
 public class ASTConstructIterator implements
         CloseableIteration<BigdataStatement, QueryEvaluationException> {
@@ -81,6 +79,11 @@ public class ASTConstructIterator implements
      * The non-ground statement patterns.
      */
     private final List<StatementPatternNode> templates;
+    
+    /**
+     * Ground triples from the template.
+     */
+    private final List<BigdataStatement> groundTriples;
 
     private final CloseableIteration<BindingSet, QueryEvaluationException> src;
 
@@ -93,8 +96,14 @@ public class ASTConstructIterator implements
      * The buffer is pre-populated with any ground triples in the construct
      * template by the constructor.
      */
-    private List<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
+    private final List<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
 
+//    /**
+//     * Return <code>true</code>iff {@link LexiconRelation#isStoreBlankNodes()}
+//     * is <code>true</code>.
+//     */
+//    private final boolean toldBNodes;
+    
     /**
      * A factory for blank node identifiers, which are scoped to a solution.
      */
@@ -103,47 +112,67 @@ public class ASTConstructIterator implements
     private boolean open = true;
 
     /**
+     * <code>true</code> until we get the first solution for the WHERE clause.
+     * We do not output ground triples in the template until we see that first
+     * solution. It is Ok if it is empty, but we need to know that the WHERE
+     * clause succeeded before we can output the ground triples.
+     */
+    private boolean haveFirstSolution = false; 
+    
+    /**
      * 
      */
-    public ASTConstructIterator(final AbstractTripleStore store,
-            final ConstructNode construct,
+    public ASTConstructIterator(//
+            final AbstractTripleStore store,//
+            final ConstructNode construct,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
         this.f = store.getValueFactory();
         
-        final List<StatementPatternNode> templates = new LinkedList<StatementPatternNode>();
+//        this.toldBNodes = store.getLexiconRelation().isStoreBlankNodes();
         
-        for(StatementPatternNode pat : construct) {
-            
+        templates = new LinkedList<StatementPatternNode>();
+
+        groundTriples = new LinkedList<BigdataStatement>();
+
+        // Blank nodes (scoped to the solution).
+        Map<String, BigdataBNode> bnodes = null;
+
+        for (StatementPatternNode pat : construct) {
+
             if (pat.isGround()) {
 
-                // add statement from template to buffer.
-                final BigdataStatement stmt = f.createStatement(//
-                        (Resource) pat.s().getValue(),//
-                        (URI) pat.p().getValue(),//
-                        (Value) pat.o().getValue(),//
-                        pat.c() == null ? null : (Resource) pat.c().getValue()//
-                        );
+                if(bnodes == null)
+                    bnodes = new LinkedHashMap<String, BigdataBNode>();
+                
+                // Create statement from the template.
+                final BigdataStatement stmt = makeStatement(pat,
+                        EmptyBindingSet.getInstance(), bnodes);
+                
+//                final BigdataStatement stmt = f.createStatement(//
+//                        (Resource) pat.s().getValue(),//
+//                        (URI) pat.p().getValue(),//
+//                        (Value) pat.o().getValue(),//
+//                        pat.c() == null ? null : (Resource) pat.c().getValue()//
+//                        );
 
-                if (log.isInfoEnabled())
-                    log.info("Ground statement: pattern" + pat + "\nstmt"
+                if (log.isDebugEnabled())
+                    log.debug("Ground statement:\npattern=" + pat + "\nstmt="
                             + stmt);
 
-                buffer.add(stmt);
-                
+                groundTriples.add(stmt);
+
             } else {
-                
+
                 /*
                  * A statement pattern that we will process for each solution.
                  */
-                
+
                 templates.add(pat);
-                
+
             }
-            
+
         }
-        
-        this.templates = templates;
 
         this.src = src;
 
@@ -154,7 +183,7 @@ public class ASTConstructIterator implements
         while (true) {
 
             if (!buffer.isEmpty()) {
-                
+
                 /*
                  * At least one statement is ready in the buffer.
                  */
@@ -236,6 +265,23 @@ public class ASTConstructIterator implements
         // Should only be invoked when the buffer is empty.
         assert buffer.isEmpty();
         
+        if (!haveFirstSolution) {
+
+            /*
+             * Once we see the first solution (even if it is empty) we can
+             * output the ground triples from the template, but not before.
+             */
+
+            haveFirstSolution = true;
+            
+            for(BigdataStatement stmt : groundTriples) {
+                
+                addStatementToBuffer(stmt);
+                
+            }
+            
+        }
+        
         // Blank nodes (scoped to the solution).
         final Map<String,BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
         
@@ -251,14 +297,29 @@ public class ASTConstructIterator implements
             if(stmt != null) {
             
                 // If successful, then add to the buffer.
-                buffer.add(stmt);
+                addStatementToBuffer(stmt);
                 
             }
             
         }
-                
+
     }
 
+    /**
+     * Add a statement to the output buffer.
+     * 
+     * @param stmt
+     *            The statement.
+     */
+    private void addStatementToBuffer(final BigdataStatement stmt) {
+        
+        if(log.isDebugEnabled())
+            log.debug(stmt.toString());
+        
+        buffer.add(stmt);
+        
+    }
+    
     /**
      * Return a statement if a valid statement could be constructed for that
      * statement pattern and this solution.
@@ -356,11 +417,23 @@ public class ASTConstructIterator implements
                 
             }
             
-            return (BigdataValue) solution.getValue(varname);
+            final BigdataValue val = (BigdataValue) solution.getValue(varname);
+            
+            /*
+             * Note: Doing this will cause several of the DAWG CONSTRUCT tests
+             * to fail...
+             */
+            if (false && val instanceof BigdataBNode) {
+ 
+                return getBNode(((BigdataBNode) val).getID(), bnodes);
+            
+            }
+            
+            return val;
 
         } else {
             
-            // TODO Support the BNode() function here.
+            // TODO Support the BNode() function here?
             throw new UnsupportedOperationException("term: "+term);
             
         }
