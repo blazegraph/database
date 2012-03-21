@@ -43,25 +43,20 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.routing.HttpRoute;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
@@ -104,9 +99,14 @@ import com.bigdata.rdf.sparql.ast.AST2SPARQLUtil;
 import com.bigdata.rdf.store.BD;
 
 /**
- * Java API to the {@link NanoSparqlServer} (see <a href=
- * "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
- * > this page </a> for more information on the HTTP API)
+ * Java API to the {@link NanoSparqlServer}.
+ * <p>
+ * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
+ * operations against the same end point.
+ * 
+ * @see <a href=
+ *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
+ *      > NanoSparqlServer REST API </a>
  */
 public class RemoteRepository {
 
@@ -117,46 +117,52 @@ public class RemoteRepository {
      */
     static private final String UTF8 = "UTF-8";
     
+    /**
+     * The service end point.
+     */
     private final String serviceURL;
 
-	private final DefaultHttpClient http;
+    /**
+     * The client used for http connections.
+     */
+    private final HttpClient httpClient;
 
     /**
-     * Create a connection to a remote repository.
-     * <p>
-     * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
-     * operations against the same end point.
+     * Create a connection to a remote repository using a shared
+     * {@link ClientConnectionManager} and a {@link DefaultHttpClient}.
      * 
      * @param serviceURL
      *            The SPARQL http end point.
+     * 
+     * @see ConnectionManagerFactory#getInstance()
      */
     public RemoteRepository(final String serviceURL) {
-    	
-        this.serviceURL = serviceURL;
-    	
-    	final SchemeRegistry schemeRegistry = new SchemeRegistry();
 
-    	schemeRegistry.register(
-    	         new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
-    	schemeRegistry.register(
-    	         new Scheme("https", 443, SSLSocketFactory.getSocketFactory()));
+        this(serviceURL, new DefaultHttpClient(
+                ConnectionManagerFactory.getInstance()));
 
-    	final ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(schemeRegistry);
-    	// Increase max total connection to 200
-    	cm.setMaxTotal(200);
-    	// Increase default max connection per route to 20
-    	cm.setDefaultMaxPerRoute(20);
-    	// Increase max connections for localhost to 50
-    	final HttpHost localhost = new HttpHost("locahost");
-    	cm.setMaxForRoute(new HttpRoute(localhost), 50);
-    	 
-    	this.http = new DefaultHttpClient(cm);
     }
-    
-    public void shutdown() {
-    	
-        this.http.getConnectionManager().shutdown();
-        
+
+    /**
+     * Create a connection to a remote repository.
+     * 
+     * @param serviceURL
+     *            The SPARQL http end point.
+     * @param httpClient
+     *            The {@link HttpClient}.
+     */
+    public RemoteRepository(final String serviceURL, final HttpClient httpClient) {
+
+        if (serviceURL == null)
+            throw new IllegalArgumentException();
+
+        if (httpClient == null)
+            throw new IllegalArgumentException();
+
+        this.serviceURL = serviceURL;
+
+        this.httpClient = httpClient;
+
     }
     
 	/**
@@ -1161,7 +1167,7 @@ public class RemoteRepository {
 
             }
 
-            final HttpResponse response = http.execute(request);
+            final HttpResponse response = httpClient.execute(request);
             
             return response;
             

@@ -1076,39 +1076,69 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	}
 
 	/*
+	 * TODO Also test SILENT for LOAD.
+	 */
 	//@Test
 	public void testLoad()
 		throws Exception
 	{
-		String update = "LOAD <http://www.daml.org/2001/01/gedcom/royal92.daml>";
-
-		String ns = "http://www.daml.org/2001/01/gedcom/gedcom#";
-
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+	    final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf>";
+	    
+	    final String ns = "http://bigdata.com/test/data#";
+	    
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
 		operation.execute();
-		assertTrue(con.hasStatement(null, RDF.TYPE, f.createURI(ns, "Family"), true));
+		
+        assertTrue(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
 	}
+
+    //@Test
+    public void testLoadSilent()
+        throws Exception
+    {
+        final String update = "LOAD SILENT <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/NOT-FOUND.rdf>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+
+        operation.execute();
+
+        assertFalse(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
 
 	//@Test
 	public void testLoadIntoGraph()
 		throws Exception
 	{
-		String ns = "http://www.daml.org/2001/01/gedcom/gedcom#";
 
-		String update = "LOAD <http://www.daml.org/2001/01/gedcom/royal92.daml> INTO GRAPH <" + ns + "> ";
+        final URI g1 = f.createURI("http://www.bigdata.com/g1");
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf> "
+                + "INTO GRAPH <" + g1.stringValue() + ">";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
-		operation.execute();
-		assertFalse(con.hasStatement((Resource)null, RDF.TYPE, f.createURI(ns, "Family"), true, (Resource)null));
-		assertTrue(con.hasStatement((Resource)null, RDF.TYPE, f.createURI(ns, "Family"), true, f.createURI(ns)));
+        operation.execute();
+        
+        assertFalse(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true, (Resource)null));
+
+        assertTrue(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true, g1));
+
 	}
-	*/
 
 	/* protected methods */
 
-	protected void loadDataset(String datasetFile)
+	protected void loadDataset(final String datasetFile)
 		throws RDFParseException, RepositoryException, IOException
 	{
 		logger.debug("loading dataset...");
@@ -1175,4 +1205,5 @@ public abstract class SPARQLUpdateTest extends TestCase {
                 .getBigdataSail().getDatabase().dumpStore();
         
 	}
+
 }

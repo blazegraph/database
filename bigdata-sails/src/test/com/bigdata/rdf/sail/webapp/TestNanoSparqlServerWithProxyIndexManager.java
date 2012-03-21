@@ -59,9 +59,6 @@ import com.bigdata.service.jini.JiniFederation;
  * queries which exercise the context position; and the default-graph and
  * named-graph URL query parameters for quads.
  * 
- * @todo How is the REST API supposed to handle INSERT w/ body and DELETE w/
- *       body against a quad store?
- * 
  * @todo Security model?
  * 
  * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
@@ -70,8 +67,6 @@ import com.bigdata.service.jini.JiniFederation;
  * @todo A SPARQL result sets JSON parser needs to be written (Sesame bundles a
  *       writer, but not a parser) before we can test queries which CONNEG for a
  *       JSON result set.
- * 
- * @todo Add tests for SIDS mode interchange of RDF XML.
  * 
  * @todo Tests which verify the correct rejection of illegal or ill-formed
  *       requests.
@@ -365,7 +360,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
                  * A bigdata federation.
                  */
 
-				final JiniClient<?> jiniClient = new JiniClient(
+				@SuppressWarnings("rawtypes")
+                final JiniClient<?> jiniClient = new JiniClient(
 						new String[] { propertyFile });
 
                 indexManager = jiniClient.connect();
