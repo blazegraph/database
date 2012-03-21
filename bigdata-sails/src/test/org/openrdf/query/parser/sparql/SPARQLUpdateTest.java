@@ -1075,9 +1075,6 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(msg, con.hasStatement(book1, DC.TITLE, null, true, bookStore2));
 	}
 
-	/*
-	 * TODO Also test SILENT for LOAD.
-	 */
 	//@Test
 	public void testLoad()
 		throws Exception
