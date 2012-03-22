@@ -95,14 +95,14 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
     protected ValueFactory f = new ValueFactoryImpl();
     protected URI bob, alice, graph1, graph2;
-    protected RemoteRepository repo;
+//    protected RemoteRepository m_repo;
 
 	@Override
 	public void setUp() throws Exception {
 	    
 	    super.setUp();
 	    
-        repo = new RemoteRepository(m_serviceURL);
+//        m_repo = new RemoteRepository(m_serviceURL);
         
         /*
          * Only for testing. Clients should use AddOp(File, RDFFormat).
@@ -114,7 +114,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
                         "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig"),
                 RDFFormat.TRIG);
         
-        repo.add(add);
+        m_repo.add(add);
 
         bob = f.createURI(EX_NS, "bob");
         alice = f.createURI(EX_NS, "alice");
@@ -157,7 +157,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
         try {
 
-            return !repo.getStatements(subj, pred, obj, includeInferred,
+            return !m_repo.getStatements(subj, pred, obj, includeInferred,
                     contexts).isEmpty();
             
         } catch (Exception e) {
@@ -178,7 +178,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
         assertFalse(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
         assertTrue(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
@@ -196,7 +196,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
         assertFalse(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
         assertTrue(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
@@ -219,7 +219,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(bob, RDFS.LABEL, null, true));
         assertFalse(hasStatement(alice, RDFS.LABEL, null, true));
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         /**
          * FIXME getStatements() is hitting a problem in the ASTConstruct
@@ -253,7 +253,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String message = "labels should have been inserted in corresponding named graphs only.";
         assertTrue(message, hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
@@ -276,7 +276,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String message = "label should have been inserted in default graph, for ex:bob only";
         assertTrue(message, hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
@@ -305,7 +305,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String message = "label should have been inserted in graph1 only, for ex:bob only";
         assertTrue(message, hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
@@ -329,7 +329,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
         assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "foaf:name properties should have been deleted";
         assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
@@ -356,7 +356,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "foaf:name properties should have been deleted";
         assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
@@ -380,7 +380,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "foaf:name properties should have been deleted";
         assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
@@ -410,7 +410,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(book1, DC.CREATOR, f.createLiteral("Ringo"), true));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "two new statements about ex:book1 should have been inserted";
         assertTrue(msg, hasStatement(book1, DC.TITLE, f.createLiteral("book 1"), true));
@@ -437,7 +437,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(book2, DC.CREATOR, f.createLiteral("George"), true));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "newly inserted statement missing";
         assertTrue(msg, hasStatement(book1, DC.TITLE, f.createLiteral("book 1"), true));
@@ -462,7 +462,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(book1, DC.TITLE, f.createLiteral("book 1"), true, graph1));
         assertFalse(hasStatement(book1, DC.CREATOR, f.createLiteral("Ringo"), true, graph1));
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 //        operation.execute();
 
         String msg = "two new statements about ex:book1 should have been inserted in graph1";
@@ -484,7 +484,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.KNOWS, bob, true));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "statement should have been deleted.";
         assertFalse(msg, hasStatement(alice, FOAF.KNOWS, bob, true));
@@ -505,7 +505,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.MBOX, f.createLiteral("alice@example.org"), true));
     
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "statement should have been deleted.";
         assertFalse(msg, hasStatement(alice, FOAF.KNOWS, bob, true));
@@ -527,7 +527,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.KNOWS, bob, true, graph1));
     
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "statement should have been deleted from graph1";
         assertFalse(msg, hasStatement(alice, FOAF.KNOWS, bob, true, graph1));
@@ -551,7 +551,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertFalse(hasStatement(alice, FOAF.KNOWS, bob, true, graph2));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "statement should have not have been deleted from graph1";
         assertTrue(msg, hasStatement(alice, FOAF.KNOWS, bob, true, graph1));
@@ -573,7 +573,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(null, null, null, false, graph1));
         assertTrue(hasStatement(null, null, null, false, graph2));
@@ -594,7 +594,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
         try {
-            repo.prepareUpdate(update.toString()).evaluate();
+            m_repo.prepareUpdate(update.toString()).evaluate();
 //            operation.execute();
 
             fail("creation of existing graph should have resulted in error.");
@@ -621,7 +621,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
       
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
         
         assertFalse(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertFalse(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -642,7 +642,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, graph2));
         assertFalse(hasStatement(alice, FOAF.NAME, null, false, graph2));
@@ -663,7 +663,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, f.createURI(EX_NS, "graph3")));
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, graph1));
@@ -685,7 +685,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
     
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -710,7 +710,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
     
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -732,7 +732,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -753,7 +753,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 //
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, graph2));
         assertTrue(hasStatement(alice, FOAF.NAME, null, false, graph2));
@@ -774,7 +774,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, f.createURI(EX_NS, "graph3")));
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, graph1));
@@ -796,7 +796,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -821,7 +821,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -843,7 +843,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertFalse(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -864,7 +864,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(bob, FOAF.NAME, null, false, f.createURI(EX_NS, "graph3")));
         assertFalse(hasStatement(null, null, null, false, graph1));
@@ -885,7 +885,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertFalse(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -909,7 +909,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
         assertTrue(hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
@@ -926,7 +926,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false));
 
@@ -945,7 +945,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false, graph1));
         assertTrue(hasStatement(null, null, null, false, graph2));
@@ -963,7 +963,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false, graph1));
         assertFalse(hasStatement(null, null, null, false, graph2));
@@ -990,7 +990,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        System.err.println(dumpStore());
         
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(null, null, null, false, graph1));
         assertTrue(hasStatement(null, null, null, false, graph2));
@@ -1011,7 +1011,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false));
 
@@ -1030,7 +1030,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false, graph1));
         assertTrue(hasStatement(null, null, null, false, graph2));
@@ -1049,7 +1049,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertFalse(hasStatement(null, null, null, false, graph1));
         assertFalse(hasStatement(null, null, null, false, graph2));
@@ -1074,7 +1074,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 //        operation.execute();
         
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         assertTrue(hasStatement(null, null, null, false, graph1));
         assertTrue(hasStatement(null, null, null, false, graph2));
@@ -1102,7 +1102,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 //        operation.execute();
 
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
         
         String msg = "foaf:name properties should have been deleted";
         assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
@@ -1131,7 +1131,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "foaf:name properties should have been deleted";
         assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
@@ -1159,7 +1159,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true, graph2));
 
 //        operation.execute();
-        repo.prepareUpdate(update.toString()).evaluate();
+        m_repo.prepareUpdate(update.toString()).evaluate();
 
         String msg = "statements about bob should have been removed from graph1";
         assertFalse(msg, hasStatement(bob, null, null, true, graph1));
@@ -1177,7 +1177,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         
         final String ns = "http://bigdata.com/test/data#";
         
-        repo.prepareUpdate(update).evaluate();
+        m_repo.prepareUpdate(update).evaluate();
         
         assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
                 f.createLiteral("Michael Personick"), true));
@@ -1192,7 +1192,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         
         final String ns = "http://bigdata.com/test/data#";
         
-        repo.prepareUpdate(update).evaluate();
+        m_repo.prepareUpdate(update).evaluate();
 
         assertFalse(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
                 f.createLiteral("Michael Personick"), true));
@@ -1211,7 +1211,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         
         final String ns = "http://bigdata.com/test/data#";
         
-        repo.prepareUpdate(update).evaluate();
+        m_repo.prepareUpdate(update).evaluate();
 
         assertFalse(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
                 f.createLiteral("Michael Personick"), true, (Resource)null));

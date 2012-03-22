@@ -59,8 +59,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         
         final String queryStr = "ASK where {?s ?p ?o}";
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final IPreparedBooleanQuery query = m_repo.prepareBooleanQuery(queryStr);
         assertEquals(false, query.evaluate());
 
 //        final QueryOptions opts = new QueryOptions();
@@ -104,8 +104,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 		final String queryStr = "select * where {?s ?p ?o}";
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
 		assertEquals(0, countResults(query.evaluate()));
 
         
@@ -159,8 +159,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
         
         try {
 		
@@ -258,8 +258,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
         	
         	final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+//            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+            final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
     		assertEquals(7, countResults(query.evaluate()));
 
         }
@@ -271,7 +271,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         if(TestMode.quads != testMode)
             return;
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         // Load the resource into the KB.
         {
@@ -293,7 +293,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             final AddOp add = new AddOp(new File(packagePath
                     + "insert_triples_with_defaultContext.ttl").toURI().toString());
             add.setContext("http://example.org");
-            assertEquals(7, repo.add(add));
+            assertEquals(7, m_repo.add(add));
             
         }
 
@@ -306,7 +306,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
             
             final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
             assertEquals(7, countResults(query.evaluate()));
             
         }
@@ -322,7 +322,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         if(TestMode.quads != testMode)
             return;
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         // Verify nothing in the KB.
         {
@@ -337,7 +337,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                    .getDefaultMIMEType();
 //            assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
             
-            final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
+            final IPreparedBooleanQuery query = m_repo.prepareBooleanQuery(queryStr);
             assertEquals(false, query.evaluate());
             
             
@@ -362,7 +362,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, result.mutationCount);
             
             final AddOp add = new AddOp("file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/quads.nq");
-            assertEquals(expectedStatementCount, repo.add(add));
+            assertEquals(expectedStatementCount, m_repo.add(add));
 
         }
 
@@ -383,7 +383,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, countResults(doSparqlQuery(
 //                    opts, requestPath)));
             
-            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
             
         }
@@ -417,9 +417,9 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            opts.queryStr = "DESCRIBE <" + s.stringValue() + ">";
 //            g2 = buildGraph(doSparqlQuery(opts, requestPath));
             
-            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
-            final IPreparedGraphQuery query = repo.prepareGraphQuery(queryStr);
+            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
             g2 = query.evaluate();
             
         }
@@ -435,7 +435,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
      */
     public void test_POST_INSERT_LOAD_FROM_URIs() throws Exception {
 
-    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
     	
         // Verify nothing in the KB.
         {
@@ -450,7 +450,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                    .getDefaultMIMEType();
 //            assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
             
-            final IPreparedBooleanQuery query = repo.prepareBooleanQuery(queryStr);
+            final IPreparedBooleanQuery query = m_repo.prepareBooleanQuery(queryStr);
             assertEquals(false, query.evaluate());
             
         }
@@ -474,7 +474,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, result.mutationCount);
             
             final AddOp add = new AddOp("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf");
-            assertEquals(expectedStatementCount, repo.add(add));
+            assertEquals(expectedStatementCount, m_repo.add(add));
 
         }
 
@@ -495,7 +495,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertEquals(expectedStatementCount, countResults(doSparqlQuery(
 //                    opts, requestPath)));
             
-            final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+            final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
             
         }
@@ -520,8 +520,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(7, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
         		null,// s
                 null,// p
                 null,// o
@@ -546,8 +546,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
         		new URIImpl("http://www.bigdata.com/Mike"),// s
         		null,// p
                 null,// o
@@ -572,8 +572,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s
                 RDF.TYPE,// p
                 null,// o
@@ -598,8 +598,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(2, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s
                 RDFS.LABEL,// p
                 null,// o
@@ -624,8 +624,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s
                 null,// p
                 new LiteralImpl("Mike"),// o
@@ -650,8 +650,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 RDF.TYPE,// p
                 null,// o
@@ -682,8 +682,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(7, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
                 null,// o
@@ -711,8 +711,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(3, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
                 null,// o
@@ -740,8 +740,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(2, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
                 null,// o
@@ -769,8 +769,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //
 //        assertEquals(1, rangeCountResult.rangeCount);
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = repo.rangeCount(
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+        final long rangeCount = m_repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 null,// p
                 null,// o
@@ -1153,7 +1153,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         setupDataOnServer();
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1202,7 +1202,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                    requestPath)));
 
-            final IPreparedGraphQuery query = repo.prepareGraphQuery(deleteQueryStr);
+            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(deleteQueryStr);
             assertSameGraph(expected, query.evaluate());
             
         }
@@ -1250,7 +1250,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             
             final RemoveOp remove = new RemoveOp(deleteQueryStr);
             final AddOp add = new AddOp(data, format);
-            assertEquals(2, repo.update(remove, add));
+            assertEquals(2, m_repo.update(remove, add));
             
         }
         
@@ -1278,7 +1278,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                        requestPath)));
                 
-                assertSameGraph(expected, repo.prepareGraphQuery(deleteQueryStr).evaluate());
+                assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr).evaluate());
 
             }
 
@@ -1313,7 +1313,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                        requestPath)));
 
-                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
+                assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2).evaluate());
 
             }
 
@@ -1350,7 +1350,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         setupDataOnServer();
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1397,7 +1397,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                    requestPath)));
             
-            assertSameGraph(expected, repo.prepareGraphQuery(deleteQueryStr).evaluate());
+            assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr).evaluate());
 
         }
 
@@ -1444,7 +1444,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             
             final RemoveOp remove = new RemoveOp(deleteQueryStr);
             final AddOp add = new AddOp(data, format);
-            assertEquals(2, repo.update(remove, add));
+            assertEquals(2, m_repo.update(remove, add));
             
         }
         
@@ -1482,7 +1482,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                        requestPath)));
 
-                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
+                assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2).evaluate());
 
             }
 
@@ -1517,7 +1517,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 //                        requestPath)));
 
-                assertSameGraph(expected, repo.prepareGraphQuery(queryStr2).evaluate());
+                assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2).evaluate());
 
             }
 
