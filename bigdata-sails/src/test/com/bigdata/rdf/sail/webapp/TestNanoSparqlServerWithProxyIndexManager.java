@@ -77,8 +77,8 @@ import com.bigdata.service.jini.JiniFederation;
  * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
  *          $
  */
-public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> extends
-		AbstractIndexManagerTestCase<S> {
+public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
+        extends AbstractIndexManagerTestCase<S> {
 
 	/**
 	 * The {@link IIndexManager} for the backing persistence engine (may be a

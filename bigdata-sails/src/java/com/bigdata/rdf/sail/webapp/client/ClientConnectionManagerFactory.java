@@ -42,17 +42,17 @@ import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ConnectionManagerFactory {
+public class ClientConnectionManagerFactory {
 
     final private ClientConnectionManager cm;
 
-    private ConnectionManagerFactory(final ClientConnectionManager cm) {
+    private ClientConnectionManagerFactory(final ClientConnectionManager cm) {
 
         this.cm = cm;
 
     }
 
-    private static ConnectionManagerFactory instance = null;
+    private static ClientConnectionManagerFactory instance = null;
 
     /**
      * Returns a shared {@link ClientConnectionManager}.
@@ -82,7 +82,7 @@ public class ConnectionManagerFactory {
 
             cm.setMaxForRoute(new HttpRoute(localhost), 50);
 
-            instance = new ConnectionManagerFactory(cm);
+            instance = new ClientConnectionManagerFactory(cm);
 
         }
 

@@ -103,6 +103,17 @@ import com.bigdata.rdf.store.BD;
  * <p>
  * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
+ * <p>
+ * Note: The {@link HttpClient} has a {@link ClientConnectionManager} which must
+ * be {@link ClientConnectionManager#shutdown()} when an application is done
+ * using http. By default, {@link RemoteRepository} instances will share the
+ * {@link ClientConnectionManager} returned by
+ * {@link ClientConnectionManagerFactory#getInstance()}. You can customize that
+ * {@link ClientConnectionManager}, but you can also supply your own
+ * {@link HttpClient} to the appropriate construct (
+ * {@link RemoteRepository#RemoteRepository(String, HttpClient)}). In either
+ * case, you are responsible for eventually invoking
+ * {@link ClientConnectionManager#shutdown()}.
  * 
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
@@ -135,12 +146,12 @@ public class RemoteRepository {
      * @param serviceURL
      *            The SPARQL http end point.
      * 
-     * @see ConnectionManagerFactory#getInstance()
+     * @see ClientConnectionManagerFactory#getInstance()
      */
     public RemoteRepository(final String serviceURL) {
 
         this(serviceURL, new DefaultHttpClient(
-                ConnectionManagerFactory.getInstance()));
+                ClientConnectionManagerFactory.getInstance()));
 
     }
 

@@ -38,6 +38,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.http.client.HttpClient;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -109,7 +112,19 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 */
 	protected String namespace;
 	
-	/**
+    /**
+     * The {@link ClientConnectionManager} for the {@link HttpClient} used by
+     * the {@link RemoteRepository}. This is used when we tear down the
+     * {@link RemoteRepository}.
+     */
+	private ClientConnectionManager m_cm;
+	
+    /**
+     * The client-API wrapper to the NSS.
+     */
+    protected RemoteRepository m_repo;
+
+    /**
 	 * The effective {@link NanoSparqlServer} http end point.
 	 */
 	protected String m_serviceURL;
@@ -263,6 +278,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             log.info("Setup done: name=" + getName() + ", namespace="
                     + namespace + ", serviceURL=" + m_serviceURL);
 
+        final HttpClient httpClient = new DefaultHttpClient();
+
+        m_cm = httpClient.getConnectionManager();
+
+        m_repo = new RemoteRepository(m_serviceURL, httpClient);
+
     }
 
     @Override
@@ -293,6 +314,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		
 		m_serviceURL = null;
 
+        if (m_cm != null) {
+
+            m_cm.shutdown();
+
+            m_cm = null;
+
+		}
+		
+		m_repo = null;
+		
 		log.info("tear down done");
 		
 		super.tearDown();
@@ -542,11 +573,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //			throw new RuntimeException(t);
 //		}
 		
-		final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//		final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 		
 		final RemoveOp remove = new RemoveOp(query);
 		
-		return repo.remove(remove);
+		return m_repo.remove(remove);
 		
     }
 
@@ -611,11 +642,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //            throw new RuntimeException(t);
 //        }
     	
-    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
     	
     	final RemoveOp remove = new RemoveOp(s, p, o, c);
     	
-    	return repo.remove(remove);
+    	return m_repo.remove(remove);
     	
     }
 
@@ -670,11 +701,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        // Verify the mutation count.
 //        assertEquals(ntriples, getMutationResult(conn).mutationCount);
 
-            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             
             final RemoveOp remove = new RemoveOp(data, format);
             
-            assertEquals(ntriples, repo.remove(remove));
+            assertEquals(ntriples, m_repo.remove(remove));
             
     }
 
@@ -735,7 +766,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        // Verify the mutation count.
 //        assertEquals(ntriples, getMutationResult(conn).mutationCount);
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final byte[] data = genNTRIPLES(ntriples, format);
 //        final File file = File.createTempFile("bigdata-testnssclient", ".data");
@@ -743,7 +774,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          * Only for testing. Clients should use AddOp(File, RDFFormat).
          */
         final AddOp add = new AddOp(data, format);
-        assertEquals(ntriples, repo.add(add));
+        assertEquals(ntriples, m_repo.add(add));
 		
 		// Verify the expected #of statements in the store.
 		{
@@ -756,7 +787,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //
 //			assertEquals(ntriples, countResults(doSparqlQuery(opts, requestPath)));
 			
-			final IPreparedTupleQuery query = repo.prepareTupleQuery(queryStr);
+			final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
 			
 			assertEquals(ntriples, countResults(query.evaluate()));
 			
@@ -792,9 +823,9 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //            throw new RuntimeException(t);
 //        }
         
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final AddOp add = new AddOp(uri);
-        return repo.add(add);
+        return m_repo.add(add);
 
     }
 
@@ -1009,11 +1040,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //            throw new RuntimeException(t);
 //        }
 
-        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final AddOp add = new AddOp(wireData, rdfFormat);
         if (defaultContext != null)
         	add.setContext(defaultContext.stringValue());
-        return repo.add(add);
+        return m_repo.add(add);
 
     }
     
@@ -1134,8 +1165,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
                 "  ?x bd:likes bd:RDF " +//
                 "}";
 
-        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
-            final IPreparedGraphQuery query = remote.prepareGraphQuery(queryStr);
+//        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
+            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
             final Graph actual = query.evaluate();
 
             assertSameGraph(expected, actual);
@@ -1333,8 +1364,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //                "  ?x bd:likes bd:RDF " +//
                 "}";
 
-        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
-            final IPreparedGraphQuery query = remote.prepareGraphQuery(queryStr);
+//        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
+            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
             final Graph actual = query.evaluate();
 
             assertSameGraph(expected, actual);
