@@ -56,6 +56,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DefaultClientDelegate;
 import com.bigdata.service.IBigdataClient;
@@ -83,6 +84,7 @@ public class BigdataRDFServletContextListener implements
     private Long readLock = null;
     private long readLockTx;
     private BigdataRDFContext rdfContext;
+    private SparqlCache sparqlCache;
 
     /**
      * <code>true</code> iff this class opened the {@link IIndexManager}, in
@@ -291,10 +293,15 @@ public class BigdataRDFServletContextListener implements
         rdfContext = new BigdataRDFContext(config, indexManager);
 
         // Used by BigdataBaseServlet
-        context.setAttribute(IIndexManager.class.getName(), indexManager);
+        context.setAttribute(BigdataServlet.ATTRIBUTE_INDEX_MANAGER,
+                indexManager);
 
         // Used by BigdataRDFBaseServlet
-        context.setAttribute(BigdataRDFContext.class.getName(), rdfContext);
+        context.setAttribute(BigdataServlet.ATTRIBUTE_RDF_CONTEXT, rdfContext);
+
+        // Initialize the SPARQL cache.
+        context.setAttribute(BigdataServlet.ATTRIBUTE_SPARQL_CACHE,
+                new SparqlCache(new MemoryManager(DirectBufferPool.INSTANCE)));
 
         if (log.isInfoEnabled()) {
             /*
@@ -383,6 +390,15 @@ public class BigdataRDFServletContextListener implements
             
         }
 
+        // Clear the SPARQL cache.
+        if (sparqlCache != null) {
+
+            sparqlCache.close();
+
+            sparqlCache  = null;
+
+        }
+        
         /*
          * Terminate various threads which should no longer be executing once we
          * have destroyed the servlet context. If you do not do this then

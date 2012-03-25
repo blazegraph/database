@@ -57,7 +57,16 @@ abstract public class BigdataServlet extends HttpServlet {
      */
     /*package*/ static final transient String ATTRIBUTE_INDEX_MANAGER = 
         IIndexManager.class.getName();
+
+    static final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
+            .getName();
     
+    /**
+     * The {@link ServletContext} attribute whose value is the
+     * {@link SparqlCache}.
+     */
+    /* package */static final transient String ATTRIBUTE_SPARQL_CACHE = SparqlCache.class.getName();
+
 	/**
 	 * The character set used for the response (not negotiated).
 	 */
@@ -110,12 +119,24 @@ abstract public class BigdataServlet extends HttpServlet {
 
     }
 
+    /**
+     * The backing {@link IIndexManager}.
+     */
 	protected IIndexManager getIndexManager() {
 	
 	    return getRequiredServletContextAttribute(ATTRIBUTE_INDEX_MANAGER);
 	    
 	}
 	
+	/**
+	 * The {@link SparqlCache}.
+	 */
+    protected SparqlCache getSparqlCache() {
+        
+        return getRequiredServletContextAttribute(ATTRIBUTE_SPARQL_CACHE);
+        
+    }
+    
     static protected void buildResponse(final HttpServletResponse resp,
             final int status, final String mimeType) throws IOException {
 

@@ -68,12 +68,12 @@ public class RESTServlet extends BigdataRDFServlet {
         m_insertServlet = new InsertServlet();
         m_updateServlet = new UpdateServlet();
         m_deleteServlet = new DeleteServlet();
-        
+
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
         m_updateServlet.init(getServletConfig());
         m_deleteServlet.init(getServletConfig());
-        
+
     }
     
     /**
@@ -101,7 +101,7 @@ public class RESTServlet extends BigdataRDFServlet {
             m_deleteServlet.destroy();
             m_deleteServlet = null;
         }
-        
+
         super.destroy();
         
     }

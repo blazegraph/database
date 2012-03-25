@@ -178,6 +178,35 @@ public class RemoteRepository {
     }
 
     /**
+     * Return the SPARQL 1.1 Service Description for the end point.
+     */
+    public Graph getServiceDescription() throws Exception {
+        
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        
+        opts.method = "GET";
+        
+        HttpResponse response = null;
+        try {
+            
+            checkResponseCode(response = doConnect(opts));
+
+            return graphResults(response);
+            
+        } finally {
+            
+            try {
+                
+                if (response != null)
+                    EntityUtils.consume(response.getEntity());
+                
+            } catch (Exception ex) { }
+            
+        }
+        
+    }
+    
+    /**
      * Prepare a tuple (select) query.
      * 
      * @param query
@@ -969,7 +998,14 @@ public class RemoteRepository {
         /** The HTTP method (GET, POST, etc). */
         public String method = "POST";
 
-		/** The accept header. */
+        /**
+         * The accept header.
+         * 
+         * FIXME This should be all valid RDF interchange syntax formats and all
+         * valid SPARQL solution set formats. There are utility methods to
+         * construct those accept headers. See {@link RDFFormat},
+         * {@link TupleQueryResultFormat}, and {@link BooleanQueryResultFormat}.
+         */
         public String acceptHeader = //
 	        BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
 	        "," + //

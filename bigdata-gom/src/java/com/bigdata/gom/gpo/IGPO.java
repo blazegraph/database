@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.gom.gpo;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.openrdf.model.Resource;
@@ -134,6 +135,14 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     /** Exists (self,p,?y). */
     boolean isBound(URI property);
 
+    /**
+     * Return a map giving the range count for each reverse link property.
+     * <pre>
+     * SELECT ?p, COUNT(*) WHERE { ?o ?p <s> } GROUP BY ?p
+     * </pre>
+     */
+    Map<URI,Long> getReverseLinkProperties();
+    
     /**
      * Removes the persistent object. Any links to this generic object are also
      * removed. Any link sets collected by this generic object are removed.

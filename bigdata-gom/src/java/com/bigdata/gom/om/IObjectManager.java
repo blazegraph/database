@@ -60,7 +60,10 @@ public interface IObjectManager extends INativeTransaction {
     // Return canonical IGPO for Resource (including Statement) w/in OM scope and never null.
     IGPO getGPO(Resource id);
 
-    // Ensure Statements are materialized for gpo's Resource.
+    /**
+     * Ensure Statements are materialized for gpo's Resource:
+     * <code>DESCRIBE ?s</code>.
+     */
     void materialize(IGPO gpo);
 
     /**

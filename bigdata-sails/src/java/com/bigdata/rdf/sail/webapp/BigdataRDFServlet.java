@@ -94,15 +94,14 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     final protected SparqlEndpointConfig getConfig() {
         
         return getBigdataRDFContext().getConfig();
-        
+
     }
 
     final protected BigdataRDFContext getBigdataRDFContext() {
 
         if (m_context == null) {
 
-            m_context = getRequiredServletContextAttribute(BigdataRDFContext.class
-                    .getName());
+            m_context = getRequiredServletContextAttribute(ATTRIBUTE_RDF_CONTEXT);
 
         }
 

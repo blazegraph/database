@@ -8,6 +8,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -23,7 +24,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.store.BD;
@@ -53,6 +53,33 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	}
 	
     /**
+     * Request the SPARQL SERVICE DESCRIPTION for the end point.
+     */
+    public void test_SERVICE_DESCRIPTION() throws Exception {
+        
+        final Graph g = m_repo.getServiceDescription();
+
+        final ValueFactory f = g.getValueFactory();
+
+        // Verify the end point is disclosed.
+        assertTrue(g.contains(f.createStatement(SD.Service, SD.endpoint,
+                f.createURI(m_serviceURL))));
+
+        // Verify description includes supported query and update languages.
+        assertTrue(g.contains(f.createStatement(SD.Service,
+                SD.supportedLanguage, SD.SPARQL10Query)));
+        assertTrue(g.contains(f.createStatement(SD.Service,
+                SD.supportedLanguage, SD.SPARQL11Query)));
+        assertTrue(g.contains(f.createStatement(SD.Service,
+                SD.supportedLanguage, SD.SPARQL11Update)));
+
+        // Verify support for Basic Federated Query is disclosed.
+        assertTrue(g.contains(f.createStatement(SD.Service, SD.feature,
+                SD.BasicFederatedQuery)));
+
+    }
+
+	/**
      * "ASK" query with an empty KB.
      */
     public void test_ASK() throws Exception {
