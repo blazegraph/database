@@ -334,14 +334,7 @@ public class SD {
          */
         g.add(SD.Service, SD.supportedLanguage, SD.SPARQL10Query);
         g.add(SD.Service, SD.supportedLanguage, SD.SPARQL11Query);
-        /*
-         * TODO Uncomment when implemented.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/448 (SPARQL 1.1
-         * UPDATE)
-         */
-        // g.add(f.createStatement(SD.Service, SD.supportedLanguage,
-        // SD.SPARQL11Update));
+        g.add(SD.Service, SD.supportedLanguage, SD.SPARQL11Update);
 
         /*
          * RDF and SPARQL Formats.

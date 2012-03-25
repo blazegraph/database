@@ -67,6 +67,7 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.SparqlCache.CacheHit;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -91,6 +92,11 @@ public class QueryServlet extends BigdataRDFServlet {
     
     static private final transient Logger log = Logger.getLogger(QueryServlet.class); 
 
+    /**
+     * The name of the request attribute for the {@link AbstractQueryTask}.
+     */
+    static private final transient String ATTR_QUERY_TASK = "QueryTask";
+    
     public QueryServlet() {
 
     }
@@ -491,6 +497,22 @@ public class QueryServlet extends BigdataRDFServlet {
                 return;
             }
 
+            /*
+             * Test the cache.
+             */
+            {
+
+                req.setAttribute(ATTR_QUERY_TASK, queryTask);
+                
+                doCache(req, resp);
+
+                if (resp.isCommitted()) {
+                    // Answered by the cache.
+                    return;
+                }
+                
+            }
+            
             final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
 
             if (log.isTraceEnabled())
@@ -1167,6 +1189,56 @@ public class QueryServlet extends BigdataRDFServlet {
 
         }
 
+    }
+
+    /**
+     * Test the SPARQL cache.
+     */
+    private void doCache(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        // The query task.
+        final AbstractQueryTask queryTask = (AbstractQueryTask) req
+                .getAttribute(ATTR_QUERY_TASK);
+
+        if (queryTask == null)
+            return;
+
+        final SparqlCache cache = getSparqlCache();
+
+        if (cache == null)
+            return;
+
+        final CacheHit hit = cache.get(queryTask);
+        
+        if(hit == null)
+            return;
+
+        /*
+         * Send the response.
+         * 
+         * TODO If the cached response entity is the wrong content type (not
+         * accepted by the Accept header), then de-serialize, convert, and
+         * re-serialize. The cache could do that on its end or we could do it
+         * here.
+         * 
+         * Ideally the SparqlCache class can be reused outside of the NSS
+         * context, e.g., for embedded applications which do not use the NSS at
+         * all. This also supports a deeper integration into the query planner.
+         * Both of which suggest that we should handle the conneg problems here.
+         */
+        resp.setStatus(HTTP_OK);
+        resp.setContentType(hit.contentType);
+        resp.setContentLength(hit.contentLength);
+        resp.setDateHeader("Last-Modified", hit.lastModified);
+        final OutputStream os = resp.getOutputStream();
+        try {
+            os.write(hit.data);
+            os.flush();
+        } finally {
+            os.close();
+        }
+        
     }
 
 }
