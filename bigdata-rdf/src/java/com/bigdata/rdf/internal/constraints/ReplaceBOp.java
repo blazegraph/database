@@ -36,10 +36,12 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.RegexBOp.Annotations;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -52,6 +54,48 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
 
 	private static final transient Logger log = Logger.getLogger(ReplaceBOp.class);
 
+    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+    	
+        /**
+         * The cached regex pattern.
+         */
+        public String PATTERN = ReplaceBOp.class.getName()
+                + ".pattern";
+        
+    }
+
+    private static Map<String,Object> anns(
+			final IValueExpression<? extends IV> pattern,
+			final IValueExpression<? extends IV> flags,
+			final String lex) {
+    	
+    	if (pattern instanceof IConstant && 
+    			(flags == null || flags instanceof IConstant)) {
+    		
+    		final IV parg = ((IConstant<IV>) pattern).get();
+    		
+    		final IV farg = flags != null ?
+    				((IConstant<IV>) flags).get() : null;
+    				
+			if (parg.hasValue() && (farg == null || farg.hasValue())) {
+    		
+				final Value pargVal = parg.getValue();
+				
+				final Value fargVal = farg != null ? farg.getValue() : null;
+				
+	    		return NV.asMap(
+	    				new NV(Annotations.NAMESPACE, lex),
+	    				new NV(Annotations.PATTERN, 
+	    						getPattern(pargVal, fargVal)));
+	    		
+			}
+    		
+    	}
+    		
+		return NV.asMap(Annotations.NAMESPACE, lex);
+    	
+    }
+    
 	/**
 	 * Construct a replace bop without flags.
 	 */
@@ -62,7 +106,7 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
 			final IValueExpression<? extends IV> replacement,
 			final String lex) {
         
-        this(new BOp[] { var, pattern, replacement }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { var, pattern, replacement }, anns(pattern, null, lex));
 
     }
     
@@ -77,7 +121,7 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
 			final IValueExpression<? extends IV> flags,
 			final String lex) {
         
-        this(new BOp[] { var, pattern, replacement, flags }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { var, pattern, replacement, flags }, anns(pattern, flags, lex));
 
     }
     
@@ -173,58 +217,19 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
 						"incompatible operand for REPLACE: " + arg);
 			}
 
-			if (!QueryEvaluationUtil.isSimpleLiteral(pattern)) {
-				throw new ValueExprEvaluationException(
-						"incompatible operand for REPLACE: " + pattern);
-			}
-
 			if (!QueryEvaluationUtil.isSimpleLiteral(replacement)) {
 				throw new ValueExprEvaluationException(
 						"incompatible operand for REPLACE: " + replacement);
 			}
 
-			String flagString = null;
-			if (flags != null) {
-				if (!QueryEvaluationUtil.isSimpleLiteral(flags)) {
-					throw new ValueExprEvaluationException(
-							"incompatible operand for REPLACE: " + flags);
-				}
-				flagString = flags.getLabel();
-			}
-
 			String argString = arg.getLabel();
-			String patternString = pattern.getLabel();
 			String replacementString = replacement.getLabel();
 
-			int f = 0;
-			if (flagString != null) {
-				for (char c : flagString.toCharArray()) {
-					switch (c) {
-					case 's':
-						f |= Pattern.DOTALL;
-						break;
-					case 'm':
-						f |= Pattern.MULTILINE;
-						break;
-					case 'i':
-						f |= Pattern.CASE_INSENSITIVE;
-						break;
-					case 'x':
-						f |= Pattern.COMMENTS;
-						break;
-					case 'd':
-						f |= Pattern.UNIX_LINES;
-						break;
-					case 'u':
-						f |= Pattern.UNICODE_CASE;
-						break;
-					default:
-						throw new ValueExprEvaluationException(flagString);
-					}
-				}
+			Pattern p = (Pattern) getProperty(Annotations.PATTERN);
+			if (p == null) {
+				p = getPattern(pattern, flags);
 			}
-
-			Pattern p = Pattern.compile(patternString, f);
+			
 			String result = p.matcher(argString).replaceAll(replacementString);
 
 			String lang = arg.getLanguage();
@@ -244,4 +249,57 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
 
 	}    
     
+    private static Pattern getPattern(final Value pattern, final Value flags) 
+			throws IllegalArgumentException {
+		
+		if (!QueryEvaluationUtil.isSimpleLiteral(pattern)) {
+			throw new IllegalArgumentException(
+					"incompatible operand for REPLACE: " + pattern);
+		}
+
+		String flagString = null;
+		if (flags != null) {
+			if (!QueryEvaluationUtil.isSimpleLiteral(flags)) {
+				throw new IllegalArgumentException(
+						"incompatible operand for REPLACE: " + flags);
+			}
+			flagString = ((Literal) flags).getLabel();
+		}
+
+		String patternString = ((Literal) pattern).getLabel();
+
+		int f = 0;
+		if (flagString != null) {
+			for (char c : flagString.toCharArray()) {
+				switch (c) {
+				case 's':
+					f |= Pattern.DOTALL;
+					break;
+				case 'm':
+					f |= Pattern.MULTILINE;
+					break;
+				case 'i':
+					f |= Pattern.CASE_INSENSITIVE;
+					break;
+				case 'x':
+					f |= Pattern.COMMENTS;
+					break;
+				case 'd':
+					f |= Pattern.UNIX_LINES;
+					break;
+				case 'u':
+					f |= Pattern.UNICODE_CASE;
+					break;
+				default:
+					throw new IllegalArgumentException(flagString);
+				}
+			}
+		}
+
+		Pattern p = Pattern.compile(patternString, f);
+		
+		return p;
+		
+	}
+	
 }

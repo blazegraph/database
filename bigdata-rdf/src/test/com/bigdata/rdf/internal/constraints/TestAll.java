@@ -63,6 +63,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestStrBeforeBOp.class);
         suite.addTestSuite(TestStrAfterBOp.class);
         suite.addTestSuite(TestReplaceBOp.class);
+        suite.addTestSuite(TestRegexBOp.class);
         
         return suite;
         
