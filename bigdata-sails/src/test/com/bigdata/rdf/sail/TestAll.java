@@ -28,6 +28,7 @@ package com.bigdata.rdf.sail;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 import org.apache.log4j.Level;
@@ -91,7 +92,14 @@ public class TestAll extends TestCase {
         suite.addTest(TestBigdataSailWithSids.suite());
         
         // run the test suite without statement identifiers enabled.
-        suite.addTest(TestBigdataSailWithoutSids.suite());
+        /*
+         * FIXME This is disabled pending resolution of
+         * 
+         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
+         * journals in CI)
+         */
+        Logger.getLogger(TestCase2.class).error("Enable: "+TestBigdataSailWithoutSids.class);
+//        suite.addTest(TestBigdataSailWithoutSids.suite());
         
         // quad store test suite w/ pipeline joins.
         suite.addTest(TestBigdataSailWithQuads.suite());

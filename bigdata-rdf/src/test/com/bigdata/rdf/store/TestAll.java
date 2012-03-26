@@ -29,7 +29,10 @@ package com.bigdata.rdf.store;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestCase2;
 import junit.framework.TestSuite;
+
+import org.apache.log4j.Logger;
 
 /**
  * Runs tests for each {@link ITripleStore} implementation.
@@ -72,7 +75,14 @@ public class TestAll extends TestCase {
 
 //        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWORM.suite() );
 
-        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutInlining.suite() );
+        /*
+         * FIXME This is disabled pending resolution of
+         * 
+         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
+         * journals in CI)
+         */
+        Logger.getLogger(TestCase2.class).error("Enable: "+TestLocalTripleStoreWithoutInlining.class);
+//        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutInlining.suite() );
 
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutStatementIdentifiers.suite() );
 
