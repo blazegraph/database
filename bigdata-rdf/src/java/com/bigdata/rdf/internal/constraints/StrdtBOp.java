@@ -25,6 +25,8 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -32,11 +34,12 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class StrdtBOp extends AbstractLiteralBOp<IV> {
+public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -6571446625816081957L;
 
@@ -55,19 +58,18 @@ public class StrdtBOp extends AbstractLiteralBOp<IV> {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
+        final IV iv = getAndCheckLiteral(0, bs);
 
-        final IV datatype = get(1).get(bs);
+        final IV datatype = getAndCheckBound(1, bs);
         
-        if (datatype == null)
-            throw new SparqlTypeErrorException.UnboundVarException();
-
         if (!datatype.isURI())
             throw new SparqlTypeErrorException();
 
@@ -76,13 +78,13 @@ public class StrdtBOp extends AbstractLiteralBOp<IV> {
 
         final BigdataURI dt = (BigdataURI) datatype.getValue();
 
-        final BigdataLiteral lit = literalValue(iv);
+        final Literal lit = literalValue(iv);
         
         final String label = lit.getLabel();
         
         final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
         
-        return DummyConstantNode.toDummyIV(str);
+        return super.createIV(str, bs);
 
     }
 

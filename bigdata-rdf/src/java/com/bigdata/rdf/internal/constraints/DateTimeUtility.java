@@ -10,10 +10,12 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
@@ -27,7 +29,7 @@ public class DateTimeUtility {
         }
     }
 
-    static public IV dateTimeMath(Literal l1, IV iv1, Literal l2, IV iv2, MathOp op, BigdataValueFactory vf) {
+    static public IV dateTimeMath(Literal l1, IV iv1, Literal l2, IV iv2, MathOp op, BigdataValueFactory vf, ILexiconConfiguration lc) {
         final URI dt1 = l1.getDatatype();
         final URI dt2 = l2.getDatatype();
         if(dt1==null||dt2==null){
@@ -44,15 +46,15 @@ public class DateTimeUtility {
                 } else if (c1 != null && d2 != null) {
                     c1.add(d2);
                     final BigdataLiteral str = vf.createLiteral(c1);
-                    return DummyConstantNode.toDummyIV(str);
+                    return createIV(str, lc);
                 } else if (c2 != null && d1 != null) {
                     c2.add(d1);
                     final BigdataLiteral str = vf.createLiteral(c2);
-                    return DummyConstantNode.toDummyIV(str);
+                    return createIV(str, lc);
                 } else if (d1 != null && d2 != null) {
                     Duration result = d1.add(d2);
                     final BigdataLiteral str = vf.createLiteral(result.toString(), XMLSchema.DURATION);
-                    return DummyConstantNode.toDummyIV(str);
+                    return createIV(str, lc);
                 } else {
                     throw new IllegalArgumentException("Cannot add process datatype literals:" + l1 + ":" + l2);
                 }
@@ -64,7 +66,7 @@ public class DateTimeUtility {
                 } else if (d1 != null && d2 != null) {
                     Duration result = d1.subtract(d2);
                     final BigdataLiteral str = vf.createLiteral(result.toString(), XMLSchema.DURATION);
-                    return DummyConstantNode.toDummyIV(str);
+                    return createIV(str, lc);
                 } else {
                     throw new IllegalArgumentException("Cannot add process datatype literals:" + l1 + ":" + l2);
                 }
@@ -111,4 +113,20 @@ public class DateTimeUtility {
         }
         throw new SparqlTypeErrorException();
     }
+    
+    private static IV createIV(final BigdataValue value, final ILexiconConfiguration lc) {
+    	
+		// see if we happen to have the value in the vocab or can otherwise
+    	// create an inline IV for it
+		IV iv = lc != null ? lc.createInlineIV(value) : null;
+		if (iv != null) {
+			iv.setValue(value);
+		} else {
+			iv = DummyConstantNode.toDummyIV(value);
+		}
+		
+		return iv;
+
+    }
+
 }

@@ -26,16 +26,36 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.Value;
+
+import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.ContextBindingSet;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.NV;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
- * Base class for RDF value expression BOps.  Value expressions perform some
- * evaluation on one or more value expressions as input and produce one
- * value expression as output (boolean, numeric value, etc.)
+ * A specialized IValueExpression that evaluates to an IV.  The inputs are
+ * usually, but not strictly limited to, IVs as well.  This class also contains
+ * many useful helper methods for evaluation, including providing access to
+ * the BigdataValueFactory and LexiconConfiguration.
  */
 public abstract class IVValueExpression<T extends IV> extends BOpBase 
 		implements IValueExpression<T> {
@@ -44,6 +64,56 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 	 * 
 	 */
 	private static final long serialVersionUID = -7068219781217676085L;
+
+    public interface Annotations extends BOpBase.Annotations {
+
+        /**
+         * The namespace of the lexicon.
+         */
+        public String NAMESPACE = IVValueExpression.class.getName()
+                + ".namespace";
+        
+    }
+
+    /**
+     * 
+     * Note: The double-checked locking pattern <em>requires</em> the keyword
+     * <code>volatile</code>.
+     */
+    private transient volatile BigdataValueFactory vf;
+
+    /**
+     * Note: The double-checked locking pattern <em>requires</em> the keyword
+     * <code>volatile</code>.
+     */
+    private transient volatile ILexiconConfiguration<BigdataValue> lc;
+
+    /**
+     * Convenience constructor.
+     * 
+     * @param lex
+     * 			the namespace for the lexicon
+     */
+    public IVValueExpression(final String lex) {
+        
+        this(BOpBase.NOARGS, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        
+    }
+    
+    /**
+     * Convenience constructor for most common unary functions.
+     * 
+     * @param x
+     * 			unary operand
+     * @param lex
+     * 			the namespace for the lexicon
+     */
+    public IVValueExpression(final IValueExpression<? extends IV> x,
+            final String lex) {
+
+        this(new BOp[] { x }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+
+    }
 
 	/**
      * Required shallow copy constructor.
@@ -59,10 +129,6 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         super(op);
     }
 
-    /**
-     * The presumption with {@link IVValueExpression} is that its operands are
-     * always themselves {@link IV}s.
-     */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public IValueExpression<? extends IV> get(final int i) {
@@ -76,6 +142,364 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
             throw new SparqlTypeErrorException();
 
         }
+
+    }
+    
+    /**
+     * Returns <code>true</code> unless overridden.
+     */
+    protected boolean isLexiconNamespaceRequired() {
+        
+        return true;
+        
+    }
+    
+    /**
+     * Return the {@link BigdataValueFactory} for the {@link LexiconRelation}.
+     * <p>
+     * Note: This is lazily resolved and then cached.
+     */
+    protected BigdataValueFactory getValueFactory() {
+
+        if (vf == null) {
+        
+            synchronized (this) {
+            
+                if (vf == null) {
+                    
+                    final String namespace = getNamespace();
+                    
+                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+                    
+                }
+
+            }
+        
+        }
+        
+        return vf;
+        
+    }
+
+    /**
+     * Return the namespace of the {@link LexiconRelation}.
+     */
+    protected String getNamespace() {
+        
+        return (String) getRequiredProperty(Annotations.NAMESPACE);
+        
+    }
+
+    /**
+     * Return the {@link ILexiconConfiguration}. The result is cached. The cache
+     * it will not be serialized when crossing a node boundary.
+     * <p>
+     * Note: It is more expensive to obtain the {@link ILexiconConfiguration}
+     * than the {@link BigdataValueFactory} because we have to resolve the
+     * {@link LexiconRelation} view. However, this happens once per function bop
+     * in a query per node, so the cost is amortized.
+     * 
+     * @param bset
+     *            A binding set flowing through this operator.
+     * 
+     * @throws ContextNotAvailableException
+     *             if the context was not accessible on the solution.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
+     *      Expose the LexiconConfiguration to function BOPs </a>
+     * 
+     *      TODO This locates the last committed view of the
+     *      {@link LexiconRelation}. Unlike {@link AbstractAccessPathOp}, the
+     *      {@link LiteralBooleanBOp} does not declares the TIMESTAMP of the
+     *      view. We really need that annotation to recover the right view of
+     *      the {@link LexiconRelation}. However, the
+     *      {@link ILexiconConfiguration} metadata is immutable so it is Ok to
+     *      use the last committed time for that view. This is NOT true of if we
+     *      were going to read data from the {@link LexiconRelation}.
+     */
+    protected ILexiconConfiguration<BigdataValue> getLexiconConfiguration(
+            final IBindingSet bset) {
+
+        if (lc == null) {
+
+            synchronized (this) {
+
+                if (lc == null) {
+
+                    if (!(bset instanceof ContextBindingSet)) {
+
+                        /*
+                         * This generally indicates a failure to propagate the
+                         * context wrapper for the binding set to a new binding
+                         * set during a copy (projection), bind (join), etc. It
+                         * could also indicate a failure to wrap binding sets
+                         * when they are vectored into an operator after being
+                         * received at a node on a cluster.
+                         */
+
+                        throw new ContextNotAvailableException();
+
+                    }
+
+                    final BOpContext<?> context = ((ContextBindingSet) bset)
+                            .getBOpContext();
+
+                    final String namespace = getNamespace();
+
+                    final LexiconRelation lex = (LexiconRelation) context
+                            .getResource(namespace, ITx.READ_COMMITTED);
+
+                    lc = lex.getLexiconConfiguration();
+
+                    if (vf != null) {
+
+                        // Available as an attribute here.
+                        vf = lc.getValueFactory();
+
+                    }
+
+                }
+                
+            }
+            
+        }
+        
+        return lc;
+        
+    }
+
+    /**
+     * Return the {@link BigdataLiteral} for the {@link IV}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return The {@link BigdataLiteral}.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the argument is <code>null</code>.
+     * @throws SparqlTypeErrorException
+     *             if the argument does not represent a {@link Literal}.
+     * @throws NotMaterializedException
+     *             if the {@link IVCache} is not set and the {@link IV} can not
+     *             be turned into a {@link Literal} without an index read.
+     */
+    @SuppressWarnings("rawtypes")
+    final protected Literal literalValue(final IV iv) {
+
+        if (iv == null)
+            throw new SparqlTypeErrorException();
+
+        if (!iv.isLiteral())
+            throw new SparqlTypeErrorException();
+        
+        final BigdataValueFactory vf = getValueFactory();
+
+        if (iv.isInline() && !iv.isExtension()) {
+
+        	if (iv instanceof Literal) {
+        		
+        		return (Literal) iv;
+        		
+        	} else {
+        	
+	            final BigdataURI datatype = vf
+	                    .asValue(iv.getDTE().getDatatypeURI());
+	
+	            return vf.createLiteral(((Value) iv).stringValue(), datatype);
+	            
+        	}
+
+        } else if (iv.hasValue()) {
+
+            return ((BigdataLiteral) iv.getValue());
+
+        } else {
+
+            throw new NotMaterializedException();
+
+        }
+
+    }
+
+    /**
+     * Return an {@link IV} for the {@link Value}.
+     * 
+     * @param value
+     *            The {@link Value}.
+     * @param bsetIsIgnored
+     *            The bindings on the solution are ignored, but the reference is
+     *            used to obtain the {@link ILexiconConfiguration}.
+     *            
+     * @return An {@link IV} for that {@link Value}.
+     */
+    final protected IV asValue(final Value value,
+            final IBindingSet bsetIsIgnored) {
+
+        /*
+         * Convert to a BigdataValue if not already one.
+         * 
+         * If it is a BigdataValue, then make sure that it is associated with
+         * the namespace for the lexicon relation.
+         */
+        
+        final BigdataValue v = getValueFactory().asValue(value);
+
+        @SuppressWarnings("rawtypes")
+        IV iv = null;
+
+        // See if the IV is already set. 
+        iv = v.getIV();
+
+        if (iv == null) {
+
+            // Resolve the lexicon configuration.
+            final ILexiconConfiguration<BigdataValue> lexConf = getLexiconConfiguration(bsetIsIgnored);
+
+            // Obtain an inline IV iff possible.
+            iv = lexConf.createInlineIV(v);
+
+        }
+        
+        if (iv == null) {
+
+            /*
+             * Since we can not represent this using an Inline IV, we will stamp
+             * a mock IV for the value.
+             */
+
+            iv = DummyConstantNode.toDummyIV(v);
+
+        }
+
+        return iv;
+
+    }
+    
+    /**
+     * Return the {@link String} label for the {@link IV}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return {@link Literal#getLabel()} for that {@link IV}.
+     * 
+     * @throws NullPointerException
+     *             if the argument is <code>null</code>.
+     *             
+     * @throws NotMaterializedException
+     *             if the {@link IVCache} is not set and the {@link IV} must be
+     *             materialized before it can be converted into an RDF
+     *             {@link Value}.
+     */
+    @SuppressWarnings("rawtypes")
+    final protected String literalLabel(final IV iv)
+            throws NotMaterializedException {
+
+    	return literalValue(iv).getLabel();
+
+    }
+    
+    final protected String literalLabel(final int i, final IBindingSet bs)
+			throws NotMaterializedException {
+
+		return literalValue(i, bs).getLabel();
+
+	}
+
+    /**
+     * Get the function argument (a value expression) and evaluate it against
+     * the source solution. The evaluation of value expressions is recursive.
+     * 
+     * @param i
+     *            The index of the function argument ([0...n-1]).
+     * @param bs
+     *            The source solution.
+     * 
+     * @return The result of evaluating that argument of this function.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if the index is not the index of an operator for this
+     *             operator.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the value expression at that index can not be evaluated.
+     * 
+     * @throws NotMaterializedException
+     *             if evaluation encountered an {@link IV} whose {@link IVCache}
+     *             was not set when the value expression required a materialized
+     *             RDF {@link Value}.
+     */
+    protected IV getAndCheckLiteral(final int i, final IBindingSet bs)
+            throws SparqlTypeErrorException, NotMaterializedException {
+
+        final IV iv = getAndCheckBound(i, bs);
+
+        if (!iv.isLiteral())
+            throw new SparqlTypeErrorException();
+        
+        if (!iv.isInline() && !iv.hasValue())
+            throw new NotMaterializedException();
+
+        return iv;
+
+    }
+    
+    /**
+     * Get the function argument (a value expression) and evaluate it against
+     * the source solution. The evaluation of value expressions is recursive.
+     * 
+     * @param i
+     *            The index of the function argument ([0...n-1]).
+     * @param bs
+     *            The source solution.
+     * 
+     * @return The result of evaluating that argument of this function.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if the index is not the index of an operator for this
+     *             operator.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the value expression at that index can not be evaluated.
+     */
+    protected IV getAndCheckBound(final int i, final IBindingSet bs)
+            throws SparqlTypeErrorException, NotMaterializedException {
+
+        final IV iv = get(i).get(bs);
+        
+        if (iv == null)
+            throw new SparqlTypeErrorException.UnboundVarException();
+
+        return iv;
+
+    }
+    
+    protected Literal literalValue(final int i, final IBindingSet bs) {
+    	
+    	return literalValue(getAndCheckLiteral(i, bs));
+    	
+    }
+    
+    protected IV createIV(final BigdataValue value, final IBindingSet bs) {
+    	
+		ILexiconConfiguration lc = null;
+		try {
+			lc = getLexiconConfiguration(bs);
+		} catch (ContextNotAvailableException ex) {
+			// can't use the LC (e.g. test cases)
+		}
+		
+		// see if we happen to have the value in the vocab or can otherwise
+    	// create an inline IV for it
+		IV iv = lc != null ? lc.createInlineIV(value) : null;
+		if (iv != null) {
+			iv.setValue(value);
+		} else {
+			iv = DummyConstantNode.toDummyIV(value);
+		}
+		
+		return iv;
 
     }
 

@@ -32,7 +32,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -57,7 +56,7 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
         /**
          * The namespace of the lexicon relation.
          */
-        public String NAMESPACE = AbstractLiteralBOp.class.getName() + ".namespace";
+        public String NAMESPACE = GROUP_CONCAT.class.getName() + ".namespace";
 
         /**
          * Required string property provides the separator used when combining

@@ -36,6 +36,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -43,7 +44,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 /**
  * @see http://www.w3.org/2009/sparql/docs/query-1.1/rq25.xml#func-strafter
  */
-public class StrAfterBOp extends AbstractLiteralBOp<IV> {
+public class StrAfterBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     /**
 	 * 
@@ -77,16 +78,18 @@ public class StrAfterBOp extends AbstractLiteralBOp<IV> {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
+	@Override
     @SuppressWarnings("rawtypes")
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final Literal arg1 = literalValue(getAndCheckIfLiteral(0, bs));
+        final Literal arg1 = literalValue(0, bs);
 
-        final Literal arg2 = literalValue(getAndCheckIfLiteral(1, bs));
+        final Literal arg2 = literalValue(1, bs);
         
         checkCompatibility(arg1, arg2);
         
@@ -94,7 +97,7 @@ public class StrAfterBOp extends AbstractLiteralBOp<IV> {
         
         if (s2.isEmpty()) {
         	
-        	return ret(arg1, "");
+        	return ret(arg1, "", bs);
         	
         }
         
@@ -105,24 +108,24 @@ public class StrAfterBOp extends AbstractLiteralBOp<IV> {
         // didn't find it
     	if (i < 0) {
         	
-        	return ret(arg1, "");
+        	return ret(arg1, "", bs);
         	
         }
 
         // found it, but it's at the end
         if (i + s2.length() == s1.length()) {
         	
-        	return ret(arg1, "");
+        	return ret(arg1, "", bs);
         	
         }
         
         final String val = s1.substring(i + s2.length());
         
-        return ret(arg1, val);
+        return ret(arg1, val, bs);
 
     }
     
-    private IV ret(final Literal arg1, final String label) {
+    private IV ret(final Literal arg1, final String label, final IBindingSet bs) {
     	
     	final String lang = arg1.getLanguage();
     	
@@ -130,7 +133,7 @@ public class StrAfterBOp extends AbstractLiteralBOp<IV> {
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, lang);
 
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
     		
     	}
     	
@@ -140,13 +143,13 @@ public class StrAfterBOp extends AbstractLiteralBOp<IV> {
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
 
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
     		
     	}
     	
         final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-        return DummyConstantNode.toDummyIV(str);
+        return super.createIV(str, bs);
     	
     }
     

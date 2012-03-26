@@ -110,20 +110,6 @@ public class FuncBOp extends IVValueExpression<IV> implements
     }
     private transient volatile Function funct;
 
-    private BigdataValueFactory getValueFactory() {
-
-        if (vf == null) {
-
-            final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
-
-            vf = BigdataValueFactoryImpl.getInstance(namespace);
-
-        }
-        return vf;
-
-    }
-    private transient volatile BigdataValueFactory vf;
-
     /**
      * Required deep copy constructor.
      */

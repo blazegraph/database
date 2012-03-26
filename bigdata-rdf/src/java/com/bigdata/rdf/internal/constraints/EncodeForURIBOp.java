@@ -27,17 +27,17 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class EncodeForURIBOp extends AbstractLiteralBOp {
+public class EncodeForURIBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -55,16 +55,17 @@ public class EncodeForURIBOp extends AbstractLiteralBOp {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheckIfMaterializedLiteral(0, bs);
-        final BigdataLiteral lit =literalValue(iv);
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
+        final Literal lit = literalValue(0, bs);
         try {
             final BigdataLiteral str = getValueFactory().createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8").replace("+", "%20"));
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
         } catch (UnsupportedEncodingException uee) {
             throw new SparqlTypeErrorException();
         }

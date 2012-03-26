@@ -114,11 +114,11 @@ public class StrBOp extends IVValueExpression<IV>
 
         if (iv.isInline() && !iv.isExtension()) {
             if(iv.isLiteral()){
-                return DummyConstantNode.toDummyIV(vf.createLiteral(
-                        ((AbstractLiteralIV)iv).getLabel()));
+                return super.createIV(vf.createLiteral(
+                        ((AbstractLiteralIV)iv).getLabel()), bs);
             }else{
-                return DummyConstantNode.toDummyIV(vf.createLiteral(iv
-                        .getInlineValue().toString()));
+                return super.createIV(vf.createLiteral(iv
+                        .getInlineValue().toString()), bs);
             }
         }
 
@@ -126,7 +126,7 @@ public class StrBOp extends IVValueExpression<IV>
             // return new simple literal using URI label
             final URI uri = (URI) iv.getValue();
             final BigdataLiteral str = vf.createLiteral(uri.toString());
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
         } else if (iv.isLiteral()) {
             final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
             if (lit.getDatatype() == null && lit.getLanguage() == null) {
@@ -136,7 +136,7 @@ public class StrBOp extends IVValueExpression<IV>
         	else {
                 // else return new simple literal using Literal.getLabel
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel());
-                return DummyConstantNode.toDummyIV(str);
+                return super.createIV(str, bs);
             }
         } else {
             throw new SparqlTypeErrorException();

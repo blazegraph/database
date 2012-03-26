@@ -25,12 +25,16 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -43,7 +47,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class IriBOp extends AbstractLiteralBOp<IV> {
+public class IriBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -61,36 +65,33 @@ public class IriBOp extends AbstractLiteralBOp<IV> {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-    	final IV iv = get(0).get(bs);
-    	
-        if (iv == null)
-            throw new SparqlTypeErrorException.UnboundVarException();
+    	final IV iv = getAndCheckBound(0, bs);
 
         if (iv.isURI()) {
-        	
         	return iv;
-        	
         }
 
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
 
-        final BigdataLiteral lit = literalValue(iv);
+        final Literal lit = literalValue(iv);
 
-        final BigdataURI dt = lit.getDatatype();
+        final URI dt = lit.getDatatype();
 
         if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
 
         final BigdataURI uri = getValueFactory().createURI(lit.getLabel());
 
-        return DummyConstantNode.toDummyIV(uri);
+        return super.createIV(uri, bs);
 
     }
 

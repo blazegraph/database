@@ -25,6 +25,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
@@ -32,10 +33,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class ConcatBOp extends AbstractLiteralBOp<IV> {
+public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 5894411703430694650L;
 
@@ -63,18 +65,23 @@ public class ConcatBOp extends AbstractLiteralBOp<IV> {
         super(op);
     }
 
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
+
     @Override
-    public IV _get(final IBindingSet bs) {
+    public IV get(final IBindingSet bs) {
         URI datatype = null;
         String lang = null;
         boolean allSame = true;
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < arity(); i++) {
             @SuppressWarnings("rawtypes")
-            final IV v = getAndCheckIfMaterializedLiteral(i, bs);
+            final IV v = getAndCheckLiteral(i, bs);
             String label = null;
             if (allSame) {
-                final BigdataLiteral lit = literalValue(v);
+                final Literal lit = literalValue(v);
                 label = lit.getLabel();
                 if (lit.getDatatype() != null) {
                     if (lang != null) {
@@ -110,12 +117,12 @@ public class ConcatBOp extends AbstractLiteralBOp<IV> {
         }
         if (allSame) {
             if (datatype != null) {
-                return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString(),datatype));
+                return super.createIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
             } else if (lang != null) {
-                return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString(),lang));
+                return super.createIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
             }
         }
-        return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString()));
+        return super.createIV(getValueFactory().createLiteral(sb.toString()), bs);
 
     }
 

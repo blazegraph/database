@@ -26,12 +26,16 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -48,7 +52,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SubstrBOp extends AbstractLiteralBOp<IV> {
+public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -7022953617164154412L;
 
@@ -76,18 +80,18 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
+	@Override
     @SuppressWarnings("rawtypes")
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
         // The literal.
         
-        final IV literalArg = getAndCheckIfMaterializedLiteral(0, bs);
-        
-        final BigdataLiteral lit = literalValue(literalArg);
+        final Literal lit = literalValue(0, bs);
 
         /* 
          * The starting offset for the substring.
@@ -133,7 +137,7 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
 
         final String lang = lit.getLanguage();
         
-        final BigdataURI dt = lit.getDatatype();
+        final URI dt = lit.getDatatype();
         
         if (lang != null) {
 
@@ -144,7 +148,7 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     lang);
 
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
 
         } else if (dt != null) {
 
@@ -155,7 +159,7 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     dt);
 
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
 
         } else {
 
@@ -165,7 +169,7 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
 
             final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
 
         }
 
