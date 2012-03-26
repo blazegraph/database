@@ -25,6 +25,8 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -32,12 +34,13 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class StrlangBOp extends AbstractLiteralBOp {
+public class StrlangBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 4227610629554743647L;
 
@@ -56,21 +59,20 @@ public class StrlangBOp extends AbstractLiteralBOp {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
-        final IV lang = getAndCheckIfMaterializedLiteral(1,bs);
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        BigdataLiteral l = literalValue(lang);
-
-        final BigdataLiteral lit = literalValue(iv);
+        final Literal lit = literalValue(0, bs);
+        final Literal l = literalValue(1, bs);
         String label = lit.getLabel();
         String langLit = l.getLabel();
         final BigdataLiteral str = getValueFactory().createLiteral(label, langLit);
-        return DummyConstantNode.toDummyIV(str);
+        return super.createIV(str, bs);
 
     }
 

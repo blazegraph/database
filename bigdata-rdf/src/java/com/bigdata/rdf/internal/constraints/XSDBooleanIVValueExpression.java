@@ -37,7 +37,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
  * {@link XSDBooleanIV}. These are operators such as Compare, Is*, And, Or, etc.
  */
 public abstract class XSDBooleanIVValueExpression extends
-        AbstractIVValueExpressionBOp2<XSDBooleanIV> {
+		IVValueExpression<XSDBooleanIV> {
 
 	/**
 	 * 

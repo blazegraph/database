@@ -95,7 +95,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(pattern), //
                         new Constant<IV>(replacement), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -123,7 +123,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(replacement), //
                         new Constant<IV>(flags), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -151,7 +151,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(replacement), //
                         new Constant<IV>(flags), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }

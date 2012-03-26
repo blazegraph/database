@@ -26,10 +26,13 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -40,7 +43,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LcaseBOp extends AbstractLiteralBOp<IV> {
+public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterialization {
     
     private static final long serialVersionUID = -6847688419473046477L;
 
@@ -90,18 +93,17 @@ public class LcaseBOp extends AbstractLiteralBOp<IV> {
      * {@link IV}s without materialization but requires materialization of
      * non-inline {@link IV}s.
      */
+    @Override
     public Requirement getRequirement() {
-        
         return Requirement.SOMETIMES;
-        
     }
 
-    @SuppressWarnings("rawtypes")
-    protected IV _get(final IBindingSet bs) {
+	@Override
+    public IV get(final IBindingSet bs) {
 
-        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
+        final IV iv = getAndCheckLiteral(0, bs);
 
-        final BigdataLiteral in = literalValue(iv);
+        final Literal in = literalValue(iv);
 
         final BigdataValueFactory vf = getValueFactory();
 
@@ -123,7 +125,7 @@ public class LcaseBOp extends AbstractLiteralBOp<IV> {
             
         }
 
-        return DummyConstantNode.toDummyIV(out);
+        return super.createIV(out, bs);
 
     }
 

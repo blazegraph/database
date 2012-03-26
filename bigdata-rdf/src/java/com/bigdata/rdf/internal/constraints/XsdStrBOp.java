@@ -111,11 +111,11 @@ public class XsdStrBOp extends IVValueExpression<IV>
 
         if (iv.isInline() && !iv.isExtension()) {
             if(iv.isLiteral()){
-                return DummyConstantNode.toDummyIV(vf.createLiteral(
-                        ((AbstractLiteralIV)iv).getLabel(), XSD.STRING));
+                return super.createIV(vf.createLiteral(
+                        ((AbstractLiteralIV)iv).getLabel(), XSD.STRING), bs);
             }else{
-                return DummyConstantNode.toDummyIV(vf.createLiteral(iv
-                        .getInlineValue().toString(), XSD.STRING));
+                return super.createIV(vf.createLiteral(iv
+                        .getInlineValue().toString(), XSD.STRING), bs);
             }
         }
 
@@ -123,7 +123,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
             // return new xsd:string literal using URI label
             final URI uri = (URI) iv.getValue();
             final BigdataLiteral str = vf.createLiteral(uri.toString(), XSD.STRING);
-            return DummyConstantNode.toDummyIV(str);
+            return super.createIV(str, bs);
         } else if (iv.isLiteral()) {
             final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
             if (lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
@@ -133,7 +133,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
         	else {
                 // else return new xsd:string literal using Literal.getLabel
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel(), XSD.STRING);
-                return DummyConstantNode.toDummyIV(str);
+                return super.createIV(str, bs);
             }
         } else {
             throw new SparqlTypeErrorException();

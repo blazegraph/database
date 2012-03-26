@@ -43,12 +43,12 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The
@@ -193,8 +193,14 @@ final public class MathBOp extends IVValueExpression
         		return IVUtility.literalMath((Literal) val1, (Literal) val2,
         				op());
         		}catch(IllegalArgumentException iae){
+        			ILexiconConfiguration lc = null;
+        			try {
+        				lc = getLexiconConfiguration(bs);
+        			} catch (ContextNotAvailableException ex) {
+        				// can't use the LC (e.g. test cases)
+        			}
         		    return DateTimeUtility.dateTimeMath((Literal)val1, left,
-        		            (Literal)val2, right, op(), vf());
+        		            (Literal)val2, right, op(), vf(), lc);
         		}
         	}
         	
@@ -223,16 +229,9 @@ final public class MathBOp extends IVValueExpression
     }
     
     public BigdataValueFactory vf(){
-        if (vf == null) {
-            synchronized (this) {
-                if (vf == null) {
-                    final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
-                    vf = BigdataValueFactoryImpl.getInstance(namespace);
-                }
-            }
-        }
-        return vf;
+        return super.getValueFactory();
     }
+    
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();

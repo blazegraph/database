@@ -41,12 +41,11 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 
 /**
  * Test suite for registering and evaluating custom functions.
@@ -191,7 +190,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Simple function concatenates its argument with itself.
      */
-    private static class MyFunctionBOp extends AbstractLiteralBOp<IV> {
+    private static class MyFunctionBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
         /**
          * 
@@ -229,10 +228,10 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
         }
 
         @Override
-        protected IV _get(final IBindingSet bset) {
+        public IV get(final IBindingSet bset) {
 
             // Evaluate a function argument.
-            final IV arg = getAndCheckIfMaterializedLiteral(0, bset);
+            final IV arg = getAndCheckLiteral(0, bset);
             
             // Convert into an RDF Value.
             final Literal lit = literalValue(arg);
@@ -248,6 +247,11 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             return ret;
 
         }
+
+		@Override
+		public Requirement getRequirement() {
+			return Requirement.SOMETIMES;
+		}
 
     }
 

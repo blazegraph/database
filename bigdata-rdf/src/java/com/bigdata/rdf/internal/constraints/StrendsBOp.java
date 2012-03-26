@@ -31,8 +31,6 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * @see http://www.w3.org/2005/xpath-functions#ends-with
@@ -40,7 +38,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StrendsBOp extends LiteralBooleanBOp {
+public class StrendsBOp extends XSDBooleanIVValueExpression implements INeedsMaterialization {
 
     private static final long serialVersionUID = 5466622630000019821L;
 
@@ -64,34 +62,17 @@ public class StrendsBOp extends LiteralBooleanBOp {
         super(op);
     }
 
+    @Override
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
     
-    @SuppressWarnings("rawtypes")
     @Override
-    boolean _accept(final BigdataValueFactory vf, final IV value,
-            final IBindingSet bs) throws SparqlTypeErrorException {
+    public boolean accept(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final IV compare = get(1).get(bs);
-        
-        if (compare == null)
-            throw new SparqlTypeErrorException.UnboundVarException();
-
-        if (!compare.isInline() && !compare.hasValue())
-            throw new NotMaterializedException();
-
-        if (compare.isLiteral()) {
-         
-            final String v = literalValue(value).getLabel();
-            
-            final String c = literalValue(compare).getLabel();
-            
-            return v.endsWith(c);
-            
-        }
-
-        throw new SparqlTypeErrorException();
+        final String v = literalValue(0, bs).getLabel();
+        final String c = literalValue(1, bs).getLabel();
+        return v.endsWith(c);
         
     }
 

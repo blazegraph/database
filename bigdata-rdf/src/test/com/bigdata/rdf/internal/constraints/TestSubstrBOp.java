@@ -101,7 +101,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(_1), //
                         new Constant<IV>(_3),//
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -119,7 +119,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(_1), //
                         new Constant<IV>(_9999),//
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -137,7 +137,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(_0), //
                         new Constant<IV>(_3),//
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }

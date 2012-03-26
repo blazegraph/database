@@ -41,6 +41,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.RegexBOp.Annotations;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -49,8 +50,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 /**
  * @see http://www.w3.org/2009/sparql/docs/query-1.1/rq25.xml#func-replace
  */
-public class ReplaceBOp extends AbstractLiteralBOp<IV> 
-		implements INeedsMaterialization {
+public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
 	private static final transient Logger log = Logger.getLogger(ReplaceBOp.class);
 
@@ -144,26 +144,26 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
         super(op);
     }
     
-    public Requirement getRequirement() {
-    	
-    	return Requirement.SOMETIMES;
-    	
-    }
-    
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
+
+	@Override
     @SuppressWarnings("rawtypes")
-    public IV _get(final IBindingSet bs) {
+    public IV get(final IBindingSet bs) {
         
         @SuppressWarnings("rawtypes")
-        final Literal var = literalValue(getAndCheckIfMaterializedLiteral(0, bs));
+        final Literal var = literalValue(0, bs);
         
         @SuppressWarnings("rawtypes")
-        final Literal pattern = literalValue(getAndCheckIfMaterializedLiteral(1, bs));
+        final Literal pattern = literalValue(1, bs);
 
         @SuppressWarnings("rawtypes")
-        final Literal replacement = literalValue(getAndCheckIfMaterializedLiteral(2, bs));
+        final Literal replacement = literalValue(2, bs);
         
         @SuppressWarnings("rawtypes")
-        final Literal flags = arity() > 3 ? literalValue(getAndCheckIfMaterializedLiteral(3, bs)) : null;
+        final Literal flags = arity() > 3 ? literalValue(3, bs) : null;
         
         if (log.isDebugEnabled()) {
         	log.debug("var: " + var);
@@ -177,7 +177,7 @@ public class ReplaceBOp extends AbstractLiteralBOp<IV>
         	final BigdataLiteral l = 
         		evaluate(getValueFactory(), var, pattern, replacement, flags);
         	
-        	return DummyConstantNode.toDummyIV(l);
+        	return super.createIV(l, bs);
         	
         } catch (ValueExprEvaluationException ex) {
         	

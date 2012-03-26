@@ -93,7 +93,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -113,7 +113,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -131,7 +131,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
 	                        new Constant<IV>(arg1), //
 	                        new Constant<IV>(arg2), //
 	                        vf.getNamespace()//
-	                )._get(emptyBindingSet);
+	                ).get(emptyBindingSet);
 	                
 	                fail("should be a type error");
                 } catch (SparqlTypeErrorException ex) { }
@@ -153,7 +153,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -173,7 +173,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }
@@ -193,7 +193,7 @@ public class TestStrBeforeBOp extends ProxyTestCase {
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
                         vf.getNamespace()//
-                )._get(emptyBindingSet);
+                ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
             }

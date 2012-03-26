@@ -26,6 +26,8 @@ package com.bigdata.rdf.internal.constraints;
 import java.security.MessageDigest;
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -33,6 +35,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
@@ -41,11 +44,11 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * operation to be applied to the operands is specified by the
  * {@link DigestBOp.Annotations#OP} annotation.
  */
-public class DigestBOp extends AbstractLiteralBOp<IV> {
+public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 9136864442064392445L;
 
-    public interface Annotations extends AbstractLiteralBOp.Annotations {
+    public interface Annotations extends IVValueExpression.Annotations {
 
         /**
          * The operation to be applied to the left operand (required). The value
@@ -133,18 +136,18 @@ public class DigestBOp extends AbstractLiteralBOp<IV> {
         
     }
 
-    public Requirement getRequirement() {
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-        return Requirement.SOMETIMES;
-        
-    }
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-
-        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
+        final IV iv = getAndCheckLiteral(0, bs);
         //Recreate since they are not thread safe
         MessageDigest md = null;
-        final BigdataLiteral lit = literalValue(iv);
+        final Literal lit = literalValue(iv);
         if (lit.getLanguage() != null || lit.getDatatype() != null
                 && lit.getDatatype().equals(XSD.STRING)) {
             try {
@@ -175,7 +178,7 @@ public class DigestBOp extends AbstractLiteralBOp<IV> {
                 md.update(bytes);
                 byte[] digest = md.digest();
                 final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
-                return DummyConstantNode.toDummyIV(str);
+                return super.createIV(str, bs);
             } catch (Exception e) {
                 throw new SparqlTypeErrorException();
             }

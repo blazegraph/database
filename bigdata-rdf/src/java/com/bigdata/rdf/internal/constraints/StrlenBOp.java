@@ -26,15 +26,18 @@ package com.bigdata.rdf.internal.constraints;
 import java.math.BigInteger;
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
-public class StrlenBOp extends AbstractLiteralBOp {
+public class StrlenBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 4176318782528605454L;
 
@@ -53,20 +56,17 @@ public class StrlenBOp extends AbstractLiteralBOp {
         super(op);
     }
 
-    public Requirement getRequirement() {
-        return Requirement.SOMETIMES;
-    }
+	@Override
+	public Requirement getRequirement() {
+		return Requirement.SOMETIMES;
+	}
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+	@Override
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
-        
-        final BigdataLiteral lit = literalValue(iv);
-        
+        final Literal lit = literalValue(0, bs);
         final String label = lit.getLabel();
-        
         final int length = label.length();
-        
         return new XSDIntegerIV(BigInteger.valueOf(length));
         
     }

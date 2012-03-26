@@ -25,6 +25,9 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -44,7 +47,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class BNodeBOp extends AbstractLiteralBOp<IV> {
+public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -70,26 +73,17 @@ public class BNodeBOp extends AbstractLiteralBOp<IV> {
         return Requirement.SOMETIMES;
     }
 
-    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+    public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
         
     	if (arity() == 0) {
     		
-    		return DummyConstantNode.toDummyIV(getValueFactory().createBNode());
+    		return super.createIV(getValueFactory().createBNode(), bs);
     		
     	}
     	
-    	@SuppressWarnings("rawtypes")
-        final IV iv = get(0).get(bs);
-    	
-        if (iv == null)
-            throw new SparqlTypeErrorException.UnboundVarException();
+        final Literal lit = literalValue(0, bs);
 
-        if (!iv.isLiteral())
-            throw new SparqlTypeErrorException();
-
-        final BigdataLiteral lit = literalValue(iv);
-
-        final BigdataURI dt = lit.getDatatype();
+        final URI dt = lit.getDatatype();
 
         if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
@@ -97,7 +91,7 @@ public class BNodeBOp extends AbstractLiteralBOp<IV> {
         final BigdataBNode bnode = getValueFactory().createBNode(
                 "-bnode-func-" + lit.getLabel());
 
-        return DummyConstantNode.toDummyIV(bnode);
+        return super.createIV(bnode, bs);
 
     }
     

@@ -33,6 +33,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
@@ -43,6 +44,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Return the datatype of the literal argument.
@@ -118,17 +120,13 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 	    	@SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
-
 	    	if (datatypeIV == null) {
-
-                datatypeIV = TermId.mockIV(VTE.URI);
-	    		datatype.setIV(datatypeIV);
-
+	    		datatypeIV = super.createIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV
 	    	datatypeIV.setValue(datatype);
-
+	    	
 	    	return datatypeIV;
 
         }
@@ -162,13 +160,8 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
             @SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
-
 	    	if (datatypeIV == null) {
-
-	    	    datatypeIV = TermId.mockIV(VTE.URI);
-
-	    	    datatype.setIV(datatypeIV);
-
+	    		datatypeIV = super.createIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV

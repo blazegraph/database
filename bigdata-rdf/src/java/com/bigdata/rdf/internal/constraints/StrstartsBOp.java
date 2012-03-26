@@ -34,7 +34,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class StrstartsBOp extends LiteralBooleanBOp {
+public class StrstartsBOp extends XSDBooleanIVValueExpression implements INeedsMaterialization {
 
     private static final long serialVersionUID = 7680098071087046784L;
 
@@ -61,33 +61,17 @@ public class StrstartsBOp extends LiteralBooleanBOp {
         super(op);
     }
 
+    @Override
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
     
-    @SuppressWarnings("rawtypes")
     @Override
-    boolean _accept(final BigdataValueFactory vf, final IV value,
-            final IBindingSet bs) throws SparqlTypeErrorException {
+    public boolean accept(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final IV compare = get(1).get(bs);
-
-        if (compare == null)
-            throw new SparqlTypeErrorException.UnboundVarException();
-
-        if (!compare.isInline() && !compare.hasValue())
-            throw new NotMaterializedException();
-
-        if (compare.isLiteral()) {
-
-            final String v = literalValue(value).getLabel();
-
-            final String c = literalValue(compare).getLabel();
-
-            return v.startsWith(c);
-        }
-
-        throw new SparqlTypeErrorException();
+        final String v = literalValue(0, bs).getLabel();
+        final String c = literalValue(1, bs).getLabel();
+        return v.startsWith(c);
 
     }
 
