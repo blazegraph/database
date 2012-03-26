@@ -21,18 +21,15 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast.eval.update;
+package com.bigdata.rdf.sparql.ast.cache;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest;
-
 /**
  * Aggregates test suites into increasing dependency order.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -58,26 +55,10 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("SPARQL Update Evaluation");
+        final TestSuite suite = new TestSuite("SPARQL Cache");
 
-        /*
-         * Boot strapped test suite for core UPDATE functionality.
-         */
-
-        suite.addTestSuite(TestUpdateBootstrap.class);
-
-        /*
-         * The openrdf SPARQL UPDATE test suite.
-         * 
-         * Note: This test suite is for quads mode only. SPARQL UPDATE support
-         * is also tested by the NSS test suite.
-         */
-
-        // Unisolated operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTest.class);
-
-        // Fully isolated read/write operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTxTest.class);
+        // Basic query.
+        suite.addTestSuite(TestSparqlCache.class);
 
         return suite;
         
