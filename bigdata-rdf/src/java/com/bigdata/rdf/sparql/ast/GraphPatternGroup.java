@@ -38,6 +38,10 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSubGroupJoinVarOptimizer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * TODO It would make the internal APIs significantly easier if we modeled this
+ * as a type of {@link GraphPatternGroup}, similar to {@link JoinGroupNode} and
+ * {@link UnionNode}.
  */
 abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
         GroupNodeBase<E> implements IJoinNode {
