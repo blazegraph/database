@@ -40,7 +40,6 @@ import org.openrdf.model.Literal;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
@@ -67,7 +66,7 @@ final public class MathBOp extends IVValueExpression
 	
 	private transient BigdataValueFactory vf;
     
-    public interface Annotations extends ImmutableBOp.Annotations {
+    public interface Annotations extends IVValueExpression.Annotations {
 
         /**
          * The operation to be applied to the left and right operands
@@ -78,7 +77,7 @@ final public class MathBOp extends IVValueExpression
          */
         String OP = (MathBOp.class.getName() + ".op").intern();
 
-        public String NAMESPACE = (MathBOp.class.getName() + ".namespace").intern();
+//        public String NAMESPACE = (MathBOp.class.getName() + ".namespace").intern();
     }
     
 	public enum MathOp {
@@ -116,7 +115,8 @@ final public class MathBOp extends IVValueExpression
     public MathBOp(final IValueExpression<? extends IV> left, 
     		final IValueExpression<? extends IV> right, final MathOp op,final String lex) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
+                new NV(Annotations.NAMESPACE, lex)));
 
     }
 
@@ -128,9 +128,9 @@ final public class MathBOp extends IVValueExpression
 	 * @param op
 	 *            The operation.
 	 */
-    public MathBOp(final BOp[] args, Map<String,Object> anns) {
+    public MathBOp(final BOp[] args, final Map<String, Object> anns) {
     
-        super(args,anns);
+        super(args, anns);
 
 		if (args.length != 2 || args[0] == null || args[1] == null
 				|| getProperty(Annotations.OP) == null

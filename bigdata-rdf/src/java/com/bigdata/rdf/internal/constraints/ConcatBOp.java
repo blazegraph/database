@@ -33,9 +33,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 

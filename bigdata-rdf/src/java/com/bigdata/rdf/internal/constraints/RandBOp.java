@@ -33,25 +33,39 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 
 public class RandBOp extends IVValueExpression<IV> {
-    Random rand = new Random();
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    final private Random rand = new Random();
 
     public RandBOp() {
+
         this(new BOp[] {}, null);
+        
     }
 
-    public RandBOp(BOp[] args, Map<String, Object> anns) {
+    public RandBOp(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
+
         if (args.length != 0)
             throw new IllegalArgumentException();
 
     }
 
-    public RandBOp(RandBOp op) {
+    public RandBOp(final RandBOp op) {
+        
         super(op);
+        
     }
 
     public IV get(IBindingSet bindingSet) {
+
         return new XSDNumericIV(rand.nextDouble());
+        
     }
 
 }

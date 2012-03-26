@@ -35,7 +35,6 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 public class EncodeForURIBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
