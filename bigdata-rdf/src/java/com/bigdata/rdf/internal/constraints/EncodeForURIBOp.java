@@ -60,7 +60,7 @@ public class EncodeForURIBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
+        IV iv = getAndCheckIfMaterializedLiteral(0, bs);
         final BigdataLiteral lit =literalValue(iv);
         try {
             final BigdataLiteral str = getValueFactory().createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8").replace("+", "%20"));

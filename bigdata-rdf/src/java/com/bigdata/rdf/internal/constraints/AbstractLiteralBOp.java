@@ -13,6 +13,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -133,7 +134,7 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
      *             was not set when the value expression required a materialized
      *             RDF {@link Value}.
      */
-    protected IV getAndCheck(final int i, final IBindingSet bs)
+    protected IV getAndCheckIfMaterializedLiteral(final int i, final IBindingSet bs)
             throws SparqlTypeErrorException, NotMaterializedException {
 
         final IV iv = get(i).get(bs);
@@ -143,10 +144,43 @@ abstract public class AbstractLiteralBOp<V extends IV> extends
 
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
-
+        
         if (!iv.isInline() && !iv.hasValue())
             throw new NotMaterializedException();
 
+        return iv;
+
+    }
+    
+    /**
+     * Get the function argument (a value expression) and evaluate it against
+     * the source solution. The evaluation of value expressions is recursive.
+     * 
+     * @param i
+     *            The index of the function argument ([0...n-1]).
+     * @param bs
+     *            The source solution.
+     * 
+     * @return The result of evaluating that argument of this function.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if the index is not the index of an operator for this
+     *             operator.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the value expression at that index can not be evaluated.
+     */
+    protected IV getAndCheckIfLiteral(final int i, final IBindingSet bs)
+            throws SparqlTypeErrorException {
+
+        final IV iv = get(i).get(bs);
+        
+        if (iv == null)
+            throw new SparqlTypeErrorException.UnboundVarException();
+
+        if (!iv.isLiteral())
+            throw new SparqlTypeErrorException();
+        
         return iv;
 
     }

@@ -232,7 +232,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
         protected IV _get(final IBindingSet bset) {
 
             // Evaluate a function argument.
-            final IV arg = getAndCheck(0, bset);
+            final IV arg = getAndCheckIfMaterializedLiteral(0, bset);
             
             // Convert into an RDF Value.
             final Literal lit = literalValue(arg);

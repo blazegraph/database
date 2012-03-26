@@ -141,7 +141,7 @@ public class DigestBOp extends AbstractLiteralBOp<IV> {
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final IV iv = getAndCheck(0, bs);
+        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
         //Recreate since they are not thread safe
         MessageDigest md = null;
         final BigdataLiteral lit = literalValue(iv);

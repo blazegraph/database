@@ -85,7 +85,7 @@ public class SubstrBOp extends AbstractLiteralBOp<IV> {
 
         // The literal.
         
-        final IV literalArg = getAndCheck(0, bs);
+        final IV literalArg = getAndCheckIfMaterializedLiteral(0, bs);
         
         final BigdataLiteral lit = literalValue(literalArg);
 

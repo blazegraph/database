@@ -60,6 +60,8 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("IV Constraints and Functions");
 
         suite.addTestSuite(TestSubstrBOp.class);
+        suite.addTestSuite(TestStrBeforeBOp.class);
+        suite.addTestSuite(TestStrAfterBOp.class);
         
         return suite;
         

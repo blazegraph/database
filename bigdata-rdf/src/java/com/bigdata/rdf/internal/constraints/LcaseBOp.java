@@ -99,7 +99,7 @@ public class LcaseBOp extends AbstractLiteralBOp<IV> {
     @SuppressWarnings("rawtypes")
     protected IV _get(final IBindingSet bs) {
 
-        final IV iv = getAndCheck(0, bs);
+        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
 
         final BigdataLiteral in = literalValue(iv);
 
