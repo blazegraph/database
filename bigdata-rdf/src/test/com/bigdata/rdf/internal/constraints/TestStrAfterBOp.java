@@ -32,8 +32,6 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -43,7 +41,6 @@ import com.bigdata.rdf.store.ProxyTestCase;
  * Test suite for {@link StrAfterBOp}.
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
- * @version $Id: TestSubstrBOp.java 5142 2011-09-07 00:26:50Z thompsonbry $
  */
 public class TestStrAfterBOp extends ProxyTestCase {
 
@@ -71,7 +68,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
 //    }
     
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void test_substr() {
+    public void test_bop() {
         
         final AbstractTripleStore db = getStore();
 
