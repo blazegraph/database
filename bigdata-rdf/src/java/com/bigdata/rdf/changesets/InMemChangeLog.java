@@ -23,11 +23,10 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * notification before the buffer is drained).
  * 
  * @author mike
- *
  */
 public class InMemChangeLog implements IChangeLog {
 
-    protected static final Logger log = Logger.getLogger(InMemChangeLog.class);
+    private static final Logger log = Logger.getLogger(InMemChangeLog.class);
     
     /**
      * Running tally of new changes since the last commit notification.
