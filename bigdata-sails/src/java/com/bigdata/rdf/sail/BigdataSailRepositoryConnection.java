@@ -391,9 +391,9 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * @param log
      *          the change log
      */
-    public void setChangeLog(final IChangeLog log) {
+    public void addChangeLog(final IChangeLog log) {
         
-        getSailConnection().setChangeLog(log);
+        getSailConnection().addChangeLog(log);
         
     }
 
