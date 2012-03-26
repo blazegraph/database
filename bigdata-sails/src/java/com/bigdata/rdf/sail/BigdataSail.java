@@ -2675,7 +2675,7 @@ public class BigdataSail extends SailBase implements Sail {
             
             if (changeLog != null) {
                 
-                changeLog.transactionCommited();
+                changeLog.transactionCommited(commitTime);
                 
             }
             
@@ -3288,8 +3288,12 @@ public class BigdataSail extends SailBase implements Sail {
         	this.changeLog.addDelegate(changeLog);
 
         }
-        
-        private DelegatingChangeLog changeLog;
+
+        /**
+         * Note: This needs to be visible to
+         * {@link BigdataSailRWTxConnection#commit2()}.
+         */
+        protected DelegatingChangeLog changeLog;
 
     } // class BigdataSailConnection
    
@@ -3402,6 +3406,12 @@ public class BigdataSail extends SailBase implements Sail {
             
                 final long commitTime = txService.commit(tx);
                 
+                if (changeLog != null) {
+                    
+                    changeLog.transactionCommited(commitTime);
+                    
+                }
+
                 newTx();
                 
                 return commitTime;

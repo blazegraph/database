@@ -27,19 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.cache;
 
-import org.openrdf.query.BindingSet;
-
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
-import com.bigdata.rdf.sail.webapp.QueryServlet;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -67,13 +67,6 @@ import com.bigdata.striterator.ICloseableIterator;
  *      TODO Limit on {@link MemoryManager} via {@link ConfigParams}. Flush
  *      older objects from cache if the {@link MemoryManager} limit would be
  *      exceeded.
- * 
- *      TODO Chain to the {@link QueryServlet}. It might be easiest to parse the
- *      query first, then chain to this servlet if we discover that it is a
- *      DESCRIBE query. Chaining the parsed query could be a strategy which is
- *      useful in general.
- * 
- *      TODO Intercept and cache <code>DESCRIBE ?s</code> query results.
  * 
  *      TODO Listen for and process deltas for DESCRIBEd objects. We need to
  *      group deltas by the subject and by the object, publishing them twice (if
@@ -103,7 +96,7 @@ import com.bigdata.striterator.ICloseableIterator;
  *      query is not always the same (e.g., include the hash of the exogenous
  *      solutions in the query hash code and we will get less reuse).
  */
-public class SparqlCache implements ISparqlCache {
+public class SparqlCache implements ISparqlCache, IChangeLog {
 
     public interface Options {
 
@@ -211,36 +204,55 @@ public class SparqlCache implements ISparqlCache {
         
     }
     
-    /**
-     * A cache hit.
+    /*
+     * TODO When caching a solution set, make sure that we do so before we apply
+     * the solution modifiers (ORDER BY, GROUP BY/HAVING, OFFSET/LIMIT) and
+     * perhaps before we evaluate DISTINCT.
+     * 
+     * TODO It will be especially easy if the solution set has been pushed into
+     * a hash index, which we can then just pour into the cache.
+     * 
+     * TODO We need a hash code to get started with query matching. However, it
+     * can not be the hash code of the query string or we will not be able to
+     * parameterize the solution modifiers. This suggests computing a hash 
+     * function over the AST which knows to leave off the solution modifiers.
      */
-    public static class CacheHit implements ICacheHit {
+    @Override
+    public ICacheHit put(final AST2BOpContext ctx,
+            final QueryBase queryOrSubquery,
+            final ICloseableIterator<IBindingSet> src) {
+        // TODO Auto-generated method stub
+        return null;
+    }
 
-        /**
-         * The timestamp when the cache entry was created / last updated.
-         */
-        private long lastModified;
-
-        @Override
-        public long getLastModified() {
-
-            return lastModified;
-
-        }
+    /**
+     * Cache invalidation / cache update protocol.
+     * 
+     * 
+     * The commit time as of which the {@link ISPO}s were added or removed.
+     * 
+     * The change events. Each event indicates an {@link ISPO} which was added
+     * to (or removed from) the database. Cache entries which depend on
+     * statement patterns which cover those {@link ISPO}s must be invalidated
+     * (or updated) when the database update is committed.
+     */
+    
+    @Override
+    public void changeEvent(IChangeRecord record) {
+        // TODO Auto-generated method stub
         
-        @Override
-        public ICloseableIterator<BindingSet> getSolutions() {
+    }
 
-            throw new UnsupportedOperationException();
-            
-        }
+    @Override
+    public void transactionCommited(final long commitTime) {
+        // TODO Auto-generated method stub
+        
+    }
 
-        public CacheHit() {
-            
-            this.lastModified = System.currentTimeMillis();
-            
-        }
-
+    @Override
+    public void transactionAborted() {
+        // TODO Auto-generated method stub
+        
     }
 
 }

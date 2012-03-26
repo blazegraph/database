@@ -27,8 +27,11 @@ public interface IChangeLog {
     
     /**
      * Occurs when the current SAIL transaction is committed.
+     * 
+     * @param commitTime
+     *            The timestamp associated with the commit point.
      */
-    void transactionCommited();
+    void transactionCommited(final long commitTime);
     
     /**
      * Occurs if the current SAIL transaction is aborted.

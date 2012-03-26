@@ -39,7 +39,9 @@ public class DelegatingChangeLog implements IChangeLog {
             log.info(record);
         
         for (IChangeLog delegate : delegates) {
-        	delegate.changeEvent(record);
+
+            delegate.changeEvent(record);
+            
         }
         
     }
@@ -47,13 +49,15 @@ public class DelegatingChangeLog implements IChangeLog {
     /**
      * See {@link IChangeLog#transactionCommited()}.
      */
-    public synchronized void transactionCommited() {
+    public synchronized void transactionCommited(final long commitTime) {
     
         if (log.isInfoEnabled()) 
             log.info("transaction committed");
         
         for (IChangeLog delegate : delegates) {
-        	delegate.transactionCommited();
+        
+            delegate.transactionCommited(commitTime);
+            
         }
         
     }
@@ -67,7 +71,9 @@ public class DelegatingChangeLog implements IChangeLog {
             log.info("transaction aborted");
         
         for (IChangeLog delegate : delegates) {
-        	delegate.transactionAborted();
+
+            delegate.transactionAborted();
+            
         }
         
     }

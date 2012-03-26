@@ -53,13 +53,13 @@ public class InMemChangeLog implements IChangeLog {
     }
     
     /**
-     * See {@link IChangeLog#transactionCommited()}.
+     * See {@link IChangeLog#transactionCommited(long)}.
      */
-    public synchronized void transactionCommited() {
+    public synchronized void transactionCommited(final long commitTime) {
     
-        if (log.isInfoEnabled()) 
-            log.info("transaction committed");
-        
+        if (log.isInfoEnabled())
+            log.info("transaction committed: " + commitTime);
+
         committed.clear();
         
         committed.putAll(changeSet);

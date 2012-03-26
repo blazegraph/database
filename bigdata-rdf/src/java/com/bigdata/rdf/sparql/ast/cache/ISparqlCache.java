@@ -27,8 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.cache;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A SPARQL solution set cache or a connection to a remove SPARQL cache or cache
@@ -62,5 +64,19 @@ public interface ISparqlCache {
      * @return The cache hit -or- <code>null</code>
      */
     ICacheHit get(final AST2BOpContext ctx, final QueryBase queryOrSubquery);
+
+    /**
+     * Publish a solution set to the cache.
+     * 
+     * @param ctx
+     *            The query context in which the solution set was generated.
+     * @param queryOrSubquery
+     *            The query or subquery used to generate the solution set.
+     * @param src
+     *            An iterator which can drain the solution set.
+     * @return A reference to the cached solution set.
+     */
+    ICacheHit put(final AST2BOpContext ctx, final QueryBase queryOrSubquery,
+            final ICloseableIterator<IBindingSet> src);
 
 }
