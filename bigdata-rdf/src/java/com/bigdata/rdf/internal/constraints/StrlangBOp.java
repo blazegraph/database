@@ -61,8 +61,8 @@ public class StrlangBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        final IV iv = getAndCheck(0, bs);
-        final IV lang = getAndCheck(1,bs);
+        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
+        final IV lang = getAndCheckIfMaterializedLiteral(1,bs);
 
         BigdataLiteral l = literalValue(lang);
 

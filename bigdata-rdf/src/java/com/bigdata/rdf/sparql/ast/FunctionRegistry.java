@@ -56,7 +56,9 @@ import com.bigdata.rdf.internal.constraints.RandBOp;
 import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
+import com.bigdata.rdf.internal.constraints.StrAfterBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.StrBeforeBOp;
 import com.bigdata.rdf.internal.constraints.StrcontainsBOp;
 import com.bigdata.rdf.internal.constraints.StrdtBOp;
 import com.bigdata.rdf.internal.constraints.StrendsBOp;
@@ -793,6 +795,40 @@ public class FunctionRegistry {
 	                
                 return new StrendsBOp(var, token, lex);
 	                
+            }
+        });
+		
+		add(STR_BEFORE,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(
+                		lex, args[1]);
+                
+                return new StrBeforeBOp(arg1, arg2, lex);
+
+            }
+        });
+		
+		add(STR_AFTER,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(
+                		lex, args[1]);
+                
+                return new StrAfterBOp(arg1, arg2, lex);
+
             }
         });
 		

@@ -71,7 +71,7 @@ public class ConcatBOp extends AbstractLiteralBOp<IV> {
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < arity(); i++) {
             @SuppressWarnings("rawtypes")
-            final IV v = getAndCheck(i, bs);
+            final IV v = getAndCheckIfMaterializedLiteral(i, bs);
             String label = null;
             if (allSame) {
                 final BigdataLiteral lit = literalValue(v);

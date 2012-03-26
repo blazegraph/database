@@ -59,7 +59,7 @@ public class UcaseBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
+        IV iv = getAndCheckIfMaterializedLiteral(0, bs);
          final BigdataLiteral lit = literalValue(iv);
 
         if (lit.getLanguage() != null) {

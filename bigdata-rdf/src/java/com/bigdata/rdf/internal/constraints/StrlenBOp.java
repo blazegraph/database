@@ -59,7 +59,7 @@ public class StrlenBOp extends AbstractLiteralBOp {
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-        final IV iv = getAndCheck(0, bs);
+        final IV iv = getAndCheckIfMaterializedLiteral(0, bs);
         
         final BigdataLiteral lit = literalValue(iv);
         
