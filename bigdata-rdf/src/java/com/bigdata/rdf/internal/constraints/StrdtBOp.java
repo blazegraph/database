@@ -34,10 +34,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 

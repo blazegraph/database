@@ -42,7 +42,6 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Call one of the Sesame casting functions.
@@ -57,9 +56,9 @@ public class FuncBOp extends IVValueExpression<IV> implements
 	
 //	private static final transient Logger log = Logger.getLogger(FuncBOp.class);
 
-	public interface Annotations extends BOp.Annotations {
+	public interface Annotations extends IVValueExpression.Annotations {
 
-		String NAMESPACE = FuncBOp.class.getName() + ".namespace";
+//		String NAMESPACE = FuncBOp.class.getName() + ".namespace";
 		
 		String FUNCTION = FuncBOp.class.getName() + ".function";
 

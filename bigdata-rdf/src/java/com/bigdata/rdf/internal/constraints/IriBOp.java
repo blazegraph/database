@@ -34,10 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * The IRI function, as defined in <a

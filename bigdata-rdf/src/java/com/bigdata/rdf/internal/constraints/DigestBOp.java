@@ -35,9 +35,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * A Digest expression involving a {@link IValueExpression} operand. The

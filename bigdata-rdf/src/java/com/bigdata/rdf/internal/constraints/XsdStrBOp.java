@@ -40,7 +40,6 @@ import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Convert the {@link IV} to a <code>xsd:string</code>.
@@ -55,11 +54,11 @@ public class XsdStrBOp extends IVValueExpression<IV>
 
     private static final transient Logger log = Logger.getLogger(XsdStrBOp.class);
 
-    public interface Annotations extends BOp.Annotations {
-
-        String NAMESPACE = XsdStrBOp.class.getName() + ".namespace";
-
-    }
+//    public interface Annotations extends BOp.Annotations {
+//
+//        String NAMESPACE = XsdStrBOp.class.getName() + ".namespace";
+//
+//    }
 
     public XsdStrBOp(final IValueExpression<? extends IV> x, final String lex) {
 

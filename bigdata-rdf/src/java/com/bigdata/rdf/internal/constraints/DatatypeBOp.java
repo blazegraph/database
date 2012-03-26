@@ -33,18 +33,14 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Return the datatype of the literal argument.
@@ -59,11 +55,11 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 	private static final transient Logger log = Logger.getLogger(DatatypeBOp.class);
 
-	public interface Annotations extends BOp.Annotations {
-
-		String NAMESPACE = DatatypeBOp.class.getName() + ".namespace";
-
-    }
+//	public interface Annotations extends BOp.Annotations {
+//
+//		String NAMESPACE = DatatypeBOp.class.getName() + ".namespace";
+//
+//    }
 
     public DatatypeBOp(final IValueExpression<? extends IV> x, final String lex) {
 
