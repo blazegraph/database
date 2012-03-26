@@ -25,14 +25,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 25, 2012
  */
 
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.sparql.ast.cache;
 
+import org.openrdf.query.BindingSet;
+
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.btree.view.FusedView;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sail.webapp.QueryServlet;
+import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.service.IDataService;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A SPARQL cache.
@@ -47,6 +60,9 @@ import com.bigdata.rwstore.sector.MemoryManager;
  *      href="http://www.informatik.uni-leipzig.de/~auer/publication/caching.pdf
  *      > Improving the Performance of Semantic Web Applications with SPARQL
  *      Query Caching </a>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/524> SPARQL
+ *      Query Cache </a>
  * 
  *      TODO Limit on {@link MemoryManager} via {@link ConfigParams}. Flush
  *      older objects from cache if the {@link MemoryManager} limit would be
@@ -87,8 +103,30 @@ import com.bigdata.rwstore.sector.MemoryManager;
  *      query is not always the same (e.g., include the hash of the exogenous
  *      solutions in the query hash code and we will get less reuse).
  */
-public class SparqlCache {
+public class SparqlCache implements ISparqlCache {
 
+    public interface Options {
+
+        /**
+         * The maximum amount of native memory which will be used to cache
+         * solution sets (default is 1/2 of the value reported by
+         * {@link Runtime#maxMemory()}).
+         * <p>
+         * Note: The {@link MemoryManager} backing the cache can use up to 4TB
+         * of RAM.
+         * <p>
+         * Note: Once the cache is full, solution sets will be expired according
+         * to the cache policy until the native memory demand has fallen below
+         * this threshold before a new solution set is added to the cache.
+         */
+        String MAX_MEMORY = SparqlCache.class.getName() + ".maxMemory";
+
+        final long DEFAULT_MAX_MEMORY = Runtime.getRuntime().maxMemory() / 2;
+
+    }
+    
+    private final QueryEngine queryEngine;
+    
     /**
      * The response body for a cached result is stored on the
      * {@link IMemoryManager}. This allows us to cache TBs of data in main
@@ -108,79 +146,99 @@ public class SparqlCache {
      */
     private final IMemoryManager mmgr;
 
-    public SparqlCache(final IMemoryManager mmgr) {
+    /**
+     * 
+     * Note: A distributed cache fabric could be accessed from any node in a
+     * cluster. That means that this could be the {@link Journal} -or- the
+     * {@link IndexManager} inside the {@link IDataService} and provides direct
+     * access to {@link FusedView}s (aka shards).
+     * 
+     * @param indexManager
+     *            The <em>local</em> {@link IIndexManager}.
+     * 
+     */
+    public SparqlCache(final QueryEngine queryEngine) {
 
-        if (mmgr == null)
+        if (queryEngine == null)
             throw new IllegalArgumentException();
 
-        this.mmgr = mmgr;
+        this.queryEngine = queryEngine;
+        
+        this.mmgr = new MemoryManager(DirectBufferPool.INSTANCE);
 
     }
 
+    @Override
+    public void init() {
+
+        // NOP.
+        
+    }
+    
+    /**
+     * {@link SparqlCache} is used with a singleton pattern managed by the
+     * {@link SparqlCacheFactory}. It will be torn down automatically it is no
+     * longer reachable. This behavior depends on not having any hard references
+     * back to the {@link QueryEngine}.
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        
+        close();
+        
+        super.finalize();
+        
+    }
+
+    @Override
     public void close() {
 
+        // TODO Clear transient cache collections.
+        
         mmgr.clear();
 
     }
 
-    /**
-     * Return the result from the cache -or- <code>null</code> if there is a
-     * cache miss.
-     * 
-     * @param queryTask
-     *            The query task.
-     *            
-     * @return The query result iff there is a cache hit.
-     */
-    public CacheHit get(final AbstractQueryTask queryTask) {
+    @Override
+    public ICacheHit get(final AST2BOpContext ctx,
+            final QueryBase queryOrSubquery) {
 
         /*
          * FIXME Implement. Start with a simple DESCRIBE <uri> cache.
          */
+
         return null;
         
     }
     
-//    public static class DescribeCacheResult {
-//
-//        public final URI uri;
-//
-//        public final int recId;
-//
-//    }
-
     /**
      * A cache hit.
      */
-    public static class CacheHit {
-
-        /**
-         * The Content-Type.
-         */
-        final String contentType;
-
-        /**
-         * The Content-Length.
-         */
-        final int contentLength;
+    public static class CacheHit implements ICacheHit {
 
         /**
          * The timestamp when the cache entry was created / last updated.
          */
-        final long lastModified;
+        private long lastModified;
 
-        /**
-         * The cached response entity.
-         */
-        final byte[] data;
+        @Override
+        public long getLastModified() {
 
-        public CacheHit(final String contentType, final long lastModified,
-                final byte[] data) {
-            this.contentType = contentType;
-            this.contentLength = data.length;
-            this.lastModified = lastModified;
-            this.data = data;
+            return lastModified;
 
+        }
+        
+        @Override
+        public ICloseableIterator<BindingSet> getSolutions() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        public CacheHit() {
+            
+            this.lastModified = System.currentTimeMillis();
+            
         }
 
     }

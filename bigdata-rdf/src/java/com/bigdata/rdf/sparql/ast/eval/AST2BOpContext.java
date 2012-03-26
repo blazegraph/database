@@ -21,6 +21,9 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -60,6 +63,11 @@ public class AST2BOpContext implements IdFactory {
 	 */
 	public final QueryEngine queryEngine;
 	
+    /**
+     * The {@link SparqlCache}.
+     */
+    public final ISparqlCache sparqlCache;
+
 	/**
 	 * The query hints from the original {@link #query}.
 	 * 
@@ -286,6 +294,17 @@ public class AST2BOpContext implements IdFactory {
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
 
+        /*
+         * Cache for SPARQL solution sets.
+         * 
+         * TODO Define a query hint for enabling or disabling the SPARQL cache
+         * for an operation. However, the cache reference must still be set
+         * since we must still issue invalidation notes to the cache even if it
+         * is disabled during update operations (and it might not make sense to
+         * use the cache during SPARQL UPDATEs at all).
+         */
+        this.sparqlCache = SparqlCacheFactory.getSparqlCache(queryEngine);
+        
         /*
          * Figure out the query UUID that will be used. This will be bound onto
          * the query plan when it is generated. We figure out what it will be up
