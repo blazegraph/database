@@ -34,6 +34,7 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
@@ -49,6 +50,48 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 	
 	private static final transient Logger log = Logger.getLogger(RegexBOp.class);
 
+    public interface Annotations extends XSDBooleanIVValueExpression.Annotations {
+    	
+        /**
+         * The cached regex pattern.
+         */
+        public String PATTERN = RegexBOp.class.getName()
+                + ".pattern";
+        
+    }
+
+    private static Map<String,Object> anns(
+			final IValueExpression<? extends IV> pattern,
+			final IValueExpression<? extends IV> flags,
+			final String lex) {
+    	
+    	if (pattern instanceof IConstant && 
+    			(flags == null || flags instanceof IConstant)) {
+    		
+    		final IV parg = ((IConstant<IV>) pattern).get();
+    		
+    		final IV farg = flags != null ?
+    				((IConstant<IV>) flags).get() : null;
+    				
+			if (parg.hasValue() && (farg == null || farg.hasValue())) {
+    		
+				final Value pargVal = parg.getValue();
+				
+				final Value fargVal = farg != null ? farg.getValue() : null;
+				
+	    		return NV.asMap(
+	    				new NV(Annotations.NAMESPACE, lex),
+	    				new NV(Annotations.PATTERN, 
+	    						getPattern(pargVal, fargVal)));
+	    		
+			}
+    		
+    	}
+    		
+		return NV.asMap(Annotations.NAMESPACE, lex);
+    	
+    }
+    
 	/**
 	 * Construct a regex bop without flags.
 	 */
@@ -58,7 +101,8 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 			final IValueExpression<? extends IV> pattern,
 			final String lex) {
         
-        this(new BOp[] { var, pattern }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { var, pattern }, anns(pattern, null, lex));
+//        		NV.asMap(Annotations.NAMESPACE, lex));
 
     }
     
@@ -72,8 +116,8 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 			final IValueExpression<? extends IV> flags,
 			final String lex) {
         
-        this(new BOp[] { var, pattern, flags }, NV.asMap(Annotations.NAMESPACE,
-                lex));
+        this(new BOp[] { var, pattern, flags }, anns(pattern, flags, lex)); 
+//        		NV.asMap(Annotations.NAMESPACE, lex));
         
     }
     
@@ -96,12 +140,9 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         super(op);
     }
     
-    /**
-     * This bop can only work with materialized terms.  
-     */
     public Requirement getRequirement() {
     	
-    	return INeedsMaterialization.Requirement.ALWAYS;
+    	return INeedsMaterialization.Requirement.SOMETIMES;
     	
     }
     
@@ -148,11 +189,45 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         	log.debug("regex flags: " + farg);
         }
         
-        if (QueryEvaluationUtil.isSimpleLiteral(arg)
-                && QueryEvaluationUtil.isSimpleLiteral(parg)
+        if (QueryEvaluationUtil.isSimpleLiteral(arg)) {
+        	
+            final String text = ((Literal) arg).getLabel();
+            
+            try {
+            
+            	// first check for cached pattern
+            	Pattern pattern = (Pattern) getProperty(Annotations.PATTERN);
+            	if (pattern == null) {
+            		pattern = getPattern(parg, farg);
+            	}
+                final boolean result = pattern.matcher(text).find();
+                return result;
+            	
+            } catch (IllegalArgumentException ex) {
+            	
+            	throw new SparqlTypeErrorException();
+            	
+            }
+            
+        } else {
+		
+        	throw new SparqlTypeErrorException();
+        	
+        }
+    	
+    }
+    
+    private static Pattern getPattern(final Value parg, final Value farg) 
+    		throws IllegalArgumentException {
+    	
+        if (log.isDebugEnabled()) {
+        	log.debug("regex pattern: " + parg);
+        	log.debug("regex flags: " + farg);
+        }
+        
+        if (QueryEvaluationUtil.isSimpleLiteral(parg)
                 && (farg == null || QueryEvaluationUtil.isSimpleLiteral(farg))) {
 
-            final String text = ((Literal) arg).getLabel();
             final String ptn = ((Literal) parg).getLabel();
 			String flags = "";
 			if (farg != null) {
@@ -180,16 +255,15 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 						f |= Pattern.UNICODE_CASE;
 						break;
 					default:
-						throw new SparqlTypeErrorException();
+						throw new IllegalArgumentException();
 				}
 			}
             final Pattern pattern = Pattern.compile(ptn, f);
-            final boolean result = pattern.matcher(text).find();
-            return result;
+            return pattern;
         }
 		
-		throw new SparqlTypeErrorException();
-    	
+		throw new IllegalArgumentException();
+		
     }
     
 }
