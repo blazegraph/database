@@ -54,6 +54,7 @@ import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RandBOp;
 import com.bigdata.rdf.internal.constraints.RegexBOp;
+import com.bigdata.rdf.internal.constraints.ReplaceBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrAfterBOp;
@@ -828,6 +829,37 @@ public class FunctionRegistry {
                 		lex, args[1]);
                 
                 return new StrAfterBOp(arg1, arg2, lex);
+
+            }
+        });
+		
+		add(REPLACE,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class, ValueExpressionNode.class);
+
+				final IValueExpression<? extends IV> var =
+					AST2BOpUtility.toVE(lex, args[0]);
+				
+				final IValueExpression<? extends IV> pattern =
+					AST2BOpUtility.toVE(lex, args[1]);
+
+				final IValueExpression<? extends IV> replacement =
+					AST2BOpUtility.toVE(lex, args[2]);
+
+				if (args.length == 3) {
+
+					return new ReplaceBOp(var, pattern, replacement, lex);
+
+				} else {
+
+					final IValueExpression<? extends IV> flags =
+						AST2BOpUtility.toVE(lex, args[3]);
+
+					return new ReplaceBOp(var, pattern, replacement, flags, lex);
+
+				}
 
             }
         });

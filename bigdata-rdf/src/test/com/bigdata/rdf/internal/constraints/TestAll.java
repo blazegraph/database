@@ -62,6 +62,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestSubstrBOp.class);
         suite.addTestSuite(TestStrBeforeBOp.class);
         suite.addTestSuite(TestStrAfterBOp.class);
+        suite.addTestSuite(TestReplaceBOp.class);
         
         return suite;
         
