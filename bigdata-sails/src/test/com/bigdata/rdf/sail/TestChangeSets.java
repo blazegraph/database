@@ -119,7 +119,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
     
@@ -218,7 +218,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
     
@@ -309,7 +309,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
     
@@ -416,7 +416,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
 
@@ -513,7 +513,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
     
@@ -620,7 +620,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.setChangeLog(changeLog);
+        cxn.addChangeLog(changeLog);
         
         try {
     

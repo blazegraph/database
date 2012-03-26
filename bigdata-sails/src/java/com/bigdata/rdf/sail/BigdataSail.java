@@ -103,6 +103,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.changesets.DelegatingChangeLog;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
@@ -3270,19 +3271,25 @@ public class BigdataSail extends SailBase implements Sail {
          * @param changeLog
          *          the change log
          */
-        synchronized public void setChangeLog(final IChangeLog changeLog) {
+        synchronized public void addChangeLog(final IChangeLog changeLog) {
             
-            this.changeLog = changeLog;
-            
-            if (assertBuffer != null  && !getTruthMaintenance()) {
-                
-                assertBuffer.setChangeLog(changeLog);
-                
-            }
+        	if (this.changeLog == null) {
+        		
+	            this.changeLog = new DelegatingChangeLog();
+	            
+	            if (assertBuffer != null  && !getTruthMaintenance()) {
+	                
+	                assertBuffer.setChangeLog(changeLog);
+	                
+	            }
+	            
+        	}
+        	
+        	this.changeLog.addDelegate(changeLog);
 
         }
         
-        private IChangeLog changeLog;
+        private DelegatingChangeLog changeLog;
 
     } // class BigdataSailConnection
    
