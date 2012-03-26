@@ -83,6 +83,8 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
        
         suite.addTestSuite(TestTxCreate.class);
 
+        suite.addTestSuite(TestChangeSets.class);
+
         suite.addTestSuite(TestSids.class);
 
 		suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacks.class);
@@ -113,8 +115,8 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());
-/*
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
+/*
         
         properties.setProperty(Options.QUADS, "false");
 */

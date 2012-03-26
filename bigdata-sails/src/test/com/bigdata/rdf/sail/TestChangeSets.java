@@ -40,6 +40,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.changesets.ChangeRecord;
+import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.changesets.InMemChangeLog;
@@ -51,6 +52,8 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
 
 /**
+ * Test suite for the {@link IChangeLog} feature.
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
@@ -111,20 +114,23 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
 
     public void testSimpleAdd() throws Exception {
 
+        BigdataSailRepositoryConnection cxn = null;
+        
         final BigdataSail sail = getSail(getTriplesNoInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
+
         try {
-    
-            final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+
+            final BigdataValueFactory vf = (BigdataValueFactory) sail
+                    .getValueFactory();
+
             final String ns = BD.NAMESPACE;
             
             final URI a = vf.createURI(ns+"A");
@@ -202,7 +208,120 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             }
             
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    /**
+     * Unit test with a full read/write transaction.
+     * 
+     * @throws Exception
+     */
+    public void testSimpleTxAdd() throws Exception {
+
+        BigdataSailRepositoryConnection cxn = null;
+        
+        final Properties properties = getTriplesNoInference();
+        
+        properties.setProperty(BigdataSail.Options.ISOLATABLE_INDICES,"true");
+        
+        final BigdataSail sail = getSail(properties);
+
+        try {
+            
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+
+            final BigdataValueFactory vf = (BigdataValueFactory) sail
+                    .getValueFactory();
+
+            final String ns = BD.NAMESPACE;
+            
+            final URI a = vf.createURI(ns+"A");
+            final URI b = vf.createURI(ns+"B");
+            final URI c = vf.createURI(ns+"C");
+            
+            final BigdataStatement[] stmts = new BigdataStatement[] {
+                vf.createStatement(a, RDFS.SUBCLASSOF, b),
+                vf.createStatement(b, RDFS.SUBCLASSOF, c),
+            };
+
+            final BigdataStatement[] stmts2 = new BigdataStatement[] {
+                vf.createStatement(a, RDFS.SUBCLASSOF, c),
+            };
+
+/**/
+            cxn.setNamespace("ns", ns);
+
+            // add the stmts[]
+            
+            for (BigdataStatement stmt : stmts) {
+                cxn.add(stmt);
+            }
+
+            cxn.commit();//
+            
+            { // should see all of the stmts[] added
+                
+                final Collection<IChangeRecord> expected = 
+                    new LinkedList<IChangeRecord>();
+                for (BigdataStatement stmt : stmts) {
+                    expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
+                }
+                
+                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                
+            }
+            
+            // add the stmts[] again
+
+            for (BigdataStatement stmt : stmts) {
+                cxn.add(stmt);
+            }
+
+            cxn.commit();//
+            
+            { // shouldn't see any change records
+                
+                compare(new LinkedList<IChangeRecord>(), changeLog.getLastCommit(sail.getDatabase()));
+                
+            }
+            
+            // add the stmts2[]
+            
+            for (BigdataStatement stmt : stmts2) {
+                cxn.add(stmt);
+            }
+
+            cxn.commit();//
+            
+            { // should see all of the stmts2[] added
+                
+                final Collection<IChangeRecord> expected = 
+                    new LinkedList<IChangeRecord>();
+                for (BigdataStatement stmt : stmts2) {
+                    expected.add(new ChangeRecord(stmt, ChangeAction.INSERTED));
+                }
+                
+                compare(expected, changeLog.getLastCommit(sail.getDatabase()));
+                
+            }
+            
+            if (log.isDebugEnabled()) {
+                log.debug("\n" + sail.getDatabase().dumpStore(true, true, false));
+            }
+            
+        } finally {
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -210,17 +329,16 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testSimpleRemove() throws Exception {
 
+        BigdataSailRepositoryConnection cxn = null;
         final BigdataSail sail = getSail(getTriplesNoInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
         try {
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
     
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
@@ -286,7 +404,8 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             }
             
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -294,25 +413,26 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testSids() throws Exception {
 
-        Properties props = getTriplesNoInference();
-        
-        if (!Boolean.valueOf(props.getProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS)).booleanValue()) {
+        if (!Boolean.valueOf(
+                getProperties().getProperty(
+                        BigdataSail.Options.STATEMENT_IDENTIFIERS,
+                        BigdataSail.Options.DEFAULT_STATEMENT_IDENTIFIERS))
+                .booleanValue()) {
             log.warn("cannot run this test without sids enabled");
             return;
         }
-        
+
+        BigdataSailRepositoryConnection cxn = null;
         final BigdataSail sail = getSail(getTriplesNoInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
         try {
-    
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+        
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
@@ -325,7 +445,7 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final URI y = vf.createURI(ns+"Y");
             final URI z = vf.createURI(ns+"Z");
             final BNode sid1 = vf.createBNode();
-            final BNode sid2 = vf.createBNode();
+//            final BNode sid2 = vf.createBNode();
             
             final BigdataStatement[] add = new BigdataStatement[] {
                 vf.createStatement(a, x, b, sid1),
@@ -400,7 +520,8 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             }
             
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -408,18 +529,27 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMAdd() throws Exception {
 
+        if (!Boolean.valueOf(
+                getProperties().getProperty(
+                        BigdataSail.Options.TRUTH_MAINTENANCE,
+                        BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE))
+                .booleanValue()) {
+            log.warn("cannot run this test without TM enabled");
+            return;
+        }
+
+        BigdataSailRepositoryConnection cxn = null;
         final BigdataSail sail = getSail(getTriplesWithInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
         try {
 
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+        
             final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
@@ -497,7 +627,8 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             }
             
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -505,18 +636,26 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMRetract() throws Exception {
 
+        if (!Boolean.valueOf(
+                getProperties().getProperty(
+                        BigdataSail.Options.TRUTH_MAINTENANCE,
+                        BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE))
+                .booleanValue()) {
+            log.warn("cannot run this test without TM enabled");
+            return;
+        }
+        
+        BigdataSailRepositoryConnection cxn = null;
         final BigdataSail sail = getSail(getTriplesWithInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
         try {
-    
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+
         	final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
@@ -604,7 +743,8 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             }
             
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
@@ -612,18 +752,28 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
     
     public void testTMUpdate() throws Exception {
 
+        if (!Boolean.valueOf(
+                getProperties().getProperty(
+                        BigdataSail.Options.TRUTH_MAINTENANCE,
+                        BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE))
+                .booleanValue()) {
+            log.warn("cannot run this test without TM enabled");
+            return;
+        }
+        
+        BigdataSailRepositoryConnection cxn = null;
         final BigdataSail sail = getSail(getTriplesWithInference());
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        cxn.setAutoCommit(false);
-        
-        final InMemChangeLog changeLog = new InMemChangeLog();
-        cxn.addChangeLog(changeLog);
-        
+
         try {
-    
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+            cxn.setAutoCommit(false);
+
+            final InMemChangeLog changeLog = new InMemChangeLog();
+            cxn.addChangeLog(changeLog);
+
         	final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
             
             final String ns = BD.NAMESPACE;
@@ -637,18 +787,18 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                 vf.createStatement(b, RDFS.SUBCLASSOF, c),
             };
 
-            final BigdataStatement[] inferred = new BigdataStatement[] {
-                vf.createStatement(a, RDF.TYPE, RDFS.CLASS),
-                vf.createStatement(a, RDFS.SUBCLASSOF, RDFS.RESOURCE),
-                vf.createStatement(a, RDFS.SUBCLASSOF, a),
-                vf.createStatement(a, RDFS.SUBCLASSOF, c),
-                vf.createStatement(b, RDF.TYPE, RDFS.CLASS),
-                vf.createStatement(b, RDFS.SUBCLASSOF, RDFS.RESOURCE),
-                vf.createStatement(b, RDFS.SUBCLASSOF, b),
-                vf.createStatement(c, RDF.TYPE, RDFS.CLASS),
-                vf.createStatement(c, RDFS.SUBCLASSOF, RDFS.RESOURCE),
-                vf.createStatement(c, RDFS.SUBCLASSOF, c),
-            };
+//            final BigdataStatement[] inferred = new BigdataStatement[] {
+//                vf.createStatement(a, RDF.TYPE, RDFS.CLASS),
+//                vf.createStatement(a, RDFS.SUBCLASSOF, RDFS.RESOURCE),
+//                vf.createStatement(a, RDFS.SUBCLASSOF, a),
+//                vf.createStatement(a, RDFS.SUBCLASSOF, c),
+//                vf.createStatement(b, RDF.TYPE, RDFS.CLASS),
+//                vf.createStatement(b, RDFS.SUBCLASSOF, RDFS.RESOURCE),
+//                vf.createStatement(b, RDFS.SUBCLASSOF, b),
+//                vf.createStatement(c, RDF.TYPE, RDFS.CLASS),
+//                vf.createStatement(c, RDFS.SUBCLASSOF, RDFS.RESOURCE),
+//                vf.createStatement(c, RDFS.SUBCLASSOF, c),
+//            };
  
 //            final BigdataStatement[] updates = new BigdataStatement[] {
             BigdataStatement update =
@@ -713,9 +863,10 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
                 
                 assertTrue("wrong type", update.isInferred());
             }
-            
+
         } finally {
-            cxn.close();
+            if (cxn != null)
+                cxn.close();
             sail.__tearDownUnitTest();
         }
 
