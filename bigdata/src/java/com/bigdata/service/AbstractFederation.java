@@ -1244,6 +1244,15 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
                 startDeferredTasks();
                 
+            } catch (RejectedExecutionException t) {
+                
+                if (isOpen()) {
+                    /*
+                     * Only an error if the federation is still open.
+                     */
+                    log.error(t, t);
+                }
+                
             } catch (Throwable t) {
 
                 log.error(t, t);
