@@ -33,6 +33,8 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.http.conn.ClientConnectionManager;
+
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
@@ -221,13 +223,9 @@ public class BOpContext<E> extends BOpContextBase {
 	 *       Note: The only call to this method outside of the test suite is 
 	 *       from ChunkedRunningQuery.  It always has a fully materialized
 	 *       chunk on hand and ready to be processed.
-	 *       
-	 *       TODO Chase down all callers and convert to just ICloseableIterator
-	 *       as part of a clean out of the IAsynchronousIterator API from the
-	 *       query engine architecture.
 	 */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public BOpContext(final IRunningQuery runningQuery,final int partitionId,
+    public BOpContext(final IRunningQuery runningQuery, final int partitionId,
             final BOpStats stats, final ICloseableIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
         
@@ -473,6 +471,16 @@ public class BOpContext<E> extends BOpContextBase {
 
         return getRunningQuery(queryId).getMemoryManager();
 
+    }
+
+    /**
+     * Return the {@link ClientConnectionManager} used to make remote SERVICE
+     * call requests.
+     */
+    public ClientConnectionManager getClientConnectionManager() {
+        
+        return getRunningQuery().getQueryEngine().getClientConnectionManager();
+        
     }
     
     /**

@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
@@ -62,6 +63,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.sail.webapp.client.ClientConnectionManagerFactory;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -363,6 +365,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     private final IIndexManager localIndexManager;
 
+    /**
+     * The {@link ClientConnectionManager} is used to make remote HTTP
+     * connections (SPARQL SERVICE call joins).
+     */
+    private final AtomicReference<ClientConnectionManager> clientConnectionManagerRef = new AtomicReference<ClientConnectionManager>();
+    
 //    /**
 //     * A pool used to service IO requests (reads on access paths).
 //     * <p>
@@ -442,6 +450,51 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     public IQueryClient getProxy() {
 
         return this;
+        
+    }
+    
+    /**
+     * Return the {@link ClientConnectionManager} used to make remote SERVICE
+     * call requests.
+     */
+    public ClientConnectionManager getClientConnectionManager() {
+
+        ClientConnectionManager cm = clientConnectionManagerRef.get();
+        
+        if (cm == null) {
+
+            // Note: Deliberate use of the ref as a monitor object.
+            synchronized (clientConnectionManagerRef) {
+            
+                cm = clientConnectionManagerRef.get();
+                
+                if (cm == null) {
+
+                    if (!isRunning()) {
+                    
+                        /*
+                         * Shutdown.
+                         */
+                        
+                        throw new IllegalStateException();
+
+                    }
+                    
+                    /*
+                     * Lazy instantiation.
+                     */
+                    
+                    clientConnectionManagerRef
+                            .set(cm = ClientConnectionManagerFactory
+                                    .getInstance());
+                    
+                }
+                
+            }
+            
+        }
+        
+        return cm;
         
     }
     
@@ -791,9 +844,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
+        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        if (cm != null) {
+            if (log.isInfoEnabled())
+                log.info("Terminating ClientConnectionManager: " + this);
+            cm.shutdown();
+        }
+        
         // clear references.
         engineFuture.set(null);
         engineService.set(null);
+        clientConnectionManagerRef.set(null);
         
     }
 
@@ -828,6 +889,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
+        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        if (cm != null) {
+            if (log.isInfoEnabled())
+                log.info("Terminating ClientConnectionManager: " + this);
+            cm.shutdown();
+        }
+
         // halt any running queries.
         for(AbstractRunningQuery q : runningQueries.values()) {
             
@@ -838,7 +906,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         // clear references.
         engineFuture.set(null);
         engineService.set(null);
-
+        clientConnectionManagerRef.set(null);
+        
     }
 
     /*

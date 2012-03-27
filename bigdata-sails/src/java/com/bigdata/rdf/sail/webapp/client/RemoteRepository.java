@@ -33,7 +33,6 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -127,17 +126,17 @@ public class RemoteRepository {
     /**
      * The name of the <code>UTF-8</code> character encoding.
      */
-    static private final String UTF8 = "UTF-8";
+    static protected final String UTF8 = "UTF-8";
 
     /**
      * The service end point.
      */
-    private final String serviceURL;
+    protected final String serviceURL;
 
     /**
      * The client used for http connections.
      */
-    private final HttpClient httpClient;
+    protected final HttpClient httpClient;
 
     /**
      * Create a connection to a remote repository using a shared
@@ -182,12 +181,14 @@ public class RemoteRepository {
      */
     public Graph getServiceDescription() throws Exception {
         
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
         
         opts.method = "GET";
         
         HttpResponse response = null;
         try {
+            
+            opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
             
             checkResponseCode(response = doConnect(opts));
 
@@ -216,7 +217,7 @@ public class RemoteRepository {
     public IPreparedTupleQuery prepareTupleQuery(final String query)
             throws Exception {
 
-        return new TupleQuery(UUID.randomUUID(), query);
+        return new TupleQuery(newConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -231,7 +232,7 @@ public class RemoteRepository {
     public IPreparedGraphQuery prepareGraphQuery(final String query)
             throws Exception {
 
-        return new GraphQuery(UUID.randomUUID(), query);
+        return new GraphQuery(newConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -240,13 +241,13 @@ public class RemoteRepository {
      * 
      * @param query
      *            the query string
-     *            
+     * 
      * @return the {@link IPreparedBooleanQuery}
      */
     public IPreparedBooleanQuery prepareBooleanQuery(final String query)
             throws Exception {
 
-        return new BooleanQuery(UUID.randomUUID(), query);
+        return new BooleanQuery(newConnectOptions(), UUID.randomUUID(), query);
 
     }
 
@@ -263,7 +264,8 @@ public class RemoteRepository {
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
             throws Exception {
 
-        return new SparqlUpdate(UUID.randomUUID(), updateStr);
+        return new SparqlUpdate(newConnectOptions(), UUID.randomUUID(),
+                updateStr);
 
     }
 
@@ -383,7 +385,7 @@ public class RemoteRepository {
 	 */
 	public void cancel(final UUID queryId) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
 
         opts.addRequestParam("cancelQuery");
 
@@ -411,7 +413,7 @@ public class RemoteRepository {
 	public long rangeCount(final URI s, final URI p, final Value o, final URI c) 
 			throws Exception {
 
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
 
         opts.method = "GET";
         
@@ -432,6 +434,8 @@ public class RemoteRepository {
         HttpResponse resp = null;
         try {
         	
+            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            
         	checkResponseCode(resp = doConnect(opts));
         	
         	final RangeCountResult result = rangeCountResults(resp);
@@ -461,7 +465,7 @@ public class RemoteRepository {
      */
     public long add(final AddOp add) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
         
         opts.method = "POST";
         
@@ -470,6 +474,7 @@ public class RemoteRepository {
         if (add.format != null) {
         	
             final ByteArrayEntity entity = new ByteArrayEntity(add.data);
+
             entity.setContentType(add.format.getDefaultMIMEType());
             
             opts.entity = entity;
@@ -489,6 +494,8 @@ public class RemoteRepository {
         HttpResponse response = null;
         try {
         	
+            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            
         	checkResponseCode(response = doConnect(opts));
         	
         	final MutationResult result = mutationResults(response);
@@ -514,9 +521,9 @@ public class RemoteRepository {
 	 * @param remove
 	 *        The RDF data to be removed.
 	 */
-	public long remove(RemoveOp remove) throws Exception {
+	public long remove(final RemoveOp remove) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
         
         remove.prepareForWire();
         	
@@ -526,6 +533,7 @@ public class RemoteRepository {
         	opts.addRequestParam("delete");
         	
             final ByteArrayEntity entity = new ByteArrayEntity(remove.data);
+
             entity.setContentType(remove.format.getDefaultMIMEType());
             
             opts.entity = entity;
@@ -559,7 +567,9 @@ public class RemoteRepository {
         HttpResponse response = null;
         try {
         	
-        	checkResponseCode(response = doConnect(opts));
+            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+
+            checkResponseCode(response = doConnect(opts));
         	
         	final MutationResult result = mutationResults(response);
         	
@@ -595,7 +605,7 @@ public class RemoteRepository {
 	 */
 	public long update(final RemoveOp remove, final AddOp add) throws Exception {
 		
-        final ConnectOptions opts = new ConnectOptions(serviceURL);
+        final ConnectOptions opts = newConnectOptions();
         
         remove.prepareForWire();
         add.prepareForWire();
@@ -638,7 +648,9 @@ public class RemoteRepository {
         
         HttpResponse response = null;
         try {
-        	
+
+            opts.acceptHeader = ConnectOptions.MIME_APPLICATION_XML;
+            
         	checkResponseCode(response = doConnect(opts));
         	
         	final MutationResult result = mutationResults(response);
@@ -665,16 +677,19 @@ public class RemoteRepository {
 	 */
     private abstract class Query implements IPreparedOperation {
 		
-		protected final UUID id;
-		
-		protected final String query;
-		
-		private final boolean update;
-		
-        public Query(final UUID id, final String query) {
-         
-            this(id, query, false/* update */);
-            
+        protected final ConnectOptions opts;
+        
+        protected final UUID id;
+
+        protected final String query;
+
+        private final boolean update;
+
+        public Query(final ConnectOptions opts, final UUID id,
+                final String query) {
+
+            this(opts, id, query, false/* update */);
+
         }
 
         /**
@@ -686,12 +701,24 @@ public class RemoteRepository {
          * @param update
          *            <code>true</code> iff this is a SPARQL update.
          */
-        public Query(final UUID id, final String query, final boolean update) {
+        public Query(final ConnectOptions opts, final UUID id,
+                final String query, final boolean update) {
+
+            if (opts == null)
+                throw new IllegalArgumentException();
+            
             if (query == null)
                 throw new IllegalArgumentException();
+            
+            this.opts = opts;
             this.id = id;
             this.query = query;
             this.update = update;
+            
+            /*
+             * Note: This sets various defaults.
+             */
+            setupConnectOptions();
         }
 
 		final public UUID getQueryId() {
@@ -706,20 +733,27 @@ public class RemoteRepository {
 		    
 		}
 		
-		protected ConnectOptions getConnectOpts() throws Exception {
+		/**
+		 * Setup the connection options.
+		 */
+		protected void setupConnectOptions() {
 			
-	        final ConnectOptions opts = new ConnectOptions(serviceURL);
-
 	        opts.method = "POST";
+
 	        if(update) {
-                opts.addRequestParam("update", query);
+            
+	            opts.addRequestParam("update", query);
+	            
 	        } else {
-                opts.addRequestParam("query", query);
+                
+	            opts.addRequestParam("query", query);
+	            
 	        }
+
             if (id != null)
                 opts.addRequestParam("queryId", getQueryId().toString());
 
-        	return opts;
+//        	return opts;
 	        	
         }
 
@@ -727,8 +761,11 @@ public class RemoteRepository {
 
     private final class TupleQuery extends Query implements IPreparedTupleQuery {
 		
-		public TupleQuery(final UUID id, final String query) {
-			super(id, query);
+        public TupleQuery(final ConnectOptions opts, final UUID id,
+                final String query) {
+
+            super(opts, id, query);
+
 		}
 		
 		public TupleQueryResult evaluate() throws Exception {
@@ -736,7 +773,10 @@ public class RemoteRepository {
 	        HttpResponse response = null;
 	        try {
 	        	
-	        	checkResponseCode(response = doConnect(getConnectOpts()));
+                if (opts.acceptHeader == null)
+                    opts.acceptHeader = ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER;
+
+	        	checkResponseCode(response = doConnect(opts));
 	        	
 	        	return tupleResults(response);
 	        	
@@ -761,9 +801,12 @@ public class RemoteRepository {
 
     private final class GraphQuery extends Query implements IPreparedGraphQuery {
 
-        public GraphQuery(final UUID id, final String query) {
-			super(id, query);
-		}
+        public GraphQuery(final ConnectOptions opts, final UUID id,
+                final String query) {
+            
+            super(opts, id, query);
+            
+        }
 		
 		@Override
         public Graph evaluate() throws Exception {
@@ -771,7 +814,12 @@ public class RemoteRepository {
 	        HttpResponse response = null;
 	        try {
 	        	
-	        	checkResponseCode(response = doConnect(getConnectOpts()));
+//	            final ConnectOptions opts = getConnectOpts();
+
+                if (opts.acceptHeader == null)
+                    opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
+
+	        	checkResponseCode(response = doConnect(opts));
 	        	
 	        	return graphResults(response);
 	        	
@@ -797,8 +845,11 @@ public class RemoteRepository {
     private final class BooleanQuery extends Query implements
             IPreparedBooleanQuery {
 		
-		public BooleanQuery(final UUID id, final String query) {
-			super(id, query);
+        public BooleanQuery(final ConnectOptions opts, final UUID id,
+                final String query) {
+        
+            super(opts, id, query);
+            
 		}
 		
 		@Override
@@ -806,8 +857,13 @@ public class RemoteRepository {
             
 	        HttpResponse response = null;
 	        try {
-	        	
-	        	checkResponseCode(response = doConnect(getConnectOpts()));
+
+//	            final ConnectOptions opts = getConnectOpts();
+	            
+                if (opts.acceptHeader == null)
+                    opts.acceptHeader = ConnectOptions.DEFAULT_BOOLEAN_ACCEPT_HEADER;
+
+	        	checkResponseCode(response = doConnect(opts));
 	        	
 	        	return booleanResults(response);
 	        	
@@ -833,9 +889,10 @@ public class RemoteRepository {
     private final class SparqlUpdate extends Query implements
             IPreparedSparqlUpdate {
         
-        public SparqlUpdate(final UUID id, final String updateStr) {
+        public SparqlUpdate(final ConnectOptions opts, final UUID id,
+                final String updateStr) {
 
-            super(id, updateStr, true/*update*/);
+            super(opts, id, updateStr, true/*update*/);
 
         }
         
@@ -845,7 +902,11 @@ public class RemoteRepository {
 	        HttpResponse response = null;
 	        try {
 	        	
-	        	checkResponseCode(response = doConnect(getConnectOpts()));
+//                final ConnectOptions opts = getConnectOpts();
+
+                // Note: No response body is expected.
+                
+	        	checkResponseCode(response = doConnect(opts));
 	        	
 	        } finally {
 	        	
@@ -988,80 +1049,6 @@ public class RemoteRepository {
 	}
 	
     /**
-     * Options for the HTTP connection.
-     */
-    private static class ConnectOptions {
-
-        /** The URL of the SPARQL end point. */
-        public String serviceURL = null;
-        
-        /** The HTTP method (GET, POST, etc). */
-        public String method = "POST";
-
-        /**
-         * The accept header.
-         * 
-         * FIXME This should be all valid RDF interchange syntax formats and all
-         * valid SPARQL solution set formats. There are utility methods to
-         * construct those accept headers. See {@link RDFFormat},
-         * {@link TupleQueryResultFormat}, and {@link BooleanQueryResultFormat}.
-         */
-        public String acceptHeader = //
-	        BigdataRDFServlet.MIME_SPARQL_RESULTS_XML + ";q=1" + //
-	        "," + //
-	        RDFFormat.RDFXML.getDefaultMIMEType() + ";q=1"//
-	        ;
-        
-        /** Request parameters to be formatted as URL query parameters. */
-        public Map<String, String[]> requestParams;
-        
-        /** Request entity. */
-        public HttpEntity entity = null;
-
-        /**
-         * TODO The connection timeout (ms) -or- ZERO (0) for an infinite
-         * timeout (how is this communicated using http components?).
-         */
-        public int timeout = 0;
-
-        public ConnectOptions(final String serviceURL) {
-        
-            this.serviceURL = serviceURL;
-            
-        }
-        
-        public void addRequestParam(final String name, final String[] vals) {
-        	
-        	if (requestParams == null) {
-        		requestParams = new LinkedHashMap<String, String[]>();
-        	}
-        	
-        	requestParams.put(name, vals);
-        	
-        }
-        
-        public void addRequestParam(final String name, final String val) {
-        	
-        	addRequestParam(name, new String[] { val });
-        	
-        }
-        
-        public void addRequestParam(final String name) {
-        	
-        	addRequestParam(name, (String[]) null);
-        	
-        }
-        
-        public String getRequestParam(final String name) {
-        	
-        	return (requestParams != null && requestParams.containsKey(name))
-        				? requestParams.get(name)[0] : null;
-        	
-        }
-        
-    }
-
-    /**
      * Connect to a SPARQL end point (GET or POST query only).
      * 
      * @param opts
@@ -1069,8 +1056,7 @@ public class RemoteRepository {
      * 
      * @return The connection.
      */
-    protected HttpResponse doConnect(final ConnectOptions opts)
-            throws Exception {
+    public HttpResponse doConnect(final ConnectOptions opts) throws Exception {
 
         /*
          * Generate the fully formed and encoded URL.
@@ -1199,7 +1185,7 @@ public class RemoteRepository {
      * 
      * @throws IOException
      */
-    static protected HttpResponse checkResponseCode(final HttpResponse response)
+    static public HttpResponse checkResponseCode(final HttpResponse response)
             throws IOException {
         
         final int rc = response.getStatusLine().getStatusCode();
@@ -1292,7 +1278,7 @@ public class RemoteRepository {
      *             {@link TupleQueryResult} already supports that within its
      *             abstraction.
      */
-    protected TupleQueryResult tupleResults(final HttpResponse response)
+    public TupleQueryResult tupleResults(final HttpResponse response)
             throws Exception {
 
     	HttpEntity entity = null;
@@ -1315,7 +1301,14 @@ public class RemoteRepository {
 
             final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
                     .getInstance().get(format);
-	
+
+            if (parserFactory == null)
+                throw new IOException(
+                        "No parser for format for service response: serviceURI="
+                                + serviceURL + ", contentType=" + contentType
+                                + ", format=" + format + " : response="
+                                + getResponseBody(response));
+
 	        final TupleQueryResultParser parser = parserFactory.getParser();
 	
 	        final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
@@ -1355,7 +1348,7 @@ public class RemoteRepository {
      *             Right now it materializes everything before returning.
      *             This will cause an API change on {@link GraphQuery}.
      */
-	protected Graph graphResults(final HttpResponse response) throws Exception {
+	public Graph graphResults(final HttpResponse response) throws Exception {
 
     	HttpEntity entity = null;
 		try {
@@ -1698,5 +1691,16 @@ public class RemoteRepository {
 	    return data;
 
 	}
+
+    /**
+     * Return the {@link ConnectOptions} which will be used by default.
+     */
+    protected ConnectOptions newConnectOptions() {
+
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
+
+        return opts;
+
+    }
 
 }

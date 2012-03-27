@@ -808,7 +808,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     .getConstantServiceURI(serviceRef);
             
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
-                    .toServiceCall(ctx.db, serviceURI, serviceNode);
+                    .toServiceCall(ctx.db,
+                            ctx.queryEngine.getClientConnectionManager(),
+                            serviceURI, serviceNode);
 
             /*
              * true IFF this is a registered bigdata aware service running in
