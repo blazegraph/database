@@ -111,7 +111,6 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
-import com.bigdata.rdf.sparql.ast.service.RemoteServiceFactoryImpl;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 /**
@@ -554,25 +553,33 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
     
     /**
-     * This is a manual test to see the Fallback in action. Query asks
-     * DBpedia, which does not support BINDINGS
-     *<p> 
+     * This is a manual test to see the Fallback in action. Query asks DBpedia,
+     * which does not support BINDINGS
+     * <p>
      * Note: Bigdata is not doing automatic fallback. You have to explicitly
-     * make a note of services which do not support SPARQL 1.1.
+     * make a note of services which do not support SPARQL 1.1. Note: I have
+     * taken this query out of CI. We are not doing fallback, so there is no
+     * reason to issue the query. Also, the virtuoso cluster for dbpedia falls
+     * over a lot ;-) causing this query to fail. For example:
+     * <pre>
+     * [junit] Caused by: java.io.IOException: Status Code=500, Status
+     * Line=HTTP/1.1 500 SPARQL Request Failed, Response=Virtuoso 08C01 Error
+     * CL...: Cluster could not connect to host 2 22202 error 111
+     * </pre>
      */
-    public void test12() throws Exception {
-        final URI serviceURI = new URIImpl("http://dbpedia.org/sparql");
-        ServiceRegistry.getInstance().add(serviceURI,
-                new RemoteServiceFactoryImpl(false/* isSparql11 */));
-        try {
-            /* test vectored join with more intermediate results */
-            // clears the repository and adds new data + execute
-            prepareTest(PREFIX + "data12.ttl", Collections.<String> emptyList());
-            execute(PREFIX + "service12.rq", PREFIX + "service12.srx", false);
-        } finally {
-            ServiceRegistry.getInstance().remove(serviceURI);
-        }
-    }
+//    public void test12() throws Exception {
+//        final URI serviceURI = new URIImpl("http://dbpedia.org/sparql");
+//        ServiceRegistry.getInstance().add(serviceURI,
+//                new RemoteServiceFactoryImpl(false/* isSparql11 */));
+//        try {
+//            /* test vectored join with more intermediate results */
+//            // clears the repository and adds new data + execute
+//            prepareTest(PREFIX + "data12.ttl", Collections.<String> emptyList());
+//            execute(PREFIX + "service12.rq", PREFIX + "service12.srx", false);
+//        } finally {
+//            ServiceRegistry.getInstance().remove(serviceURI);
+//        }
+//    }
 
     /*
      * FIXME I have disabled this test. For now, just workaround the problem by
