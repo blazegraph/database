@@ -96,14 +96,7 @@ public class TestAll extends TestCase {
         
 //        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
-        /*
-         * FIXME This is disabled pending resolution of
-         * 
-         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
-         * journals in CI)
-         */
-        Logger.getLogger(TestCase2.class).error("Enable: "+TestTransientJournal.class);
-//            suite.addTest( TestTransientJournal.suite() );
+        suite.addTest( TestTransientJournal.suite() );
 
         /*
          * Commented out since this mode is not used and there is an occasional
