@@ -27,8 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.rdf.store.TestLocalTripleStoreWithoutInlining;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 /**
@@ -91,7 +96,14 @@ public class TestAll extends TestCase {
         
 //        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
-            suite.addTest( TestTransientJournal.suite() );
+        /*
+         * FIXME This is disabled pending resolution of
+         * 
+         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
+         * journals in CI)
+         */
+        Logger.getLogger(TestCase2.class).error("Enable: "+TestTransientJournal.class);
+//            suite.addTest( TestTransientJournal.suite() );
 
         /*
          * Commented out since this mode is not used and there is an occasional

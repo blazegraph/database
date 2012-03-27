@@ -108,7 +108,14 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
         // quad store in scale-out.
-        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
+        /*
+         * FIXME This is disabled pending resolution of
+         * 
+         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
+         * journals in CI)
+         */
+        Logger.getLogger(TestCase2.class).error("Enable: "+TestBigdataSailEmbeddedFederationWithQuads.class);
+//        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 
