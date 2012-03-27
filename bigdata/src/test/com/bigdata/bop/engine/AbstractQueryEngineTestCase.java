@@ -45,7 +45,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -463,7 +462,13 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
             fail("Expecting null, but have " + o2);
 
         }
-        
+
+        if (o1 != null && o2 == null) {
+
+            fail("Expecting non-null, but have null: expected=" + o1);
+
+        }
+
         if (!o1.getClass().equals(o2.getClass())) {
 
             fail("Types differ: expecting " + o1.getClass() + ", but have "

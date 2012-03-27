@@ -38,6 +38,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 
@@ -208,6 +209,8 @@ public class ServiceCallJoin extends PipelineOp {
 //        private final IConstraint[] constraints;
 
         private final AbstractTripleStore db;
+
+        private final ClientConnectionManager cm;
         
         private final IVariableOrConstant<?> serviceRef;
 
@@ -253,6 +256,8 @@ public class ServiceCallJoin extends PipelineOp {
 
             this.db = (AbstractTripleStore) context
                     .getResource(namespace, timestamp);
+            
+            this.cm = context.getClientConnectionManager();
 
 //            this.valueFactory = db.getValueFactory();
 
@@ -523,7 +528,7 @@ public class ServiceCallJoin extends PipelineOp {
                 final BigdataURI serviceURI) {
 
             final ServiceCall<?> serviceCall = ServiceRegistry.getInstance()
-                    .toServiceCall(db, serviceURI, serviceNode);
+                    .toServiceCall(db, cm, serviceURI, serviceNode);
 
             return serviceCall;
 

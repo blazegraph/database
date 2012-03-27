@@ -42,7 +42,6 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.query.parser.sparql.DC;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.XSD;
@@ -89,7 +88,7 @@ public class TestRemoteSparql10QueryBuilder extends
     /**
      * @param name
      */
-    public TestRemoteSparql10QueryBuilder(String name) {
+    public TestRemoteSparql10QueryBuilder(final String name) {
         super(name);
     }
     

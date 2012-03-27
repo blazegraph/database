@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import org.openrdf.query.resultio.TupleQueryResultFormat;
-
 /**
  * Configurable options for a remote service end point.
  * 
@@ -50,21 +48,21 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
  */
 public class RemoteServiceOptions extends ServiceOptionsBase {
 
-    static private final String DEFAULT_ACCEPT_HEADER;
-    
-    static {
-
-        DEFAULT_ACCEPT_HEADER = //
-                TupleQueryResultFormat.BINARY.getDefaultMIMEType() + ";q=1" + //
-                "," + //
-                TupleQueryResultFormat.SPARQL.getDefaultMIMEType() + ";q=.9"//
-        ;
-
-    }
+//    static private final String DEFAULT_ACCEPT_HEADER;
+//    
+//    static {
+//
+//        DEFAULT_ACCEPT_HEADER = //
+//                TupleQueryResultFormat.BINARY.getDefaultMIMEType() + ";q=1" + //
+//                "," + //
+//                TupleQueryResultFormat.SPARQL.getDefaultMIMEType() + ";q=.9"//
+//        ;
+//
+//    }
     
     private boolean isSparql11 = true;
     private boolean isGET = true;
-    private String acceptStr = DEFAULT_ACCEPT_HEADER;
+    private String acceptStr = null;
 
     public RemoteServiceOptions() {
 
@@ -98,33 +96,39 @@ public class RemoteServiceOptions extends ServiceOptionsBase {
     /**
      * When <code>true</code>, use GET for query. Otherwise use POST. Note that
      * POST can often handle larger queries than GET due to limits at the HTTP
-     * client layer.
+     * client layer, but HTTP caching only works for GET.
      */
     public boolean isGET() {
+
         return isGET;
+        
     }
 
-    /**
-     * FIXME Disabled since the {@link RemoteServiceCallImpl} does not support
-     * POST yet.
-     */
     public void setGET(final boolean newValue) {
-        if (true) {
-            throw new UnsupportedOperationException();
-        }
+        
         this.isGET = newValue;
+        
     }
     
+    /**
+     * The <code>Accept</code> header.
+     * 
+     * @return The header -or- <code>null</code> if the default header should be
+     *         used.
+     */
     public String getAcceptHeader() {
         
         return acceptStr;
         
     }
 
+    /**
+     * Set a non-default <code>Accept</code> header.
+     * 
+     * @param newValue
+     *            The new value -or- <code>null</code> to clear the old value.
+     */
     public void setAcceptHeader(final String newValue) {
-        
-        if (newValue == null || newValue.length() == 0)
-            throw new IllegalArgumentException();
         
         this.acceptStr = newValue;
         

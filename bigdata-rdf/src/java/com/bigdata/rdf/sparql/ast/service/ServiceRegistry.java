@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -178,6 +179,9 @@ public class ServiceRegistry {
      * 
      * @param store
      *            The {@link AbstractTripleStore}.
+     * @param cm
+     *            The {@link ClientConnectionManager} will be used to make
+     *            remote HTTP connections.
      * @param serviceURI
      *            The as-bound {@link URI} of the service end point.
      * @param serviceNode
@@ -186,8 +190,8 @@ public class ServiceRegistry {
      * @return A {@link ServiceCall} for that service.
      */
     public final ServiceCall<? extends Object> toServiceCall(
-            final AbstractTripleStore store, URI serviceURI,
-            final ServiceNode serviceNode) {
+            final AbstractTripleStore store, final ClientConnectionManager cm,
+            URI serviceURI, final ServiceNode serviceNode) {
 
         if (serviceURI == null)
             throw new IllegalArgumentException();
