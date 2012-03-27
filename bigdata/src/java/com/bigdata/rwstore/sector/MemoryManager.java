@@ -619,7 +619,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 *            
 	 * @return A copy of the data stored at that address.
 	 */
-	static byte[] read(IMemoryManager mmgr, final long addr) {
+	static byte[] read(final IMemoryManager mmgr, final long addr) {
 
 		final int nbytes = getAllocationSize(addr);
 		
