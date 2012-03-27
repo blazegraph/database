@@ -2094,9 +2094,17 @@ abstract public class LoadBalancerService extends AbstractService
          */
         String serviceName;
         if (IDataService.class == serviceIface) {
+            final IBigdataFederation<?> fed;
             try {
-                serviceName = getFederation().getDataService(serviceUUID)
-                        .getServiceName();
+                fed = getFederation();
+            } catch (IllegalStateException t) {
+                /*
+                 * Note: Indicates that the federation is closed.
+                 */
+                return;
+            }
+            try {
+                serviceName = fed.getDataService(serviceUUID).getServiceName();
             } catch (Throwable t) {
                 log.warn(t.getMessage(), t);
                 serviceName = serviceUUID.toString();
