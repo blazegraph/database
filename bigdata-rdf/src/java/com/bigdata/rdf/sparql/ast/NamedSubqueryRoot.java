@@ -34,19 +34,21 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
  * 
  * @see NamedSubqueryInclude
  */
-public class NamedSubqueryRoot extends SubqueryBase {
+public class NamedSubqueryRoot extends SubqueryBase implements
+        INamedSolutionSet {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryRoot.Annotations {
-        
-        /**
-         * The name of the temporary solution set.
-         */
-        String SUBQUERY_NAME = "subqueryName";
+    public interface Annotations extends SubqueryRoot.Annotations,
+            INamedSolutionSet.Annotations {
+
+//        /**
+//         * The name of the temporary solution set.
+//         */
+//        String SUBQUERY_NAME = "subqueryName";
         
         /**
          * The {@link String}[] of the named solution sets on which this named
@@ -116,26 +118,18 @@ public class NamedSubqueryRoot extends SubqueryBase {
 
     }
 
-    /**
-     * The name associated with the subquery.
-     */
     public String getName() {
 
-        return (String) getProperty(Annotations.SUBQUERY_NAME);
+        return (String) getProperty(Annotations.NAMED_SET);
         
     }
 
-    /**
-     * Set the name associated with the subquery.
-     * 
-     * @param name
-     */
-    public void setName(String name) {
+    public void setName(final String name) {
 
         if(name == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.SUBQUERY_NAME, name);
+        setProperty(Annotations.NAMED_SET, name);
         
     }
 

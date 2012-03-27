@@ -40,7 +40,7 @@ import com.bigdata.bop.IVariable;
  * @see SliceNode
  */
 abstract public class QueryBase extends QueryNodeBase implements
-        IBindingProducerNode, IGraphPatternContainer {
+        IBindingProducerNode, IGraphPatternContainer, IProjectionDecl {
 
     /**
      * 
@@ -48,7 +48,7 @@ abstract public class QueryBase extends QueryNodeBase implements
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends QueryNodeBase.Annotations,
-            IGraphPatternContainer.Annotations {
+            IGraphPatternContainer.Annotations, IProjectionDecl.Annotations {
 
         /**
          * The {@link QueryType}.
@@ -60,15 +60,15 @@ abstract public class QueryBase extends QueryNodeBase implements
          */
         String CONSTRUCT = "construct";
 
-        /**
-         * The {@link ProjectionNode} (optional). This is also used for DESCRIBE
-         * queries to capture the list of variables and IRIs which are then used
-         * to rewrite the DESCRIBE query into what amounts to a CONSTRUCT query.
-         * The resulting CONSTRUCT query will have a different
-         * {@link ProjectionNode} suitable for use with the generated
-         * {@link ConstructNode}.
-         */
-        String PROJECTION = "projection";
+//        /**
+//         * The {@link ProjectionNode} (optional). This is also used for DESCRIBE
+//         * queries to capture the list of variables and IRIs which are then used
+//         * to rewrite the DESCRIBE query into what amounts to a CONSTRUCT query.
+//         * The resulting CONSTRUCT query will have a different
+//         * {@link ProjectionNode} suitable for use with the generated
+//         * {@link ConstructNode}.
+//         */
+//        String PROJECTION = "projection";
 
         /**
          * The {@link GroupByNode} (optional).
@@ -181,27 +181,18 @@ abstract public class QueryBase extends QueryNodeBase implements
         
     }
     
-    /**
-     * Return the projection -or- <code>null</code> if there is no projection.
-     */
+    public void setProjection(final ProjectionNode projection) {
+
+        setProperty(Annotations.PROJECTION, projection);
+
+    }
+
     public ProjectionNode getProjection() {
 
         return (ProjectionNode) getProperty(Annotations.PROJECTION);
 
     }
     
-    /**
-     * Return the set of variables projected out of this query (this is a NOP if
-     * there is no {@link ProjectionNode} for the query, which can happen for an
-     * ASK query).  This DOES NOT report the variables which are used by the
-     * SELECT expressions, just the variables which are PROJECTED out by the
-     * BINDs.
-     * 
-     * @param vars
-     *            The projected variables are added to this set.
-     * 
-     * @return The caller's set.
-     */
     public Set<IVariable<?>> getProjectedVars(final Set<IVariable<?>> vars) {
         
         final ProjectionNode tmp = getProjection();
@@ -241,18 +232,6 @@ abstract public class QueryBase extends QueryNodeBase implements
         
         return vars;
         
-    }
-
-    /**
-     * Set or clear the projection.
-     * 
-     * @param projection
-     *            The projection (may be <code>null</code>).
-     */
-    public void setProjection(final ProjectionNode projection) {
-
-        setProperty(Annotations.PROJECTION, projection);
-
     }
 
     /**

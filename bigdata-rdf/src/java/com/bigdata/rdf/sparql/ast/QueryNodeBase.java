@@ -28,7 +28,7 @@ public abstract class QueryNodeBase extends ASTBase implements
     /**
      * Required deep copy constructor.
      */
-    public QueryNodeBase(QueryNodeBase op) {
+    public QueryNodeBase(final QueryNodeBase op) {
 
         super(op);
         
@@ -37,7 +37,7 @@ public abstract class QueryNodeBase extends ASTBase implements
     /**
      * Required shallow copy constructor.
      */
-    public QueryNodeBase(BOp[] args, Map<String, Object> anns) {
+    public QueryNodeBase(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
