@@ -92,14 +92,7 @@ public class TestAll extends TestCase {
         suite.addTest(TestBigdataSailWithSids.suite());
         
         // run the test suite without statement identifiers enabled.
-        /*
-         * FIXME This is disabled pending resolution of
-         * 
-         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
-         * journals in CI)
-         */
-        Logger.getLogger(TestCase2.class).error("Enable: "+TestBigdataSailWithoutSids.class);
-//        suite.addTest(TestBigdataSailWithoutSids.suite());
+        suite.addTest(TestBigdataSailWithoutSids.suite());
         
         // quad store test suite w/ pipeline joins.
         suite.addTest(TestBigdataSailWithQuads.suite());
@@ -108,14 +101,7 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
         // quad store in scale-out.
-        /*
-         * FIXME This is disabled pending resolution of
-         * 
-         * @see http://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary
-         * journals in CI)
-         */
-        Logger.getLogger(TestCase2.class).error("Enable: "+TestBigdataSailEmbeddedFederationWithQuads.class);
-//        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
+        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 
