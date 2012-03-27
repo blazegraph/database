@@ -340,9 +340,9 @@ public class QueryEngineFactory {
          * @param indexManager
          * @param resourceService
          */
-        public FederatedQueryController(UUID thisService,
-                IBigdataFederation<?> fed, Journal indexManager,
-                ManagedResourceService resourceService) {
+        public FederatedQueryController(final UUID thisService,
+                final IBigdataFederation<?> fed, final Journal indexManager,
+                final ManagedResourceService resourceService) {
 
             super(thisService, fed, indexManager, resourceService);
 
