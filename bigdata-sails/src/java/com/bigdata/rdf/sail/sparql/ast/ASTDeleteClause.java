@@ -22,5 +22,19 @@ class ASTDeleteClause extends SimpleNode {
   public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data) throws VisitorException {
     return visitor.visit(this, data);
   }
+
+  private String name;
+  public void setName(String name) {
+      this.name = name;
+  }
+  
+  public String getName() {
+      return name;
+  }
+  
+  public ASTSelect getSelect() {
+      return jjtGetChild(ASTSelect.class);
+  }
+
 }
 /* JavaCC - OriginalChecksum=301afda347437e0cb5e0b2bee033d014 (do not edit this line) */

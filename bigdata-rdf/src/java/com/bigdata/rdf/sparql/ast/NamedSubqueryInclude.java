@@ -47,17 +47,13 @@ import com.bigdata.bop.IVariable;
  */
 public class NamedSubqueryInclude extends
         GroupMemberNodeBase<NamedSubqueryInclude> implements
-        IJoinNode {
+        IJoinNode, INamedSolutionSet {
 
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryRoot.Annotations {
+    public interface Annotations extends SubqueryRoot.Annotations,
+            INamedSolutionSet.Annotations {
 
-        /**
-         * The name of the temporary solution set.
-         */
-        String NAMED_SET = "namedSet";
-        
         /**
          * A {@link VarNode}[] specifying the join variables that will be used
          * when the named result set is join with the query. The join variables
@@ -128,30 +124,24 @@ public class NamedSubqueryInclude extends
      *            The name of the subquery result set.
      */
     public NamedSubqueryInclude(final String name) {
+
         setName(name);
+        
     }
 
-    /**
-     * The name of the {@link NamedSubqueryRoot} to be joined.
-     */
     public String getName() {
-        
+
         return (String) getProperty(Annotations.NAMED_SET);
-                
+
     }
 
-    /**
-     * Set the name of the {@link NamedSubqueryRoot} to be joined.
-     * 
-     * @param name
-     */
     public void setName(final String name) {
-     
-        if(name == null)
+
+        if (name == null)
             throw new IllegalArgumentException();
-        
+
         setProperty(Annotations.NAMED_SET, name);
-        
+
     }
 
     /**

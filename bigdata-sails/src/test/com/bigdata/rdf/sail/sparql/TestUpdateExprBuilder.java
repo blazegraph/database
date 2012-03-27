@@ -52,7 +52,9 @@ import com.bigdata.rdf.sparql.ast.InsertData;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
+import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -1362,7 +1364,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1375,7 +1377,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -1467,7 +1469,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1480,7 +1482,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -1577,7 +1579,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1590,7 +1592,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -1692,7 +1694,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1705,7 +1707,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), null,
                         Scope.DEFAULT_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -1811,7 +1813,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1824,7 +1826,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -1950,7 +1952,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), null,
                         Scope.DEFAULT_CONTEXTS));
                         
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -1970,7 +1972,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS)));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -2080,7 +2082,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label1), new ConstantNode(addresses),
                         Scope.NAMED_CONTEXTS));
                         
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -2100,7 +2102,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         new ConstantNode(label2), new VarNode("graph"),
                         Scope.NAMED_CONTEXTS)));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -2181,7 +2183,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 deleteClause.addChild(new StatementPatternNode(new VarNode(
                         "book"), new VarNode("p"), new VarNode("v")));
 
-                op.setDeleteClause(deleteClause);
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
             }
 
@@ -2266,7 +2268,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                         "book"), new VarNode("p"), new VarNode("v"),
                         new ConstantNode(bookstore2), Scope.NAMED_CONTEXTS));
 
-                op.setInsertClause(insertClause);
+                op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
             }
 
@@ -2415,7 +2417,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                             new ConstantNode(label1), null,
                             Scope.DEFAULT_CONTEXTS));
 
-                    op.setDeleteClause(deleteClause);
+                    op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
                 }
 
@@ -2457,7 +2459,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                             new ConstantNode(label2), null,
                             Scope.DEFAULT_CONTEXTS));
 
-                    op.setInsertClause(insertClause);
+                    op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
                 }
 
@@ -2578,7 +2580,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                             new ConstantNode(label1), null,
                             Scope.DEFAULT_CONTEXTS));
 
-                    op.setDeleteClause(deleteClause);
+                    op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
 
                 }
 
@@ -2632,7 +2634,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                             new ConstantNode(label2), null,
                             Scope.DEFAULT_CONTEXTS));
 
-                    op.setInsertClause(insertClause);
+                    op.setInsertClause(new QuadsDataOrNamedSolutionSet(insertClause));
 
                 }
 
@@ -2657,6 +2659,194 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
                                             "graph"), Scope.NAMED_CONTEXTS)));
 
                 }
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * INSERT INTO named solution set (bigdata extension).
+     * 
+     * <pre>
+     * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
+     * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+     * 
+     * INSERT INTO %cached_solution_set 
+     * WHERE
+     *   { GRAPH  <http://example/bookStore>
+     *        { ?book dc:date ?date .
+     *          FILTER ( ?date > "1970-01-01T00:00:00-02:00"^^xsd:dateTime )
+     *          ?book ?p ?v
+     *   } }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/524 (SPARQL Cache)
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert__insertInto_01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+                  "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
+                + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//
+                + "INSERT INTO %cached_solution_set\n"//
+                + "SELECT ?book ?date\n"//
+                + "WHERE\n"//
+                + "   { GRAPH  <http://example/bookStore>\n"//
+                + "        { ?book dc:date ?date .\n"//
+                + "          FILTER ( ?date > \"1970-01-01T00:00:00-02:00\"^^xsd:dateTime )\n"//
+                + "          ?book ?p ?v\n"//
+                + "} }";
+        
+        final IV dcDate = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/date"));
+        final IV dateTime = makeIV(valueFactory.createLiteral("1970-01-01T00:00:00-02:00",XSD.DATETIME));
+        final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadsDataOrNamedSolutionSet insertClause = new QuadsDataOrNamedSolutionSet(
+                        "%cached_solution_set");
+                
+                final ProjectionNode projection = new ProjectionNode();
+                insertClause.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("book"));
+                projection.addProjectionVar(new VarNode("date"));
+                
+                op.setInsertClause(insertClause);
+
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                final JoinGroupNode graphGroup = new JoinGroupNode();
+
+                whereClause.addChild(graphGroup);
+
+                graphGroup.setContext(new ConstantNode(bookstore));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new ConstantNode(dcDate),
+                        new VarNode("date"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                graphGroup.addChild(new FilterNode(FunctionNode.GT(new VarNode(
+                        "date"), new ConstantNode(dateTime))));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new VarNode("p"),
+                        new VarNode("v"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                op.setWhereClause(whereClause);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * DELETE FROM named solution set (bigdata extension).
+     * 
+     * <pre>
+     * PREFIX dc:  <http://purl.org/dc/elements/1.1/>
+     * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+     * 
+     * DELETE FROM %cached_solution_set 
+     * WHERE
+     *   { GRAPH  <http://example/bookStore>
+     *        { ?book dc:date ?date .
+     *          FILTER ( ?date > "1970-01-01T00:00:00-02:00"^^xsd:dateTime )
+     *          ?book ?p ?v
+     *   } }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/524 (SPARQL Cache)
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_delete_insert__deleteFrom_01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+                  "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
+                + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//
+                + "DELETE FROM %cached_solution_set\n"//
+                + "SELECT ?book ?date\n"//
+                + "WHERE\n"//
+                + "   { GRAPH  <http://example/bookStore>\n"//
+                + "        { ?book dc:date ?date .\n"//
+                + "          FILTER ( ?date > \"1970-01-01T00:00:00-02:00\"^^xsd:dateTime )\n"//
+                + "          ?book ?p ?v\n"//
+                + "} }";
+        
+        final IV dcDate = makeIV(valueFactory.createURI("http://purl.org/dc/elements/1.1/date"));
+        final IV dateTime = makeIV(valueFactory.createLiteral("1970-01-01T00:00:00-02:00",XSD.DATETIME));
+        final IV bookstore = makeIV(valueFactory.createURI("http://example/bookStore"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadsDataOrNamedSolutionSet deleteClause = new QuadsDataOrNamedSolutionSet(
+                        "%cached_solution_set");
+                
+                final ProjectionNode projection = new ProjectionNode();
+                deleteClause.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("book"));
+                projection.addProjectionVar(new VarNode("date"));
+                
+                op.setDeleteClause(deleteClause);
+
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                final JoinGroupNode graphGroup = new JoinGroupNode();
+
+                whereClause.addChild(graphGroup);
+
+                graphGroup.setContext(new ConstantNode(bookstore));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new ConstantNode(dcDate),
+                        new VarNode("date"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                graphGroup.addChild(new FilterNode(FunctionNode.GT(new VarNode(
+                        "date"), new ConstantNode(dateTime))));
+
+                graphGroup.addChild(new StatementPatternNode(
+                        new VarNode("book"), new VarNode("p"),
+                        new VarNode("v"), new ConstantNode(bookstore),
+                        Scope.NAMED_CONTEXTS));
+
+                op.setWhereClause(whereClause);
 
             }
 

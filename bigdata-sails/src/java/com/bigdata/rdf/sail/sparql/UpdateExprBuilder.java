@@ -75,6 +75,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
+import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.spo.ISPO;
@@ -533,11 +534,24 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             if (deleteNode != null) {
 
-                // This is a QuadPattern (versus ground data)
-                final QuadData deleteClause = (QuadData) deleteNode.jjtAccept(
-                        this, data);
+                if (deleteNode.getName() == null) {
 
-                op.setDeleteClause(deleteClause);
+                    // This is a QuadPattern (versus ground data)
+                    final QuadData quadData = (QuadData) deleteNode
+                            .jjtAccept(this, data);
+
+                    op.setDeleteClause(new QuadsDataOrNamedSolutionSet(quadData));
+
+                } else {
+
+                    final QuadsDataOrNamedSolutionSet deleteClause = new QuadsDataOrNamedSolutionSet(
+                            deleteNode.getName());
+
+                    handleSelect(deleteNode.getSelect(), deleteClause);
+                    
+                    op.setDeleteClause(deleteClause);
+
+                }
 
             }
 
@@ -549,11 +563,24 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             if (insertNode != null) {
 
-                // This is a QuadPattern (versus ground data)
-                final QuadData deleteClause = (QuadData) insertNode.jjtAccept(
-                        this, data);
+                if (insertNode.getName() == null) {
 
-                op.setInsertClause(deleteClause);
+                    // This is a QuadPattern (versus ground data)
+                    final QuadData quadData = (QuadData) insertNode
+                            .jjtAccept(this, data);
+
+                    op.setInsertClause(new QuadsDataOrNamedSolutionSet(quadData));
+
+                } else {
+
+                    final QuadsDataOrNamedSolutionSet insertClause = new QuadsDataOrNamedSolutionSet(
+                            insertNode.getName());
+
+                    handleSelect(insertNode.getSelect(), insertClause);
+
+                    op.setInsertClause(insertClause);
+
+                }
 
             }
             

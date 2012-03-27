@@ -1256,6 +1256,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                  * tends to get "noticed" by the next lock acquisition, which
                  * happens to be the one where we release the native memory
                  * buffers.
+                 * 
+                 * TODO It may be possible for interrupts to be thrown inside of
+                 * these methods after we have tested and cleared the interrupt
+                 * status of the Thread. That would result in a wrapped
+                 * exception and the cancelQueryOnPeers() or queryBuffer.close()
+                 * might not be processed properly.
                  */
                 interrupted |= Thread.interrupted();
                 if (controller) {

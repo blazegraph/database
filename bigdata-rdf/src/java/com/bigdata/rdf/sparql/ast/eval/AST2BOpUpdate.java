@@ -97,6 +97,7 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
+import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -408,7 +409,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final ASTContainer astContainer = new ASTContainer(queryRoot);
 
-            final QuadData insertClause = op.getInsertClause();
+            final QuadsDataOrNamedSolutionSet insertClause = op.getInsertClause();
 
             if (insertClause == null && op.getDeleteClause() == null) {
                 
@@ -422,24 +423,28 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  * not yet running those against the UPDATE AST.
                  */
                 
-                final QuadData deleteClause = new QuadData();
+                final QuadData deleteTemplate = new QuadData();
                 
-                final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(whereClause, StatementPatternNode.class);
+                final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                        whereClause, StatementPatternNode.class);
 
-                while(itr.hasNext()) {
-                    
+                while (itr.hasNext()) {
+
                     final StatementPatternNode t = (StatementPatternNode) itr
                             .next().clone();
 
-                    deleteClause.addChild(t);
-                
+                    deleteTemplate.addChild(t);
+
                 }
-                
+
+                final QuadsDataOrNamedSolutionSet deleteClause = new QuadsDataOrNamedSolutionSet(
+                        deleteTemplate);
+
                 op.setDeleteClause(deleteClause);
-                
+
             }
 
-            final QuadData deleteClause = op.getDeleteClause();
+            final QuadsDataOrNamedSolutionSet deleteClause = op.getDeleteClause();
 
             // Just the insert clause.
             final boolean isInsertOnly = insertClause != null
@@ -477,6 +482,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  * avoiding materialization of the RDF Values and using an
                  * ASTConstructIterator which builds ISPOs using IVs rather than
                  * Values).
+                 * 
+                 * FIXME Support INSERT INTO / DELETE FROM here.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
+                 * (SPARQL Cache)
                  */
 
                 // Run as a SELECT query.
@@ -493,7 +503,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         result.beforeFirst();
 
                         final ConstructNode template = op.getDeleteClause()
-                                .flatten();
+                                .getQuadData().flatten();
 
                         final ASTConstructIterator itr = new ASTConstructIterator(
                                 context.conn.getTripleStore(), template, result);
@@ -517,7 +527,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         result.beforeFirst();
 
                         final ConstructNode template = op.getInsertClause()
-                                .flatten();
+                                .getQuadData().flatten();
 
                         final ASTConstructIterator itr = new ASTConstructIterator(
                                 context.conn.getTripleStore(), template, result);
@@ -543,9 +553,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             } else {
 
-                final QuadData quadData = insertClause == null ? deleteClause
-                        : insertClause;
-                
+                /*
+                 * FIXME Support INSERT INTO / DELETE FROM here.
+                 *  
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524 (SPARQL Cache)
+                 */
+                final QuadData quadData = (insertClause == null ? deleteClause
+                        : insertClause).getQuadData();
+
                 final ConstructNode template = quadData.flatten();
                 
                 // Set the CONSTRUCT template (quads patterns).

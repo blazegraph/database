@@ -70,12 +70,12 @@ public class DeleteInsertGraph extends GraphUpdate implements
          * The optional DELETE clause.
          */
         String DELETE_CLAUSE = "deleteClause";
-
+        
         /**
          * The optional INSERT clause.
          */
         String INSERT_CLAUSE = "insertClause";
-        
+
     }
 
     public DeleteInsertGraph() {
@@ -170,25 +170,31 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
     }
 
-    public QuadData getDeleteClause() {
+    /**
+     * Return the template for the DELETE clause.
+     */
+    public QuadsDataOrNamedSolutionSet getDeleteClause() {
 
-        return (QuadData) getProperty(Annotations.DELETE_CLAUSE);
-
-    }
-
-    public QuadData getInsertClause() {
-
-        return (QuadData) getProperty(Annotations.INSERT_CLAUSE);
+        return (QuadsDataOrNamedSolutionSet) getProperty(Annotations.DELETE_CLAUSE);
 
     }
 
-    public void setDeleteClause(final QuadData data) {
+    /**
+     * Return the template for the INSERT clause.
+     */
+    public QuadsDataOrNamedSolutionSet getInsertClause() {
+
+        return (QuadsDataOrNamedSolutionSet) getProperty(Annotations.INSERT_CLAUSE);
+
+    }
+
+    public void setDeleteClause(final QuadsDataOrNamedSolutionSet data) {
 
         setProperty(Annotations.DELETE_CLAUSE, data);
 
     }
 
-    public void setInsertClause(final QuadData data) {
+    public void setInsertClause(final QuadsDataOrNamedSolutionSet data) {
 
         setProperty(Annotations.INSERT_CLAUSE, data);
 
@@ -204,10 +210,10 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
         final DatasetNode dataset = getDataset();
 
-        final QuadData deleteClause = getDeleteClause();
+        final QuadsDataOrNamedSolutionSet deleteClause = getDeleteClause();
 
-        final QuadData insertClause = getInsertClause();
-
+        final QuadsDataOrNamedSolutionSet insertClause = getInsertClause();
+        
         final GraphPatternGroup<?> whereClause = getWhereClause();
         
         if (dataset != null) {
@@ -217,18 +223,16 @@ public class DeleteInsertGraph extends GraphUpdate implements
         }
 
         if (deleteClause != null) {
-
             sb.append("\n");
             sb.append(indent(indent + 1));
-            sb.append("DELETE");
+            sb.append("DELETE ");
             sb.append(deleteClause.toString(indent + 2));
         }
 
         if (insertClause != null) {
-
             sb.append("\n");
             sb.append(indent(indent + 1));
-            sb.append("INSERT");
+            sb.append("INSERT ");
             sb.append(insertClause.toString(indent + 2));
         }
 

@@ -85,6 +85,7 @@ import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IProjectionDecl;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -163,8 +164,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         // Accept optional NamedSubquery(s).
         handleNamedSubqueryClause(astQuery, queryRoot);
-                
-        handleSelect(astQuery, queryRoot);
+
+        handleSelect(astQuery.getSelect(), queryRoot);
 
         handleWhereClause(astQuery, queryRoot);
         
@@ -610,19 +611,17 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
     /**
      * Handle a SELECT clause. The {@link ProjectionNode} will be attached to
-     * the {@link QueryBase}.
+     * the {@link IProjectionDecl}.
      * 
-     * @param astQuery
-     *            The {@link ASTSelectQuery} node.
+     * @param select
+     *            The {@link ASTSelect} node.
      * @param queryRoot
      *            The {@link QueryBase}.
      * 
      * @throws VisitorException
      */
-    private void handleSelect(final ASTSelectQuery astQuery,
-            final QueryBase queryRoot) throws VisitorException {
-
-        final ASTSelect select = astQuery.getSelect();
+    protected void handleSelect(final ASTSelect select,
+            final IProjectionDecl queryRoot) throws VisitorException {
 
         final ProjectionNode projection = new ProjectionNode();
         

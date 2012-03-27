@@ -44,6 +44,7 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -96,7 +97,7 @@ import com.bigdata.striterator.ICloseableIterator;
  *      query is not always the same (e.g., include the hash of the exogenous
  *      solutions in the query hash code and we will get less reuse).
  */
-public class SparqlCache implements ISparqlCache, IChangeLog {
+public class SparqlCache implements ISparqlCache {
 
     public interface Options {
 
@@ -228,31 +229,79 @@ public class SparqlCache implements ISparqlCache, IChangeLog {
     /**
      * Cache invalidation / cache update protocol.
      * 
+     * FIXME This listener needs to build up a "transaction" of change events
+     * which will cause invalidation of cache entries. Those change events need
+     * to be processed once we have committed the change set, but they MUST be
+     * processed before another operation can read against the new commit point.
+     * <P>
+     * In order to close that gap, we can either invalidate the cache as we go
+     * (this will cause the query engine to regenerate the cache before the
+     * cached results are actually wrong) -or- we need to have a low level
+     * callback from the {@link Journal} where we get notice of the
+     * {@link IChangeLog} commit (including the timestamp) before the
+     * {@link Journal} actually finishes the commit process, but probably after
+     * it check points the various indices. E.g., hooked right into the middle
+     * of the commit protocol. For a tightly integrated cache, this can be fast
+     * enough.
+     * <p>
+     * Another possibility is to permit reads against the cache for any cached
+     * solution for which we have not yet received an invalidation notice. Once
+     * we get an invalidation notice, the cache will only respond for that
+     * cached solution set up to the lastCommitTime before the
+     * {@link IChangeRecord} event (so the cache needs to listen to commit
+     * times, which is easy). This will allow read-only operations against
+     * historical commit points to proceed but will not allow reads against the
+     * cache for cached solution sets which MIGHT be invalidated.
+     * <p>
+     * Each cache entry needs to have the createTime (commit time against which
+     * it was created, which needs to be the actually commit point if the reader
+     * is isolated by a transaction). That is the first commit point for which
+     * the cache entry is valid. It also needs to know the last commit time for
+     * which the cache entry is valid, which is the point at which it was
+     * expired. When a cache invalidation notice ({@link IChangeRecord}) has
+     * been received, but we have not yet observed the commit for that change
+     * record, we need to flag the cache entry as possibly invalid after the
+     * then most current last commit time. Queries which hit that window must be
+     * passed through to the database.
+     * <p>
+     * We need one {@link IChangeLog} listener per update connection. There can
+     * be multiple such listeners concurrently when the database is using full
+     * read/write transactions and/or when there are updates against different
+     * triple/quad store instances.
      * 
-     * The commit time as of which the {@link ISPO}s were added or removed.
+     * TODO Each Change log event indicates an {@link ISPO} which was added to
+     * (or removed from) the database. Cache entries which depend on statement
+     * patterns which cover those {@link ISPO}s must be invalidated (or updated)
+     * when the database update is committed. Obviously, the cache entries need
+     * to be indexed for rapid discovery for invalidation purposes (in addition
+     * to the discovery for cache hits).
      * 
-     * The change events. Each event indicates an {@link ISPO} which was added
-     * to (or removed from) the database. Cache entries which depend on
-     * statement patterns which cover those {@link ISPO}s must be invalidated
-     * (or updated) when the database update is committed.
+     * TODO Cache entries need to be chained together so we can have hits for
+     * the same query for different commit points. The backing solution set for
+     * a given commit time needs to be expired no later than when we recycle
+     * that commit point. This is yet another place where a low-level
+     * integration with the {@link AbstractTransactionService} is required.
      */
-    
-    @Override
-    public void changeEvent(IChangeRecord record) {
-        // TODO Auto-generated method stub
-        
-    }
+    private class CacheChangeLogListener implements IChangeLog {
 
-    @Override
-    public void transactionCommited(final long commitTime) {
-        // TODO Auto-generated method stub
-        
-    }
+        @Override
+        public void changeEvent(IChangeRecord record) {
+            // TODO Auto-generated method stub
 
-    @Override
-    public void transactionAborted() {
-        // TODO Auto-generated method stub
-        
+        }
+
+        @Override
+        public void transactionCommited(final long commitTime) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void transactionAborted() {
+            // TODO Auto-generated method stub
+
+        }
+
     }
 
 }

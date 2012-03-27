@@ -1712,7 +1712,7 @@ void Update() #void :
 |	LOOKAHEAD(2) InsertData()
 |	LOOKAHEAD(2) DeleteData() 
 |	LOOKAHEAD(2) DeleteWhere()
-|	Modify()
+|	LOOKAHEAD(2) Modify()
 }
 
 void Load() :
@@ -1777,15 +1777,17 @@ void DeleteWhere() :
 }
 
 void DeleteClause() :
-{}
+{Token t;}
 {
-    <DELETE> QuadData()
+    <DELETE> (<FROM> t = <VAR3> Select() {jjtThis.setName(t.image);}	
+    | QuadData())
 }
 
 void InsertClause() :
-{}
+{Token t;}
 {
-    <INSERT> QuadData()
+    <INSERT> (<INTO> t = <VAR3> Select() {jjtThis.setName(t.image);}
+     | QuadData())
 }
 
 void UsingClause() #DatasetClause :
