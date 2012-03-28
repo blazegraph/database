@@ -100,8 +100,14 @@ public class TestAll extends TestCase {
         // NanoSparqlServer
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
-        // quad store in scale-out.
-        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
+        /* quad store in scale-out.
+         * 
+         * FIXME Restore this test suite.  It is out best protection against
+         * regression of the cluster database mode.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary Journals in CI)
+         */
+//        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 
