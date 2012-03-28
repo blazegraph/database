@@ -1055,7 +1055,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (runOnQueryEngine)
             throw new UnsupportedOperationException();
 
-        clearGraph(targetGraph,scope, context);        
+        // FIXME This assumes that the target is a GRAPH (vs SOLUTION SET).
+        clearGraph(targetGraph, scope, context);       
 
         return left;
         
@@ -1068,11 +1069,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param targetGraph
      * @param scope
      * @param context
-     * @throws RepositoryException 
-     * @throws SailException 
+     * @throws RepositoryException
+     * @throws SailException
      */
     private static void clearGraph(final URI targetGraph, final Scope scope,
-            final AST2BOpUpdateContext context) throws RepositoryException, SailException {
+            final AST2BOpUpdateContext context) throws RepositoryException,
+            SailException {
 
         if (log.isDebugEnabled())
             log.debug("targetGraph=" + targetGraph + ", scope=" + scope);
@@ -1156,6 +1158,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * @param op
      * @param context
      * @return
+     * 
+     * FIXME Support CREATE SOLUTIONS here.
      */
     private static PipelineOp convertCreateGraph(final PipelineOp left,
             final CreateGraph op, final AST2BOpUpdateContext context) {

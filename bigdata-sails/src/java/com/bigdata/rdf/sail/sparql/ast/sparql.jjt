@@ -244,6 +244,8 @@ TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 |	<ASSIGN: ":=">
 | 	<VAR3: "%" <VARNAME>>
 |   <VIRTUAL_GRAPH: "virtual graph">
+|	<GRAPHS: "graphs">
+|   <SOLUTIONS: "solutions">
 }
 
 TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
@@ -1659,13 +1661,18 @@ void IRI() :
 
 /// SPARQL 1.1 Update productions
 
+// bigdata extensions: GRAPHS, SOLUTIONS, and SolutionsRef(). 
 void GraphRefAll() :
 {}
 {
 	GraphRef() 
 |	<DEFAULT_GRAPH> {jjtThis.setDefault(true); }
-|	<NAMED> 	{jjtThis.setNamed(true); }
-|	<ALL>
+|	<NAMED> 	    {jjtThis.setNamed(true); }
+|	<ALL>           {jjtThis.setAllGraphs(true); jjtThis.setAllSolutions(true); }
+|   <GRAPHS>        {jjtThis.setAllGraphs(true); }
+|   LOOKAHEAD(2)
+ SolutionsRef()
+| <SOLUTIONS>    {jjtThis.setAllSolutions(true); }
 }
 
 void GraphOrDefault() :
@@ -1679,6 +1686,20 @@ void GraphRef() #void :
 {}
 { 
 	<GRAPH> IRIref() 
+}
+
+// bigdata extension: either a GRAPH uri or a SOLUTIONS name.
+//void GraphOrSolutionsRef() #void :
+//{}
+//{ 
+//	(GraphRef()|SolutionsRef())
+//}
+
+// bigdata extension: A SOLUTIONS name (aka named solution set ref).
+void SolutionsRef() :
+{Token t;}
+{
+	<SOLUTIONS> t = <VAR3> {jjtThis.setName(t.image);}  
 }
 
 void QuadData() #void :
@@ -1721,7 +1742,6 @@ void Load() :
     <LOAD> [<SILENT> {jjtThis.setSilent(true);} ] IRIref() [<INTO> GraphRef() ]
 }
 
-
 void Clear() :
 {}
 {
@@ -1752,10 +1772,15 @@ void Copy() :
 	<COPY> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
 }
 
+// bigdata extension: CREATE SOLUTIONS ...
 void Create() :
 {}
 {
-	<CREATE> [<SILENT> {jjtThis.setSilent(true);} ] GraphRef()
+	<CREATE> [<SILENT> {jjtThis.setSilent(true);} ]
+	 ( GraphRef()
+//	 | SolutionsRef() (<LBRACE> TriplesTemplate() <RBRACE>)?
+	 | SolutionsRef() (QuadData())?
+	 )
 }
 
 void InsertData() :
@@ -1779,8 +1804,11 @@ void DeleteWhere() :
 void DeleteClause() :
 {Token t;}
 {
-    <DELETE> (<FROM> t = <VAR3> Select() {jjtThis.setName(t.image);}	
-    | QuadData())
+    <DELETE>
+    (
+      <FROM> t = <VAR3> Select() {jjtThis.setName(t.image);}	
+    | QuadData()
+    )
 }
 
 void InsertClause() :

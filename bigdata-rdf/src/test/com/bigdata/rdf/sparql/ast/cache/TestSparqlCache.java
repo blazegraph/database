@@ -46,5 +46,12 @@ public class TestSparqlCache extends AbstractASTEvaluationTestCase {
         super(name);
         
     }
+
+    /*
+     * FIXME This test suite is just a stub.
+     */
+    public void test_something() {
+        
+    }
     
 }

@@ -34,7 +34,15 @@ public class VarNode extends TermNode {
         String ANONYMOUS = VarNode.class.getName() + ".anonymous";
 
         boolean DEFAULT_ANONYMOUS = false;
-        
+
+        /**
+         * Annotation marks a variable which is actually the name of a solution
+         * set.
+         */
+        String SOLUTION_SET = VarNode.class.getName() + ".solutionSet";
+
+        boolean DEFAULT_SOLUTION_SET = false;
+
     }
     
     /**
@@ -94,6 +102,28 @@ public class VarNode extends TermNode {
 	    
 	}
 
+    /**
+     * Return <code>true</code> if the variable represents a solution set name.
+     */
+    public boolean isSolutionSet() {
+
+        return getProperty(Annotations.SOLUTION_SET,
+                Annotations.DEFAULT_SOLUTION_SET);
+
+    }
+
+    /**
+     * Mark this as a variable which actually conveys the name of a solution
+     * set.
+     * 
+     * @param <code>true</code> if the variable represents a solution set name.
+     */
+    public void setSolutionSet(final boolean solutionSet) {
+
+        setProperty(Annotations.SOLUTION_SET, solutionSet);
+
+    }
+
 	/**
 	 * Return <code>true</code> iff the variable is <code>*</code>.
 	 */
@@ -123,7 +153,9 @@ public class VarNode extends TermNode {
     public String toString() {
 
         return "VarNode(" + getValueExpression() + ")"
-                + (isAnonymous() ? "[anonymous]" : "");
+                + (isAnonymous() ? "[anonymous]" : "")
+                + (isSolutionSet() ? "[solutionSet]" : "")
+                ;
 
     }
 	

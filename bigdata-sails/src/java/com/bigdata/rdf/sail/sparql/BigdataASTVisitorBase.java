@@ -172,7 +172,7 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
      * this step.
      */
     @Override
-    final public VarNode visit(final ASTVar node, Object data)
+    final public VarNode visit(final ASTVar node, final Object data)
             throws VisitorException {
 
         final VarNode var = new VarNode(node.getName());
@@ -185,7 +185,7 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     }
 
     @Override
-    final public Object visit(ASTQName node, Object data)
+    final public Object visit(final ASTQName node, final Object data)
             throws VisitorException {
  
         throw new VisitorException(

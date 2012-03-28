@@ -37,7 +37,7 @@ import com.bigdata.bop.BOp;
  * The DROP operation removes the specified graph(s) from the Graph Store.
  * 
  * <pre>
- * DROP  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL )
+ * DROP  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL | GRAPHS | SOLUTIONS | SOLUTIONS %VARNAME)
  * </pre>
  * 
  * Note: Bigdata does not support empty graphs, so DROP and CLEAR have identical
@@ -54,6 +54,28 @@ public class DropGraph extends AbstractOneGraphManagement {
      */
     private static final long serialVersionUID = 1L;
 
+    public interface Annotations extends AbstractOneGraphManagement.Annotations {
+
+        /**
+         * Boolean property (default {@value #DEFAULT_ALL_GRAPHS}) which is
+         * <code>true</code> iff ALL GRAPHS should be effected by this
+         * operation.
+         */
+        String ALL_GRAPHS = "allGraphs";
+
+        boolean DEFAULT_ALL_GRAPHS = false;
+        
+        /**
+         * Boolean property (default {@value #DEFAULT_ALL_GRAPHS}) which is
+         * <code>true</code> iff ALL SOLUTION SETS should be effected by this
+         * operation.
+         */
+        String ALL_SOLUTION_SETS = "allSolutionSets";
+
+        boolean DEFAULT_ALL_SOLUTION_SETS = false;
+
+    }
+    
     /**
      * Used by {@link ClearGraph}.
      */
@@ -87,11 +109,35 @@ public class DropGraph extends AbstractOneGraphManagement {
     }
 
     /**
-     * Return <code>true</code> IFF this is <code>DROP ALL</code>.
+     * Return <code>true</code> IFF this operation should effect ALL GRAPHS.
      */
-    public boolean isAll() {
+    public boolean isAllGraphs() {
+
+        return getProperty(Annotations.ALL_GRAPHS,
+                Annotations.DEFAULT_ALL_GRAPHS);
         
-        return getTargetGraph() == null && getScope() == null;
+    }
+
+    public void setAllGraphs(final boolean allGraphs) {
+
+        setProperty(Annotations.ALL_GRAPHS, allGraphs);
+        
+    }
+    
+    /**
+     * Return <code>true</code> IFF this operation should effect ALL SOLUTION
+     * SETS.
+     */
+    public boolean isAllSolutionSets() {
+
+        return getProperty(Annotations.ALL_SOLUTION_SETS,
+                Annotations.DEFAULT_ALL_SOLUTION_SETS);
+        
+    }
+
+    public void setAllSolutionSets(final boolean allSolutionSets) {
+
+        setProperty(Annotations.ALL_SOLUTION_SETS, allSolutionSets);
         
     }
     
