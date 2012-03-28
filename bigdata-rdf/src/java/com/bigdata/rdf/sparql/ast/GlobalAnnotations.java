@@ -26,6 +26,13 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.io.Serializable;
 
+/**
+ * A glue class for reporting the namespace of the lexicon relation and the
+ * timestamp of the view of the lexicon relation through the function bops.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ */
 public class GlobalAnnotations implements Serializable {
 
 	/**
@@ -33,10 +40,23 @@ public class GlobalAnnotations implements Serializable {
 	 */
 	private static final long serialVersionUID = -6220818059592500418L;
 
+	/**
+	 * The namespace of the lexicon relation.
+	 */
 	public final String lex;
 	
+	/**
+	 * The timestamp of the view of the lexicon relation.
+	 */
 	public final long timestamp;
-	
+
+    /**
+     * 
+     * @param lex
+     *            The namespace of the lexicon relation.
+     * @param timestamp
+     *            The timestamp of the view of the lexicon relation.
+     */
 	public GlobalAnnotations(final String lex, final long timestamp) {
 		this.lex = lex;
 		this.timestamp = timestamp;
