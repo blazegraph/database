@@ -57,7 +57,8 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataSailTestCase {
+public class TestBigdataSailEmbeddedFederationWithQuads extends
+        AbstractBigdataSailTestCase {
 
     /**
      * 
@@ -247,9 +248,11 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
      * Data files are placed into a directory named by the test. If the
      * directory exists, then it is removed before the federation is set up.
      */
+    @SuppressWarnings("rawtypes")
     @Override
-    protected void setUp(ProxyBigdataSailTestCase testCase) throws Exception {
-        
+    protected void setUp(final ProxyBigdataSailTestCase testCase)
+            throws Exception {
+
         final File dataDir = new File(NAMESPACE);
 
         if (dataDir.exists() && dataDir.isDirectory()) {
@@ -259,24 +262,31 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
         }
 
         client = new EmbeddedClient(getProperties());
-        
+
         fed = client.connect();
-        
+
     }
-    
+
     @Override
-    protected void tearDown(ProxyBigdataSailTestCase testCase) throws Exception {
-        
+    protected void tearDown(final ProxyBigdataSailTestCase testCase)
+            throws Exception {
+
+        if (fed != null) {
+
+            fed.destroy();
+
+            fed = null;
+
+        }
+
         if (client != null) {
 
             client.disconnect(true/* immediateShutdown */);
 
             client = null;
-            
+
         }
-        
-        fed = null;
-        
+
     }
     
     /**
