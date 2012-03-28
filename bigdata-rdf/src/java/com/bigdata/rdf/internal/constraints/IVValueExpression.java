@@ -44,7 +44,6 @@ import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
