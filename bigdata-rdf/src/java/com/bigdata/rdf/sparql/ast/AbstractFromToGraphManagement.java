@@ -79,7 +79,7 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
     @Override
     public ConstantNode getSourceGraph() {
         
-        return (ConstantNode) getProperty(Annotations.SOURCE_GRAPH);
+        return (ConstantNode) getProperty(Annotations.SOURCE);
         
     }
 
@@ -89,7 +89,7 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
         if (sourceGraph == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.SOURCE_GRAPH, sourceGraph);
+        setProperty(Annotations.SOURCE, sourceGraph);
         
     }
 
@@ -102,7 +102,7 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
     @Override
     final public ConstantNode getTargetGraph() {
         
-        return (ConstantNode) getProperty(Annotations.TARGET_GRAPH);
+        return (ConstantNode) getProperty(Annotations.TARGET);
         
     }
 
@@ -112,7 +112,7 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
         if (targetGraph == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.TARGET_GRAPH, targetGraph);
+        setProperty(Annotations.TARGET, targetGraph);
         
     }
 

@@ -58,6 +58,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTLoad;
 import com.bigdata.rdf.sail.sparql.ast.ASTModify;
 import com.bigdata.rdf.sail.sparql.ast.ASTMove;
 import com.bigdata.rdf.sail.sparql.ast.ASTQuadsNotTriples;
+import com.bigdata.rdf.sail.sparql.ast.ASTSolutionsRef;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.AddGraph;
@@ -78,6 +79,7 @@ import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
@@ -270,10 +272,19 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         if (graphRef.jjtGetNumChildren() > 0) {
 
-            final ConstantNode targetGraph = (ConstantNode) graphRef
+            final TermNode targetGraph = (TermNode) graphRef
                     .jjtGetChild(0).jjtAccept(this, data);
 
-            op.setTargetGraph(targetGraph);
+            if(targetGraph instanceof ConstantNode) {
+
+                op.setTargetGraph((ConstantNode) targetGraph);
+                
+            } else {
+                
+                op.setTargetSolutionSet(targetGraph.getValueExpression()
+                        .getName());
+                
+            }
 
         } else {
 
@@ -285,6 +296,18 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
                 op.setScope(Scope.NAMED_CONTEXTS);
 
+            }
+            
+            if(graphRef.isAllGraphs()) {
+                
+                op.setAllGraphs(true);
+                
+            }
+
+            if(graphRef.isAllSolutions()) {
+                
+                op.setAllSolutionSets(true);
+                
             }
 
         }
@@ -310,10 +333,19 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         if (graphRef.jjtGetNumChildren() > 0) {
 
-            final ConstantNode targetGraph = (ConstantNode) graphRef
+            final TermNode targetGraph = (TermNode) graphRef
                     .jjtGetChild(0).jjtAccept(this, data);
             
-            op.setTargetGraph(targetGraph);
+            if (targetGraph instanceof ConstantNode) {
+             
+                op.setTargetGraph((ConstantNode) targetGraph);
+                
+            } else {
+                
+                op.setTargetSolutionSet(targetGraph.getValueExpression()
+                        .getName());
+                
+            }
 
         } else {
             
@@ -327,6 +359,18 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
                 
             }
 
+            if(graphRef.isAllGraphs()) {
+                
+                op.setAllGraphs(true);
+                
+            }
+
+            if(graphRef.isAllSolutions()) {
+                
+                op.setAllSolutionSets(true);
+                
+            }
+
         }
         
         return op;
@@ -337,12 +381,28 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     public CreateGraph visit(final ASTCreate node, final Object data)
             throws VisitorException {
 
-        final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(0)
-                .jjtAccept(this, data);
+        final TermNode target = (TermNode) node.jjtGetChild(0).jjtAccept(this,
+                data);
 
         final CreateGraph op = new CreateGraph();
-        
-        op.setTargetGraph(targetGraph);
+
+        if (target instanceof ConstantNode) {
+
+            op.setTargetGraph((ConstantNode) target);
+
+        } else {
+
+            op.setTargetSolutionSet(target.getValueExpression().getName());
+            
+            final ISPO[] params = doQuadsData(node, data);
+
+            if (params != null && params.length > 0) {
+                
+                op.setParams(params);
+                
+            }
+            
+        }
         
         if (node.isSilent())
             op.setSilent(true);
@@ -729,6 +789,24 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         graphPattern = parentGP;
 
         return quadData;
+
+    }
+
+    /**
+     * Solution set names get modeled as variables which report
+     * <code>true</code> for {@link VarNode#isSolutionSet()}.
+     */
+    @Override
+    final public VarNode visit(final ASTSolutionsRef node, final Object data)
+            throws VisitorException {
+
+        final String name = node.getName();
+
+        final VarNode c = new VarNode(name);
+
+        c.setSolutionSet(true);
+
+        return c;
 
     }
 

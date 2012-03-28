@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sparql.ast.Update.Annotations;
 
 /**
  * A Graph Management operation.
@@ -48,23 +47,29 @@ abstract public class GraphManagement extends Update {
     /**
      * @param updateType
      */
-    public GraphManagement(UpdateType updateType) {
+    public GraphManagement(final UpdateType updateType) {
+        
         super(updateType);
+        
     }
 
     /**
      * @param op
      */
-    public GraphManagement(GraphManagement op) {
+    public GraphManagement(final GraphManagement op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public GraphManagement(BOp[] args, Map<String, Object> anns) {
+    public GraphManagement(final BOp[] args, final Map<String, Object> anns) {
+
         super(args, anns);
+        
     }
 
     @Override

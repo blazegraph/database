@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.spo.ISPO;
 
 /**
  * Any of the operations which acts on a single target graph.
@@ -47,29 +48,62 @@ abstract public class AbstractOneGraphManagement extends GraphManagement {
     /**
      * @param updateType
      */
-    public AbstractOneGraphManagement(UpdateType updateType) {
+    public AbstractOneGraphManagement(final UpdateType updateType) {
+        
         super(updateType);
+        
     }
 
     /**
      * @param op
      */
-    public AbstractOneGraphManagement(AbstractOneGraphManagement op) {
+    public AbstractOneGraphManagement(final AbstractOneGraphManagement op) {
+        
         super(op);
+        
     }
 
     /**
      * @param args
      * @param anns
      */
-    public AbstractOneGraphManagement(BOp[] args, Map<String, Object> anns) {
+    public AbstractOneGraphManagement(final BOp[] args,
+            final Map<String, Object> anns) {
+        
         super(args, anns);
+        
+    }
+
+    /**
+     * Return <code>true</code> if the target is a GRAPH.
+     */
+    final boolean isTargetGraph() {
+        
+        return getProperty(Annotations.TARGET) instanceof ConstantNode;
+        
+    }
+
+    /**
+     * Return <code>true</code> if the target is a SOLUTION SET.
+     */
+    final boolean isTargetSolutionSet() {
+
+        return getProperty(Annotations.TARGET) instanceof VarNode;
+        
     }
 
     @Override
     final public ConstantNode getTargetGraph() {
         
-        return (ConstantNode) getProperty(Annotations.TARGET_GRAPH);
+        final Object o = getProperty(Annotations.TARGET);
+
+        if (o instanceof ConstantNode) {
+        
+            return (ConstantNode) o;
+            
+        }
+
+        return null;
         
     }
 
@@ -79,12 +113,38 @@ abstract public class AbstractOneGraphManagement extends GraphManagement {
         if (targetGraph == null)
             throw new IllegalArgumentException();
 
-        setProperty(Annotations.TARGET_GRAPH, targetGraph);
+        setProperty(Annotations.TARGET, targetGraph);
+
+    }
+
+//    @Override
+    final public String getTargetSolutionSet() {
+
+        final Object o = getProperty(Annotations.TARGET);
+
+        if (o instanceof String) {
+
+            return (String) o;
+
+        }
+
+        return null;
+
+    }
+
+//    @Override
+    final public void setTargetSolutionSet(final String targetSolutionSet) {
+
+        if (targetSolutionSet == null)
+            throw new IllegalArgumentException();
+
+        setProperty(Annotations.TARGET, targetSolutionSet);
 
     }
 
     // CREATE ( SILENT )? GRAPH IRIref
-    // DROP  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL )
+    // DROP  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL | GRAPHS | SOLUTIONS | SOLUTIONS %VARNAME)
+    // CLEAR ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL | GRAPHS | SOLUTIONS | SOLUTIONS %VARNAME)
     final public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();
@@ -98,10 +158,51 @@ abstract public class AbstractOneGraphManagement extends GraphManagement {
 
         final ConstantNode targetGraph = getTargetGraph();
 
+        final String targetSolutionSet = getTargetSolutionSet();
+
         if (targetGraph != null) {
-            sb.append(" target=" + targetGraph);
-        } else {
-            sb.append(" all");
+
+            sb.append(" targetGraph=" + targetGraph);
+        
+        }
+        if (targetSolutionSet != null) {
+            
+            sb.append(" targetSolutionSet=" + targetSolutionSet);
+
+        }
+        
+        if(this instanceof DropGraph) {
+
+            final DropGraph t = (DropGraph) this;
+            
+            if (t.isAllGraphs())
+                sb.append(" ALL-GRAPHS");
+
+            if (t.isAllSolutionSets())
+                sb.append(" ALL-SOLUTIONS");
+
+        } else if(this instanceof CreateGraph) {
+
+            final CreateGraph t = (CreateGraph) this;
+
+            final ISPO[] params = t.getParams();
+
+            if (params != null) {
+
+                final String s = indent(indent + 1);
+
+                sb.append("\n").append(s).append("PARAMS {");
+
+                for (ISPO v : params) {
+
+                    sb.append(v.toString());
+
+                }
+
+                sb.append("\n").append(s).append("}");
+
+            }
+
         }
 
         sb.append("\n");

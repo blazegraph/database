@@ -32,7 +32,6 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;

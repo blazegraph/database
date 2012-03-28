@@ -882,4 +882,9 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
         return node.childrenAccept(this, data);
     }
 
+    public Object visit(ASTSolutionsRef node, Object data)
+            throws VisitorException {
+        return node.childrenAccept(this, data);
+    }
+
 }

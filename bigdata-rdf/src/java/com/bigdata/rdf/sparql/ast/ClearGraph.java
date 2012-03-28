@@ -36,7 +36,7 @@ import com.bigdata.bop.BOp;
  * Graph Store.
  * 
  * <pre>
- * CLEAR  ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL )
+ * CLEAR ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL | GRAPHS | SOLUTIONS | SOLUTIONS %VARNAME)
  * </pre>
  * 
  * Note: Bigdata does not support empty graphs, so DROP and CLEAR have identical
@@ -54,7 +54,9 @@ public class ClearGraph extends DropGraph {
     private static final long serialVersionUID = 1L;
 
     public ClearGraph() {
+        
         super(UpdateType.Clear);
+        
     }
 
     /**

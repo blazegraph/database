@@ -11,6 +11,8 @@ public
 class ASTGraphRefAll extends SimpleNode {
   private boolean _default;
 private boolean named;
+private boolean allGraphs;
+private boolean allSolutions;
 
 public ASTGraphRefAll(int id) {
     super(id);
@@ -53,5 +55,28 @@ public ASTGraphRefAll(int id) {
 	public boolean isNamed() {
 		return named;
 	}
+	
+    /**
+     * Return <code>true</code> iff ALL graphs should be dropped.
+     */
+    public boolean isAllGraphs() {
+        return allGraphs;
+    }
+
+    public void setAllGraphs(boolean allGraphs) {
+        this.allGraphs= allGraphs;
+    }
+
+    /**
+     * Return <code>true</code> iff ALL named solution sets should be dropped.
+     */
+    public boolean isAllSolutions() {
+        return allSolutions;
+    }
+
+    public void setAllSolutions(boolean allSolutions) {
+        this.allSolutions = allSolutions;
+    }
+
 }
 /* JavaCC - OriginalChecksum=76b459b84d8a145884f6d9f597fa6072 (do not edit this line) */

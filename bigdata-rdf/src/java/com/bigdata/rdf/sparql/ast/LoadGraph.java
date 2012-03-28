@@ -86,7 +86,7 @@ public class LoadGraph extends GraphUpdate {
     @Override
     public ConstantNode getSourceGraph() {
         
-        return (ConstantNode) getProperty(Annotations.SOURCE_GRAPH);
+        return (ConstantNode) getProperty(Annotations.SOURCE);
         
     }
 
@@ -96,14 +96,14 @@ public class LoadGraph extends GraphUpdate {
         if (sourceGraph == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.SOURCE_GRAPH, sourceGraph);
+        setProperty(Annotations.SOURCE, sourceGraph);
         
     }
 
     @Override
     public ConstantNode getTargetGraph() {
         
-        return (ConstantNode) getProperty(Annotations.TARGET_GRAPH);
+        return (ConstantNode) getProperty(Annotations.TARGET);
         
     }
 
@@ -113,7 +113,7 @@ public class LoadGraph extends GraphUpdate {
         if (targetGraph == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.TARGET_GRAPH, targetGraph);
+        setProperty(Annotations.TARGET, targetGraph);
         
     }
 

@@ -54,17 +54,29 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
         String UPDATE_TYPE = "updateType";
 
         /**
-         * The {@link ConstantNode} for the source graph (for operations which
-         * have this concept).
+         * The source graph -or- solution set (for operations which have this
+         * concept).
+         * <p>
+         * When the value is a {@link ConstantNode}, then the annotation is the
+         * source <em>graph</em>.
+         * <p>
+         * When the value is a {@link String}, then the annotation is the source
+         * <em>solution set</em>.
          */
-        String SOURCE_GRAPH = "sourceGraph";
+        String SOURCE = "source";
         
         /**
-         * The {@link ConstantNode} for the target graph (for operations which
-         * have this concept). If there is only one graph on which the operation
-         * will have an effect, then it is modeled by this annotation.
+         * The target graph -or- solution set (for operations which have this
+         * concept). If there is only one graph (or solution set) on which the
+         * operation will have an effect, then it is modeled by this annotation.
+         * <p>
+         * When the value is a {@link ConstantNode}, then the annotation is the
+         * target <em>graph</em>.
+         * <p>
+         * When the value is a {@link String}, then the annotation is the target
+         * <em>solution set</em>.
          */
-        String TARGET_GRAPH = "targetGraph";
+        String TARGET = "target";
      
         /**
          * The "SILENT" option (default <code>false</code>) (for operations
