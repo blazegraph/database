@@ -135,6 +135,8 @@ public class FileLockUtility {
             if (new File(file + ".lock").exists()) {
 
                 // reject if there is already an advisory lock for this file.
+            	
+            	raf.close(); // but close file first!
                 
                 throw new IOException("Advisory lock exists: "
                         + file.getAbsolutePath());
