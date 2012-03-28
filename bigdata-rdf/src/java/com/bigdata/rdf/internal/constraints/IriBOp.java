@@ -35,6 +35,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * The IRI function, as defined in <a
@@ -48,8 +49,9 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
 
     private static final long serialVersionUID = -8448763718374010166L;
 
-    public IriBOp(IValueExpression<? extends IV> x, String lex) {
-        super(x, lex);
+    public IriBOp(final IValueExpression<? extends IV> x, 
+    		final GlobalAnnotations globals) {
+        super(x, globals);
     }
 
     public IriBOp(BOp[] args, Map<String, Object> anns) {
@@ -88,7 +90,7 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
 
         final BigdataURI uri = getValueFactory().createURI(lit.getLabel());
 
-        return super.createIV(uri, bs);
+        return super.getOrCreateIV(uri, bs);
 
     }
 

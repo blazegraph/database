@@ -51,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -493,7 +494,11 @@ public class TestASTBottomUpOptimizer extends
                                                     .getIV())) //
                                     }//
                             ));
-                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    final GlobalAnnotations globals = new GlobalAnnotations(
+                    		context.getLexiconNamespace(),
+                    		context.getTimestamp()
+                    		);
+                    AST2BOpUtility.toVE(globals,
                             filterNode.getValueExpressionNode());
                     innerClause.addChild(filterNode);
 
@@ -936,7 +941,11 @@ public class TestASTBottomUpOptimizer extends
                             }//
                             )//
                     );
-            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+            final GlobalAnnotations globals = new GlobalAnnotations(
+            		context.getLexiconNamespace(),
+            		context.getTimestamp()
+            		);
+            AST2BOpUtility.toVE(globals,
                     filterNode.getValueExpressionNode());
             innerGroup.addChild(filterNode);
 
@@ -1076,7 +1085,11 @@ public class TestASTBottomUpOptimizer extends
                             }//
                             )//
             );
-            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+            final GlobalAnnotations globals = new GlobalAnnotations(
+            		context.getLexiconNamespace(),
+            		context.getTimestamp()
+            		);
+            AST2BOpUtility.toVE(globals,
                     filterNode.getValueExpressionNode());
             expectedWhereClause.addChild(filterNode);
 

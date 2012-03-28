@@ -50,9 +50,9 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
     private static final transient Logger log = Logger
             .getLogger(NeedsMaterializationBOp.class);
 
-    public NeedsMaterializationBOp(final IValueExpression<?> x, final String lex) {
+    public NeedsMaterializationBOp(final IValueExpression<?> x) {
 
-        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { x }, BOp.NOANNS);
 
     }
     

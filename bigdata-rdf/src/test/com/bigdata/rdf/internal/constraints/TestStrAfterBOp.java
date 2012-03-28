@@ -29,11 +29,13 @@ package com.bigdata.rdf.internal.constraints;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
 
@@ -92,7 +94,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
                 final IV actual = new StrAfterBOp(//
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -112,7 +114,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
                 final IV actual = new StrAfterBOp(//
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -130,7 +132,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
 	                final IV actual = new StrAfterBOp(//
 	                        new Constant<IV>(arg1), //
 	                        new Constant<IV>(arg2), //
-	                        vf.getNamespace()//
+	                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
 	                ).get(emptyBindingSet);
 	                
 	                fail("should be a type error");
@@ -152,7 +154,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
                 final IV actual = new StrAfterBOp(//
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -172,7 +174,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
                 final IV actual = new StrAfterBOp(//
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -192,7 +194,7 @@ public class TestStrAfterBOp extends ProxyTestCase {
                 final IV actual = new StrAfterBOp(//
                         new Constant<IV>(arg1), //
                         new Constant<IV>(arg2), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);

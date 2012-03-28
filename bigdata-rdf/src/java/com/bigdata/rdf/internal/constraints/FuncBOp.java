@@ -42,6 +42,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Call one of the Sesame casting functions.
@@ -58,19 +59,15 @@ public class FuncBOp extends IVValueExpression<IV> implements
 
 	public interface Annotations extends IVValueExpression.Annotations {
 
-//		String NAMESPACE = FuncBOp.class.getName() + ".namespace";
-		
 		String FUNCTION = FuncBOp.class.getName() + ".function";
 
     }
 	
     @SuppressWarnings("rawtypes")
     public FuncBOp(final IValueExpression<? extends IV>[] args, 
-    		final String func, final String lex) {
+    		final String func, final GlobalAnnotations globals) {
         
-        this(args, NV.asMap(
-        		new NV(Annotations.NAMESPACE, lex),
-        		new NV(Annotations.FUNCTION, func)));
+        this(args, anns(globals, new NV(Annotations.FUNCTION, func)));
         
     }
     

@@ -42,6 +42,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.MIN;
 import com.bigdata.bop.rdf.aggregate.SUM;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -50,6 +51,7 @@ import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Test suite for {@link GroupByState}.
@@ -72,19 +74,18 @@ public class TestGroupByState extends TestCase2 {
         super(name);
     }
     
-    /** The lexicon namespace - required for {@link CompareBOp}. */
-    private String namespace;
+    private GlobalAnnotations globals;
     
     protected void setUp() throws Exception {
 
         super.setUp();
         
-        namespace = getName();
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
     }
     
     protected void tearDown() throws Exception {
         
-        namespace = null;
+        globals = null;
         
         super.tearDown();
         
@@ -402,7 +403,7 @@ public class TestGroupByState extends TestCase2 {
         final String namespace = "kb.lex"; 
 
         final IValueExpression<?> ucaseExpr = new Bind(org2, new UcaseBOp(org,
-                namespace));
+                globals));
 
         final IValueExpression<?>[] select = new IValueExpression[] { org2 };
 
@@ -446,7 +447,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<?> mathExpr = new Bind(index, //
                 new MathBOp(o, new Constant(new XSDNumericIV(1)),
-                        MathBOp.MathOp.PLUS,getName()));
+                        MathBOp.MathOp.PLUS,globals));
 
         final IValueExpression<?>[] select = new IValueExpression[] { new Bind(
                 index, index) };
@@ -497,8 +498,8 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
-                namespace))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT
+                ))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -545,8 +546,8 @@ public class TestGroupByState extends TestCase2 {
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(new SUM(
                 false/* distinct */, (IValueExpression<IV>) y),
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
-                namespace)) //
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT
+                )) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -588,7 +589,7 @@ public class TestGroupByState extends TestCase2 {
                 new SUM(false/* distinct */,
                         (IValueExpression<IV>) new MathBOp(x, new MIN(
                                 false/* distinct */, (IValueExpression<IV>) y),
-                                MathOp.PLUS,getName())));
+                                MathOp.PLUS,globals)));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { zExpr };
 
@@ -640,7 +641,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
                 new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) x), z, MathOp.PLUS,getName()));
+                        (IValueExpression<IV>) x), z, MathOp.PLUS,globals));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { zExpr, aExpr };
 
@@ -691,7 +692,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
                 new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) x), z, MathOp.PLUS,getName()));
+                        (IValueExpression<IV>) x), z, MathOp.PLUS,globals));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { aExpr, zExpr };
 
@@ -734,8 +735,8 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT,
-                namespace))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT
+                ))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -785,7 +786,7 @@ public class TestGroupByState extends TestCase2 {
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
                         (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
-                        new XSDNumericIV(10)), CompareOp.LT, namespace)) //
+                        new XSDNumericIV(10)), CompareOp.LT)) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -865,7 +866,7 @@ public class TestGroupByState extends TestCase2 {
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
                         (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
-                        new XSDNumericIV(10)), CompareOp.LT, namespace)) //
+                        new XSDNumericIV(10)), CompareOp.LT)) //
         };
 
         // SELECT may not be null.

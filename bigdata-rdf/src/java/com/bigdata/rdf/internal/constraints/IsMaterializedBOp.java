@@ -60,12 +60,6 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
     	
     }
     
-//	public IsMaterializedBOp(final IVariable<IV> x) {
-//        
-//        this(x, true);
-//        
-//    }
-
     /**
      * 
      * @param x
@@ -78,11 +72,9 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
      * @param lex
      *            The namespace of the lexicon relation.
      */
-    public IsMaterializedBOp(final IVariable<IV> x, final boolean materialized,
-            final String lex) {
+    public IsMaterializedBOp(final IVariable<IV> x, final boolean materialized) {
 
-        this(new BOp[] { x }, NV.asMap(new NV(Annotations.MATERIALIZED,
-                materialized), new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x }, NV.asMap(Annotations.MATERIALIZED, materialized));
 
     }
     

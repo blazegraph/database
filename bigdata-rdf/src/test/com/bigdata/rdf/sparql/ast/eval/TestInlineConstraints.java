@@ -44,8 +44,11 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
+import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.constraints.OrBOp;
+import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
+import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -120,48 +123,36 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
     
     public void testAnd() {
     	
-    	final IValueExpression<IV> T = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				return XSDBooleanIV.TRUE;
-			}
-		};
+    	final IValueExpression T = TrueBOp.INSTANCE;
     	
-    	final IValueExpression<IV> F = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				return XSDBooleanIV.FALSE;
-			}
-		};
+    	final IVValueExpression F = FalseBOp.INSTANCE;
     	
-    	final IValueExpression<IV> E = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				throw new SparqlTypeErrorException();
-			}
-		};
+    	final IVValueExpression E = SparqlTypeErrorBOp.INSTANCE;
 		
 		final IBindingSet bs = new ListBindingSet();
 		
 		{
-			final AndBOp and = new AndBOp(T, T, getName());
+			final AndBOp and = new AndBOp(T, T);
 			final XSDBooleanIV iv = and.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(T, F, getName());
+			final AndBOp and = new AndBOp(T, F);
 			final XSDBooleanIV iv = and.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(F, T, getName());
+			final AndBOp and = new AndBOp(F, T);
 			final XSDBooleanIV iv = and.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(F, F, getName());
+			final AndBOp and = new AndBOp(F, F);
 			final XSDBooleanIV iv = and.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(T, E, getName());
+			final AndBOp and = new AndBOp(T, E);
 			try {
 				and.get(bs);
 				//should produce a type error
@@ -169,7 +160,7 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
 			} catch (SparqlTypeErrorException ex) { }
 		}
 		{
-			final AndBOp and = new AndBOp(E, T, getName());
+			final AndBOp and = new AndBOp(E, T);
 			try {
 				and.get(bs);
 				//should produce a type error
@@ -177,17 +168,17 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
 			} catch (SparqlTypeErrorException ex) { }
 		}
 		{
-			final AndBOp and = new AndBOp(E, F, getName());
+			final AndBOp and = new AndBOp(E, F);
 			final XSDBooleanIV iv = and.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(F, E, getName());
+			final AndBOp and = new AndBOp(F, E);
 			final XSDBooleanIV iv = and.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final AndBOp and = new AndBOp(E, E, getName());
+			final AndBOp and = new AndBOp(E, E);
 			try {
 				and.get(bs);
 				//should produce a type error
@@ -199,58 +190,46 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
     
     public void testOr() {
     	
-    	final IValueExpression<IV> T = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				return XSDBooleanIV.TRUE;
-			}
-		};
+    	final IValueExpression T = TrueBOp.INSTANCE;
     	
-    	final IValueExpression<IV> F = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				return XSDBooleanIV.FALSE;
-			}
-		};
+    	final IVValueExpression F = FalseBOp.INSTANCE;
     	
-    	final IValueExpression<IV> E = new IVValueExpression(new BOp[] { }, null/*anns*/) {
-			public IV get(IBindingSet bindingSet) {
-				throw new SparqlTypeErrorException();
-			}
-		};
+    	final IVValueExpression E = SparqlTypeErrorBOp.INSTANCE;
 		
 		final IBindingSet bs = new ListBindingSet();
 		
 		{
-			final OrBOp or = new OrBOp(T, T, getName());
+			final OrBOp or = new OrBOp(T, T);
 			final XSDBooleanIV iv = or.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(T, F, getName());
+			final OrBOp or = new OrBOp(T, F);
 			final XSDBooleanIV iv = or.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(F, T, getName());
+			final OrBOp or = new OrBOp(F, T);
 			final XSDBooleanIV iv = or.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(F, F, getName());
+			final OrBOp or = new OrBOp(F, F);
 			final XSDBooleanIV iv = or.get(bs);
 			assertFalse(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(E, T, getName());
+			final OrBOp or = new OrBOp(E, T);
 			final XSDBooleanIV iv = or.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(T, E, getName());
+			final OrBOp or = new OrBOp(T, E);
 			final XSDBooleanIV iv = or.get(bs);
 			assertTrue(iv.booleanValue());
 		}
 		{
-			final OrBOp or = new OrBOp(F, E, getName());
+			final OrBOp or = new OrBOp(F, E);
 			try {
 				or.get(bs);
 				//should produce a type error
@@ -258,7 +237,7 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
 			} catch (SparqlTypeErrorException ex) { }
 		}
 		{
-			final OrBOp or = new OrBOp(E, F, getName());
+			final OrBOp or = new OrBOp(E, F);
 			try {
 				or.get(bs);
 				//should produce a type error
@@ -266,7 +245,7 @@ public class TestInlineConstraints extends AbstractDataDrivenSPARQLTestCase {
 			} catch (SparqlTypeErrorException ex) { }
 		}
 		{
-			final OrBOp or = new OrBOp(E, E, getName());
+			final OrBOp or = new OrBOp(E, E);
 			try {
 				or.get(bs);
 				//should produce a type error

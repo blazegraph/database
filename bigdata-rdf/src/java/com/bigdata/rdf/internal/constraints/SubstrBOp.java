@@ -32,10 +32,10 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * This function has an origin of ONE (1) not ZERO (0). The start and offset
@@ -57,10 +57,10 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
     public SubstrBOp(//
             final IValueExpression<? extends IV> x,
             final IValueExpression<? extends IV> start,
-            final IValueExpression<? extends IV> length, String lex) {
+            final IValueExpression<? extends IV> length, 
+            final GlobalAnnotations globals) {
      
-        this(new BOp[] { x, start, length }, NV.asMap(new NV(
-                Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x, start, length }, anns(globals));
         
     }
 
@@ -88,7 +88,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
         // The literal.
         
-        final Literal lit = literalValue(0, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
 
         /* 
          * The starting offset for the substring.
@@ -145,7 +145,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     lang);
 
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
 
         } else if (dt != null) {
 
@@ -156,7 +156,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     dt);
 
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
 
         } else {
 
@@ -166,7 +166,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
             final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
 
         }
 

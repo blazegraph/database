@@ -41,24 +41,11 @@ public class FalseBOp extends XSDBooleanIVValueExpression {
 
 	public static final FalseBOp INSTANCE = new FalseBOp();
 
-    @Override
-    protected boolean isLexiconNamespaceRequired() {
-     
-        return false;
-        
-    }
-    
 	private FalseBOp() {
 		
 		this(BOp.NOARGS, BOp.NOANNS);
 		
 	}
-	
-//	public FalseBOp(final IValueExpression<? extends IV> x) {
-//		
-//		this(new BOp[] { x }, BOp.NOANNS);
-//		
-//	}
 	
     /**
      * Required shallow copy constructor.

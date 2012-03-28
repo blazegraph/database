@@ -38,6 +38,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Calculates the "effective boolean value" of an IValueExpression.  See the
@@ -51,25 +52,9 @@ public class EBVBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note: This is willing to ignore the lexicon namespace. However, when
-     * doing that {@link #getLexiconConfiguration(IBindingSet)} WILL NOT work
-     * for this {@link EBVBOp} instance.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/513">
-     *      Expose the LexiconConfiguration to function BOPs </a>
-     */
-    protected boolean isLexiconNamespaceRequired() {
-        
-        return false;
-        
-    }
+    public EBVBOp(final IValueExpression<? extends IV> x) { 
 
-    public EBVBOp(final IValueExpression<? extends IV> x, final String lex) {
-
-        this(new BOp[] { x }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x }, BOp.NOANNS);
 
     }
 

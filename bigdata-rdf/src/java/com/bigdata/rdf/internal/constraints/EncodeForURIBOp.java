@@ -35,13 +35,15 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class EncodeForURIBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
-    public EncodeForURIBOp(IValueExpression<? extends IV> x, String lex) {
-        super(x, lex);
+    public EncodeForURIBOp(final IValueExpression<? extends IV> x, 
+    		final GlobalAnnotations globals) {
+        super(x, globals);
     }
 
     public EncodeForURIBOp(BOp[] args, Map<String, Object> anns) {
@@ -61,10 +63,10 @@ public class EncodeForURIBOp extends IVValueExpression<IV> implements INeedsMate
 
 	@Override
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
-        final Literal lit = literalValue(0, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
         try {
             final BigdataLiteral str = getValueFactory().createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8").replace("+", "%20"));
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
         } catch (UnsupportedEncodingException uee) {
             throw new SparqlTypeErrorException();
         }

@@ -38,6 +38,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A date expression involving a left IValueExpression operand. The operation to be applied to the operands is specified by the {@link Annotations#OP}
@@ -66,6 +67,13 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
 
     }
 
+    @Override
+    protected boolean areGlobalsRequired() {
+     
+        return false;
+        
+    }
+    
     /**
      *
      * @param left
@@ -75,22 +83,11 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
      * @param op
      *            The annotation specifying the operation to be performed on those operands.
      */
-    public DateBOp(final IValueExpression<? extends IV> left, final DateOp op) {
+    public DateBOp(final IValueExpression<? extends IV> left, 
+    		final DateOp op) {
 
-        this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op)));
+        this(new BOp[] { left }, NV.asMap(Annotations.OP, op));
 
-    }
-
-    /**
-     * Required shallow copy constructor.
-     *
-     * @param args
-     *            The operands.
-     * @param op
-     *            The operation.
-     */
-    private DateBOp(final BOp[] args, final DateOp op) {
-        this(args, NV.asMap(new NV(Annotations.OP, op)));
     }
 
     /**

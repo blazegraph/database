@@ -33,13 +33,14 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class UcaseBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 5894411703430694650L;
 
-    public UcaseBOp(IValueExpression<? extends IV> x, String lex) {
-        super(x, lex);
+    public UcaseBOp(IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
+        super(x, globals);
     }
 
     public UcaseBOp(BOp[] args, Map<String, Object> anns) {
@@ -60,17 +61,17 @@ public class UcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
 	@Override
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
-        final Literal lit = literalValue(0, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
 
         if (lit.getLanguage() != null) {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getLanguage());
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
         } else if (lit.getDatatype() != null) {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getDatatype());
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
         } else {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase());
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
         }
     }
 

@@ -40,6 +40,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Perform open-world value comparison operations per the SPARQL spec.
@@ -66,11 +67,9 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 
     @SuppressWarnings("rawtypes")
     public CompareBOp(final IValueExpression<? extends IV> left,
-            final IValueExpression<? extends IV> right, final CompareOp op,
-            final String lex) {
+            final IValueExpression<? extends IV> right, final CompareOp op) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
-                new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { left, right }, NV.asMap(Annotations.OP, op));
 
     }
     

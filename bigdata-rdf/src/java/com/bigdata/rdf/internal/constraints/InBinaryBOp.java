@@ -32,6 +32,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A constraint that a variable may only take on the bindings enumerated by some
@@ -94,12 +95,11 @@ public class InBinaryBOp extends InBOp {
      */
     @SuppressWarnings("rawtypes")
     public InBinaryBOp(//
-            final String lex,//
             final boolean not,//
             final IValueExpression<? extends IV> var,//
             final IConstant<? extends IV>... set) {
      
-        super(lex, not, var, set);
+        super(not, var, set);
 
     }
 

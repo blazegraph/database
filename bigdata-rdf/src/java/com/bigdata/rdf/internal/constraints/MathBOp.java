@@ -48,6 +48,7 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The
@@ -64,8 +65,6 @@ final public class MathBOp extends IVValueExpression
 	
 	private static final transient Logger log = Logger.getLogger(MathBOp.class);
 	
-	private transient BigdataValueFactory vf;
-    
     public interface Annotations extends IVValueExpression.Annotations {
 
         /**
@@ -77,7 +76,6 @@ final public class MathBOp extends IVValueExpression
          */
         String OP = (MathBOp.class.getName() + ".op").intern();
 
-//        public String NAMESPACE = (MathBOp.class.getName() + ".namespace").intern();
     }
     
 	public enum MathOp {
@@ -113,10 +111,10 @@ final public class MathBOp extends IVValueExpression
      *            those operands.
      */
     public MathBOp(final IValueExpression<? extends IV> left, 
-    		final IValueExpression<? extends IV> right, final MathOp op,final String lex) {
+    		final IValueExpression<? extends IV> right, final MathOp op,
+    		final GlobalAnnotations globals) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
-                new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { left, right }, anns(globals, new NV(Annotations.OP, op)));
 
     }
 
@@ -189,19 +187,26 @@ final public class MathBOp extends IVValueExpression
         		if (!(val1 instanceof Literal) || !(val2 instanceof Literal)) {
         			throw new SparqlTypeErrorException();
         		}
+        		
         		try{
-        		return IVUtility.literalMath((Literal) val1, (Literal) val2,
-        				op());
-        		}catch(IllegalArgumentException iae){
+        			
+        			return IVUtility.literalMath(
+        					(Literal) val1, (Literal) val2, op());
+        			
+        		} catch(IllegalArgumentException iae){
+        			
         			ILexiconConfiguration lc = null;
         			try {
         				lc = getLexiconConfiguration(bs);
         			} catch (ContextNotAvailableException ex) {
         				// can't use the LC (e.g. test cases)
         			}
+        			
         		    return DateTimeUtility.dateTimeMath((Literal)val1, left,
         		            (Literal)val2, right, op(), vf(), lc);
+        		    
         		}
+        		
         	}
         	
         } catch (IllegalArgumentException ex) {
@@ -300,9 +305,7 @@ final public class MathBOp extends IVValueExpression
      * evaluate to non-inline numerics that this bop needs materialization.  
      */
     public Requirement getRequirement() {
-    	
     	return INeedsMaterialization.Requirement.SOMETIMES;
-    	
     }
     
 }

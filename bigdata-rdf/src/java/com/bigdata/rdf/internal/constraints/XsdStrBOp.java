@@ -40,6 +40,7 @@ import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Convert the {@link IV} to a <code>xsd:string</code>.
@@ -54,16 +55,9 @@ public class XsdStrBOp extends IVValueExpression<IV>
 
     private static final transient Logger log = Logger.getLogger(XsdStrBOp.class);
 
-//    public interface Annotations extends BOp.Annotations {
-//
-//        String NAMESPACE = XsdStrBOp.class.getName() + ".namespace";
-//
-//    }
+    public XsdStrBOp(final IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
 
-    public XsdStrBOp(final IValueExpression<? extends IV> x, final String lex) {
-
-        this(new BOp[] { x },
-        		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x }, anns(globals));
 
     }
 
@@ -91,29 +85,17 @@ public class XsdStrBOp extends IVValueExpression<IV>
 
     public IV get(final IBindingSet bs) {
 
-        final IV iv = get(0).get(bs);
-
-        if (log.isDebugEnabled()) {
-            log.debug(iv);
-        }
-
-        // not yet bound
-        if (iv == null)
-            throw new SparqlTypeErrorException();
-
-        final String namespace = (String)
-        	getRequiredProperty(Annotations.NAMESPACE);
+        final IV iv = getAndCheckBound(0, bs);
 
         // use to create my simple literals
-        final BigdataValueFactory vf =
-        	BigdataValueFactoryImpl.getInstance(namespace);
+        final BigdataValueFactory vf = getValueFactory();
 
         if (iv.isInline() && !iv.isExtension()) {
             if(iv.isLiteral()){
-                return super.createIV(vf.createLiteral(
+                return super.getOrCreateIV(vf.createLiteral(
                         ((AbstractLiteralIV)iv).getLabel(), XSD.STRING), bs);
             }else{
-                return super.createIV(vf.createLiteral(iv
+                return super.getOrCreateIV(vf.createLiteral(iv
                         .getInlineValue().toString(), XSD.STRING), bs);
             }
         }
@@ -122,7 +104,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
             // return new xsd:string literal using URI label
             final URI uri = (URI) iv.getValue();
             final BigdataLiteral str = vf.createLiteral(uri.toString(), XSD.STRING);
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
         } else if (iv.isLiteral()) {
             final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
             if (lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
@@ -132,7 +114,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
         	else {
                 // else return new xsd:string literal using Literal.getLabel
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel(), XSD.STRING);
-                return super.createIV(str, bs);
+                return super.getOrCreateIV(str, bs);
             }
         } else {
             throw new SparqlTypeErrorException();

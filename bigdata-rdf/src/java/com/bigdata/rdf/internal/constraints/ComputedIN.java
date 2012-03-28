@@ -33,6 +33,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * "IN" and "NOT IN" operator based on testing of the enumerated value
@@ -57,13 +58,9 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
     private transient boolean not = false;
 
     @SuppressWarnings("rawtypes")
-    public ComputedIN(final boolean not, final String lex,
-            final IValueExpression<? extends IV>... ise) {
+    public ComputedIN(final boolean not, final IValueExpression<? extends IV>... ise) {
 
-        super(ise, NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not)),
-                new NV(Annotations.NAMESPACE, lex)));
-
-        this.not = not;
+        this(ise, NV.asMap(Annotations.NOT, Boolean.valueOf(not)));
         
     }
 

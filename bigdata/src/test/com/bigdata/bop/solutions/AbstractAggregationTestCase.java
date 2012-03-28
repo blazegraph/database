@@ -55,6 +55,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.rdf.aggregate.COUNT;
 import com.bigdata.bop.rdf.aggregate.SUM;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
@@ -68,6 +69,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -102,7 +104,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         
         queryContext = new MockQueryContext(queryId);
         
-        namespace = getName();
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
         
     }
     
@@ -116,7 +118,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             
         }
 
-        namespace = null;
+        globals = null;
         
         super.tearDown();
         
@@ -144,9 +146,10 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
     protected IQueryContext queryContext = null;
     
     /**
-     * The namespace of the lexicon relation - required by {@link CompareBOp}.
+     * The global annotations containing the namespace of the lexicon relation 
+     * - required by {@link CompareBOp}.
      */
-    private String namespace = null;
+    private GlobalAnnotations globals = null;
     
     /**
      * Factory for {@link GroupByOp} to be tested.
@@ -789,7 +792,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { org, totalPriceExpr }, // select
@@ -961,7 +964,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(5)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { org, totalPriceExpr }, // select
@@ -1295,7 +1298,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { totalPriceExpr }, // select
@@ -1455,7 +1458,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(50)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                 new IValueExpression[] { totalPriceExpr }, // select
@@ -2287,7 +2290,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
         final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
-                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS,getName()));
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS, globals));
 
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
                 nestedExpr);
@@ -2296,7 +2299,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { totalPriceExpr }, // select
@@ -2477,7 +2480,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
         final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
-                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS,getName()));
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS, globals));
 
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
                 nestedExpr);
@@ -2486,7 +2489,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { org, totalPriceExpr }, // select
@@ -2678,13 +2681,13 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Note: This has a dependency on SUM(?lprice)
         final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
                 new MathBOp(totalPrice, new Constant(new XSDNumericIV(2)),
-                        MathBOp.MathOp.MULTIPLY,getName()));
+                        MathBOp.MathOp.MULTIPLY, globals));
 
         final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
                 new CompareBOp(
                         totalPrice,
                         new Constant<XSDNumericIV<BigdataLiteral>>(new XSDNumericIV(10)),
-                        CompareOp.GT, namespace));
+                        CompareOp.GT));
         
         final GroupByOp query = newFixture(//
                     new IValueExpression[] { totalPriceExpr, inflatedPriceExpr }, // select
@@ -2861,7 +2864,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Note: This has a dependency on SUM(?lprice)
         final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
                 new MathBOp(totalPrice, new Constant(new XSDNumericIV(2)),
-                        MathBOp.MathOp.MULTIPLY,getName()));
+                        MathBOp.MathOp.MULTIPLY, globals));
 
 //        final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
 //                new CompareBOp(

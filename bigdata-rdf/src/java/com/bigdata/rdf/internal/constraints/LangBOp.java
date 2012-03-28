@@ -27,20 +27,15 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Return the language tag of the literal argument.
@@ -55,17 +50,8 @@ public class LangBOp extends IVValueExpression<IV>
 	
 	private static final transient Logger log = Logger.getLogger(LangBOp.class);
 
-//	public interface Annotations extends BOp.Annotations {
-//
-//		String NAMESPACE = (LangBOp.class.getName() + ".namespace").intern();
-//
-//    }
-	
-    public LangBOp(final IValueExpression<? extends IV> x, final String lex) {
-        
-        this(new BOp[] { x }, 
-        		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
-        
+    public LangBOp(final IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
+        super(x, globals);
     }
     
     /**
@@ -92,70 +78,24 @@ public class LangBOp extends IVValueExpression<IV>
 
     public IV get(final IBindingSet bs) {
         
-        final IV iv = get(0).get(bs);
+        final Literal literal = getAndCheckLiteralValue(0, bs);
         
-        if (log.isDebugEnabled()) {
-        	log.debug(iv);
-        }
+		String langTag = literal.getLanguage();
+		if (langTag == null) {
+			langTag = "";
+		}
 
-        // not yet bound
-        if (iv == null)
-        	throw new SparqlTypeErrorException();
-        
-        final BigdataValue val = iv.getValue();
-        
-        if (val == null)
-        	throw new NotMaterializedException();
-        
-        if (log.isDebugEnabled()) {
-        	log.debug(val);
-        }
+        final BigdataValueFactory vf = getValueFactory(); 
 
-        if (val instanceof BigdataLiteral) {
-        	
-        	final BigdataLiteral literal = (BigdataLiteral) val;
-        	
-			String langTag = literal.getLanguage();
-			if (langTag == null) {
-				langTag = "";
-			}
-
-            final String namespace = (String)
-	    		getRequiredProperty(Annotations.NAMESPACE);
-	    
-	        final BigdataValueFactory vf = 
-	        	BigdataValueFactoryImpl.getInstance(namespace);
-
-			final BigdataValue lang = vf.createLiteral(langTag);
-			
-	    	IV langIV = lang.getIV();
-	    	
-	    	if (langIV == null) {
-	    		
-	    		langIV = TermId.mockIV(VTE.LITERAL);
-
-	    		lang.setIV(langIV);
-		    	
-	    	}
-	    	
-	    	// cache the value on the IV
-	    	langIV.setValue(lang);
-	    	
-	    	return langIV;
-        	
-        }
-        
-        throw new SparqlTypeErrorException();
-        
+		final BigdataValue lang = vf.createLiteral(langTag);
+		
+    	return super.getOrCreateIV(lang, bs);
+    	
     }
-    
-    /**
-     * This bop can only work with materialized terms.  
-     */
+
+    @Override
     public Requirement getRequirement() {
-    	
-    	return INeedsMaterialization.Requirement.ALWAYS;
-    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
     }
     
     

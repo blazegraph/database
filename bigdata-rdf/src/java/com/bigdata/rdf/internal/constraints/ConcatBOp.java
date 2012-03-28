@@ -31,16 +31,16 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 5894411703430694650L;
 
-    public ConcatBOp(final String lex, IValueExpression<? extends IV>... args) {
+    public ConcatBOp(final GlobalAnnotations globals, IValueExpression<? extends IV>... args) {
 
-        super(args, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        super(args, anns(globals));
     }
 
     /**
@@ -114,12 +114,12 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
         }
         if (allSame) {
             if (datatype != null) {
-                return super.createIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
+                return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
             } else if (lang != null) {
-                return super.createIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
+                return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
             }
         }
-        return super.createIV(getValueFactory().createLiteral(sb.toString()), bs);
+        return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString()), bs);
 
     }
 

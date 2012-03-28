@@ -43,9 +43,9 @@ public class IsURIBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsURIBOp(final IValueExpression<? extends IV> x, final String lex) {
+    public IsURIBOp(final IValueExpression<? extends IV> x) {
 
-        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { x }, BOp.NOANNS);
 
     }
     

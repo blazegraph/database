@@ -38,6 +38,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
@@ -262,7 +263,7 @@ public class TestAST extends TestCase {
 
         final HavingNode havingBy = new HavingNode();
         havingBy.addExpr(new ValueExpressionNode(new CompareBOp(Var.var("x"),
-                Var.var("y"), CompareOp.GT, "lex-namespace")));
+                Var.var("y"), CompareOp.GT)));
 
     	final OrderByNode orderBy = new OrderByNode();
     	orderBy.addExpr(new OrderByExpr(new VarNode("s"), true));
@@ -355,8 +356,7 @@ public class TestAST extends TestCase {
         public Filter(final int id) {
     		super(BOp.NOARGS, 
         			NV.asMap(
-                            new NV(BOp.Annotations.BOP_ID, id),//
-                            new NV(IVValueExpression.Annotations.NAMESPACE, "kb")//
+                            new NV(BOp.Annotations.BOP_ID, id)//
         			        ));
     	}
     	

@@ -34,6 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Conditional if BOp
@@ -47,13 +48,18 @@ public class IfBOp extends IVValueExpression<IV> implements IPassesMaterializati
 
 	private static final transient Logger log = Logger.getLogger(IfBOp.class);
 
-
-
+    @Override
+    protected boolean areGlobalsRequired() {
+     
+        return false;
+        
+    }
+    
     public IfBOp(final IValueExpression<? extends IV> conditional,//
             final IValueExpression<? extends IV> expression1,//
             final IValueExpression<? extends IV> expression2) {
 
-        this(new BOp[] { conditional,expression1,expression2 },null);
+        this(new BOp[] { conditional,expression1,expression2 }, BOp.NOANNS);
 
     }
 

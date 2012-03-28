@@ -33,6 +33,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A constraint that a value expression which may only take on the bindings
@@ -97,12 +98,12 @@ public class InHashBOp extends InBOp {
      *            allowable values for that variable.
      */
     @SuppressWarnings("rawtypes")
-    public InHashBOp(final String lex,//
+    public InHashBOp(
             final boolean not, //
             final IValueExpression<? extends IV> var,
             final IConstant<? extends IV>... set) {
      
-        super(lex, not, var, set);
+        super(not, var, set);
         
     }
 

@@ -29,11 +29,13 @@ package com.bigdata.rdf.internal.constraints;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
 
@@ -100,7 +102,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(plain_text.getIV()), //
                         new Constant<IV>(_1), //
                         new Constant<IV>(_3),//
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -118,7 +120,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(plain_text.getIV()), //
                         new Constant<IV>(_1), //
                         new Constant<IV>(_9999),//
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -136,7 +138,7 @@ public class TestSubstrBOp extends ProxyTestCase {
                         new Constant<IV>(plain_text.getIV()), //
                         new Constant<IV>(_0), //
                         new Constant<IV>(_3),//
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);

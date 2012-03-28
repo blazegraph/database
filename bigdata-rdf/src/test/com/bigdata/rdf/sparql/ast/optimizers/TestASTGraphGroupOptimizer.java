@@ -41,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -264,7 +265,12 @@ public class TestASTGraphGroupOptimizer extends
             final FilterNode filterNode = new FilterNode(FunctionNode.sameTerm(
                     g, g1));
 
-            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+            final GlobalAnnotations globals = new GlobalAnnotations(
+            		context.getLexiconNamespace(),
+            		context.getTimestamp()
+            		);
+            
+            AST2BOpUtility.toVE(globals,
                     filterNode.getValueExpressionNode());
             
             innerGraphGroup.addChild(filterNode);

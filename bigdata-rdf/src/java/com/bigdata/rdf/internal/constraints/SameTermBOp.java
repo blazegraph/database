@@ -58,16 +58,13 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
     
     /**
      * Constructor for sameTerm using {@link CompareOp#EQ}.
-     * 
-     * @param left
-     * @param right
-     * @param namespace
      */
     @SuppressWarnings("rawtypes")
-    public SameTermBOp(final IValueExpression<? extends IV> left,
-            final IValueExpression<? extends IV> right, final String namespace) {
+    public SameTermBOp(
+    		final IValueExpression<? extends IV> left,
+            final IValueExpression<? extends IV> right) {
 
-        this(left, right, CompareOp.EQ, namespace);
+        this(left, right, CompareOp.EQ);
 
     }
     
@@ -78,15 +75,12 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
      * @param left
      * @param right
      * @param op
-     * @param namespace
      */
     @SuppressWarnings("rawtypes")
     public SameTermBOp(final IValueExpression<? extends IV> left,
-            final IValueExpression<? extends IV> right, final CompareOp op,
-            final String namespace) {
+            final IValueExpression<? extends IV> right, final CompareOp op) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),
-                new NV(Annotations.NAMESPACE, namespace)));
+        this(new BOp[] { left, right }, NV.asMap(Annotations.OP, op));
 
     }
     

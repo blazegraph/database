@@ -35,6 +35,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * The BNODE()/BNODE(Literal) function as defined in <a
@@ -48,12 +49,13 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
     private static final long serialVersionUID = -8448763718374010166L;
 
-    public BNodeBOp(final String lex) {
-    	super(lex);
+    public BNodeBOp(final GlobalAnnotations globals) {
+    	super(globals);
     }
     
-    public BNodeBOp(IValueExpression<? extends IV> x, String lex) {
-        super(x, lex);
+    public BNodeBOp(final IValueExpression<? extends IV> x, 
+    		final GlobalAnnotations globals) {
+        this(new BOp[] { x }, anns(globals));
     }
 
     public BNodeBOp(BOp[] args, Map<String, Object> anns) {
@@ -74,11 +76,11 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
         
     	if (arity() == 0) {
     		
-    		return super.createIV(getValueFactory().createBNode(), bs);
+    		return super.getOrCreateIV(getValueFactory().createBNode(), bs);
     		
     	}
     	
-        final Literal lit = literalValue(0, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
 
         final URI dt = lit.getDatatype();
 
@@ -88,7 +90,7 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
         final BigdataBNode bnode = getValueFactory().createBNode(
                 "-bnode-func-" + lit.getLabel());
 
-        return super.createIV(bnode, bs);
+        return super.getOrCreateIV(bnode, bs);
 
     }
     

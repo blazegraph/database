@@ -58,8 +58,8 @@ public class SPARQLConstraint<X extends XSDBooleanIV> extends
 	private static XSDBooleanIVValueExpression wrap(
 			final IValueExpression<? extends IV> ve) {
 		
-        return ve instanceof XSDBooleanIVValueExpression ? (XSDBooleanIVValueExpression) ve
-                : new EBVBOp(ve, null/* lex */);
+        return ve instanceof XSDBooleanIVValueExpression ? 
+        		(XSDBooleanIVValueExpression) ve : new EBVBOp(ve);
 
 	}
 	

@@ -41,6 +41,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Return the datatype of the literal argument.
@@ -55,16 +56,9 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 	private static final transient Logger log = Logger.getLogger(DatatypeBOp.class);
 
-//	public interface Annotations extends BOp.Annotations {
-//
-//		String NAMESPACE = DatatypeBOp.class.getName() + ".namespace";
-//
-//    }
+    public DatatypeBOp(final IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
 
-    public DatatypeBOp(final IValueExpression<? extends IV> x, final String lex) {
-
-        this(new BOp[] { x },
-        		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x }, anns(globals));
 
     }
 
@@ -92,11 +86,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
     public IV get(final IBindingSet bs) {
 
-        final String namespace = (String)
-			getRequiredProperty(Annotations.NAMESPACE);
-
-	    final BigdataValueFactory vf =
-	    	BigdataValueFactoryImpl.getInstance(namespace);
+	    final BigdataValueFactory vf = super.getValueFactory();
 
         @SuppressWarnings("rawtypes")
         final IV iv = get(0).get(bs);
@@ -117,7 +107,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    	@SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
 	    	if (datatypeIV == null) {
-	    		datatypeIV = super.createIV(datatype, bs);
+	    		datatypeIV = super.getOrCreateIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV
@@ -157,7 +147,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
             @SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
 	    	if (datatypeIV == null) {
-	    		datatypeIV = super.createIV(datatype, bs);
+	    		datatypeIV = super.getOrCreateIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV

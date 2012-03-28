@@ -33,6 +33,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -44,6 +45,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -60,6 +62,23 @@ public class TestAVERAGE extends TestCase2 {
 		super(name);
 	}
 
+    private GlobalAnnotations globals;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        globals = null;
+        
+        super.tearDown();
+        
+    }
+    
     public void test_average() {
         
         final IVariable<IV> org = Var.var("org");
@@ -158,7 +177,7 @@ public class TestAVERAGE extends TestCase2 {
 
         // AVERAGE(lprice*2)
         final AVERAGE op = new AVERAGE(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY,getName()));
+                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY, globals));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

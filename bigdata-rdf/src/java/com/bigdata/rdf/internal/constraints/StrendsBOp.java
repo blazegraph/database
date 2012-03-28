@@ -31,6 +31,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * @see http://www.w3.org/2005/xpath-functions#ends-with
@@ -42,10 +43,11 @@ public class StrendsBOp extends XSDBooleanIVValueExpression implements INeedsMat
 
     private static final long serialVersionUID = 5466622630000019821L;
 
-    public StrendsBOp(IValueExpression<? extends IV> x,
-            IValueExpression<? extends IV> y, String lex) {
+    public StrendsBOp(
+    		final IValueExpression<? extends IV> x,
+            final IValueExpression<? extends IV> y) {
    
-        this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x, y }, BOp.NOANNS);
         
     }
 
@@ -70,8 +72,8 @@ public class StrendsBOp extends XSDBooleanIVValueExpression implements INeedsMat
     @Override
     public boolean accept(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final String v = literalValue(0, bs).getLabel();
-        final String c = literalValue(1, bs).getLabel();
+        final String v = getAndCheckLiteralValue(0, bs).getLabel();
+        final String c = getAndCheckLiteralValue(1, bs).getLabel();
         return v.endsWith(c);
         
     }

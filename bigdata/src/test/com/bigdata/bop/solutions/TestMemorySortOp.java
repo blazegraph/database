@@ -49,6 +49,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -57,6 +58,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -343,7 +345,7 @@ public class TestMemorySortOp extends TestCase2 {
         final IConstant<IV> _5 = new Constant<IV>(new XSDNumericIV(5));
 
         final ISortOrder<?> sors[] = new ISortOrder[] { //
-                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,getName())), false/* asc */),//
+                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,new GlobalAnnotations(getName(), ITx.READ_COMMITTED))), false/* asc */),//
                 new SortOrder(y, false/* asc */) //
         };
 
