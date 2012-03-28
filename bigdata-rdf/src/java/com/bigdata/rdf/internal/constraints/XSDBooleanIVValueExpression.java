@@ -31,6 +31,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Base class for RDF value expression BOps that happen to evaluate to an
@@ -51,13 +52,24 @@ public abstract class XSDBooleanIVValueExpression extends
      * @return An operand which is known to evaluate to an {@link XSDBooleanIV}.
      */
     protected static final XSDBooleanIVValueExpression wrap(
-            final IValueExpression<? extends IV> ve, final String lex) {
+            final IValueExpression<? extends IV> ve) {
 
-        return ve instanceof XSDBooleanIVValueExpression ? (XSDBooleanIVValueExpression) ve
-                : new EBVBOp(ve, lex);
+        return ve instanceof XSDBooleanIVValueExpression ? 
+        		(XSDBooleanIVValueExpression) ve : new EBVBOp(ve);
 
     }
 
+    /**
+     * None of the xsd:boolean IV value expressions require access to the
+     * ValueFactory or LexiconConfiguration.
+     */
+    @Override
+    protected boolean areGlobalsRequired() {
+     
+        return false;
+        
+    }
+    
 	/**
      * Required shallow copy constructor.
      */

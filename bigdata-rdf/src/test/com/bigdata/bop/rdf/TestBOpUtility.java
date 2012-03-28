@@ -105,7 +105,7 @@ public class TestBOpUtility extends TestCase2 {
     		if (bop == null) {
     			bop = c;
     		} else {
-    			bop = new OrBOp(c, bop, getName());
+    			bop = new OrBOp(c, bop);
     		}
     		
     	}

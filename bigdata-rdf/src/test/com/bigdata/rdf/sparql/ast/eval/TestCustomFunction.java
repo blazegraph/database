@@ -45,6 +45,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 
 /**
@@ -86,16 +87,17 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
         final FunctionRegistry.Factory myFactory = new FunctionRegistry.Factory() {
 
             @Override
-            public IValueExpression<? extends IV> create(String lex,
+            public IValueExpression<? extends IV> create(
+            		GlobalAnnotations globals,
                     Map<String, Object> scalarValues,
                     ValueExpressionNode... args) {
 
                 FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
                 final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                        lex, args[0]);
+                        globals, args[0]);
 
-                return new MyFunctionBOp(ve, lex);
+                return new MyFunctionBOp(ve, globals);
 
             }
 
@@ -147,16 +149,17 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
     private static class MyFunctionFactory implements FunctionRegistry.Factory {
 
         @Override
-        public IValueExpression<? extends IV> create(String lex,
+        public IValueExpression<? extends IV> create(
+        		GlobalAnnotations globals,
                 Map<String, Object> scalarValues,
                 ValueExpressionNode... args) {
 
             FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                    lex, args[0]);
+                    globals, args[0]);
 
-            return new MyFunctionBOp(ve, lex);
+            return new MyFunctionBOp(ve, globals);
 
         }
 
@@ -223,8 +226,8 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
          * @param lex
          *            The namespace of the lexicon relation.
          */
-        public MyFunctionBOp(IValueExpression<? extends IV> x, String lex) {
-            super(x, lex);
+        public MyFunctionBOp(IValueExpression<? extends IV> x, GlobalAnnotations globals) {
+            super(x, globals);
         }
 
         @Override
@@ -261,16 +264,17 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
     private static class MyFilterFactory implements FunctionRegistry.Factory {
 
         @Override
-        public IValueExpression<? extends IV> create(String lex,
+        public IValueExpression<? extends IV> create(
+        		GlobalAnnotations globals,
                 Map<String, Object> scalarValues,
                 ValueExpressionNode... args) {
             
             FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                    lex, args[0]);
+                    globals, args[0]);
 
-            return new MyFilterBOp(ve, lex);
+            return new MyFilterBOp(ve);
 
         }
 
@@ -310,10 +314,9 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             super(args, anns);
         }
 
-        public MyFilterBOp(final IValueExpression<? extends IV> x,
-                final String lex) {
+        public MyFilterBOp(final IValueExpression<? extends IV> x) {
 
-            this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+            this(new BOp[] { x }, BOp.NOANNS);
 
         }
 

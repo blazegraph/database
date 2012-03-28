@@ -34,13 +34,15 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class StrlenBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 4176318782528605454L;
 
-    public StrlenBOp(IValueExpression<? extends IV> x, String lex) {
-        super(x, lex);
+    public StrlenBOp(final IValueExpression<? extends IV> x, 
+    		final GlobalAnnotations globals) {
+        super(x, globals);
     }
 
     public StrlenBOp(BOp[] args, Map<String, Object> anns) {
@@ -62,7 +64,7 @@ public class StrlenBOp extends IVValueExpression<IV> implements INeedsMaterializ
 	@Override
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
         
-        final Literal lit = literalValue(0, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
         final String label = lit.getLabel();
         final int length = label.length();
         return new XSDIntegerIV(BigInteger.valueOf(length));

@@ -34,6 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * <pre>http://www.w3.org/2005/xpath-functions#lower-case</pre>
@@ -45,10 +46,8 @@ public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
     
     private static final long serialVersionUID = -6847688419473046477L;
 
-    public LcaseBOp(IValueExpression<? extends IV> x, final String lex) {
-
-        super(x, lex);
-        
+    public LcaseBOp(final IValueExpression<? extends IV> x, final GlobalAnnotations globals) {
+        super(x, globals);
     }
 
     /**
@@ -99,9 +98,7 @@ public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
 	@Override
     public IV get(final IBindingSet bs) {
 
-        final IV iv = getAndCheckLiteral(0, bs);
-
-        final Literal in = literalValue(iv);
+        final Literal in = getAndCheckLiteralValue(0, bs);
 
         final BigdataValueFactory vf = getValueFactory();
 
@@ -123,7 +120,7 @@ public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
             
         }
 
-        return super.createIV(out, bs);
+        return super.getOrCreateIV(out, bs);
 
     }
 

@@ -32,6 +32,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Imposes the constraint <code>bound(x)</code> for the variable x.
@@ -43,9 +44,9 @@ public class IsBoundBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -7408654639183330874L;
 
-    public IsBoundBOp(final IVariable<IV> x, final String lex) {
+    public IsBoundBOp(final IVariable<IV> x) {
 
-        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { x }, BOp.NOANNS);
 
     }
 

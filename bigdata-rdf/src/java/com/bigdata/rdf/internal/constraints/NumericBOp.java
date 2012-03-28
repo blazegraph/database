@@ -33,6 +33,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The operation to be applied to the operands is
@@ -50,6 +51,13 @@ public class NumericBOp extends IVValueExpression<IV>  {
         ABS, ROUND, CEIL, FLOOR;
     }
 
+    @Override
+    protected boolean areGlobalsRequired() {
+     
+        return false;
+        
+    }
+    
     /**
      *
      * @param left
@@ -60,9 +68,10 @@ public class NumericBOp extends IVValueExpression<IV>  {
      *            The annotation specifying the operation to be performed on those operands.
      */
     @SuppressWarnings("rawtypes")
-    public NumericBOp(final IValueExpression<? extends IV> left, final NumericOp op) {
+    public NumericBOp(final IValueExpression<? extends IV> left, 
+    		final NumericOp op) {
 
-        this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op)));
+        this(new BOp[] { left }, NV.asMap(Annotations.OP, op));
 
     }
 

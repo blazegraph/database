@@ -37,6 +37,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -95,6 +96,23 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 	    return namespace;
 	    
 	}
+	
+    private GlobalAnnotations globals;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        globals = null;
+        
+        super.tearDown();
+        
+    }
 
     /**
      * When true, the test uses hardcoded access to an existing Journal already
@@ -394,10 +412,10 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 							origProperty1,// FIXME verify correct var w/ MikeP
 							new MathBOp(origProperty1, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(120))),
-									MathOp.MINUS,getName()),//
+									MathOp.MINUS,globals),//
 							new MathBOp(origProperty1, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(120))),
-									MathOp.PLUS,getName())//
+									MathOp.PLUS,globals)//
 							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
@@ -425,10 +443,10 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 							origProperty2,// FIXME verify correct var with MikeP
 							new MathBOp(origProperty2, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(170))),
-									MathOp.MINUS,getName()),//
+									MathOp.MINUS,globals),//
 							new MathBOp(origProperty2, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(170))),
-									MathOp.PLUS,getName())//
+									MathOp.PLUS,globals)//
 							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
@@ -444,7 +462,7 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                      * /dataFromProducer1092/Product53999> != ?product)
                      */
                     new NotBOp(new SameTermBOp(product, new Constant(
-                            product53999.getIV()), lexnamespace), lexnamespace), //
+                            product53999.getIV()))), //
 
                     /*
                      * FILTER (?simProperty1 < (?origProperty1 + 120) &&
@@ -457,14 +475,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDNumericIV(120)), MathOp.PLUS,getName()) }, NV
+                                    new XSDNumericIV(120)), MathOp.PLUS,globals) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDNumericIV(120)), MathOp.MINUS,getName()) }, NV
+                                    new XSDNumericIV(120)), MathOp.MINUS,globals) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 
@@ -475,14 +493,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDNumericIV(170)), MathOp.PLUS,getName()) }, NV
+                                    new XSDNumericIV(170)), MathOp.PLUS,globals) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDNumericIV(170)), MathOp.MINUS,getName()) }, NV
+                                    new XSDNumericIV(170)), MathOp.MINUS,globals) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 
@@ -807,8 +825,7 @@ test_bsbm_q5 : Total times: static=7312, runtime=3305, delta(static-runtime)=400
                     CompareBOp.Annotations.OP, CompareOp.LT) })));
 
             // FILTER (!bound(?testVar))
-            c2 = new SPARQLConstraint(new NotBOp(new IsBoundBOp(testVar,
-                    namespace), lexnamespace));
+            c2 = new SPARQLConstraint(new NotBOp(new IsBoundBOp(testVar)));
             
             // the constraints on the join graph.
             constraints = new IConstraint[] { c0, c1, c2 };

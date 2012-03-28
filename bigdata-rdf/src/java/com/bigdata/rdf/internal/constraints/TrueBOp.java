@@ -41,23 +41,11 @@ public class TrueBOp extends XSDBooleanIVValueExpression {
 	
 	public static final TrueBOp INSTANCE = new TrueBOp();
 
-    protected boolean isLexiconNamespaceRequired() {
-        
-        return false;
-        
-    }
-        
 	private TrueBOp() {
 		
 		this(BOp.NOARGS, BOp.NOANNS);
 		
 	}
-	
-//	public TrueBOp(final IValueExpression<? extends IV> x) {
-//		
-//		this(new BOp[] { x }, BOp.NOANNS);
-//		
-//	}
 	
     /**
      * Required shallow copy constructor.

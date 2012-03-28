@@ -46,6 +46,7 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -332,7 +333,12 @@ public class TestASTSimpleOptionalOptimizer extends
                             }//
                     ));
             
-            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+            final GlobalAnnotations globals = new GlobalAnnotations(
+            		context.getLexiconNamespace(),
+            		context.getTimestamp()
+            		);
+            
+            AST2BOpUtility.toVE(globals,
                     filterNode.getValueExpressionNode());
             
             filters.add(filterNode);

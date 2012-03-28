@@ -34,13 +34,17 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class StrlangBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = 4227610629554743647L;
 
-    public StrlangBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> dt, String lex) {
-        this(new BOp[] { x, dt }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    public StrlangBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> dt, 
+    		final GlobalAnnotations globals) {
+    	
+        this(new BOp[] { x, dt }, anns(globals));
+        
     }
 
     public StrlangBOp(BOp[] args, Map<String, Object> anns) {
@@ -62,12 +66,12 @@ public class StrlangBOp extends IVValueExpression<IV> implements INeedsMateriali
 	@Override
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final Literal lit = literalValue(0, bs);
-        final Literal l = literalValue(1, bs);
+        final Literal lit = getAndCheckLiteralValue(0, bs);
+        final Literal l = getAndCheckLiteralValue(1, bs);
         String label = lit.getLabel();
         String langLit = l.getLabel();
         final BigdataLiteral str = getValueFactory().createLiteral(label, langLit);
-        return super.createIV(str, bs);
+        return super.getOrCreateIV(str, bs);
 
     }
 

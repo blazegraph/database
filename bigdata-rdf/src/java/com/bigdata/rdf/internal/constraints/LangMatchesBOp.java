@@ -32,7 +32,6 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
@@ -49,18 +48,11 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = 5910711647357240974L;
 	
-//    private static final transient Logger log = Logger
-//            .getLogger(LangMatchesBOp.class);
-
-    public LangMatchesBOp(final IValueExpression<? extends IV> tag, 
-    		final IValueExpression<? extends IV> range, final String lex) {
+    public LangMatchesBOp(
+    		final IValueExpression<? extends IV> tag, 
+    		final IValueExpression<? extends IV> range) { 
         
-        this(new BOp[] { tag, range }, NV.asMap(Annotations.NAMESPACE, lex));
-        
-//        if (log.isDebugEnabled()) {
-//        	log.info(tag);
-//        	log.info(range);
-//        }
+        this(new BOp[] { tag, range }, BOp.NOANNS);
         
     }
     

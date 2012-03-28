@@ -33,6 +33,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Imposes the constraint <code>!x</code>. The operand of this operator must
@@ -46,10 +47,9 @@ public class NotBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -5701967329003122236L;
 
-	public NotBOp(final IValueExpression<? extends IV> x, final String lex) {
+	public NotBOp(final IValueExpression<? extends IV> x) {
 
-        this(new BOp[] { wrap(x, lex) }, NV.asMap(new NV(Annotations.NAMESPACE,
-                lex)));
+        this(new BOp[] { wrap(x) }, BOp.NOANNS);
 
     }
 

@@ -44,11 +44,13 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.MIN;
 import com.bigdata.bop.rdf.aggregate.SUM;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Test suite for {@link GroupByRewriter}.
@@ -79,18 +81,18 @@ public class TestGroupByRewriter extends TestCase2 {
     }
 
     /** The lexicon namespace - required for {@link CompareBOp}. */
-    private String namespace;
+    private GlobalAnnotations globals;
     
     protected void setUp() throws Exception {
 
         super.setUp();
         
-        namespace = getName();
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
     }
     
     protected void tearDown() throws Exception {
         
-        namespace = null;
+        globals = null;
         
         super.tearDown();
         
@@ -282,7 +284,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IConstraint constraint = new SPARQLConstraint(
                 new CompareBOp(new SUM(false/* distinct */,
                         (IValueExpression<IV>) x), new Constant<IV>(
-                        new XSDNumericIV(10)), CompareOp.GT, namespace));
+                        new XSDNumericIV(10)), CompareOp.GT));
 
         /*
          * Set up the expected answer.
@@ -294,8 +296,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IConstraint expectedExpr = new SPARQLConstraint(new CompareBOp(
-                _0, new Constant<IV>(new XSDNumericIV(10)), CompareOp.GT,
-                namespace));
+                _0, new Constant<IV>(new XSDNumericIV(10)), CompareOp.GT));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);
@@ -390,7 +391,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IValueExpression<?> expr = new /* Conditional */Bind(y,
                 new MathBOp(new Constant<IV>(new XSDNumericIV(1)), new SUM(
                         false/* distinct */, (IValueExpression<IV>) x),
-                        MathBOp.MathOp.PLUS,getName()));
+                        MathBOp.MathOp.PLUS, globals));
 
         /*
          * Set up the expected answer.
@@ -402,7 +403,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IValueExpression<IV> expectedExpr = new Bind(y, new MathBOp(
-                new Constant<IV>(new XSDNumericIV(1)), _0, MathBOp.MathOp.PLUS,getName()));
+                new Constant<IV>(new XSDNumericIV(1)), _0, MathBOp.MathOp.PLUS, globals));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);
@@ -440,7 +441,7 @@ public class TestGroupByRewriter extends TestCase2 {
 
         final IValueExpression<IV> sumX = new /* Conditional */Bind(y, new SUM(
                 false/* distinct */, new MathBOp(x, new MIN(
-                        false/* distinct */, x), MathBOp.MathOp.PLUS,getName())));
+                        false/* distinct */, x), MathBOp.MathOp.PLUS, globals)));
 
         /*
          * Set up the expected answer.
@@ -451,7 +452,7 @@ public class TestGroupByRewriter extends TestCase2 {
 
         final IAggregate<IV> _minX = new MIN(false/* distinct */, x);
         final IAggregate<IV> _sumX = new SUM(false/* distinct */, new MathBOp(
-                x, _0, MathBOp.MathOp.PLUS,getName()));
+                x, _0, MathBOp.MathOp.PLUS,globals));
 
         final IValueExpression<IV> expectedExpr = new Bind(y, _1);
 

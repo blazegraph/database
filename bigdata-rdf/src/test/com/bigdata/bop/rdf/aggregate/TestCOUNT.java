@@ -33,6 +33,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -45,6 +46,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -61,6 +63,23 @@ public class TestCOUNT extends TestCase2 {
 		super(name);
 	}
 
+    private GlobalAnnotations globals;
+    
+    protected void setUp() throws Exception {
+
+        super.setUp();
+        
+        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        globals = null;
+        
+        super.tearDown();
+        
+    }
+    
     public void test_count() {
 
         final IVariable<IV> org = Var.var("org");
@@ -159,7 +178,7 @@ public class TestCOUNT extends TestCase2 {
 
         // COUNT(lprice+1)
         final COUNT op = new COUNT(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,getName()));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,globals));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
@@ -277,7 +296,7 @@ public class TestCOUNT extends TestCase2 {
 
         // Note: Formula will produce an error for non-numeric data.
         final COUNT op = new COUNT(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(ZERO), MathBOp.MathOp.PLUS,getName()));
+                new Constant<IV>(ZERO), MathBOp.MathOp.PLUS,globals));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

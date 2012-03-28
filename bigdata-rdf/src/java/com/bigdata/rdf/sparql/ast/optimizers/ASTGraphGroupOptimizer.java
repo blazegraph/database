@@ -37,6 +37,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -284,7 +285,12 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                             FunctionNode.sameTerm(graphContext,
                                     innerGraphContext));
 
-                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    final GlobalAnnotations globals = new GlobalAnnotations(
+                    		context.getLexiconNamespace(),
+                    		context.getTimestamp()
+                    		);
+                    
+                    AST2BOpUtility.toVE(globals,
                             filterNode.getValueExpressionNode());
 
                     group.addChild(filterNode);

@@ -43,6 +43,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * @see http://www.w3.org/2009/sparql/docs/query-1.1/rq25.xml#func-replace
@@ -64,7 +65,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
     private static Map<String,Object> anns(
 			final IValueExpression<? extends IV> pattern,
 			final IValueExpression<? extends IV> flags,
-			final String lex) {
+			final GlobalAnnotations globals) {
     	
     	if (pattern instanceof IConstant && 
     			(flags == null || flags instanceof IConstant)) {
@@ -80,8 +81,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
 				
 				final Value fargVal = farg != null ? farg.getValue() : null;
 				
-	    		return NV.asMap(
-	    				new NV(Annotations.NAMESPACE, lex),
+	    		return anns(globals,
 	    				new NV(Annotations.PATTERN, 
 	    						getPattern(pargVal, fargVal)));
 	    		
@@ -89,7 +89,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
     		
     	}
     		
-		return NV.asMap(Annotations.NAMESPACE, lex);
+		return anns(globals);
     	
     }
     
@@ -101,9 +101,9 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
 			final IValueExpression<? extends IV> var, 
 			final IValueExpression<? extends IV> pattern,
 			final IValueExpression<? extends IV> replacement,
-			final String lex) {
+			final GlobalAnnotations globals) {
         
-        this(new BOp[] { var, pattern, replacement }, anns(pattern, null, lex));
+        this(new BOp[] { var, pattern, replacement }, anns(pattern, null, globals));
 
     }
     
@@ -116,9 +116,9 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
 			final IValueExpression<? extends IV> pattern,
 			final IValueExpression<? extends IV> replacement,
 			final IValueExpression<? extends IV> flags,
-			final String lex) {
+			final GlobalAnnotations globals) {
         
-        this(new BOp[] { var, pattern, replacement, flags }, anns(pattern, flags, lex));
+        this(new BOp[] { var, pattern, replacement, flags }, anns(pattern, flags, globals));
 
     }
     
@@ -151,16 +151,16 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
     public IV get(final IBindingSet bs) {
         
         @SuppressWarnings("rawtypes")
-        final Literal var = literalValue(0, bs);
+        final Literal var = getAndCheckLiteralValue(0, bs);
         
         @SuppressWarnings("rawtypes")
-        final Literal pattern = literalValue(1, bs);
+        final Literal pattern = getAndCheckLiteralValue(1, bs);
 
         @SuppressWarnings("rawtypes")
-        final Literal replacement = literalValue(2, bs);
+        final Literal replacement = getAndCheckLiteralValue(2, bs);
         
         @SuppressWarnings("rawtypes")
-        final Literal flags = arity() > 3 ? literalValue(3, bs) : null;
+        final Literal flags = arity() > 3 ? getAndCheckLiteralValue(3, bs) : null;
         
         if (log.isDebugEnabled()) {
         	log.debug("var: " + var);
@@ -174,7 +174,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
         	final BigdataLiteral l = 
         		evaluate(getValueFactory(), var, pattern, replacement, flags);
         	
-        	return super.createIV(l, bs);
+        	return super.getOrCreateIV(l, bs);
         	
         } catch (ValueExprEvaluationException ex) {
         	

@@ -48,11 +48,10 @@ public class StrcontainsBOp extends XSDBooleanIVValueExpression implements INeed
     @SuppressWarnings("rawtypes")
     public StrcontainsBOp(//
             final IValueExpression<? extends IV> x,//
-            final IValueExpression<? extends IV> y, //
-            final String lex//
+            final IValueExpression<? extends IV> y//
             ) {
 
-        this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x, y }, BOp.NOANNS);
 
     }
 
@@ -79,8 +78,8 @@ public class StrcontainsBOp extends XSDBooleanIVValueExpression implements INeed
     @Override
     public boolean accept(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final String v = literalValue(0, bs).getLabel();
-        final String c = literalValue(1, bs).getLabel();
+        final String v = getAndCheckLiteralValue(0, bs).getLabel();
+        final String c = getAndCheckLiteralValue(1, bs).getLabel();
         return v.contains(c);
 
     }

@@ -60,21 +60,9 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
     	
     }
 
-//    public IsInlineBOp(final IVariable<IV> x) {
-//        
-//        this(x, true);
-//        
-//    }
-    
-    protected boolean isLexiconNamespaceRequired() {
-        
-        return false;
-        
-    }
-    
     public IsInlineBOp(final IVariable<IV> x, final boolean inline) {
         
-        this(new BOp[] { x }, NV.asMap(new NV(Annotations.INLINE, inline)));
+        this(new BOp[] { x }, NV.asMap(Annotations.INLINE, inline));
         
     }
     

@@ -29,9 +29,11 @@ package com.bigdata.rdf.internal.constraints;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
 
@@ -94,7 +96,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(var), //
                         new Constant<IV>(pattern), //
                         new Constant<IV>(replacement), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -122,7 +124,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(pattern), //
                         new Constant<IV>(replacement), //
                         new Constant<IV>(flags), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -150,7 +152,7 @@ public class TestReplaceBOp extends ProxyTestCase {
                         new Constant<IV>(pattern), //
                         new Constant<IV>(replacement), //
                         new Constant<IV>(flags), //
-                        vf.getNamespace()//
+                        new GlobalAnnotations(vf.getNamespace(), ITx.READ_COMMITTED)//
                 ).get(emptyBindingSet);
 
                 assertEquals(expected, actual);

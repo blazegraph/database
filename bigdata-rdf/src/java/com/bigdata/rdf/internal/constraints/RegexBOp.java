@@ -62,8 +62,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 
     private static Map<String,Object> anns(
 			final IValueExpression<? extends IV> pattern,
-			final IValueExpression<? extends IV> flags,
-			final String lex) {
+			final IValueExpression<? extends IV> flags) {
     	
     	if (pattern instanceof IConstant && 
     			(flags == null || flags instanceof IConstant)) {
@@ -80,7 +79,6 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 				final Value fargVal = farg != null ? farg.getValue() : null;
 				
 	    		return NV.asMap(
-	    				new NV(Annotations.NAMESPACE, lex),
 	    				new NV(Annotations.PATTERN, 
 	    						getPattern(pargVal, fargVal)));
 	    		
@@ -88,7 +86,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     		
     	}
     		
-		return NV.asMap(Annotations.NAMESPACE, lex);
+		return BOp.NOANNS;
     	
     }
     
@@ -98,11 +96,9 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     @SuppressWarnings("rawtypes")
 	public RegexBOp(
 			final IValueExpression<? extends IV> var, 
-			final IValueExpression<? extends IV> pattern,
-			final String lex) {
+			final IValueExpression<? extends IV> pattern) {
         
-        this(new BOp[] { var, pattern }, anns(pattern, null, lex));
-//        		NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { var, pattern }, anns(pattern, null));
 
     }
     
@@ -113,11 +109,9 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     public RegexBOp(
 			final IValueExpression<? extends IV> var, 
 			final IValueExpression<? extends IV> pattern,
-			final IValueExpression<? extends IV> flags,
-			final String lex) {
+			final IValueExpression<? extends IV> flags) {
         
-        this(new BOp[] { var, pattern, flags }, anns(pattern, flags, lex)); 
-//        		NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { var, pattern, flags }, anns(pattern, flags)); 
         
     }
     

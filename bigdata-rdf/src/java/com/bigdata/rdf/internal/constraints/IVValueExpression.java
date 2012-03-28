@@ -37,7 +37,6 @@ import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A specialized IValueExpression that evaluates to an IV.  The inputs are
@@ -73,6 +73,12 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         public String NAMESPACE = IVValueExpression.class.getName()
                 + ".namespace";
         
+        /**
+         * The timestamp of the query.
+         */
+        public String TIMESTAMP = IVValueExpression.class.getName()
+                + ".timestamp";
+        
     }
 
     /**
@@ -89,37 +95,80 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     private transient volatile ILexiconConfiguration<BigdataValue> lc;
 
     /**
-     * Convenience constructor.
+     * Used by subclasses to create the annotations object from the global
+     * annotations and the custom annotations for the particular VE.
      * 
-     * @param lex
-     * 			the namespace for the lexicon
+     * @param globals
+     *            The global annotations, including the lexicon namespace.
+     * @param anns
+     * 			  Any additional custom annotations.            
      */
-    public IVValueExpression(final String lex) {
+    protected static Map<String, Object> anns(
+    		final GlobalAnnotations globals, final NV... anns) {
+    	
+    	final int size = 2 + (anns != null ? anns.length : 0);
+    	
+    	final NV[] nv = new NV[size];
+    	nv[0] = new NV(Annotations.NAMESPACE, globals.lex);
+    	nv[1] = new NV(Annotations.TIMESTAMP, globals.timestamp);
+    	
+    	if (anns != null) {
+    		for (int i = 0; i < anns.length; i++) {
+    			nv[i+2] = anns[i];
+    		}
+    	}
+    	
+    	return NV.asMap(nv);
+    	
+    }
+    
+    /**
+     * Zero arg convenience constructor.
+     * 
+     * @param globals
+     *            The global annotations, including the lexicon namespace.
+     * @param anns
+     * 			  Any additional custom annotations.            
+     */
+    public IVValueExpression(final GlobalAnnotations globals, final NV... anns) {
         
-        this(BOpBase.NOARGS, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(BOpBase.NOARGS, anns(globals, anns));
         
     }
     
     /**
-     * Convenience constructor for most common unary functions.
+     * One arg convenience constructor.
      * 
-     * @param x
-     * 			unary operand
-     * @param lex
-     * 			the namespace for the lexicon
+     * @param globals
+     *            The global annotations, including the lexicon namespace.
+     * @param anns
+     * 			  Any additional custom annotations.            
      */
-    public IVValueExpression(final IValueExpression<? extends IV> x,
-            final String lex) {
-
-        this(new BOp[] { x }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
-
+    public IVValueExpression(final IValueExpression<? extends IV> x, 
+    		final GlobalAnnotations globals, final NV... anns) {
+        
+        this(new BOp[] { x }, anns(globals, anns));
+        
     }
-
+    
 	/**
      * Required shallow copy constructor.
      */
     public IVValueExpression(final BOp[] args, final Map<String, Object> anns) {
         super(args, anns);
+        
+        if (areGlobalsRequired()) {
+        	
+	        if (getProperty(Annotations.NAMESPACE) == null) {
+	        	throw new IllegalArgumentException("must set the lexicon namespace");
+	        }
+	        
+	        if (getProperty(Annotations.TIMESTAMP) == null) {
+	        	throw new IllegalArgumentException("must set the query timestamp");
+	        }
+	        
+        }
+        
     }
 
     /**
@@ -127,6 +176,19 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      */
     public IVValueExpression(final IVValueExpression<T> op) {
         super(op);
+        
+        if (areGlobalsRequired()) {
+        	
+	        if (getProperty(Annotations.NAMESPACE) == null) {
+	        	throw new IllegalArgumentException("must set the lexicon namespace");
+	        }
+	        
+	        if (getProperty(Annotations.TIMESTAMP) == null) {
+	        	throw new IllegalArgumentException("must set the query timestamp");
+	        }
+	        
+        }
+        
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -146,9 +208,13 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
     
     /**
-     * Returns <code>true</code> unless overridden.
+     * Returns <code>true</code> unless overridden, meaning the 
+     * {@link GlobalAnnotations} are required for this value expression
+     * (certain boolean value expressions do not require them).  Global
+     * annotations allow the method getValueFactory and getLexiconConfiguration
+     * to work.
      */
-    protected boolean isLexiconNamespaceRequired() {
+    protected boolean areGlobalsRequired() {
         
         return true;
         
@@ -187,6 +253,15 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     protected String getNamespace() {
         
         return (String) getRequiredProperty(Annotations.NAMESPACE);
+        
+    }
+
+    /**
+     * Return the timestamp for the query.
+     */
+    protected long getTimestamp() {
+        
+        return (Long) getRequiredProperty(Annotations.TIMESTAMP);
         
     }
 
@@ -245,9 +320,12 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
                             .getBOpContext();
 
                     final String namespace = getNamespace();
+                    
+//                    final long timestamp = ITx.READ_COMMITTED;
+                    final long timestamp = getTimestamp();
 
                     final LexiconRelation lex = (LexiconRelation) context
-                            .getResource(namespace, ITx.READ_COMMITTED);
+                		.getResource(namespace, timestamp);
 
                     lc = lex.getLexiconConfiguration();
 
@@ -293,22 +371,22 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
         
-        final BigdataValueFactory vf = getValueFactory();
+//        final BigdataValueFactory vf = getValueFactory();
 
         if (iv.isInline() && !iv.isExtension()) {
 
-        	if (iv instanceof Literal) {
+//        	if (iv instanceof Literal) {
         		
         		return (Literal) iv;
         		
-        	} else {
-        	
-	            final BigdataURI datatype = vf
-	                    .asValue(iv.getDTE().getDatatypeURI());
-	
-	            return vf.createLiteral(((Value) iv).stringValue(), datatype);
-	            
-        	}
+//        	} else {
+//        	
+//	            final BigdataURI datatype = vf
+//	                    .asValue(iv.getDTE().getDatatypeURI());
+//	
+//	            return vf.createLiteral(((Value) iv).stringValue(), datatype);
+//	            
+//        	}
 
         } else if (iv.hasValue()) {
 
@@ -403,7 +481,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     final protected String literalLabel(final int i, final IBindingSet bs)
 			throws NotMaterializedException {
 
-		return literalValue(i, bs).getLabel();
+		return getAndCheckLiteralValue(i, bs).getLabel();
 
 	}
 
@@ -475,31 +553,59 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 
     }
     
-    protected Literal literalValue(final int i, final IBindingSet bs) {
+    protected Literal getAndCheckLiteralValue(final int i, final IBindingSet bs) {
     	
     	return literalValue(getAndCheckLiteral(i, bs));
     	
     }
     
-    protected IV createIV(final BigdataValue value, final IBindingSet bs) {
+    /**
+     * If the supplied BigdataValue has an IV, cache the BigdataValue on the
+     * IV and return it.  If there is no IV, first check the LexiconConfiguration
+     * to see if an inline IV can be created.  As a last resort, create a
+     * "dummy IV" (a TermIV with a "0" reference) for the value.
+     * 
+     * @param value
+     * 			The BigdataValue.
+     * @param bs
+     * 			The solution binding set (used to get the LexiconConfiguration,
+     * 			@see {@link #getLexiconConfiguration(IBindingSet)}).
+     * @return
+     * 			The internal value.
+     */
+    protected IV getOrCreateIV(final BigdataValue value, final IBindingSet bs) {
     	
+    	// first check to see if there is already an IV
+    	IV iv = value.getIV();
+    	if (iv != null) {
+			// cache the value
+    		iv.setValue(value);
+    		return iv;
+    	}
+    	
+		@SuppressWarnings("rawtypes")
 		ILexiconConfiguration lc = null;
 		try {
 			lc = getLexiconConfiguration(bs);
 		} catch (ContextNotAvailableException ex) {
 			// can't use the LC (e.g. test cases)
+			// log.warn?
 		}
 		
 		// see if we happen to have the value in the vocab or can otherwise
     	// create an inline IV for it
-		IV iv = lc != null ? lc.createInlineIV(value) : null;
-		if (iv != null) {
-			iv.setValue(value);
-		} else {
-			iv = DummyConstantNode.toDummyIV(value);
+		if (lc != null) {
+			iv = lc.createInlineIV(value);
+			if (iv != null) {
+				// cache the value
+				iv.setValue(value);
+				return iv;
+			}
 		}
 		
-		return iv;
+		// toDummyIV will also necessarily cache the value since the IV
+		// doesn't mean anything
+		return DummyConstantNode.toDummyIV(value);
 
     }
 

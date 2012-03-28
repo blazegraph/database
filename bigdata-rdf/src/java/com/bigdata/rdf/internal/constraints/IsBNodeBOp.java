@@ -32,6 +32,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Imposes the constraint <code>isBNode(x)</code>.
@@ -43,9 +44,9 @@ public class IsBNodeBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsBNodeBOp(final IValueExpression<? extends IV> x, final String lex) {
+    public IsBNodeBOp(final IValueExpression<? extends IV> x) { 
 
-        this(new BOp[] { x }, NV.asMap(Annotations.NAMESPACE, lex));
+        this(new BOp[] { x }, BOp.NOANNS);
         
     }
     

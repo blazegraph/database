@@ -33,6 +33,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -45,6 +46,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -159,7 +161,7 @@ public class TestMAX extends TestCase2 {
 
         // MAX(lprice+1)
         final MAX op = new MAX(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,"test"));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS, new GlobalAnnotations("test", ITx.READ_COMMITTED)));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

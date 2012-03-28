@@ -93,8 +93,7 @@ public class TestRegexBOp extends ProxyTestCase {
                 final boolean actual = new RegexBOp(//
                         new Constant<IV>(var), //
                         new Constant<IV>(pattern), //
-                        new Constant<IV>(flags), //
-                        vf.getNamespace()//
+                        new Constant<IV>(flags)//
                 ).accept(emptyBindingSet);
 
                 assertEquals(expected, actual);
@@ -116,8 +115,7 @@ public class TestRegexBOp extends ProxyTestCase {
                 final boolean actual = new RegexBOp(//
                         new Constant<IV>(var), //
                         new Constant<IV>(pattern), //
-                        new Constant<IV>(flags), //
-                        vf.getNamespace()//
+                        new Constant<IV>(flags)//
                 ).accept(emptyBindingSet);
 
                 assertEquals(expected, actual);

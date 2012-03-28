@@ -37,6 +37,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * @see http://www.w3.org/2009/sparql/docs/query-1.1/rq25.xml#func-strafter
@@ -55,10 +56,9 @@ public class StrAfterBOp extends IVValueExpression<IV> implements INeedsMaterial
     public StrAfterBOp(//
             final IValueExpression<? extends IV> arg1,
             final IValueExpression<? extends IV> arg2,
-            final String lex) {
+            final GlobalAnnotations globals) {
      
-        this(new BOp[] { arg1, arg2 }, NV.asMap(new NV(
-                Annotations.NAMESPACE, lex)));
+        this(new BOp[] { arg1, arg2 }, anns(globals));
         
     }
 
@@ -84,9 +84,9 @@ public class StrAfterBOp extends IVValueExpression<IV> implements INeedsMaterial
     @SuppressWarnings("rawtypes")
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final Literal arg1 = literalValue(0, bs);
+        final Literal arg1 = getAndCheckLiteralValue(0, bs);
 
-        final Literal arg2 = literalValue(1, bs);
+        final Literal arg2 = getAndCheckLiteralValue(1, bs);
         
         checkCompatibility(arg1, arg2);
         
@@ -130,7 +130,7 @@ public class StrAfterBOp extends IVValueExpression<IV> implements INeedsMaterial
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, lang);
 
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
     		
     	}
     	
@@ -140,13 +140,13 @@ public class StrAfterBOp extends IVValueExpression<IV> implements INeedsMaterial
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
 
-            return super.createIV(str, bs);
+            return super.getOrCreateIV(str, bs);
     		
     	}
     	
         final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-        return super.createIV(str, bs);
+        return super.getOrCreateIV(str, bs);
     	
     }
     

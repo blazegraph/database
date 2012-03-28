@@ -33,6 +33,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Imposes the constraint <code>x AND y</code>. Each operand of this operator
@@ -46,11 +47,11 @@ public class AndBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = -1217715173822304819L;
 
-    public AndBOp(final IValueExpression<? extends IV> x,
-            final IValueExpression<? extends IV> y, final String lex) {
+    public AndBOp(
+    		final IValueExpression<? extends IV> x,
+            final IValueExpression<? extends IV> y) {
 
-        this(new BOp[] { wrap(x,lex), wrap(y,lex) }, NV.asMap(new NV(
-                Annotations.NAMESPACE, lex)));
+        this(new BOp[] { wrap(x), wrap(y) }, BOp.NOANNS);
 
     }
 

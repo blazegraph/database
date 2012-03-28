@@ -100,6 +100,7 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
@@ -3627,8 +3628,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * instead. Either way, the {@link IValueExpression} is set on the
      * {@link IValueExpressionNode} as a side effect.
      * 
-     * @param lex
-     *            The lexicon namespace.
+     * @param globals
+     *            The global annotations, including the lexicon namespace.
      * @param node
      *            The expression to convert.
      * 
@@ -3637,11 +3638,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * @see ASTSetValueExpressionsOptimizer
      */
     @SuppressWarnings("rawtypes")
-    public static final IValueExpression<? extends IV> toVE(final String lex,
+    public static final IValueExpression<? extends IV> toVE(
+    		final GlobalAnnotations globals,
             final IValueExpressionNode node) {
 
         // Convert AST value expr node => IValueExpressionNode.
-        final IValueExpression<? extends IV> ve1 = toVE1(lex, node);
+        final IValueExpression<? extends IV> ve1 = toVE1(globals, node);
 
         // Reduce IValueExpressionNode to constant when possible.
         try {
@@ -3772,8 +3774,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * {@link IValueExpression}. The {@link IValueExpression} is set on the
      * {@link IValueExpressionNode} as a side effect.
      * 
-     * @param lex
-     *            The lexicon namespace.
+     * @param globals
+     *            The global annotations, including the lexicon namespace.
      * @param node
      *            The expression to convert.
      * 
@@ -3782,8 +3784,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * @see ASTSetValueExpressionsOptimizer
      */
     @SuppressWarnings("rawtypes")
-    private static final IValueExpression<? extends IV> toVE1(final String lex,
-                final IValueExpressionNode node) {
+    private static final IValueExpression<? extends IV> toVE1(
+    		final GlobalAnnotations globals,
+            final IValueExpressionNode node) {
 
         /*
          * Check to see if value expression has already been created and cached
@@ -3810,7 +3813,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
             final IValueExpressionNode valueExpr = assignment
                     .getValueExpressionNode();
 
-            final IValueExpression<? extends IV> ve = toVE(lex, valueExpr);
+            final IValueExpression<? extends IV> ve = toVE(globals, valueExpr);
 
             return ve;
 
@@ -3826,7 +3829,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new ValueExpressionNode[functionNode.arity()]);
 
             final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
-                    lex, functionURI, scalarValues, args);
+                    globals, functionURI, scalarValues, args);
 
             functionNode.setValueExpression(ve);
 

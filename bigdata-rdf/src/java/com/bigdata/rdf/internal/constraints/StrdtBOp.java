@@ -30,19 +30,22 @@ import org.openrdf.model.Literal;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterialization {
 
     private static final long serialVersionUID = -6571446625816081957L;
 
-    public StrdtBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> dt, String lex) {
-        this(new BOp[] { x, dt }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    public StrdtBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> dt, 
+    		final GlobalAnnotations globals) {
+    	
+        this(new BOp[] { x, dt }, anns(globals));
+        
     }
 
     public StrdtBOp(BOp[] args, Map<String, Object> anns) {
@@ -82,7 +85,7 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
         
         final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
         
-        return super.createIV(str, bs);
+        return super.getOrCreateIV(str, bs);
 
     }
 

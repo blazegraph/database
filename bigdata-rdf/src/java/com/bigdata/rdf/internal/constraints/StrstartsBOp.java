@@ -28,9 +28,9 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class StrstartsBOp extends XSDBooleanIVValueExpression implements INeedsMaterialization {
 
@@ -39,10 +39,10 @@ public class StrstartsBOp extends XSDBooleanIVValueExpression implements INeedsM
     @SuppressWarnings("rawtypes")
     public StrstartsBOp(//
             final IValueExpression<? extends IV> x,//
-            final IValueExpression<? extends IV> y, //
-            final String lex) {
+            final IValueExpression<? extends IV> y//
+            ) {
 
-        this(new BOp[] { x, y }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+        this(new BOp[] { x, y }, BOp.NOANNS);
         
     }
 
@@ -67,8 +67,8 @@ public class StrstartsBOp extends XSDBooleanIVValueExpression implements INeedsM
     @Override
     public boolean accept(final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final String v = literalValue(0, bs).getLabel();
-        final String c = literalValue(1, bs).getLabel();
+        final String v = getAndCheckLiteralValue(0, bs).getLabel();
+        final String c = getAndCheckLiteralValue(1, bs).getLabel();
         return v.startsWith(c);
 
     }

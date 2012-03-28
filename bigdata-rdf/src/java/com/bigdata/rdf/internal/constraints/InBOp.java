@@ -31,6 +31,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Abstract base class for "IN" {@link IConstraint} implementations.
@@ -73,14 +74,13 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
 
     @SuppressWarnings("rawtypes")
     public InBOp(//
-            final String lex,
             final boolean not, //
             final IValueExpression<? extends IV> var,//
             final IConstant<? extends IV>... set//
-    ) {
+            ) {
 
-        this(mergeArguments(var, set), NV.asMap(new NV(Annotations.NOT, Boolean
-                .valueOf(not)),new NV(Annotations.NAMESPACE,lex)));
+        this(mergeArguments(var, set), 
+        		NV.asMap(Annotations.NOT, Boolean.valueOf(not)));
         
     }
 

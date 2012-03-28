@@ -36,6 +36,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * A Digest expression involving a {@link IValueExpression} operand. The
@@ -75,10 +76,9 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
      *            those operands.
      */
     public DigestBOp(final IValueExpression<? extends IV> left,
-            final DigestOp op, final String lex) {
+            final DigestOp op, final GlobalAnnotations globals) {
 
-        this(new BOp[] { left }, NV.asMap(new NV(Annotations.OP, op), new NV(
-                Annotations.NAMESPACE, lex)));
+        this(new BOp[] { left }, anns(globals, new NV(Annotations.OP, op)));
 
     }
 
@@ -176,7 +176,7 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
                 md.update(bytes);
                 byte[] digest = md.digest();
                 final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
-                return super.createIV(str, bs);
+                return super.getOrCreateIV(str, bs);
             } catch (Exception e) {
                 throw new SparqlTypeErrorException();
             }

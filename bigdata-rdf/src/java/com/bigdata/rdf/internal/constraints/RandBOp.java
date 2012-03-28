@@ -31,6 +31,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 public class RandBOp extends IVValueExpression<IV> {
 
@@ -41,9 +42,16 @@ public class RandBOp extends IVValueExpression<IV> {
 
     final private Random rand = new Random();
 
+    @Override
+    protected boolean areGlobalsRequired() {
+     
+        return false;
+        
+    }
+    
     public RandBOp() {
 
-        this(new BOp[] {}, null);
+        this(BOp.NOARGS, BOp.NOANNS);
         
     }
 

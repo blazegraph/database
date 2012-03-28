@@ -33,6 +33,7 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
@@ -76,11 +77,16 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
 
         final QueryRoot query = (QueryRoot) queryNode;
 
-        final String lex = context.db.getLexiconRelation().getNamespace();
+        final GlobalAnnotations globals = new GlobalAnnotations(
+        		context.getLexiconNamespace(),
+        		context.getTimestamp()
+        		);
+        
+//        final String lex = context.db.getLexiconRelation().getNamespace();
 
 //        convert1(lex, query); // Works around a concurrent modification.
 
-        convert2(lex, query); // Should be faster.
+        convert2(globals, query); // Should be faster.
         
         return query;
         
@@ -126,7 +132,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
      * @param lex
      * @param query
      */
-    private void convert2(final String lex, final QueryRoot query) {
+    private void convert2(final GlobalAnnotations globals, final QueryRoot query) {
         
         /*
          * Visit nodes that require modification.
@@ -177,7 +183,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
             if (op instanceof IValueExpressionNodeContainer) {
 
                 // AssignmentNode, FilterNode, OrderByExpr
-                AST2BOpUtility.toVE(lex, ((IValueExpressionNodeContainer) op)
+                AST2BOpUtility.toVE(globals, ((IValueExpressionNodeContainer) op)
                         .getValueExpressionNode());
                 
             } else if (op instanceof HavingNode) {
@@ -186,7 +192,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
                 
                 for(IValueExpressionNode node : havingNode) {
                 
-                    AST2BOpUtility.toVE(lex, node);
+                    AST2BOpUtility.toVE(globals, node);
                     
                 }
                 

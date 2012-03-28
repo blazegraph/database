@@ -44,6 +44,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -719,8 +720,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     // clear the old value expression.
                     filter.getValueExpressionNode().setValueExpression(null);
                     
+                    final GlobalAnnotations globals = new GlobalAnnotations(
+                    		context.getLexiconNamespace(),
+                    		context.getTimestamp()
+                    		);
+                    
                     // re-generate the value expression.
-                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    AST2BOpUtility.toVE(globals,
                             filter.getValueExpressionNode());
                     
                 }

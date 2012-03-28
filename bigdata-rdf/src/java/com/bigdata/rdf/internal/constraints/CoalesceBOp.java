@@ -34,6 +34,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
  * Coalesce BOp The COALESCE function form returns the RDF term value of the first expression that evaluates without error. In
@@ -45,9 +46,9 @@ public class CoalesceBOp extends IVValueExpression<IV> implements IPassesMateria
 
     private static final transient Logger log              = Logger.getLogger(CoalesceBOp.class);
 
-    public CoalesceBOp(final IValueExpression<? extends IV>... expressions) {
+    public CoalesceBOp(final GlobalAnnotations globals, final IValueExpression<? extends IV>... expressions) {
 
-        this(expressions, null);
+        this(expressions, anns(globals));
 
     }
 
