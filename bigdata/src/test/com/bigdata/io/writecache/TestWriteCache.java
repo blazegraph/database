@@ -134,9 +134,12 @@ public class TestWriteCache extends TestCase3 {
                     if (log.isInfoEnabled())
                         log.info("Expected: " + ce.getMessage());
                 }
+            	
+            	writeCache.close();
 
             } finally {
             	buf.release();
+            	opener.destroy();
             }
         } catch (Exception e) {
         	fail("Unexpected exception", e);
