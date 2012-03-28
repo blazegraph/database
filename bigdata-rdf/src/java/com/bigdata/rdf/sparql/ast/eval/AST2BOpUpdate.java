@@ -247,7 +247,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     private static PipelineOp convertCommit(PipelineOp left,
             final AST2BOpUpdateContext context) throws Exception {
 
-        if (!context.isCluster()) {
+    	/*
+    	 * Note: Since we are using the BigdataSail interface, we DO have to
+    	 * do a commit on the cluster.  It is only if we are running on the
+    	 * query engine that things could be different (but that requires a
+    	 * wholly different plan).
+    	 */
+//        if (!context.isCluster()) 
+        {
 
             if (runOnQueryEngine) {
             
