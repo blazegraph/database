@@ -229,7 +229,13 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
                 
                 if (state[i] == null) {
 
-                    // The solution set was not found!
+                    /**
+                     * The solution set was not found!
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/534#comment:2">
+                     *      BSBM BI Q5 Error when using MERGE JOIN </a>
+                     */
                     throw new RuntimeException("Not found: " + namedSetRef[i]);
 
                 }

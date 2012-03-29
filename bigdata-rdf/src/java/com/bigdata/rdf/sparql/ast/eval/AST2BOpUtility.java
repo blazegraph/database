@@ -2113,13 +2113,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
     /**
      * Attempt to translate the join group using a merge join.
      * <P>
-     * We recognize a merge join when there an INCLUDEs followed by either a
-     * series of INCLUDEs -or- a series of OPTIONAL {INCLUDE}s in the group. The
-     * initial INCLUDE becomes the primary source for the merge join (the hub).
-     * Each INCLUDE after the first must have the same join variables. If the
-     * OPTIONAL {INCLUDE}s pattern is recognized then the MERGE JOIN is itself
-     * OPTIONAL. The sequences of such INCLUDEs in this group is then translated
-     * into a single MERGE JOIN operator.
+     * We recognize a merge join when there an INCLUDE followed by either a
+     * series of INCLUDEs -or- a series of <code>OPTIONAL {INCLUDE}</code>s in
+     * the group. The initial INCLUDE becomes the primary source for the merge
+     * join (the hub). Each INCLUDE after the first must have the same join
+     * variables. If the <code>OPTIONAL {INCLUDE}</code>s pattern is recognized
+     * then the MERGE JOIN is itself OPTIONAL. The sequences of such INCLUDEs in
+     * this group is then translated into a single MERGE JOIN operator.
      * <p>
      * Note: The critical pattern for a merge join is that we have a hash index
      * against which we may join several other hash indices. To join, of course,
@@ -2134,6 +2134,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * join. While the merge join will consider the same combinations of
      * solutions, it does so with a very efficient linear pass over the hash
      * indices.
+     * <p>
+     * For the JVM Merge Join operator we have to do a SORT first, but the HTree
+     * imposes a consistent ordering by the hash bits so we can go directly to
+     * the linear pass. (It is actually log linear due to the tree structure of
+     * the HTree, which we presume has basically the same costs as a function of
+     * depth as a B+Tree, but it is against main memory and it is a sequential
+     * scan of the index so it should be effectively linear.)
      * 
      * @param left
      * @param joinGroup
@@ -2248,7 +2255,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     && child instanceof NamedSubqueryInclude) {
 
                 /*
-                 * INCLUDE x.
+                 * INCLUDE %namedSet JOIN ON (theJoinVars)
                  */
 
                 final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
@@ -2259,9 +2266,26 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 final Set<IVariable<?>> theJoinVars = nsi.getJoinVarSet();
 
                 if (joinVars.isEmpty()) {
+
+                    if (theJoinVars.isEmpty()) {
+
+                        /**
+                         * If the 2nd INCLUDE does not have any join variables
+                         * either then we can not do a merge join. However, see
+                         * the comment block immediately below. We should be
+                         * doing better in join variable assignment for
+                         * sub-selects!
+                         */
+                        
+                        break;
+                        
+                    }
+                    
                     joinVars.addAll(theJoinVars);
+                    
                 } else if (!joinVars.equals(theJoinVars)) {
-                    /*
+
+                    /**
                      * The join variables are not the same.
                      * 
                      * TODO It is possible to fix this for some queries since
@@ -2269,9 +2293,24 @@ public class AST2BOpUtility extends AST2BOpJoins {
                      * variables. However, we need to model the MERGE JOIN in
                      * the AST in order to do that since, by this time, we have
                      * already generated the physical query plan for the named
-                     * subquery and the join vars are backed into that plan.
+                     * subquery and the join vars are baked into that plan.
+                     * 
+                     * TODO In fact, we probably can be more aggressive about
+                     * putting join variables onto sub-selects and named
+                     * subqueries. If static analysis can predict that some
+                     * variable(s) are known bound on exit, then those should be
+                     * annotated as join variables for the sub-select. I've
+                     * looked into this a few times, but have not yet wrestled
+                     * it to the ground. It would probably make a big difference
+                     * for some queries.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/534#comment:2">
+                     *      BSBM BI Q5 Error when using MERGE JOIN </a>
                      */
+                    
                     break;
+                    
                 }
 
                 requiredIncludes.add(nsi);
@@ -2327,7 +2366,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final NamedSolutionSetRef firstNamedSolutionSetRef = new NamedSolutionSetRef(
                 ctx.queryId, firstInclude.getName(), joinvars2);
         
-        if(!firstInclude.getJoinVarSet().equals(joinVars)) {
+        if (!firstInclude.getJoinVarSet().equals(joinVars)) {
             
             /*
              * If the primary source does not share the same join variables,
