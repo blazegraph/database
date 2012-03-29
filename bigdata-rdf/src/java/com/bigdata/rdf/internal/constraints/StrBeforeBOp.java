@@ -127,7 +127,7 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, lang);
 
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
     		
     	}
     	
@@ -137,13 +137,13 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
     		
             final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
 
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
     		
     	}
     	
         final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-        return super.getOrCreateIV(str, bs);
+        return super.asIV(str, bs);
     	
     }
     

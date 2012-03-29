@@ -174,7 +174,7 @@ public class ReplaceBOp extends IVValueExpression<IV> implements INeedsMateriali
         	final BigdataLiteral l = 
         		evaluate(getValueFactory(), var, pattern, replacement, flags);
         	
-        	return super.getOrCreateIV(l, bs);
+        	return super.asIV(l, bs);
         	
         } catch (ValueExprEvaluationException ex) {
         	

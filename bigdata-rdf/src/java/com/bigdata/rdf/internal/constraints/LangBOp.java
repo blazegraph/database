@@ -89,7 +89,7 @@ public class LangBOp extends IVValueExpression<IV>
 
 		final BigdataValue lang = vf.createLiteral(langTag);
 		
-    	return super.getOrCreateIV(lang, bs);
+    	return super.asIV(lang, bs);
     	
     }
 

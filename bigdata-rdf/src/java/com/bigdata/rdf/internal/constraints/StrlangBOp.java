@@ -71,7 +71,7 @@ public class StrlangBOp extends IVValueExpression<IV> implements INeedsMateriali
         String label = lit.getLabel();
         String langLit = l.getLabel();
         final BigdataLiteral str = getValueFactory().createLiteral(label, langLit);
-        return super.getOrCreateIV(str, bs);
+        return super.asIV(str, bs);
 
     }
 

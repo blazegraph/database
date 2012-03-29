@@ -176,7 +176,7 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
                 md.update(bytes);
                 byte[] digest = md.digest();
                 final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
-                return super.getOrCreateIV(str, bs);
+                return super.asIV(str, bs);
             } catch (Exception e) {
                 throw new SparqlTypeErrorException();
             }

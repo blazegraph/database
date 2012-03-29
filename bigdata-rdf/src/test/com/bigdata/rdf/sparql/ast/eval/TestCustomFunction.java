@@ -244,7 +244,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
                     + lit.getLabel());
             
             // Convert into an IV.
-            final IV ret = asValue(lit2, bset);
+            final IV ret = asIV(lit2, bset);
             
             // Return the function result.
             return ret;

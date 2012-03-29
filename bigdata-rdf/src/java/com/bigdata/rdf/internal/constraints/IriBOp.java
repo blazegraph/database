@@ -90,7 +90,7 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
 
         final BigdataURI uri = getValueFactory().createURI(lit.getLabel());
 
-        return super.getOrCreateIV(uri, bs);
+        return super.asIV(uri, bs);
 
     }
 

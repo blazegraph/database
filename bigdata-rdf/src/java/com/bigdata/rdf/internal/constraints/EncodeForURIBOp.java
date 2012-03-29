@@ -66,7 +66,7 @@ public class EncodeForURIBOp extends IVValueExpression<IV> implements INeedsMate
         final Literal lit = getAndCheckLiteralValue(0, bs);
         try {
             final BigdataLiteral str = getValueFactory().createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8").replace("+", "%20"));
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
         } catch (UnsupportedEncodingException uee) {
             throw new SparqlTypeErrorException();
         }

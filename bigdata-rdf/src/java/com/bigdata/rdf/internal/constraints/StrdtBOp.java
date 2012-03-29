@@ -85,7 +85,7 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
         
         final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
         
-        return super.getOrCreateIV(str, bs);
+        return super.asIV(str, bs);
 
     }
 

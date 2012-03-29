@@ -145,7 +145,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     lang);
 
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
 
         } else if (dt != null) {
 
@@ -156,7 +156,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final BigdataLiteral str = getValueFactory().createLiteral(label,
                     dt);
 
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
 
         } else {
 
@@ -166,7 +166,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
             final BigdataLiteral str = getValueFactory().createLiteral(label);
 
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
 
         }
 
