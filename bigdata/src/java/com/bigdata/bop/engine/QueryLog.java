@@ -354,23 +354,27 @@ public class QueryLog {
 			 * keep this from breaking the table format.
 			 */
 			sb.append(BOpUtility.toString(q.getQuery()).replace('\n', ' '));
-            sb.append('\t');
-            sb.append("total"); // summary line.
+            sb.append('\t'); // evalOrder
+            sb.append("total");
+            sb.append('\t'); // evaluation context
+            sb.append('\t'); // controller annotation.
+            sb.append('\t'); // bopId
+            sb.append("total");
         } else {
         	// Otherwise show just this bop.
         	sb.append(bopIndex.get(bopId).toString());
 	        sb.append('\t');
 	        sb.append(evalOrder); // eval order for this bop.
+	        sb.append('\t');
+	        sb.append(bop.getEvaluationContext());
+	        sb.append('\t');
+	        sb.append(bop.getProperty(BOp.Annotations.CONTROLLER,
+	                BOp.Annotations.DEFAULT_CONTROLLER));
+	        sb.append('\t');
+	        sb.append(Integer.toString(bopId));
         }
         
         sb.append('\t');
-        sb.append(bop.getEvaluationContext());
-        sb.append('\t');
-        sb.append(bop.getProperty(BOp.Annotations.CONTROLLER,
-                BOp.Annotations.DEFAULT_CONTROLLER));
-        sb.append('\t');
-        sb.append(Integer.toString(bopId));
-		sb.append('\t');
         @SuppressWarnings("rawtypes")
         final IPredicate pred = (IPredicate<?>) bop
                 .getProperty(PipelineJoin.Annotations.PREDICATE);
@@ -385,8 +389,13 @@ public class QueryLog {
             }
         }
         sb.append('\t');
-        sb.append(bop.getClass().getSimpleName());
-        sb.append("[" + bopId + "]");
+        // bopSummary
+        if (summary) {
+            sb.append("total");
+        } else {
+            sb.append(bop.getClass().getSimpleName());
+            sb.append("[" + bopId + "]");
+        }
         sb.append('\t');
         if (pred != null) {
             sb.append(pred.getClass().getSimpleName());
@@ -911,7 +920,12 @@ public class QueryLog {
 //				w.write(TDx);
 //        	}
             w.write(TD);
-            w.write("total"); // summary line.
+            w.write("total"); // evalOrder
+            w.write(TDx);
+            w.write(TD); w.write(TDx); // evalContext
+            w.write(TD); w.write(TDx); // controller?
+            w.write(TD);
+            w.write("total"); // bopId
             w.write(TDx);
         } else {
 //        	// The query string (SPARQL).
@@ -941,19 +955,18 @@ public class QueryLog {
             w.write(TD);
             w.write(Integer.toString(evalOrder)); // eval order for this bop.
             w.write(TDx);
-        }
-        
-        w.write(TD);
-        w.write(cdata(bop.getEvaluationContext().toString()));
-        w.write(TDx);
-        w.write(TD);
-        w.write(cdata(bop.getProperty(BOp.Annotations.CONTROLLER,
-                BOp.Annotations.DEFAULT_CONTROLLER).toString()));
-        w.write(TDx);
+            w.write(TD);
+            w.write(cdata(bop.getEvaluationContext().toString()));
+            w.write(TDx);
+            w.write(TD);
+            w.write(cdata(bop.getProperty(BOp.Annotations.CONTROLLER,
+                    BOp.Annotations.DEFAULT_CONTROLLER).toString()));
+            w.write(TDx);
+            w.write(TD);
+            w.write(Integer.toString(bopId));
+            w.write(TDx);
+        }        
 
-        w.write(TD);
-        w.write(Integer.toString(bopId));
-        w.write(TDx);
         @SuppressWarnings("rawtypes")
         final IPredicate pred = (IPredicate<?>) bop
                 .getProperty(PipelineJoin.Annotations.PREDICATE);
@@ -969,10 +982,16 @@ public class QueryLog {
             }
         }
         w.write(TDx);
+
         w.write(TD);
-        w.write(cdata(bop.getClass().getSimpleName()));
-        w.write(cdata("[" + bopId + "]"));
+        if(summary) {
+            w.write("total");
+        } else {
+            w.write(cdata(bop.getClass().getSimpleName()));
+            w.write(cdata("[" + bopId + "]"));
+        }
         w.write(TDx);
+
         w.write(TD);
         if (pred != null) {
             w.write(cdata(pred.getClass().getSimpleName()));
