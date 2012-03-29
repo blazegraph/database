@@ -475,9 +475,12 @@ public class IVBindingSetEncoderWithIVCache extends IVBindingSetEncoder {
 
         final BTree blobsCache = this.blobsCache.get();
 
-        if (ivCache.getEntryCount() == 0L && blobsCache.getEntryCount() == 0L) {
+        if ((ivCache == null || ivCache.getEntryCount() == 0L)
+                && (blobsCache == null || blobsCache.getEntryCount() == 0L)) {
+
             // Nothing materialized.
             return;
+            
         }
         
         final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache

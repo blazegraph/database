@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.encoder;
 
+import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -46,8 +47,11 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -119,6 +123,12 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
     /** A "mockIV". */
     protected TermId<BigdataValue> mockIV3;
+    
+    /** An inline IV whose {@link IVCache} is set. */
+    protected XSDIntegerIV<BigdataLiteral> inlineIV;
+
+    /** An inline IV whose {@link IVCache} is NOT set. */
+    protected IV<?,?> inlineIV2;
 
     /**
      * The encoder under test.
@@ -155,6 +165,12 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         mockIV3 = (TermId) TermId.mockIV(VTE.LITERAL);
         mockIV3.setValue((BigdataValue) valueFactory.createLiteral("green"));
 
+        inlineIV = new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(100));
+        inlineIV.setValue((BigdataLiteral) valueFactory.createLiteral("100",
+                XSD.INTEGER));
+        
+        inlineIV2 = XSDBooleanIV.TRUE;
+        
     }
 
     protected void tearDown() throws Exception {
@@ -172,6 +188,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
         termId = termId2 = null;
         blobIV = null;
         mockIV1 = mockIV2 = mockIV3 = null;
+        inlineIV = null;
+        inlineIV2 = null;
         
     }
 
@@ -229,12 +247,13 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     protected void assertEquals(final IBindingSet expected,
             final IBindingSet actual, final boolean testCache) {
 
-        // check the binding set
+        // Check the binding sets (w/o regard to the IVCache associations).
         super.assertEquals(expected, actual);
 
         if (!testCache)
             return;
 
+        // Check the IVCache associations.
         final Iterator<Entry<IVariable, IConstant>> itr = expected.iterator();
 
         while (itr.hasNext()) {
@@ -245,7 +264,11 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
             final IV iv = (IV) c.get();
 
-            if (iv.hasValue()) {
+            /*
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/532
+             * (ClassCastException during hash join (can not be cast to TermId))
+             */
+            if (iv.hasValue() && !iv.isInline()) {
 
                 final IVariable var = e.getKey();
 
@@ -257,7 +280,8 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
                 assertEquals(iv, iv2);
 
-                assertTrue(iv2.hasValue());
+                if (!iv2.hasValue())
+                    fail("IVCache not set on decode: " + iv);
 
                 assertEquals(iv.getValue(), iv2.getValue());
 
@@ -475,6 +499,41 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
     }
 
     /**
+     * Test where an inline {@link IV} has its {@link IVCache} set.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/532">
+     *      ClassCastException during hash join (can not be cast to TermId) </a>
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_encodeNonEmptyWithCachedValuesAndInlineValues() {
+
+        final IBindingSet expected = new ListBindingSet();
+        expected.set(Var.var("x"), new Constant<IV>(termId));
+        expected.set(Var.var("y"), new Constant<IV>(inlineIV));
+
+        doEncodeDecodeTest(expected);
+
+    }
+
+    /**
+     * Variant where the inline {@link IV} does NOT have its {@link IVCache}
+     * set.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/532">
+     *      ClassCastException during hash join (can not be cast to TermId) </a>
+     */
+    @SuppressWarnings("rawtypes")
+    public void test_encodeNonEmptyWithCachedValuesAndInlineValues2() {
+
+        final IBindingSet expected = new ListBindingSet();
+        expected.set(Var.var("x"), new Constant<IV>(termId));
+        expected.set(Var.var("y"), new Constant<IV>(inlineIV2));
+
+        doEncodeDecodeTest(expected);
+
+    }
+
+    /**
      * Multiple solutions where a variable does not appear in the 2nd solution.
      */
     @SuppressWarnings("rawtypes")
@@ -659,6 +718,52 @@ abstract public class AbstractBindingSetEncoderTestCase extends TestCase2 {
 
             expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
             expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+    }
+
+    /**
+     * Unit test of a solution with 3 bindings, some of which do not have an
+     * {@link IVCache} association and some of which have an inline IV. This
+     * test was added when it was observed that we were pushing inline IVs into
+     * the cache for the {@link IVBindingSetEncoderWithIVCache}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/532">
+     *      ClassCastException during hash join (can not be cast to TermId) </a>
+     */
+    public void test_solutionWithThreeBindingsSomeNotCachedSomeInline() {
+
+        final TermId<BigdataLiteral> termIdNoCache = new TermId<BigdataLiteral>(
+                VTE.LITERAL, 912/* termId */);
+
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(inlineIV));
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(termId2));
+            expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(inlineIV2));
+
+            doEncodeDecodeTest(expected);
+        }
+        
+        {
+            final IBindingSet expected = new ListBindingSet();
+
+            expected.set(Var.var("z"), new Constant<IV<?, ?>>(termId));
+            expected.set(Var.var("x"), new Constant<IV<?, ?>>(inlineIV2));
             expected.set(Var.var("y"), new Constant<IV<?, ?>>(termIdNoCache));
 
             doEncodeDecodeTest(expected);
