@@ -25,11 +25,14 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -676,31 +679,31 @@ public class QueryServlet extends BigdataRDFServlet {
 			}
 		}
 
-		if(ft.isDone()) {
-			/*
-			 * If the query is done, the check for an error before we build up
-			 * the explanation document.
-			 */
-			ft.get();
-			
-			/*
-			 * No error and the Future is done. The UUID of the IRunningQuery
-			 * MUST have been assigned. If we do not have it yet, then check
-			 * once more. If it is not set then that is an error.
-			 */
-			if (queryTask.queryId2 != null) {
-				// Check once more. 
-				queryId2 = queryTask.queryId2;
-				if (queryId2 == null) {
-					/*
-					 * This should have been assigned unless the query failed
-					 * during the setup.
-					 */
-					throw new AssertionError();
-				}
-			}
-		}
-		assert queryId2 != null;
+        if (ft.isDone()) {
+            /*
+             * If the query is done, the check for an error before we build up
+             * the explanation document.
+             */
+            ft.get();
+
+            /*
+             * No error and the Future is done. The UUID of the IRunningQuery
+             * MUST have been assigned. If we do not have it yet, then check
+             * once more. If it is not set then that is an error.
+             */
+            if (queryTask.queryId2 != null) {
+                // Check once more.
+                queryId2 = queryTask.queryId2;
+                if (queryId2 == null) {
+                    /*
+                     * This should have been assigned unless the query failed
+                     * during the setup.
+                     */
+                    throw new AssertionError();
+                }
+            }
+        }
+        assert queryId2 != null;
 
 		/*
 		 * Build the explanation.
@@ -839,8 +842,23 @@ public class QueryServlet extends BigdataRDFServlet {
 
             }
 
-			// wait for the Future (will toss any exceptions).
-			ft.get();
+            /*
+             * Wait for the Future. If the query fails, then note the exception
+             * but do NOT rethrow it. The exception will get painted into the
+             * page.
+             */
+            Throwable cause = null;
+            try {
+                // Wait for the query to finish.
+                ft.get();
+                /*
+                 * Note: An InterruptedException here is NOT caught. It means
+                 * that this Thread was interrupted rather than the Query.
+                 */
+            } catch (ExecutionException ex) {
+                // Some error.
+                cause = ex.getCause();
+            }
 
 			current.node("h2", "Query Evaluation Statistics");
 			
@@ -880,6 +898,22 @@ public class QueryServlet extends BigdataRDFServlet {
                         .text(", elapsed=" + elapsedMillis + "ms")//
                         .text(q.isCancelled()?", CANCELLED.":".")
                         .close();
+                
+                if (cause != null) {
+
+                    // Format the stack trace.
+                    
+                    final StringWriter sw = new StringWriter();
+                    
+                    cause.printStackTrace(new PrintWriter(sw));
+                    
+                    final String s = sw.getBuffer().toString();
+                    
+                    // And write it into the page.
+                    
+                    current.node("pre").text(s).close();
+                    
+                }
 
                 /*
                  * Format query statistics as a table.
