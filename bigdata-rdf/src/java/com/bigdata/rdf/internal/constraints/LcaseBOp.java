@@ -120,7 +120,7 @@ public class LcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
             
         }
 
-        return super.getOrCreateIV(out, bs);
+        return super.asIV(out, bs);
 
     }
 

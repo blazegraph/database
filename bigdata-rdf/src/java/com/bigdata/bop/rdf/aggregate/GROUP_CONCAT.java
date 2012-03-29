@@ -102,7 +102,8 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
         super(args, annotations);
         
-        getRequiredProperty(Annotations.NAMESPACE);
+        if (!(getRequiredProperty(Annotations.NAMESPACE) instanceof String))
+        	throw new IllegalArgumentException();
 //        if (getProperty(Annotations.NAMESPACE) == null)
 //            throw new IllegalArgumentException();
 

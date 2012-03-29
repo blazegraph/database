@@ -92,10 +92,10 @@ public class XsdStrBOp extends IVValueExpression<IV>
 
         if (iv.isInline() && !iv.isExtension()) {
             if(iv.isLiteral()){
-                return super.getOrCreateIV(vf.createLiteral(
+                return super.asIV(vf.createLiteral(
                         ((AbstractLiteralIV)iv).getLabel(), XSD.STRING), bs);
             }else{
-                return super.getOrCreateIV(vf.createLiteral(iv
+                return super.asIV(vf.createLiteral(iv
                         .getInlineValue().toString(), XSD.STRING), bs);
             }
         }
@@ -104,7 +104,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
             // return new xsd:string literal using URI label
             final URI uri = (URI) iv.getValue();
             final BigdataLiteral str = vf.createLiteral(uri.toString(), XSD.STRING);
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
         } else if (iv.isLiteral()) {
             final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
             if (lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
@@ -114,7 +114,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
         	else {
                 // else return new xsd:string literal using Literal.getLabel
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel(), XSD.STRING);
-                return super.getOrCreateIV(str, bs);
+                return super.asIV(str, bs);
             }
         } else {
             throw new SparqlTypeErrorException();

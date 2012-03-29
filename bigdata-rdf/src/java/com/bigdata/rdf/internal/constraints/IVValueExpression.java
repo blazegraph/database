@@ -346,12 +346,12 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
-     * Return the {@link BigdataLiteral} for the {@link IV}.
+     * Return the {@link Literal} for the {@link IV}.
      * 
      * @param iv
      *            The {@link IV}.
      * 
-     * @return The {@link BigdataLiteral}.
+     * @return The {@link Literal}.
      * 
      * @throws SparqlTypeErrorException
      *             if the argument is <code>null</code>.
@@ -400,60 +400,6 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
-     * Return an {@link IV} for the {@link Value}.
-     * 
-     * @param value
-     *            The {@link Value}.
-     * @param bsetIsIgnored
-     *            The bindings on the solution are ignored, but the reference is
-     *            used to obtain the {@link ILexiconConfiguration}.
-     *            
-     * @return An {@link IV} for that {@link Value}.
-     */
-    final protected IV asValue(final Value value,
-            final IBindingSet bsetIsIgnored) {
-
-        /*
-         * Convert to a BigdataValue if not already one.
-         * 
-         * If it is a BigdataValue, then make sure that it is associated with
-         * the namespace for the lexicon relation.
-         */
-        
-        final BigdataValue v = getValueFactory().asValue(value);
-
-        @SuppressWarnings("rawtypes")
-        IV iv = null;
-
-        // See if the IV is already set. 
-        iv = v.getIV();
-
-        if (iv == null) {
-
-            // Resolve the lexicon configuration.
-            final ILexiconConfiguration<BigdataValue> lexConf = getLexiconConfiguration(bsetIsIgnored);
-
-            // Obtain an inline IV iff possible.
-            iv = lexConf.createInlineIV(v);
-
-        }
-        
-        if (iv == null) {
-
-            /*
-             * Since we can not represent this using an Inline IV, we will stamp
-             * a mock IV for the value.
-             */
-
-            iv = DummyConstantNode.toDummyIV(v);
-
-        }
-
-        return iv;
-
-    }
-    
-    /**
      * Return the {@link String} label for the {@link IV}.
      * 
      * @param iv
@@ -477,13 +423,6 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 
     }
     
-    final protected String literalLabel(final int i, final IBindingSet bs)
-			throws NotMaterializedException {
-
-		return getAndCheckLiteralValue(i, bs).getLabel();
-
-	}
-
     /**
      * Get the function argument (a value expression) and evaluate it against
      * the source solution. The evaluation of value expressions is recursive.
@@ -552,6 +491,10 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 
     }
     
+    /**
+     * Combination of {@link #getAndCheckLiteral(int, IBindingSet)} and
+     * {@link #literalValue(IV)}.
+     */
     protected Literal getAndCheckLiteralValue(final int i, final IBindingSet bs) {
     	
     	return literalValue(getAndCheckLiteral(i, bs));
@@ -559,20 +502,48 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
     
     /**
+     * Return an {@link IV} for the {@link Value}.
+     * 
+     * @param value
+     *            The {@link Value}.
+     * @param bs
+     *            The bindings on the solution are ignored, but the reference is
+     *            used to obtain the {@link ILexiconConfiguration}.
+     *            
+     * @return An {@link IV} for that {@link Value}.
+     */
+    final protected IV asIV(final Value value, final IBindingSet bs) {
+
+        /*
+         * Convert to a BigdataValue if not already one.
+         * 
+         * If it is a BigdataValue, then make sure that it is associated with
+         * the namespace for the lexicon relation.
+         */
+        
+        final BigdataValue v = getValueFactory().asValue(value);
+        
+        return asIV(v, bs);
+
+    }
+    
+    /**
+     * Return an {@link IV} for the {@link Value}.
+     * <p>
      * If the supplied BigdataValue has an IV, cache the BigdataValue on the
      * IV and return it.  If there is no IV, first check the LexiconConfiguration
      * to see if an inline IV can be created.  As a last resort, create a
      * "dummy IV" (a TermIV with a "0" reference) for the value.
      * 
      * @param value
-     * 			The BigdataValue.
+     * 			The {@link BigdataValue}
      * @param bs
-     * 			The solution binding set (used to get the LexiconConfiguration,
-     * 			@see {@link #getLexiconConfiguration(IBindingSet)}).
-     * @return
-     * 			The internal value.
+     *            The bindings on the solution are ignored, but the reference is
+     *            used to obtain the {@link ILexiconConfiguration}.
+     *            
+     * @return An {@link IV} for that {@link BigdataValue}.
      */
-    protected IV getOrCreateIV(final BigdataValue value, final IBindingSet bs) {
+    protected IV asIV(final BigdataValue value, final IBindingSet bs) {
     	
     	// first check to see if there is already an IV
     	IV iv = value.getIV();
@@ -587,7 +558,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 		try {
 			lc = getLexiconConfiguration(bs);
 		} catch (ContextNotAvailableException ex) {
-			// can't use the LC (e.g. test cases)
+			// can't access the LC (e.g. some test cases)
 			// log.warn?
 		}
 		
@@ -596,8 +567,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 		if (lc != null) {
 			iv = lc.createInlineIV(value);
 			if (iv != null) {
-				// cache the value
-				iv.setValue(value);
+				// we don't need to cache the value on inline IVs
 				return iv;
 			}
 		}

@@ -1486,7 +1486,7 @@ public class FunctionRegistry {
 
             }
 
-            tmp.put(Annotations.NAMESPACE, globals);
+            tmp.put(Annotations.NAMESPACE, globals.lex);
             
             final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
 

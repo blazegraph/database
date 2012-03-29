@@ -76,7 +76,7 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
         
     	if (arity() == 0) {
     		
-    		return super.getOrCreateIV(getValueFactory().createBNode(), bs);
+    		return super.asIV(getValueFactory().createBNode(), bs);
     		
     	}
     	
@@ -90,7 +90,7 @@ public class BNodeBOp extends IVValueExpression<IV> implements INeedsMaterializa
         final BigdataBNode bnode = getValueFactory().createBNode(
                 "-bnode-func-" + lit.getLabel());
 
-        return super.getOrCreateIV(bnode, bs);
+        return super.asIV(bnode, bs);
 
     }
     

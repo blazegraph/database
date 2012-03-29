@@ -53,7 +53,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
@@ -100,11 +99,9 @@ public class TestBOpUtility extends TestCase2 {
     	for (int i = 0; i < count; i++) {
     		
         	final IValueExpression c = new DummyVE(
-        	        new BOp[] { a,
-                    new Constant<Integer>(i) }, NV.asMap(new NV[] { //
-                    new NV(DummyVE.Annotations.NAMESPACE, "lex"),//
-                    new NV(DummyVE.Annotations.TIMESTAMP, "0") //
-                    }));
+        	        new BOp[] { a, new Constant<Integer>(i) }, 
+        	        BOp.NOANNS
+                    );
 
     		if (bop == null) {
     			bop = c;
@@ -173,6 +170,11 @@ public class TestBOpUtility extends TestCase2 {
 		public IV get(IBindingSet bindingSet) {
     		throw new RuntimeException();
     	}
+		
+		@Override
+		public boolean areGlobalsRequired() {
+			return false;
+		}
     }
     
     public void testOpenWorldEq() throws Exception {

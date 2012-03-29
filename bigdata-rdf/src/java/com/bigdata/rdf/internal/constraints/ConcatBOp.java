@@ -114,12 +114,12 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
         }
         if (allSame) {
             if (datatype != null) {
-                return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
+                return super.asIV(getValueFactory().createLiteral(sb.toString(),datatype), bs);
             } else if (lang != null) {
-                return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
+                return super.asIV(getValueFactory().createLiteral(sb.toString(),lang), bs);
             }
         }
-        return super.getOrCreateIV(getValueFactory().createLiteral(sb.toString()), bs);
+        return super.asIV(getValueFactory().createLiteral(sb.toString()), bs);
 
     }
 

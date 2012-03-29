@@ -107,7 +107,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    	@SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
 	    	if (datatypeIV == null) {
-	    		datatypeIV = super.getOrCreateIV(datatype, bs);
+	    		datatypeIV = super.asIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV
@@ -147,7 +147,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
             @SuppressWarnings("rawtypes")
             IV datatypeIV = datatype.getIV();
 	    	if (datatypeIV == null) {
-	    		datatypeIV = super.getOrCreateIV(datatype, bs);
+	    		datatypeIV = super.asIV(datatype, bs);
 	    	}
 
 	    	// cache the value on the IV

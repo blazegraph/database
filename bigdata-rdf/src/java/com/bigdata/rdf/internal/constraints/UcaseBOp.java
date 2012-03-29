@@ -65,13 +65,13 @@ public class UcaseBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
         if (lit.getLanguage() != null) {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getLanguage());
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
         } else if (lit.getDatatype() != null) {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getDatatype());
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
         } else {
             final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase());
-            return super.getOrCreateIV(str, bs);
+            return super.asIV(str, bs);
         }
     }
 
