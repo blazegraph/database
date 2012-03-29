@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import junit.framework.TestCase2;
@@ -52,21 +53,30 @@ public class TestNamedSolutionSetRef extends TestCase2 {
     /**
      * @param name
      */
-    public TestNamedSolutionSetRef(String name) {
+    public TestNamedSolutionSetRef(final String name) {
         super(name);
     }
 
     public void test_ctor() {
         
+        @SuppressWarnings("rawtypes")
         final IVariable x = Var.var("x");
+        @SuppressWarnings("rawtypes")
         final IVariable y = Var.var("y");
 
         final UUID queryId = UUID.randomUUID();
         final String namedSet = "namedSet1";
+        @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[] { x, y };
+        
+        {
+            final NamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
+                    namedSet, joinVars);
 
-        final NamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
-                namedSet, joinVars);
+            assertEquals("namedSet", namedSet, ref.namedSet);
+            assertTrue("queryId", queryId.equals(ref.queryId));
+            assertTrue("joinVars", Arrays.deepEquals(joinVars, ref.joinVars));
+        }
 
         try {
             new NamedSolutionSetRef(null/*queryId*/, namedSet, joinVars);
@@ -76,7 +86,6 @@ public class TestNamedSolutionSetRef extends TestCase2 {
                 log.info("Expecting: " + IllegalArgumentException.class);
         }
 
-
         try {
             new NamedSolutionSetRef(queryId, null/*namedSet*/, joinVars);
             fail("Expecting: " + IllegalArgumentException.class);
@@ -84,7 +93,6 @@ public class TestNamedSolutionSetRef extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("Expecting: " + IllegalArgumentException.class);
         }
-
 
         try {
             new NamedSolutionSetRef(queryId, namedSet, null/*joinVars*/);
@@ -98,26 +106,31 @@ public class TestNamedSolutionSetRef extends TestCase2 {
 
     public void test_valueOf() {
 
+        @SuppressWarnings("rawtypes")
         final IVariable x = Var.var("x");
+        @SuppressWarnings("rawtypes")
         final IVariable y = Var.var("y");
 
         final UUID queryId = UUID.randomUUID();
         final String namedSet = "namedSet1";
+        @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[] { x, y };
 
         final NamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
                 namedSet, joinVars);
 
         final String s = ref.toString();
-        
-        System.err.println(s);
-        
-        final NamedSolutionSetRef ref2 = NamedSolutionSetRef.valueOf(s);
-        
-        System.err.println(ref2.toString());
 
-        assertEquals(ref,ref2);
-        
+        if (log.isInfoEnabled())
+            log.info(s);
+
+        final NamedSolutionSetRef ref2 = NamedSolutionSetRef.valueOf(s);
+
+        if (log.isInfoEnabled())
+            log.info(ref2.toString());
+
+        assertEquals(ref, ref2);
+
     }
     
 }
