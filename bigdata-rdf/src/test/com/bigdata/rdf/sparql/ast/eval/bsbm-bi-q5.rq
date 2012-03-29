@@ -4,6 +4,8 @@ prefix rev: <http://purl.org/stuff/rev#>
 prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 Select ?country ?product ?nrOfReviews ?avgPrice
 {
+#hint:Query hint:mergeJoin "false" .
+#hint:Query hint:analytic "true" .
   { Select ?country (max(?nrOfReviews) As ?maxReviews)
     {
       { Select ?country ?product (count(?review) As ?nrOfReviews)
