@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import org.openrdf.model.URI;
-
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * A factory for service calls against remote SPARQL end points. You can control
  * the way in which bigdata handles SPARQL 1.1 Federated Query for a remote
@@ -78,11 +74,9 @@ public class RemoteServiceFactoryImpl implements ServiceFactory {
     }
 
     @Override
-    public RemoteServiceCall create(final AbstractTripleStore store,
-            final URI serviceURI, final ServiceNode serviceNode) {
+    public RemoteServiceCall create(final ServiceCallCreateParams params) {
 
-        return new RemoteServiceCallImpl(store, serviceURI, serviceNode,
-                serviceOptions);
+        return new RemoteServiceCallImpl(params);
 
     }
 

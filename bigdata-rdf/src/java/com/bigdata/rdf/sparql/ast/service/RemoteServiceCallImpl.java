@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.service;
 
 import org.apache.http.HttpResponse;
-import org.openrdf.model.URI;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
@@ -36,7 +36,6 @@ import org.openrdf.query.TupleQueryResult;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -59,53 +58,35 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 //     */
 //    static private final String UTF8 = "UTF-8";
     
-    private final URI serviceURI;
-    private final ServiceNode serviceNode;
-    private final RemoteServiceOptions serviceOptions;
+    private final ServiceCallCreateParams params;
+//    private final URI serviceURI;
+//    private final ServiceNode serviceNode;
+//    private final RemoteServiceOptions serviceOptions;
 
     @Override
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getName());
-        sb.append("{serviceURI=" + serviceURI);
-        sb.append(",serviceNode=" + serviceNode);
-        sb.append(",serviceOptions=" + serviceOptions);
+        sb.append("{params=" + params);
         sb.append("}");
         return sb.toString();
         
     }
     
-    public RemoteServiceCallImpl(final AbstractTripleStore store,
-            final URI serviceURI, final ServiceNode serviceNode,
-            final RemoteServiceOptions serviceOptions) {
+    public RemoteServiceCallImpl(final ServiceCallCreateParams params) {
 
-//        if (store == null)
-//            throw new IllegalArgumentException();
-
-        if (serviceURI == null)
+        if (params == null)
             throw new IllegalArgumentException();
 
-        if (serviceNode == null)
-            throw new IllegalArgumentException();
-
-        if (serviceOptions == null)
-            throw new IllegalArgumentException();
-
-//        this.store = store;
-        
-        this.serviceURI = serviceURI;
-        
-        this.serviceNode = serviceNode;
-        
-        this.serviceOptions = serviceOptions;
+        this.params = params;
 
     }
     
     @Override
     public RemoteServiceOptions getServiceOptions() {
         
-        return serviceOptions;
+        return (RemoteServiceOptions) params.getServiceOptions();
         
     }
 
@@ -113,7 +94,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
     public ICloseableIterator<BindingSet> call(final BindingSet[] bindingSets)
             throws Exception {
 
-        final String uriStr = serviceURI.stringValue();
+        final String uriStr = params.getServiceURI().stringValue();
         
         final RemoteServiceOptions serviceOptions = getServiceOptions();
 
@@ -146,7 +127,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
          * in which we have to vector solutions to the service end point.
          */
         final IRemoteSparqlQueryBuilder queryBuilder = RemoteSparqlBuilderFactory
-                .get(serviceOptions, serviceNode, bindingSets);
+                .get(serviceOptions, params.getServiceNode(), bindingSets);
         
         final String queryStr = queryBuilder.getSparqlQuery(bindingSets);
         
@@ -154,7 +135,10 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         
         o.addRequestParam("query", queryStr);
 
-        final RemoteRepository repo = new RemoteRepository(uriStr);
+        final RemoteRepository repo = new RemoteRepository(uriStr,
+                new DefaultHttpClient(params.getClientConnectionManager()),
+                params.getTripleStore().getExecutorService()
+                );
         
         /*
          * Note: This does not stream chunks back. The ServiceCallJoin currently

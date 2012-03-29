@@ -29,16 +29,14 @@ package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.List;
 
-import org.openrdf.model.URI;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
+import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -63,12 +61,13 @@ public class OpenrdfNativeMockServiceFactory implements ServiceFactory {
     }
 
     @Override
-    public ServiceCall<?> create(final AbstractTripleStore store,
-            final URI serviceURI, final ServiceNode serviceNode) {
+    public ServiceCall<?> create(final ServiceCallCreateParams params) {
 
-        TestOpenrdfNativeServiceEvaluation.assertNotNull(store);
+        TestOpenrdfNativeServiceEvaluation.assertNotNull(params);
+        
+        TestOpenrdfNativeServiceEvaluation.assertNotNull(params.getTripleStore());
 
-        TestOpenrdfNativeServiceEvaluation.assertNotNull(serviceNode);
+        TestOpenrdfNativeServiceEvaluation.assertNotNull(params.getServiceNode());
 
         return new MockExternalServiceCall();
 

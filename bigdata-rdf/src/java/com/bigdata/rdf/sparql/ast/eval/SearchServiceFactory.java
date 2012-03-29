@@ -57,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -105,12 +106,21 @@ public class SearchServiceFactory implements ServiceFactory {
         
     }
     
-    public BigdataServiceCall create(final AbstractTripleStore store,
-            final URI serviceUriIsIgnored, final ServiceNode serviceNode) {
+    public BigdataServiceCall create(final ServiceCallCreateParams params) {
+
+        if (params == null)
+            throw new IllegalArgumentException();
+
+        final AbstractTripleStore store = params.getTripleStore();
+
+        if (store == null)
+            throw new IllegalArgumentException();
+
+        final ServiceNode serviceNode = params.getServiceNode();
 
         if (serviceNode == null)
             throw new IllegalArgumentException();
-        
+
         /*
          * Validate the search predicates for a given search variable.
          */

@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import org.openrdf.model.URI;
-
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * Factory for creating objects which can talk to SPARQL service end points.
  */
@@ -45,16 +41,11 @@ public interface ServiceFactory {
     /**
      * Create a service invocation object.
      * 
-     * @param store
-     *            The {@link AbstractTripleStore}.
-     * @param serviceURI
-     *            The as-bound URI of the service end point.
-     * @param serviceNode
-     *            The SERVICE clause.
+     * @param params
+     *            The pararameters, which are encapsulated by this interface.
      * 
      * @return The object which can be used to evaluate the SERVICE clause.
      */
-    ServiceCall<?> create(final AbstractTripleStore store,
-            final URI serviceURI, final ServiceNode serviceNode);
+    ServiceCall<?> create(ServiceCallCreateParams params);
 
 }

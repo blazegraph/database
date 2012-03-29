@@ -107,14 +107,26 @@ public class ConnectOptions {
     /** Request entity. */
     public HttpEntity entity = null;
 
-    /**
-     * The connection timeout (ms) -or- ZERO (0) for an infinite timeout
-     * 
-     * FIXME How is this communicated using http components? (I do not believe
-     * that it is, in which case how is this settable; if people can do it
-     * themselves then drop it otherwise hook it into http components.)
-     */
-    public int timeout = 0;
+//    /**
+//     * The connection timeout (ms) -or- ZERO (0) for an infinite timeout
+//     * 
+//     * FIXME How is this communicated using http components? (I do not believe
+//     * that it is, in which case how is this settable; if people can do it
+//     * themselves then drop it otherwise hook it into http components.)
+//     * 
+//     * It looks like the answer setting an appropriate parameter on the
+//     * {@link DefaultHttpClient}
+//     * 
+//     * <pre>
+//     * {@link org.apache.http.params.CoreConnectionPNames#TCP_NODELAY}
+//     * </pre>
+//     * 
+//     * If so, then this can not be overridden here. It needs to be done for the
+//     * {@link HttpClient} as a whole. That would suggest an SPI mechanism for
+//     * configuring that client (or maybe doing it via the
+//     * {@link RemoteServiceOptions}).
+//     */
+//    public int timeout = 0;
 
     public ConnectOptions(final String serviceURL) {
 
