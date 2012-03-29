@@ -1962,9 +1962,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         inFilters.addAll(joinGroup.getInFilters());
 
         final AtomicInteger start = new AtomicInteger(0);
-        if (ctx.mergeJoin
-                || joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
-                        QueryHints.DEFAULT_MERGE_JOIN)) {
+        if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
+                ctx.mergeJoin)) {
 
             /*
              * Attempt to interpret the leading sequence in the group as a merge
