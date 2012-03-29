@@ -705,11 +705,18 @@ public class QueryServlet extends BigdataRDFServlet {
         }
         assert queryId2 != null;
 
-		/*
-		 * Build the explanation.
-		 * 
-		 * Note: The query may still be executing while we do this.
-		 */
+        /*
+         * Build the explanation.
+         * 
+         * Note: The query may still be executing while we do this.
+         * 
+         * Note: The document that we are building writes onto the http
+         * response. Therefore, the response MIGHT be committed anytime after we
+         * start producing this document.
+         * 
+         * Note: If the query fails after this point, this method will wind up
+         * writing the stack trace into the response page.
+         */
 		final HTMLBuilder doc = new HTMLBuilder(queryTask.charset.name(), w);
 		{
 
@@ -842,22 +849,38 @@ public class QueryServlet extends BigdataRDFServlet {
 
             }
 
-            /*
-             * Wait for the Future. If the query fails, then note the exception
-             * but do NOT rethrow it. The exception will get painted into the
-             * page.
-             */
-            Throwable cause = null;
             try {
-                // Wait for the query to finish.
+                
+                /*
+                 * Wait for the Future. If the query fails, then note the
+                 * exception but do NOT rethrow it. The exception will get
+                 * painted into the page.
+                 */
+
                 ft.get();
+                
                 /*
                  * Note: An InterruptedException here is NOT caught. It means
                  * that this Thread was interrupted rather than the Query.
                  */
+                
             } catch (ExecutionException ex) {
+
                 // Some error.
-                cause = ex.getCause();
+                final Throwable cause = ex.getCause();
+
+                // Format the stack trace.
+                final StringWriter sw = new StringWriter();
+
+                cause.printStackTrace(new PrintWriter(sw));
+
+                final String s = sw.getBuffer().toString();
+
+                // And write it into the page.
+                current.node("pre").text(s).close();
+
+                // Fall through and paint the query stats table(s).
+                
             }
 
 			current.node("h2", "Query Evaluation Statistics");
@@ -899,28 +922,13 @@ public class QueryServlet extends BigdataRDFServlet {
                         .text(q.isCancelled()?", CANCELLED.":".")
                         .close();
                 
-                if (cause != null) {
-
-                    // Format the stack trace.
-                    
-                    final StringWriter sw = new StringWriter();
-                    
-                    cause.printStackTrace(new PrintWriter(sw));
-                    
-                    final String s = sw.getBuffer().toString();
-                    
-                    // And write it into the page.
-                    
-                    current.node("pre").text(s).close();
-                    
-                }
-
                 /*
                  * Format query statistics as a table.
                  * 
                  * Note: This is writing on the Writer so it goes directly into
                  * the HTML document we are building for the client.
                  */
+
                 QueryLog.getTableXHTML(queryStr, q, children, w,
                         false/* summaryOnly */, 0/* maxBopLength */);
 
