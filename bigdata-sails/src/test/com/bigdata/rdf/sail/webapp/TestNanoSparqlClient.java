@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 
+import org.openrdf.http.server.repository.GraphQueryResultView;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
@@ -15,6 +16,7 @@ import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
@@ -447,7 +449,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
             final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
             final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-            g2 = query.evaluate();
+            g2 = asGraph(query.evaluate());
             
         }
         
@@ -1230,7 +1232,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                    requestPath)));
 
             final IPreparedGraphQuery query = m_repo.prepareGraphQuery(deleteQueryStr);
-            assertSameGraph(expected, query.evaluate());
+            assertSameGraph(expected, asGraph(query.evaluate()));
             
         }
 

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import org.openrdf.model.Graph;
 import org.openrdf.query.GraphQueryResult;
 
 /**
@@ -38,9 +37,6 @@ import org.openrdf.query.GraphQueryResult;
  */
 public interface IPreparedGraphQuery extends IPreparedQuery {
 
-    /**
-     * FIXME Change the return type to {@link GraphQueryResult}.
-     */
-    Graph evaluate() throws Exception;
+	GraphQueryResult evaluate() throws Exception;
 
 }
