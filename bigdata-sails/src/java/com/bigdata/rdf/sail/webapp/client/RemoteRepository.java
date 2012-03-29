@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.parsers.SAXParser;
@@ -62,7 +61,6 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
@@ -95,10 +93,11 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
-import org.openrdf.rio.helpers.StatementCollector;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
 import com.bigdata.rdf.sail.webapp.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.MiniMime;
@@ -111,17 +110,6 @@ import com.bigdata.rdf.store.BD;
  * <p>
  * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
- * <p>
- * Note: The {@link HttpClient} has a {@link ClientConnectionManager} which must
- * be {@link ClientConnectionManager#shutdown()} when an application is done
- * using http. By default, {@link RemoteRepository} instances will share the
- * {@link ClientConnectionManager} returned by
- * {@link ClientConnectionManagerFactory#getInstance()}. You can customize that
- * {@link ClientConnectionManager}, but you can also supply your own
- * {@link HttpClient} to the appropriate construct (
- * {@link RemoteRepository#RemoteRepository(String, HttpClient)}). In either
- * case, you are responsible for eventually invoking
- * {@link ClientConnectionManager#shutdown()}.
  * 
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
@@ -152,48 +140,68 @@ public class RemoteRepository {
      */
 	private final Executor executor;
     
-    /**
-     * Create a connection to a remote repository using a shared
-     * {@link ClientConnectionManager} and a {@link DefaultHttpClient}.
-     * 
-     * @param serviceURL
-     *            The SPARQL http end point.
-     * 
-     * @see ClientConnectionManagerFactory#getInstance()
-     */
-    public RemoteRepository(final String serviceURL) {
-
-        this(serviceURL, new DefaultHttpClient(
-                ClientConnectionManagerFactory.getInstance()));
-
-    }
-
-    /**
-     * Create a connection to a remote repository.
-     * 
-     * @param serviceURL
-     *            The SPARQL http end point.
-     * @param httpClient
-     *            The {@link HttpClient}.
-     */
-    public RemoteRepository(final String serviceURL, final HttpClient httpClient) {
-
-    	this(serviceURL, httpClient, Executors.newCachedThreadPool());
-    	
-    }
+//    /**
+//     * Create a connection to a remote repository using a shared
+//     * {@link ClientConnectionManager} and a {@link DefaultHttpClient}.
+//     * 
+//     * @param serviceURL
+//     *            The SPARQL http end point.
+//     * 
+//     * @see ClientConnectionManagerFactory#getInstance()
+//     */
+//    public RemoteRepository(final String serviceURL) {
+//
+//        this(serviceURL, new DefaultHttpClient(
+//                ClientConnectionManagerFactory.getInstance()));
+//
+//    }
+//
+//    /**
+//     * Create a connection to a remote repository.
+//     * 
+//     * @param serviceURL
+//     *            The SPARQL http end point.
+//     * @param httpClient
+//     *            The {@link HttpClient}.
+//     */
+//    public RemoteRepository(final String serviceURL, final HttpClient httpClient) {
+//
+//    	this(serviceURL, httpClient, Executors.newCachedThreadPool());
+//    	
+//    }
     
     /**
-     * Create a connection to a remote repository.
+     * Create a connection to a remote repository. A typical invocation looks
+     * like:
+     * 
+     * <pre>
+     * cm = ...
+     * executor = ...
+     * new RemoteRepository(serviceURL, new DefaultHttpClient(cm), executor);
+     * </pre>
+     * <p>
+     * Note: You SHOULD reuse the backing {@link ClientConnectionManager} for
+     * the {@link HttpClient}. It generally relies on a thread pool and the life
+     * cycle of the {@link ClientConnectionManager} needs to be properly
+     * managed. Some hooks for this are listed below.
+     * <p>
+     * Note: You SHOULD reuse an existing thread pool {@link Executor} and the
+     * life cycle of that {@link Executor} needs to be properly managed. Again,
+     * see below for some hooks.
      * 
      * @param serviceURL
      *            The SPARQL http end point.
      * @param httpClient
      *            The {@link HttpClient}.
      * @param executor
-     * 			  The thread pool for processing HTTP responses.
+     *            The thread pool for processing HTTP responses.
+     * 
+     * @see DefaultClientConnectionManagerFactory
+     * @see QueryEngine#getClientConnectionManager()
+     * @see IIndexManager#getExecutorService()
      */
-    public RemoteRepository(final String serviceURL, final HttpClient httpClient,
-    		final Executor executor) {
+    public RemoteRepository(final String serviceURL,
+            final HttpClient httpClient, final Executor executor) {
     	
         if (serviceURL == null)
             throw new IllegalArgumentException();
@@ -317,11 +325,6 @@ public class RemoteRepository {
      * @throws Exception
      * 
      *             TODO includeInferred is currently ignored.
-     * 
-     *             FIXME Should return an closeable iteration (or iterator) so
-     *             we do not have to eagerly materialize all the solutions. (The
-     *             same comment applies to {@link #prepareGraphQuery(String)}
-     *             and {@link #prepareTupleQuery(String)}).
      */
     public GraphQueryResult getStatements(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
@@ -1305,12 +1308,6 @@ public class RemoteRepository {
      * 
      * @throws Exception
      *             If anything goes wrong.
-     * 
-     *             FIXME This should be modified to provide incremental parsing
-     *             of the solutions. Right now they are materialized eagerly.
-     *             However, we do not need to change the API for this since the
-     *             {@link TupleQueryResult} already supports that within its
-     *             abstraction.
      */
     public TupleQueryResult tupleResults(final HttpResponse response)
             throws Exception {
@@ -1357,7 +1354,7 @@ public class RemoteRepository {
 	        final InsertBindingSetCursor cursor = 
 	        	new InsertBindingSetCursor(result, bindings);
 	        
-	        List<String> list = new ArrayList<String>(
+	        final List<String> list = new ArrayList<String>(
 					result.getBindingNames());
 			
 			return new TupleQueryResultImpl(list, cursor);
@@ -1395,13 +1392,6 @@ public class RemoteRepository {
      * 
      * @throws Exception
      *             If anything goes wrong.
-     * 
-     *             FIXME This should be modified to return a
-     *             {@link GraphQueryResult}. That abstraction supports
-     *             incremental materialization. The implementation should
-     *             then be modified to perform incremental materialization.
-     *             Right now it materializes everything before returning.
-     *             This will cause an API change on {@link GraphQuery}.
      */
 	public GraphQueryResult graphResults(final HttpResponse response) throws Exception {
 

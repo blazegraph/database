@@ -221,8 +221,81 @@ public class ServiceRegistry {
 
         }
 
-        return f.create(store, serviceURI, serviceNode);
+        final ServiceCallCreateParams params = new ServiceCallCreateParamsImpl(
+                serviceURI, store, serviceNode, cm, f.getServiceOptions()
+        );
+
+        return f.create(params);
+
+//        return f.create(store, serviceURI, serviceNode);
 
     }
 
+    private static class ServiceCallCreateParamsImpl implements ServiceCallCreateParams {
+
+        private final URI serviceURI;
+        private final AbstractTripleStore store; 
+        private final ServiceNode serviceNode;
+        private final ClientConnectionManager cm;
+        private final IServiceOptions serviceOptions;
+        
+        public ServiceCallCreateParamsImpl(final URI serviceURI,
+                final AbstractTripleStore store, final ServiceNode serviceNode,
+                final ClientConnectionManager cm,
+                final IServiceOptions serviceOptions) {
+
+            this.serviceURI = serviceURI;
+            
+            this.store = store;
+            
+            this.serviceNode = serviceNode;
+            
+            this.cm = cm;
+            
+            this.serviceOptions = serviceOptions;
+            
+        }
+        
+        @Override
+        public URI getServiceURI() {
+            return serviceURI;
+        }
+
+        @Override
+        public AbstractTripleStore getTripleStore() {
+            return store;
+        }
+
+        @Override
+        public ServiceNode getServiceNode() {
+            return serviceNode;
+        }
+
+        @Override
+        public ClientConnectionManager getClientConnectionManager() {
+            return cm;
+        }
+
+        @Override
+        public IServiceOptions getServiceOptions() {
+            return serviceOptions;
+        }
+        
+        @Override
+        public String toString() {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append(getClass().getName());
+            sb.append("{serviceURI=" + getServiceURI());
+            sb.append(",serviceNode=" + getServiceNode());
+            sb.append(",serviceOptions=" + getServiceOptions());
+            sb.append(",tripleStore=" + getTripleStore());
+            sb.append(",clientConnectionManager=" + getClientConnectionManager());
+            sb.append("}");
+            return sb.toString();
+            
+        }
+        
+    }
+    
 }

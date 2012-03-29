@@ -76,6 +76,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -279,11 +280,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             log.info("Setup done: name=" + getName() + ", namespace="
                     + namespace + ", serviceURL=" + m_serviceURL);
 
-        final HttpClient httpClient = new DefaultHttpClient();
+//        final HttpClient httpClient = new DefaultHttpClient();
 
-        m_cm = httpClient.getConnectionManager();
+//        m_cm = httpClient.getConnectionManager();
+        
+        m_cm = DefaultClientConnectionManagerFactory.getInstance()
+                .newInstance();
 
-        m_repo = new RemoteRepository(m_serviceURL, httpClient);
+        m_repo = new RemoteRepository(m_serviceURL,
+                new DefaultHttpClient(m_cm),
+                m_indexManager.getExecutorService());
 
     }
 
