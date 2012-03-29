@@ -42,6 +42,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -103,9 +104,11 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
          * operator in the query plan. For example, a named solution set can be
          * consumed by more than one operator and thus must not be released
          * until all such operators are done.
-         * 
-         * TODO Alternatively, we could specify the #of different locations in
-         * the query plan where the named solution set will be consumed.
+         * <p>
+         * Note: Any memory associated with the {@link IRunningQuery} will be
+         * released no later than when the {@link IRunningQuery#isDone()}. This
+         * only provides a means to release data as soon as it is known that the
+         * data will not be referenced again during the query.
          * 
          * @see HTreeSolutionSetHashJoinOp.Annotations#RELEASE
          */
