@@ -43,6 +43,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -131,6 +132,11 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          * could be part of the {@link HTreeHashJoinUtility} state, in which
          * case it would only be set as an annotation on the operator which
          * generates the hash index.
+         * <p>
+         * Note: Any memory associated with the {@link IRunningQuery} will be
+         * released no later than when the {@link IRunningQuery#isDone()}. This
+         * only provides a means to release data as soon as it is known that the
+         * data will not be referenced again during the query.
          */
         final String RELEASE = HTreeSolutionSetHashJoinOp.class + ".release";
 
