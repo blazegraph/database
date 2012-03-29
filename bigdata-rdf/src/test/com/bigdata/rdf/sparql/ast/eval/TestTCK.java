@@ -858,15 +858,38 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 //     * long running, so take it out of this test suite once we get to the bottom
 //     * of the problem.
 //     * <p>
-//     * Note: The problem with Q5 is likely to be the way it is written.
+//     * I finally tracked this down to an error in the logic to decide on a merge
+//     * join. The story is documented at the trac issue below. However, even
+//     * after all that the predicted result for openrdf differs at the 4th
+//     * decimal place. I have therefore filtered out this test from the openrdf
+//     * TCK.
+//     * 
+//     * <pre>
+//     * Missing bindings: 
+//     * [product=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer2/Product63;
+//     * nrOfReviews="3"^^<http://www.w3.org/2001/XMLSchema#integer>;
+//     * avgPrice="4207.426"^^<http://www.w3.org/2001/XMLSchema#float>;
+//     * country=http://downlode.org/rdf/iso-3166/countries#RU]
+//     * ====================================================
+//     * Unexpected bindings: 
+//     * [country=http://downlode.org/rdf/iso-3166/countries#RU;
+//     * product=http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer2/Product63;
+//     * nrOfReviews="3"^^<http://www.w3.org/2001/XMLSchema#integer>;
+//     * avgPrice="4207.4263"^^<http://www.w3.org/2001/XMLSchema#float>]
+//     * </pre>
+//     * 
+//     * @see <a
+//     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/534#comment:2">
+//     *      BSBM BI Q5 Error when using MERGE JOIN </a>
 //     */
 //    public void test_BSBM_BI_05() throws Exception {
 //        
 //        new TestHelper(
 //                "BSBM BI 05", // testURI,
 //                "bsbm-bi-q5.rq",// queryFileURL
-//                "bsbm-100.ttl",// dataFileURL
-//                "bsbm-bi-q5.srx"// resultFileURL
+//                "bsbm-100.ttl",// dataFileURL // per the openrdf test.
+////                "bsbm/bsbm3_dataset_pc10.nt",// dataFileURL
+//                "bsbm-bi-q5.srx"// resultFileURL // per the openrdf test.
 //                ,false// laxCardinality
 //                ,true// checkOrder
 //                ).runTest();
