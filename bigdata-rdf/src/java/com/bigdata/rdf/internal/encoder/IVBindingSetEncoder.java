@@ -45,6 +45,7 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -88,6 +89,11 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
      */
     final protected LinkedHashSet<IVariable<?>> ivCacheSchema;
     
+    /**
+     * A cache mapping from non-inline {@link IV}s ({@link TermId}s and
+     * {@link BlobIV}s) whose {@link IVCache} association was set to the
+     * corresponding {@link BigdataValue}.
+     */
     final Map<IV<?, ?>, BigdataValue> cache;
     
     /**
@@ -192,7 +198,7 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
             } else {
                 final IV<?, ?> iv = c.get();
                 IVUtility.encode(keyBuilder, iv);
-                if (iv.hasValue() && !filter) {
+                if (!iv.isInline() && iv.hasValue() && !filter) {
                     ivCacheSchema.add(v);
                     if (cache != null)
                         cache.put(iv, iv.getValue());
@@ -207,7 +213,8 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
     @Override
     public void flush() {
 
-        cache.clear();
+        if (cache != null)
+            cache.clear();
         
     }
     

@@ -37,10 +37,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.BlobIV;
-import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -49,9 +45,11 @@ import com.bigdata.rdf.model.BigdataValue;
  * observed associations as reported by {@link IVCache#getValue()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestIVBindingSetEncoderWithCache.java 6036 2012-02-17 14:07:48Z
+ *          thompsonbry $
  */
-public class TestIVBindingSetEncoderWithCache extends AbstractBindingSetEncoderTestCase {
+public class TestIVBindingSetEncoderWithCache extends
+        AbstractBindingSetEncoderTestCase {
 
     /**
      * 
