@@ -87,8 +87,6 @@ import com.bigdata.striterator.ICloseableIterator;
  *      equals). AST based caching allows sub-select caching or even caching of
  *      sub-groups. That could be interesting.
  * 
- *      TODO Extract interface and write unit tests.
- * 
  *      TODO Benchmark impact of cache on BSBM explore+update. The cache should
  *      be integrated into the query planner so we can cache solution sets for
  *      sub-groups and sub-selects. However, when BINDINGS are present, then the
