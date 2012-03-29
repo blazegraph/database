@@ -31,6 +31,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.join.AbstractHashJoinUtilityTestCase;
 import com.bigdata.bop.join.AbstractMergeJoin;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 
 /**
  * Data driven test suite.
@@ -109,6 +110,28 @@ public class TestMergeJoin extends AbstractDataDrivenSPARQLTestCase {
         // Verify that a MERGE JOIN operator was used.
         assertTrue(
                 "No merge join?",
+                BOpUtility.visitAll(astContainer.getQueryPlan(),
+                        AbstractMergeJoin.class).hasNext());
+
+    }
+
+    /**
+     * Variant of the test above in which we disable the merge join with a query
+     * hint and verify that the merge join operator was NOT used in the query
+     * plan.
+     */
+    public void test_merge_join_01a() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(//
+                "merge-join-01a", // testURI,
+                "merge-join-01a.rq",// queryFileURL
+                "merge-join-01.trig",// dataFileURL
+                "merge-join-01.srx"// resultFileURL
+        ).runTest();
+
+        // Verify that a MERGE JOIN operator was used.
+        assertFalse(
+                "Merge join should have been suppressed",
                 BOpUtility.visitAll(astContainer.getQueryPlan(),
                         AbstractMergeJoin.class).hasNext());
 
