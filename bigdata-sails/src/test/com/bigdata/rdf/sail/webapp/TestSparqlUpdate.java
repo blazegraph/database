@@ -157,8 +157,8 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
         try {
 
-            return !m_repo.getStatements(subj, pred, obj, includeInferred,
-                    contexts).isEmpty();
+            return m_repo.getStatements(subj, pred, obj, includeInferred,
+                    contexts).hasNext();
             
         } catch (Exception e) {
             

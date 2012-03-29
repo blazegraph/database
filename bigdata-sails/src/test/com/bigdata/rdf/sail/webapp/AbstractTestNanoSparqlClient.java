@@ -55,6 +55,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
@@ -1167,7 +1168,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 //        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
             final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-            final Graph actual = query.evaluate();
+            final Graph actual = asGraph(query.evaluate());
 
             assertSameGraph(expected, actual);
             
@@ -1366,7 +1367,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 //        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
             final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-            final Graph actual = query.evaluate();
+            final Graph actual = asGraph(query.evaluate());
 
             assertSameGraph(expected, actual);
             
@@ -1374,6 +1375,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     
     }
     
+    protected void assertSameGraph(final Graph expected, final GraphQueryResult actual) throws Exception {
+    	
+    	assertSameGraph(expected, asGraph(actual));
+    	
+    }
     /**
      * Compare two graphs for equality.
      * <p>
@@ -1397,6 +1403,22 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         assertEquals("size", expected.size(), actual.size());
 
+    }
+    
+    protected Graph asGraph(final GraphQueryResult result) throws Exception {
+    	
+    	final Graph g = new GraphImpl();
+    	
+    	while (result.hasNext()) {
+    	
+    		g.add(result.next());
+    		
+    	}
+    	
+    	result.close();
+    	
+    	return g;
+    	
     }
 
 }

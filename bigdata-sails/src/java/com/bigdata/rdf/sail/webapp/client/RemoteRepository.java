@@ -27,20 +27,27 @@ import info.aduna.io.IOUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -70,7 +77,8 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.TupleQueryResultHandlerBase;
-import org.openrdf.query.impl.TupleQueryResultBuilder;
+import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.impl.TupleQueryResultImpl;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.BooleanQueryResultParser;
 import org.openrdf.query.resultio.BooleanQueryResultParserFactory;
@@ -79,6 +87,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.repository.sparql.query.InsertBindingSetCursor;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
@@ -139,6 +148,11 @@ public class RemoteRepository {
     protected final HttpClient httpClient;
 
     /**
+     * Thread pool for processing HTTP responses in background.
+     */
+	private final Executor executor;
+    
+    /**
      * Create a connection to a remote repository using a shared
      * {@link ClientConnectionManager} and a {@link DefaultHttpClient}.
      * 
@@ -164,15 +178,37 @@ public class RemoteRepository {
      */
     public RemoteRepository(final String serviceURL, final HttpClient httpClient) {
 
+    	this(serviceURL, httpClient, Executors.newCachedThreadPool());
+    	
+    }
+    
+    /**
+     * Create a connection to a remote repository.
+     * 
+     * @param serviceURL
+     *            The SPARQL http end point.
+     * @param httpClient
+     *            The {@link HttpClient}.
+     * @param executor
+     * 			  The thread pool for processing HTTP responses.
+     */
+    public RemoteRepository(final String serviceURL, final HttpClient httpClient,
+    		final Executor executor) {
+    	
         if (serviceURL == null)
             throw new IllegalArgumentException();
 
         if (httpClient == null)
             throw new IllegalArgumentException();
 
+        if (executor == null)
+            throw new IllegalArgumentException();
+
         this.serviceURL = serviceURL;
 
         this.httpClient = httpClient;
+        
+        this.executor = executor;
 
     }
 
@@ -192,7 +228,7 @@ public class RemoteRepository {
             
             checkResponseCode(response = doConnect(opts));
 
-            return graphResults(response);
+            return asGraph(graphResults(response));
             
         } finally {
             
@@ -287,7 +323,7 @@ public class RemoteRepository {
      *             same comment applies to {@link #prepareGraphQuery(String)}
      *             and {@link #prepareTupleQuery(String)}).
      */
-    public Graph getStatements(final Resource subj, final URI pred,
+    public GraphQueryResult getStatements(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
 
@@ -360,9 +396,7 @@ public class RemoteRepository {
         
         final IPreparedGraphQuery query = prepareGraphQuery(queryStr);
         
-        final Graph result = query.evaluate();
-
-        return result;
+        return query.evaluate();
                 
     }
 
@@ -771,7 +805,7 @@ public class RemoteRepository {
 		public TupleQueryResult evaluate() throws Exception {
 			
 	        HttpResponse response = null;
-	        try {
+//	        try {
 	        	
                 if (opts.acceptHeader == null)
                     opts.acceptHeader = ConnectOptions.DEFAULT_SOLUTIONS_ACCEPT_HEADER;
@@ -780,20 +814,20 @@ public class RemoteRepository {
 	        	
 	        	return tupleResults(response);
 	        	
-	        } finally {
-	        	
-	        	try {
-	            	
-	        		if (response != null)
-	        			EntityUtils.consume(response.getEntity());
-	        		
-	        	} catch (Exception ex) {
-
-	        	    log.warn(ex);
-
-	        	}
-	        	
-	        }
+//	        } finally {
+//	        	
+//	        	try {
+//	            	
+//	        		if (response != null)
+//	        			EntityUtils.consume(response.getEntity());
+//	        		
+//	        	} catch (Exception ex) {
+//
+//	        	    log.warn(ex);
+//
+//	        	}
+//	        	
+//	        }
 			
 		}
 		
@@ -809,10 +843,10 @@ public class RemoteRepository {
         }
 		
 		@Override
-        public Graph evaluate() throws Exception {
+        public GraphQueryResult evaluate() throws Exception {
 
 	        HttpResponse response = null;
-	        try {
+//	        try {
 	        	
 //	            final ConnectOptions opts = getConnectOpts();
 
@@ -823,20 +857,20 @@ public class RemoteRepository {
 	        	
 	        	return graphResults(response);
 	        	
-	        } finally {
-	        	
-	        	try {
-	            	
-	        		if (response != null)
-	        			EntityUtils.consume(response.getEntity());
-	        		
-	        	} catch (Exception ex) { 
-	        	    
-	                  log.warn(ex);
-
-	        	}
-	        	
-	        }
+//	        } finally {
+//	        	
+//	        	try {
+//	            	
+//	        		if (response != null)
+//	        			EntityUtils.consume(response.getEntity());
+//	        		
+//	        	} catch (Exception ex) { 
+//	        	    
+//	                  log.warn(ex);
+//
+//	        	}
+//	        	
+//	        }
 			
 		}
 		
@@ -1282,6 +1316,7 @@ public class RemoteRepository {
             throws Exception {
 
     	HttpEntity entity = null;
+    	BackgroundTupleResult result = null;
     	try {
     		
     		entity = response.getEntity();
@@ -1311,20 +1346,40 @@ public class RemoteRepository {
 
 	        final TupleQueryResultParser parser = parserFactory.getParser();
 	
-	        final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
-	
-	        parser.setTupleQueryResultHandler(handler);
-	
-	        parser.parse(entity.getContent());
-	
-	        // done.
-	        return handler.getQueryResult();
+	        final InputStream in = entity.getContent();
+	        
+	        result = new BackgroundTupleResult(parser, in, entity);
+	        
+	        executor.execute(result);
+	        
+	        final MapBindingSet bindings = new MapBindingSet();
+	        
+	        final InsertBindingSetCursor cursor = 
+	        	new InsertBindingSetCursor(result, bindings);
+	        
+	        List<String> list = new ArrayList<String>(
+					result.getBindingNames());
+			
+			return new TupleQueryResultImpl(list, cursor);
+	        
+//	        final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
+//	
+//	        parser.setTupleQueryResultHandler(handler);
+//	
+//	        parser.parse(entity.getContent());
+//	
+//	        // done.
+//	        return handler.getQueryResult();
 	        
     	} finally {
     		
 //			// terminate the http connection.
 //    		response.disconnect();
-    		EntityUtils.consume(entity);
+			if (result == null) {
+				try {
+					EntityUtils.consume(entity);
+				} catch (IOException ex) { }
+			}
     		
     	}
 
@@ -1348,9 +1403,10 @@ public class RemoteRepository {
      *             Right now it materializes everything before returning.
      *             This will cause an API change on {@link GraphQuery}.
      */
-	public Graph graphResults(final HttpResponse response) throws Exception {
+	public GraphQueryResult graphResults(final HttpResponse response) throws Exception {
 
     	HttpEntity entity = null;
+    	BackgroundGraphResult result = null;
 		try {
 
     		entity = response.getEntity();
@@ -1380,31 +1436,53 @@ public class RemoteRepository {
                         "RDFParserFactory not found: Content-Type="
                                 + contentType + ", format=" + format);
 
-            final Graph g = new GraphImpl();
-
-			final RDFParser rdfParser = factory.getParser();
+			final RDFParser parser = factory.getParser();
 			
 			// TODO These options should be configurable using RDFParserOptions.
-			rdfParser.setValueFactory(new ValueFactoryImpl());
+			parser.setValueFactory(new ValueFactoryImpl());
 
-			rdfParser.setVerifyData(true);
+			parser.setVerifyData(true);
 
-			rdfParser.setStopAtFirstError(true);
+			parser.setStopAtFirstError(true);
 
-			rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+			parser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-			rdfParser.setRDFHandler(new StatementCollector(g));
+			Charset charset = Charset.forName(UTF8);
+			try {
+				final Header encoding = entity.getContentEncoding();
+				if (encoding != null)
+					charset = Charset.forName(encoding.getValue());
+			} catch (IllegalCharsetNameException e) {
+				// work around for Joseki-3.2
+				// Content-Type: application/rdf+xml;
+				// charset=application/rdf+xml
+			}
+			
+			result = new BackgroundGraphResult(
+					parser, entity.getContent(), charset, baseURI, entity);
+			
+			executor.execute(result);
+			
+			return result;
 
-			rdfParser.parse(entity.getContent(), baseURI);
-
-//			return new GraphQueryResultImpl(Collections.EMPTY_MAP, g);
-			return g;
+//            final Graph g = new GraphImpl();
+//
+//			parser.setRDFHandler(new StatementCollector(g));
+//
+//			parser.parse(entity.getContent(), baseURI);
+//
+////			return new GraphQueryResultImpl(Collections.EMPTY_MAP, g);
+//			return g;
 
 		} finally {
 
 //			// terminate the http connection.
 //			response.disconnect();
-			EntityUtils.consume(entity);
+			if (result == null) {
+				try {
+					EntityUtils.consume(entity);
+				} catch (IOException ex) { }
+			}
 
 		}
 
@@ -1459,7 +1537,9 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
-        	EntityUtils.consume(entity);
+        	try {
+        		EntityUtils.consume(entity);
+        	} catch (IOException ex) { }
 
         }
 
@@ -1536,7 +1616,9 @@ public class RemoteRepository {
 
 //			// terminate the http connection.
 //			response.disconnect();
-			EntityUtils.consume(entity);
+			try {
+				EntityUtils.consume(entity);
+			} catch (IOException ex) { }
 
 		}
 
@@ -1596,7 +1678,9 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
-        	EntityUtils.consume(entity);
+			try {
+				EntityUtils.consume(entity);
+			} catch (IOException ex) { }
 
         }
 
@@ -1656,7 +1740,9 @@ public class RemoteRepository {
 
 //            // terminate the http connection.
 //            response.disconnect();
-        	EntityUtils.consume(entity);
+			try {
+				EntityUtils.consume(entity);
+			} catch (IOException ex) { }
 
         }
 
@@ -1703,4 +1789,18 @@ public class RemoteRepository {
 
     }
 
+    protected Graph asGraph(final GraphQueryResult result) throws Exception {
+    	
+    	final Graph g = new GraphImpl();
+    	
+    	while (result.hasNext()) {
+    	
+    		g.add(result.next());
+    		
+    	}
+    	
+    	return g;
+    	
+    }
+    
 }
