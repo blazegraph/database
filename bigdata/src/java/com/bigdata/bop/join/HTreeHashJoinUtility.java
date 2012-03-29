@@ -350,7 +350,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
         if (joinSet.get() != null)
             sb.append(",joinSetSize=" + getJoinSetSize());
-        sb.append(",encoder=");
+//        sb.append(",encoder="+encoder);
         sb.append("}");
         
         return sb.toString();
