@@ -108,7 +108,7 @@ public class OrderByNode extends SolutionModifierBase implements
 
         sb.append(indent(indent));
         
-        sb.append("order by");
+        sb.append("ORDER BY");
         
         for (OrderByExpr e : this) {
         
