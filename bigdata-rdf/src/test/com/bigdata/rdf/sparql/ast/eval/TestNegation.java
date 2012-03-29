@@ -356,4 +356,21 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         }
     
+    /**
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
+     *      Query with two "FILTER NOT EXISTS" expressions returns no
+     *      results</a>
+     */
+    public void test_filter_not_exists2() throws Exception {
+        new TestHelper(
+                "filter-not-exists", // testURI,
+                "filter-not-exists2.rq",// queryFileURL
+                "filter-not-exists.ttl",// dataFileURL
+                "filter-not-exists.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+        }
+
 }
