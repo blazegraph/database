@@ -113,33 +113,15 @@ public class EBVBOp extends XSDBooleanIVValueExpression
 	 */
     public boolean accept(final IBindingSet bs) {
 
-    	final IV iv = get(0).get(bs);
-    	
-    	// not yet bound
-    	if (iv == null) {
-    		
-    		throw new SparqlTypeErrorException();
-    		
-    	}
+    	final IV iv = getAndCheckBound(0, bs);
     	
     	if (iv instanceof XSDBooleanIV) {
+    		
     		return ((XSDBooleanIV) iv).booleanValue();
-    	}
-    	
-    	Value val = null;
-    	
-    	if (iv.isInline() && !iv.isExtension()) {
-    		
-    		val = (Value) iv;
-    		
-    	} else {
-    		
-    		val = iv.getValue();
     		
     	}
     	
-    	if (val == null)
-    		throw new NotMaterializedException();
+    	final Value val = super.asValue(iv);
     	
     	try {
     		

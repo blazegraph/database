@@ -81,7 +81,7 @@ public class IriBOp extends IVValueExpression<IV> implements INeedsMaterializati
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
 
-        final Literal lit = literalValue(iv);
+        final Literal lit = asLiteral(iv);
 
         final URI dt = lit.getDatatype();
 

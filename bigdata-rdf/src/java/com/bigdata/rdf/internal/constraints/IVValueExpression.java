@@ -362,7 +362,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      *             be turned into a {@link Literal} without an index read.
      */
     @SuppressWarnings("rawtypes")
-    final protected Literal literalValue(final IV iv) {
+    final protected Literal asLiteral(final IV iv) {
 
         if (iv == null)
             throw new SparqlTypeErrorException();
@@ -400,6 +400,42 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
+     * Return the {@link Literal} for the {@link IV}.
+     * 
+     * @param iv
+     *            The {@link IV}.
+     * 
+     * @return The {@link Literal}.
+     * 
+     * @throws SparqlTypeErrorException
+     *             if the argument is <code>null</code>.
+     * @throws NotMaterializedException
+     *             if the {@link IVCache} is not set and the {@link IV} can not
+     *             be turned into a {@link Literal} without an index read.
+     */
+    @SuppressWarnings("rawtypes")
+    final protected Value asValue(final IV iv) {
+
+        if (iv == null)
+            throw new SparqlTypeErrorException();
+
+        if (iv.isInline() && !iv.isExtension()) {
+
+    		return (Value) iv;
+        		
+        } else if (iv.hasValue()) {
+
+            return ((BigdataLiteral) iv.getValue());
+
+        } else {
+
+            throw new NotMaterializedException();
+
+        }
+
+    }
+
+    /**
      * Return the {@link String} label for the {@link IV}.
      * 
      * @param iv
@@ -419,7 +455,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     final protected String literalLabel(final IV iv)
             throws NotMaterializedException {
 
-    	return literalValue(iv).getLabel();
+    	return asLiteral(iv).getLabel();
 
     }
     
@@ -493,11 +529,11 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     
     /**
      * Combination of {@link #getAndCheckLiteral(int, IBindingSet)} and
-     * {@link #literalValue(IV)}.
+     * {@link #asLiteral(IV)}.
      */
     protected Literal getAndCheckLiteralValue(final int i, final IBindingSet bs) {
     	
-    	return literalValue(getAndCheckLiteral(i, bs));
+    	return asLiteral(getAndCheckLiteral(i, bs));
     	
     }
     

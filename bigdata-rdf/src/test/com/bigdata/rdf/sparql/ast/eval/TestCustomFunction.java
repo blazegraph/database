@@ -237,7 +237,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             final IV arg = getAndCheckLiteral(0, bset);
             
             // Convert into an RDF Value.
-            final Literal lit = literalValue(arg);
+            final Literal lit = asLiteral(arg);
 
             // Concat with self.
             final Literal lit2 = new LiteralImpl(lit.getLabel() + "-"
@@ -332,7 +332,7 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
             }
             
             // Convert into an RDF Value.
-            final Literal lit = literalValue(arg0);
+            final Literal lit = asLiteral(arg0);
 
             return lit.getLabel().equals("Mike");
 

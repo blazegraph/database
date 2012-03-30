@@ -78,7 +78,7 @@ public class ConcatBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final IV v = getAndCheckLiteral(i, bs);
             String label = null;
             if (allSame) {
-                final Literal lit = literalValue(v);
+                final Literal lit = asLiteral(v);
                 label = lit.getLabel();
                 if (lit.getDatatype() != null) {
                     if (lang != null) {

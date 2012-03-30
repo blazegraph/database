@@ -98,7 +98,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
 
         // Negative values and zero are treated as ONE.
         final int start = Math.max(1,
-                (int) Math.round(literalValue(startArg).doubleValue()));
+                (int) Math.round(asLiteral(startArg).doubleValue()));
 
         /*
          * The length of the substring (optional argument).
@@ -115,7 +115,7 @@ public class SubstrBOp extends IVValueExpression<IV> implements INeedsMaterializ
             final IV lengthArg = get(2).get(bs);
 
             final int length = Math.min(label.length(),
-                    (int) Math.round(literalValue(lengthArg).doubleValue()));
+                    (int) Math.round(asLiteral(lengthArg).doubleValue()));
 
 //            final int length = (int) Math.round(literalValue(lengthArg).doubleValue());
             
