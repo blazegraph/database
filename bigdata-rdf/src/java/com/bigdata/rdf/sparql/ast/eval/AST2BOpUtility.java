@@ -1103,6 +1103,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * TODO This should be set based on the #of INCLUDEs for the named
          * subquery. We can not release the associated hash index until all
          * includes are done.
+         * 
+         * Note: We MUST NOT [release] a named solution set whose scope is
+         * outside of the query (durable or cached).
          */
         final boolean release = false;
         
