@@ -6,6 +6,12 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 
+/**
+ * AST node for value expressions.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class ValueExpressionNode extends ASTBase implements
         IValueExpressionNode {
 
@@ -44,7 +50,7 @@ public class ValueExpressionNode extends ASTBase implements
     /**
      * Required deep copy constructor.
      */
-    public ValueExpressionNode(ValueExpressionNode op) {
+    public ValueExpressionNode(final ValueExpressionNode op) {
         super(op);
     }
 
@@ -107,7 +113,7 @@ public class ValueExpressionNode extends ASTBase implements
      * with value expressions. 
      */
     @SuppressWarnings({ "rawtypes" })
-    public void setValueExpression(IValueExpression<? extends IV> ve) {
+    public void setValueExpression(final IValueExpression<? extends IV> ve) {
 
         setProperty(Annotations.VALUE_EXPR, ve);
 

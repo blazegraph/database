@@ -114,6 +114,8 @@ abstract public class CoreBaseBOp implements BOp {
             final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
             if (tid != null) {
                 sb.append("[" + tid + "]");
+//            } else {
+//                sb.append("@"+t.hashCode());
             }
             return sb.toString();
         }
@@ -162,14 +164,16 @@ abstract public class CoreBaseBOp implements BOp {
                     sb.append(" ");
                 else
                     sb.append(", ");
-                if (e.getValue() != null && e.getValue().getClass().isArray()) {
-                    sb.append(e.getKey() + "="
-                            + Arrays.toString((Object[]) e.getValue()));
-                } else if (e.getKey().equals(IPredicate.Annotations.FLAGS)) {
-                    sb.append(e.getKey() + "="
-                            + Tuple.flagString((Integer) e.getValue()));
+                final String key = e.getKey();
+                final Object val = e.getValue();
+                if (val != null && val.getClass().isArray()) {
+                    sb.append(key + "=" + Arrays.toString((Object[]) val));
+                } else if (key.equals(IPredicate.Annotations.FLAGS)) {
+                    sb.append(key + "=" + Tuple.flagString((Integer) val));
+                } else if( val instanceof BOp) {
+                    sb.append(key + "=" + ((BOp) val).toShortString());
                 } else {
-                    sb.append(e.getKey() + "=" + e.getValue());
+                    sb.append(key + "=" + val);
                 }
                 first = false;
             }
@@ -384,7 +388,9 @@ abstract public class CoreBaseBOp implements BOp {
 
             for (int i = 0; i < n; i++) {
 
-                h = 31 * h + get(i).hashCode();
+                final BOp arg = get(i);
+                
+                h = 31 * h + (arg == null ? 0 : arg.hashCode());
 
             }
 

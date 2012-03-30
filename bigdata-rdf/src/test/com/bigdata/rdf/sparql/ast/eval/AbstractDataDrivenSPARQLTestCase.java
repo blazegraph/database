@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Abstract base class for data driven test suites.
@@ -135,6 +136,18 @@ public class AbstractDataDrivenSPARQLTestCase extends
        
 //        private final PipelineOp queryPlan;
 
+        public ASTContainer getASTContainer() {
+            
+            return astContainer;
+            
+        }
+        
+        public AbstractTripleStore getTripleStore() {
+            
+            return store;
+            
+        }
+        
         /**
          * 
          * @param testURI

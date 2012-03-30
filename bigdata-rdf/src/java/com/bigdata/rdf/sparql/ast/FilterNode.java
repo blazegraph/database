@@ -22,7 +22,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
     /**
      * Required deep copy constructor.
      */
-    public FilterNode(FilterNode op) {
+    public FilterNode(final FilterNode op) {
 
         super(op);
         
@@ -31,7 +31,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
     /**
      * Required shallow copy constructor.
      */
-    public FilterNode(BOp[] args, Map<String, Object> anns) {
+    public FilterNode(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
 
