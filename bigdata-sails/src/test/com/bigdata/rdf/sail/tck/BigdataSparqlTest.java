@@ -228,6 +228,9 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
      * run.
      */
     static final Collection<String> testURIs = Arrays.asList(new String[] {
+    		
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/cast/manifest#cast-dT"
+    		
     		// 8, 9, 14-19, 23-30
 
 //        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-in-02",
