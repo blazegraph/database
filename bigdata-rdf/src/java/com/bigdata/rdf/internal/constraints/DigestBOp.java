@@ -145,7 +145,7 @@ public class DigestBOp extends IVValueExpression<IV> implements INeedsMaterializ
         final IV iv = getAndCheckLiteral(0, bs);
         //Recreate since they are not thread safe
         MessageDigest md = null;
-        final Literal lit = literalValue(iv);
+        final Literal lit = asLiteral(iv);
         if (lit.getLanguage() != null || lit.getDatatype() != null
                 && lit.getDatatype().equals(XSD.STRING)) {
             try {

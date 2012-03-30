@@ -79,7 +79,7 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
 
         final BigdataURI dt = (BigdataURI) datatype.getValue();
 
-        final Literal lit = literalValue(iv);
+        final Literal lit = asLiteral(iv);
         
         final String label = lit.getLabel();
         
