@@ -81,6 +81,17 @@ public class ChunkedMaterializationOp extends PipelineOp {
         String RELATION_NAME = Predicate.Annotations.RELATION_NAME;
 
         String TIMESTAMP = Predicate.Annotations.TIMESTAMP;
+        
+        /**
+         * If true, materialize inline values in addition to term IDs.
+         */
+        String MATERIALIZE_ALL = ChunkedMaterializationOp.class.getName()+".materializeAll";
+        
+        /**
+         * Default materialize all is false.
+         */
+        boolean DEFAULT_MATERIALIZE_ALL = false;
+
     }
 
     /**
@@ -137,6 +148,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 new NV(Annotations.TIMESTAMP, timestamp) //
         );
     }
+    
+    public boolean materializeAll() {
+    	
+    	return getProperty(Annotations.MATERIALIZE_ALL, Annotations.DEFAULT_MATERIALIZE_ALL);
+    	
+    }
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -159,9 +176,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
         private final String namespace;
 
         private final long timestamp;
+        
+        private final boolean materializeAll;
 
         ChunkTask(final ChunkedMaterializationOp op,
-                final BOpContext<IBindingSet> context) {
+                final BOpContext<IBindingSet> context
+                ) {
 
             this.context = context;
 
@@ -173,6 +193,8 @@ public class ChunkedMaterializationOp extends PipelineOp {
             namespace = ((String[]) op.getProperty(Annotations.RELATION_NAME))[0];
 
             timestamp = (Long) op.getProperty(Annotations.TIMESTAMP);
+            
+            materializeAll = op.materializeAll();
 
         }
 
@@ -197,7 +219,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(a.length);
 
-                    resolveChunk(vars, lex, a);
+                    resolveChunk(vars, lex, a, materializeAll);
 
                     sink.add(a);
 
@@ -232,7 +254,8 @@ public class ChunkedMaterializationOp extends PipelineOp {
      */
     static private void resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
-            final IBindingSet[] chunk//
+            final IBindingSet[] chunk,//
+            final boolean materializeAll
     ) {
 
         if (log.isInfoEnabled())
@@ -281,7 +304,11 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    ids.add(iv);
+                    if (!iv.isInline() || iv.isExtension() || materializeAll) {
+                    	
+                    	ids.add(iv);
+                    
+                    }
 
                 }
 
@@ -304,7 +331,11 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    ids.add(iv);
+                    if (!iv.isInline() || iv.isExtension() || materializeAll) {
+                    	
+                    	ids.add(iv);
+                    	
+                    }
 
                 }
 
@@ -383,7 +414,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 
                 final BigdataValue value = terms.get(iv);
 
-                if (value == null) {
+                if (value == null && (iv.isExtension() || !iv.isInline())) {
 
                     throw new RuntimeException("Could not resolve: iv=" + iv);
 
@@ -426,7 +457,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 final BigdataValue value = terms.get(iv);
 
-                if (value == null) {
+                if (value == null && (iv.isExtension() || !iv.isInline())) {
 
                     throw new RuntimeException("Could not resolve: iv=" + iv);
 
