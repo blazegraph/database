@@ -389,7 +389,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 
         } else if (iv.hasValue()) {
 
-            return ((BigdataLiteral) iv.getValue());
+            return (BigdataLiteral) iv.getValue();
 
         } else {
 
@@ -414,7 +414,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      *             be turned into a {@link Literal} without an index read.
      */
     @SuppressWarnings("rawtypes")
-    final protected Value asValue(final IV iv) {
+    final static protected Value asValue(final IV iv) {
 
         if (iv == null)
             throw new SparqlTypeErrorException();
@@ -425,7 +425,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         		
         } else if (iv.hasValue()) {
 
-            return ((BigdataLiteral) iv.getValue());
+            return (BigdataValue) iv.getValue();
 
         } else {
 
@@ -557,6 +557,12 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
          * the namespace for the lexicon relation.
          */
         
+    	if (value instanceof IV) {
+    		
+    		return (IV) value;
+    		
+    	}
+    	
         final BigdataValue v = getValueFactory().asValue(value);
         
         return asIV(v, bs);
@@ -603,7 +609,10 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 		if (lc != null) {
 			iv = lc.createInlineIV(value);
 			if (iv != null) {
-				// we don't need to cache the value on inline IVs
+				// cache the value only if it's an extension
+				if (iv.isExtension()) {
+					iv.setValue(value);
+				}
 				return iv;
 			}
 		}

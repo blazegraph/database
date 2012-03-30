@@ -27,20 +27,18 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
@@ -101,32 +99,17 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
         if (iv.isInline() && !iv.isExtension()) {
 
-//            final BigdataURI datatype = vf.createURI(iv.getDTE().getDatatype());
-            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
-
-	    	@SuppressWarnings("rawtypes")
-            IV datatypeIV = datatype.getIV();
-	    	if (datatypeIV == null) {
-	    		datatypeIV = super.asIV(datatype, bs);
-	    	}
-
-	    	// cache the value on the IV
-	    	datatypeIV.setValue(datatype);
-	    	
-	    	return datatypeIV;
-
+        	return asIV(iv.getDTE().getDatatypeURI(), bs);
+        	
         }
 
-        final BigdataValue val = iv.getValue();
+        final Value val = asValue(iv);
 
-        if (val == null)
-        	throw new NotMaterializedException();
+        if (val instanceof Literal) {
 
-        if (val instanceof BigdataLiteral) {
+        	final Literal literal = (Literal) val;
 
-        	final BigdataLiteral literal = (BigdataLiteral) val;
-
-        	final BigdataURI datatype;
+        	final URI datatype;
 
 			if (literal.getDatatype() != null) {
 
@@ -136,7 +119,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 			} else if (literal.getLanguage() == null) {
 
 				// simple literal
-				datatype = vf.asValue(XSD.STRING);
+				datatype = XSD.STRING;
 
 			} else {
 
@@ -144,16 +127,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 
 			}
 
-            @SuppressWarnings("rawtypes")
-            IV datatypeIV = datatype.getIV();
-	    	if (datatypeIV == null) {
-	    		datatypeIV = super.asIV(datatype, bs);
-	    	}
-
-	    	// cache the value on the IV
-	    	datatypeIV.setValue(datatype);
-
-	    	return datatypeIV;
+	    	return asIV(datatype, bs);
 
         }
 

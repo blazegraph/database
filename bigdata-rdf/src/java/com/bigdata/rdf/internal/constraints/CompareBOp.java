@@ -287,7 +287,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     }
     
 	private static boolean valuesEqual(
-			final IV<BigdataValue, ?> left, final IV<BigdataValue, ?> right) {
+			final IV<?, ?> left, final IV<?, ?> right) {
 		
     	// must be the same type of value (e.g. both URIs, both BNodes, etc)
     	if (left.getVTE() != right.getVTE()) {
@@ -303,7 +303,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 		 */
 		if (left.isNullIV() || right.isNullIV()) {
 			
-			return left.getValue().equals(right.getValue());
+			return asValue(left).equals(asValue(right));
 			
 		} else {
 			
