@@ -303,7 +303,8 @@ public class AST2BOpContext implements IdFactory {
          * is disabled during update operations (and it might not make sense to
          * use the cache during SPARQL UPDATEs at all).
          */
-        this.sparqlCache = SparqlCacheFactory.getSparqlCache(queryEngine);
+        this.sparqlCache = null;
+//        this.sparqlCache = SparqlCacheFactory.getSparqlCache(queryEngine);
         
         /*
          * Figure out the query UUID that will be used. This will be bound onto
