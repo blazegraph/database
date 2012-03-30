@@ -1368,13 +1368,30 @@ public class AST2BOpUtility extends AST2BOpJoins {
      *         is known.
      * 
      *         TODO Mark the ASK SUBQUERY and the MINUS join group with an
-     *         annotation which identifies the "FILTER variables" which will
-     *         govern when they are to be evaluated. Use the presence of that
-     *         annotation to guide the reordering of the joins by the
+     *         annotation which identifies the "FILTER variables" which must be
+     *         bound before they can run (if bound by a required join) and which
+     *         thereby govern when they are to be evaluated. Use the presence of
+     *         that annotation to guide the reordering of the joins by the
      *         {@link ASTJoinOrderByTypeOptimizer} such that we run those nodes
      *         as early as possible and (in the case of (NOT) EXISTS before the
      *         FILTER which references the anonymous variable which is bound by
      *         the ASK subquery).
+     *         <p>
+     *         Note: While that while the change for ticket 515 fixes that
+     *         query, it is possible that we still could get bad join orderings
+     *         when the variables used by the filter are only bound by OPTIONAL
+     *         joins. It is also possible that we could run the ASK subquery for
+     *         FILTER (NOT) EXISTS earlier if the filter variables are bound by
+     *         required joins. This is really identical to the join filter
+     *         attachment problem. The problem in the AST is that both the ASK
+     *         subquery and the FILTER are present. It seems that the best
+     *         solution would be to attach the ASK subquery to the FILTER and
+     *         then to run it immediately before the FILTER, letting the
+     *         existing filter attachment logic decide where to place the
+     *         filter. We would also have to make sure that the FILTER was never
+     *         attached to a JOIN since the ASK subquery would have to be run
+     *         before the FILTER was evaluated.
+     * 
      * 
      *         TODO isAggregate() is probably no longer necessary as we always
      *         lift an aggregation subquery into a named subquery. Probably turn
