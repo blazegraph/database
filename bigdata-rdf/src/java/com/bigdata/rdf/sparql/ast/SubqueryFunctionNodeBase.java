@@ -58,19 +58,20 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
     /**
      * Required deep copy constructor.
      */
-    public SubqueryFunctionNodeBase(SubqueryFunctionNodeBase op) {
+    public SubqueryFunctionNodeBase(final SubqueryFunctionNodeBase op) {
         super(op);
     }
 
     /**
      * Required shallow copy constructor.
      */
-    public SubqueryFunctionNodeBase(final BOp[] args, final Map<String, Object> anns) {
+    public SubqueryFunctionNodeBase(final BOp[] args,
+            final Map<String, Object> anns) {
 
         super(args, anns);
 
     }
-    
+
     /**
      * @param anonvar
      *            An anonymous variable which will be bound by an ASK subquery.
