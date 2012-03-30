@@ -3,11 +3,11 @@ WHERE {
 #hint:Query hint:optimizer "None" .
     {
         ?ar a <os:class/AnalysisResults>.
-        FILTER NOT EXISTS {
+        FILTER NOT EXISTS { # note: turns into "-exists-1".
             ?ar <os:prop/analysis/refEntity> <os:elem/loc/Artis>.
         }
     } 
-    FILTER NOT EXISTS {
+    FILTER NOT EXISTS { # note: turns into "-exists-2".
         ?ar <os:prop/analysis/refEntity> <os:elem/loc/Kriterion>.
     }
 }

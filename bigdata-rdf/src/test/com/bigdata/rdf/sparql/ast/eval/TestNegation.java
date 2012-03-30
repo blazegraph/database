@@ -33,7 +33,6 @@ import java.util.Map;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -52,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
@@ -380,15 +380,29 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
     
     /**
      * A varient on {@link #test_filter_not_exists()} where the first SP and
-     * FILTER NOT EXISTS are moved into a child join group. openrdf translates
-     * this into the same operator model for execution.
+     * FILTER NOT EXISTS are moved into a child join group. Interestingly,
+     * openrdf translates this into the same operator model for execution but we
+     * do not, so there is some structural optimization that we are missing out
+     * on there.
      * <p>
      * We wind up with a bad evaluation plan which does not produce any results.
-     * It winds up running the 2nd FILTER NOT EXISTS before the child join
-     * group. However, if we disable the join order optimizer, then the child
-     * join group runs first, but we still get the wrong answer. This suggests
-     * that there is a problem with (a) filter attachment; and (b) nested
-     * evaluation.
+     * The basic problem is that the first ASK subquery (which is in the
+     * top-level of the WHERE clause) is being run BEFORE the nested
+     * {@link JoinGroupNode}. The fix was to {@link ASTJoinOrderByTypeOptimizer}
+     * which now runs the ASK Subqueries after the required join groups.
+     * <p>
+     * Note: While that change fixes this query, it is possible that we still
+     * could get bad join orderings when the variables used by the filter are
+     * only bound by OPTIONAL joins. It is also possible that we could run the
+     * ASK subquery for FILTER (NOT) EXISTS earlier if the filter variables are
+     * bound by required joins. This is really identical to the join filter
+     * attachment problem. The problem in the AST is that both the ASK subquery
+     * and the FILTER are present. It seems that the best solution would be to
+     * attach the ASK subquery to the FILTER and then to run it immediately
+     * before the FILTER, letting the existing filter attachment logic decide
+     * where to place the filter. We would also have to make sure that the
+     * FILTER was never attached to a JOIN since the ASK subquery would have to
+     * be run before the FILTER was evaluated.
      * 
      * <pre>
      * SELECT DISTINCT ?ar
@@ -403,16 +417,6 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
      *     }
      * }
      * </pre>
-     * 
-     * If we remove the 2nd FILTER NOT EXISTS, then the SP and the first FILTER
-     * NOT EXIST are lifted out of the child graph group pattern and we get the
-     * correct result (assuming that this does not change the correct query
-     * result!).
-     * <p>
-     * If we move the 2nd FILTER NOT EXISTS into the child join group, then the
-     * child group is once again lifted and we get the right result.
-     * <p>
-     * If we disable the join order optimizer.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
      *      Query with two "FILTER NOT EXISTS" expressions returns no
@@ -470,12 +474,6 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
          *     
          *   }
          * </pre>
-         * 
-         * TODO First build the AST which is actually being produced. Then
-         * modify that AST to the correct target AST. Finally, backtrack on the
-         * filter attachment and optimizers until we fix the problem (I think
-         * that it is a filter attachment/ordering problem). We might be able to
-         * extract a simpler unit test at that point.
          */
        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
@@ -544,7 +542,11 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
             {
                 
                 notExistsSubquery2 = new SubqueryRoot(QueryType.ASK);
-                whereClause.addChild(notExistsSubquery2);
+                /*
+                 * Note: This can not be attached until after the nested join
+                 * group.
+                 */
+                //                whereClause.addChild(notExistsSubquery2);
 
                 {
                     final ProjectionNode projection = new ProjectionNode();
@@ -690,15 +692,22 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
                 }
 
-                /** 
-                 * <pre>
-                 * JOIN ON (ar)
-                 * </pre>
+                /*
+                 * Note: The join variable (ar) is no longer predicted once the
+                 * ASK Subquery is moved to after the child join group.
                  */
-
-                group.setJoinVars(new IVariable[]{Var.var("ar")});
+//                /** 
+//                 * <pre>
+//                 * JOIN ON (ar)
+//                 * </pre>
+//                 */
+//
+//              group.setJoinVars(new IVariable[]{Var.var("ar")});
+                group.setJoinVars(new IVariable[]{});
 
             } // end group
+
+            whereClause.addChild(notExistsSubquery2);
 
             /**
              * <pre>
@@ -741,7 +750,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
         /*
          * Verify the expected AST.
          */
-        {
+        if (true) {
 
             // Get a reference to the ASTContainer.
             final ASTContainer astContainer = h.getASTContainer();
