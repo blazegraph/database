@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Value;
 import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
@@ -125,7 +126,17 @@ public class EBVBOp extends XSDBooleanIVValueExpression
     		return ((XSDBooleanIV) iv).booleanValue();
     	}
     	
-    	final BigdataValue val = iv.getValue();
+    	Value val = null;
+    	
+    	if (iv.isInline() && !iv.isExtension()) {
+    		
+    		val = (Value) iv;
+    		
+    	} else {
+    		
+    		val = iv.getValue();
+    		
+    	}
     	
     	if (val == null)
     		throw new NotMaterializedException();
