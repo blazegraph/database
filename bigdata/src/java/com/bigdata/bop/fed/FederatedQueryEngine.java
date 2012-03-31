@@ -47,6 +47,7 @@ import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryEngineCounters;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -148,6 +149,24 @@ public class FederatedQueryEngine extends QueryEngine {
         return fed;
 
     }
+
+//    public ConcurrencyManager getConcurrencyManager() {
+//
+//        if (isDataService) {
+//
+//            /*
+//             * The concurrency manager for the DataService.
+//             */
+//
+//            return ((DelegateIndexManager) getIndexManager())
+//                    .getConcurrencyManager();
+//        } else {
+//            
+//            return super.getConcurrencyManager();
+// 
+//        }
+//
+//    }
 
     /**
      * The service used to expose {@link ByteBuffer}s and managed index
