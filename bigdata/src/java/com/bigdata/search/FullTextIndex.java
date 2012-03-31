@@ -62,6 +62,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -102,7 +103,7 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * 
  * <pre>
  * 
- *             {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
+ *             {sortKey(token), weight, docId, fldId} : {freq?, sorted(pos)+}
  * 
  * </pre>
  * 
@@ -329,15 +330,15 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
         String DEFAULT_FIELDS_ENABLED = "false";
 
-        /**
-         * When <code>true</code>, the <code>localTermWeight</code> is stored
-         * using double-precision. When <code>false</code>, it is stored using
-         * single-precision.
-         */
-        String DOUBLE_PRECISION = FullTextIndex.class.getName()
-                + ".doublePrecision";
-
-        String DEFAULT_DOUBLE_PRECISION = "false";
+//        /**
+//         * When <code>true</code>, the <code>localTermWeight</code> is stored
+//         * using double-precision. When <code>false</code>, it is stored using
+//         * single-precision.
+//         */
+//        String DOUBLE_PRECISION = FullTextIndex.class.getName()
+//                + ".doublePrecision";
+//
+//        String DEFAULT_DOUBLE_PRECISION = "false";
         
         /**
          * The name of the {@link IAnalyzerFactory} class which will be used to
@@ -571,6 +572,9 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
                     Options.ANALYZER_FACTORY_CLASS,
                     Options.DEFAULT_ANALYZER_FACTORY_CLASS);
 
+            if (log.isInfoEnabled())
+                log.info(Options.ANALYZER_FACTORY_CLASS + "=" + className);
+
             final Class<IAnalyzerFactory> cls;
             try {
                 cls = (Class<IAnalyzerFactory>) Class.forName(className);
@@ -678,23 +682,18 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             if (log.isInfoEnabled())
                 log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
     
-            final boolean doublePrecision = Boolean.parseBoolean(p
-                    .getProperty(Options.DOUBLE_PRECISION,
-                            Options.DEFAULT_DOUBLE_PRECISION));
-    
-            if (log.isInfoEnabled())
-                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+//            final boolean doublePrecision = Boolean.parseBoolean(p
+//                    .getProperty(Options.DOUBLE_PRECISION,
+//                            Options.DEFAULT_DOUBLE_PRECISION));
+//    
+//            if (log.isInfoEnabled())
+//                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
 
-            /*
-             * FIXME Optimize. SimpleRabaCoder will be faster, but can do better
-             * with record aware coder.
-             */
             indexMetadata.setTupleSerializer(new FullTextIndexTupleSerializer<V>(
                     keyBuilderFactory,//
                     DefaultTupleSerializer.getDefaultLeafKeysCoder(),//
-                    DefaultTupleSerializer.getDefaultValuesCoder(),//
-                    fieldsEnabled,//
-                    doublePrecision//
+                    EmptyRabaValueCoder.INSTANCE,//
+                    fieldsEnabled//
             ));
             
             indexManager.registerIndex(indexMetadata);
@@ -1064,7 +1063,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         }
         
         final FullTextSearchQuery cacheKey = new FullTextSearchQuery(
-        		query, matchAllTerms, prefixMatch
+        		query, matchAllTerms, prefixMatch, timeout, unit
         		);
         
         Hit<V>[] a;
@@ -1123,28 +1122,41 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	            
 	        }
 	
-	        final ConcurrentHashMap<V/* docId */, Hit<V>> hits;
-	        {
+	        final IHitCollector<V> hits;
+	        
+	        if (qdata.distinctTermCount() == 1) {
+	        	
+	        	final Map.Entry<String, ITermMetadata> e = qdata.getSingletonEntry();
+	        	
+                final String termText = e.getKey();
+            	
+                final ITermMetadata md = e.getValue();
+
+                final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, prefixMatch, md
+                        .getLocalTermWeight(), this);
+                
+                hits = new SingleTokenHitCollector<V>(task1);
+	        	
+	        } else {
+	        	
+	            final List<CountIndexTask<V>> tasks = new ArrayList<CountIndexTask<V>>(
+	                    qdata.distinctTermCount());
 	
-				/*
-				 * Note: Initial capacity COULD be set based on the max across the
-				 * range counts of the different search terms. However, it can not
-				 * be usefully set to the min(maxRank,10000) as we will buffer ALL
-				 * hits in this map before pruning those selected by min/max rank.
-				 */
-				final int initialCapacity = 256;//Math.min(maxRank,10000);
+	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
+	
+	                final String termText = e.getKey();
+	
+	                final ITermMetadata md = e.getValue();
+	
+	                tasks.add(new CountIndexTask<V>(termText, prefixMatch, md
+	                        .getLocalTermWeight(), this));
+	
+	            }
 	            
-				/*
-				 * Note: The actual concurrency will be the #of distinct query
-				 * tokens.
-				 */
-	        	final int concurrencyLevel = qdata.distinctTermCount();
-	
-				hits = new ConcurrentHashMap<V, Hit<V>>(initialCapacity,
-						.75f/* loadFactor */, concurrencyLevel);
-	
+	            hits = new MultiTokenHitCollector<V>(tasks);
+	        	
 	        }
-	
+	        
 	        // run the queries.
 	        {
 	
@@ -1167,12 +1179,21 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	
 	            try {
 	
+	    	        final long start = System.currentTimeMillis();
+	    	        
 	                executionHelper.submitTasks(tasks);
+	                
+	                if (log.isInfoEnabled()) {
+		                final long readTime = System.currentTimeMillis() - start;
+		                log.info("read time: " + readTime);
+	                }
 	                
 	            } catch (InterruptedException ex) {
 	
-	                // TODO Should we wrap and toss this interrupt instead?
-	                log.warn("Interrupted - only partial results will be returned.");
+	            	if (log.isInfoEnabled()) {
+		                // TODO Should we wrap and toss this interrupt instead?
+		                log.info("Interrupted - only partial results will be returned.");
+	            	}
 	                
 	            } catch (ExecutionException ex) {
 	
@@ -1181,53 +1202,62 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	            }
 	
 	        }
-	
-	        /*
-	         * If match all is specified, remove any hits with a term count less
-	         * than the number of search tokens.
-	         */
-	        if (matchAllTerms) {
+	        
+	        a = hits.getHits();
+	        
+	        if (a.length == 0) {
 	        	
-		        final int nterms = qdata.terms.size();
-		        
-		        if (log.isInfoEnabled())
-		        	log.info("matchAll=true, nterms=" + nterms);
-		        
-		        final Iterator<Map.Entry<V,Hit<V>>> it = hits.entrySet().iterator();
-		        
-		        while (it.hasNext()) {
-		        	
-		        	final Hit<V> hit = it.next().getValue();
-	
-		        	// Note: log test in loop shows up in profiler.
-	//		        if (log.isInfoEnabled()) {
-	//		        	log.info("hit terms: " + hit.getTermCount());
-	//		        }
-			        
-		        	if (hit.getTermCount() != nterms) {
-		        		it.remove();
-		        	}
-		        	
-		        }
-		        
-	        }
-	        
-	        // #of hits.
-	        final int nhits = hits.size();
-	        
-	        if (nhits == 0) {
-	
 	            log.warn("No hits: languageCode=[" + languageCode + "], query=["
 	                    + query + "]");
-	            
-	            a = new Hit[] {};
 	            
 	            cache.put(cacheKey, a);
 	            
 	            return a; 
 	            
 	        }
+	
+	        /*
+	         * If match all is specified, remove any hits with a term count less
+	         * than the number of search tokens.
+	         */
+	        if (matchAllTerms && qdata.distinctTermCount() > 1) {
+	        	
+		        final int nterms = qdata.terms.size();
+		        
+		        if (log.isInfoEnabled())
+		        	log.info("matchAll=true, nterms=" + nterms);
+		        
+	        	final Hit<V>[] tmp = new Hit[a.length];
+	        	
+	        	int i = 0;
+	        	for (Hit<V> hit : a) {
+	        		
+	        		if (hit.getTermCount() == nterms) {
+	        			tmp[i++] = hit;
+	        		}
+	        		
+	        	}
+	        	
+	        	if (i < a.length) {
+	        		
+	        		a = new Hit[i];
+	        		System.arraycopy(tmp, 0, a, 0, i);
+	        		
+	        	}
+	        	
+	        }
 	        
+	        if (a.length == 0) {
+	        	
+	            log.warn("No hits after matchAllTerms pruning: languageCode=[" + languageCode + "], query=["
+	                    + query + "]");
+	            
+	            cache.put(cacheKey, a);
+	            
+	            return a; 
+	            
+	        }
+	
 	        /*
 	         * Rank order the hits by relevance.
 	         * 
@@ -1240,11 +1270,16 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	         */
 	        
 	        if (log.isInfoEnabled())
-	            log.info("Rank ordering "+nhits+" hits by relevance");
+	            log.info("Rank ordering "+a.length+" hits by relevance");
 	        
-	        a = hits.values().toArray(new Hit[nhits]);
+	        final long start = System.currentTimeMillis();
 	        
 	        Arrays.sort(a);
+	        
+	        if (log.isInfoEnabled()) {
+	        	final long sortTime = System.currentTimeMillis() - start;
+	        	log.info("sort time: " + sortTime);
+	        }
 	        
 	        for (int i = 0; i < a.length; i++) {
 	        	a[i].setRank(i+1);
@@ -1431,33 +1466,28 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 		private final String search;
     	private final boolean matchAllTerms;
     	private final boolean prefixMatch;
+    	private final long timeout;
+    	private final TimeUnit unit;
     	
     	public FullTextSearchQuery(
     	    	final String search,
     	    	final boolean matchAllTerms,
-    	    	final boolean prefixMatch) {
+    	    	final boolean prefixMatch,
+    	    	final long timeout,
+    	    	final TimeUnit unit) {
     		
     		this.search = search;
     		this.matchAllTerms = matchAllTerms;
     		this.prefixMatch = prefixMatch;
+    		this.timeout = timeout;
+    		this.unit = unit;
     		
     	}
     	
-    	public String getSearch() {
-			return search;
-		}
-
-		public boolean isMatchAllTerms() {
-			return matchAllTerms;
-		}
-
-		public boolean isPrefixMatch() {
-			return prefixMatch;
-		}
-		
 		/**
 		 * Generated by Eclipse.
 		 */
+		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
@@ -1465,13 +1495,16 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 			result = prime * result + (prefixMatch ? 1231 : 1237);
 			result = prime * result
 					+ ((search == null) ? 0 : search.hashCode());
+			result = prime * result + (int) (timeout ^ (timeout >>> 32));
+			result = prime * result + ((unit == null) ? 0 : unit.hashCode());
 			return result;
 		}
 
 		/**
 		 * Generated by Eclipse.
 		 */
-		public boolean equals(final Object obj) {
+		@Override
+		public boolean equals(Object obj) {
 			if (this == obj)
 				return true;
 			if (obj == null)
@@ -1488,9 +1521,13 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 					return false;
 			} else if (!search.equals(other.search))
 				return false;
+			if (timeout != other.timeout)
+				return false;
+			if (unit != other.unit)
+				return false;
 			return true;
 		}
-		
+
     }
     
 }

@@ -47,7 +47,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -427,7 +427,7 @@ public class SearchServiceFactory implements ServiceFactory {
         @SuppressWarnings({ "rawtypes", "unchecked" })
         private Hiterator<IHit<?>> getHiterator() {
 
-            final ITextIndexer<IHit> textIndex = (ITextIndexer) store
+            final IValueCentricTextIndexer<IHit> textIndex = (IValueCentricTextIndexer) store
                     .getLexiconRelation().getSearchEngine();
             
             if (textIndex == null)

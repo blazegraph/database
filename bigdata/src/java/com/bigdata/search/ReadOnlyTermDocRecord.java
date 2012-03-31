@@ -14,12 +14,14 @@ public class ReadOnlyTermDocRecord<V extends Comparable<V>>
 
     private final Integer fieldId;
 
-    private final int termFreq;
+//    private final int termFreq;
 
     private final double termWeight;
 
     public ReadOnlyTermDocRecord(final String text, final V docId,
-            final int fieldId, final int termFreq, final double termWeight) {
+            final int fieldId, 
+//            final int termFreq, 
+            final double termWeight) {
 
         if (docId == null)
             throw new IllegalArgumentException();
@@ -27,7 +29,7 @@ public class ReadOnlyTermDocRecord<V extends Comparable<V>>
         this.text = text; // MAY be null.
         this.docId = docId;
         this.fieldId = fieldId;
-        this.termFreq = termFreq;
+//        this.termFreq = termFreq;
         this.termWeight = termWeight;
 
     }
@@ -35,7 +37,7 @@ public class ReadOnlyTermDocRecord<V extends Comparable<V>>
     public String toString(){
 
         return getClass().getName() + "{text=" + text + ", docId=" + docId
-                + ", fieldId=" + fieldId + ", termFreq=" + termFreq
+                + ", fieldId=" + fieldId /* + ", termFreq=" + termFreq */
                 + ", termWeight=" + termWeight + "}";
         
     }
@@ -66,8 +68,8 @@ public class ReadOnlyTermDocRecord<V extends Comparable<V>>
         return termWeight;
     }
 
-    public int termFreq() {
-        return termFreq;
-    }
+//    public int termFreq() {
+//        return termFreq;
+//    }
     
 }

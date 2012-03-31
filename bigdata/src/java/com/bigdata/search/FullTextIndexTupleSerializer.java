@@ -32,6 +32,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
+import org.apache.lucene.search.Similarity;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -62,15 +63,15 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
             .getLogger(FullTextIndexTupleSerializer.class);
 
     private boolean fieldsEnabled;
-    private boolean doublePrecision;
+//    private boolean doublePrecision;
     
     public boolean isFieldsEnabled() {
         return fieldsEnabled;
     }
 
-    public boolean isDoublePrecision() {
-        return doublePrecision;
-    }
+//    public boolean isDoublePrecision() {
+//        return doublePrecision;
+//    }
     
     /**
      * Used to serialize the values for the tuples in the index.
@@ -101,22 +102,19 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
      *            included as a component in the generated key. When
      *            <code>false</code> it will not be present in the generated
      *            key.
-     * @param doublePrecision
-     *            When <code>true</code>, the term weight will be serialized
-     *            using double precision.
      */
     public FullTextIndexTupleSerializer(//
             final IKeyBuilderFactory keyBuilderFactory,//
             final IRabaCoder leafKeysCoder, //
             final IRabaCoder leafValsCoder,//
-            final boolean fieldsEnabled,//
-            final boolean doublePrecision//
+            final boolean fieldsEnabled//
+//            final boolean doublePrecision//
             ) {
    
         super(keyBuilderFactory, leafKeysCoder, leafValsCoder);
 
         this.fieldsEnabled = fieldsEnabled;
-        this.doublePrecision = doublePrecision;
+//        this.doublePrecision = doublePrecision;
         
     }
 
@@ -127,7 +125,17 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         final ITermDocKey<V> entry = (ITermDocKey<V>) obj;
 
         final String termText = entry.getToken();
-
+        
+        final double termWeight = entry.getLocalTermWeight();
+        
+        /*
+         * See: http://lucene.apache.org/core/old_versioned_docs/versions/3_0_2/api/all/org/apache/lucene/search/Similarity.html
+         * 
+         * For more information on the round-trip of normalized term weight.
+         */
+        final byte termWeightCompact =
+        	org.apache.lucene.search.Similarity.encodeNorm((float) termWeight);
+        
         final V docId = entry.getDocId();
 
         final IKeyBuilder keyBuilder = getKeyBuilder();
@@ -137,6 +145,8 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         // the token text (or its successor as desired).
         keyBuilder
                 .appendText(termText, true/* unicode */, false/* successor */);
+        
+        keyBuilder.append(termWeightCompact);
 
         keyBuilder.append((V) docId);
 
@@ -159,30 +169,32 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
 
     @Override
     public byte[] serializeVal(final ITermDocVal obj) {
-        
-        final ITermDocVal val = (ITermDocVal) obj;
-        
-        if (log.isDebugEnabled()) {
-            log.debug(val);
-        }
 
-        buf.reset();
-
-        final int termFreq = val.termFreq();
-
-        final double localTermWeight = val.getLocalTermWeight();
-
-        // The term frequency
-        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
-                : (short) termFreq);
-
-        // The term weight
-        if (doublePrecision)
-            buf.putDouble(localTermWeight);
-        else
-            buf.putFloat((float) localTermWeight);
-
-        return buf.toByteArray();
+    	return null;
+    	
+//        final ITermDocVal val = (ITermDocVal) obj;
+//        
+//        if (log.isDebugEnabled()) {
+//            log.debug(val);
+//        }
+//
+//        buf.reset();
+//
+//        final int termFreq = val.termFreq();
+//
+//        final double localTermWeight = val.getLocalTermWeight();
+//
+//        // The term frequency
+//        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
+//                : (short) termFreq);
+//
+//        // The term weight
+//        if (doublePrecision)
+//            buf.putDouble(localTermWeight);
+//        else
+//            buf.putFloat((float) localTermWeight);
+//
+//        return buf.toByteArray();
 
     }
 
@@ -232,34 +244,46 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         } else {
             fieldId = -1;
         }
+        
+        final int termWeightOffset = docIdOffset - Bytes.SIZEOF_BYTE;
+        
+        final byte termWeightCompact = kbuf.getByte(termWeightOffset);
+        
+        /*
+         * See: http://lucene.apache.org/core/old_versioned_docs/versions/3_0_2/api/all/org/apache/lucene/search/Similarity.html
+         * 
+         * For more information on the round-trip of normalized term weight.
+         */
+        final double termWeight = 
+        	org.apache.lucene.search.Similarity.decodeNorm(termWeightCompact);
 
         if (keyOnly) {
 
-            return new ReadOnlyTermDocKey(docId, fieldId);
+            return new ReadOnlyTermDocKey(docId, fieldId, termWeight);
             
         }
         
-        final int termFreq;
-        final double termWeight;
-        try {
-
-            final DataInputBuffer dis = tuple.getValueStream();
-
-            termFreq = dis.readShort();
-
-            if(doublePrecision)
-                termWeight = dis.readDouble();
-            else
-                termWeight = dis.readFloat();
-            
-        } catch (IOException ex) {
-            
-            throw new RuntimeException(ex);
-
-        }
-
+//        final int termFreq;
+//        final double termWeight;
+//        try {
+//
+//            final DataInputBuffer dis = tuple.getValueStream();
+//
+//            termFreq = dis.readShort();
+//
+//            if(doublePrecision)
+//                termWeight = dis.readDouble();
+//            else
+//                termWeight = dis.readFloat();
+//            
+//        } catch (IOException ex) {
+//            
+//            throw new RuntimeException(ex);
+//
+//        }
+//
         return new ReadOnlyTermDocRecord<V>(null/* token */, docId, fieldId,
-                termFreq, termWeight);
+                /* termFreq, */ termWeight);
 
     }
 
@@ -281,7 +305,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
             throw new IOException("unknown version=" + version);
         }
         this.fieldsEnabled = in.readBoolean();
-        this.doublePrecision = in.readBoolean();
+//        this.doublePrecision = in.readBoolean();
 
     }
 
@@ -289,7 +313,7 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         super.writeExternal(out);
         out.writeByte(VERSION);
         out.writeBoolean(fieldsEnabled);
-        out.writeBoolean(doublePrecision);
+//        out.writeBoolean(doublePrecision);
     }
 
 }

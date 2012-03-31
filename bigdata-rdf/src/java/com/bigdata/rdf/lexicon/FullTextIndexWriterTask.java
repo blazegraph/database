@@ -13,13 +13,13 @@ class FullTextIndexWriterTask implements Callable<Long> {
 //    static private final transient Logger log = Logger
 //            .getLogger(FullTextIndexWriterTask.class);
 
-    private final ITextIndexer<?> textIndexer;
+    private final IValueCentricTextIndexer<?> textIndexer;
     
     private final int capacity;
     
     private final Iterator<BigdataValue> itr;
 
-    public FullTextIndexWriterTask(final ITextIndexer<?> textIndexer,
+    public FullTextIndexWriterTask(final IValueCentricTextIndexer<?> textIndexer,
             final int capacity, final Iterator<BigdataValue> itr) {
 
         if (textIndexer == null)

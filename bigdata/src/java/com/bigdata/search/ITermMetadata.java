@@ -34,27 +34,27 @@ package com.bigdata.search;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITermMetadata extends ITermDocVal {
+public interface ITermMetadata { // extends ITermDocVal {
 
 //    /**
 //     * The text of the token.
 //     */
 //    String termText();
 
-//    /**
-//     * The term (aka token) frequency count.
-//     */
-//    int termFreq();
+    /**
+     * The term (aka token) frequency count.
+     */
+    int termFreq();
 
     /**
      * Add an occurrence.
      */
     void add();
 
-//    /**
-//     * The local term weight, which may be computed by a variety of methods.
-//     */
-//    double getLocalTermWeight();
+    /**
+     * The local term weight, which may be computed by a variety of methods.
+     */
+    double getLocalTermWeight();
 
     /**
      * The local term weight, which may be computed by a variety of methods.

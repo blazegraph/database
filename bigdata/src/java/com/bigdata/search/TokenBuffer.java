@@ -314,7 +314,7 @@ public class TokenBuffer<V extends Comparable<V>> {
                  * into the key/val of the index.
                  */
                 final ITermDocRecord<V> rec = new ReadOnlyTermDocRecord<V>(
-                        termText, docId, fieldId, termMetadata.termFreq(),
+                        termText, docId, fieldId, /* termMetadata.termFreq(), */
                         termMetadata.getLocalTermWeight());
 
                 final byte[] key = tupleSer.serializeKey(rec);
@@ -422,6 +422,22 @@ public class TokenBuffer<V extends Comparable<V>> {
                 );
         
         return resultHandler.getResult();
+        
+    }
+    
+    /**
+     * Writes on the index.
+     *  
+     * @param n
+     * @param keys
+     * @param vals
+     * 
+     * @return The #of pre-existing records that were updated.
+     */
+    protected long deleteFromIndex(final int n, final byte[][] keys,
+            final byte[][] vals) {
+
+    	throw new RuntimeException("implement me");
         
     }
     

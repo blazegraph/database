@@ -138,7 +138,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     private final List<IKeyOrder<BigdataValue>> keyOrders;
     
-    private final AtomicReference<ITextIndexer<?>> viewRef = new AtomicReference<ITextIndexer<?>>();
+    private final AtomicReference<IValueCentricTextIndexer<?>> viewRef = new AtomicReference<IValueCentricTextIndexer<?>>();
 
     /**
      * Note: This is a stateless class.
@@ -171,7 +171,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	}
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    protected Class<ITextIndexer> determineTextIndexerClass() {
+    protected Class<IValueCentricTextIndexer> determineTextIndexerClass() {
 
         final String className = getProperty(
                 AbstractTripleStore.Options.TEXT_INDEXER_CLASS,
@@ -185,14 +185,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     + AbstractTripleStore.Options.TEXT_INDEXER_CLASS, e);
         }
 
-        if (!ITextIndexer.class.isAssignableFrom(cls)) {
+        if (!IValueCentricTextIndexer.class.isAssignableFrom(cls)) {
             throw new RuntimeException(
                     AbstractTripleStore.Options.TEXT_INDEXER_CLASS
                             + ": Must implement: "
-                            + ITextIndexer.class.getName());
+                            + IValueCentricTextIndexer.class.getName());
         }
 
-        return (Class<ITextIndexer>) cls;
+        return (Class<IValueCentricTextIndexer>) cls;
 
     }
     
@@ -620,7 +620,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 // Create the full text index
 
-				final ITextIndexer<?> tmp = getSearchEngine();
+				final IValueCentricTextIndexer<?> tmp = getSearchEngine();
 
                 tmp.create();
 
@@ -1022,7 +1022,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       already imposes a canonicalizing mapping within for the index name
      *       and timestamp inside of a JVM.
      */
-    public ITextIndexer<?> getSearchEngine() {
+    public IValueCentricTextIndexer<?> getSearchEngine() {
 
         if (!textIndex)
             return null;
@@ -1038,13 +1038,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 if (viewRef.get() == null) {
 
-                    final ITextIndexer<?> tmp;
+                    final IValueCentricTextIndexer<?> tmp;
                     try {
                         final Class<?> vfc = determineTextIndexerClass();
                         final Method gi = vfc.getMethod("getInstance",
                                 IIndexManager.class, String.class, Long.class,
                                 Properties.class);
-                        tmp = (ITextIndexer<?>) gi.invoke(null/* object */,
+                        tmp = (IValueCentricTextIndexer<?>) gi.invoke(null/* object */,
                                 getIndexManager(), getNamespace(),
                                 getTimestamp(), getProperties());
                         if(tmp instanceof ILocatableResource<?>) {
@@ -1843,7 +1843,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * operation for a database of any significant size. You must be using the
      * unisolated view of the {@link AbstractTripleStore} for this operation.
      * {@link AbstractTripleStore.Options#TEXT_INDEX} must be enabled. This
-     * operation is only supported when the {@link ITextIndexer} uses the
+     * operation is only supported when the {@link IValueCentricTextIndexer} uses the
      * {@link FullTextIndex} class.
      */
     @SuppressWarnings("unchecked")
@@ -1855,7 +1855,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (!textIndex)
             throw new UnsupportedOperationException();
 
-        final ITextIndexer<?> textIndexer = getSearchEngine();
+        final IValueCentricTextIndexer<?> textIndexer = getSearchEngine();
 
         // destroy the existing text index.
         textIndexer.destroy();

@@ -39,7 +39,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.BigdataValueCentricFullTextIndex;
 import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -443,7 +443,7 @@ public class TestAsynchronousStatementBufferFactory extends
 
                     // Full text index.
                     
-                    final ITupleIterator<?> itr = ((BigdataRDFFullTextIndex) store
+                    final ITupleIterator<?> itr = ((BigdataValueCentricFullTextIndex) store
                             .getLexiconRelation().getSearchEngine()).getIndex()
                             .rangeIterator();
 

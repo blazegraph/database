@@ -1,6 +1,7 @@
 package com.bigdata.search;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.lucene.analysis.Token;
 
@@ -142,6 +143,16 @@ public class TermFrequencyData<V extends Comparable<V>> {
 
         return magnitude;
         
+    }
+    
+    public Map.Entry<String, ITermMetadata> getSingletonEntry() {
+    	
+    	if (terms.size() != 1) {
+    		throw new RuntimeException("not a singleton");
+    	}
+    	
+    	return terms.entrySet().iterator().next();
+    	
     }
     
 }

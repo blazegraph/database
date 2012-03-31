@@ -99,9 +99,9 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
-import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.BigdataValueCentricFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
-import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.TermIdEncoder;
@@ -876,7 +876,7 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
         
         /**
-         * The name of the {@link ITextIndexer} class. The implementation MUST
+         * The name of the {@link IValueCentricTextIndexer} class. The implementation MUST
          * declare a method with the following signature which will be used to
          * locate instances of that class.
          * 
@@ -891,7 +891,7 @@ abstract public class AbstractTripleStore extends
 		String TEXT_INDEXER_CLASS = AbstractTripleStore.class.getName()
 				+ ".textIndexerClass";
 
-		String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
+		String DEFAULT_TEXT_INDEXER_CLASS = BigdataValueCentricFullTextIndex.class
 				.getName();
 
         /*

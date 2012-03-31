@@ -107,7 +107,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         final String NAMESPACE = "test";
 
         final boolean prefixMatch = false;
-        final double minCosine = .4;
+        final double minCosine = .0;
         final double maxCosine = 1.0d;
         final int minRank = 1;
         final int maxRank = Integer.MAX_VALUE;// (was 10000)
@@ -157,12 +157,12 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
                         minRank, maxRank, matchAllTerms, timeout, unit);
 //                                query, languageCode, 0d/* minCosine */,
 //                                Integer.MAX_VALUE/* maxRank */);
-
+                
                 assertSameHits(new IHit[] { //
-                        new HT<Long>(5L, .5),//
-                        new HT<Long>(6L, .5),//
-                        new HT<Long>(2L, .408248290463863d),//
-                        new HT<Long>(3L, .408248290463863d),//
+                        new HT<Long>(5L, 0.44194173824159216d),//
+                        new HT<Long>(6L, 0.44194173824159216d),//
+                        new HT<Long>(2L, 0.35355339059327373d),//
+                        new HT<Long>(3L, 0.35355339059327373d),//
                 }, itr);
             }
 
