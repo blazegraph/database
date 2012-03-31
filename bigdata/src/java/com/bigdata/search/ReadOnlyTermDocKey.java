@@ -9,17 +9,21 @@ public class ReadOnlyTermDocKey<V extends Comparable<V>>
         implements ITermDocKey<V> {
 
     private final V docId;
-
+    
     private final Integer fieldId;
 
-    public ReadOnlyTermDocKey(final V docId, final int fieldId) {
+    private final double termWeight;
+
+    public ReadOnlyTermDocKey(final V docId, final int fieldId, final double termWeight) {
 
         if (docId == null)
             throw new IllegalArgumentException();
 
         this.docId = docId;
-
+        
         this.fieldId = fieldId;
+
+        this.termWeight = termWeight;
 
     }
 
@@ -30,7 +34,7 @@ public class ReadOnlyTermDocKey<V extends Comparable<V>>
     public V getDocId() {
         return docId;
     }
-
+    
     public int getFieldId() throws UnsupportedOperationException {
 
         if (fieldId == Integer.MIN_VALUE)
@@ -40,4 +44,8 @@ public class ReadOnlyTermDocKey<V extends Comparable<V>>
 
     }
     
+    public double getLocalTermWeight() {
+    	return termWeight;
+    }
+
 }

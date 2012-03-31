@@ -94,7 +94,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.AssignTermId;
-import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.BigdataValueCentricFullTextIndex;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.BlobsWriteProc;
 import com.bigdata.rdf.lexicon.BlobsWriteProc.BlobsWriteProcConstructor;
@@ -1504,7 +1504,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                      * unless we change to [s] centric full text indexing).
                      */
                     
-                    final BigdataRDFFullTextIndex tmp = (BigdataRDFFullTextIndex) lexiconRelation
+                    final BigdataValueCentricFullTextIndex tmp = (BigdataValueCentricFullTextIndex) lexiconRelation
                             .getSearchEngine();
 
                     buffer_text = ((IScaleOutClientIndex) tmp.getIndex()).newWriteBuffer(
@@ -3396,7 +3396,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         private final KVOLatch latch;
 
-        private final BigdataRDFFullTextIndex textIndex;
+        private final BigdataValueCentricFullTextIndex textIndex;
         
         private final IChunkedIterator<BigdataValue> src;
 
@@ -3410,7 +3410,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          *            has already been filtered out.
          */
         public AsyncTextIndexWriteTask(final KVOLatch latch,
-                final BigdataRDFFullTextIndex textIndex,
+                final BigdataValueCentricFullTextIndex textIndex,
                 final IChunkedIterator<BigdataValue> src,
                 final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
 
@@ -3438,14 +3438,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         /**
          * FIXME This will on the full text index using the
-         * {@link BigdataRDFFullTextIndex} class. That class will wind up doing
+         * {@link BigdataValueCentricFullTextIndex} class. That class will wind up doing
          * gathered batch inserts in chunks of up to the capacity set inline in
          * the method below. However, it will use Sync RPC rather than the ASYNC
          * [buffer_text] index write pipeline. While this should be enough to
          * write unit tests for the full text indexing feature, it is not going
          * to scale well.
          * 
-         * @see BigdataRDFFullTextIndex
+         * @see BigdataValueCentricFullTextIndex
          */
         public Void call() throws Exception {
 
@@ -4388,7 +4388,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (buffer_text != null) {
 
                 tasks.add(new AsyncTextIndexWriteTask(documentRestartSafeLatch,
-                        (BigdataRDFFullTextIndex) lexiconRelation
+                        (BigdataValueCentricFullTextIndex) lexiconRelation
                                 .getSearchEngine(), newTextIterator(
                                 lexiconRelation, values.values().iterator(),
                                 producerChunkSize, indexDatatypeLiterals),

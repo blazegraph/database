@@ -54,25 +54,28 @@ public interface ITextIndexer<A extends IHit> {
 
     public void destroy();
 
-    /**
-     * <p>
-     * Add the terms to the full text index so that we can do fast lookup of the
-     * corresponding term identifiers. Only literals are tokenized. Literals
-     * that have a language code property are parsed using a tokenizer
-     * appropriate for the specified language family. Other literals and URIs
-     * are tokenized using the default {@link Locale}.
-     * </p>
-     * 
-     * @param capacity
-     *            A hint to the underlying layer about the buffer size before an
-     *            incremental flush of the index.
-     * @param itr
-     *            Iterator visiting the terms to be indexed.
-     * 
-     * @todo allow registeration of datatype specific tokenizers (we already
-     *       have language family based lookup).
-     */
-    public void index(int capacity, Iterator<BigdataValue> valuesIterator);
+/*
+ * Moved to IValueCentricTextIndexer    
+ */
+//    /**
+//     * <p>
+//     * Add the terms to the full text index so that we can do fast lookup of the
+//     * corresponding term identifiers. Only literals are tokenized. Literals
+//     * that have a language code property are parsed using a tokenizer
+//     * appropriate for the specified language family. Other literals and URIs
+//     * are tokenized using the default {@link Locale}.
+//     * </p>
+//     * 
+//     * @param capacity
+//     *            A hint to the underlying layer about the buffer size before an
+//     *            incremental flush of the index.
+//     * @param itr
+//     *            Iterator visiting the terms to be indexed.
+//     * 
+//     * @todo allow registeration of datatype specific tokenizers (we already
+//     *       have language family based lookup).
+//     */
+//    public void index(int capacity, Iterator<BigdataValue> valuesIterator);
 
     /**
      * Return <code>true</code> iff datatype literals are being indexed.

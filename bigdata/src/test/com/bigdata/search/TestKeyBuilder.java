@@ -261,12 +261,22 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
         private final V docId;
 
         private final int fieldId;
+        
+//        private final double termWeight;
 
         private ReadOnlyTermDocKey(final String token, final V docId,
                 final int fieldId) {
             this.token = token;
             this.docId = docId;
             this.fieldId = fieldId;
+        }
+
+        private ReadOnlyTermDocKey(final String token, final V docId,
+                final int fieldId, final double termWeight) {
+            this.token = token;
+            this.docId = docId;
+            this.fieldId = fieldId;
+//            this.termWeight = termWeight;
         }
 
         public String getToken() {
@@ -279,6 +289,10 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
 
         public int getFieldId() {
             return fieldId;
+        }
+
+        public double getLocalTermWeight() {
+            return 0;
         }
 
     }

@@ -46,6 +46,12 @@ public interface ITermDocKey<V extends Comparable<V>> {
     String getToken() throws UnsupportedOperationException;
     
     /**
+     * The normalized local term weight for the token and document in the
+     * associated entry of the full text search index.
+     */
+    double getLocalTermWeight();
+    
+    /**
      * The document identifier.
      */
     V getDocId();

@@ -33,7 +33,7 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
      * <p>
      * Note: You must call {@link #setDocId(long)} after using this ctor.
      * 
-     * @see ReadIndexTask
+     * @see ReadIndexTask2
      */
     Hit() {
 

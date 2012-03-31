@@ -36,15 +36,15 @@ package com.bigdata.search;
  */
 public interface ITermDocVal {
 
-    /**
-     * The term-frequency count for the token and document in the associated
-     * entry of the full text search index.
-     */
-    int termFreq();
+//    /**
+//     * The term-frequency count for the token and document in the associated
+//     * entry of the full text search index.
+//     */
+//    int termFreq();
 
-    /**
-     * The normalized local term weight for the token and document in the
-     * associated entry of the full text search index.
-     */
-    double getLocalTermWeight();
+//    /**
+//     * The normalized local term weight for the token and document in the
+//     * associated entry of the full text search index.
+//     */
+//    double getLocalTermWeight();
 }

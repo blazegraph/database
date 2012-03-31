@@ -33,16 +33,12 @@ import com.bigdata.btree.keys.SuccessorUtil;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> {
+public class ReadIndexTask<V extends Comparable<V>> extends AbstractIndexTask<V> 
+	implements Callable<Object> {
 
     final private static Logger log = Logger.getLogger(ReadIndexTask.class);
 
-    private final String queryTerm;
-//    private final boolean prefixMatch;
-//    private final int exactMatchLength;
-    private final double queryTermWeight;
-//    private final IRecordBuilder<V> recordBuilder;
-    private final ConcurrentHashMap<V, Hit<V>> hits;
+    private final IHitCollector<V> hits;
     private final ITupleIterator<?> itr;
 
     /**
@@ -73,65 +69,15 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
      */
     public ReadIndexTask(final String termText, final boolean prefixMatch,
             final double queryTermWeight, final FullTextIndex<V> searchEngine,
-            final ConcurrentHashMap<V, Hit<V>> hits) {
+            final IHitCollector<V> hits) {
 
-        if (termText == null)
-            throw new IllegalArgumentException();
-        
-        if (searchEngine == null)
-            throw new IllegalArgumentException();
-        
+    	super(termText, prefixMatch, queryTermWeight, searchEngine);
+    	
         if (hits == null)
             throw new IllegalArgumentException();
         
-        this.queryTerm = termText;
-
-//        this.prefixMatch = prefixMatch;
-        
-        this.queryTermWeight = queryTermWeight;
-
-//        this.fieldsEnabled = searchEngine.isFieldsEnabled();
-        
-//        this.recordBuilder = searchEngine.getRecordBuilder();
-
         this.hits = hits;
      
-        final IKeyBuilder keyBuilder = searchEngine.getIndex()
-                .getIndexMetadata().getKeyBuilder();
-
-        final byte[] fromKey;
-        {// = recordBuilder.getFromKey(keyBuilder, termText);
-            keyBuilder.reset();
-            keyBuilder
-                    .appendText(termText, true/* unicode */, false/* successor */);
-            fromKey = keyBuilder.getKey();
-        }
-
-        final byte[] toKey;
-        
-        if (prefixMatch) {
-            /*
-             * Accepts anything starting with the search term. E.g., given
-             * "bro", it will match "broom" and "brown" but not "break".
-             * 
-             * Note: This uses the successor of the Unicode sort key, so it will
-             * scan all keys starting with that prefix until the sucessor of
-             * that prefix.
-             */
-            keyBuilder.reset();
-            keyBuilder.appendText(termText, true/* unicode */, true/*successor*/);
-            toKey = keyBuilder.getKey();
-        } else {
-            /*
-             * Accepts only those entries that exactly match the search term.
-             * 
-             * Note: This uses the fixed length successor of the fromKey. That
-             * gives us a key-range scan which only access keys having the same
-             * Unicode sort key.
-             */
-            toKey = SuccessorUtil.successor(fromKey.clone());
-        }
-
         if (log.isDebugEnabled())
             log.debug("termText=[" + termText + "], prefixMatch=" + prefixMatch
                     + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
@@ -259,7 +205,7 @@ public class ReadIndexTask<V extends Comparable<V>> implements Callable<Object> 
             throws Exception {
         try {
             // log an error
-            log.error(t, t);
+//    		log.error(t, t);
         } finally {
             // ignore any problems here.
         }

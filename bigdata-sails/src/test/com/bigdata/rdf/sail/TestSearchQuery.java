@@ -60,7 +60,7 @@ import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sparql.ast.eval.service.TestSearch;
@@ -789,7 +789,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -856,7 +856,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -926,7 +926,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1000,7 +1000,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1076,7 +1076,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1150,7 +1150,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1220,7 +1220,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 final Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1289,7 +1289,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1327,7 +1327,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "how now brown cow";
                 
-                final ITextIndexer search = 
+                final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 
                 final int i = search.count(

@@ -36,12 +36,15 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
@@ -52,22 +55,27 @@ import com.bigdata.search.TokenBuffer;
  * Implementation based on the built-in keyword search capabilities for bigdata.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BigdataRDFFullTextIndex.java 4709 2011-06-15 16:23:22Z thompsonbry $
  */
-public class BigdataRDFFullTextIndex extends FullTextIndex implements
-        ITextIndexer<Hit> {
+public class BigdataSubjectCentricFullTextIndex extends FullTextIndex implements
+        ISubjectCentricTextIndexer<Hit> {
 
     final private static transient Logger log = Logger
-            .getLogger(BigdataRDFFullTextIndex.class);
+            .getLogger(BigdataSubjectCentricFullTextIndex.class);
+    
+    /**
+     * The basename of the search index.
+     */
+    public static final transient String NAME_SUBJ_SEARCH = "subjectSearch";
 
-    static public BigdataRDFFullTextIndex getInstance(
+    static public BigdataSubjectCentricFullTextIndex getInstance(
             final IIndexManager indexManager, final String namespace,
             final Long timestamp, final Properties properties) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
 
-        return new BigdataRDFFullTextIndex(indexManager, namespace, timestamp,
+        return new BigdataSubjectCentricFullTextIndex(indexManager, namespace, timestamp,
                 properties);
 
     }
@@ -89,7 +97,7 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
      * @param timestamp
      * @param properties
      */
-    public BigdataRDFFullTextIndex(final IIndexManager indexManager,
+    public BigdataSubjectCentricFullTextIndex(final IIndexManager indexManager,
             final String namespace, final Long timestamp,
             final Properties properties) {
 
@@ -120,7 +128,7 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
         assertWritable();
         
-        final String name = getNamespace() + "."+NAME_SEARCH;
+        final String name = getNamespace() + "."+NAME_SUBJ_SEARCH;
 
         final IIndexManager indexManager = getIndexManager();
 
@@ -172,12 +180,12 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
             if (log.isInfoEnabled())
                 log.info(Options.FIELDS_ENABLED + "=" + fieldsEnabled);
     
-            final boolean doublePrecision = Boolean.parseBoolean(p
-                    .getProperty(Options.DOUBLE_PRECISION,
-                            Options.DEFAULT_DOUBLE_PRECISION));
-    
-            if (log.isInfoEnabled())
-                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
+//            final boolean doublePrecision = Boolean.parseBoolean(p
+//                    .getProperty(Options.DOUBLE_PRECISION,
+//                            Options.DEFAULT_DOUBLE_PRECISION));
+//    
+//            if (log.isInfoEnabled())
+//                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
 
             /*
              * FIXME Optimize. SimpleRabaCoder will be faster, but can do better
@@ -186,15 +194,15 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
             indexMetadata.setTupleSerializer(new RDFFullTextIndexTupleSerializer(
                     keyBuilderFactory,//
                     DefaultTupleSerializer.getDefaultLeafKeysCoder(),//
-                    DefaultTupleSerializer.getDefaultValuesCoder(),//
-                    fieldsEnabled,//
-                    doublePrecision//
+//                    DefaultTupleSerializer.getDefaultValuesCoder(),//
+                    SimpleRabaCoder.INSTANCE,
+                    fieldsEnabled
             ));
             
             indexManager.registerIndex(indexMetadata);
 
             if (log.isInfoEnabled())
-                log.info("Registered new text index: name=" + name);
+                log.info("Registered new subject-centric text index: name=" + name);
 
             /*
              * Note: defer resolution of the index.
@@ -225,23 +233,67 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
     
         assertWritable();
         
-        final String name = getNamespace() + "." + NAME_SEARCH;
+        final String name = getNamespace() + "." + NAME_SUBJ_SEARCH;
         
         getIndexManager().dropIndex(name);
 
     }
+    
+    /**
+     * The backing index.
+     */
+    volatile private IIndex ndx;
 
-    public void index(final int capacity,
+    /**
+     * The index used to associate term identifiers with tokens parsed from
+     * documents.
+     */
+    public IIndex getIndex() {
+        
+        if(ndx == null) {
+
+            synchronized (this) {
+
+                ndx = getIndex(getNamespace() + "." + NAME_SUBJ_SEARCH);
+
+                if (ndx == null)
+                    throw new IllegalStateException();
+                
+            }
+            
+        }
+        
+        return ndx;
+        
+    }
+
+    public void index(final IV<?,?> subject,
             final Iterator<BigdataValue> valuesIterator) {
         
-        final TokenBuffer<?> buffer = new TokenBuffer(capacity, this);
+    	if (subject == null) {
+    		throw new IllegalArgumentException();
+    	}
+    	
+    	if (log.isDebugEnabled()) {
+    		log.debug("indexing: " + subject);
+    	}
+    	
+    	/*
+    	 * We can use a capacity of one, because we will be indexing exactly
+    	 * one subject.
+    	 */
+        final TokenBuffer<?> buffer = new TokenBuffer(1, this);
 
         int n = 0;
-
+        
         while (valuesIterator.hasNext()) {
 
             final BigdataValue val = valuesIterator.next();
 
+        	if (log.isDebugEnabled()) {
+        		log.debug("value: " + val);
+        	}
+        	
             if (!(val instanceof Literal)) {
 
                 /*
@@ -278,27 +330,23 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
              * cost of re-indexing each time we see a term.
              */
 
-            final IV<?,?> termId = val.getIV();
-
-            assert termId != null; // the termId must have been assigned.
-
 //            // don't bother text indexing inline values for now
 //            if (termId.isInline()) {
 //                continue;
 //            }
             
-            index(buffer, termId, 0/* fieldId */, languageCode,
+            index(buffer, subject, 0/* fieldId */, languageCode,
                     new StringReader(text));
 
             n++;
 
         }
-
+        
         // flush writes to the text index.
         buffer.flush();
 
         if (log.isInfoEnabled())
-            log.info("indexed " + n + " new terms");
+            log.info("indexed " + n + " new values for s: " + subject);
 
     }
     
