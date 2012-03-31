@@ -119,10 +119,15 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
             assert key != null;
             assert key.length > 0;
 
-            // the value encodes the term-frequency and optional position metadata.
+            /*
+             * Note: The value MAY be used to encoded information. While it is
+             * no longer used to encode information in the com.bigdata.search
+             * package, the RDF specific full text indices still use the value.
+             * Therefore it now MAY be null and these asserts have been removed.
+             */
             final byte[] val = getValue(i);
-            assert val != null;
-            assert val.length > 0;
+//            assert val != null;
+//            assert val.length > 0;
 
             /*
              * Write on the index if (a) overwrite was specified; or (b) the
