@@ -32,7 +32,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
-import org.apache.lucene.search.Similarity;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -42,8 +41,6 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -73,13 +70,13 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
 //        return doublePrecision;
 //    }
     
-    /**
-     * Used to serialize the values for the tuples in the index.
-     * <p>
-     * Note: While this object is not thread-safe, the mutable B+Tree is
-     * restricted to a single writer so it does not have to be thread-safe.
-     */
-    final transient private DataOutputBuffer buf = new DataOutputBuffer(24);
+//    /**
+//     * Used to serialize the values for the tuples in the index.
+//     * <p>
+//     * Note: While this object is not thread-safe, the mutable B+Tree is
+//     * restricted to a single writer so it does not have to be thread-safe.
+//     */
+//    final transient private DataOutputBuffer buf = new DataOutputBuffer(24);
 
     /**
      * De-serialization constructor.

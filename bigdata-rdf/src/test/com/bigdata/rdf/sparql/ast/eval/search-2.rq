@@ -3,7 +3,7 @@ PREFIX bd: <http://www.bigdata.com/rdf/search#>
 
 SELECT ?subj ?score 
   WITH {
-   SELECT ?subj ( round(?cosine*10)/10 as ?score )
+   SELECT ?subj ( round(?cosine*100)/100 as ?score )
     WHERE {
       ?lit bd:search "child proofing" .
       ?lit bd:relevance ?cosine .
