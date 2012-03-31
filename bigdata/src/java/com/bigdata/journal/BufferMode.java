@@ -26,6 +26,8 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.sector.MemoryManager;
 
 /**
  * <p>
@@ -160,7 +162,16 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM);
+    Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
+    
+//    /**
+//     * A transient buffer mode backed by the {@link MemoryManager}, which is
+//     * similar to the {@link RWStore} but optimized for main memory. This can
+//     * scale up to 4TB of main memory.
+//     */
+//    MemStore(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW)
+
+    ;
 
     private final boolean stable;
     private final boolean fullyBuffered;

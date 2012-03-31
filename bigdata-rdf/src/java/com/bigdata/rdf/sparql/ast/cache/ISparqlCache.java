@@ -51,32 +51,32 @@ public interface ISparqlCache {
      */
     void close();
 
-    /**
-     * Return the result from the cache -or- <code>null</code> if there is a
-     * cache miss.
-     * 
-     * @param ctx
-     *            The {@link AST2BOpContext}.
-     *            
-     * @param queryOrSubquery
-     *            The query.
-     * 
-     * @return The cache hit -or- <code>null</code>
-     */
-    ICacheHit get(final AST2BOpContext ctx, final QueryBase queryOrSubquery);
-
-    /**
-     * Publish a solution set to the cache.
-     * 
-     * @param ctx
-     *            The query context in which the solution set was generated.
-     * @param queryOrSubquery
-     *            The query or subquery used to generate the solution set.
-     * @param src
-     *            An iterator which can drain the solution set.
-     * @return A reference to the cached solution set.
-     */
-    ICacheHit put(final AST2BOpContext ctx, final QueryBase queryOrSubquery,
-            final ICloseableIterator<IBindingSet> src);
+//    /**
+//     * Return the result from the cache -or- <code>null</code> if there is a
+//     * cache miss.
+//     * 
+//     * @param ctx
+//     *            The {@link AST2BOpContext}.
+//     *            
+//     * @param queryOrSubquery
+//     *            The query.
+//     * 
+//     * @return The cache hit -or- <code>null</code>
+//     */
+//    ICacheHit get(final AST2BOpContext ctx, final QueryBase queryOrSubquery);
+//
+//    /**
+//     * Publish a solution set to the cache.
+//     * 
+//     * @param ctx
+//     *            The query context in which the solution set was generated.
+//     * @param queryOrSubquery
+//     *            The query or subquery used to generate the solution set.
+//     * @param src
+//     *            An iterator which can drain the solution set.
+//     * @return A reference to the cached solution set.
+//     */
+//    ICacheHit put(final AST2BOpContext ctx, final QueryBase queryOrSubquery,
+//            final ICloseableIterator<IBindingSet> src);
 
 }

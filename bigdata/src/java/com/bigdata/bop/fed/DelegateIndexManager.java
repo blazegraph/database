@@ -8,6 +8,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IResourceLockService;
@@ -154,6 +155,12 @@ class DelegateIndexManager implements IIndexManager {
 		return dataService.getFederation().getHttpdPort();
 	}
 
+//	public ConcurrencyManager getConcurrencyManager() {
+//	    
+//	    return dataService.getConcurrencyManager();
+//	    
+//	}
+	
 	public String toString() {
 
     	return super.toString() + "{dataServiceUUID="
