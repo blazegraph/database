@@ -28,7 +28,9 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest2;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest2;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -79,6 +81,21 @@ public class TestAll extends TestCase {
         // Fully isolated read/write operations.
         suite.addTestSuite(BigdataSPARQLUpdateTxTest.class);
 
+        if(false) {
+
+            /*
+             * The bigdata extensions to SPARQL UPDATE to support solution sets
+             * as well as graphs.
+             */
+        
+            // Unisolated operations.
+            suite.addTestSuite(BigdataSPARQLUpdateTest2.class);
+
+            // Fully isolated read/write operations.
+            suite.addTestSuite(BigdataSPARQLUpdateTxTest2.class);
+        
+        }
+        
         return suite;
         
     }
