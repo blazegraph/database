@@ -849,9 +849,9 @@ abstract public class AbstractTripleStore extends
 		 */
 		
         /**
-         * Boolean option (default <code>true</code>) enables support for a
-         * full text index that may be used to lookup literals by tokens found
-         * in the text of those literals.
+         * Boolean option (default {@value #DEFAULT_TEXT_INDEX}) enables support
+         * for a full text index that may be used to lookup literals by tokens
+         * found in the text of those literals.
          * 
          * @see #TEXT_INDEXER_CLASS
          * @see #TEXT_INDEX_DATATYPE_LITERALS
@@ -860,7 +860,7 @@ abstract public class AbstractTripleStore extends
          */
         String TEXT_INDEX = AbstractTripleStore.class.getName() + ".textIndex";
 
-        String DEFAULT_INLINE_TEXT_INDEX = "true";
+        String DEFAULT_TEXT_INDEX = "true";
 
 		/**
 		 * Boolean option enables support for a full text index that may be used
@@ -1452,7 +1452,7 @@ abstract public class AbstractTripleStore extends
         tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
 
         if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
-                Options.DEFAULT_INLINE_TEXT_INDEX))) {
+                Options.DEFAULT_TEXT_INDEX))) {
 
             /*
              * If the text index is enabled for a new kb instance, then disable

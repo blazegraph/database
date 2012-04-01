@@ -258,7 +258,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             this.textIndex = Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.TEXT_INDEX,
-                    AbstractTripleStore.Options.DEFAULT_INLINE_TEXT_INDEX));
+                    AbstractTripleStore.Options.DEFAULT_TEXT_INDEX));
          
             if (textIndex) {
                 /*
