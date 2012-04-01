@@ -341,7 +341,7 @@ public class BuildInfo {
 		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
 			      author="true" version="true" use="true"
 			    overview="${bigdata.dir}/overview.html"
-			 windowtitle="bigdata&#174;"
+			 windowtitle="bigdata&#174; v${build.ver}"
 			classpathref="build.classpath"
 			>
 			<arg value="-J-Xmx1000m" />
@@ -354,15 +354,23 @@ public class BuildInfo {
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
 			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
 			<doctitle>
-				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
+				<![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
 		<bottom>
-			<![CDATA[<i>Copyright &#169; 2006-2011 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+			<![CDATA[<i>Copyright &#169; 2006-2012 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
 	<tag name="todo" scope="all" description="TODO:" />
 	<tag name="issue" scope="all" description="ISSUE:" />
 	<!--tag name="FIXME" scope="all" description="FIXME:"/-->
 	<link href="http://download.oracle.com/javase/6/docs/api/" />
 	<link href="http://www.openrdf.org/doc/sesame2/api/" />
 	<link href="http://lucene.apache.org/java/3_0_0/api/"/>
+	<link href="http://hc.apache.org/httpcomponents-core-ga/httpcore/apidocs/"/>
+	<link href="http://hc.apache.org/httpcomponents-core-ga/httpcore-nio/apidocs/"/>
+	<link href="http://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/"/>
+	<link href="http://hc.apache.org/httpcomponents-client-ga/httpmime/apidocs/"/>
+	<link href="http://hc.apache.org/httpcomponents-client-ga/httpclient-cache/apidocs/"/>
+	<link href="http://icu-project.org/apiref/icu4j/"/>
+	<link href="http://lucene.apache.org/core/old_versioned_docs/versions/3_0_3/api/all/"/>
+	<link href="http://jetty.codehaus.org/jetty/jetty-6/apidocs/"/>
 </javadoc>
 </target>
 
