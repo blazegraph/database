@@ -27,13 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.Hiterator;
