@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
@@ -53,7 +55,13 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     public final BigdataSailRepositoryConnection conn;
 
     private boolean includeInferred;
-    
+
+    /**
+     * The timestamp associated with the commit point for the update and
+     * <code>-1</code> if until there is a commit.
+     */
+    private AtomicLong commitTime = new AtomicLong(-1);
+
     public final boolean isIncludeInferred() {
         
         return includeInferred;
@@ -64,6 +72,22 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
         
         this.includeInferred = includeInferred;
         
+    }
+    
+    /**
+     * The timestamp associated with the commit point for the update and
+     * <code>-1</code> if until there is a commit.
+     */
+    public long getCommitTime() {
+        
+        return commitTime.get();
+        
+    }
+
+    public void setCommitTime(final long commitTime) {
+
+        this.commitTime.set(commitTime);
+
     }
     
     /**

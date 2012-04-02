@@ -270,6 +270,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                 final long commitTime = context.conn.commit2();
                 
+                context.setCommitTime(commitTime);
+                
                 if (log.isDebugEnabled())
                     log.debug("COMMIT: commitTime=" + commitTime);
                 

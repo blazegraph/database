@@ -119,6 +119,19 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     @Override
     public void execute() throws UpdateExecutionException {
+        
+        execute2();
+        
+    }
+
+    /**
+     * Execute a SPARQL UPDATE request.
+     * 
+     * @return The timestamp of the commit point for that UPDATE.
+     * 
+     * @throws UpdateExecutionException
+     */
+    public long execute2() throws UpdateExecutionException {
 
 //        final QueryRoot originalQuery = astContainer.getOriginalAST();
 //
@@ -128,7 +141,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 //
 //        originalQuery.setIncludeInferred(getIncludeInferred());
 
-        ASTEvalHelper.executeUpdate(
+        return ASTEvalHelper.executeUpdate(
                 ((BigdataSailRepositoryConnection) getConnection()),
                 astContainer,//
                 dataset,//
