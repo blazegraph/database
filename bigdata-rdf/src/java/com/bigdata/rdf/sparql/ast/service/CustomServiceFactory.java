@@ -1,0 +1,56 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Apr 2, 2012
+ */
+
+package com.bigdata.rdf.sparql.ast.service;
+
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+
+/**
+ * Interface for custom services.
+ * 
+ * @see <a
+ *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=FederatedQuery">
+ *      Federated Query and Custom Services</a>
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public interface CustomServiceFactory extends ServiceFactory {
+
+    /**
+     * Callback is used to notify the {@link ServiceFactory} of connection
+     * starts. If the service wishes to be notified of updates, then it must
+     * return a {@link IChangeLog} implementation here. The listener will be
+     * obtained when the {@link ServiceFactory} is registered.
+     * 
+     * @return The {@link IChangeLog} listener -or- <code>null</code> if the
+     *         service does not want to observe changes.
+     */
+    void startConnection(BigdataSailConnection conn);
+
+}

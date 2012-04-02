@@ -1,7 +1,9 @@
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.http.conn.ClientConnectionManager;
@@ -11,8 +13,14 @@ import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
+import cutthecrap.utils.striterators.ReadOnlyIterator;
+
 /**
  * Registry for service calls.
+ * 
+ * @see <a
+ *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=FederatedQuery">
+ *      Federated Query and Custom Services</a>
  */
 public class ServiceRegistry {
 
@@ -27,17 +35,37 @@ public class ServiceRegistry {
 
     }
 
-    private ConcurrentMap<URI, ServiceFactory> services;
-    private ConcurrentMap<URI/*from*/, URI/*to*/> aliases;
+    /**
+     * Primary {@link ServiceFactory} registration.
+     */
+    private final ConcurrentMap<URI, ServiceFactory> services;
 
+    /**
+     * Aliases for registered {@link ServiceFactory}s.
+     */
+    private final ConcurrentMap<URI/* from */, URI/* to */> aliases;
+
+    /**
+     * The set of registered {@link ServiceFactory}s is also maintained here for
+     * fast, safe iteration by {@link #services()}.
+     */
+    private final CopyOnWriteArrayList<CustomServiceFactory> customServices;  
+
+    /**
+     * The default {@link ServiceFactory} used for REMOTE SPARQL SERVICE end
+     * points which are not otherwise registered.
+     */
     private AtomicReference<ServiceFactory> defaultServiceFactoryRef;
     
     protected ServiceRegistry() {
 
         services = new ConcurrentHashMap<URI, ServiceFactory>();
 
+        customServices = new CopyOnWriteArrayList<CustomServiceFactory>();
+        
         aliases = new ConcurrentHashMap<URI, URI>();
 
+        // Add the Bigdata search service.
         add(BD.SEARCH, new SearchServiceFactory());
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
@@ -74,18 +102,28 @@ public class ServiceRegistry {
     
     public final void add(final URI serviceURI, final ServiceFactory factory) {
 
-        if (aliases.containsKey(serviceURI)) {
+        synchronized (this) {
 
-            throw new UnsupportedOperationException("Already declared.");
+            if (aliases.containsKey(serviceURI)) {
+
+                throw new UnsupportedOperationException("Already declared.");
+
+            }
+
+            if (services.putIfAbsent(serviceURI, factory) != null) {
+
+                throw new UnsupportedOperationException("Already declared.");
+
+            }
+
+            if (factory instanceof CustomServiceFactory) {
+
+                customServices.add((CustomServiceFactory) factory);
+
+            }
 
         }
-
-        if (services.putIfAbsent(serviceURI, factory) != null) {
-
-            throw new UnsupportedOperationException("Already declared.");
-
-        }
-
+        
 	}
 
     /**
@@ -100,15 +138,29 @@ public class ServiceRegistry {
 
         boolean modified = false;
 
-        if (aliases.remove(serviceURI) != null) {
+        synchronized (this) {
 
-            modified = true;
+            if (aliases.remove(serviceURI) != null) {
 
-        }
+                // removed an alias.
+                modified = true;
 
-        if (services.remove(serviceURI) != null) {
+            }
 
-            modified = true;
+            // Remove the factory.
+            final ServiceFactory factory = services.remove(serviceURI);
+
+            if (factory != null) {
+
+                modified = true;
+
+                if(factory instanceof CustomServiceFactory) {
+
+                    customServices.remove(factory);
+                    
+                }
+
+            }
 
         }
 
@@ -117,11 +169,22 @@ public class ServiceRegistry {
     }
 
     /**
+     * Register one URI as an alias for another.
      * 
      * @param serviceURI
-     *            The URI of a service which is already declared.
+     *            The URI of a service. It is expressly permitted to register an
+     *            alias for a URI which does not have a registered
+     *            {@link ServiceFactory}. This may be used to alias a remote URI
+     *            which you want to intercept locally.
      * @param aliasURI
      *            The URI of an alias under which that service may be accessed.
+     * @throws IllegalStateException
+     *             if the <i>serviceURI</i> has already been registered as a
+     *             alias (you must {@link #remove(URI)} the old alias before you
+     *             can map it against a different <i>serviceURI</i>).
+     * @throws IllegalStateException
+     *             if the <i>aliasURI</i> has already been registered as a
+     *             service (you can not mask an existing service registration).
      */
     public final void addAlias(final URI serviceURI, final URI aliasURI) {
 
@@ -131,17 +194,60 @@ public class ServiceRegistry {
         if (aliasURI == null)
             throw new IllegalArgumentException();
 
-        if (services.containsKey(serviceURI)) {
+        synchronized (this) {
 
-            throw new UnsupportedOperationException("ServiceURI:" + serviceURI
-                    + " already registered.");
+            /*
+             * Note: it is expressly permitted to register an alias for a URI
+             * which does not have a registered ServiceFactory. This may be used
+             * to alias a remote URI which you want to intercept locally.
+             */
+            
+//            // Lookup the service.
+//            final ServiceFactory service = services.get(serviceURI);
+//            
+//            if (service == null) {
+//
+//                throw new IllegalStateException("No such service: uri="
+//                        + serviceURI);
+//
+//            }
+            
+            if (services.containsKey(aliasURI)) {
 
+                throw new IllegalStateException(
+                        "Alias already registered as service: uri=" + aliasURI);
+
+            }
+
+            if (aliases.containsKey(aliasURI)) {
+
+                throw new IllegalStateException(
+                        "Alias already registered: uri=" + aliasURI);
+
+            }
+            
+            aliases.put(aliasURI, serviceURI);
+            
         }
 
-        aliases.put(aliasURI, serviceURI);
-        
     }
 
+    /**
+     * Return an {@link Iterator} providing a read-only view of the registered
+     * {@link CustomServiceFactory}s.
+     */
+    public Iterator<CustomServiceFactory> customServices() {
+
+        /*
+         * Note: This relies on the copy-on-write array list for fast and
+         * efficient traversal with snapshot isolation.
+         */
+
+        return new ReadOnlyIterator<CustomServiceFactory>(
+                customServices.iterator());
+
+    }
+    
     /**
      * Return the {@link ServiceFactory} for that URI. If the {@link URI} is a
      * known alias, then it is resolved before looking up the
