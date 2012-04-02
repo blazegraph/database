@@ -60,7 +60,9 @@ import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sparql.ast.eval.service.TestSearch;
@@ -87,21 +89,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         super(name);
     }
     
-//    /**
-//     * Overriden to use a persistent backing store.
-//     */
-//    public Properties getProperties() {
-//        
-//        Properties properties = super.getProperties();
-//        
-//        // use a disk-based mode since we will re-open the store to test restart safety.
-//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
-//
-//        properties.setProperty(Options.FILE,file.toString());
-//        
-//        return properties;
-//        
-//    }
+    /**
+     * Overriden to allow the subject-centric full text index.
+     */
+    public Properties getProperties() {
+        
+        Properties properties = super.getProperties();
+        
+        properties.setProperty(Options.SUBJECT_CENTRIC_TEXT_INDEX, "true");
+        
+        return properties;
+        
+    }
 
 //    /**
 //     * Overriden to cause the backing store to be deleted.
@@ -789,7 +788,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
                 Collection<BindingSet> answer = new LinkedList<BindingSet>();
                 
-                final IValueCentricTextIndexer search = 
+                final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
                 	search.search(searchQuery, 
@@ -1359,6 +1358,848 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         }
         
     }
+    
+    public void testSubjectSearch() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        
+        try {
+            
+            cxn.setAutoCommit(false);
+
+            final ValueFactory vf = sail.getValueFactory();
+
+        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final Literal l1 = vf.createLiteral("how");
+        	final Literal l2 = vf.createLiteral("now");
+        	final Literal l3 = vf.createLiteral("brown");
+        	final Literal l4 = vf.createLiteral("cow");
+        	final Literal l5 = vf.createLiteral("how now");
+        	final Literal l6 = vf.createLiteral("brown cow");
+        	final Literal l7 = vf.createLiteral("how now brown cow");
+        	final Literal l8 = vf.createLiteral("toilet");
+        	
+            cxn.add(s1, RDFS.LABEL, l1);
+            cxn.add(s2, RDFS.LABEL, l2);
+            cxn.add(s3, RDFS.LABEL, l3);
+            cxn.add(s4, RDFS.LABEL, l4);
+            cxn.add(s5, RDFS.LABEL, l5);
+            cxn.add(s6, RDFS.LABEL, l6);
+            cxn.add(s7, RDFS.LABEL, l7);
+            cxn.add(s8, RDFS.LABEL, l8);
+            
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();
+            
+            sail.getDatabase().getLexiconRelation().buildSubjectCentricTextIndex();
+            
+            final Map<IV, Literal> literals = new LinkedHashMap<IV, Literal>();
+            literals.put(((BigdataURI)s1).getIV(), l1);
+            literals.put(((BigdataURI)s2).getIV(), l2);
+            literals.put(((BigdataURI)s3).getIV(), l3);
+            literals.put(((BigdataURI)s4).getIV(), l4);
+            literals.put(((BigdataURI)s5).getIV(), l5);
+            literals.put(((BigdataURI)s6).getIV(), l6);
+            literals.put(((BigdataURI)s7).getIV(), l7);
+            literals.put(((BigdataURI)s8).getIV(), l8);
+            
+            final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
+            uris.put(((BigdataURI)s1).getIV(), s1);
+            uris.put(((BigdataURI)s2).getIV(), s2);
+            uris.put(((BigdataURI)s3).getIV(), s3);
+            uris.put(((BigdataURI)s4).getIV(), s4);
+            uris.put(((BigdataURI)s5).getIV(), s5);
+            uris.put(((BigdataURI)s6).getIV(), s6);
+            uris.put(((BigdataURI)s7).getIV(), s7);
+            uris.put(((BigdataURI)s8).getIV(), s8);
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { 
+            	final String searchQuery = "how now brown cow";
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results", 7, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV)hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("score", score));
+                	if(log.isInfoEnabled())
+                		log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { 
+            	final String searchQuery = "how now brown cow";
+            	final int maxHits = 5;
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.MAX_RANK+"> \""+maxHits+"\" . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results", 5, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            maxHits, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV)hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                		log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { 
+            	final String searchQuery = "how now brown cow";
+            	final double minRelevance = 0.6d;
+            	final double maxRelevance = 0.9d;
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?s <"+BD.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results", 2, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                		log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // exact match
+            	
+            	final String searchQuery = "brown cow";
+            	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?s ?p ?o . " +
+                    "    filter regex(?o, \""+searchQuery+"\") " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                if(log.isInfoEnabled())
+            		log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results: " + i, 2, i);
+                
+                result = tupleQuery.evaluate();
+
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                	if (!o.getLabel().contains(searchQuery))
+                		continue;
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // prefix match
+            	
+            	final String searchQuery = "bro*";
+            	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+//                    "    filter regex(?o, \""+searchQuery+"\") " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                if(log.isInfoEnabled())
+            		log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results: " + i, 3, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // prefix match using a stopword
+            	
+            	final String searchQuery = "to*";
+            	final double minRelevance = 0.0d;
+            	final double maxRelevance = BD.DEFAULT_MAX_RELEVANCE;//1.0d;
+            	
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+//                    "    filter regex(?o, \""+searchQuery+"\") " +
+                    "} " +
+                    "order by desc(?score)";
+                
+            	if(log.isInfoEnabled())
+            		log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results: " + i, 1, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // match all terms
+            	
+            	final String searchQuery = "how now brown cow";
+            	final double minRelevance = 0.0d;
+            	final double maxRelevance = 1.0d;
+            	
+                final String query = 
+                    "select ?s " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.MATCH_ALL_TERMS+"> \"true\" . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "}";
+                
+                if(log.isInfoEnabled())
+                    log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+//                assertTrue("wrong # of results: " + i, i == 1);
+                
+                result = tupleQuery.evaluate();
+
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            true, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s)
+//                    		new BindingImpl("o", o)
+                    		);
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+            { // minRank, maxRank
+            	
+            	final String searchQuery = "how now brown cow";
+            	final int minRank = 2;
+            	final int maxRank = 5;
+                final String query = 
+                    "select ?s ?score " + 
+                    "where " +
+                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BD.MIN_RANK+"> \""+minRank+"\" . " +
+                    "    ?s <"+BD.MAX_RANK+"> \""+maxRank+"\" . " +
+                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "}";
+                
+                if(log.isInfoEnabled())
+                    log.info("\n"+query);
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertTrue("wrong # of results: " + i, i == (maxRank-minRank+1));
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            minRank,//1
+                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV) hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+//                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                    if(log.isInfoEnabled())
+                        log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+            
+            { // countHits
+            	
+            	final String searchQuery = "how now brown cow";
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
+                
+                final int i = search.count(
+                			searchQuery, 
+                            null, // languageCode
+                            true, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            BD.DEFAULT_MIN_RANK, // minRank
+                            BD.DEFAULT_MAX_RANK, // maxRank
+                            false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                if (log.isInfoEnabled()) {
+                	log.info(i + " search results.");
+                }
+                
+                assertTrue("wrong # of results: " + i, i == 7);
+                
+            }
+            
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
+    
+    /**
+     * FIXME This should be migrated to the data-driven test suite in
+     * {@link TestSearch}.
+     * 
+     * @see TestSearch
+     */
+    public void testValidationWithIncomingBindings() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        
+        try {
+            
+            cxn.setAutoCommit(false);
+
+            final ValueFactory vf = sail.getValueFactory();
+
+        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final Literal l1 = vf.createLiteral("how");
+        	final Literal l2 = vf.createLiteral("now");
+        	final Literal l3 = vf.createLiteral("brown");
+        	final Literal l4 = vf.createLiteral("cow");
+        	final Literal l5 = vf.createLiteral("how now");
+        	final Literal l6 = vf.createLiteral("brown cow");
+        	final Literal l7 = vf.createLiteral("how now brown cow");
+        	final Literal l8 = vf.createLiteral("toilet");
+        	
+            cxn.add(s1, RDFS.LABEL, l1);
+            cxn.add(s2, RDFS.LABEL, l2);
+            cxn.add(s3, RDFS.LABEL, l3);
+            cxn.add(s4, RDFS.LABEL, l4);
+            cxn.add(s5, RDFS.LABEL, l5);
+            cxn.add(s6, RDFS.LABEL, l6);
+            cxn.add(s7, RDFS.LABEL, l7);
+            cxn.add(s8, RDFS.LABEL, l8);
+            
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();
+            
+            final Map<IV, Literal> literals = new LinkedHashMap<IV, Literal>();
+            literals.put(((BigdataValue)l1).getIV(), l1);
+            literals.put(((BigdataValue)l2).getIV(), l2);
+            literals.put(((BigdataValue)l3).getIV(), l3);
+            literals.put(((BigdataValue)l4).getIV(), l4);
+            literals.put(((BigdataValue)l5).getIV(), l5);
+            literals.put(((BigdataValue)l6).getIV(), l6);
+            literals.put(((BigdataValue)l7).getIV(), l7);
+            literals.put(((BigdataValue)l8).getIV(), l8);
+            
+            final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
+            uris.put(((BigdataValue)l1).getIV(), s1);
+            uris.put(((BigdataValue)l2).getIV(), s2);
+            uris.put(((BigdataValue)l3).getIV(), s3);
+            uris.put(((BigdataValue)l4).getIV(), s4);
+            uris.put(((BigdataValue)l5).getIV(), s5);
+            uris.put(((BigdataValue)l6).getIV(), s6);
+            uris.put(((BigdataValue)l7).getIV(), s7);
+            uris.put(((BigdataValue)l8).getIV(), s8);
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { 
+            	final String searchQuery = "how now brown cow";
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> ?searchQuery . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                tupleQuery.setBinding("searchQuery", new LiteralImpl(searchQuery));
+                
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results", 7, i);
+                
+                result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV)hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                	if(log.isInfoEnabled())
+                		log.info(bs);
+                    answer.add(bs);
+                }
+                
+                compare(result, answer);
+
+            }
+
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
+    
+
     
 //    private final void doQuery() throws Exception {
 //        

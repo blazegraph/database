@@ -99,8 +99,10 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
+import com.bigdata.rdf.lexicon.BigdataSubjectCentricFullTextIndex;
 import com.bigdata.rdf.lexicon.BigdataValueCentricFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
+import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -862,6 +864,20 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_TEXT_INDEX = "true";
 
+        /**
+         * Boolean option (default <code>true</code>) enables support for a
+         * full text index that may be used to lookup literals by tokens found
+         * in the text of those literals.
+         * 
+         * @see #TEXT_INDEXER_CLASS
+         * @see #TEXT_INDEX_DATATYPE_LITERALS
+         * @see #INLINE_TEXT_LITERALS
+         * @see #MAX_INLINE_TEXT_LENGTH
+         */
+        String SUBJECT_CENTRIC_TEXT_INDEX = AbstractTripleStore.class.getName() + ".subjectCentricTextIndex";
+
+        String DEFAULT_SUBJECT_CENTRIC_TEXT_INDEX = "false";
+
 		/**
 		 * Boolean option enables support for a full text index that may be used
 		 * to lookup datatype literals by tokens found in the text of those
@@ -892,6 +908,25 @@ abstract public class AbstractTripleStore extends
 				+ ".textIndexerClass";
 
 		String DEFAULT_TEXT_INDEXER_CLASS = BigdataValueCentricFullTextIndex.class
+				.getName();
+
+        /**
+         * The name of the {@link ITextIndexer} class. The implementation MUST
+         * declare a method with the following signature which will be used to
+         * locate instances of that class.
+         * 
+         * <pre>
+         * static public ITextIndexer getInstance(final IIndexManager indexManager,
+         *             final String namespace, final Long timestamp,
+         *             final Properties properties)
+         * </pre>
+         * 
+         * @see #DEFAULT_TEXT_INDEXER_CLASS
+         */
+		String SUBJECT_CENTRIC_TEXT_INDEXER_CLASS = AbstractTripleStore.class.getName()
+				+ ".subjectCentricTextIndexerClass";
+
+		String DEFAULT_SUBJECT_CENTRIC_TEXT_INDEXER_CLASS = BigdataSubjectCentricFullTextIndex.class
 				.getName();
 
         /*

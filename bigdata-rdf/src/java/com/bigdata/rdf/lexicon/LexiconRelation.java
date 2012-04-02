@@ -1,3 +1,4 @@
+
 /**
 
  Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
@@ -77,6 +78,7 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
@@ -99,6 +101,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
@@ -139,6 +142,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final List<IKeyOrder<BigdataValue>> keyOrders;
     
     private final AtomicReference<IValueCentricTextIndexer<?>> viewRef = new AtomicReference<IValueCentricTextIndexer<?>>();
+
+    /**
+     * A new one for the subject-centric full text index.
+     */
+    private final AtomicReference<ISubjectCentricTextIndexer<?>> viewRef2 = new AtomicReference<ISubjectCentricTextIndexer<?>>();
 
     /**
      * Note: This is a stateless class.
@@ -193,6 +201,32 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
         return (Class<IValueCentricTextIndexer>) cls;
+
+    }
+    
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    protected Class<ISubjectCentricTextIndexer> determineSubjectCentricTextIndexerClass() {
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.SUBJECT_CENTRIC_TEXT_INDEXER_CLASS,
+                AbstractTripleStore.Options.DEFAULT_SUBJECT_CENTRIC_TEXT_INDEXER_CLASS);
+        
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.SUBJECT_CENTRIC_TEXT_INDEXER_CLASS, e);
+        }
+
+        if (!ISubjectCentricTextIndexer.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.SUBJECT_CENTRIC_TEXT_INDEXER_CLASS
+                            + ": Must implement: "
+                            + ISubjectCentricTextIndexer.class.getName());
+        }
+
+        return (Class<ISubjectCentricTextIndexer>) cls;
 
     }
     
@@ -283,6 +317,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             }
             
+            // just for now while I am testing, don't feel like rebuilding
+            // the entire journal
+            this.subjectCentricTextIndex = textIndex;
+//            this.subjectCentricTextIndex = Boolean.parseBoolean(getProperty(
+//                    AbstractTripleStore.Options.SUBJECT_CENTRIC_TEXT_INDEX,
+//                    AbstractTripleStore.Options.DEFAULT_SUBJECT_CENTRIC_TEXT_INDEXER_CLASS));
+         
         }
         
         this.storeBlankNodes = Boolean.parseBoolean(getProperty(
@@ -705,6 +746,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final boolean textIndex;
     
     /**
+     * When <code>true</code> a secondary subject-centric full text index is 
+     * maintained.
+     * 
+     * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
+     */
+    private final boolean subjectCentricTextIndex;
+    /**
      * When <code>true</code> the kb is using told blank nodes semantics.
      * 
      * @see AbstractTripleStore.Options#STORE_BLANK_NODES
@@ -848,6 +896,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public boolean isTextIndex() {
         
         return textIndex;
+        
+    }
+
+    /**
+     * <code>true</code> iff the subject-centric full text index is enabled.
+     * 
+     * @see AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX
+     */
+    final public boolean isSubjectCentricTextIndex() {
+        
+        return subjectCentricTextIndex;
         
     }
 
@@ -1064,6 +1123,61 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
         return viewRef.get();
+
+    }
+
+    /**
+     * A factory returning the softly held singleton for the
+     * {@link FullTextIndex} representing the subject-centric full text index.
+     * 
+     * @see AbstractTripleStore.Options#TEXT_INDEX
+     * 
+     * @todo replace with the use of the {@link IResourceLocator} since it
+     *       already imposes a canonicalizing mapping within for the index name
+     *       and timestamp inside of a JVM.
+     */
+    public ISubjectCentricTextIndexer<?> getSubjectCentricSearchEngine() {
+
+    	if (!subjectCentricTextIndex)
+            return null;
+
+        /*
+         * Note: Double-checked locking pattern requires [volatile] variable or
+         * AtomicReference. This uses the AtomicReference since that gives us a
+         * lock object which is specific to this request.
+         */
+        if (viewRef2.get() == null) {
+
+            synchronized (viewRef2) {// NB: Ignore find bugs complaint per above.
+
+                if (viewRef2.get() == null) {
+
+                    final ISubjectCentricTextIndexer<?> tmp;
+                    try {
+                        final Class<?> vfc = determineSubjectCentricTextIndexerClass();
+                        final Method gi = vfc.getMethod("getInstance",
+                                IIndexManager.class, String.class, Long.class,
+                                Properties.class);
+                        tmp = (ISubjectCentricTextIndexer<?>) gi.invoke(null/* object */,
+                                getIndexManager(), getNamespace(),
+                                getTimestamp(), getProperties());
+                        if(tmp instanceof ILocatableResource<?>) {
+                        	((ILocatableResource<?>)tmp).init();
+                        }
+                        viewRef2.set(tmp);
+                    } catch (Throwable e) {
+                        throw new IllegalArgumentException(
+                                AbstractTripleStore.Options.SUBJECT_CENTRIC_TEXT_INDEXER_CLASS,
+                                e);
+                    }
+
+                }
+
+            }
+
+        }
+
+        return viewRef2.get();
 
     }
 
@@ -2002,6 +2116,299 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
     }
 
+	/**
+	 * Utility method to (re-)build the subject-based full text index. This is a
+	 * high latency operation for a database of any significant size. You must
+	 * be using the unisolated view of the {@link AbstractTripleStore} for this
+	 * operation. {@link AbstractTripleStore.Options#TEXT_INDEX} must be
+	 * enabled. This operation is only supported when the {@link ITextIndexer}
+	 * uses the {@link FullTextIndex} class.
+	 * <p>
+	 * The subject-based full text index is one that rolls up normal
+	 * object-based full text index into a similarly structured index that
+	 * captures relevancy across subjects. Instead of
+	 * 
+	 * (t,s) => s.len, termWeight
+	 * 
+	 * Where s is the subject's IV. The term weight has the same
+	 * interpretation, but it is across all literals which are linked to that
+	 * subject and which contain the given token.  This index basically
+	 * pre-computes the (?s ?p ?o) join that sometimes follows the (?o
+	 * bd:search "xyz") request.
+	 * <p>
+	 * Truth Maintenance
+	 * <p>
+	 * We will need to perform truth maintenance on the subject-centric text
+	 * index, that is - the index will need to be updated as statements are
+	 * added and removed (to the extent that those statements involving a
+	 * literal in the object position).  Adding a statement is the easier
+	 * case because we will never need to remove entries from the index, we
+	 * can simply write over them with new relevance values.  All that is
+	 * involved with truth maintenance for adding a statement is taking a post-
+	 * commit snapshot of the subject in the statement and running it through
+	 * the indexer (a "subject-refresh").
+	 * <p>
+	 * The same "subject-refresh" will be necessary for truth maintenance for
+	 * removal, but an additional step will be necessary beforehand - the index
+	 * entries associated with the deleted subject/object (tokens+subject) will
+	 * need to be removed in case the token appears only in the removed literal.
+	 * After this pruning step the subject can be refreshed in the index exactly
+	 * the same as for truth maintenance on add.
+	 * <p>
+	 * It looks like the right place to hook in truth maintenance for add is
+	 * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, com.bigdata.relation.accesspath.IElementFilter)}
+	 * after the ISPOs are added to the SPORelation.
+	 * Likewise, the place to hook in truth maintenance for delete is
+	 * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)} 
+	 * after the ISPOs are removed from the SPORelation.
+	 */
+    @SuppressWarnings("unchecked")
+    public void buildSubjectCentricTextIndex() {
+
+        if (getTimestamp() != ITx.UNISOLATED)
+            throw new UnsupportedOperationException();
+
+        if (!subjectCentricTextIndex)
+            throw new UnsupportedOperationException();
+
+        final ISubjectCentricTextIndexer<?> textIndexer = getSubjectCentricSearchEngine();
+
+        try {
+        
+	        // destroy the existing text index.
+	        textIndexer.destroy();
+	        
+        } catch (NoSuchIndexException ex) {
+        	
+        	if (log.isInfoEnabled())
+        		log.info("could not destroy subject-centric full text index, does not currently exist");
+        	
+        }
+
+        // create a new index.
+        textIndexer.create();
+
+        // TermIVs
+        {
+            // The index to scan for the individual subjects and their literal
+        	// values.
+            final IIndex spoNdx = getContainer().getSPORelation().getPrimaryIndex();
+            
+            /*
+             * For each S in SPO, collect up O values and pass this information
+             * to the subject-centric text indexer for indexing.
+             */
+            
+            // used to decode the
+            @SuppressWarnings("rawtypes")
+            final ITupleSerializer tupSer = spoNdx.getIndexMetadata()
+                    .getTupleSerializer();
+
+            /*
+             * Visit all plain, language code, and datatype literals in the
+             * object position of the primary statement index.
+             * 
+             * Note: This uses a filter on the ITupleIterator in order to filter
+             * out non-literal terms before they are shipped from a remote index
+             * shard.
+             */
+            final Iterator<ISPO> itr = new Striterator(
+            		spoNdx.rangeIterator(null/* fromKey */, null/* toKey */,
+                            0/* capacity */, IRangeQuery.DEFAULT,
+                            new TupleFilter<ISPO>() {
+                                private static final long serialVersionUID = 1L;
+
+                                protected boolean isValid(
+                                        final ITuple<ISPO> obj) {
+                                    final ISPO spo = (ISPO) tupSer
+                                            .deserializeKey(obj);
+                                    if (spo.o().isLiteral()) {
+                                        return true;
+                                    }
+                                    return false;
+                                }
+                            })).addFilter(new Resolver() {
+                private static final long serialVersionUID = 1L;
+
+                protected Object resolve(final Object obj) {
+                    final ISPO spo = (ISPO) tupSer
+                    	.deserializeKey((ITuple<?>) obj);
+                    return spo;
+                }
+            });
+            
+            /*
+             * Keep track of the current subject being indexed.
+             */
+            IV<?,?> s = null;
+            
+            /*
+             * Keep a collection of literals to be indexed for that subject.
+             */
+            final Collection<IV<?,?>> literals = new LinkedList<IV<?,?>>();
+            
+            long subjectCount = 0;
+            long statementCount = 0;
+            
+            final boolean l = log.isInfoEnabled();
+            
+            while (itr.hasNext()) {
+            	
+            	final ISPO spo = itr.next();
+            	
+            	if (!spo.s().equals(s)) {
+            	
+            		// flush the old s to the text index if != null
+            		
+            		if (s != null) {
+            			
+            			textIndexer.index(s, getTerms(literals).values().iterator());
+            			
+                        subjectCount++;
+                        statementCount += literals.size();
+                        
+                        if (l && subjectCount % 1000 == 0) {
+                        	log.info("indexed " + subjectCount + " subjects, " + statementCount + " statements");
+                        }
+                        
+            		}
+            		
+            		// set the current s and clear the literals
+            		
+            		s = spo.s();
+            		
+            		literals.clear();
+            		
+            	}
+            	
+            	literals.add(spo.o());
+            	
+            }
+            
+            if (s != null) {
+
+            	// flush the last subject
+            	textIndexer.index(s, getTerms(literals).values().iterator());
+            	
+                subjectCount++;
+                statementCount += literals.size();
+                
+            	if (log.isInfoEnabled()) {
+            		log.info("indexed " + subjectCount + " subjects, " + statementCount + " statements");
+            	}
+            	
+            }
+            
+        }
+
+    }
+    
+//    @SuppressWarnings("unchecked")
+//    public void refreshSubjectCentricTextIndex(final Set<IV<?,?>> subjects) {
+//
+//        if (getTimestamp() != ITx.UNISOLATED)
+//            throw new UnsupportedOperationException();
+//
+//        if (!subjectCentricTextIndex)
+//            throw new UnsupportedOperationException();
+//
+//        final ISubjectCentricTextIndexer<?> textIndexer = getSubjectCentricSearchEngine();
+//
+//        final AbstractTripleStore db = getContainer();
+//        
+//        /*
+//         * Keep a collection of literals to be indexed for each subject.
+//         */
+//        final Collection<IV<?,?>> literals = new LinkedList<IV<?,?>>();
+//        
+//        for (IV<?,?> s : subjects) {
+//        	
+//        	literals.clear();
+//        	
+//            /*
+//             * Visit all plain, language code, and datatype literals in the
+//             * object position of the primary statement index.
+//             * 
+//             * Note: This uses a filter on the ITupleIterator in order to filter
+//             * out non-literal terms before they are shipped from a remote index
+//             * shard.
+//             */
+//            final Iterator<ISPO> itr = db.getAccessPath(s, null, null, new SPOFilter<ISPO>() {
+//	                private static final long serialVersionUID = 1L;
+//					@Override
+//					public boolean isValid(Object e) {
+//						return ((ISPO)e).o().isLiteral();
+//					}
+//				}).iterator(); 
+//            	
+//            while (itr.hasNext()) {
+//            	
+//            	final ISPO spo = itr.next();
+//            	
+//            	literals.add(spo.o());
+//            	
+//            }
+//            
+//        	// flush the last subject
+//        	textIndexer.index(s, getTerms(literals).values().iterator());
+//            
+//        }
+//
+//    }
+//    
+//    @SuppressWarnings("unchecked")
+//    public void refreshSubjectCentricTextIndex(final Set<ISPO> removed) {
+//
+//        if (getTimestamp() != ITx.UNISOLATED)
+//            throw new UnsupportedOperationException();
+//
+//        if (!subjectCentricTextIndex)
+//            throw new UnsupportedOperationException();
+//
+//        final ISubjectCentricTextIndexer<?> textIndexer = getSubjectCentricSearchEngine();
+//
+//        final AbstractTripleStore db = getContainer();
+//        
+//        /*
+//         * Keep a collection of literals to be indexed for each subject.
+//         */
+//        final Collection<IV<?,?>> literals = new LinkedList<IV<?,?>>();
+//        
+//        for (ISPO spo : removed) {
+//        	
+//        	literals.clear();
+//        	
+//            /*
+//             * Visit all plain, language code, and datatype literals in the
+//             * object position of the primary statement index.
+//             * 
+//             * Note: This uses a filter on the ITupleIterator in order to filter
+//             * out non-literal terms before they are shipped from a remote index
+//             * shard.
+//             */
+//            final Iterator<ISPO> itr = db.getAccessPath(s, null, null, new SPOFilter<ISPO>() {
+//	                private static final long serialVersionUID = 1L;
+//					@Override
+//					public boolean isValid(Object e) {
+//						return ((ISPO)e).o().isLiteral();
+//					}
+//				}).iterator(); 
+//            	
+//            while (itr.hasNext()) {
+//            	
+//            	final ISPO spo = itr.next();
+//            	
+//            	literals.add(spo.o());
+//            	
+//            }
+//            
+//        	// flush the last subject
+////        	textIndexer.index(s, getTerms(literals).values().iterator());
+//        	
+//        }
+//
+//    }
+    
     /**
      * Batch resolution of internal values to {@link BigdataValue}s.
      * 

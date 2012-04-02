@@ -284,6 +284,45 @@ public interface BD {
     final boolean DEFAULT_PREFIX_MATCH = false;
     
     /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:subjectSearch "true" .
+     * }
+     * 
+     * </pre>
+     * <p>
+     * The subject-centric search index must be enabled via
+     * {@link AbstractTripleStore.Options#SUBJECT_CENTRIC_TEXT_INDEX}.
+     */
+    final URI SUBJECT_SEARCH = new URIImpl(SEARCH_NAMESPACE+"subjectSearch");
+
+    final boolean DEFAULT_SUBJECT_SEARCH = false;
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:searchTimeout "5000" .
+     * }
+     * 
+     * </pre>
+     * <p>
+     * Timeout specified in milliseconds.
+     */
+    final URI SEARCH_TIMEOUT = new URIImpl(SEARCH_NAMESPACE+"searchTimeout");
+    
+    /**
      * The default timeout for a free text search (milliseconds).
      */
     final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
