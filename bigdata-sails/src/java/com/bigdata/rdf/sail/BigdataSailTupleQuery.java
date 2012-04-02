@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sail;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.openrdf.query.Dataset;
@@ -8,7 +10,11 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailTupleQuery;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
@@ -72,6 +78,27 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     public TupleQueryResult evaluate() throws QueryEvaluationException {
 
         final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+        if (getMaxQueryTime() > 0)
+            originalQuery.setTimeout(TimeUnit.SECONDS
+                    .toMillis(getMaxQueryTime()));
+
+        originalQuery.setIncludeInferred(getIncludeInferred());
+
+        final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(
+                getTripleStore(), astContainer, new QueryBindingSet(
+                        getBindings()));
+
+        return queryResult;
+
+    }
+
+    public TupleQueryResult evaluate(final BindingsClause bc) 
+    		throws QueryEvaluationException {
+
+        final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+        originalQuery.setBindingsClause(bc);
 
         if (getMaxQueryTime() > 0)
             originalQuery.setTimeout(TimeUnit.SECONDS
