@@ -47,6 +47,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -282,6 +283,14 @@ public class SearchServiceFactory implements ServiceFactory {
                 
                 assertObjectIsLiteral(sp);
                 
+            } else if(uri.equals(BD.SUBJECT_SEARCH)) {
+                
+                assertObjectIsLiteral(sp);
+                
+            } else if(uri.equals(BD.SEARCH_TIMEOUT)) {
+                
+                assertObjectIsLiteral(sp);
+                
             } else {
 
                 throw new AssertionError("Unverified search predicate: " + sp);
@@ -339,6 +348,8 @@ public class SearchServiceFactory implements ServiceFactory {
         private final Literal minRelevance;
         private final Literal maxRelevance;
         private final boolean matchAllTerms;
+        private final boolean subjectSearch;
+        private final Literal searchTimeout;
         
         public SearchCall(
                 final AbstractTripleStore store,
@@ -382,6 +393,8 @@ public class SearchServiceFactory implements ServiceFactory {
             Literal minRelevance = null;
             Literal maxRelevance = null;
             boolean matchAllTerms = false;
+            boolean subjectSearch = false;
+            Literal searchTimeout = null;
 
             for (StatementPatternNode meta : statementPatterns.values()) {
 
@@ -407,6 +420,10 @@ public class SearchServiceFactory implements ServiceFactory {
                     maxRelevance = (Literal) oVal;
                 } else if (BD.MATCH_ALL_TERMS.equals(p)) {
                     matchAllTerms = ((Literal) oVal).booleanValue();
+                } else if (BD.SUBJECT_SEARCH.equals(p)) {
+                    subjectSearch = ((Literal) oVal).booleanValue();
+                } else if (BD.SEARCH_TIMEOUT.equals(p)) {
+                    searchTimeout = (Literal) oVal;
                 }
             }
 
@@ -421,15 +438,22 @@ public class SearchServiceFactory implements ServiceFactory {
             this.minRelevance = minRelevance;
             this.maxRelevance = maxRelevance;
             this.matchAllTerms = matchAllTerms;
+            this.subjectSearch = subjectSearch;
+            this.searchTimeout = searchTimeout;
 
         }
 
         @SuppressWarnings({ "rawtypes", "unchecked" })
         private Hiterator<IHit<?>> getHiterator() {
 
-            final IValueCentricTextIndexer<IHit> textIndex = (IValueCentricTextIndexer) store
-                    .getLexiconRelation().getSearchEngine();
+//            final IValueCentricTextIndexer<IHit> textIndex = (IValueCentricTextIndexer) store
+//                    .getLexiconRelation().getSearchEngine();
             
+        	final ITextIndexer<IHit> textIndex = (ITextIndexer) 
+	    		(this.subjectSearch ?
+	    			store.getLexiconRelation().getSubjectCentricSearchEngine() :
+	    				store.getLexiconRelation().getSearchEngine());
+        	
             if (textIndex == null)
                 throw new UnsupportedOperationException("No free text index?");
 
@@ -450,7 +474,7 @@ public class SearchServiceFactory implements ServiceFactory {
                 minRank == null ? BD.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
                 maxRank == null ? BD.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
                 matchAllTerms,
-                BD.DEFAULT_TIMEOUT/*0L*//* timeout */,
+                searchTimeout == null ? BD.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
                 TimeUnit.MILLISECONDS);
         
         }
@@ -481,11 +505,11 @@ public class SearchServiceFactory implements ServiceFactory {
             if (bindingsClause.length == 1 && !bindingsClause[0].isEmpty()) {
 
                 /*
-                 * FIXME This case is not supported.  We need to propagate
-                 * the bindings into the search engine.
+                 * Fixed this by putting the ASTBindingAssigner before the
+                 * ASTSearchOptimizer in the DefaultOptimizerList. 
                  */
 
-                throw new UnsupportedOperationException();
+//                throw new UnsupportedOperationException();
 
             }
             

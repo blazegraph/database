@@ -200,20 +200,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTEmptyGroupOptimizer());
         
         /**
-         * Translate {@link BD#SEARCH} and associated magic predicates into a a
-         * {@link ServiceNode}. If there are multiple searches in the query,
-         * then each is translated into its own {@link ServiceNode}. The magic
-         * predicates identify the bindings to be projected out of the named
-         * subquery (rank, cosine, etc).
-         * <p>
-         * Note: Search is most efficiently expressed within named subqueries.
-         * This let's you perform additional joins against the solutions from
-         * the search service before the results are materialized on a hash
-         * index to be joined into the main query.
-         */
-        add(new ASTSearchOptimizer());
-        
-        /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of
          * variables visible to the {@link QueryBase} having that projection.
          * This is done first for the {@link NamedSubqueriesNode} and then
@@ -248,6 +234,20 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */ 
         add(new ASTBindingAssigner());
 
+        /**
+         * Translate {@link BD#SEARCH} and associated magic predicates into a a
+         * {@link ServiceNode}. If there are multiple searches in the query,
+         * then each is translated into its own {@link ServiceNode}. The magic
+         * predicates identify the bindings to be projected out of the named
+         * subquery (rank, cosine, etc).
+         * <p>
+         * Note: Search is most efficiently expressed within named subqueries.
+         * This let's you perform additional joins against the solutions from
+         * the search service before the results are materialized on a hash
+         * index to be joined into the main query.
+         */
+        add(new ASTSearchOptimizer());
+        
         /**
          * Imposes a LIMIT of ONE for a non-aggregation ASK query.
          */

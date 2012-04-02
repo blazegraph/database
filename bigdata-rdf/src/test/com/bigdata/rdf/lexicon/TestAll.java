@@ -108,6 +108,9 @@ public class TestAll extends TestCase {
         // test suite for access paths reading on the TERMS index.
         suite.addTestSuite(TestAccessPaths.class);
         
+        // test suite for subject-centric text index
+        suite.addTestSuite(TestSubjectCentricFullTextIndex.class);
+        
         return suite;
         
     }
