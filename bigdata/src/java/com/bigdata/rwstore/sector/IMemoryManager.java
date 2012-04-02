@@ -28,6 +28,8 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rwstore.PSInputStream;
+import com.bigdata.rwstore.PSOutputStream;
 
 /**
  * Abstraction for managing data in {@link ByteBuffer}s. Typically those buffers
@@ -254,5 +256,17 @@ public interface IMemoryManager extends ICounterSetAccess {
 	 * this {@link IMemoryManager} (including any child allocation contexts).
 	 */
 	public long getSlotBytes();
+	
+	/**
+	 * @return an outputstream to stream data to the memory manager and to retrieve
+	 * an address to later stream the data back.
+	 */
+	public PSOutputStream getOutputStream();
+	
+	/**
+	 * @return an outputstream to stream data to the memory manager and to retrieve
+	 * an address to later stream the data back.
+	 */
+	public PSInputStream getInputStream(long addr);
 	
 }

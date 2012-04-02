@@ -1779,7 +1779,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (alloc.isAllocated(addrOffset))
 				throw new IllegalStateException("Reallocation problem with WriteCache");
 
-			if (alloc.m_context == null && !m_commitList.contains(alloc)) {
+			if (alloc.isUnlocked() && !m_commitList.contains(alloc)) {
 				m_commitList.add(alloc);
 			}
 			
@@ -1882,7 +1882,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				
 				final int addr = allocator.alloc(this, size, context);
 
-				if (allocator.m_context == null && !m_commitList.contains(allocator)) {
+				if (allocator.isUnlocked() && !m_commitList.contains(allocator)) {
 					m_commitList.add(allocator);
 				}
 
@@ -2594,7 +2594,8 @@ public class RWStore implements IStore, IBufferedWriter {
         final int blocks = m_metaBits.length / cDefaultMetaBitsSize;
         for (int b = 0; b < blocks; b++) {
             final int ret = fndBit(m_metaTransientBits,
-                    (b * cDefaultMetaBitsSize) + 1, 8);
+                    (b * cDefaultMetaBitsSize) + 1, cDefaultMetaBitsSize-1);
+            
             if (ret != -1) {
 				return ret;
 			}
@@ -2626,10 +2627,24 @@ public class RWStore implements IStore, IBufferedWriter {
 		m_writeCache.clearWrite(metaBit2Addr(bit));
 	}
 
+	/**
+	 * The metabits are encoded in cDefaultMetaBitsSize int runs as follows
+	 * [start addr1][bits0][bits1]...[bitsN]
+	 * [start addr2]...
+	 * ...
+	 * The bit parameter is processed to determine which run it is part of.
+	 * 
+	 * Note that the bit offsets are not contiguous since there are "holes"
+	 * where the meta allocation [start addr] are stored.
+	 * 
+	 */
 	long metaBit2Addr(final int bit) {
 //		final int bitsPerBlock = 9 * 32;
 		
 		final int intIndex = bit / 32; // divide 32;
+		
+		assert intIndex % cDefaultMetaBitsSize != 0; // used by the start addrs!
+		
 		final int addrIndex = (intIndex/cDefaultMetaBitsSize)*cDefaultMetaBitsSize;
 		final long addr = convertAddr(m_metaBits[addrIndex]);
 

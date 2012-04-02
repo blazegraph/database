@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,6 +34,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IStore;
+import com.bigdata.rwstore.PSInputStream;
+import com.bigdata.rwstore.PSOutputStream;
 
 /**
  * The {@link AllocationContext} is used to maintain a handle on allocations
@@ -57,7 +62,7 @@ import com.bigdata.counters.OneShotInstrument;
  * 
  * @author Martyn Cutcher
  */
-public class AllocationContext implements IMemoryManager {
+public class AllocationContext implements IMemoryManager, IStore {
 	
 	private static final transient Logger log = Logger
 			.getLogger(AllocationContext.class);
@@ -283,6 +288,54 @@ public class AllocationContext implements IMemoryManager {
 		
 		return root;
 		
+	}
+
+	@Override
+	public PSOutputStream getOutputStream() {
+		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, null);
+	}
+
+	@Override
+	public PSInputStream getInputStream(long addr) {
+		return new PSInputStream(this, addr);
+	}
+
+	@Override
+	public long alloc(byte[] buf, int size, IAllocationContext context) {
+		if (context != null)
+			throw new IllegalArgumentException("The MemoryManager does not support AllocationContexts");
+		
+		return MemoryManager.getAllocationAddress(allocate(ByteBuffer.wrap(buf, 0, size))); // return the rwaddr!
+	}
+
+	@Override
+	public void close() {
+		clear();
+	}
+
+	@Override
+	public void free(long addr, int size) {
+		free((addr << 32) + size);
+	}
+
+	@Override
+	public int getAssociatedSlotSize(int addr) {
+		return m_root.allocationSize(addr);
+	}
+
+	@Override
+	public void getData(long l, byte[] buf) {
+		/**
+		 * TBD: this could probably be more efficient!
+		 */
+		final ByteBuffer rbuf = m_root.getBuffer((int) l, buf.length);	
+		rbuf.get(buf);
+	}
+
+	@Override
+	public File getStoreFile() {
+		throw new UnsupportedOperationException("The MemoryManager does not provdie a StoreFile");
+
 	}
 
 //	private SectorAllocation m_head = null;

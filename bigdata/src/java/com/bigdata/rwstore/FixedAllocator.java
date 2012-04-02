@@ -91,6 +91,10 @@ public class FixedAllocator implements Allocator {
 			return val < 0 ? -1 : 1;
 		}
 	}
+	
+	public boolean equals(final Object o) {
+		return this == o;
+	}
 
 	public int getDiskAddr() {
 		return m_diskAddr;
@@ -160,15 +164,22 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 
-	volatile IAllocationContext m_context;
-	volatile Thread m_contextThread;
+	volatile private IAllocationContext m_context;
+	volatile private Thread m_contextThread;
 
+	/**
+	 * @return whether the allocator is unassigned to an AllocationContext
+	 */
+	boolean isUnlocked() {
+		return m_context == null;
+	}
+	
 	/**
 	 * Indicates whether session protection has been used to protect
 	 * store from re-allocating allocations reachable from read-only
 	 * requests and concurrent transactions.
 	 */
-	boolean m_sessionActive;
+	private boolean m_sessionActive;
 
 	private boolean m_pendingContextCommit = false;
 	

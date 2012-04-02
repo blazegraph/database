@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +40,10 @@ import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IStore;
+import com.bigdata.rwstore.PSInputStream;
+import com.bigdata.rwstore.PSOutputStream;
 
 /**
  * The MemoryManager manages an off-heap Direct {@link ByteBuffer}. It uses the
@@ -53,7 +58,7 @@ import com.bigdata.io.IBufferAccess;
  * @author Martyn Cutcher
  */
 public class MemoryManager implements IMemoryManager, ISectorManager,
-		ICounterSetAccess {
+		ICounterSetAccess, IStore {
 
 	private static final Logger log = Logger.getLogger(MemoryManager.class);
 
@@ -506,7 +511,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				int[] addrs = null;
 				try {
 					nblocks = SectorAllocator.getBlobBlockCount(nbytes);
-					hdrbuf = ByteBuffer.allocate(nblocks * 4);
+					hdrbuf = ByteBuffer.allocate(nblocks * 4 + 4); // include block count
+					hdrbuf.putInt(nblocks);
 					addrs = new int[nblocks];
 					
 					for (int i = 0; i < nblocks; i++) {
@@ -534,7 +540,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 					// We could have failed to allocate any of the blob parts or the header
 					try {
 						hdrbuf.position(0);
-						hdrbuf.limit(nblocks*4);
+						hdrbuf.limit(nblocks*4+4);
+						final int rblocks = hdrbuf.getInt();
+						assert(nblocks == rblocks);
 						for (int i = 0; i < nblocks; i++) {
 							int addr = hdrbuf.getInt();
 							if (addr == 0) {
@@ -587,7 +595,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 			
 			final ByteBuffer hdrbuf = getBlobHdr(addr);
 			
-			final int nblocks = hdrbuf.remaining() / 4;
+			final int nblocks = hdrbuf.getInt();
 			
 			final ByteBuffer[] blobbufs = new ByteBuffer[nblocks];
 			int remaining = size;
@@ -652,7 +660,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		int size = getAllocationSize(addr);
 		
 		final int nblocks = SectorAllocator.getBlobBlockCount(size);
-		final int hdrsize = 4*nblocks;
+		final int hdrsize = 4*nblocks+4; // include count entry
 		
 		// Mockup hdraddr with header size to retrieve the ByteBuffer
 		final long hdraddr = (addr & 0xFFFFFFFF00000000L) | hdrsize;
@@ -670,7 +678,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 *            
 	 * @return The mutable view.
 	 */
-	private ByteBuffer getBuffer(final int rwaddr, final int size) {
+	ByteBuffer getBuffer(final int rwaddr, final int size) {
 
 		final SectorAllocator sector = getSector(rwaddr);
 		
@@ -779,7 +787,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				final ByteBuffer hdrbuf = getBlobHdr(addr);
 				final int spos = hdrbuf.position();
 				final int hdrsize = hdrbuf.limit() - spos;
-				final int nblocks = hdrsize / 4;
+				final int nblocks = hdrbuf.getInt(); // read # of blocks
 				
 				// free each block
 				int remaining = size;
@@ -936,6 +944,61 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 		return getClass().getName() + "{counters=" + getCounters() + "}";
 
+	}
+
+	@Override
+	public long alloc(byte[] buf, int size, IAllocationContext context) {
+		if (context != null)
+			throw new IllegalArgumentException("The MemoryManager does not support AllocationContexts");
+		
+		return getAllocationAddress(allocate(ByteBuffer.wrap(buf, 0, size))); // return the rwaddr!
+	}
+
+	@Override
+	public void close() {
+		clear(); // releasing direct buffers
+	}
+
+	@Override
+	public void free(long addr, int size) {
+		free((addr << 32) + size);
+	}
+
+	@Override
+	public int getAssociatedSlotSize(int addr) {
+		final SectorAllocator sector = getSector(addr);
+		
+		final int offset = SectorAllocator.getSectorOffset(addr);
+		
+		return sector.getPhysicalSize(offset);
+	}
+
+	@Override
+	public void getData(long l, byte[] buf) {
+		/**
+		 * TBD: this could probably be more efficient!
+		 */
+		final ByteBuffer rbuf = getBuffer((int) l, buf.length);	
+		rbuf.get(buf);
+	}
+
+	@Override
+	public File getStoreFile() {
+		throw new UnsupportedOperationException("The MemoryManager does not provdie a StoreFile");
+	}
+
+	@Override
+	public PSOutputStream getOutputStream() {
+		return getOutputStream(null/*AllocationContext*/);
+	}
+
+	public PSOutputStream getOutputStream(final IAllocationContext context) {
+		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, context);
+	}
+
+	@Override
+	public PSInputStream getInputStream(long addr) {
+		return new PSInputStream(this, addr);
 	}
 
 	/*

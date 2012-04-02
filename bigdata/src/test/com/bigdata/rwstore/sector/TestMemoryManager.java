@@ -1,5 +1,9 @@
 package com.bigdata.rwstore.sector;
 
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,6 +22,8 @@ import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rwstore.PSInputStream;
+import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -132,6 +138,46 @@ public class TestMemoryManager extends TestCase2 {
 			doStressAllocations(context, false, 5000, 5 + r.nextInt(3000));
 			
 			context.clear();
+			
+		}
+	}
+	
+	public void testAllocationContextsStreams() throws IOException {
+		
+		final IMemoryManager context = manager.createAllocationContext();
+		
+		final String ss = "Just a simple string object";
+		for (int i = 0; i < 500; i++) {
+
+			PSOutputStream pout = context.getOutputStream();
+			ObjectOutputStream out = new ObjectOutputStream(pout);
+
+			for (int t = 0; t < 100; t++) {
+				out.writeObject(ss);
+			}
+
+			out.close();
+
+			final long addr = pout.getAddr();
+			PSInputStream pin = context.getInputStream(addr);
+			ObjectInputStream in = new ObjectInputStream(pin);
+			int reads = 0;
+			try {
+				while (true) {
+					assertTrue(ss.equals(in.readObject()));
+					reads++;
+				}
+			} catch (EOFException eof) {
+				// expected
+			} catch (ClassNotFoundException e) {
+				fail("Unexpected ClassNotFoundException");
+			}
+			
+			assertTrue (reads == 100);
+			
+			context.clear();
+			
+			assertTrue(manager.getSlotBytes() == 0);
 			
 		}
 	}

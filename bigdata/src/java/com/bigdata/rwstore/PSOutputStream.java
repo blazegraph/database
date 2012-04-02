@@ -225,6 +225,8 @@ public class PSOutputStream extends OutputStream {
   			// m_blobHdrIdx = 0;
   		}
   		
+  		System.out.println("Writing BLOB part: " + m_count);
+  		
   		final int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
   		// m_blobHeader[m_blobHdrIdx++] = curAddr;
   		m_blobHeader.add(curAddr);
@@ -372,11 +374,9 @@ public class PSOutputStream extends OutputStream {
   }
   
   public void close() throws IOException {
-  	if (m_store != null) {
+  	if (false && m_store != null) {
   		m_store = null;
   	
-			m_isSaved = false;
-			
   		returnStream(this);
   	}
   }
@@ -402,6 +402,15 @@ public class PSOutputStream extends OutputStream {
 				}
 			}
 		};
+	}
+
+	public long getAddr() {
+		
+		long addr = save();
+		addr <<= 32;
+		addr += m_bytesWritten;
+		
+		return addr;
 	}
 			
 			
