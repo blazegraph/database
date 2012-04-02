@@ -69,27 +69,32 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          TODO It should be possible to define an native int32 hash table in
- *          parallel to the unsigned byte[] hash table simply by having an
- *          alternative descent passing an int32 key all the way down and using
- *          the variant of getBits() method which operates on the int32 values.
- *          We could also optimize the storage and retrieval of the int32 keys,
- *          perhaps with a custom mutable bucket page and mutable bucket data
- *          implementation for int32 keys. This optimization is likely to be
- *          quite worth while as the majority of use cases for the hash tree use
- *          int32 keys.
+ * @see <a
+ *      href="A robust scheme for multilevel extendible hashing (2003)">
+ *      A Robust Scheme for Multilevel Extendible Hashing </a> by Sven Helmer,
+ *      Thomas Neumann, Guido Moerkotte. ISCIS 2003: 220-227.
  * 
- *          TODO It is quite possible to define a range query interface for the
- *          hash tree. You have to use an order preserving hash function, which
- *          is external to the HTree implementation. Internally, the HTree must
- *          either double-link the pages or crawl the directory structure.
  * 
- *          TODO The keys should be declared as a computed key based on the data
- *          fields in the record. The {@link HTree} supports arbitrary bit
- *          length keys, but can be optimized for int32 keys easily enough.
+ *      TODO It should be possible to define an native int32 hash table in
+ *      parallel to the unsigned byte[] hash table simply by having an
+ *      alternative descent passing an int32 key all the way down and using the
+ *      variant of getBits() method which operates on the int32 values. We could
+ *      also optimize the storage and retrieval of the int32 keys, perhaps with
+ *      a custom mutable bucket page and mutable bucket data implementation for
+ *      int32 keys. This optimization is likely to be quite worth while as the
+ *      majority of use cases for the hash tree use int32 keys.
  * 
- *          TODO Instrument performance counters for structural modifications,
- *          insert, remove, etc. per {@link BTreeCounters}.
+ *      TODO It is quite possible to define a range query interface for the hash
+ *      tree. You have to use an order preserving hash function, which is
+ *      external to the HTree implementation. Internally, the HTree must either
+ *      double-link the pages or crawl the directory structure.
+ * 
+ *      TODO The keys should be declared as a computed key based on the data
+ *      fields in the record. The {@link HTree} supports arbitrary bit length
+ *      keys, but can be optimized for int32 keys easily enough.
+ * 
+ *      TODO Instrument performance counters for structural modifications,
+ *      insert, remove, etc. per {@link BTreeCounters}.
  */
 public class HTree extends AbstractHTree 
 	implements 
