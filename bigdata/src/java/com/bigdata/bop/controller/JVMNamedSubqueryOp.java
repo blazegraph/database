@@ -61,9 +61,9 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * Evaluation of a subquery, producing a named result set. This operator passes
  * through any source binding sets without modification. The subquery is
  * evaluated exactly once, the first time this operator is invoked for a given
- * query plan. No bindings are pushed into the subquery. If some variables are
- * known to be bound, then they should be rewritten into constants or their
- * bindings should be inserted into the subquery using LET() operator.
+ * query plan. If some variables are known to be bound, then they should be
+ * rewritten into constants or their bindings should be inserted into the
+ * subquery using LET() operator.
  * <p>
  * This operator is NOT thread-safe. It relies on the query engine to provide
  * synchronization for the "run-once" contract of the subquery. The operator
