@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -554,7 +556,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.update = true;
             this.queryType = null;
             this.mimeType = null;
-            this.charset = null;
+            this.charset = Charset.forName("UTF-8");
             this.fileExt = null;
             this.req = req;
             this.explain = req.getParameter(EXPLAIN) != null;
@@ -982,8 +984,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * Executes a SPARQL UPDATE.
      */
-    private class UpdateTask extends AbstractQueryTask {
+    class UpdateTask extends AbstractQueryTask {
 
+        /**
+         * The timestamp for the commit point associated with the update and
+         * <code>-1</code> if the commit point has not yet been assigned.
+         */
+        public AtomicLong commitTime = new AtomicLong(-1);
+        
         public UpdateTask(final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
                 final HttpServletRequest req, final OutputStream os) {
@@ -1004,7 +1012,62 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final BigdataSailUpdate update = setupUpdate(cxn);
 
-            update.execute();
+            this.commitTime.set(update.execute2());
+
+            /*
+             * Setup the response headers.
+             */
+
+//        // No caching for UPDATE.
+//        resp.addHeader("Cache-Control", "no-cache");
+
+//            final Charset charset = updateTask.charset;
+
+            final Writer w = new OutputStreamWriter(os, charset);
+
+            try {
+
+                final HTMLBuilder doc = new HTMLBuilder(charset.name(), w);
+
+                {
+
+                    XMLBuilder.Node current = doc.root("html");
+                    {
+                        current = current.node("head");
+                        current.node("meta")
+                                .attr("http-equiv", "Content-Type")
+                                .attr("content",
+                                        "text/html;charset=" + charset.name())
+                                .close();
+                        current.node("title").textNoEncode("bigdata&#174;")
+                                .close();
+                        current = current.close();// close the head.
+                    }
+
+                    // open the body
+                    current = current.node("body");
+
+                    current.node("p")//
+                            .text("commitTime=" + commitTime.get())//
+                            .close();
+
+                    // current.node("p")//
+                    // .text("commitTime=" + updateTask.commitTime.get())//
+                    // .close();
+
+                    doc.closeAll(current);
+
+                }
+
+                w.flush();
+
+            } finally {
+
+                w.close();
+                // os.flush();
+                // os.close();
+
+            }
 
         }
 
@@ -1056,7 +1119,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         final String baseURI = req.getRequestURL().toString();
 
-        if(update) {
+        if (update) {
 
             /*
              * Parse the query so we can figure out how it will need to be executed.

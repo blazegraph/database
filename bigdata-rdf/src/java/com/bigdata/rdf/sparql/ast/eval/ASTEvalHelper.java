@@ -663,12 +663,14 @@ public class ASTEvalHelper {
      *            sequence (optional).
      * @param includeInferred
      *            if inferences should be included in various operations.
+     *
+     * @return The timestamp of the commit point.
      *            
      * @throws SailException
      * 
      * TODO timeout for update?
      */
-    static public void executeUpdate(//
+    static public long executeUpdate(//
             final BigdataSailRepositoryConnection conn,//
             final ASTContainer astContainer,//
             final Dataset dataset,
@@ -711,6 +713,8 @@ public class ASTEvalHelper {
              */
             AST2BOpUpdate.convertUpdate(ctx);
 
+            return ctx.getCommitTime();
+            
         } catch (Exception ex) {
 
             throw new UpdateExecutionException(ex);

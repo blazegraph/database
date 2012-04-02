@@ -28,6 +28,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -70,6 +71,7 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -318,15 +320,15 @@ public class QueryServlet extends BigdataRDFServlet {
             // final boolean explain =
             // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
 
-            final AbstractQueryTask queryTask;
+            final UpdateTask updateTask;
             try {
                 /*
                  * Attempt to construct a task which we can use to evaluate the
                  * query.
                  */
-                queryTask = context
-                        .getQueryTask(namespace, timestamp, updateStr,
-                                null/* acceptOverride */, req, os, true/* update */);
+                updateTask = (UpdateTask) context.getQueryTask(namespace,
+                        timestamp, updateStr, null/* acceptOverride */, req,
+                        os, true/* update */);
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the
@@ -337,20 +339,10 @@ public class QueryServlet extends BigdataRDFServlet {
                 return;
             }
 
-            final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+            final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
 
             if (log.isTraceEnabled())
                 log.trace("Will run update: " + updateStr);
-
-            /*
-             * Setup the response headers.
-             */
-
-            resp.setStatus(HTTP_OK);
-            resp.setContentType(BigdataServlet.MIME_TEXT_PLAIN);
-            
-            // No caching for UPDATE.
-            resp.addHeader("Cache-Control", "no-cache");
 
 //            if (queryTask.explain) {
 //                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
@@ -427,9 +419,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 // Wait for the Future.
                 ft.get();
-//
-//            }
-
+                
         } catch (Throwable e) {
             try {
                 throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
