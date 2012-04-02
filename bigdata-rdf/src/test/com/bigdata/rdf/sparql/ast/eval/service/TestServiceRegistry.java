@@ -202,6 +202,17 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
         assertNull(ServiceRegistry.getInstance().get(serviceURI1));
         assertNull(ServiceRegistry.getInstance().get(serviceURI2));
 
+        /*
+         * Verify that we can re-register the alias.
+         */
+        try {
+            // Register alias.
+            ServiceRegistry.getInstance().addAlias(serviceURI1, serviceURI2);
+        } finally {
+            // Remove alias.
+            ServiceRegistry.getInstance().remove(serviceURI2);
+        }
+
     }
 
     /**
