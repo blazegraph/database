@@ -108,7 +108,12 @@ public class TestAll extends TestCase {
          * Note: See the NanoSparqlServer test suite for REMOTE SPARQL SERVICE
          * evaluation against embedded HTTP end points.
          */
-       
+
+        /*
+         * Test suite for registering and managing services.
+         */
+        suite.addTestSuite(TestServiceRegistry.class);
+        
         return suite;
         
     }

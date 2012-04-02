@@ -120,6 +120,8 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
@@ -1141,19 +1143,52 @@ public class BigdataSail extends SailBase implements Sail {
     protected NotifyingSailConnection getConnectionInternal() 
         throws SailException {
 
+        final BigdataSailConnection conn;
         try {
 
             // if we have isolatable indices then use a read/write transaction
             // @todo finish testing so we can enable this
             if (isolatable) {
                 
-                return getReadWriteConnection();
+                conn = getReadWriteConnection();
                 
             } else {
             
-                return getUnisolatedConnection();
-                
+                conn = getUnisolatedConnection();
+
             }
+
+            if (!conn.isReadOnly()) {
+
+                /*
+                 * Give each registered ServiceFactory instance an opportunity
+                 * to intercept the start of this connection.
+                 */
+                
+                final Iterator<CustomServiceFactory> itr = ServiceRegistry
+                        .getInstance().customServices();
+
+                while (itr.hasNext()) {
+
+                    final CustomServiceFactory f = itr.next();
+
+                    try {
+
+                        f.startConnection(conn);
+
+                    } catch (Throwable t) {
+
+                        log.error(t, t);
+
+                        continue;
+
+                    }
+
+                }
+
+            }
+            
+            return conn;
             
         } catch (Exception ex) {
             
