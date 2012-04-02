@@ -130,7 +130,8 @@ public class ServiceRegistry {
      * Remove a service from the registry and/or set of known aliases.
      * 
      * @param serviceURI
-     *            The service URI.
+     *            The URI of the service -or- the URI of an alias registered
+     *            using {@link #addAlias(URI, URI)}.
      * 
      * @return <code>true</code> iff a service for that URI was removed.
      */

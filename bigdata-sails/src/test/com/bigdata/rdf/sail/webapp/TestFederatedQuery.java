@@ -485,9 +485,9 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
         } finally {
         
-            // De-register those service URIs.
-            ServiceRegistry.getInstance().remove(serviceURI1);
-            ServiceRegistry.getInstance().remove(serviceURI2);
+            // De-register those service aliases.
+            ServiceRegistry.getInstance().remove(serviceURI1_alias);
+            ServiceRegistry.getInstance().remove(serviceURI2_alias);
             
         }
         
