@@ -372,7 +372,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         
 //        final BigdataValueFactory vf = getValueFactory();
 
-        if (iv.isInline() && !iv.isExtension()) {
+        if (iv.isInline() && !iv.needsMaterialization()) {
 
 //        	if (iv instanceof Literal) {
         		
@@ -405,7 +405,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      * @param iv
      *            The {@link IV}.
      * 
-     * @return The {@link Literal}.
+     * @return The {@link Value}.
      * 
      * @throws SparqlTypeErrorException
      *             if the argument is <code>null</code>.
@@ -419,7 +419,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         if (iv == null)
             throw new SparqlTypeErrorException();
 
-        if (iv.isInline() && !iv.isExtension()) {
+        if (iv.isInline() && !iv.needsMaterialization()) {
 
     		return (Value) iv;
         		

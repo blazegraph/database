@@ -143,10 +143,10 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     public boolean accept(final IBindingSet bs) {
         
         @SuppressWarnings("rawtypes")
-        final IV var = get(0).get(bs);
+        final Value var = asValue(getAndCheckBound(0, bs));
         
         @SuppressWarnings("rawtypes")
-        final IV pattern = get(1).get(bs);
+        final IV pattern = getAndCheckBound(1, bs);
 
         @SuppressWarnings("rawtypes")
         final IV flags = arity() > 2 ? get(2).get(bs) : null;
@@ -157,11 +157,7 @@ public class RegexBOp extends XSDBooleanIVValueExpression
         	log.debug("regex flags: " + flags);
         }
         
-        // not yet bound
-        if (var == null || pattern == null)
-        	throw new SparqlTypeErrorException();
-        
-        return accept(var.getValue(), pattern.getValue(), 
+        return accept(var, pattern.getValue(), 
         		flags != null ? flags.getValue() : null);
 
     }

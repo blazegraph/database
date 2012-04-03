@@ -128,4 +128,5 @@ public class TestRegexBOp extends ProxyTestCase {
         }
         
     }
+    
 }
