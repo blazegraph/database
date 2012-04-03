@@ -11,15 +11,21 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
+import com.bigdata.journal.AbstractJournalTestCase;
+
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.RWStore;
+import com.bigdata.journal.TestJournalBasics;
+import com.bigdata.journal.Journal.Options;
 
 /**
  * Test suite for {@link MemStore}.
  * 
  * @author thompsonbry
  */
-public class TestMemStore extends TestCase2 {
+public class TestMemStore extends AbstractJournalTestCase {
 
 	public TestMemStore() {
 	}
@@ -28,7 +34,42 @@ public class TestMemStore extends TestCase2 {
 		super(name);
 	}
 
-    public static Test suite() {
+	public Properties getProperties() {
+
+        final Properties properties = super.getProperties();
+
+        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.MemStore
+                .toString());
+		// properties.setProperty(Options.BUFFER_MODE,
+		// BufferMode.TemporaryRW.toString());
+
+		// properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+		// properties.setProperty(Options.FILE,
+		// "/Volumes/SSDData/TestRW/tmp.rw");
+
+		properties.setProperty(Options.DELETE_ON_EXIT, "true");
+
+		// ensure history retention to force deferredFrees
+		// properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE,
+		// "1"); // Non-zero
+		
+		// Set OVERWRITE_DELETE
+		// properties.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
+
+		return properties;
+
+	}
+
+	public static Test suite() {
 
         final TestMemStore delegate = new TestMemStore(); // !!!! THIS CLASS !!!!
 
@@ -55,12 +96,12 @@ public class TestMemStore extends TestCase2 {
         // test suite for MRMW correctness.
         suite.addTestSuite( TestMRMW.class );
 
-//        /*
-//         * Pickup the basic journal test suite. This is a proxied test suite, so
-//         * all the tests will run with the configuration specified in this test
-//         * class and its optional .properties file.
-//         */
-//        suite.addTest(TestJournalBasics.suite());
+        /*
+         * Pickup the basic journal test suite. This is a proxied test suite, so
+         * all the tests will run with the configuration specified in this test
+         * class and its optional .properties file.
+         */
+        // suite.addTest(TestJournalBasics.suite());
 
         return suite;
 

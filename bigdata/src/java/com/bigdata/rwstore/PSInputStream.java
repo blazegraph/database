@@ -118,7 +118,7 @@ public class PSInputStream extends InputStream {
 			if (++m_index == m_buffers.length) 
 				return retlen;
 			
-			buf = m_buffers[++m_index];
+			buf = m_buffers[m_index];
 			rem = buf.remaining();
 		}
 		

@@ -63,6 +63,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestMemoryManager.class);
 
         suite.addTestSuite(TestMemoryManager2.class);
+        
+        suite.addTestSuite(TestMemoryManagerStreams.class);
 
         suite.addTest(TestMemStore.suite());
 

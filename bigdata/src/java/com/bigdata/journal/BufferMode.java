@@ -164,12 +164,12 @@ public enum BufferMode {
      */
     Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
     
-//    /**
-//     * A transient buffer mode backed by the {@link MemoryManager}, which is
-//     * similar to the {@link RWStore} but optimized for main memory. This can
-//     * scale up to 4TB of main memory.
-//     */
-//    MemStore(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW)
+    /**
+     * A transient buffer mode backed by the {@link MemoryManager}, which is
+     * similar to the {@link RWStore} but optimized for main memory. This can
+     * scale up to 4TB of main memory.
+     */
+    MemStore(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW)
 
     ;
 

@@ -338,6 +338,21 @@ public class AllocationContext implements IMemoryManager, IStore {
 
 	}
 
+	@Override
+	public int getSectorSize() {
+		return m_root.getSectorSize();
+	}
+
+	@Override
+	public int getMaxSectors() {
+		return m_root.getMaxSectors();
+	}
+
+	@Override
+	public int getSectorCount() {
+		return m_root.getSectorCount();
+	}
+
 //	private SectorAllocation m_head = null;
 //	
 //	/**

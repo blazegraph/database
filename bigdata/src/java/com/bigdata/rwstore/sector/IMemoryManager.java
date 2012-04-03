@@ -268,5 +268,13 @@ public interface IMemoryManager extends ICounterSetAccess {
 	 * an address to later stream the data back.
 	 */
 	public PSInputStream getInputStream(long addr);
+
+	public int getSectorSize();
+
+	public int getSectorCount();
+
+	public int getMaxSectors();
+
+	public void close();
 	
 }
