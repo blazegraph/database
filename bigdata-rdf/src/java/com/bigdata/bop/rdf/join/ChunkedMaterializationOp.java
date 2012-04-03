@@ -304,7 +304,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    if (!iv.isInline() || iv.isExtension() || materializeAll) {
+                    if (iv.needsMaterialization() || materializeAll) {
                     	
                     	ids.add(iv);
                     
@@ -331,7 +331,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    if (!iv.isInline() || iv.isExtension() || materializeAll) {
+                    if (iv.needsMaterialization() || materializeAll) {
                     	
                     	ids.add(iv);
                     	
@@ -414,7 +414,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                 
                 final BigdataValue value = terms.get(iv);
 
-                if (value == null && (iv.isExtension() || !iv.isInline())) {
+                if (value == null && iv.needsMaterialization()) {
 
                     throw new RuntimeException("Could not resolve: iv=" + iv);
 
@@ -457,7 +457,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                 final BigdataValue value = terms.get(iv);
 
-                if (value == null && (iv.isExtension() || !iv.isInline())) {
+                if (value == null && iv.needsMaterialization()) {
 
                     throw new RuntimeException("Could not resolve: iv=" + iv);
 

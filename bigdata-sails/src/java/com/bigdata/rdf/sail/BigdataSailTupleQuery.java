@@ -77,19 +77,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     @Override
     public TupleQueryResult evaluate() throws QueryEvaluationException {
 
-        final QueryRoot originalQuery = astContainer.getOriginalAST();
-
-        if (getMaxQueryTime() > 0)
-            originalQuery.setTimeout(TimeUnit.SECONDS
-                    .toMillis(getMaxQueryTime()));
-
-        originalQuery.setIncludeInferred(getIncludeInferred());
-
-        final TupleQueryResult queryResult = ASTEvalHelper.evaluateTupleQuery(
-                getTripleStore(), astContainer, new QueryBindingSet(
-                        getBindings()));
-
-        return queryResult;
+        return evaluate((BindingsClause) null);
 
     }
 
@@ -98,7 +86,8 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
         final QueryRoot originalQuery = astContainer.getOriginalAST();
 
-        originalQuery.setBindingsClause(bc);
+        if (bc != null)
+        	originalQuery.setBindingsClause(bc);
 
         if (getMaxQueryTime() > 0)
             originalQuery.setTimeout(TimeUnit.SECONDS
