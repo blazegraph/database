@@ -43,20 +43,15 @@ import com.bigdata.rawstore.TransientResourceMetadata;
  * 
  * @author thompsonbry
  */
-public class MemStore extends AbstractRawStore implements IRawStore {
+public class MemStore extends AbstractRawStore {
 
 //	private static final transient Logger log = Logger
 //			.getLogger(MemStore.class);
 
 	/**
-	 * The address manager.
-	 */
-	private final IAddressManager m_am = new MemStoreAddressManager();
-
-	/**
 	 * The backing store implementation.
 	 */
-	private final IMemoryManager m_store;
+	private final MemStrategy m_strategy;
 
 	/**
 	 * The {@link UUID} for the store.
@@ -83,7 +78,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		if (bufferCapacity <= 0)
 			throw new IllegalArgumentException();
 
-		m_store = new MemoryManager(pool, bufferCapacity);
+		m_strategy = new MemStrategy(new MemoryManager(pool, bufferCapacity));
 
 		m_uuid = UUID.randomUUID();
 
@@ -115,7 +110,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		if (mmgr == null)
 			throw new IllegalArgumentException();
 
-		m_store = mmgr;
+		m_strategy = new MemStrategy(mmgr);
 
 		m_uuid = storeId;
 
@@ -126,7 +121,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	 */
     public IMemoryManager getMemoryManager() {
 
-        return m_store;
+        return m_strategy.getMemoryManager();
         
     }
     
@@ -141,25 +136,25 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	 */
 	public MemStore createAllocationContext() {
 
-		return new MemStore(m_store.createAllocationContext(), m_uuid);
+		return new MemStore(m_strategy.getMemoryManager().createAllocationContext(), m_uuid);
 
 	}
 
 	public ByteBuffer read(final long addr) {
 
-		return ByteBuffer.wrap(m_store.read(addr));
+		return m_strategy.read(addr);
 
 	}
 
 	public long write(final ByteBuffer data) {
 
-		return m_store.allocate(data);
+		return m_strategy.write(data);
 
 	}
 	
 	public void delete(final long addr) {
 
-		m_store.free(addr);
+		m_strategy.delete(addr);
 
 	}
 	
@@ -170,7 +165,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		root.addCounter("UUID", new OneShotInstrument<String>(getUUID()
 				.toString()));
 
-		root.attach(m_store.getCounters());
+		root.attach(m_strategy.m_mmgr.getCounters());
 		
 		return root;
 
@@ -198,7 +193,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 
 		open = false;
 		
-		m_store.clear();
+		m_strategy.close();
 
 	}
 
@@ -207,7 +202,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		if (open)
 			throw new IllegalStateException(AbstractBufferStrategy.ERR_OPEN);
 
-		m_store.clear();
+		m_strategy.deleteResources();
 
 	}
 
@@ -289,7 +284,7 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	@Override
 	public long size() {
 
-		return m_store.getSlotBytes();
+		return m_strategy.size();
 
 	}
 
@@ -298,53 +293,27 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	 */
 
 	public IAddressManager getAddressManager() {
-		return m_am;
+		return m_strategy.getAddressManager();
 	}
 
 	public int getByteCount(final long addr) {
-		return m_am.getByteCount(addr);
+		return getAddressManager().getByteCount(addr);
 	}
 
 	public long getOffset(final long addr) {
-		return m_am.getOffset(addr);
+		return getAddressManager().getOffset(addr);
 	}
 
-
 	public long getPhysicalAddress(long addr) {
-		return m_am.getPhysicalAddress(addr);
+		return getAddressManager().getPhysicalAddress(addr);
 	}
 
 	public long toAddr(final int nbytes, final long offset) {
-		return m_am.toAddr(nbytes, offset);
+		return getAddressManager().toAddr(nbytes, offset);
 	}
 
 	public String toString(final long addr) {
-		return m_am.toString(addr);
-	}
-
-	private static class MemStoreAddressManager implements IAddressManager {
-
-		public int getByteCount(final long addr) {
-			return (int) (addr & 0xFFFFFFFFL);
-		}
-
-		public long getOffset(final long addr) {
-			return addr >> 32;
-		}
-
-		public long toAddr(final int nbytes, final long offset) {
-			return (offset << 32) + nbytes;
-		}
-
-		public String toString(final long addr) {
-			return "{off=" + getOffset(addr) + ",len=" + getByteCount(addr)
-					+ "}";
-		}
-
-		public long getPhysicalAddress(long addr) {
-	        return getOffset(addr);   
-		}
-
+		return getAddressManager().toString(addr);
 	}
 
 }

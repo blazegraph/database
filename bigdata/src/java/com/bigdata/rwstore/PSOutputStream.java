@@ -225,8 +225,6 @@ public class PSOutputStream extends OutputStream {
   			// m_blobHdrIdx = 0;
   		}
   		
-  		System.out.println("Writing BLOB part: " + m_count);
-  		
   		final int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
   		// m_blobHeader[m_blobHdrIdx++] = curAddr;
   		m_blobHeader.add(curAddr);

@@ -79,6 +79,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
@@ -95,6 +96,8 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.sector.MemStrategy;
+import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1018,6 +1021,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 															 */,
 					// minimumExtension,
 							fileMetadata);
+
+					this._rootBlock = fileMetadata.rootBlock;
+
+					break;
+
+				}
+
+				case MemStore: {
+
+					/*
+					 * Setup the buffer strategy.
+					 * 
+					 * FIXME define property for number of direct buffers
+					 */
+					_bufferStrategy = new MemStrategy(new MemoryManager(DirectBufferPool.INSTANCE /*, 10*/));
 
 					this._rootBlock = fileMetadata.rootBlock;
 
