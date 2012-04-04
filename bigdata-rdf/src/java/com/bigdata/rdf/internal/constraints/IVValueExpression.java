@@ -609,8 +609,8 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
 		if (lc != null) {
 			iv = lc.createInlineIV(value);
 			if (iv != null) {
-				// cache the value only if it's an extension
-				if (iv.isExtension()) {
+				// cache the value only if it's something that would require materialization
+				if (iv.needsMaterialization()) {
 					iv.setValue(value);
 				}
 				return iv;
