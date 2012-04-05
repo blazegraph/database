@@ -275,6 +275,22 @@ public class BuildInfo {
 		<echo message="${myclasspath}"/>-->
 	</target>
 
+	<target name="sourceJar" depends="prepare" description="Generates the sources jar.">
+        <jar destfile="${build.dir}/${version}-sources.jar">
+            <fileset dir="${bigdata.dir}/bigdata/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata/src/samples" />
+            <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-jini/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
+            <fileset dir="${bigdata.dir}/bigdata-sails/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-sails/src/samples" />
+            <fileset dir="${bigdata.dir}/ctc-striterators/src/java" />
+        </jar>
+    </target>
+
+	
 	<!-- This generates the jar, but does not bundled the dependencies.
 		 See 'bundleJar'. -->
 	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
