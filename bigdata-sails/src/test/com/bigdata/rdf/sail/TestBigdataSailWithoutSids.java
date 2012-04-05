@@ -95,7 +95,7 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket473.class);
 
         suite.addTestSuite(com.bigdata.rdf.sail.TestLexJoinOps.class);
-        suite.addTestSuite(com.bigdata.rdf.sail.TestRegex.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestMaterialization.class);
         
         return suite;
         

@@ -27,18 +27,18 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
@@ -86,27 +86,22 @@ public class StrBOp extends IVValueExpression<IV>
     public IV get(final IBindingSet bs) {
 
         final IV iv = getAndCheckBound(0, bs);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug(iv);
+        }
+        
+        final Value val = asValue(iv);
 
+        if (log.isDebugEnabled()) {
+        	log.debug(val);
+        }
+        
         // use to create my simple literals
         final BigdataValueFactory vf = getValueFactory();
 
-        if (iv.isInline() && !iv.isExtension()) {
-            if(iv.isLiteral()){
-                return super.asIV(vf.createLiteral(
-                        ((AbstractLiteralIV)iv).getLabel()), bs);
-            }else{
-                return super.asIV(vf.createLiteral(iv
-                        .getInlineValue().toString()), bs);
-            }
-        }
-
-        if (iv.isURI()) {
-            // return new simple literal using URI label
-            final URI uri = (URI) iv.getValue();
-            final BigdataLiteral str = vf.createLiteral(uri.toString());
-            return super.asIV(str, bs);
-        } else if (iv.isLiteral()) {
-            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        if (val instanceof Literal) {
+        	final Literal lit = (Literal) val;
             if (lit.getDatatype() == null && lit.getLanguage() == null) {
                 // if simple literal return it
                 return iv;
@@ -116,9 +111,43 @@ public class StrBOp extends IVValueExpression<IV>
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel());
                 return super.asIV(str, bs);
             }
+        } else if (val instanceof URI) {
+            // return new simple literal using URI label
+            final BigdataLiteral str = vf.createLiteral(val.stringValue());
+            return super.asIV(str, bs);
         } else {
             throw new SparqlTypeErrorException();
         }
+        
+//        if (iv.isInline() && !iv.isExtension()) {
+//            if(iv.isLiteral()){
+//                return super.asIV(vf.createLiteral(
+//                        ((AbstractLiteralIV)iv).getLabel()), bs);
+//            }else{
+//                return super.asIV(vf.createLiteral(iv
+//                        .getInlineValue().toString()), bs);
+//            }
+//        }
+//
+//        if (iv.isURI()) {
+//            // return new simple literal using URI label
+//            final URI uri = (URI) iv.getValue();
+//            final BigdataLiteral str = vf.createLiteral(uri.toString());
+//            return super.asIV(str, bs);
+//        } else if (iv.isLiteral()) {
+//            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+//            if (lit.getDatatype() == null && lit.getLanguage() == null) {
+//                // if simple literal return it
+//                return iv;
+//        	}
+//        	else {
+//                // else return new simple literal using Literal.getLabel
+//                final BigdataLiteral str = vf.createLiteral(lit.getLabel());
+//                return super.asIV(str, bs);
+//            }
+//        } else {
+//            throw new SparqlTypeErrorException();
+//        }
 
     }
 
