@@ -64,25 +64,35 @@ public class RegexBOp extends XSDBooleanIVValueExpression
 			final IValueExpression<? extends IV> pattern,
 			final IValueExpression<? extends IV> flags) {
     	
-    	if (pattern instanceof IConstant && 
-    			(flags == null || flags instanceof IConstant)) {
+    	try {
     		
-    		final IV parg = ((IConstant<IV>) pattern).get();
-    		
-    		final IV farg = flags != null ?
-    				((IConstant<IV>) flags).get() : null;
-    				
-			if (parg.hasValue() && (farg == null || farg.hasValue())) {
-    		
-				final Value pargVal = parg.getValue();
-				
-				final Value fargVal = farg != null ? farg.getValue() : null;
-				
-	    		return NV.asMap(
-	    				new NV(Annotations.PATTERN, 
-	    						getPattern(pargVal, fargVal)));
+	    	if (pattern instanceof IConstant && 
+	    			(flags == null || flags instanceof IConstant)) {
 	    		
-			}
+	    		final IV parg = ((IConstant<IV>) pattern).get();
+	    		
+	    		final IV farg = flags != null ?
+	    				((IConstant<IV>) flags).get() : null;
+	    				
+				if (parg.hasValue() && (farg == null || farg.hasValue())) {
+	    		
+					final Value pargVal = parg.getValue();
+					
+					final Value fargVal = farg != null ? farg.getValue() : null;
+					
+		    		return NV.asMap(
+		    				new NV(Annotations.PATTERN, 
+		    						getPattern(pargVal, fargVal)));
+		    		
+				}
+	    		
+	    	}
+	    	
+    	} catch (Exception ex) {
+    	
+    		if (log.isInfoEnabled()) {
+    			log.info("could not create pattern for: " + pattern + ", " + flags);
+    		}
     		
     	}
     		

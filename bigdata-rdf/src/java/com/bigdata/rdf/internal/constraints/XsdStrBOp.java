@@ -27,7 +27,9 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -86,27 +88,22 @@ public class XsdStrBOp extends IVValueExpression<IV>
     public IV get(final IBindingSet bs) {
 
         final IV iv = getAndCheckBound(0, bs);
+        
+        if (log.isDebugEnabled()) {
+        	log.debug(iv);
+        }
+        
+        final Value val = asValue(iv);
 
+        if (log.isDebugEnabled()) {
+        	log.debug(val);
+        }
+        
         // use to create my simple literals
         final BigdataValueFactory vf = getValueFactory();
 
-        if (iv.isInline() && !iv.isExtension()) {
-            if(iv.isLiteral()){
-                return super.asIV(vf.createLiteral(
-                        ((AbstractLiteralIV)iv).getLabel(), XSD.STRING), bs);
-            }else{
-                return super.asIV(vf.createLiteral(iv
-                        .getInlineValue().toString(), XSD.STRING), bs);
-            }
-        }
-
-        if (iv.isURI()) {
-            // return new xsd:string literal using URI label
-            final URI uri = (URI) iv.getValue();
-            final BigdataLiteral str = vf.createLiteral(uri.toString(), XSD.STRING);
-            return super.asIV(str, bs);
-        } else if (iv.isLiteral()) {
-            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        if (val instanceof Literal) {
+        	final Literal lit = (Literal) val;
             if (lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
                 // if xsd:string literal return it
                 return iv;
@@ -116,9 +113,48 @@ public class XsdStrBOp extends IVValueExpression<IV>
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel(), XSD.STRING);
                 return super.asIV(str, bs);
             }
+        } else if (val instanceof URI) {
+            // return new simple literal using URI label
+            final BigdataLiteral str = vf.createLiteral(val.stringValue(), XSD.STRING);
+            return super.asIV(str, bs);
         } else {
             throw new SparqlTypeErrorException();
         }
+        
+//        final IV iv = getAndCheckBound(0, bs);
+//
+//        // use to create my simple literals
+//        final BigdataValueFactory vf = getValueFactory();
+//
+//        if (iv.isInline() && !iv.isExtension()) {
+//            if(iv.isLiteral()){
+//                return super.asIV(vf.createLiteral(
+//                        ((AbstractLiteralIV)iv).getLabel(), XSD.STRING), bs);
+//            }else{
+//                return super.asIV(vf.createLiteral(iv
+//                        .getInlineValue().toString(), XSD.STRING), bs);
+//            }
+//        }
+//
+//        if (iv.isURI()) {
+//            // return new xsd:string literal using URI label
+//            final URI uri = (URI) iv.getValue();
+//            final BigdataLiteral str = vf.createLiteral(uri.toString(), XSD.STRING);
+//            return super.asIV(str, bs);
+//        } else if (iv.isLiteral()) {
+//            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+//            if (lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
+//                // if xsd:string literal return it
+//                return iv;
+//        	}
+//        	else {
+//                // else return new xsd:string literal using Literal.getLabel
+//                final BigdataLiteral str = vf.createLiteral(lit.getLabel(), XSD.STRING);
+//                return super.asIV(str, bs);
+//            }
+//        } else {
+//            throw new SparqlTypeErrorException();
+//        }
 
     }
 
