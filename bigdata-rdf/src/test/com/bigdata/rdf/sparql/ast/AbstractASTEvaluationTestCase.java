@@ -257,7 +257,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     protected IV makeIV(final Value v) {
         final BigdataValue bv = store.getValueFactory().asValue(v);
-        final IV iv = TermId.mockIV(VTE.URI);
+        final IV iv = TermId.mockIV(VTE.valueOf(v));
         iv.setValue(bv);
         return iv;
     }
