@@ -16,6 +16,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
@@ -1125,135 +1126,45 @@ public class FunctionRegistry {
 			final IValueExpression<? extends IV> right =
 				AST2BOpUtility.toVE(globals, args[1]);
 
-            if (left.equals(right)
-                    && (left instanceof IVariable || left instanceof Constant)
-                    && (right instanceof IVariable || right instanceof Constant)) {
-                
-                if (op == CompareOp.EQ || op == CompareOp.LE
-                        || op == CompareOp.GE) {
+	    	/*
+	         * If we are dealing with a URI constant we can use 
+	         * SparqlTypeErrorBOp for any operator other than EQ, NE.
+	         *
+	    	 */
 
-	    			return TrueBOp.INSTANCE;
+	    	if (!(op == CompareOp.EQ || op == CompareOp.NE)) {
+    		
+	    		if (left instanceof Constant &&
+	    			((Constant<? extends IV>) left).get().isURI()) {
 
-	    		} else {
+    	    		return SparqlTypeErrorBOp.INSTANCE;
 
-	    			return FalseBOp.INSTANCE;
+	    		}
+
+	    		if (right instanceof Constant &&
+	    			((Constant<? extends IV>) right).get().isURI()) {
+
+    	    		return SparqlTypeErrorBOp.INSTANCE;
 
 	    		}
 
 	    	}
 
 	    	/*
-	         * If we are dealing with a URI constant:
-	         *
-	         * We can use SparqlTypeErrorBOp for any operator other than EQ, NE
-	         *
-	         * If it's a real term:
-	         *
-	         * We can use SameTermBOp
-	         *
-	         * If it's not a real term:
-	         *
-	         * The only time we actually need to evaluate this is when the other
-	         * operand is a DatatypeBOp. All other times, we can return FalseBOp for
-	         * EQ and TrueBOp for NE.
-	         *
+	    	 * If we have a variable or constant for both operands and they
+	    	 * are equal, we can optimize to true 
 	    	 */
+            if (left instanceof IVariableOrConstant &&
+        		right instanceof IVariableOrConstant &&
+        		left.equals(right)) {
+            	
+                if (op == CompareOp.EQ || op == CompareOp.LE || op == CompareOp.GE) {
 
-	    	if (left instanceof Constant) {
+	    			return TrueBOp.INSTANCE;
 
-	    		final IV iv = ((Constant<? extends IV>) left).get();
+	    		} else {
 
-	    		if (iv.isURI()) {
-
-	    	    	if (!(op == CompareOp.EQ || op == CompareOp.NE)) {
-
-//	    	    		return new SparqlTypeErrorBOp(new CompareBOp(left, right, op));
-	    	    		return SparqlTypeErrorBOp.INSTANCE;
-
-	    	    	}
-
-	    	    	/*
-	    	    	 * DatatypeBOp is the only bop that can cast things to a URI,
-	    	    	 * and that URI might not be in the database. Thus there are no
-	    	    	 * optimizations we can do: we can't check term equality, and
-	    	    	 * we can't assume automatic false or true.
-	    	    	 */
-		    		if (!(right instanceof DatatypeBOp)) {
-
-		    			if (!iv.isNullIV()) {
-
-			    			// if it's a real term we can use SameTermBOp
-		    				return new SameTermBOp(left, right, op);
-
-		    			} else {
-
-		    				// if it's not a real term then we can substitute false
-		    				// for EQ and true for NE
-		    				if (op == CompareOp.EQ) {
-
-//	    	        			return new FalseBOp(new CompareBOp(left, right, op));
-		    					return FalseBOp.INSTANCE;
-
-		    				} else {
-
-//	    	        			return new TrueBOp(new CompareBOp(left, right, op));
-		    					return TrueBOp.INSTANCE;
-
-		    				}
-
-		    			}
-
-		    		}
-
-	    		}
-
-	    	}
-
-	    	if (right instanceof Constant) {
-
-	    		final IV iv = ((Constant<? extends IV>) right).get();
-
-	    		if (iv.isURI()) {
-
-	    	    	if (!(op == CompareOp.EQ || op == CompareOp.NE)) {
-
-//	    	    		return new SparqlTypeErrorBOp(new CompareBOp(left, right, op));
-	    	    		return SparqlTypeErrorBOp.INSTANCE;
-
-	    	    	}
-
-	    	    	/*
-	    	    	 * DatatypeBOp is the only bop that can cast things to a URI,
-	    	    	 * and that URI might not be in the database. Thus there are no
-	    	    	 * optimizations we can do: we can't check term equality, and
-	    	    	 * we can't assume automatic false or true.
-	    	    	 */
-		    		if (!(left instanceof DatatypeBOp)) {
-
-		    			if (!iv.isNullIV()) {
-
-			    			// if it's a real term we can use SameTermBOp
-		    				return new SameTermBOp(left, right, op);
-
-		    			} else {
-
-		    				// if it's not a real term then we can substitute false
-		    				// for EQ and true for NE
-		    				if (op == CompareOp.EQ) {
-
-//	    	        			return new FalseBOp(new CompareBOp(left, right, op));
-		    					return FalseBOp.INSTANCE;
-
-		    				} else {
-
-//	    	        			return new TrueBOp(new CompareBOp(left, right, op));
-		    					return TrueBOp.INSTANCE;
-
-		    				}
-
-		    			}
-
-		    		}
+	    			return FalseBOp.INSTANCE;
 
 	    		}
 
@@ -1280,64 +1191,6 @@ public class FunctionRegistry {
 			
 			final IValueExpression<? extends IV> right =
 				AST2BOpUtility.toVE(globals, args[1]);
-
-			/*
-			 * If a constant operand in the SameTerm op uses a value not found in
-			 * the database, we end up in one of two possible situations:
-			 *
-			 * 1. If the constant operand is a URI, there is no possible way for
-			 * SameTerm to evaluate to true, unless the other operand is a
-			 * DatatypeBOp. (This is because DatatypeBOp will stamp phony TermId IVs
-			 * for the datatypes for inline numerics and math operations.) So if the
-			 * other operand is not a DatatypeBOp, we can just return a FalseBOp
-			 * that wraps the SameTermBOp that would have happened (this wrapping is
-			 * purely informational).
-			 *
-			 * 2. If the constant operand is not a URI, we need to defer to the
-			 * CompareBOp, which knows how to do value comparisons. SameTermBOp only
-			 * works on IVs.
-			 */
-	    	if (left instanceof Constant) {
-
-	    		final IV iv = ((Constant<? extends IV>) left).get();
-
-	    		if (!iv.isInline() && iv.isNullIV()) {
-//	    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
-
-	    			if (iv.isURI() && !(right instanceof DatatypeBOp)) {
-
-	    				return FalseBOp.INSTANCE;
-
-	    			} else {
-
-	    				return new CompareBOp(left, right, CompareOp.EQ);
-
-	    			}
-
-	    		}
-
-	    	}
-
-	    	if (right instanceof Constant) {
-
-	    		final IV iv = ((Constant<? extends IV>) right).get();
-
-	    		if (!iv.isInline() && iv.isNullIV()) {
-//	    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
-
-	    			if (iv.isURI() && !(left instanceof DatatypeBOp)) {
-
-	    				return FalseBOp.INSTANCE;
-
-	    			} else {
-
-	    				return new CompareBOp(left, right, CompareOp.EQ);
-
-	    			}
-
-	    		}
-
-	    	}
 
 	        return new SameTermBOp(left, right, CompareOp.EQ);
 

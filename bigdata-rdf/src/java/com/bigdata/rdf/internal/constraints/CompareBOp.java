@@ -157,22 +157,27 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 		
     }
     
+    private static boolean isRealTermId(final IV iv) {
+    	
+    	return !iv.isInline() && !iv.isNullIV();
+    	
+    }
+    
     private static boolean compareLiterals(
     		final IV<BigdataValue, ?> left,
     		final IV<BigdataValue, ?> right,
     		final CompareOp op) {
     	
     	/*
-    	 * Handle the special case where we have exact termId equality.
-    	 * Probably would never hit this because of SameTermBOp 
+    	 * Handle the special case where we have exact termId equality.  This
+    	 * only works if both are "real" termIds (i.e. not mock IVs).
     	 */
-    	if (!left.isInline() && !right.isInline() && op == CompareOp.EQ) {
+    	if (op == CompareOp.EQ && isRealTermId(left) && isRealTermId(right)) {
 
-            if (!left.isNullIV() && !right.isNullIV() && left.equals(right)) {
-                /*
-                 * Neither may be a NullIV (or mock IV) and they are equals().
-                 */
+            if (left.equals(right)) {
+            	
                 return true;
+                
             }
     		
     	}
@@ -207,55 +212,15 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		}
     		
     	}
-//    	
-//    	if (left.isInline() && left.isNumeric() && right.isInline() && right.isNumeric()) {
-//    		
-//            final DTE dte1 = left.getDTE();
-//            final DTE dte2 = right.getDTE();
-//
-//            // we can use the natural ordering if they have the same DTE
-//            // this will naturally take care of two booleans or two numerics of the
-//            // same datatype
-//            if (dte1 == dte2)
-//                return _accept(left.compareTo(right), op);
-//            
-//            // otherwise we need to try to convert them into comparable numbers
-//            final AbstractLiteralIV num1 = (AbstractLiteralIV) left; 
-//            final AbstractLiteralIV num2 = (AbstractLiteralIV) right; 
-//            
-//            // if one's a BigDecimal we should use the BigDecimal comparator for both
-//            if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
-//                return _accept(num1.decimalValue().compareTo(num2.decimalValue()), op);
-//            }
-//            
-//            // same for BigInteger
-//            if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
-//                return _accept(num1.integerValue().compareTo(num2.integerValue()), op);
-//            }
-//            
-//            // fixed length numerics
-//            if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
-//                // non-BigDecimal floating points - use doubles
-//                return _accept(Double.compare(num1.doubleValue(), num2.doubleValue()), op);
-//            } else {
-//                // non-BigInteger integers - use longs
-//                final long a = num1.longValue();
-//                final long b = num2.longValue();
-//                return _accept(a == b ? 0 : a < b ? -1 : 1, op);
-//            }
-//
-//    	}
     	
 		/*
 		 * Now that the IVs implement the right openrdf interfaces,
 		 * we should be able to mix and match inline with non-inline,
 		 * using either the IV directly or its materialized value.
 		 */
-//		final Literal l1 = left.isInline() ? (Literal) left : left.getValue();
-		final Literal l1 = (Literal) left;
+		final Literal l1 = asLiteral(left);
 		
-//		final Literal l2 = right.isInline() ? (Literal) right : right.getValue();
-		final Literal l2 = (Literal) right;
+		final Literal l2 = asLiteral(right);
 		
         if (log.isDebugEnabled()) {
             log.debug(l1);

@@ -38,7 +38,10 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.constraints.MathUtility;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -78,7 +81,7 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
      * Note: This field is guarded by the monitor on the {@link SUM} instance.
      */
     @SuppressWarnings("rawtypes")
-    private transient IV aggregated = ZERO;
+    private transient NumericIV aggregated = ZERO;
     
     /**
      * The first error encountered since the last {@link #reset()}.
@@ -141,35 +144,43 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
             if (iv != null) {
 
                 /*
-                 * Aggregate non-null values.
+                 * Aggregate non-null literal values.
                  */
 
-                if (iv.isInline()) {
-
-                    // Two IVs.
-                    aggregated = IVUtility.numericalMath(iv, aggregated,
-                            MathOp.PLUS);
-
-                } else {
-
-                    // One IV and one Literal.
-                    final BigdataValue val1 = iv.getValue();
-
-                    if (val1 == null)
-                        throw new NotMaterializedException();
-
-                    if (!(val1 instanceof Literal))
-                        throw new SparqlTypeErrorException();
-
-                    // Only numeric value can be used in math expressions
-                    final URI dt1 = ((Literal) val1).getDatatype();
-                    if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
-                        throw new SparqlTypeErrorException();
-
-                    aggregated = IVUtility.numericalMath((Literal) val1,
-                            aggregated, MathOp.PLUS);
-
-                }
+            	final Literal lit = IVValueExpression.asLiteral(iv);
+            	
+            	if (!MathUtility.checkNumericDatatype(lit))
+                    throw new SparqlTypeErrorException();
+            		
+            	aggregated = 
+            		MathUtility.literalMath(aggregated, lit, MathOp.PLUS);
+            	
+//                if (iv.isInline()) {
+//
+//                    // Two IVs.
+//                    aggregated = IVUtility.numericalMath(iv, aggregated,
+//                            MathOp.PLUS);
+//
+//                } else {
+//
+//                    // One IV and one Literal.
+//                    final BigdataValue val1 = iv.getValue();
+//
+//                    if (val1 == null)
+//                        throw new NotMaterializedException();
+//
+////                    if (!(val1 instanceof Literal))
+////                        throw new SparqlTypeErrorException();
+//
+//                    // Only numeric value can be used in math expressions
+//                    final URI dt1 = ((Literal) val1).getDatatype();
+//                    if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
+//                        throw new SparqlTypeErrorException();
+//
+//                    aggregated = IVUtility.numericalMath((Literal) val1,
+//                            aggregated, MathOp.PLUS);
+//
+//                }
 
             }
             

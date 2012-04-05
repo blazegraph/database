@@ -153,71 +153,45 @@ final public class MathBOp extends IVValueExpression
 
     final public IV get(final IBindingSet bs) {
         
-        final IV left = left().get(bs);
+        final IV iv1 = getAndCheckLiteral(0, bs);
+        final IV iv2 = getAndCheckLiteral(1, bs);
+        
+    	if (log.isDebugEnabled()) {
+    		log.debug(toString(iv1.toString(), iv2.toString()));
+    	}
+    	
+		final Literal lit1 = asLiteral(iv1);
+		final Literal lit2 = asLiteral(iv2);
 
-        // not yet bound?
-        if (left == null)
-        	throw new SparqlTypeErrorException.UnboundVarException();
-
-        final IV right = right().get(bs);
-        
-        // not yet bound?
-        if (right == null)
-        	throw new SparqlTypeErrorException.UnboundVarException();
-        
-        try {
-        
-        	if (log.isDebugEnabled()) {
-        		log.debug(toString(left.toString(), right.toString()));
-        	}
-        	
-        	if (left.isInline() && right.isInline()) {
-        	
-        		return IVUtility.numericalMath(left, right, op());
-        		
-        	} else {
-        		
-        		final BigdataValue val1 = left.getValue();
-        		
-        		final BigdataValue val2 = right.getValue();
-        		
-        		if (val1 == null || val2 == null)
-        			throw new NotMaterializedException();
-        		
-        		if (!(val1 instanceof Literal) || !(val2 instanceof Literal)) {
-        			throw new SparqlTypeErrorException();
-        		}
-        		
-        		try{
-        			
-        			return IVUtility.literalMath(
-        					(Literal) val1, (Literal) val2, op());
-        			
-        		} catch(IllegalArgumentException iae){
-        			
-        			ILexiconConfiguration lc = null;
-        			try {
-        				lc = getLexiconConfiguration(bs);
-        			} catch (ContextNotAvailableException ex) {
-        				// can't use the LC (e.g. test cases)
-        			}
-        			
-        		    return DateTimeUtility.dateTimeMath((Literal)val1, left,
-        		            (Literal)val2, right, op(), vf(), lc);
-        		    
-        		}
-        		
-        	}
-        	
-        } catch (IllegalArgumentException ex) {
-        	
-        	if (log.isDebugEnabled()) {
-        		log.debug("illegal argument, filtering solution");
-        	}
-        	
-        	throw new SparqlTypeErrorException();
-        	
-        }
+		if (MathUtility.checkNumericDatatype(lit1, lit2)) {
+			
+			return MathUtility.literalMath(lit1, lit2, op());
+			
+		} else if (DateTimeUtility.checkDateTimeDatatype(lit1, lit2)) {
+		
+			final IV iv = 
+				DateTimeUtility.dateTimeMath(lit1, iv1, lit2, iv2, op(), vf());
+			
+			// try to create a real IV if possible
+			if (iv.isNullIV()) {
+				
+				final BigdataValue val = iv.getValue();
+				
+				return asIV(val, bs);
+				
+			} else {
+				
+				return iv;
+				
+			}
+			
+		}
+    		
+    	if (log.isDebugEnabled()) {
+    		log.debug("illegal argument(s), filtering solution: " + iv1 + ", " + iv2);
+    	}
+    	
+    	throw new SparqlTypeErrorException();
 
     }
 

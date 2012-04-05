@@ -33,6 +33,7 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.IVValueExpression;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -279,12 +280,17 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
         if (iv != null && !done) {
 
-            final String str;
-            if (iv.isInline() && !iv.isExtension()) {
-                str = iv.getInlineValue().toString();
-            } else {
-                str = iv.getValue().stringValue();
-            }
+            final String str = IVValueExpression.asValue(iv).stringValue();
+            /*
+             * This kind of logic needs to be hidden.  It causes too many 
+             * problems.  Right now IVValueExpression.asValue(IV) knows how
+             * to handle this correctly.
+             */
+//            if (iv.isInline() && !iv.isExtension()) {
+//                str = iv.getInlineValue().toString();
+//            } else {
+//                str = iv.getValue().stringValue();
+//            }
 
             if (aggregated == null)
                 aggregated = new StringBuilder(str);
