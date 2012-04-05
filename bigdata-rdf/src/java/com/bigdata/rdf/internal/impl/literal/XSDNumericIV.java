@@ -41,7 +41,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * <code>xsd:decimal</code>. 
  */
 public class XSDNumericIV<V extends BigdataLiteral> extends
-        AbstractLiteralIV<V, Number> implements Literal {
+        NumericIV<V, Number> implements Literal {
 
     /**
      * 

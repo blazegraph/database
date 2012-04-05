@@ -11,7 +11,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
@@ -193,7 +193,7 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 	
 
     /** A ZERO. */
-    protected static final transient IV ZERO = new XSDNumericIV<BigdataLiteral>(0);
+    protected static final transient NumericIV ZERO = new XSDNumericIV<BigdataLiteral>(0);
 
     /** An empty string. */
     protected static final transient Literal EMPTY_LITERAL = new LiteralImpl("");

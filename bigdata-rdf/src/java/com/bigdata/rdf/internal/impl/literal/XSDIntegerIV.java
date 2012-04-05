@@ -38,7 +38,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:integer</code>. */
 public class XSDIntegerIV<V extends BigdataLiteral> extends
-        AbstractLiteralIV<V, BigInteger> implements Literal {
+        NumericIV<V, BigInteger> implements Literal {
     
     /**
 	 * 

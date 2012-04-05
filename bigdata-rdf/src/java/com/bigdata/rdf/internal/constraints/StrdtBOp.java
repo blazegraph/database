@@ -74,10 +74,7 @@ public class StrdtBOp extends IVValueExpression<IV> implements INeedsMaterializa
         if (!datatype.isURI())
             throw new SparqlTypeErrorException();
 
-        if (!datatype.isInline() && !datatype.hasValue())
-            throw new NotMaterializedException();
-
-        final BigdataURI dt = (BigdataURI) datatype.getValue();
+        final BigdataURI dt = (BigdataURI) asValue(datatype);
 
         final Literal lit = asLiteral(iv);
         

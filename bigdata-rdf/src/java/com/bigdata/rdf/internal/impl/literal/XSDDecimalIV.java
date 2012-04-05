@@ -27,6 +27,8 @@ package com.bigdata.rdf.internal.impl.literal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import org.openrdf.model.Literal;
+
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
@@ -36,7 +38,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:decimal</code>. */
 public class XSDDecimalIV<V extends BigdataLiteral> extends
-        AbstractLiteralIV<V, BigDecimal> {
+        NumericIV<V, BigDecimal> implements Literal {
     
     /**
 	 * 

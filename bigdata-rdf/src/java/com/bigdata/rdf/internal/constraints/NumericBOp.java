@@ -25,23 +25,27 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
- * A math expression involving a left and right IValueExpression operand. The operation to be applied to the operands is
- * specified by the {@link Annotations#OP} annotation.
+ * A math expression involving a left and right IValueExpression operand. The 
+ * operation to be applied to the operands is specified by the 
+ * {@link Annotations#OP} annotation.
  */
 public class NumericBOp extends IVValueExpression<IV>  {
 
     private static final long serialVersionUID = 9136864442064392445L;
+    
+    private static final transient Logger log = Logger.getLogger(NumericBOp.class);
+    
 
     public interface Annotations extends ImmutableBOp.Annotations {
         String OP = NumericBOp.class.getName() + ".op";
@@ -116,20 +120,15 @@ public class NumericBOp extends IVValueExpression<IV>  {
     }
 
     @SuppressWarnings("rawtypes")
-    public IV get(final IBindingSet bindingSet) {
+    public IV get(final IBindingSet bs) {
         
-        final IV iv = get(0).get(bindingSet);
-
-        if (iv == null)
-            throw new SparqlTypeErrorException();
-
-        if (!iv.isLiteral())
-            throw new SparqlTypeErrorException();
-
-        if (!iv.isInline() )
-            throw new SparqlTypeErrorException();
-
-        return IVUtility.numericalFunc(iv, op());
+    	final Literal lit = super.getAndCheckLiteralValue(0, bs);
+    	
+    	if (log.isDebugEnabled())
+    		log.debug(lit);
+    	
+        return MathUtility.numericalFunc(lit, op());
+        
     }
 
 

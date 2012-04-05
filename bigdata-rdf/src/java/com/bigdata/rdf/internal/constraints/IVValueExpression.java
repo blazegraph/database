@@ -362,7 +362,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      *             be turned into a {@link Literal} without an index read.
      */
     @SuppressWarnings("rawtypes")
-    final protected Literal asLiteral(final IV iv) {
+    final static public Literal asLiteral(final IV iv) {
 
         if (iv == null)
             throw new SparqlTypeErrorException();
@@ -370,23 +370,10 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
         
-//        final BigdataValueFactory vf = getValueFactory();
-
         if (iv.isInline() && !iv.needsMaterialization()) {
 
-//        	if (iv instanceof Literal) {
+    		return (Literal) iv;
         		
-        		return (Literal) iv;
-        		
-//        	} else {
-//        	
-//	            final BigdataURI datatype = vf
-//	                    .asValue(iv.getDTE().getDatatypeURI());
-//	
-//	            return vf.createLiteral(((Value) iv).stringValue(), datatype);
-//	            
-//        	}
-
         } else if (iv.hasValue()) {
 
             return (BigdataLiteral) iv.getValue();
@@ -414,7 +401,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
      *             be turned into a {@link Literal} without an index read.
      */
     @SuppressWarnings("rawtypes")
-    final static protected Value asValue(final IV iv) {
+    final static public Value asValue(final IV iv) {
 
         if (iv == null)
             throw new SparqlTypeErrorException();
@@ -490,7 +477,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
         if (!iv.isLiteral())
             throw new SparqlTypeErrorException();
         
-        if (!iv.isInline() && !iv.hasValue())
+        if (iv.needsMaterialization() && !iv.hasValue())
             throw new NotMaterializedException();
 
         return iv;

@@ -26,6 +26,9 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
@@ -38,7 +41,8 @@ import com.bigdata.rdf.internal.IV;
 /**
  * Compare two terms for exact equality. 
  */
-public class SameTermBOp extends XSDBooleanIVValueExpression {
+public class SameTermBOp extends XSDBooleanIVValueExpression 
+		implements INeedsMaterialization {
 
     /**
      * 
@@ -107,6 +111,13 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
     public SameTermBOp(final SameTermBOp op) {
         super(op);
     }
+    
+    @Override
+    public INeedsMaterialization.Requirement getRequirement() {
+    	
+    	return INeedsMaterialization.Requirement.SOMETIMES;
+    	
+    }
 
     public boolean accept(final IBindingSet bs) {
         
@@ -127,12 +138,60 @@ public class SameTermBOp extends XSDBooleanIVValueExpression {
         final CompareOp op = (CompareOp) getRequiredProperty(Annotations.OP);
 
         switch (op) {
-        case NE:
-            return !left.equals(right);
+        case EQ:
+            return compare(left, right);
         default:
-            return left.equals(right);
+            return !compare(left, right);
         }
 
+    }
+    
+    private static boolean compare(final IV iv1, final IV iv2) {
+    	
+    	if (iv1.isNullIV() || iv2.isNullIV()) {
+    	
+    		final Value val1 = asValue(iv1);
+    		
+    		final Value val2 = asValue(iv2);
+    		
+    		if (val1 instanceof URI && val2 instanceof URI) {
+    			
+    			return val1.stringValue().equals(val2.stringValue());
+    			
+    		} else if (val1 instanceof Literal && val2 instanceof Literal) {
+    			
+    			final Literal lit1 = (Literal) val1;
+    			
+    			final Literal lit2 = (Literal) val2;
+    			
+    			return equals(lit1.getLabel(), lit2.getLabel()) &&
+	    			   equals(lit1.getDatatype(), lit2.getDatatype()) &&
+	    			   equals(lit1.getLanguage(), lit2.getLanguage());
+    			
+    		} else {
+    			
+    			return false;
+    			
+    		}
+    		
+    	} else {
+    		
+    		return iv1.equals(iv2);
+    		
+    	}
+    	
+    }
+    
+    private static boolean equals(final Object o1, final Object o2) {
+    	
+    	if (o1 == null && o2 == null)
+    		return true;
+    	
+    	if (o1 == null || o2 == null)
+    		return false;
+    	
+    	return o1.equals(o2);
+    	
     }
     
 }

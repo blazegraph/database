@@ -87,7 +87,7 @@ public class DatatypeBOp extends IVValueExpression<IV>
 	    final BigdataValueFactory vf = super.getValueFactory();
 
         @SuppressWarnings("rawtypes")
-        final IV iv = get(0).get(bs);
+        final IV iv = getAndCheckLiteral(0, bs);
 
         // not yet bound
         if (iv == null)
@@ -97,11 +97,16 @@ public class DatatypeBOp extends IVValueExpression<IV>
             log.debug(iv);
         }
 
-        if (iv.isInline() && !iv.isExtension()) {
-
-        	return asIV(iv.getDTE().getDatatypeURI(), bs);
-        	
-        }
+        /*
+         * We don't need to do this anymore.  asValue(IV) does the right thing,
+         * it will let us work with the IV directly in the right cases.  The
+         * BOps should no longer be doing this kind of logic directly.
+         */
+//        if (iv.isInline() && !iv.isExtension()) {
+//
+//        	return asIV(iv.getDTE().getDatatypeURI(), bs);
+//        	
+//        }
 
         final Value val = asValue(iv);
 
