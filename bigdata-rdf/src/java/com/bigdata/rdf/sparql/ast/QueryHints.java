@@ -386,4 +386,16 @@ public interface QueryHints {
 
     boolean DEFAULT_HASH_JOIN = false;
 
+    /**
+     * Option controls whether or not the bigdata extension to SPARQL Update for
+     * named solution sets is enabled.
+     * 
+     * @see <a
+     *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
+     *      SPARQL Update </a>
+     */
+    String SOLUTION_SET_CACHE = "solutionSetCache";
+
+    boolean DEFAULT_SOLUTION_SET_CACHE = false;
+    
 }

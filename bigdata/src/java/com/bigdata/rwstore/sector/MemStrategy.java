@@ -12,20 +12,39 @@ import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.util.ChecksumUtility;
 
+/**
+ * A buffer implementation backed by an {@link IMemoryManager}.
+ * 
+ * @author <a href="mailto:matyncutcher@users.sourceforge.net">Martyn Cutcher</a>
+ * @version $Id$
+ */
 public class MemStrategy implements IBufferStrategy {
 	
-	final IMemoryManager m_mmgr;
-	final IAddressManager m_am;
+	final private IMemoryManager m_mmgr;
+	final private IAddressManager m_am;
 	
-	boolean m_modifiable = true;
-	boolean m_open = true;
+	private volatile boolean m_modifiable = true;
+	private volatile boolean m_open = true;
 	
-	public MemStrategy(IMemoryManager mmgr) {
-		m_mmgr = mmgr;
-		m_am = new IAddressManager() {
+	private volatile boolean m_dirty = true;
+	
+	private volatile IRootBlockView m_rb0 = null;
+	private volatile IRootBlockView m_rb1 = null;
+	
+	public MemStrategy(final IMemoryManager mmgr) {
+        
+	    if (mmgr == null)
+            throw new IllegalArgumentException();
+		
+	    m_mmgr = mmgr;
+		
+	    m_am = new IAddressManager() {
 
 			@Override
 			public int getByteCount(long addr) {
@@ -55,11 +74,28 @@ public class MemStrategy implements IBufferStrategy {
 
 			@Override
 			public String toString(final long addr) {
-				// TODO Auto-generated method stub
 				return "PhysicalAddress: " + getPhysicalAddress(addr) + ", length: " + getByteCount(addr);
 			}
 			
 		};
+		
+		// initialise RootBlocks
+		final UUID uuid = UUID.randomUUID(); // Journal's UUID.
+		final long createTime = System.currentTimeMillis();
+		final ChecksumUtility checker = new ChecksumUtility();
+		m_rb0 = new RootBlockView(true, 0,
+	            0, 0, 0, 0, 0, 0,
+	            uuid,
+	            0, 0, 0,
+	            StoreTypeEnum.RW,
+	            createTime, 0, RootBlockView.currentVersion, checker);
+
+		m_rb1 = new RootBlockView(false, 0,
+	            0, 0, 0, 0, 0, 0,
+	            uuid,
+	            0, 0, 0,
+	            StoreTypeEnum.RW,
+	            createTime, 0, RootBlockView.currentVersion, checker);	
 	}
 	
 	public IMemoryManager getMemoryManager() {
@@ -68,7 +104,7 @@ public class MemStrategy implements IBufferStrategy {
 
 	@Override
 	public void abort() {
-		throw new UnsupportedOperationException();
+		// NOP
 	}
 
 	@Override
@@ -78,7 +114,8 @@ public class MemStrategy implements IBufferStrategy {
 
 	@Override
 	public void commit(IJournal journal) {
-		// NOP
+		m_mmgr.commit();
+		m_dirty = false;
 	}
 
 	@Override
@@ -92,10 +129,19 @@ public class MemStrategy implements IBufferStrategy {
 	}
 
 	@Override
-	public CounterSet getCounters() {
-		// TODO Auto-generated method stub
-		return null;
+	synchronized public CounterSet getCounters() {
+
+		if (root == null) {
+
+			root = new CounterSet();
+
+		}
+
+		return root;
+
 	}
+
+	private CounterSet root;
 
 	@Override
 	public long getExtent() {
@@ -158,14 +204,12 @@ public class MemStrategy implements IBufferStrategy {
 
 	@Override
 	public ByteBuffer readRootBlock(boolean rootBlock0) {
-		// NOP
-		return null;
+		return (rootBlock0 ? m_rb0 : m_rb1).asReadOnlyBuffer();
 	}
 
 	@Override
 	public boolean requiresCommit(IRootBlockView block) {
-		// NOP
-		return false;
+        return m_dirty;
 	}
 
 	@Override
@@ -186,7 +230,11 @@ public class MemStrategy implements IBufferStrategy {
 	@Override
 	public void writeRootBlock(IRootBlockView rootBlock,
 			ForceEnum forceOnCommitEnum) {
-		throw new UnsupportedOperationException();
+		if (rootBlock.isRootBlock0()) {
+			m_rb0 = rootBlock;
+		} else {
+			m_rb1 = rootBlock;
+		}
 	}
 
 	@Override
@@ -200,6 +248,8 @@ public class MemStrategy implements IBufferStrategy {
 		if (!m_modifiable) {
 			throw new IllegalStateException("The store is not modifiable");
 		}
+		m_mmgr.free(addr);
+		m_dirty = true;
 	}
 
 	@Override
@@ -264,16 +314,20 @@ public class MemStrategy implements IBufferStrategy {
 
 	@Override
 	public long write(ByteBuffer data) {
+		m_dirty = true;
+
 		return m_mmgr.allocate(data);
 	}
 
 	@Override
 	public long write(ByteBuffer data, long oldAddr) {
-		// since there is no commit, we might as well
-		// immediately recycle!
-		m_mmgr.free(oldAddr);
+		m_dirty = true;
 		
-		return write(data);
+		final long ret =  write(data);
+		
+		m_mmgr.free(oldAddr);
+				
+		return ret;
 	}
 
 	// AddressManager delagates

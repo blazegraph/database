@@ -5,20 +5,17 @@ import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
-import junit.framework.TestCase2;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.AbstractRawStoreTestCase;
-import com.bigdata.journal.AbstractJournalTestCase;
-
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.RWStore;
-import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
+import com.bigdata.journal.TestJournalBasics;
+import com.bigdata.rawstore.AbstractRawStoreTestCase;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Test suite for {@link MemStore}.
@@ -101,7 +98,7 @@ public class TestMemStore extends AbstractJournalTestCase {
          * all the tests will run with the configuration specified in this test
          * class and its optional .properties file.
          */
-        // suite.addTest(TestJournalBasics.suite());
+        suite.addTest(TestJournalBasics.suite());
 
         return suite;
 

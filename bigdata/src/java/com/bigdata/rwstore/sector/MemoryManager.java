@@ -27,6 +27,7 @@ package com.bigdata.rwstore.sector;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -999,6 +1000,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	@Override
 	public PSInputStream getInputStream(long addr) {
 		return new PSInputStream(this, addr);
+	}
+
+	@Override
+	public void commit() {
+		final Iterator<SectorAllocator> sectors = m_sectors.iterator();
+		while (sectors.hasNext()) {
+			sectors.next().commit();
+		}
 	}
 
 	/*

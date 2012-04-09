@@ -184,7 +184,7 @@ public class RootBlockView implements IRootBlockView {
      * readable). Finally, new root block images MUST be formed using the
      * {@link #currentVersion}.
      */
-    static final int currentVersion = VERSION2;
+    public static final int currentVersion = VERSION2;
     
     /**
      * The buffer holding the backing data.
@@ -355,7 +355,7 @@ public class RootBlockView implements IRootBlockView {
      *            superseded by another journal).
      * @param version 
      */
-    RootBlockView(//
+    public RootBlockView(//
             final boolean rootBlock0, final int offsetBits,
             final long nextOffset, final long firstCommitTime,
             final long lastCommitTime, final long commitCounter,

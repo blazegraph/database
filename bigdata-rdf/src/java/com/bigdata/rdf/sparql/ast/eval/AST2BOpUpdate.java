@@ -713,11 +713,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         if (!sourceGraph.equals(targetGraph)) {
 
-            clearGraph(targetGraph, null/* scope */, context);
+            clearOneGraph(targetGraph, context);
 
             copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
 
-            clearGraph(sourceGraph, null/* scope */, context);
+            clearOneGraph(sourceGraph, context);
             
         }
 
@@ -754,7 +754,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         if (!sourceGraph.equals(targetGraph)) {
 
-            clearGraph(targetGraph, null/* scope */, context);
+            clearOneGraph(targetGraph, context);
 
             copyStatements(context, op.isSilent(), sourceGraph, targetGraph);
 
@@ -1054,36 +1054,82 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final DropGraph op, final AST2BOpUpdateContext context)
             throws RepositoryException, SailException {
 
+        if (runOnQueryEngine)
+            throw new UnsupportedOperationException();
+
         final TermNode targetGraphNode = op.getTargetGraph();
 
         final BigdataURI targetGraph = targetGraphNode == null ? null
                 : (BigdataURI) targetGraphNode.getValue();
 
-        final Scope scope = op.getScope();
-
-        if (runOnQueryEngine)
-            throw new UnsupportedOperationException();
-
-        // FIXME This assumes that the target is a GRAPH (vs SOLUTION SET).
-        clearGraph(targetGraph, scope, context);       
+        clearGraph(op.isSilent(), op.getTargetSolutionSet(), targetGraph,
+                op.getScope(), op.isAllGraphs(), op.isAllSolutionSets(),
+                context);
 
         return left;
         
     }
 
     /**
-     * Remove all statements from the target graph or the specified
-     * {@link Scope}.
+     * Clear one graph (SILENT).
      * 
      * @param targetGraph
-     * @param scope
+     *            The graph to be cleared -or- <code>null</code> if no target
+     *            graph was named.
      * @param context
+     *            The {@link AST2BOpUpdateContext} used to perform the
+     *            operation.
+     * 
      * @throws RepositoryException
      * @throws SailException
      */
-    private static void clearGraph(final URI targetGraph, final Scope scope,
-            final AST2BOpUpdateContext context) throws RepositoryException,
-            SailException {
+    private static final void clearOneGraph(final URI targetGraph, //
+            final AST2BOpUpdateContext context//
+    ) throws RepositoryException, SailException {
+
+        clearGraph(true/* silent */, null/* targetSolutionSet */, targetGraph,
+                null/* scope */, false/* allGraphs */,
+                false/* allSolutionSets */, context);
+
+    }
+    
+    /**
+     * Clear one or more graphs and/or solution sets.
+     * 
+     * @param silent
+     *            When <code>true</code>, some kinds of problems will not be
+     *            reported to the caller.
+     * @param targetSolutionSet
+     *            The target solution set to be cleared -or- <code>null</code>
+     *            if no target solution set was named.
+     * @param targetGraph
+     *            The graph to be cleared -or- <code>null</code> if no target
+     *            graph was named.
+     * @param scope
+     *            The scope iff just the graphs in either the
+     *            {@link Scope#DEFAULT_CONTEXTS} or {@link Scope#NAMED_CONTEXTS}
+     *            should be cleared and otherwise <code>null</code>.
+     * @param allGraphs
+     *            iff all graphs should be cleared.
+     * @param allSolutionSets
+     *            iff all solution sets should be cleared.
+     * @param context
+     *            The {@link AST2BOpUpdateContext} used to perform the
+     *            operation.
+     * 
+     * @throws RepositoryException
+     * @throws SailException
+     */
+    // CLEAR/DROP ( SILENT )? (GRAPH IRIref | DEFAULT | NAMED | ALL | GRAPHS | SOLUTIONS | SOLUTIONS %VARNAME)
+    private static void clearGraph(//
+            final boolean silent,//
+            final String solutionSet,//
+            final URI targetGraph, //
+            final Scope scope,//
+            final boolean allGraphs,//
+            final boolean allSolutionSets,//
+            final AST2BOpUpdateContext context//
+    ) throws RepositoryException, SailException {
 
         if (log.isDebugEnabled())
             log.debug("targetGraph=" + targetGraph + ", scope=" + scope);
@@ -1093,6 +1139,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          */
         final BigdataSailConnection sailConn = context.conn.getSailConnection();
         
+        if (solutionSet != null) {
+
+            // Clear the named solution set.
+            if (!context.sparqlCache.clear(context, solutionSet) && !silent) {
+
+                throw new SailException("solutionSet=" + solutionSet);
+                
+            }
+            
+        }
+
         if (targetGraph != null) {
 
             /*
@@ -1102,7 +1159,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             sailConn.removeStatements(null/* s */, null/* p */, null/* o */,
                     targetGraph);
 
-        } else if (scope != null) {
+        } 
+        
+        if (scope != null) {
 
             if (scope == Scope.DEFAULT_CONTEXTS) {
 
@@ -1141,7 +1200,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 
             }
 
-        } else {  
+        } 
+        
+        if(allGraphs) {
             
             /*
              * Addressing ALL graphs.
@@ -1158,7 +1219,20 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         }
 
+        /*
+         * Note: We need to verify that the backing data structure is enabled
+         * since the default semantics of CLEAR ALL and DROP ALL also imply all
+         * named solution sets.
+         */
+        if (allSolutionSets && context.sparqlCache != null) {
+            
+            // Delete all solution sets.
+            context.sparqlCache.clearAll(context);
+            
+        }
+        
     }
+
     /**
      * If the graph already exists (context has at least one statement), then
      * this is an error (unless SILENT). Otherwise it is a NOP.

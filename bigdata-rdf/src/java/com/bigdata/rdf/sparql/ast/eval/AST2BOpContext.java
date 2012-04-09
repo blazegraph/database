@@ -295,18 +295,6 @@ public class AST2BOpContext implements IdFactory {
                 .getIndexManager());
 
         /*
-         * Cache for SPARQL solution sets.
-         * 
-         * TODO Define a query hint for enabling or disabling the SPARQL cache
-         * for an operation. However, the cache reference must still be set
-         * since we must still issue invalidation notes to the cache even if it
-         * is disabled during update operations (and it might not make sense to
-         * use the cache during SPARQL UPDATEs at all).
-         */
-        this.sparqlCache = null;
-//        this.sparqlCache = SparqlCacheFactory.getSparqlCache(queryEngine);
-        
-        /*
          * Figure out the query UUID that will be used. This will be bound onto
          * the query plan when it is generated. We figure out what it will be up
          * front so we can refer to its UUID in parts of the query plan. For
@@ -330,6 +318,29 @@ public class AST2BOpContext implements IdFactory {
                 .fromString(queryIdStr);
 
         this.queryId = queryId;
+        
+        /*
+         * Cache for SPARQL named solution sets.
+         * 
+         * TODO Define a query hint for enabling or disabling the SPARQL cache
+         * for an operation.
+         */
+        {
+            final boolean enable = queryHints == null ? QueryHints.DEFAULT_SOLUTION_SET_CACHE
+                    : Boolean
+                            .valueOf(queryHints
+                                    .getProperty(
+                                            QueryHints.SOLUTION_SET_CACHE,
+                                            QueryHints.DEFAULT_SOLUTION_SET_CACHE ? Boolean.TRUE
+                                                    .toString() : Boolean.FALSE
+                                                    .toString()));
+            if (enable) {
+                this.sparqlCache = SparqlCacheFactory
+                        .getSparqlCache(queryEngine);
+            } else {
+                this.sparqlCache = null;
+            }
+        }
         
         this.context = new BOpContextBase(queryEngine);
 

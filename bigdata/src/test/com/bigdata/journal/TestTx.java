@@ -41,6 +41,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
 import com.bigdata.btree.isolation.IsolatedFusedView;
@@ -266,6 +267,9 @@ public class TestTx extends ProxyTestCase<Journal> {
 
             final long tx1 = journal.newTx(ITx.UNISOLATED);
 
+            if(log.isDebugEnabled())
+                log.debug("State A, tx1: " + tx1 + "\n" + showCRI(journal));
+
             {
 
                 /*
@@ -291,8 +295,12 @@ public class TestTx extends ProxyTestCase<Journal> {
                 IIndex index = journal.getIndex(name);
 
                 assertNull(index.insert(k2, v2));
+                assertTrue(index.contains(k2));
 
-                assertNotSame(0L, journal.commit());
+                final long c2 = journal.commit();
+                if(log.isDebugEnabled())
+                    log.debug("State B, c2: " + c2 + "\n" + showCRI(journal));
+                assertNotSame(0L, c2);
 
             }
 
@@ -310,10 +318,26 @@ public class TestTx extends ProxyTestCase<Journal> {
 
             }
 
-            final long tx2 = journal.newTx(ITx.UNISOLATED);
-
             {
 
+                final IIndex index = journal.getIndex(name);
+
+                assertTrue(index.contains(k1));
+                assertTrue(index.contains(k2));
+
+            }
+            
+            /*
+             * start another transaction and verify that the 2nd committed
+             * write is now visible to that transaction.
+             */
+
+            final long tx2 = journal.newTx(ITx.UNISOLATED);
+            
+            if(log.isDebugEnabled())
+                log.debug("tx1: " + tx1 + ", tx2: " + tx2 + "\n" + showCRI(journal));
+
+            {
                 /*
                  * start another transaction and verify that the 2nd committed
                  * write is now visible to that transaction.
@@ -337,6 +361,45 @@ public class TestTx extends ProxyTestCase<Journal> {
         }
         
     }
+    
+    String showCRI(final Journal journal) {
+		final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
+		/*
+		 * Commit can be called prior to Journal initialisation, in which case
+		 * the commitRecordIndex will not be set.
+		 */
+		final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+		if (commitRecordIndex == null) { // TODO Why is this here?
+			return "EMPTY";
+		}
+
+		final IndexMetadata metadata = commitRecordIndex.getIndexMetadata();
+
+		commitRecords = commitRecordIndex.rangeIterator();
+
+		StringBuilder out = new StringBuilder();
+		while (commitRecords.hasNext()) {
+
+			final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
+
+			final CommitRecordIndex.Entry entry = tuple.getObject();
+
+			try {
+
+				final ICommitRecord record = CommitRecordSerializer.INSTANCE
+						.deserialize(journal.read(entry.addr));
+
+				out.append(record.toString() + "\n");
+			} catch (RuntimeException re) {
+
+				throw new RuntimeException("Problem with entry at "
+						+ entry.addr, re);
+
+			}
+		}
+		return out.toString();
+
+	}
 
     /**
      * Test verifies that an isolated write is visible inside of a transaction
