@@ -47,6 +47,7 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
 import com.bigdata.bop.join.HTreeMergeJoin;
@@ -1166,17 +1167,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * parent context which are not projected by the subquery are hidden from
      * view during its evaluation scope.
      * <p>
-     * Note: We evaluate SPARQL 1.1 style sub-queries using a pipelined subquery
-     * join. For each solution which flows through the pipeline, we issue the
-     * sub-query for the as-bound solution and join the subquery results against
-     * that as-bound solution.
-     * <p>
-     * Note: Some SPARQL 1.1 subqueries may be more efficiently run once to
-     * produce a temporary solution set which is then joined into the query for
-     * each solution which flows through the query. Such subqueries should be
-     * translated into named subqueries with an include by a query optimizer
-     * step. When a subquery is rewritten like this is will no longer appear as
-     * a {@link SubqueryRoot} node in the AST.
+     * Note: We evaluate SPARQL 1.1 style sub-queries using the same pattern
+     * which is used for sub-groups. However, we must also handle variable
+     * hiding based on the variables projected by the sub-select.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/232 (Support
      *      bottom-up evaluation semantics)
