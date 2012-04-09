@@ -68,8 +68,6 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestSubqueryOp.class);
 
-        suite.addTestSuite(TestSubqueryHashJoinOp.class);
-        
         // @todo test STAR (transitive closure).
 //        suite.addTestSuite(TestStar.class);
 
