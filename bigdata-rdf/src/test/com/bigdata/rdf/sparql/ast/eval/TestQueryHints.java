@@ -463,6 +463,119 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Unit test for the {@link IPredicate.Annotations#KEY_ORDER} query hint on
+     * a pipeline join (versus a hash join).
+     * <p>
+     * Note: This test does NOT verify that the pipeline join actually obeys
+     * that query hint. You need to verify that with a unit test of the pipeline
+     * join evaluation and check to see that the right index is used for each
+     * join.
+     */
+    public void test_query_hints_05a() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper(
+                "query-hints-05a",
+                "query-hints-05a.rq",
+                "query-hints-05.trig",
+                "query-hints-05.srx"
+                )
+                .runTest();
+
+        /*
+         * Check the optimized AST. The magic predicates which correspond to
+         * query hints should have be removed and various annotations made to
+         * the AST which capture the semantics of those query hints.
+         */
+        {
+
+            final JoinGroupNode whereClause = (JoinGroupNode) astContainer
+                    .getOptimizedAST().getWhereClause();
+
+            /*
+             * The hint to disable the join order optimizer should show up on
+             * the JoinGroupNodes. For the sample query, that means just the
+             * top-level WHERE clause.
+             */
+            assertEquals(QueryOptimizerEnum.None,
+                    whereClause.getProperty(QueryHints.OPTIMIZER));
+
+            // There are two statement pattern nodes left (after removing the
+            // query hint SPs).
+            assertEquals(2, whereClause.arity());
+
+            {
+
+                final StatementPatternNode sp = (StatementPatternNode) whereClause
+                        .get(0);
+
+                assertEquals(RDFS.LABEL, sp.p().getValue());
+
+            }
+
+            {
+
+                final StatementPatternNode sp = (StatementPatternNode) whereClause
+                        .get(1);
+
+                assertEquals(RDF.TYPE, sp.p().getValue());
+
+                assertEquals(SPOKeyOrder.PCSO.toString(),
+                        sp.getQueryHint(IPredicate.Annotations.KEY_ORDER));
+
+//                assertEquals("true",
+//                        sp.getQueryHint(QueryHints.HASH_JOIN));
+
+            }
+
+        } // end check of the AST.
+
+        /*
+         * Check the query plan.
+         */
+        {
+
+            /*
+             * Should be two pipeline joins.   
+             * 
+             * The first pipeline join is (?x rdfs:label ?o)
+             * 
+             * The second pipeline join is (?x rdf:type foaf:Person)
+             */
+            @SuppressWarnings("rawtypes")
+            final PipelineJoin[] joins = BOpUtility.toList(
+                    BOpUtility.visitAll(astContainer.getQueryPlan(),
+                            PipelineJoin.class)).toArray(new PipelineJoin[0]);
+            
+            assertEquals("#joins", 2, joins.length);
+            {
+
+                @SuppressWarnings("rawtypes")
+                final PipelineJoin join = joins[1];
+                
+                assertEquals(RDFS.LABEL, ((IV<?,?>)join.getPredicate().get(1/* p */)
+                        .get()).getValue());
+                
+            }
+
+            {
+            
+                @SuppressWarnings("rawtypes")
+                final PipelineJoin join = joins[0];
+                
+                assertEquals(RDF.TYPE, ((IV<?,?>) join.getPredicate().get(1/* p */)
+                        .get()).getValue());
+
+                final IPredicate<?> pred = join.getPredicate();
+                
+                assertEquals(SPOKeyOrder.PCSO, pred.getKeyOrder());
+                
+            }
+
+        }
+        
+    }
+    
+    /**
      * Unit test for {@link QueryHints#CHUNK_SIZE}.
      * 
      * <pre>

@@ -405,14 +405,29 @@ public class BOpUtility {
      * @param it
      *            The iterator.
      */
-    @SuppressWarnings("rawtypes")
-    public static List<IVariable> toList(final Iterator<IVariable<?>> it) {
+//    @SuppressWarnings("rawtypes")
+//    public static List<IVariable> toList(final Iterator<IVariable<?>> it) {
+//
+//        final List<IVariable> c = new LinkedList<IVariable>();
+//
+//        while (it.hasNext()) {
+//
+//            final IVariable v = it.next();
+//
+//            c.add(v);
+//
+//        }
+//
+//        return c;
+//        
+//    }
+    public static <T> List<T> toList(final Iterator<T> it) {
 
-        final List<IVariable> c = new LinkedList<IVariable>();
+        final List<T> c = new LinkedList<T>();
 
         while (it.hasNext()) {
 
-            final IVariable v = it.next();
+            final T v = it.next();
 
             c.add(v);
 
