@@ -276,5 +276,7 @@ public interface IMemoryManager extends ICounterSetAccess {
 	public int getMaxSectors();
 
 	public void close();
+
+	public void commit();
 	
 }

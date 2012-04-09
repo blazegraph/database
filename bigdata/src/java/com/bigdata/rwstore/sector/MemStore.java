@@ -165,7 +165,7 @@ public class MemStore extends AbstractRawStore {
 		root.addCounter("UUID", new OneShotInstrument<String>(getUUID()
 				.toString()));
 
-		root.attach(m_strategy.m_mmgr.getCounters());
+		root.attach(m_strategy.getMemoryManager().getCounters());
 		
 		return root;
 

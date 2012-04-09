@@ -682,4 +682,12 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		
 	}
 
+	/**
+	 * Called from MemoryManager to commit bits
+	 */
+	public void commit() {
+		m_commitbits = m_bits.clone();
+		m_transientbits = m_bits.clone();
+	}
+
 }

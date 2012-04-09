@@ -33,6 +33,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.service.AbstractTransactionService;
 
 /**
@@ -334,7 +335,8 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
             assertTrue(commitRecordIndexAddrs[i]!=0L);
 
-            if ((!(journal.getBufferStrategy() instanceof RWStrategy)) && i > 0)
+            final IBufferStrategy strat = journal.getBufferStrategy();
+            if ((!(strat instanceof RWStrategy || strat instanceof MemStrategy)) && i > 0)
                 assertTrue(commitRecordIndexAddrs[i] > commitRecordIndexAddrs[i - 1]);
 
             // get the current commit record.

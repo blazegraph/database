@@ -47,7 +47,6 @@ import java.util.Properties;
 import junit.framework.TestCase2;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.QueryResultUtil;
@@ -420,8 +419,8 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             sb.append("}\n");
 //            sb.append("ORDER BY ?name");
             
-            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
-            
+            con.prepareUpdate(QueryLanguage.SPARQL, sb.toString()).execute();
+
         }
         
         // Query it.

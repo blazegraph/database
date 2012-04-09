@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.cache;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -50,6 +49,48 @@ public interface ISparqlCache {
      * Close the cache / cache connection.
      */
     void close();
+
+    /**
+     * Clear the specified named solution set.
+     * 
+     * @param solutionSet
+     *            The name of the solution set.
+     * 
+     * @return <code>true</code> iff a solution set by that name existed and was
+     *         cleared.
+     */
+    boolean clear(AST2BOpContext ctx,String solutionSet);
+
+    /**
+     * Clear all named solution sets.
+     */
+    void clearAll(AST2BOpContext ctx);
+
+    /**
+     * Save the solutions a named solution set.
+     * 
+     * @param ctx
+     * @param solutionSet
+     *            The name of the solution set.
+     * @param src
+     *            The solutions.
+     */
+    void put(AST2BOpContext ctx, String solutionSet,
+            ICloseableIterator<IBindingSet[]> src);
+
+    /**
+     * Read the solutions from a named solution set.
+     * 
+     * @param ctx
+     * @param solutionSet
+     *            The name of the solution set.
+     * 
+     * @return An iterator from which the solutions may be drained.
+     * 
+     * @throws IllegalStateException
+     *             if no solution set with that name exists.
+     */
+    ICloseableIterator<IBindingSet[]> get(AST2BOpContext ctx, String solutionSet);
 
 //    /**
 //     * Return the result from the cache -or- <code>null</code> if there is a

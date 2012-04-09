@@ -353,6 +353,11 @@ public class AllocationContext implements IMemoryManager, IStore {
 		return m_root.getSectorCount();
 	}
 
+	@Override
+	public void commit() {
+		m_root.commit();
+	}
+
 //	private SectorAllocation m_head = null;
 //	
 //	/**

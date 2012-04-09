@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.cache;
 
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.AbstractJournal;
@@ -50,13 +54,16 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A SPARQL cache.
@@ -149,7 +156,29 @@ public class SparqlCache implements ISparqlCache {
      * stores, etc.
      */
     private final CacheJournal cache;
-
+    
+    /**
+     * TODO There are several problems here.
+     * <p>
+     * 1. We need a common semantics for visibility for the named solution sets
+     * and the query and update operations. This cache can not provide that
+     * without being somehow integrated with the MVCC architecture.
+     * <p>
+     * 2. We need to expire (at least some) cache objects. That expiration
+     * should have a default but should also be configurable for each cache
+     * object. The visibility issue also exists for expiration (we can not
+     * expire a result set while it is being used).
+     * <p>
+     * 3. If we allow updates against named solution sets, then the visibility
+     * of those updates must again be consistent with the MVCC architecture for
+     * the query and update operations.
+     * <p>
+     * 4. We need to have metadata about solution sets on hand for explicit
+     * CREATEs (e.g., supporting declared join variables).
+     */
+    private final ConcurrentHashMap<String/*name*/,SolutionSetMetadata> cacheMap;
+//    private final ConcurrentWeakValueCacheWithTimeout<String/* name */, IMemoryManager /* allocationContext */> cacheMap;
+    
 //    /**
 //     * The performance counters for the {@link IBufferStrategy} backing the
 //     * {@link #cache}.
@@ -215,21 +244,48 @@ public class SparqlCache implements ISparqlCache {
         this.queryEngine = queryEngine;
         
         /*
-         * FIXME Setup properties from Journal or Federation (mainly the maximum
+         * TODO Setup properties from Journal or Federation (mainly the maximum
          * amount of RAM to use, but we can not limit that if we are using this
          * for to store named solution sets rather than as a cache).
+         * 
+         * TODO Setup an expire thread or a priority heap for expiring named
+         * solution sets from the cache.
          */
         final Properties properties = new Properties();
-        
-        // FIXME Use MemStore to back this (new BufferMode).
+
+        /*
+         * Note: The cache will be backed by ByteBuffer objects allocated on the
+         * native process heap (Zero GC).
+         */
         properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-                BufferMode.Transient.name());
+                BufferMode.MemStore.name());
 
         properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""
                 + (10 * Bytes.megabyte));
+
+        properties.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE,
+                "true");
+
+//        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+//                "false");
+//
+//        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+//                "false");
+//
+//        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+
+        this.cache = new CacheJournal(properties);
         
-        this.cache = new CacheJournal( properties );
-        
+//        /*
+//         * TODO The expire should be per cached object, not global. We would
+//         * need a different cache map class for that.
+//         */
+//        final long timeoutNanos = TimeUnit.SECONDS.toNanos(20);
+
+//        this.cacheMap = new ConcurrentWeakValueCacheWithTimeout<String, IMemoryManager>(
+//                0/* queueCapacity */, timeoutNanos);
+        this.cacheMap = new ConcurrentHashMap<String, SolutionSetMetadata>();
+
     }
     
     @Override
@@ -255,10 +311,101 @@ public class SparqlCache implements ISparqlCache {
     @Override
     public void close() {
 
+        cacheMap.clear();
+        
         cache.destroy();
 
     }
 
+    @Override
+    public void clearAll(final AST2BOpContext ctx) {
+
+        final Iterator<Map.Entry<String, SolutionSetMetadata>> itr = cacheMap
+                .entrySet().iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<String, SolutionSetMetadata> e = itr.next();
+
+            final String solutionSet = e.getKey();
+            
+            final SolutionSetMetadata sset = e.getValue();
+
+            if (log.isInfoEnabled())
+                log.info("solutionSet: " + solutionSet);
+
+            sset.clear();
+            
+            itr.remove();
+            
+        }
+
+    }
+
+    @Override
+    public boolean clear(final AST2BOpContext ctx, final String solutionSet) {
+
+        if (log.isInfoEnabled())
+            log.info("solutionSet: " + solutionSet);
+
+        final SolutionSetMetadata sset = cacheMap.remove(solutionSet);
+
+        if (sset != null) {
+            sset.clear();
+
+            return true;
+
+        }
+
+        return false;
+        
+    }
+
+    public void put(final AST2BOpContext ctx, final String solutionSet,
+            final ICloseableIterator<IBindingSet[]> src) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+        
+        if (src == null)
+            throw new IllegalArgumentException();
+
+        /*
+         * TODO Deal with visibility issues on update (when the modified
+         * solution set state becomes visible).
+         */
+
+        SolutionSetMetadata sset = cacheMap.get(solutionSet);
+
+        if (sset == null) {
+
+            final IMemoryManager mmrgr = ((MemStrategy) cache
+                    .getBufferStrategy()).getMemoryManager();
+
+            sset = new SolutionSetMetadata(solutionSet,
+                    mmrgr.createAllocationContext());
+
+        }
+
+        sset.put(src);
+        
+    }
+
+    public ICloseableIterator<IBindingSet[]> get(final AST2BOpContext ctx,
+            final String solutionSet) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+
+        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+
+        if (sset == null)
+            throw new IllegalStateException("Not found: " + solutionSet);
+
+        return sset.get();
+
+    }
+    
 //    @Override
 //    public ICacheHit get(final AST2BOpContext ctx,
 //            final QueryBase queryOrSubquery) {

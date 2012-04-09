@@ -815,6 +815,9 @@ public class FileMetadata {
 			case Temporary:
 				buffer = null;
 				break;
+			case MemStore:
+				buffer = null;
+				break;
 			default:
 				throw new AssertionError();
 			}
