@@ -243,6 +243,23 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
+    
+    /**
+     * This is the same query, except we are running the rewritten version of
+     * the query (that is, the version that we have to produce for the query
+     * above with the badly designed left join).
+     * 
+     */
+    public void test_two_nested_opt2() throws Exception {
+
+        new TestHelper(
+                "two-nested-opt", // testURI,
+                "two-nested-opt2.rq",// queryFileURL
+                "two-nested-opt.ttl",// dataFileURL
+                "two-nested-opt.srx"// resultFileURL
+                ).runTest();
+
+    }
 
     /**
      * This case is not a problem. It provides a contrast to

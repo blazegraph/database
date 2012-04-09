@@ -1,0 +1,16 @@
+PREFIX :    <http://example/>
+
+SELECT *
+WITH {
+  SELECT ?w ?v {
+     :x3 :q ?w .
+     OPTIONAL { :x2 :p ?v }
+  }
+} as %namedSet1
+{ 
+    :x1 :p ?v .
+    OPTIONAL
+    { 
+       INCLUDE %namedSet1
+    }
+}
