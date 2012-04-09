@@ -224,7 +224,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
             if (nodes.length != 3 && nodes.length != 4)
                 throw new RuntimeException(
-                        "Only triples are quads are supported: found n="
+                        "Only triples or quads are supported: found n="
                                 + nodes.length);
 
             final Resource s;
