@@ -881,7 +881,8 @@ public class BOpContext<E> extends BOpContextBase {
 
         return new CloseableIteratorWrapper(
                 new com.bigdata.striterator.ChunkedStriterator(src).addFilter(
-                        new ChunkedFilter() {
+//                        new ChunkedFilter() {
+                        new ChunkedFilter<IChunkedIterator<Object>, Object, Object>() {
 
                             private static final long serialVersionUID = 1L;
 
