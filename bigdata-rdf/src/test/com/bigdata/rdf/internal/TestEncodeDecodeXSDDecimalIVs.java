@@ -83,6 +83,42 @@ public class TestEncodeDecodeXSDDecimalIVs extends
 
     }
 
+
+    /**
+     * Unit test of {@link XSDDecimalIV} with trailing zeros. The encoded and
+     * decoded values are consistent, but trailing zeros are removed by the
+     * {@link XSDDecimalIV} encoding.
+     */
+    public void test_encodeDecode_XSDDecimal_trailingZeros() {
+
+        final BigDecimal p1 = new BigDecimal("1.50");
+        final BigDecimal p2 = new BigDecimal("1.500");
+
+        final IV<?,?>[] e = new IV[] {
+                new XSDDecimalIV<BigdataLiteral>(p1),//
+                new XSDDecimalIV<BigdataLiteral>(p2),//
+                };
+
+//        for(IV t : e) {
+//            System.err.println(t.toString()+" : "+((XSDDecimalIV) t).getLabel());
+//        }
+        
+        final IV<?,?>[] a = doEncodeDecodeTest(e);
+
+//        for(IV t : a) {
+//            System.err.println(t.toString()+" : "+((XSDDecimalIV) t).getLabel());
+//        }
+
+        doComparatorTest(e);
+
+        doComparatorTest(a);
+
+        final IV<?, ?>[] b = new IV[] { e[0], e[1], a[0], a[1] };
+
+        doComparatorTest(b);
+
+    }
+
     /**
      * Unit test demonstrates that precision is not preserved by the encoding.
      * Thus, ZEROs are encoded in the same manner regardless of their precision
