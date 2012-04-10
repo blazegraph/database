@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.cache;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -59,12 +60,26 @@ public interface ISparqlCache {
      * @return <code>true</code> iff a solution set by that name existed and was
      *         cleared.
      */
-    boolean clear(AST2BOpContext ctx,String solutionSet);
+    boolean clearSolutions(AST2BOpContext ctx, String solutionSet);
 
     /**
      * Clear all named solution sets.
      */
-    void clearAll(AST2BOpContext ctx);
+    void clearAllSolutions(AST2BOpContext ctx);
+
+    /**
+     * Create a named solution set.
+     * 
+     * @param ctx
+     * @param solutionSet
+     *            The name of the solution set.
+     * @param params
+     *            The configuration parameters (optional).
+     * 
+     * @throws RuntimeException
+     *             if a solution set exists for that name.
+     */
+    void createSolutions(AST2BOpContext ctx, String solutionSet, ISPO[] params);
 
     /**
      * Save the solutions a named solution set.
@@ -75,7 +90,7 @@ public interface ISparqlCache {
      * @param src
      *            The solutions.
      */
-    void put(AST2BOpContext ctx, String solutionSet,
+    void putSolutions(AST2BOpContext ctx, String solutionSet,
             ICloseableIterator<IBindingSet[]> src);
 
     /**
@@ -90,8 +105,20 @@ public interface ISparqlCache {
      * @throws IllegalStateException
      *             if no solution set with that name exists.
      */
-    ICloseableIterator<IBindingSet[]> get(AST2BOpContext ctx, String solutionSet);
+    ICloseableIterator<IBindingSet[]> getSolutions(AST2BOpContext ctx,
+            String solutionSet);
 
+    /**
+     * Return <code>true</code> iff a named solution set exists.
+     * 
+     * @param ctx
+     * @param solutionSet
+     *            The name of the solution set.
+     *            
+     * @return <code>true</code> iff a solution set having that name exists.
+     */
+    boolean existsSolutions(AST2BOpContext ctx, String solutionSet);
+    
 //    /**
 //     * Return the result from the cache -or- <code>null</code> if there is a
 //     * cache miss.

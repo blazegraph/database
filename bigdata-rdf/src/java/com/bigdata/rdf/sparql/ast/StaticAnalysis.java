@@ -46,6 +46,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
@@ -197,6 +198,15 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 //    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
     
+    /**
+     * FIXME This will go away now once we have the ability to resolve named
+     * subqueries against the {@link ISparqlCache}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
+     *      SPARQL Update for Named Solution Sets </a>
+     */
+    private static boolean requireDeclaredNamedSubquery = !QueryHints.DEFAULT_SOLUTION_SET_CACHE;
+
     /**
      * 
      * @param queryRoot
@@ -805,11 +815,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(queryRoot);
 
-            if (nsr == null)
+            if (nsr != null)
+                vars.addAll(getDefinitelyProducedBindings(nsr));
+            else if(requireDeclaredNamedSubquery)
                 throw new RuntimeException("No named subquery declared: name="
                         + nsi.getName());
-
-            vars.addAll(getDefinitelyProducedBindings(nsr));
 
         } else if(node instanceof ServiceNode) {
 
@@ -943,11 +953,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(queryRoot);
 
-            if (nsr == null)
+            if (nsr != null)
+                vars.addAll(getMaybeProducedBindings(nsr));
+            else if(requireDeclaredNamedSubquery)
                 throw new RuntimeException("No named subquery declared: name="
                         + nsi.getName());
-
-            vars.addAll(getMaybeProducedBindings(nsr));
 
         } else if(node instanceof ServiceNode) {
 

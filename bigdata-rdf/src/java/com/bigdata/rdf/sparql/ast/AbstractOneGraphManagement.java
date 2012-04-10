@@ -88,7 +88,7 @@ abstract public class AbstractOneGraphManagement extends GraphManagement {
      */
     public final boolean isTargetSolutionSet() {
 
-        return getProperty(Annotations.TARGET) instanceof VarNode;
+        return getProperty(Annotations.TARGET) instanceof String;
         
     }
 

@@ -399,7 +399,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * solutions are present using a query and an INCLUDE join against the named
      * solution set.
      */
-    public void test01() throws Exception {
+    public void test_insertIntoSolutions() throws Exception {
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -455,7 +455,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * solutions and verifies that they are no longer reported by query as a
      * post-condition.
      */
-    public void test02() throws Exception {
+    public void test_deleteFromSolutions() throws Exception {
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -487,7 +487,8 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
             sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
             sb.append("DELETE FROM %namedSet1\n");
-            sb.append("SELECT (<http://www.bigdata.com/> as ?x) (\"Mike\" as ?name) \n");
+            sb.append("SELECT (<http://www.bigdata.com/> as ?x) (\"Mike\" as ?name)\n");
+            sb.append("WHERE { }\n");
             
             con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
             
@@ -515,7 +516,24 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             QueryResultUtil.equals(ret, expected);
 
         }
-        
+
+    }
+
+    /**
+     * TODO Unit test where we are deleting from one solution set and inserting
+     * into another.
+     * 
+     * TODO Unit test where we are deleting some solutions from a solution set
+     * and inserting other solutions into the same solution set.
+     * 
+     * TODO Unit test where we are deleting some triples from a graph and
+     * inserting some solutions into a named solution set.
+     * 
+     * TODO Unit test where we are deleting some solutions from a named solution
+     * set and inserting some triples into a graph.
+     */
+    public void test_deleteInsert01() {
+        fail("write test");
     }
     
     /**

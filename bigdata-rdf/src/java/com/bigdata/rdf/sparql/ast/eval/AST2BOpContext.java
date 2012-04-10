@@ -13,6 +13,8 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.EmptySolutionSetStats;
@@ -441,6 +443,28 @@ public class AST2BOpContext implements IdFactory {
 
         return prefix + (varIdFactory++);
 
+    }
+
+    /**
+     * Return the timestamp which will be used to read on the lexicon.
+     * <p>
+     * Note: This uses the timestamp of the triple store view unless this is a
+     * read/write transaction, in which case we need to use the last commit
+     * point in order to see any writes which it may have performed (lexicon
+     * writes are always unisolated).
+     */
+    public long getLexiconReadTimestamp() {
+    
+        long timestamp = db.getTimestamp();
+    
+        if (TimestampUtility.isReadWriteTx(timestamp)) {
+    
+            timestamp = ITx.UNISOLATED;
+            
+        }
+        
+        return timestamp;
+        
     }
 
 }

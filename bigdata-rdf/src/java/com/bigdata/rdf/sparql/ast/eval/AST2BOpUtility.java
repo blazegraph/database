@@ -47,7 +47,6 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
 import com.bigdata.bop.join.HTreeMergeJoin;
@@ -513,10 +512,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 
                 if (!tmp.isEmpty()) {
 
-                    final long timestamp = getLexiconReadTimestamp(ctx);
+                    final long timestamp = ctx.getLexiconReadTimestamp();
 
-                    final String ns = ctx.db.getLexiconRelation()
-                            .getNamespace();
+                    final String ns = ctx.getLexiconNamespace();
 
                     final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
                             .size()]);
@@ -525,7 +523,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
                             new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                             new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
-                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_ALL, true), //
+                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
                             new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
                             );
