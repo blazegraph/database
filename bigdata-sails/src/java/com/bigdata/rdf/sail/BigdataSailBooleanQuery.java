@@ -3,12 +3,14 @@ package com.bigdata.rdf.sail;
 import java.util.concurrent.TimeUnit;
 
 import org.openrdf.query.Dataset;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailBooleanQuery;
 
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
@@ -71,7 +73,17 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     @Override
     public boolean evaluate() throws QueryEvaluationException {
 
+        return evaluate((BindingsClause) null);
+
+    }
+
+    public boolean evaluate(final BindingsClause bc) 
+    		throws QueryEvaluationException {
+
         final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+        if (bc != null)
+        	originalQuery.setBindingsClause(bc);
 
         if (getMaxQueryTime() > 0)
             originalQuery.setTimeout(TimeUnit.SECONDS
