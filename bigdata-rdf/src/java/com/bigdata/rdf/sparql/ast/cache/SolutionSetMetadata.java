@@ -408,6 +408,10 @@ final class SolutionSetMetadata {
 
         if (solutionSetAddr != IRawStore.NULL) {
 
+            /*
+             * Release the old solution set.
+             */
+
             allocationContext.free(solutionSetAddr);
 
         }
