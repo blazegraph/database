@@ -35,12 +35,19 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 
 /**
- * An AST node which models either {@link QuadData} or a named solution set.
- * This is used for the INSERT clause and DELETE clause of a
- * {@link DeleteInsertGraph} operation.
+ * An AST node which models either {@link QuadData} or a named solution set in
+ * support of the INSERT clause and DELETE clause of a {@link DeleteInsertGraph}
+ * operations. Use {@link #isQuads()} or {@link #isSolutions()} to identify how
+ * this AST node should be interpreted.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: QuadsDataOrNamedSolutionSet.java 6196 2012-03-27 20:06:22Z
+ *          thompsonbry $
+ * 
+ *          TODO Rather than overriding this for two very different things
+ *          (quads data and the name of a solution set) it might be better to
+ *          relayer the AST model or just handle this via polymorphism in the
+ *          {@link DeleteInsertGraph} AST node.
  */
 public class QuadsDataOrNamedSolutionSet extends QueryNodeBase implements
         INamedSolutionSet, IProjectionDecl {
@@ -54,7 +61,8 @@ public class QuadsDataOrNamedSolutionSet extends QueryNodeBase implements
             INamedSolutionSet.Annotations, IProjectionDecl.Annotations {
 
         /**
-         * The optional {@link QuadData}.
+         * The {@link QuadData} (optional; when present this is modeling QUADS
+         * data).
          */
         String QUAD_DATA = "quadData";
 
@@ -107,6 +115,26 @@ public class QuadsDataOrNamedSolutionSet extends QueryNodeBase implements
 
     }
 
+    /**
+     * Return <code>true</code> iff this models QUADS data (rather than named
+     * solutions)
+     */
+    public boolean isQuads() {
+
+        return getProperty(Annotations.QUAD_DATA)!=null;
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff this models a reference to some named
+     * solutions (rather than QUADS data).
+     */
+    public boolean isSolutions() {
+
+        return getProperty(Annotations.NAMED_SET) != null;
+        
+    }
+    
     public String getName() {
 
         return (String) getProperty(Annotations.NAMED_SET);

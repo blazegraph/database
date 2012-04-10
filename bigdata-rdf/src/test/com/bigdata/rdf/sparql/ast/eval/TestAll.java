@@ -143,6 +143,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestCustomFunction.class);
 
         /*
+         * Named solution sets (outside of the scope of a Query).
+         */
+        suite.addTest(com.bigdata.rdf.sparql.ast.eval.cache.TestAll.suite());
+        
+        /*
          * SPARQL 1.1 UPDATE
          */
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.update.TestAll.suite());

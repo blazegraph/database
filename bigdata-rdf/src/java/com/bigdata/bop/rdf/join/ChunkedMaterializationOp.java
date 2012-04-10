@@ -60,6 +60,9 @@ import com.bigdata.striterator.ICloseableIterator;
  * {@link BigdataBindingSetResolverator} replaces the {@link IV} in the solution
  * with the {@link BigdataValue}. Also, this class does not filter out variables
  * which are not being materialized.
+ * 
+ * @see ChunkedMaterializationIterator
+ * @see BigdataBindingSetResolverator
  */
 public class ChunkedMaterializationOp extends PipelineOp {
 
@@ -71,10 +74,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
     public interface Annotations extends PipelineOp.Annotations {
 
         /**
-         * The variables to be materialized. When <code>null</code> or not
-         * specified, ALL variables will be materialized. This may not be an
-         * empty array as that would imply that there is no need to use this
-         * operator.
+         * The {@link IVariable}[] identifying the variables to be materialized.
+         * When <code>null</code> or not specified, ALL variables will be
+         * materialized. This may not be an empty array as that would imply that
+         * there is no need to use this operator.
          */
         String VARS = ChunkedMaterializationOp.class.getName()+".vars";
 
@@ -85,12 +88,12 @@ public class ChunkedMaterializationOp extends PipelineOp {
         /**
          * If true, materialize inline values in addition to term IDs.
          */
-        String MATERIALIZE_ALL = ChunkedMaterializationOp.class.getName()+".materializeAll";
+        String MATERIALIZE_INLINE_IVS = ChunkedMaterializationOp.class.getName()+".materializeAll";
         
         /**
          * Default materialize all is false.
          */
-        boolean DEFAULT_MATERIALIZE_ALL = false;
+        boolean DEFAULT_MATERIALIZE_INLINE_IVS = false;
 
     }
 
@@ -149,10 +152,16 @@ public class ChunkedMaterializationOp extends PipelineOp {
         );
     }
     
-    public boolean materializeAll() {
-    	
-    	return getProperty(Annotations.MATERIALIZE_ALL, Annotations.DEFAULT_MATERIALIZE_ALL);
-    	
+    /**
+     * When <code>true</code>, inline {@link IV}s are also materialized.
+     * 
+     * @see Annotations#MATERIALIZE_INLINE_IVS
+     */
+    public boolean materializeInlineIVs() {
+
+        return getProperty(Annotations.MATERIALIZE_INLINE_IVS,
+                Annotations.DEFAULT_MATERIALIZE_INLINE_IVS);
+
     }
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
@@ -177,7 +186,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
         private final long timestamp;
         
-        private final boolean materializeAll;
+        private final boolean materializeInlineIVs;
 
         ChunkTask(final ChunkedMaterializationOp op,
                 final BOpContext<IBindingSet> context
@@ -194,7 +203,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
             timestamp = (Long) op.getProperty(Annotations.TIMESTAMP);
             
-            materializeAll = op.materializeAll();
+            materializeInlineIVs = op.materializeInlineIVs();
 
         }
 
@@ -219,7 +228,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(a.length);
 
-                    resolveChunk(vars, lex, a, materializeAll);
+                    resolveChunk(vars, lex, a, materializeInlineIVs);
 
                     sink.add(a);
 
@@ -252,10 +261,10 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * @param chunk
      *            The chunk of solutions whose variables will be materialized.
      */
-    static private void resolveChunk(final IVariable<?>[] required,
+    static void resolveChunk(final IVariable<?>[] required,
             final LexiconRelation lex,//
             final IBindingSet[] chunk,//
-            final boolean materializeAll
+            final boolean materializeInlineIVs
     ) {
 
         if (log.isInfoEnabled())
@@ -304,7 +313,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    if (iv.needsMaterialization() || materializeAll) {
+                    if (iv.needsMaterialization() || materializeInlineIVs) {
                     	
                     	ids.add(iv);
                     
@@ -331,7 +340,7 @@ public class ChunkedMaterializationOp extends PipelineOp {
 
                     }
 
-                    if (iv.needsMaterialization() || materializeAll) {
+                    if (iv.needsMaterialization() || materializeInlineIVs) {
                     	
                     	ids.add(iv);
                     	

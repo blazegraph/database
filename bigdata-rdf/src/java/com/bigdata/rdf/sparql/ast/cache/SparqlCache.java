@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.cache;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,6 +57,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.rwstore.RWStore;
@@ -63,6 +66,7 @@ import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -232,9 +236,8 @@ public class SparqlCache implements ISparqlCache {
      * {@link IndexManager} inside the {@link IDataService} and provides direct
      * access to {@link FusedView}s (aka shards).
      * 
-     * @param indexManager
-     *            The <em>local</em> {@link IIndexManager}.
-     * 
+     * @param queryEngine
+     *            The {@link QueryEngine}.
      */
     public SparqlCache(final QueryEngine queryEngine) {
 
@@ -317,8 +320,22 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
+    /**
+     * Return the {@link IMemoryManager} backing all transient named solution
+     * sets. The caller is responsible for creating a child allocation context
+     * when writing a named solution set onto the {@link IMemoryManager}.
+     * 
+     * @return The shared {@link IMemoryManager}.
+     */
+    protected IMemoryManager getMemoryManager() {
+        
+        return ((MemStrategy) cache
+                .getBufferStrategy()).getMemoryManager();
+        
+    }
+    
     @Override
-    public void clearAll(final AST2BOpContext ctx) {
+    public void clearAllSolutions(final AST2BOpContext ctx) {
 
         final Iterator<Map.Entry<String, SolutionSetMetadata>> itr = cacheMap
                 .entrySet().iterator();
@@ -343,7 +360,7 @@ public class SparqlCache implements ISparqlCache {
     }
 
     @Override
-    public boolean clear(final AST2BOpContext ctx, final String solutionSet) {
+    public boolean clearSolutions(final AST2BOpContext ctx, final String solutionSet) {
 
         if (log.isInfoEnabled())
             log.info("solutionSet: " + solutionSet);
@@ -361,7 +378,7 @@ public class SparqlCache implements ISparqlCache {
         
     }
 
-    public void put(final AST2BOpContext ctx, final String solutionSet,
+    public void putSolutions(final AST2BOpContext ctx, final String solutionSet,
             final ICloseableIterator<IBindingSet[]> src) {
 
         if (solutionSet == null)
@@ -379,19 +396,59 @@ public class SparqlCache implements ISparqlCache {
 
         if (sset == null) {
 
-            final IMemoryManager mmrgr = ((MemStrategy) cache
-                    .getBufferStrategy()).getMemoryManager();
+            final IMemoryManager mmrgr = getMemoryManager()
+                    .createAllocationContext();
 
-            sset = new SolutionSetMetadata(solutionSet,
-                    mmrgr.createAllocationContext());
+            sset = new SolutionSetMetadata(solutionSet, mmrgr,
+                    getDefaultMetadata());
 
+            cacheMap.put(solutionSet, sset);
+            
         }
 
+        // write the solutions onto the memory manager.
         sset.put(src);
-        
+
     }
 
-    public ICloseableIterator<IBindingSet[]> get(final AST2BOpContext ctx,
+    public void createSolutions(final AST2BOpContext ctx,
+            final String solutionSet, final ISPO[] params) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+        
+        /*
+         * TODO Deal with visibility issues on update (when the modified
+         * solution set state becomes visible and race conditions on create).
+         */
+
+        SolutionSetMetadata sset = cacheMap.get(solutionSet);
+
+        if (sset != null)
+            throw new RuntimeException("Exists: " + solutionSet);
+        
+        final IMemoryManager mmrgr = getMemoryManager()
+                .createAllocationContext();
+
+        sset = new SolutionSetMetadata(solutionSet, mmrgr,
+                params == null ? getDefaultMetadata() : params);
+
+        cacheMap.put(solutionSet, sset);
+
+        {
+
+            final List<IBindingSet[]> emptySolutionSet = new LinkedList<IBindingSet[]>();
+            
+            final ICloseableIterator<IBindingSet[]> src = new CloseableIteratorWrapper<IBindingSet[]>(
+                    emptySolutionSet.iterator());
+
+            // write the solutions onto the memory manager.
+            sset.put(src);
+        }
+
+    }
+
+    public ICloseableIterator<IBindingSet[]> getSolutions(final AST2BOpContext ctx,
             final String solutionSet) {
 
         if (solutionSet == null)
@@ -402,8 +459,33 @@ public class SparqlCache implements ISparqlCache {
         if (sset == null)
             throw new IllegalStateException("Not found: " + solutionSet);
 
+        // Return iterator over the decoded solutions.
         return sset.get();
 
+    }
+
+    public boolean existsSolutions(final AST2BOpContext ctx,
+            final String solutionSet) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+
+        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+
+        return sset != null;
+
+    }
+
+    /**
+     * Return the default metadata used when a named solution set is declared
+     * implicitly rather than explicitly.
+     * 
+     * @return The metadata describing that solution set.
+     */
+    protected ISPO[] getDefaultMetadata() {
+        
+        return new ISPO[]{};
+        
     }
     
 //    @Override

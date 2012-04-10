@@ -123,6 +123,9 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
                 final QuadsDataOrNamedSolutionSet insertClause = new QuadsDataOrNamedSolutionSet(
                         "%cached_solution_set");
                 
+                assertTrue(insertClause.isSolutions());
+                assertFalse(insertClause.isQuads());
+                
                 final ProjectionNode projection = new ProjectionNode();
                 insertClause.setProjection(projection);
                 
@@ -280,6 +283,8 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
             expected.addChild(op);
             
             op.setTargetSolutionSet("%solutionSet");
+            
+            assertTrue(op.isTargetSolutionSet());
 
         }
         

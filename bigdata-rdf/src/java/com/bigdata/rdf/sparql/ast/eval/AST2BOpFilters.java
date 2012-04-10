@@ -51,8 +51,6 @@ import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
@@ -240,9 +238,9 @@ public class AST2BOpFilters extends AST2BOpBase {
         if (nvars == 0)
             return left;
 
-        final long timestamp = getLexiconReadTimestamp(ctx);
+        final long timestamp = ctx.getLexiconReadTimestamp();
 
-        final String ns = ctx.db.getLexiconRelation().getNamespace();
+        final String ns = ctx.getLexiconNamespace();
 
         if (nvars >= 1) {
             /*
@@ -411,28 +409,6 @@ public class AST2BOpFilters extends AST2BOpBase {
         }
 
         return left;
-
-    }
-
-    /**
-     * Return the timestamp which will be used to read on the lexicon.
-     * <p>
-     * Note: This uses the timestamp of the triple store view unless this is a
-     * read/write transaction, in which case we need to use the last commit
-     * point in order to see any writes which it may have performed (lexicon
-     * writes are always unisolated).
-     */
-    static protected long getLexiconReadTimestamp(final AST2BOpContext ctx) {
-       
-        long timestamp = ctx.db.getTimestamp();
-
-        if (TimestampUtility.isReadWriteTx(timestamp)) {
-
-            timestamp = ITx.UNISOLATED;
-            
-        }
-        
-        return timestamp;
 
     }
     

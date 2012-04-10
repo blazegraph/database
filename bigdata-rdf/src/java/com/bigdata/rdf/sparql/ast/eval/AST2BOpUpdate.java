@@ -110,6 +110,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Class handles SPARQL update query plan generation.
@@ -484,7 +485,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                  * the WHERE clause results when both the DELETE clause and the
                  * INSERT clause are present.
                  * 
-                 * TODO For large intermediate results, we would be much better
+                 * FIXME For large intermediate results, we would be much better
                  * off putting the data onto an HTree and processing the
                  * bindings as IVs rather than materializing them as RDF Values
                  * (and even for small data sets, we would be better off
@@ -563,37 +564,116 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             } else {
 
                 /*
-                 * FIXME Support INSERT INTO / DELETE FROM here.
-                 *  
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524 (SPARQL Cache)
+                 * DELETE/INSERT.
+                 * 
+                 * Note: For this code path, only the INSERT clause -or- the
+                 * DELETE clause was specified. We handle the case where BOTH
+                 * clauses were specified above.
                  */
-                final QuadData quadData = (insertClause == null ? deleteClause
-                        : insertClause).getQuadData();
-
-                final ConstructNode template = quadData.flatten();
                 
-                // Set the CONSTRUCT template (quads patterns).
-                queryRoot.setConstruct(template);
+                // true iff this is an INSERT
+                final boolean isInsert = insertClause != null;
+//                final boolean isDelete = deleteClause != null;
+  
+                // The clause (either for INSERT or DELETE)
+                final QuadsDataOrNamedSolutionSet clause = isInsert ? insertClause
+                        : deleteClause;
+                
+                assert clause != null;
 
-                // Run as a CONSTRUCT query.
-                final GraphQueryResult result = ASTEvalHelper
-                        .evaluateGraphQuery(context.db, astContainer, null/* bindingSets */);
+                // Figure out whether we are insert or deleting solutions.
+                final boolean isSolutionSet = clause.isSolutions();
 
-                try {
+                if(isSolutionSet) {
+                    
+                    /*
+                     * Target is solution set.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
+                     * (SPARQL Cache)
+                     */
+                    
+                    // The named solution set on which we will write.
+                    final String solutionSet = clause.getName();
 
-                    while (result.hasNext()) {
+                    // Set the projection node.
+                    queryRoot.setProjection(clause.getProjection());
 
-                        final BigdataStatement stmt = (BigdataStatement) result
-                                .next();
-
-                        addOrRemoveStatement(context.conn.getSailConnection(),
-                                stmt, isInsertOnly);
-                        
+                    if (!isInsert) {
+                        /*
+                         * FIXME We need to find and remove the matching
+                         * solutions. Probably the best way to do that is to
+                         * transform the WHERE clause with a MINUS joining
+                         * against the target solution set via an INCLUDE. The
+                         * solutions which are produced by the query can then be
+                         * written directly onto the named solution set. That
+                         * way, both DELETE and INSERT will wind up as
+                         * putSolutions().
+                         */
+                        throw new UnsupportedOperationException();
                     }
+                    
+                    // Run as a SELECT query : Do NOT materialize IVs.
+                    final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
+                            .evaluateTupleQuery2(context.db, astContainer,
+                                    null/* bindingSets */, false/* materialize */);
 
-                } finally {
+                    try {
 
-                    result.close();
+                        // Write the solutions onto the named solution set.
+                        context.sparqlCache.putSolutions(context, solutionSet,
+                                result);
+
+                    } finally {
+
+                        result.close();
+
+                    }
+                                        
+                } else {
+
+                    /*
+                     * Target is graph.
+                     */
+                    
+                    final QuadData quadData = (insertClause == null ? deleteClause
+                            : insertClause).getQuadData();
+
+                    final ConstructNode template = quadData.flatten();
+
+                    // Set the CONSTRUCT template (quads patterns).
+                    queryRoot.setConstruct(template);
+
+                    /*
+                     * Run as a CONSTRUCT query
+                     * 
+                     * FIXME Can we avoid IV materialization for this code path?
+                     * Note that we have to do Truth Maintenance. However, I
+                     * suspect that we do not need to do IV materialization if
+                     * we can tunnel into the Sail's assertion and retraction
+                     * buffers.
+                     */
+                    final GraphQueryResult result = ASTEvalHelper
+                            .evaluateGraphQuery(context.db, astContainer, null/* bindingSets */);
+
+                    try {
+
+                        while (result.hasNext()) {
+
+                            final BigdataStatement stmt = (BigdataStatement) result
+                                    .next();
+
+                            addOrRemoveStatement(
+                                    context.conn.getSailConnection(), stmt,
+                                    isInsertOnly);
+
+                        }
+
+                    } finally {
+
+                        result.close();
+
+                    }
 
                 }
 
@@ -1142,7 +1222,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (solutionSet != null) {
 
             // Clear the named solution set.
-            if (!context.sparqlCache.clear(context, solutionSet) && !silent) {
+            if (!context.sparqlCache.clearSolutions(context, solutionSet) && !silent) {
 
                 throw new SailException("solutionSet=" + solutionSet);
                 
@@ -1227,27 +1307,49 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (allSolutionSets && context.sparqlCache != null) {
             
             // Delete all solution sets.
-            context.sparqlCache.clearAll(context);
+            context.sparqlCache.clearAllSolutions(context);
             
         }
         
     }
 
     /**
-     * If the graph already exists (context has at least one statement), then
-     * this is an error (unless SILENT). Otherwise it is a NOP.
+     * GRAPHS : If the graph already exists (context has at least one
+     * statement), then this is an error (unless SILENT). Otherwise it is a NOP.
+     * <p>
+     * SOLUTIONS : If the named solution set already exists (is registered, but
+     * may be empty), then this is an error (unless SILENT). Otherwise, the
+     * named solution set is provisioned according to the optional parameters.
      * 
      * @param left
      * @param op
      * @param context
      * @return
-     * 
-     * FIXME Support CREATE SOLUTIONS here.
      */
     private static PipelineOp convertCreateGraph(final PipelineOp left,
             final CreateGraph op, final AST2BOpUpdateContext context) {
 
-        if (!op.isSilent()) {
+        if (op.isTargetSolutionSet()) {
+
+            final String solutionSet = op.getTargetSolutionSet();
+
+            final boolean exists = context.sparqlCache.existsSolutions(context,
+                    solutionSet);
+            
+            if (!op.isSilent() && exists) {
+
+                throw new RuntimeException("Solutions exists:" + solutionSet);
+
+            }
+
+            if (!exists) {
+
+                context.sparqlCache.createSolutions(context, solutionSet,
+                        op.getParams());
+
+            }
+            
+        } else {
 
             final BigdataURI c = (BigdataURI) ((CreateGraph) op)
                     .getTargetGraph().getValue();
@@ -1255,13 +1357,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             if (log.isDebugEnabled())
                 log.debug("targetGraph=" + c);
 
-            if (context.db.getAccessPath(null/* s */, null/* p */, null/* o */,
-                    c.getIV()).rangeCount(false/* exact */) != 0) {
+            if (!op.isSilent()) {
 
-                throw new RuntimeException("Graph exists: " + c);
+                if (context.db.getAccessPath(null/* s */, null/* p */,
+                        null/* o */, c.getIV()).rangeCount(false/* exact */) != 0) {
+
+                    throw new RuntimeException("Graph exists: " + c);
+
+                }
 
             }
-
+            
         }
 
         return left;

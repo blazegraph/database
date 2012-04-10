@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast.eval.update;
+package com.bigdata.rdf.sparql.ast.eval.cache;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -31,7 +31,6 @@ import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest2;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest2;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -61,45 +60,10 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("SPARQL Update Evaluation");
+        final TestSuite suite = new TestSuite("SPARQL Solution Sets");
 
-        /*
-         * Boot strapped test suite for core UPDATE functionality.
-         */
-
-        suite.addTestSuite(TestUpdateBootstrap.class);
-
-        /*
-         * The openrdf SPARQL UPDATE test suite.
-         * 
-         * Note: This test suite is for quads mode only. SPARQL UPDATE support
-         * is also tested by the NSS test suite.
-         */
-
-        // Unisolated operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTest.class);
-
-        // Fully isolated read/write operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTxTest.class);
-
-        /*
-         * TODO We should always run this test suite, not just when the solution
-         * set cache is enabled.
-         */
-        if(QueryHints.DEFAULT_SOLUTION_SET_CACHE) {
-
-            /*
-             * The bigdata extensions to SPARQL UPDATE to support solution sets
-             * as well as graphs.
-             */
-        
-            // Unisolated operations.
-            suite.addTestSuite(BigdataSPARQLUpdateTest2.class);
-
-            // Fully isolated read/write operations.
-            suite.addTestSuite(BigdataSPARQLUpdateTxTest2.class);
-        
-        }
+        // Test get/put/clear/etc for named solution sets.
+        suite.addTestSuite(TestSolutionSetCache.class);
         
         return suite;
         

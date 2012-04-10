@@ -98,8 +98,8 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
      */
     public Update(final UpdateType updateType) {
 
-        setProperty(Annotations.UPDATE_TYPE,updateType);
-        
+        setProperty(Annotations.UPDATE_TYPE, updateType);
+
     }
 
     /**
