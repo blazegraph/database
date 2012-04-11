@@ -75,11 +75,11 @@ public class JournalTransactionService extends AbstractTransactionService {
 
         super.activateTx(state);
 
-        if (TimestampUtility.isReadWriteTx(state.tx)) {
+//        if (TimestampUtility.isReadWriteTx(state.tx)) 
+        {
 
             /*
-             * Register read-write transactions with the local transaction
-             * manager.
+             * Register transaction with the local transaction manager.
              */
 
             new Tx(journal.getLocalTransactionManager(), journal, state.tx,
@@ -93,10 +93,11 @@ public class JournalTransactionService extends AbstractTransactionService {
 
         super.deactivateTx(state);
                 
-        if (TimestampUtility.isReadWriteTx(state.tx)) {
+//        if (TimestampUtility.isReadWriteTx(state.tx))
+        {
 
             /*
-             * Unregister read-write transactions.
+             * Unregister transactions.
              */
 
             final Tx localState = journal.getLocalTransactionManager()

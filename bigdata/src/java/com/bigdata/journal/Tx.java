@@ -50,7 +50,7 @@ import com.bigdata.service.IDataService;
 
 /**
  * <p>
- * A read-write transaction.
+ * A transaction.
  * <p>
  * A transaction is a context in which the application can access and perform
  * operations on fully named indices. Writes on the named indices accessed by
@@ -112,9 +112,9 @@ import com.bigdata.service.IDataService;
  */
 public class Tx implements ITx {
 
-    protected static final Logger log = Logger.getLogger(Tx.class);
+    private static final Logger log = Logger.getLogger(Tx.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
     
     /*
      * Text for error messages.
@@ -134,15 +134,15 @@ public class Tx implements ITx {
      */
     final public ReentrantLock lock = new ReentrantLock();
     
-    /**
-     * Used for some handshaking in the commit protocol.
-     */
-    final protected AbstractLocalTransactionManager localTransactionManager;
+//    /**
+//     * Used for some handshaking in the commit protocol.
+//     */
+//    final private AbstractLocalTransactionManager localTransactionManager;
     
     /**
      * Used to locate the named indices that the transaction isolates.
      */
-    final protected IResourceManager resourceManager;
+    final private IResourceManager resourceManager;
     
     /**
      * The start startTime assigned to this transaction.
@@ -150,7 +150,7 @@ public class Tx implements ITx {
      * Note: Transaction {@link #startTime} and {@link #revisionTime}s are
      * assigned by the {@link ITransactionService}.
      */
-    final protected long startTime;
+    final private long startTime;
 
     /**
      * The timestamp of the commit point against which this transaction is
@@ -168,12 +168,17 @@ public class Tx implements ITx {
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      */
-    final protected long readsOnCommitTime;
+    final private long readsOnCommitTime;
     
     /**
      * The pre-computed hash code for the transaction (based on the start time).
      */
     final private int hashCode;
+    
+    /**
+     * <code>true</code> iff this is a read-only transaction.
+     */
+    final private boolean readOnly;
     
     /**
      * The revisionTime assigned to the transaction when it was validated and
@@ -190,6 +195,37 @@ public class Tx implements ITx {
     public long getRevisionTime() {
         
         return revisionTime;
+        
+    }
+
+    /**
+     * The timestamp of the commit point against which this transaction is
+     * reading.
+     * <p>
+     * Note: This is not currently available on a cluster. In that context, we
+     * wind up with the same timestamp for {@link #startTime} and
+     * {@link #readsOnCommitTime} which causes cache pollution for things which
+     * cache based on {@link #readsOnCommitTime}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+     *      Refactor native long tx id to thin object</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+    public long getReadsOnCommitTime() {
+
+        return readsOnCommitTime;
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff this is a read-only transaction.
+     */
+    public boolean isReadOnly() {
+        
+        return readOnly;
         
     }
     
@@ -209,7 +245,7 @@ public class Tx implements ITx {
      * same transaction (however, those operations will be serialized if they
      * declare any named indices in common).
      */
-    private ConcurrentHashMap<String, ILocalBTreeView> indices = new ConcurrentHashMap<String, ILocalBTreeView>();
+    private final ConcurrentHashMap<String, ILocalBTreeView> indices;
 
     /**
      * Create a transaction reading from the most recent committed state not
@@ -252,18 +288,23 @@ public class Tx implements ITx {
         if (resourceManager == null)
             throw new IllegalArgumentException();
 
-        if (!TimestampUtility.isReadWriteTx(startTime)) {
+        this.readOnly = !TimestampUtility.isReadWriteTx(startTime);
+        
+//        if (!TimestampUtility.isReadWriteTx(startTime)) {
+//
+//            /*
+//             * Note: We only maintain local state for read-write transactions.
+//             */
+//
+//            throw new IllegalArgumentException();
+//
+//        }
 
-            /*
-             * Note: We only maintain local state for read-write transactions.
-             */
+//        this.localTransactionManager = localTransactionManager;
 
-            throw new IllegalArgumentException();
-
-        }
-
-        this.localTransactionManager = localTransactionManager;
-
+        this.indices = readOnly ? null
+                : new ConcurrentHashMap<String, ILocalBTreeView>();
+        
         this.resourceManager = resourceManager;
 
         this.startTime = startTime;
@@ -499,13 +540,18 @@ public class Tx implements ITx {
      *             If the transaction can not be validated.
      * @throws IllegalMonitorStateException
      *             unless the caller holds the {@link #lock}.
+     * @throws UnsupportedOperationException
+     *             if the transaction is read-only.
      */
     public void prepare(final long revisionTime) {
 
+        if(readOnly)
+            throw new UnsupportedOperationException();
+        
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("tx=" + this);
 
         if (!isActive()) {
@@ -661,6 +707,9 @@ public class Tx implements ITx {
      */
     protected void releaseResources() {
         
+        if(readOnly)
+            return;
+        
         assert lock.isHeldByCurrentThread();
         
         if(!isComplete()) {
@@ -787,7 +836,7 @@ public class Tx implements ITx {
 
                 // Validation failed.
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("validation failed: " + name);
 
                 return false;
@@ -883,6 +932,17 @@ public class Tx implements ITx {
         if (name == null)
             throw new IllegalArgumentException();
 
+        if(readOnly) {
+
+            /*
+             * Note: Access to the indices currently goes through the
+             * IResourceManager interface for a read-only transaction.
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         /*
          * @todo lock could be per index for higher concurrency rather than for
          * all indices which you might access through this tx.
@@ -932,7 +992,7 @@ public class Tx implements ITx {
                  * ground state.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("No such index: " + name + ", startTime="
                             + startTime);
 
@@ -1008,6 +1068,9 @@ public class Tx implements ITx {
 
     final public boolean isEmptyWriteSet() {
 
+        if (readOnly)
+            return true;
+        
         lock.lock();
 
         try {
@@ -1040,6 +1103,9 @@ public class Tx implements ITx {
 
     final public String[] getDirtyResource() {
 
+        if (readOnly)
+            return EMPTY_ARRAY;
+
         lock.lock();
 
         try {
@@ -1054,4 +1120,6 @@ public class Tx implements ITx {
 
     }
 
+    private static final String[] EMPTY_ARRAY = new String[0];
+        
 }
