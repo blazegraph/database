@@ -151,6 +151,24 @@ public class Tx implements ITx {
      * assigned by the {@link ITransactionService}.
      */
     final protected long startTime;
+
+    /**
+     * The timestamp of the commit point against which this transaction is
+     * reading.
+     * <p>
+     * Note: This is not currently available on a cluster. In that context, we
+     * wind up with the same timestamp for {@link #startTime} and
+     * {@link #readsOnCommitTime} which causes cache pollution for things which
+     * cache based on {@link #readsOnCommitTime}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+     *      Refactor native long tx id to thin object</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+    final protected long readsOnCommitTime;
     
     /**
      * The pre-computed hash code for the transaction (based on the start time).
@@ -177,12 +195,12 @@ public class Tx implements ITx {
     
     private RunState runState;
 
-    /**
-     * A temporary store used to hold write sets for read-write transactions. It
-     * is null if the transaction is read-only and will remain null in any case
-     * until its first use.
-     */
-    private IRawStore tmpStore = null;
+//    /**
+//     * A temporary store used to hold write sets for read-write transactions. It
+//     * is null if the transaction is read-only and will remain null in any case
+//     * until its first use.
+//     */
+//    private IRawStore tmpStore = null;
 
     /**
      * Indices isolated by this transactions.
@@ -210,11 +228,22 @@ public class Tx implements ITx {
      *            transaction.
      * @param startTime
      *            The transaction identifier
+     * @param readsOnCommitTime
+     *            The timestamp of the commit point against which this
+     *            transaction is reading.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+     *      Refactor native long tx id to thin object</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
      */
     public Tx(//
             final AbstractLocalTransactionManager localTransactionManager,//
             final IResourceManager resourceManager, //
-            final long startTime//
+            final long startTime,
+            final long readsOnCommitTime//
     ) {
 
         if (localTransactionManager == null)
@@ -238,6 +267,26 @@ public class Tx implements ITx {
         this.resourceManager = resourceManager;
 
         this.startTime = startTime;
+        
+        /*
+         * Note: On a new journal, the lastCommitTime is ZERO before the first
+         * commit point. In order to avoid having the ground state view be the
+         * UNISOLATED index view, we use a timestamp which is known to be before
+         * any valid timestamp (and which will be shared by any transaction
+         * started against an empty journal).
+         * 
+         * Note: It might be better to put this logic into
+         * Journal#getLastCommitTime(). However, there are other callers for
+         * that method. By making the change here, we can guarantee that its
+         * scope is limited to only the code change made for the following
+         * ticket.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" >
+         * Add cache for access to historical index views on the Journal by name
+         * and commitTime. </a>
+         */
+        this.readsOnCommitTime = readsOnCommitTime == ITx.UNISOLATED ? 1
+                : readsOnCommitTime;
 
         this.runState = RunState.Active;
 
@@ -346,7 +395,8 @@ public class Tx implements ITx {
         
 //        return Long.toString(startTime);
         
-        return "LocalTxState{startTime="+startTime+",runState="+runState+"}";
+        return "LocalTxState{startTime=" + startTime + ",readsOnCommitTime="
+                + readsOnCommitTime + ",runState=" + runState + "}";
         
     }
     
@@ -873,7 +923,7 @@ public class Tx implements ITx {
              */
 
             final AbstractBTree[] sources = resourceManager.getIndexSources(
-                    name, startTime);
+                    name, readsOnCommitTime);// startTime);
 
             if (sources == null) {
 

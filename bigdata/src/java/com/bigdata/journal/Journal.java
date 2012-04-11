@@ -666,23 +666,31 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
             /*
              * A specified historical index commit point.
+             * 
+             * @see <a
+             * href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+             * cache for access to historical index views on the Journal by name
+             * and commitTime. </a>
              */
             
             final long ts = Math.abs(timestamp);
 
-            final ICommitRecord commitRecord = getCommitRecord(ts);
-
-            if (commitRecord == null) {
-
-                log.warn("No commit record: name="+name+", timestamp="+ts);
-                
-                return null;
-                
-            }
+//            final ICommitRecord commitRecord = getCommitRecord(ts);
+//
+//            if (commitRecord == null) {
+//
+//                log.warn("No commit record: name=" + name + ", timestamp=" + ts);
+//
+//                return null;
+//                
+//            }
+//
+//            // MAY be null
+//            btree = getIndex(name, commitRecord);
 
             // MAY be null
-            btree = getIndex(name, commitRecord);
-        
+            btree = (BTree) super.getIndex(name, ts);
+
             if (btree != null) {
 
 //                /*
@@ -779,6 +787,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: {@link ITx#READ_COMMITTED} views are given read-committed semantics
      * using a {@link ReadCommittedView}.  This means that they can be cached
      * since the view will update automatically as commits are made against
@@ -786,6 +796,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      *  
      * @see IndexManager#getIndex(String, long)
      */
+    @Override
     public ILocalBTreeView getIndex(final String name, final long timestamp) {
         
         if (name == null) {
@@ -863,14 +874,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * 
              * Note: The backing index is always a historical state of the named
              * index.
+             * 
+             * Note: Tx.getIndex() will pass through the actual commit time of
+             * the ground state against which the transaction is reading (if it
+             * is available, which it is on the local Journal).
+             * 
+             * @see <a
+             * href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+             * Refactor native long tx id to thin object</a>
              */
 
             final ILocalBTreeView isolatedIndex = tx.getIndex(name);
 
             if (isolatedIndex == null) {
 
-                log.warn("No such index: name="+name+", tx="+timestamp);
-                
+                log.warn("No such index: name=" + name + ", tx=" + timestamp);
+
                 return null;
 
             }
