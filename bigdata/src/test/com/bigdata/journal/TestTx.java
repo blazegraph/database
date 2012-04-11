@@ -363,7 +363,7 @@ public class TestTx extends ProxyTestCase<Journal> {
         
     }
     
-    String showCRI(final Journal journal) {
+    private static String showCRI(final Journal journal) {
 		final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
 		/*
 		 * Commit can be called prior to Journal initialisation, in which case
@@ -1189,29 +1189,35 @@ public class TestTx extends ProxyTestCase<Journal> {
             // start 2 transactions. they will read from the same commit point.
             final long tx0 = journal.newTx(ITx.READ_COMMITTED);
             final long tx1 = journal.newTx(ITx.READ_COMMITTED);
+            
+            // txids MUST be distinct.
+            assertTrue(tx0 != tx1);
 
             // resolve the same index for those transactions.
             final ILocalBTreeView tx0Index = journal.getIndex(name, tx0);
             final ILocalBTreeView tx1Index = journal.getIndex(name, tx1);
-
-            /*
-             * The Name2Addr index will also wind up in these caches when it is
-             * fetched for a historical commit time.
-             */
-            final int NALWAYS = 1;
             
-            // The index shows up exactly once in the historical index cache.
-            assertEquals("historicalIndexCacheSize", 1+NALWAYS,
+            /*
+             * The index shows up exactly once in the historical index cache.
+             * 
+             * Note: The Name2Addr index will also wind up in this cache when it
+             * is fetched for a historical commit time.
+             */
+            assertEquals("historicalIndexCacheSize", 1 + 1 /* Name2Addr */,
                     journal.getHistoricalIndexCacheSize());
 
-            // The index shows up exactly once in the index cache.
-            assertEquals("indexCacheSize", 1 + NALWAYS,
-                    journal.getIndexCacheSize());
+            /*
+             * The index shows up exactly once in the index cache.
+             * 
+             * Note: Name2Addr is NOT present in this cache.
+             */
+            assertEquals("indexCacheSize", 1, journal.getIndexCacheSize());
 
             // Verify that the views are BTree instances vs IsolatedFusedViews
             if (!(tx0Index instanceof BTree))
                 fail("Expecting " + BTree.class + " but have "
                         + tx0Index.getClass());
+
             if (!(tx1Index instanceof BTree))
                 fail("Expecting " + BTree.class + " but have "
                         + tx1Index.getClass());
@@ -1228,6 +1234,9 @@ public class TestTx extends ProxyTestCase<Journal> {
             assertEquals("readsOnCommitTime", tx0Obj.getReadsOnCommitTime(),
                     tx1Obj.getReadsOnCommitTime());
 
+            // The tranaction objects must be distinct.
+            assertTrue(tx0Obj != tx1Obj);
+            
             // The indices are the same reference.
             assertTrue(tx0Index == tx1Index);
 
