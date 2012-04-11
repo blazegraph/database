@@ -3514,45 +3514,48 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-        /*
-         * Form the key for the cache.
-         * 
-         * Note: In order to avoid cluttering the cache, a read-only or
-         * read/write transaction MUST pass the timestamp of the actual commit
-         * point against which it is reading into this method. If it passes in
-         * abs(txId) instead, then the cache will be cluttered since each tx
-         * will have a distinct key for the same index against the same commit
-         * point.
-         */
-        final NT nt = new NT(name, commitTime);
-
-        // Test the cache.
-        BTree ndx = indexCache.get(nt);
-
-        if (ndx != null) {
-
-            if (isHistoryGone(commitTime)) {
-
-                /*
-                 * No longer visible.
-                 * 
-                 * Note: If you are using a transaction, then the transaction
-                 * will have a read lock which prevents the commit point against
-                 * which it is reading from being released. Thus, a transaction
-                 * can not hit this code path. However, it can be hit by
-                 * historical reads which are not protected by a transaction.
-                 */
- 
-                indexCache.remove(nt);
-
-                return null;            
-                
-            }
-
-            // Cache hit.
-            return ndx;
-
-        }
+        BTree ndx = null;
+        
+//      FIXME Restore indexCache
+//        /*
+//         * Form the key for the cache.
+//         * 
+//         * Note: In order to avoid cluttering the cache, a read-only or
+//         * read/write transaction MUST pass the timestamp of the actual commit
+//         * point against which it is reading into this method. If it passes in
+//         * abs(txId) instead, then the cache will be cluttered since each tx
+//         * will have a distinct key for the same index against the same commit
+//         * point.
+//         */
+//        final NT nt = new NT(name, commitTime);
+//
+//        // Test the cache.
+//        ndx = indexCache.get(nt);
+//
+//        if (ndx != null) {
+//
+//            if (isHistoryGone(commitTime)) {
+//
+//                /*
+//                 * No longer visible.
+//                 * 
+//                 * Note: If you are using a transaction, then the transaction
+//                 * will have a read lock which prevents the commit point against
+//                 * which it is reading from being released. Thus, a transaction
+//                 * can not hit this code path. However, it can be hit by
+//                 * historical reads which are not protected by a transaction.
+//                 */
+// 
+//                indexCache.remove(nt);
+//
+//                return null;            
+//                
+//            }
+//
+//            // Cache hit.
+//            return ndx;
+//
+//        }
 
         /*
          * Cache miss.
@@ -3589,22 +3592,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             }
 
-            // Add the index to the cache.
-            final BTree ndx2 = indexCache.putIfAbsent(nt, ndx);
-
-            if (ndx2 != null) {
-
-                /*
-                 * Lost a data race. Use the winner's version of the index.
-                 * 
-                 * Note: Both index objects SHOULD be the same reference.
-                 * getIndex(name,commitRecord) will go through a canonicalizing
-                 * mapping to ensure that.
-                 */
-
-                ndx = ndx2;
-
-            }
+//            FIXME Restore indexCache
+//            // Add the index to the cache.
+//            final BTree ndx2 = indexCache.putIfAbsent(nt, ndx);
+//
+//            if (ndx2 != null) {
+//
+//                /*
+//                 * Lost a data race. Use the winner's version of the index.
+//                 * 
+//                 * Note: Both index objects SHOULD be the same reference.
+//                 * getIndex(name,commitRecord) will go through a canonicalizing
+//                 * mapping to ensure that.
+//                 */
+//
+//                ndx = ndx2;
+//
+//            }
 
             // Found it and cached it.
             return ndx;
