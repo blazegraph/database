@@ -39,6 +39,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -373,7 +374,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 			return "EMPTY";
 		}
 
-		final IndexMetadata metadata = commitRecordIndex.getIndexMetadata();
+//		final IndexMetadata metadata = commitRecordIndex.getIndexMetadata();
 
 		commitRecords = commitRecordIndex.rangeIterator();
 
@@ -504,7 +505,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
                     final BTree btree = ((BTree) journal.getIndex(name));
 
-                    final ITuple tuple = btree.lookup(k1, new Tuple(btree,
+                    final ITuple<?> tuple = btree.lookup(k1, new Tuple(btree,
                             IRangeQuery.ALL));
 
                     assertNotNull(tuple);
@@ -535,7 +536,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
                     final BTree btree = ((BTree) journal.getIndex(name));
 
-                    Tuple tuple = btree.lookup(k1, new Tuple(btree,
+                    Tuple<?> tuple = btree.lookup(k1, new Tuple(btree,
                             IRangeQuery.ALL));
 
                     tuple = isolatedView.getWriteSet().lookup(k1, tuple);
@@ -1131,6 +1132,116 @@ public class TestTx extends ProxyTestCase<Journal> {
 
     }
 
+    /**
+     * Unit test written to verify that a read-only tx gets the same view of an
+     * index when it has the same ground state as another read-only tx. That
+     * view should be a simple {@link BTree} rather than an
+     * {@link IsolatedFusedView}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+     *      Refactor native long tx id to thin object</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+    public void test_readOnlyTx() {
+
+        final Journal journal = getStore();
+
+        try {
+
+            final String name = "abc";
+
+            final long commitTime1;
+            {
+                
+                final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+                /*
+                 * Note: Thie tests w/ and w/o isolation. Isolation is NOT
+                 * required for this. We are testing the semantics of read-only
+                 * transactions and those are available for indices which do NOT
+                 * support isolation as well as those which do.
+                 */
+
+                md.setIsolatable(r.nextBoolean());
+
+                journal.registerIndex(md);
+
+                commitTime1 = journal.commit();
+
+            }
+
+            // The unisolated index view.
+            final BTree un = journal.getIndex(name);
+           
+            // The index exists.
+            assertNotNull(un);
+            
+            // The unisolated view is not in the historical index cache.
+            assertEquals("historicalIndexCacheSize", 0,
+                    journal.getHistoricalIndexCacheSize());
+
+            // The unisolated view is not in the index cache.
+            assertEquals("indexCacheSize", 0, journal.getIndexCacheSize());
+
+            // start 2 transactions. they will read from the same commit point.
+            final long tx0 = journal.newTx(ITx.READ_COMMITTED);
+            final long tx1 = journal.newTx(ITx.READ_COMMITTED);
+
+            // resolve the same index for those transactions.
+            final ILocalBTreeView tx0Index = journal.getIndex(name, tx0);
+            final ILocalBTreeView tx1Index = journal.getIndex(name, tx1);
+
+            /*
+             * The Name2Addr index will also wind up in these caches when it is
+             * fetched for a historical commit time.
+             */
+            final int NALWAYS = 1;
+            
+            // The index shows up exactly once in the historical index cache.
+            assertEquals("historicalIndexCacheSize", 1+NALWAYS,
+                    journal.getHistoricalIndexCacheSize());
+
+            // The index shows up exactly once in the index cache.
+            assertEquals("indexCacheSize", 1 + NALWAYS,
+                    journal.getIndexCacheSize());
+
+            // Verify that the views are BTree instances vs IsolatedFusedViews
+            if (!(tx0Index instanceof BTree))
+                fail("Expecting " + BTree.class + " but have "
+                        + tx0Index.getClass());
+            if (!(tx1Index instanceof BTree))
+                fail("Expecting " + BTree.class + " but have "
+                        + tx1Index.getClass());
+
+            // Lookup the underlying ITx objects.
+            final Tx tx0Obj = (Tx) journal.getTransactionManager().getTx(tx0);
+            final Tx tx1Obj = (Tx) journal.getTransactionManager().getTx(tx1);
+
+            // Should be the commitTime for the commit above.
+            assertEquals("commitTime", commitTime1,
+                    tx0Obj.getReadsOnCommitTime());
+
+            // Should read on the same commit time.
+            assertEquals("readsOnCommitTime", tx0Obj.getReadsOnCommitTime(),
+                    tx1Obj.getReadsOnCommitTime());
+
+            // The indices are the same reference.
+            assertTrue(tx0Index == tx1Index);
+
+            // The read-only views are not the same as the unisolated view.
+            assertFalse(un == tx0Index);
+
+        } finally {
+
+            journal.destroy();
+
+        }
+
+    }
+    
     /**
      * Stress test for concurrent transactions against a single named index.
      */

@@ -95,7 +95,7 @@ abstract public class AbstractLocalTransactionManager implements
 
         try {
 
-            if (!localState.isComplete())
+            if (!localState.isReadOnly() && !localState.isComplete())
                 throw new IllegalStateException("Not complete: "+localState);
 
             // release any local resources.

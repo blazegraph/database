@@ -27,13 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import org.apache.log4j.Logger;
-
-import com.bigdata.rdf.store.TestLocalTripleStoreWithoutInlining;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 /**
