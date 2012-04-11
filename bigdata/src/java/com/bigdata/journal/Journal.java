@@ -807,8 +807,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         final boolean isReadWriteTx = TimestampUtility.isReadWriteTx(timestamp);
 
-        final Tx tx = (Tx) (isReadWriteTx ? getConcurrencyManager()
-                .getTransactionManager().getTx(timestamp) : null);
+//        final Tx tx = (Tx) (isReadWriteTx ? getConcurrencyManager()
+//                .getTransactionManager().getTx(timestamp) : null);
+        final Tx tx = (Tx) getConcurrencyManager().getTransactionManager()
+                .getTx(timestamp);
 
         if (isReadWriteTx) {
 
@@ -911,24 +913,55 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     tmp = new ReadCommittedView(this, name);
 
                 } else {
-                    
-                    // historical read
 
-                    final AbstractBTree[] sources = getIndexSources(name,
-                            timestamp);
+                    if (tx != null) {
+  
+                        /*
+                         * read-only transaction
+                         * 
+                         * @see <a href=
+                         * "http://sourceforge.net/apps/trac/bigdata/ticket/546"
+                         * > Add cache for access to historical index views on
+                         * the Journal by name and commitTime. </a>
+                         */
 
-                    if (sources == null) {
+                        final AbstractBTree[] sources = getIndexSources(name,
+                                tx.getReadsOnCommitTime());
 
-                        log.warn("No such index: name=" + name + ", timestamp="
-                                + timestamp);
+                        if (sources == null) {
 
-                        return null;
+                            log.warn("No such index: name=" + name
+                                    + ", timestamp=" + timestamp);
+
+                            return null;
+
+                        }
+
+                        assert sources[0].isReadOnly();
+
+                        tmp = (BTree) sources[0];
+                        
+                    } else {
+
+                        // historical read not protected by a transaction
+
+                        final AbstractBTree[] sources = getIndexSources(name,
+                                timestamp);
+
+                        if (sources == null) {
+
+                            log.warn("No such index: name=" + name
+                                    + ", timestamp=" + timestamp);
+
+                            return null;
+
+                        }
+
+                        assert sources[0].isReadOnly();
+
+                        tmp = (BTree) sources[0];
 
                     }
-
-                    assert sources[0].isReadOnly();
-
-                    tmp = (BTree) sources[0];
 
                 }
                 
