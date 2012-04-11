@@ -29,8 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.File;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -39,7 +37,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
@@ -58,7 +55,6 @@ import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
@@ -74,11 +70,11 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Tx;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
@@ -379,7 +375,7 @@ abstract public class IndexManager extends StoreManager {
      *       definition (index segments in use) might have changed as well.
      */
 //    final private WeakValueCache<NT, IIndex> indexCache;
-    final private IndexCache indexCache;
+    final private IndexCache<ILocalBTreeView> indexCache;
 
     /**
      * The earliest timestamp that MUST be retained for the read-historical
@@ -395,204 +391,6 @@ abstract public class IndexManager extends StoreManager {
         assert t > 0 : "t=" + t;
 
         return t;
-        
-    }
-    
-    /**
-     * Extends the {@link ConcurrentWeakValueCache} to track the earliest
-     * timestamp from which any local {@link IIndex} view is reading. This
-     * timestamp is reported by {@link #getRetentionTime()}. The
-     * {@link StoreManager} uses this in
-     * {@link StoreManager#purgeOldResources()} to provide a "read lock" such
-     * that resources for in use views are not released.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public class IndexCache extends
-            ConcurrentWeakValueCacheWithTimeout<NT, ILocalBTreeView> {
-
-        /**
-         * The earliest timestamp that must be retained for the read-historical
-         * indices in the cache, {@link Long#MAX_VALUE} if there a NO
-         * read-historical indices in the cache, and (-1L) if the value is not
-         * known and must be computed by scanning the index cache.
-         * 
-         * @todo an alternative is to maintain a sorted set of the timestamps
-         *       (breaking ties with the index name) and then always return the
-         *       first entry (lowest value) from the set. in fact the tx service
-         *       does something similar, but it has an easier time since the
-         *       timestamps are unique where the same timestamp may be used for
-         *       multiple indices here.
-         */
-        private AtomicLong retentionTime = new AtomicLong(-1L);
-
-        /**
-         * The earliest timestamp that MUST be retained for the read-historical
-         * indices in the cache and {@link Long#MAX_VALUE} if there are NO
-         * read-historical indices in the cache.
-         * <p>
-         * Note: Due to the concurrent operations of the garbage collector, this
-         * method MAY return a time that is earlier than necessary. This
-         * possibility arises because {@link WeakReference} values may be
-         * cleared at any time. There is no negative consequence to this
-         * behavior - it simply means that fewer resources will be released than
-         * might otherwise be possible. This "hole" can not be closed by polling
-         * the {@link ReferenceQueue} since it is not when the entries are
-         * removed from the map which matters, but when their
-         * {@link WeakReference} values are cleared. However, periodically
-         * clearing stale references using {@link #clearStaleRefs()} will keep
-         * down the size of that "hole".
-         */
-        public long getRetentionTime() {
-
-//            /*
-//             * This will tend to clear stale references and cause them to be
-//             * cleared in the cache, but probably not in time for the changes to
-//             * be noticed within the loop below.
-//             */
-//
-//            clearStaleRefs();
-            
-            synchronized (retentionTime) {
-
-                // @todo remove debug flag.
-                final boolean debug = false;
-                
-                if (retentionTime.get() == -1L) {
-
-                    // note: default if nothing is found.
-                    long tmp = Long.MAX_VALUE;
-
-                    int n = 0;
-
-                    final long now = System.currentTimeMillis();
-                    
-                    final Iterator<Map.Entry<NT, WeakReference<ILocalBTreeView>>> itr = entryIterator();
-
-                    while (itr.hasNext()) {
-
-                        final Map.Entry<NT, WeakReference<ILocalBTreeView>> entry = itr
-                                .next();
-
-                        if (entry.getValue().get() == null) {
-
-                            // skip cleared references.
-                            continue;
-
-                        }
-
-                        final long timestamp = entry.getKey().getTimestamp();
-
-                        if (timestamp == ITx.UNISOLATED) {
-
-                            // ignore unisolated indices.
-                            continue;
-
-                        }
-
-                        if(debug)
-                            log.warn("considering: " + entry.getKey());
-                        
-                        if (timestamp < tmp) {
-
-                            // choose the earliest timestamp for any index.
-                            tmp = timestamp;
-                            
-                            if(debug)
-                            log.warn("Earliest so far: "
-                                    + tmp
-                                    + " (age="
-                                    + TimeUnit.MILLISECONDS
-                                            .toSeconds(tmp - now) + "secs)");
-
-                        }
-                        
-                        n++;
-
-                    } // next entry
-
-                    retentionTime.set(tmp);
-
-                    if(debug)
-                        log.warn("Considered: " + n + " indices: retentionTime="
-                            + tmp + " (age="
-                            + TimeUnit.MILLISECONDS.toSeconds(tmp - now)
-                            + "secs)");
-                    
-                } // end search.
-
-                return retentionTime.get();
-                
-            } // synchronized(retentionTime)
-
-        }
-
-        public ILocalBTreeView put(final NT k, final ILocalBTreeView v) {
-
-            synchronized (retentionTime) {
-
-                if (retentionTime.get() > k.getTimestamp()) {
-
-                    // found an earlier timestamp, so use that.
-                    retentionTime.set(k.getTimestamp());
-
-                }
-
-            }
-
-            return super.put(k, v);
-
-        }
-
-        public ILocalBTreeView putIfAbsent(final NT k, final ILocalBTreeView v) {
-            
-            synchronized(retentionTime) {
-                
-                if (retentionTime.get() > k.getTimestamp()) {
-
-                    // found an earlier timestamp, so use that.
-                    retentionTime.set(k.getTimestamp());
-                    
-                }
-                
-            }
-
-            return super.putIfAbsent(k, v);
-            
-        }
-        
-        /**
-         * Overridden to clear the {@link #retentionTime} if the map entry
-         * corresponding to that timestamp is being removed from the map.
-         */
-        @Override
-        protected WeakReference<ILocalBTreeView> removeMapEntry(final NT k) {
-            
-            synchronized(retentionTime) {
-                
-                if (retentionTime.get() == k.getTimestamp()) {
-
-                    /*
-                     * Removed the earliest timestamp so we will need to
-                     * explicitly search for the new minimum timestamp.
-                     */
-                    
-                    retentionTime.set(-1L);
-                    
-                }
-                
-            }
-
-            return super.removeMapEntry(k);
-            
-        }
-        
-        public IndexCache(final int cacheCapacity, final long cacheTimeout) {
-
-            super(cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
-
-        }
         
     }
     
@@ -1316,6 +1114,8 @@ abstract public class IndexManager extends StoreManager {
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: An {@link ITx#READ_COMMITTED} view returned by this method WILL NOT
      * update if there are intervening commits. This decision was made based on
      * the fact that views are requested from the {@link IndexManager} by an
@@ -1337,6 +1137,7 @@ abstract public class IndexManager extends StoreManager {
      * 
      * @see Journal#getIndex(String, long)
      */
+    @Override
     public ILocalBTreeView getIndex(final String name, /*final*/ long timestamp) {
         
         if (name == null) {
