@@ -3507,6 +3507,57 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	public IIndex getIndex(final String name, final long commitTime) {
 
+        if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
+                || TimestampUtility.isReadWriteTx(commitTime)) {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        /*
+         * Form the key for the cache.
+         * 
+         * Note: In order to avoid cluttering the cache, a read-only or
+         * read/write transaction MUST pass the timestamp of the actual commit
+         * point against which it is reading into this method. If it passes in
+         * abs(txId) instead, then the cache will be cluttered since each tx
+         * will have a distinct key for the same index against the same commit
+         * point.
+         */
+        final NT nt = new NT(name, commitTime);
+
+        // Test the cache.
+        BTree ndx = indexCache.get(nt);
+
+        if (ndx != null) {
+
+            if (isHistoryGone(commitTime)) {
+
+                /*
+                 * No longer visible.
+                 * 
+                 * Note: If you are using a transaction, then the transaction
+                 * will have a read lock which prevents the commit point against
+                 * which it is reading from being released. Thus, a transaction
+                 * can not hit this code path. However, it can be hit by
+                 * historical reads which are not protected by a transaction.
+                 */
+ 
+                indexCache.remove(nt);
+
+                return null;            
+                
+            }
+
+            // Cache hit.
+            return ndx;
+
+        }
+
+        /*
+         * Cache miss.
+         */
+        
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
 		lock.lock();
@@ -3515,42 +3566,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			assertOpen();
 
-			if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
-					|| TimestampUtility.isReadWriteTx(commitTime)) {
-
-				throw new UnsupportedOperationException();
-
-			}
-
-            if (isHistoryGone(commitTime))
-                return null;
-			
-            /*
-             * Form the key for the cache.
-             * 
-             * Note: In order to avoid cluttering the cache, a read-only or
-             * read/write transaction MUST pass the timestamp of the actual
-             * commit point against which it is reading into this method. If it
-             * passes in abs(txId) instead, then the cache will be cluttered
-             * since each tx will have a distinct key for the same index against
-             * the same commit point.
-             */
-            final NT nt = new NT(name, commitTime);
-
-            // Test the cache.
-            BTree ndx = indexCache.get(nt);
-
-            if (ndx != null) {
-
-                // Cache hit.
-                return ndx;
-
-            }
-
-            /*
-             * Cache miss.
-             */
-            
             // Resolve the commit record.
 			final ICommitRecord commitRecord = getCommitRecord(commitTime);
 
