@@ -99,6 +99,7 @@ import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.NT;
 
 /**
  * <p>
@@ -370,30 +371,51 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private final long historicalIndexCacheTimeout;
 
-	/**
-	 * A cache that is used by the {@link AbstractJournal} to provide a
-	 * canonicalizing mapping from an address to the instance of a read-only
-	 * historical object loaded from that address and which indirectly controls
-	 * how long the journal will "keep open" historical index objects by prevent
-	 * them from being swept by the garbage collector.
-	 * <p>
-	 * Note: the "live" version of an object MUST NOT be placed into this cache
-	 * since its state will continue to evolve with additional writes while the
-	 * cache is intended to provide a canonicalizing mapping to the historical
-	 * committed states of the object. This means that objects such as indices
-	 * and the {@link Name2Addr} index MUST NOT be inserted into the cache if
-	 * the are being read from the store for "live" use. For this reason
-	 * {@link Name2Addr} uses its own caching mechanisms.
-	 * <p>
-	 * Note: {@link #abort()} discards the contents of this cache in order to
-	 * ensure that partial writes are discarded.
-	 * 
-	 * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
-	 * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
-	 */
+    /**
+     * A cache that is used by the {@link AbstractJournal} to provide a
+     * <em>canonicalizing</em> mapping from an address to the instance of a
+     * read-only historical object loaded from that address and which indirectly
+     * controls how long the journal will "keep open" historical index objects
+     * by prevent them from being swept by the garbage collector.
+     * <p>
+     * Note: the "live" version of an object MUST NOT be placed into this cache
+     * since its state will continue to evolve with additional writes while the
+     * cache is intended to provide a canonicalizing mapping to the historical
+     * committed states of the object. This means that objects such as indices
+     * and the {@link Name2Addr} index MUST NOT be inserted into the cache if
+     * the are being read from the store for "live" use. For this reason
+     * {@link Name2Addr} uses its own caching mechanisms.
+     * <p>
+     * Note: {@link #abort()} discards the contents of this cache in order to
+     * ensure that partial writes are discarded.
+     * 
+     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+     * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
+     */
 	// final private WeakValueCache<Long, ICommitter> historicalIndexCache;
 	final private ConcurrentWeakValueCache<Long, BTree> historicalIndexCache;
 
+    /**
+     * A cache that is used to avoid lookups against the
+     * {@link CommitRecordIndex} and {@link Name2Addr} for historical index
+     * views.
+     * <p>
+     * Note: This cache is in front of the {@link #historicalIndexCache} as the
+     * latter is only tested once we have the {@link ICommitRecord} and have
+     * resolved the entry in {@link Name2Addr}. This cache allows us to avoid
+     * both of those steps.
+     * <p>
+     * Note: The {@link #historicalIndexCache} imposes a canonicalizing mapping.
+     * It remains necessary, even with the introduction of the
+     * {@link #indexCache}.
+     * 
+     * @see #getIndex(String, long)
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+    final private ConcurrentWeakValueCacheWithTimeout<NT, BTree> indexCache;
+    
 	/**
 	 * The "live" BTree mapping index names to the last metadata record
 	 * committed for the named index. The keys are index names (unicode
@@ -745,8 +767,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// historicalIndexCache = new WeakValueCache<Long, ICommitter>(
 			// new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
 
+			// Cache by addr
 			historicalIndexCache = new ConcurrentWeakValueCacheWithTimeout<Long, BTree>(historicalIndexCacheCapacity,
 					TimeUnit.MILLISECONDS.toNanos(historicalIndexCacheTimeout));
+
+			// Cache by (name,commitTime). This cache is in front of the cache by addr.
+			indexCache = new ConcurrentWeakValueCacheWithTimeout<NT, BTree>(historicalIndexCacheCapacity,
+	                    TimeUnit.MILLISECONDS.toNanos(historicalIndexCacheTimeout));
 
 			liveIndexCacheCapacity = getProperty(Options.LIVE_INDEX_CACHE_CAPACITY,
 					Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY, IntegerValidator.GT_ZERO);
@@ -1308,7 +1335,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			});
 
-			counters.addCounter("liveIndexCacheSize", new Instrument<Integer>() {
+            counters.addCounter("indexCacheSize", new Instrument<Integer>() {
+                public void sample() {
+                    final AbstractJournal jnl = ref.get();
+                    if (jnl != null) {
+                        setValue(jnl.indexCache.size());
+                    }
+                }
+            });
+
+            counters.addCounter("liveIndexCacheSize", new Instrument<Integer>() {
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -2271,6 +2307,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * commit point
 			 */
 			historicalIndexCache.clear();
+            indexCache.clear();
 
 		} finally {
 
@@ -3340,30 +3377,54 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * @todo the {@link CommitRecordIndex} is a possible source of thread
-	 *       contention since transactions need to use this code path in order
-	 *       to locate named indices but the {@link WriteExecutorService} can
-	 *       also write on this index. I have tried some different approaches to
-	 *       handling this.
-	 */
-	public ICommitRecord getCommitRecord(final long commitTime) {
-		
-		if (this._bufferStrategy instanceof RWStrategy) {
-            /*
-             * There are some bigdata releases (such as 1.0.4) where the commit
-             * record index was not pruned when deferred deletes were recycled.
-             * By maintaining this test, we will correctly refuse to return a
-             * commit record for a commit point whose deferred deletes have been
-             * recycled, even when the commit record is still present in the
-             * commit record index.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
-             */
-			if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
-				return null; // no index available
-			}
-		}
+    /**
+     * Note: There are some bigdata releases (such as 1.0.4) where the commit
+     * record index was not pruned when deferred deletes were recycled. By
+     * maintaining this test, we will correctly refuse to return a commit record
+     * for a commit point whose deferred deletes have been recycled, even when
+     * the commit record is still present in the commit record index.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
+     */
+	private boolean isHistoryGone(final long commitTime) {
+
+	    if (this._bufferStrategy instanceof RWStrategy) {
+	            if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
+	                return true; // no index available
+	            }
+	        }
+	    return false;
+	}
+	
+    /**
+     * {@inheritDoc}
+     * 
+     * @todo the {@link CommitRecordIndex} is a possible source of thread
+     *       contention since transactions need to use this code path in order
+     *       to locate named indices but the {@link WriteExecutorService} can
+     *       also write on this index. I have tried some different approaches to
+     *       handling this.
+     */
+    public ICommitRecord getCommitRecord(final long commitTime) {
+
+        if (isHistoryGone(commitTime))
+            return null;
+	    
+//		if (this._bufferStrategy instanceof RWStrategy) {
+//            /*
+//             * There are some bigdata releases (such as 1.0.4) where the commit
+//             * record index was not pruned when deferred deletes were recycled.
+//             * By maintaining this test, we will correctly refuse to return a
+//             * commit record for a commit point whose deferred deletes have been
+//             * recycled, even when the commit record is still present in the
+//             * commit record index.
+//             * 
+//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
+//             */
+//			if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
+//				return null; // no index available
+//			}
+//		}
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -3424,15 +3485,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * {@inheritDoc}
-	 * 
-	 * @throws UnsupportedOperationException
-	 *             If you pass in {@link ITx#UNISOLATED},
-	 *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
-	 *             to a read-write transaction since those are not "commit
-	 *             times".
-	 */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Transactions should pass in the timestamp against which they are
+     * reading rather than the transaction identifier (aka startTime). By
+     * providing the timestamp of the commit point, the transaction will hit the
+     * {@link #indexCache}. If the transaction passes the startTime instead,
+     * then all startTimes will be different and the cache will be defeated.
+     * 
+     * @throws UnsupportedOperationException
+     *             If you pass in {@link ITx#UNISOLATED},
+     *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
+     *             to a read-write transaction since those are not "commit
+     *             times".
+     * 
+     * @see #indexCache
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
 	public IIndex getIndex(final String name, final long commitTime) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -3450,18 +3522,77 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			}
 
+            if (isHistoryGone(commitTime))
+                return null;
+			
+            /*
+             * Form the key for the cache.
+             * 
+             * Note: In order to avoid cluttering the cache, a read-only or
+             * read/write transaction MUST pass the timestamp of the actual
+             * commit point against which it is reading into this method. If it
+             * passes in abs(txId) instead, then the cache will be cluttered
+             * since each tx will have a distinct key for the same index against
+             * the same commit point.
+             */
+            final NT nt = new NT(name, commitTime);
+
+            // Test the cache.
+            BTree ndx = indexCache.get(nt);
+
+            if (ndx != null) {
+
+                // Cache hit.
+                return ndx;
+
+            }
+
+            /*
+             * Cache miss.
+             */
+            
+            // Resolve the commit record.
 			final ICommitRecord commitRecord = getCommitRecord(commitTime);
 
 			if (commitRecord == null) {
 
 //              if (log.isInfoEnabled())
-				log.warn("No commit record for timestamp=" + commitTime);
+                log.warn("No commit record: name=" + name + ", timestamp="
+                        + commitTime);
 
 				return null;
 
 			}
 
-			return getIndex(name, commitRecord);
+			// Resolve the index against that commit record.
+            ndx = getIndex(name, commitRecord);
+
+            if (ndx == null) {
+
+                // Not found
+                return null;
+                
+            }
+
+            // Add the index to the cache.
+            final BTree ndx2 = indexCache.putIfAbsent(nt, ndx);
+
+            if (ndx2 != null) {
+
+                /*
+                 * Lost a data race. Use the winner's version of the index.
+                 * 
+                 * Note: Both index objects SHOULD be the same reference.
+                 * getIndex(name,commitRecord) will go through a canonicalizing
+                 * mapping to ensure that.
+                 */
+
+                ndx = ndx2;
+
+            }
+
+            // Found it and cached it.
+            return ndx;
 
 		} finally {
 

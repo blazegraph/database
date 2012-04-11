@@ -1340,8 +1340,27 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                 if (transactionManager.getTx(timestamp) == null) {
 
-                    // start tx on this data service.
-                    new Tx(transactionManager, resourceManager, timestamp);
+                    /*
+                     * Start tx on this data service.
+                     * 
+                     * FIXME This should be passing the [readsOnCommitTime] into
+                     * the Tx object. However, that information is not available
+                     * when we are running on a cluster per the ticket below.
+                     * While we COULD tunnel this when running tasks on a
+                     * Journal, we tend not to do that. Tasks tend to be
+                     * submitted primarily for the clustered database
+                     * deployment.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+                     * (refactor native long tx id to thin object)
+                     * 
+                     * @see <a
+                     * href="http://sourceforge.net/apps/trac/bigdata/ticket/546"
+                     * > Add cache for access to historical index views on the
+                     * Journal by name and commitTime. </a>
+                     */
+                    new Tx(transactionManager, resourceManager, timestamp,
+                            timestamp/* readsOnCommitTime */);
 
                 }
 

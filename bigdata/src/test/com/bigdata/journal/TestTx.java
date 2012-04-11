@@ -75,12 +75,12 @@ public class TestTx extends ProxyTestCase<Journal> {
 //     */
 //    public void test_constants() {
 //        
-//        System.err.println("min : "+new Date(Long.MIN_VALUE));
-//        System.err.println("min1: "+new Date(Long.MIN_VALUE+1));
-//        System.err.println("-1L : "+new Date(-1));
-//        System.err.println(" 0L : "+new Date(0L));
-//        System.err.println("max1: "+new Date(Long.MAX_VALUE-1));
-//        System.err.println("max : "+new Date(Long.MAX_VALUE));
+//        if(log.isInfoEnabled()) log.info("min : "+new Date(Long.MIN_VALUE));
+//        if(log.isInfoEnabled()) log.info("min1: "+new Date(Long.MIN_VALUE+1));
+//        if(log.isInfoEnabled()) log.info("-1L : "+new Date(-1));
+//        if(log.isInfoEnabled()) log.info(" 0L : "+new Date(0L));
+//        if(log.isInfoEnabled()) log.info("max1: "+new Date(Long.MAX_VALUE-1));
+//        if(log.isInfoEnabled()) log.info("max : "+new Date(Long.MAX_VALUE));
 //        
 //    }
     
@@ -562,7 +562,7 @@ public class TestTx extends ProxyTestCase<Journal> {
 
                 } catch (ValidationError ex) {
 
-                    System.err.println("Ignoring expected exception: " + ex);
+                    if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
 
                 }
 
@@ -948,7 +948,7 @@ public class TestTx extends ProxyTestCase<Journal> {
                 journal.registerIndex(md);
 
                 commitTime0 = journal.commit();
-                System.err.println("commitTime0: " + journal.getCommitRecord());
+                if(log.isInfoEnabled()) log.info("commitTime0: " + journal.getCommitRecord());
 
                 assertNotSame(0L, commitTime0);
                 assertEquals("commitCounter", 1L, journal.getCommitRecord()
@@ -968,10 +968,10 @@ public class TestTx extends ProxyTestCase<Journal> {
             // new transaction - commit will not be visible in this scope.
             final long tx2 = journal.newTx(ITx.UNISOLATED);
 
-            System.err.println("commitTime0   =" + commitTime0);
-            System.err.println("tx0: startTime=" + tx0);
-            System.err.println("tx1: startTime=" + tx1);
-            System.err.println("tx2: startTime=" + tx2);
+            if(log.isInfoEnabled()) log.info("commitTime0   =" + commitTime0);
+            if(log.isInfoEnabled()) log.info("tx0: startTime=" + tx0);
+            if(log.isInfoEnabled()) log.info("tx1: startTime=" + tx1);
+            if(log.isInfoEnabled()) log.info("tx2: startTime=" + tx2);
 
             assertTrue(commitTime0 <= Math.abs(tx0));
             assertTrue(Math.abs(tx0) < Math.abs(tx1));
@@ -999,9 +999,9 @@ public class TestTx extends ProxyTestCase<Journal> {
             // commit.
             final long tx1CommitTime = journal.commit(tx1);
             assertNotSame(0L, tx1CommitTime);
-            System.err.println("tx1: startTime=" + tx1 + ", commitTime="
+            if(log.isInfoEnabled()) log.info("tx1: startTime=" + tx1 + ", commitTime="
                     + tx1CommitTime);
-            System.err.println("tx1: after commit: "
+            if(log.isInfoEnabled()) log.info("tx1: after commit: "
                     + journal.getCommitRecord());
             assertEquals("commitCounter", 2L, journal.getCommitRecord()
                     .getCommitCounter());
@@ -1013,8 +1013,8 @@ public class TestTx extends ProxyTestCase<Journal> {
             final long tx3 = journal.newTx(ITx.UNISOLATED);
             assertTrue(Math.abs(tx2) < Math.abs(tx3));
             assertTrue(Math.abs(tx3) >= tx1CommitTime);
-            System.err.println("tx3: startTime=" + tx3);
-            // System.err.println("tx3: ground state:
+            if(log.isInfoEnabled()) log.info("tx3: startTime=" + tx3);
+            // if(log.isInfoEnabled()) log.info("tx3: ground state:
             // "+((Tx)journal.getTx(tx3)).commitRecord);
 
             // data version still not visible in tx0.

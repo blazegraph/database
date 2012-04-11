@@ -82,7 +82,8 @@ public class JournalTransactionService extends AbstractTransactionService {
              * manager.
              */
 
-            new Tx(journal.getLocalTransactionManager(), journal, state.tx);
+            new Tx(journal.getLocalTransactionManager(), journal, state.tx,
+                    state.readsOnCommitTime);
 
         }
 
