@@ -33,6 +33,7 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -47,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
@@ -144,7 +146,10 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+        
+        final IQueryNode actual = rewriter.optimize(context,
                 given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
@@ -244,7 +249,10 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
                 given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
@@ -356,9 +364,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -502,9 +513,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -634,9 +648,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -749,9 +766,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -905,9 +925,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1039,9 +1062,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1124,9 +1150,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1255,9 +1284,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1407,9 +1439,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1547,9 +1582,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1640,9 +1678,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
@@ -1741,9 +1782,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
         
-        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
 
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+        
         assertSameAST(expected, actual);
 
     }
