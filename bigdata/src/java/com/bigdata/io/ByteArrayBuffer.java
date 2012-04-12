@@ -70,7 +70,7 @@ import com.bigdata.btree.BytesUtil;
  * @version $Id$
  */
 public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
-        RepositionableStream {
+        RepositionableStream, LongPacker.IByteBuffer {
 
     private static final transient Logger log = Logger
             .getLogger(ByteArrayBuffer.class);
@@ -1012,100 +1012,9 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @return The #of bytes onto which the unsigned long value was packed.
      */
-    final public int packLong( final long v ) {
-        
-        /*
-         * You can only pack non-negative long values with this method.
-         */
-        
-        if (v < 0) {
-            
-            throw new IllegalArgumentException("negative value: v=" + v);
-            
-        }
-        
-        /*
-         * If the high byte is non-zero then we will write the value as a normal
-         * long and return nbytes == 8. This case handles large positive long
-         * values.
-         */
-        if( ( v >> 56 ) != 0 ) {
-            pbuf[0] = ( (byte)((0xff & (v >> 56))|0x80) ); // note: set the high bit.
-            pbuf[1] = ( (byte)(0xff & (v >> 48)) );
-            pbuf[2] = ( (byte)(0xff & (v >> 40)) );
-            pbuf[3] = ( (byte)(0xff & (v >> 32)) );
-            pbuf[4] = ( (byte)(0xff & (v >> 24)) );
-            pbuf[5] = ( (byte)(0xff & (v >> 16)) );
-            pbuf[6] = ( (byte)(0xff & (v >>  8)) );
-            pbuf[7] = ( (byte)(0xff & v) );
-            put(pbuf, 0, 8);
-            return 8;
-        }
-        
-        // #of nibbles required to represent the long value.
-        final int nnibbles = getNibbleLength( v );
-
-        /*
-         * Is [nnibbles] even? (If it is even then we need to pad out an extra
-         * zero nibble in the first byte.)
-         */
-        final boolean evenNibbleCount = ( nnibbles == ( ( nnibbles >> 1 ) << 1 ) );
-        
-        // #of bytes required to represent the long value (plus the header nibble).
-        final int nbytes = ( ( nnibbles +1 ) >> 1 ) + (evenNibbleCount?1:0);
-        
-        int nwritten = 0;
-        
-        if( evenNibbleCount ) {
-            
-            /*
-             * An even nibble count requires that we pad the low nibble of the
-             * first byte with zeros.
-             */
-        
-            // header byte. low nibble is empty.
-            byte b = (byte) ( nbytes << 4 );
-            
-            pbuf[nwritten++] = b;
-            
-            // remaining bytes containing the packed value.
-            for( int i=(nnibbles-2)<<2; i>=0; i-=8 ) {
-                
-                b = (byte) (0xff & (v >> i));
-                
-                pbuf[nwritten++] = b;
-                
-            }
-            
-        } else {
-            
-            /*
-             * An odd nibble count means that we pack the first nibble of the
-             * long value into the low nibble of the header byte. In this case
-             * the first nibble will always be the low nibble of the first
-             * non-zero byte in the long value (the high nibble of that byte
-             * must be zero since there is an odd nibble count).
-             */
-            
-            byte highByte = (byte) (0xff & (v >> ((nbytes-1)*8) ));
-            
-            byte b = (byte) ( ( nbytes << 4 ) | highByte );
-            
-            pbuf[nwritten++] = b;
-            
-            for( int i=(nnibbles-3)<<2; i>=0; i-=8 ) {
-            
-                b = (byte) (0xff & (v >> i));
-                
-                pbuf[nwritten++] = b;
-                
-            }
-            
-        }
-        
-        put(pbuf,0,nwritten);
-        
-        return nwritten;
+    final public int packLong(final long v) {
+     
+        return LongPacker.packLong(v, pbuf, this);
         
     }
 
@@ -1114,37 +1023,38 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      */
     final private byte[] pbuf = new byte[8];
     
-    /**
-     * Return the #of non-zero nibbles, counting from the first non-zero nibble
-     * in the long value. A value of <code>0L</code> is considered to be one
-     * nibble for our purposes.
-     * 
-     * @param v
-     *            The long value.
-     * 
-     * @return The #of nibbles in [1:16].
-     */
-    static protected final int getNibbleLength( final long v )
-    {
-
-        for( int i=56, j=16; i>=0; i-=8, j-=2 ) {
-            
-            if( (0xf0 & (v >> i)) != 0 ) return j;
-            
-            if( (0x0f & (v >> i)) != 0 ) return j-1;
-            
-        }
-        
-        if (v != 0)
-            throw new AssertionError("v=" + v);
-     
-        /*
-         * value is zero, which is considered to be one nibble for our purposes.
-         */
-
-        return 1;
-        
-    }
+//    /**
+//     * Return the #of non-zero nibbles, counting from the first non-zero nibble
+//     * in the long value. A value of <code>0L</code> is considered to be one
+//     * nibble for our purposes.
+//     * 
+//     * @param v
+//     *            The long value.
+//     * 
+//     * @return The #of nibbles in [1:16].
+//     */
+//    static protected final int getNibbleLength( final long v )
+//    {
+//        return LongPacker.getNibbleLength(v);
+//        
+////        for( int i=56, j=16; i>=0; i-=8, j-=2 ) {
+////            
+////            if( (0xf0 & (v >> i)) != 0 ) return j;
+////            
+////            if( (0x0f & (v >> i)) != 0 ) return j-1;
+////            
+////        }
+////        
+////        if (v != 0)
+////            throw new AssertionError("v=" + v);
+////     
+////        /*
+////         * value is zero, which is considered to be one nibble for our purposes.
+////         */
+////
+////        return 1;
+////        
+//    }
     
     /*
      * Pack unsigned short integer.

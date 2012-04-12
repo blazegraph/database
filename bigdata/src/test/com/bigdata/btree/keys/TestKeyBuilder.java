@@ -42,6 +42,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.io.LongPacker;
 
 /**
  * Test suite for high level operations that build variable length _unsigned_
@@ -1500,6 +1501,31 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+//    /*
+//     * Packed long integers.
+//     * 
+//     * These are decodable (no loss) but negative longs are not allowed.
+//     */
+//    public void test_packLong() {
+//
+//        final KeyBuilder keyBuilder = new KeyBuilder();
+//
+//        /*
+//         * TODO Do loop, appending into the buffer. Then do decode of each
+//         * packed value in turn.
+//         */
+//        final long v = 1;
+//        final int off = keyBuilder.off();
+//        keyBuilder.pack(1);
+//        final int nbytes = LongPacker.getByteLength(v);
+//        assertEquals("nbytes", off + nbytes, keyBuilder.off());
+//
+//        final long d = KeyBuilder.unpackLong(keyBuilder.array(), off, off
+//                + nbytes);
+//        assertEquals("decodedValue", v, d);
+//        
+//    }
+    
     /*
      * BigInteger.
      * 
@@ -1508,10 +1534,10 @@ public class TestKeyBuilder extends TestCase2 {
     
     public void test_BigInteger_ctor() {
         
-        Random r = new Random();
-        
-        for(int i=0; i<10000; i++) {
-            
+        final Random r = new Random();
+
+        for (int i = 0; i < 10000; i++) {
+
             final BigInteger v1 = BigInteger.valueOf(r.nextLong());
   
             // Note: This DOES NOT work.
@@ -2568,7 +2594,8 @@ public class TestKeyBuilder extends TestCase2 {
 
         for (BigDecimal i : a) {
             i = i.stripTrailingZeros();
-            System.err.println("i="
+            if(log.isInfoEnabled())
+                log.info("i="
                     + i
                     + "\t(scale="
                     + i.scale()

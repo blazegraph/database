@@ -37,7 +37,6 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
-
 /**
  * Test suite for packing and unpacking unsigned long integers using the
  * {@link DataInputBuffer} and the {@link ByteArrayBuffer}.
@@ -79,9 +78,9 @@ public class TestLongPacker extends TestCase {
     	throws IOException
     {
     
-        DataInputBuffer dib = new DataInputBuffer(packed);
+        final DataInputBuffer dib = new DataInputBuffer(packed);
         
-        long actual = dib.unpackLong();
+        final long actual = dib.unpackLong();
         
         assertEquals( "value", expected, actual );
         
@@ -208,46 +207,46 @@ public class TestLongPacker extends TestCase {
     {
 
         // Note: zero (0) is interpreted as being one nibble for our purposes.
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0x0 ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0x0 ) );
         
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0x1 ) );
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0x2 ) );
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0x7 ) );
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0x8 ) );
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0xe ) );
-        assertEquals( "nibbles", 1, DataOutputBuffer.getNibbleLength( 0xf ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0x1 ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0x2 ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0x7 ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0x8 ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0xe ) );
+        assertEquals( "nibbles", 1, LongPacker.getNibbleLength( 0xf ) );
         
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x10 ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x11 ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x12 ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x17 ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x18 ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x1e ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x1f ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x7f ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0x8f ) );
-        assertEquals( "nibbles", 2, DataOutputBuffer.getNibbleLength( 0xff ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x10 ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x11 ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x12 ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x17 ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x18 ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x1e ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x1f ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x7f ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0x8f ) );
+        assertEquals( "nibbles", 2, LongPacker.getNibbleLength( 0xff ) );
 
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0x100 ) );
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0x101 ) );
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0x121 ) );
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0x1ee ) );
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0x1ff ) );
-        assertEquals( "nibbles", 3, DataOutputBuffer.getNibbleLength( 0xfff ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0x100 ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0x101 ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0x121 ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0x1ee ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0x1ff ) );
+        assertEquals( "nibbles", 3, LongPacker.getNibbleLength( 0xfff ) );
         
-        assertEquals( "nibbles", 4, DataOutputBuffer.getNibbleLength( 0x1ff0 ) );
-        assertEquals( "nibbles", 4, DataOutputBuffer.getNibbleLength( 0x7ff0 ) );
-        assertEquals( "nibbles", 4, DataOutputBuffer.getNibbleLength( 0xfff0 ) );
-        assertEquals( "nibbles", 4, DataOutputBuffer.getNibbleLength( 0xfff1 ) );
+        assertEquals( "nibbles", 4, LongPacker.getNibbleLength( 0x1ff0 ) );
+        assertEquals( "nibbles", 4, LongPacker.getNibbleLength( 0x7ff0 ) );
+        assertEquals( "nibbles", 4, LongPacker.getNibbleLength( 0xfff0 ) );
+        assertEquals( "nibbles", 4, LongPacker.getNibbleLength( 0xfff1 ) );
 
-        assertEquals( "nibbles", 5, DataOutputBuffer.getNibbleLength( 0x12345 ) );
-        assertEquals( "nibbles", 5, DataOutputBuffer.getNibbleLength( 0x54321 ) );
+        assertEquals( "nibbles", 5, LongPacker.getNibbleLength( 0x12345 ) );
+        assertEquals( "nibbles", 5, LongPacker.getNibbleLength( 0x54321 ) );
 
-        assertEquals( "nibbles", 6, DataOutputBuffer.getNibbleLength( 0x123456 ) );
-        assertEquals( "nibbles", 6, DataOutputBuffer.getNibbleLength( 0x654321 ) );
+        assertEquals( "nibbles", 6, LongPacker.getNibbleLength( 0x123456 ) );
+        assertEquals( "nibbles", 6, LongPacker.getNibbleLength( 0x654321 ) );
 
-        assertEquals( "nibbles", 7, DataOutputBuffer.getNibbleLength( 0x1234567 ) );
-        assertEquals( "nibbles", 7, DataOutputBuffer.getNibbleLength( 0x7654321 ) );
+        assertEquals( "nibbles", 7, LongPacker.getNibbleLength( 0x1234567 ) );
+        assertEquals( "nibbles", 7, LongPacker.getNibbleLength( 0x7654321 ) );
 
         /*
          * Note: At 8 nibbles we have 32 bits. When the high bit is one, this
@@ -255,32 +254,32 @@ public class TestLongPacker extends TestCase {
          * will be interpreted as a negative integer and sign extended to a
          * negative long.
          */
-        assertEquals( "nibbles", 8, DataOutputBuffer.getNibbleLength( 0x12345678L ) );
-        assertEquals( "nibbles", 8, DataOutputBuffer.getNibbleLength( 0x87654321L ) ); 
+        assertEquals( "nibbles", 8, LongPacker.getNibbleLength( 0x12345678L ) );
+        assertEquals( "nibbles", 8, LongPacker.getNibbleLength( 0x87654321L ) ); 
 
-        assertEquals( "nibbles", 9, DataOutputBuffer.getNibbleLength( 0x123456789L ) );
-        assertEquals( "nibbles", 9, DataOutputBuffer.getNibbleLength( 0x987654321L ) ); 
+        assertEquals( "nibbles", 9, LongPacker.getNibbleLength( 0x123456789L ) );
+        assertEquals( "nibbles", 9, LongPacker.getNibbleLength( 0x987654321L ) ); 
 
-        assertEquals( "nibbles", 10, DataOutputBuffer.getNibbleLength( 0x123456789aL ) );
-        assertEquals( "nibbles", 10, DataOutputBuffer.getNibbleLength( 0xa987654321L ) ); 
+        assertEquals( "nibbles", 10, LongPacker.getNibbleLength( 0x123456789aL ) );
+        assertEquals( "nibbles", 10, LongPacker.getNibbleLength( 0xa987654321L ) ); 
 
-        assertEquals( "nibbles", 11, DataOutputBuffer.getNibbleLength( 0x123456789abL ) );
-        assertEquals( "nibbles", 11, DataOutputBuffer.getNibbleLength( 0xba987654321L ) ); 
+        assertEquals( "nibbles", 11, LongPacker.getNibbleLength( 0x123456789abL ) );
+        assertEquals( "nibbles", 11, LongPacker.getNibbleLength( 0xba987654321L ) ); 
 
-        assertEquals( "nibbles", 12, DataOutputBuffer.getNibbleLength( 0x123456789abcL ) );
-        assertEquals( "nibbles", 12, DataOutputBuffer.getNibbleLength( 0xcba987654321L ) ); 
+        assertEquals( "nibbles", 12, LongPacker.getNibbleLength( 0x123456789abcL ) );
+        assertEquals( "nibbles", 12, LongPacker.getNibbleLength( 0xcba987654321L ) ); 
 
-        assertEquals( "nibbles", 13, DataOutputBuffer.getNibbleLength( 0x123456789abcdL ) );
-        assertEquals( "nibbles", 13, DataOutputBuffer.getNibbleLength( 0xdcba987654321L ) ); 
+        assertEquals( "nibbles", 13, LongPacker.getNibbleLength( 0x123456789abcdL ) );
+        assertEquals( "nibbles", 13, LongPacker.getNibbleLength( 0xdcba987654321L ) ); 
 
-        assertEquals( "nibbles", 14, DataOutputBuffer.getNibbleLength( 0x123456789abcdeL ) );
-        assertEquals( "nibbles", 14, DataOutputBuffer.getNibbleLength( 0xedcba987654321L ) ); 
+        assertEquals( "nibbles", 14, LongPacker.getNibbleLength( 0x123456789abcdeL ) );
+        assertEquals( "nibbles", 14, LongPacker.getNibbleLength( 0xedcba987654321L ) ); 
 
-        assertEquals( "nibbles", 15, DataOutputBuffer.getNibbleLength( 0x123456789abcdefL ) );
-        assertEquals( "nibbles", 15, DataOutputBuffer.getNibbleLength( 0xfedcba987654321L ) ); 
+        assertEquals( "nibbles", 15, LongPacker.getNibbleLength( 0x123456789abcdefL ) );
+        assertEquals( "nibbles", 15, LongPacker.getNibbleLength( 0xfedcba987654321L ) ); 
 
-        assertEquals( "nibbles", 16, DataOutputBuffer.getNibbleLength( 0x1234567890abcdefL ) );
-        assertEquals( "nibbles", 16, DataOutputBuffer.getNibbleLength( 0xfedcba0987654321L ) ); 
+        assertEquals( "nibbles", 16, LongPacker.getNibbleLength( 0x1234567890abcdefL ) );
+        assertEquals( "nibbles", 16, LongPacker.getNibbleLength( 0xfedcba0987654321L ) ); 
 
     }
     

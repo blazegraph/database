@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.io.LongPacker;
 
 /**
  * A class that may be used to form multi-component keys but which does not
@@ -61,7 +62,7 @@ import com.bigdata.btree.ITupleSerializer;
  *       len field to the mark. keys with multiple components could benefit from
  *       allowing multiple marks (the sparse row store is the main use case).
  */
-public class KeyBuilder implements IKeyBuilder {
+public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
 
     private static final transient Logger log = Logger.getLogger(KeyBuilder.class);
     
@@ -735,6 +736,100 @@ public class KeyBuilder implements IKeyBuilder {
         return this;
         
     }
+
+    /**
+     * Packs a non-negative long value into the minimum #of bytes in which the
+     * value can be represented and writes those bytes onto the buffer. The
+     * first byte determines whether or not the long value was packed and, if
+     * packed, how many bytes were required to represent the packed long value.
+     * When the high bit of the first byte is a one (1), then the long value
+     * could not be packed and the long value is found by clearing the high bit
+     * and interpreting the first byte plus the next seven (7) bytes as a long.
+     * Otherwise the next three (3) bits are interpreted as an unsigned integer
+     * giving the #of bytes (nbytes) required to represent the packed long
+     * value. To recover the long value the high nibble is cleared and the first
+     * byte together with the next nbytes are interpreted as an unsigned long
+     * value whose leading zero bytes were not written.
+     * 
+     * <pre>
+     * 
+     * [0|1|2|3|4|5|6|7]
+     *  1 - - -   nbytes = 8, clear high bit and interpret this plus the next 7 bytes as a long.
+     *  0 1 1 1   nbytes = 7, clear high nibble and interpret this plus the next 6 bytes as a long. 
+     *  0 1 1 0   nbytes = 6, clear high nibble and interpret this plus the next 5 bytes as a long. 
+     *  0 1 0 1   nbytes = 5, clear high nibble and interpret this plus the next 4 bytes as a long.
+     *  0 1 0 0   nbytes = 4, clear high nibble and interpret this plus the next 3 bytes as a long.
+     *  0 0 1 1   nbytes = 3, clear high nibble and interpret this plus the next 3 bytes as a long.
+     *  0 0 1 0   nbytes = 2, clear high nibble and interpret this plus the next byte as a long.
+     *  0 0 0 1   nbytes = 1, clear high nibble.  value is the low nibble.
+     * 
+     * </pre>
+     * 
+     * Note: These are decodable (no loss) but negative longs are not allowed.
+     * <p>
+     * Note: The order is NOT fully preserved. Any long which is encoded into
+     * less than 8 bytes has its order preserved. However, a long which is
+     * encoded into 8 bytes will wind up ordered before any longs which pack
+     * into fewer bytes.
+     * 
+     * @param v
+     *            The unsigned long value.
+     * 
+     * @return The #of bytes onto which the unsigned long value was packed.
+     */
+    final public KeyBuilder pack(final long v) {
+        
+        LongPacker.packLong(v, pbuf, this);
+        
+        return this;
+        
+    }
+
+    /**
+     * Relative <i>put</i> method for writing a byte[] on the buffer.
+     * 
+     * @param b
+     *            The byte[].
+     * @param off
+     *            The offset of the first byte in <i>b</i> to be written on
+     *            the buffer.
+     * @param len
+     *            The #of bytes in <i>b</i> to be written on the buffer.
+     */
+    public void put(final byte[] b, final int off, final int len) {
+     
+        ensureFree(len);
+        
+        System.arraycopy(b/* src */, 0/* srcPos */, buf/* dest */,
+                this.len/* destPos */, len/* length */);
+        
+        this.len += len;
+        
+    }
+
+    /**
+     * Private buffer for packing long integers.
+     */
+    final private byte[] pbuf = new byte[8];
+
+//    /**
+//     * Unpack a long value from the current buffer position.
+//     * 
+//     * @param buf
+//     *            The buffer containing the data to be decoded.
+//     * @param off
+//     *            The offset of the first byte of the value to be decoded.
+//     * @param limit
+//     *            The exclusive upper bound available for decoding
+//     * 
+//     * @return The long value.
+//     */
+//    static final public long unpackLong(final byte[] buf, final int off,
+//            final int limit) {
+//     
+//        return LongPacker.unpackLong(buf, off, limit);
+//        
+//    }
 
     /**
      * Return the value that will impose the lexiographic ordering as an

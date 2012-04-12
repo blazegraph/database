@@ -135,7 +135,7 @@ import cutthecrap.utils.striterators.Striterator;
 public class LexiconRelation extends AbstractRelation<BigdataValue> 
         implements IDatatypeURIResolver {
 
-    final static Logger log = Logger.getLogger(LexiconRelation.class);
+    private final static Logger log = Logger.getLogger(LexiconRelation.class);
 
     private final Set<String> indexNames;
 
