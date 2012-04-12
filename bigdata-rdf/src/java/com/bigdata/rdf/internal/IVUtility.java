@@ -100,8 +100,8 @@ public class IVUtility {
      * Note: This option requires that term identifiers are non-negative. That
      * is not currently true for the cluster due to the {@link TermIdEncoder}.
      * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/529">
-     *      Improve load performance </a>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/548">
+     *      Pack TIDs</a>
      */
     public static final boolean PACK_TIDS = false;
     
