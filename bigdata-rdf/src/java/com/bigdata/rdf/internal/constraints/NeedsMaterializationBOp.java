@@ -26,12 +26,9 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.util.InnerCause;
 
@@ -47,8 +44,8 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
 	 */
     private static final long serialVersionUID = 4767476516948560884L;
 
-    private static final transient Logger log = Logger
-            .getLogger(NeedsMaterializationBOp.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(NeedsMaterializationBOp.class);
 
     public NeedsMaterializationBOp(final IValueExpression<?> x) {
 
@@ -82,15 +79,15 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
     	
     	try {
     		
-    		if (log.isDebugEnabled()) {
-    			log.debug("about to attempt evaluation prior to materialization");
-    		}
+//    		if (log.isDebugEnabled()) {
+//    			log.debug("about to attempt evaluation prior to materialization");
+//    		}
     		
     		ve.get(bs);
     		
-    		if (log.isDebugEnabled()) {
-    			log.debug("successfully evaluated constraint without materialization");
-    		}
+//    		if (log.isDebugEnabled()) {
+//    			log.debug("successfully evaluated constraint without materialization");
+//    		}
     		
     		return false;
     		
@@ -98,9 +95,9 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
 
 			if (InnerCause.isInnerCause(t, NotMaterializedException.class)) {
     		
-	    		if (log.isDebugEnabled()) {
-	    			log.debug("could not evaluate constraint without materialization");
-	    		}
+//	    		if (log.isDebugEnabled()) {
+//	    			log.debug("could not evaluate constraint without materialization");
+//	    		}
 	    		
 	    		return true;
     		

@@ -77,53 +77,70 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 
     protected boolean accept(final IBindingSet bs) {
         
-        final IV tag = get(0).get(bs);
-        final IV range = get(1).get(bs);
-        
+        final IV<?, ?> tag = get(0).get(bs);
+
+        // not yet bound
+        if (tag == null)
+            throw new SparqlTypeErrorException();
+
+        final IV<?, ?> range = get(1).get(bs);
+
+        // not yet bound
+        if (range == null)
+            throw new SparqlTypeErrorException();
+
 //        if (log.isDebugEnabled()) {
 //        	log.debug(tag);
 //        	log.debug(range);
 //        }
 
-        // not yet bound
-        if (tag == null || range == null)
-        	throw new SparqlTypeErrorException();
 
         final BigdataValue tagVal = tag.getValue();
+
+        // not yet materialized
+        if (tagVal == null)
+            throw new NotMaterializedException();
+
+        if (!QueryEvaluationUtil.isSimpleLiteral(tagVal))
+            throw new SparqlTypeErrorException();
+
         final BigdataValue rangeVal = range.getValue();
-        
+
+        // not yet materialized
+        if (rangeVal == null)
+            throw new NotMaterializedException();
+
+        if (!QueryEvaluationUtil.isSimpleLiteral(rangeVal))
+            throw new SparqlTypeErrorException();
+
 //        if (log.isDebugEnabled()) {
 //        	log.debug(tagVal);
 //        	log.debug(rangeVal);
 //        }
 
-        // not yet materialized
-        if (tagVal == null || rangeVal == null)
-        	throw new NotMaterializedException();
-        
-		if (QueryEvaluationUtil.isSimpleLiteral(tagVal)
-				&& QueryEvaluationUtil.isSimpleLiteral(rangeVal))
-		{
-			final String langTag = ((Literal)tagVal).getLabel();
-			final String langRange = ((Literal)rangeVal).getLabel();
+//		if (QueryEvaluationUtil.isSimpleLiteral(tagVal)
+//				&& QueryEvaluationUtil.isSimpleLiteral(rangeVal))
+//		{
+        final String langTag = ((Literal) tagVal).getLabel();
+        final String langRange = ((Literal) rangeVal).getLabel();
 
-			boolean result = false;
-			if (langRange.equals("*")) {
-				result = langTag.length() > 0;
-			}
-			else if (langTag.length() == langRange.length()) {
-				result = langTag.equalsIgnoreCase(langRange);
-			}
-			else if (langTag.length() > langRange.length()) {
-				// check if the range is a prefix of the tag
-			    final String prefix = langTag.substring(0, langRange.length());
-				result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
-			}
-
-			return result;
+		boolean result = false;
+		if (langRange.equals("*")) {
+			result = langTag.length() > 0;
+		}
+		else if (langTag.length() == langRange.length()) {
+			result = langTag.equalsIgnoreCase(langRange);
+		}
+		else if (langTag.length() > langRange.length()) {
+			// check if the range is a prefix of the tag
+		    final String prefix = langTag.substring(0, langRange.length());
+			result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
 		}
 
-		throw new SparqlTypeErrorException();
+		return result;
+//		}
+//
+//		throw new SparqlTypeErrorException();
 		
     }
     
