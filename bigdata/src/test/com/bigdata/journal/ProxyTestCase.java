@@ -163,6 +163,7 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
 	        final ThreadGroup grp = Thread.currentThread().getThreadGroup();
 	    	final int tearDownActiveThreads = grp.activeCount();
+	    	int nremaining = 0;
 	    	if (startupActiveThreads != tearDownActiveThreads) {
 	    		final Thread[] threads = new Thread[tearDownActiveThreads];
 	    		grp.enumerate(threads);
@@ -175,17 +176,18 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 	    		        info.append(',');
                     info.append("[" + t.getName() + "]");
                     first = false;
+                    nremaining++;
 	    		}
 	    		
 	    		final String failMessage = "Threads left active after task"
 	    		        +": test=" + getName()//
 	    	            + ", delegate="+getOurDelegate().getClass().getName()
 	    	            + ", startupCount=" + startupActiveThreads
-	    				+ ", teardownCount=" + tearDownActiveThreads
+	    				+ ", teardownCount=" + nremaining
 	    				+ ", thisThread="+Thread.currentThread().getName()
 	    				+ ", threads: " + info;
 	    		
-                if (grp.activeCount() != startupActiveThreads)
+                if (nremaining > startupActiveThreads)
                     log.error(failMessage);  
 
                 /*

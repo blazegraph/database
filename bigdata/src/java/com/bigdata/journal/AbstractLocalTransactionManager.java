@@ -41,7 +41,9 @@ abstract public class AbstractLocalTransactionManager implements
      * preparing will remain in this collection until it has either successfully
      * prepared or aborted.
      * 
-     * @todo config initial capacity and concurrency.
+     * TODO Configure the initial capacity and concurrency. For example, this
+     * should be sized to the #of client connections for both the
+     * initialCapacity and the concurrency level.
      */
     final private ConcurrentHashMap<Long, Tx> activeTx = new ConcurrentHashMap<Long, Tx>();
 
