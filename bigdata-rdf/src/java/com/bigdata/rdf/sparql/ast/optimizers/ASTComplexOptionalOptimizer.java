@@ -140,7 +140,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         final Set<IVariable<?>> exogenousVars = context.getSolutionSetStats()
                 .getUsedVars();

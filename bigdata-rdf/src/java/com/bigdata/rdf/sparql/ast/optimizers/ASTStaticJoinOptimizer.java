@@ -62,7 +62,9 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.IAccessPath;
 
@@ -227,7 +229,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * Return <code>true</code> if the static join optimizer is enabled for the
      * given join group.
      */
-    static boolean isStaticOptimizer(final AST2BOpContext context,
+    static boolean isStaticOptimizer(final IEvaluationContext context,
             final JoinGroupNode joinGroup) {
 
         QueryOptimizerEnum optimizer = null;
@@ -407,7 +409,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                      * tails.
                      */
                     final StaticOptimizer opt = new StaticOptimizer(queryRoot,
-                            ancestry, required, optimistic);
+                            ctx, ancestry, required, optimistic);
 
                     final int[] order = opt.getOrder();
 
@@ -531,6 +533,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             final List<StatementPatternNode> spNodes,
             final IBindingSet exogenousBindings) {
 
+        final AbstractTripleStore db = ctx.getAbstractTripleStore();
+        
     	for (StatementPatternNode sp : spNodes) {
     		
     		if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
@@ -540,7 +544,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
                 final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
     			
-                final IAccessPath<?> ap = ctx.db.getAccessPath(s, p, o, c);
+                final IAccessPath<?> ap = db.getAccessPath(s, p, o, c);
                 
                 final long cardinality = ap.rangeCount(false/* exact */);
 
@@ -615,6 +619,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     private static final class StaticOptimizer {
     	
     	private final QueryRoot queryRoot;
+    	
+    	private final AST2BOpContext context;
     	
     	private final IJoinNode[] ancestry;
     	
@@ -701,11 +707,15 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          *            The rule.
          */
         public StaticOptimizer(final QueryRoot queryRoot,
+                final AST2BOpContext context,
         		final IJoinNode[] ancestry, 
         		final List<StatementPatternNode> spNodes,
         		final double optimistic) {
-            
+
             if (queryRoot == null)
+                throw new IllegalArgumentException();
+            
+            if (context == null)
                 throw new IllegalArgumentException();
             
             if (ancestry == null)
@@ -715,6 +725,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 throw new IllegalArgumentException();
             
             this.queryRoot = queryRoot;
+            
+            this.context = context;
             
             this.ancestry = ancestry;
             
@@ -805,7 +817,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
              * give preferential treatment to the predicates that can join
              * on those variables.
              */
-        	final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
             for (IJoinNode join : ancestry) {
             	if (log.isDebugEnabled()) {
             		log.debug("considering join node from ancestry: " + join);

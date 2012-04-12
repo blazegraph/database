@@ -50,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -222,7 +223,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
     @SuppressWarnings("unchecked")
     private void visitGroups(
             //
-            final AST2BOpContext context,//
+            final IEvaluationContext context,//
             final DatasetNode dataSet,//
             final IGroupNode<IGroupMemberNode> group, //
             TermNode graphContext,//

@@ -60,7 +60,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
 import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -90,7 +90,7 @@ public class TestSolutionSetCache extends TestCase2 {
     
     /** Note: Not used yet by the {@link SparqlCache}.
      */
-    protected AST2BOpContext ctx = null;
+    protected IEvaluationContext ctx = null;
 
     /**
      * The namespace for the {@link BigdataValueFactory}.

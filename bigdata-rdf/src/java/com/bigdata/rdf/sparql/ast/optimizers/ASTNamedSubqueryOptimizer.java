@@ -123,7 +123,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
         /*
          * Figure out the join variables for each INCLUDE.
          */
-        assignJoinVars(queryRoot, namedSubqueries, allIncludes);
+        assignJoinVars(queryRoot, context, namedSubqueries, allIncludes);
 
         return queryRoot;
 
@@ -322,11 +322,12 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/405
      */
     static private void assignJoinVars(//
-            final QueryRoot queryRoot,
-            final NamedSubqueriesNode namedSubqueries,
+            final QueryRoot queryRoot,//
+            final AST2BOpContext context,//
+            final NamedSubqueriesNode namedSubqueries,//
             final NamedSubqueryInclude[] allIncludes) {
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 

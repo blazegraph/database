@@ -70,7 +70,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
         
         /*
          * NAMED SUBQUERIES

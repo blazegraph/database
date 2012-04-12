@@ -810,7 +810,7 @@ public class TestASTNamedSubqueryOptimizer extends
 
         assertSameAST(expected, actual);
 
-        final StaticAnalysis sa = new StaticAnalysis(expected);
+        final StaticAnalysis sa = new StaticAnalysis(expected, context);
 
         // Test "incoming" bindings.
         assertEquals(asSet(new Var[] { Var.var("var1") }),

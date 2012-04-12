@@ -44,19 +44,20 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 public class ASTUnionFiltersOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // Main WHERE clause
         {
@@ -110,7 +111,7 @@ public class ASTUnionFiltersOptimizer implements IASTOptimizer {
 	 * the filters into all children of the union and remove the filters from
 	 * the group.
 	 */
-    private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
+    private void optimize(final IEvaluationContext ctx, final StaticAnalysis sa,
     		final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {

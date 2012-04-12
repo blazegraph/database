@@ -140,7 +140,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          * and mark the statement pattern node as "optional".
          */
         
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         for(JoinGroupNode group : optionalGroups) {
             
@@ -224,8 +224,9 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
      * statement pattern node and and filters into the parent group and mark the
      * statement pattern node as "optional".
      */
-    private void liftOptionalGroup(final StaticAnalysis sa, final JoinGroupNode group) {
-       
+    private void liftOptionalGroup(final StaticAnalysis sa,
+            final JoinGroupNode group) {
+
         // The parent join group.
         final JoinGroupNode p = group.getParentJoinGroup();
 
