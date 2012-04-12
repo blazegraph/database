@@ -15,7 +15,6 @@ import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.EmptySolutionSetStats;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -29,19 +28,14 @@ import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
-import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
- * 
- * TODO AST2BOpContext should be converted into an interface for better
- * extensibility and protection.
  */
-public class AST2BOpContext implements IdFactory {
+public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     /**
      * The {@link ASTContainer}
@@ -53,12 +47,12 @@ public class AST2BOpContext implements IdFactory {
 	 * 
 	 * @see #nextId()
 	 */
-	final AtomicInteger idFactory;
+	private final AtomicInteger idFactory;
 	
 	/**
 	 * The KB instance.
 	 */
-	public final AbstractTripleStore db;
+	protected final AbstractTripleStore db;
 	
 	/**
 	 * The {@link QueryEngine}. 
@@ -213,11 +207,7 @@ public class AST2BOpContext implements IdFactory {
      */
     private ISolutionSetStats sss = null;
     
-    /**
-     * Some summary statistics about the exogenous solution sets. These are
-     * computed by {@link AST2BOpUtility#convert(AST2BOpContext, IBindingSet[])}
-     * before it begins to run the {@link IASTOptimizer}s.
-     */
+    @Override
     public ISolutionSetStats getSolutionSetStats() {
     
         if(sss == null)
@@ -348,9 +338,7 @@ public class AST2BOpContext implements IdFactory {
 
     }
 
-    /**
-     * The timestamp or transaction identifier associated with the view.
-     */
+    @Override
     public long getTimestamp() {
 
         return db.getTimestamp();
@@ -363,67 +351,49 @@ public class AST2BOpContext implements IdFactory {
 
     }
 
-    /**
-     * Return <code>true</code> if we are running on a cluster.
-     */
+    @Override
     public boolean isCluster() {
 
         return db.getIndexManager() instanceof IBigdataFederation<?>;
 
     }
 
-    /**
-     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
-     * quads mode.
-     */
+    @Override
     public boolean isQuads() {
 
         return db.isQuads();
         
     }
     
-    /**
-     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
-     * SIDS mode.
-     */
+    @Override
     public boolean isSIDs() {
 
         return db.isStatementIdentifiers();
         
     }
 
-    /**
-     * Return <code>true</code> iff the target {@link AbstractTripleStore} is in
-     * triples mode.
-     */
+    @Override
     public boolean isTriples() {
 
         return !db.isQuads() && !db.isStatementIdentifiers();
         
     }
     
-
-    /**
-     * Return the namespace of the {@link AbstractTripleStore}.
-     */
+    @Override
     public String getNamespace() {
     
         return db.getNamespace();
         
     }
 
-    /**
-     * Return the namespace of the {@link SPORelation}.
-     */
+    @Override
     public String getSPONamespace() {
 
         return db.getSPORelation().getNamespace();
 
     }
 
-    /**
-     * Return the namespace of the {@link LexiconRelation}.
-     */
+    @Override
     public String getLexiconNamespace() {
 
         return db.getLexiconRelation().getNamespace();
@@ -445,14 +415,7 @@ public class AST2BOpContext implements IdFactory {
 
     }
 
-    /**
-     * Return the timestamp which will be used to read on the lexicon.
-     * <p>
-     * Note: This uses the timestamp of the triple store view unless this is a
-     * read/write transaction, in which case we need to use the last commit
-     * point in order to see any writes which it may have performed (lexicon
-     * writes are always unisolated).
-     */
+    @Override
     public long getLexiconReadTimestamp() {
     
         long timestamp = db.getTimestamp();
@@ -464,6 +427,12 @@ public class AST2BOpContext implements IdFactory {
         }
         
         return timestamp;
+        
+    }
+
+    public AbstractTripleStore getAbstractTripleStore() {
+        
+        return db;
         
     }
 

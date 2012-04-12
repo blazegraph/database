@@ -63,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
  * Rewrites aspects of queries where bottom-up evaluation would produce
@@ -182,7 +183,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              * so this explicitly visits the interesting parts of the tree.
              */
 
-            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
             // List of the inner optional groups for badly designed left joins.
             final List<JoinGroupNode> innerOptionalGroups = new LinkedList<JoinGroupNode>();
@@ -234,7 +235,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          */
         {
 
-            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
             // Handle named subqueries.
             if (queryRoot.getNamedSubqueries() != null) {
@@ -259,7 +260,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          */
         {
 
-            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
             // Handle named subqueries.
             if (queryRoot.getNamedSubqueries() != null) {
@@ -295,7 +296,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * in the parent group but are bound in groups above the parent group.
      */
     private void checkForBadlyDesignedLeftJoin(
-            final AST2BOpContext context,
+            final IEvaluationContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> whereClause,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
@@ -387,7 +388,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     private void checkForBadlyDesignedLeftJoin2(
-            final AST2BOpContext context,
+            final IEvaluationContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> group,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
@@ -851,7 +852,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private void handleMinusWithoutSharedVariables(
-            final AST2BOpContext context,
+            final IEvaluationContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<?> group) {
 

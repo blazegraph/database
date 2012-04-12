@@ -56,7 +56,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
@@ -335,7 +335,7 @@ public class SparqlCache implements ISparqlCache {
     }
     
     @Override
-    public void clearAllSolutions(final AST2BOpContext ctx) {
+    public void clearAllSolutions(final IEvaluationContext ctx) {
 
         final Iterator<Map.Entry<String, SolutionSetMetadata>> itr = cacheMap
                 .entrySet().iterator();
@@ -360,7 +360,7 @@ public class SparqlCache implements ISparqlCache {
     }
 
     @Override
-    public boolean clearSolutions(final AST2BOpContext ctx, final String solutionSet) {
+    public boolean clearSolutions(final IEvaluationContext ctx, final String solutionSet) {
 
         if (log.isInfoEnabled())
             log.info("solutionSet: " + solutionSet);
@@ -378,7 +378,7 @@ public class SparqlCache implements ISparqlCache {
         
     }
 
-    public void putSolutions(final AST2BOpContext ctx, final String solutionSet,
+    public void putSolutions(final IEvaluationContext ctx, final String solutionSet,
             final ICloseableIterator<IBindingSet[]> src) {
 
         if (solutionSet == null)
@@ -411,7 +411,7 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
-    public void createSolutions(final AST2BOpContext ctx,
+    public void createSolutions(final IEvaluationContext ctx,
             final String solutionSet, final ISPO[] params) {
 
         if (solutionSet == null)
@@ -448,7 +448,7 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
-    public ICloseableIterator<IBindingSet[]> getSolutions(final AST2BOpContext ctx,
+    public ICloseableIterator<IBindingSet[]> getSolutions(final IEvaluationContext ctx,
             final String solutionSet) {
 
         if (solutionSet == null)
@@ -464,7 +464,7 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
-    public boolean existsSolutions(final AST2BOpContext ctx,
+    public boolean existsSolutions(final IEvaluationContext ctx,
             final String solutionSet) {
 
         if (solutionSet == null)

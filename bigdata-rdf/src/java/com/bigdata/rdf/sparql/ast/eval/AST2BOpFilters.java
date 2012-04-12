@@ -121,8 +121,6 @@ public class AST2BOpFilters extends AST2BOpBase {
      *            no {@link NotMaterializedException} is thrown).
      * @param varsToMaterialize
      *            the terms to materialize
-     * @param idFactory
-     *            the bop id factory
      * @param queryHints
      *            the query hints
      * @return the final bop added to the pipeline by this method
@@ -445,8 +443,6 @@ public class AST2BOpFilters extends AST2BOpBase {
      * @param needsMaterialization
      *            A map of constraints and their variable materialization
      *            requirements.
-     * @param idFactory
-     *            Used to assign bop ids.
      * @param context
      * @param queryHints
      */
@@ -483,7 +479,7 @@ public class AST2BOpFilters extends AST2BOpBase {
 	                
                 }
 
-                final int condId = ctx.idFactory.incrementAndGet();
+                final int condId = ctx.nextId();
 
                 // we might have already materialized everything we need
                 if (!terms.isEmpty()) {

@@ -30,7 +30,7 @@ package com.bigdata.rdf.sparql.ast.hints;
 import java.util.Properties;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
@@ -96,7 +96,7 @@ abstract class AbstractQueryHint<T> implements IQueryHint<T> {
      * @param value
      *            The value for the query hint.
      */
-    protected final void _setQueryHint(final AST2BOpContext ctx,
+    protected final void _setQueryHint(final IEvaluationContext ctx,
             final QueryHintScope scope, final ASTBase op, final String name,
             final T value) {
 
@@ -120,7 +120,7 @@ abstract class AbstractQueryHint<T> implements IQueryHint<T> {
      * @param value
      *            The value of the annotation.
      */
-    protected final void _setAnnotation(final AST2BOpContext ctx,
+    protected final void _setAnnotation(final IEvaluationContext ctx,
             final QueryHintScope scope, final ASTBase op, final String name,
             final T value) {
 

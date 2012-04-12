@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.cache;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -60,12 +60,12 @@ public interface ISparqlCache {
      * @return <code>true</code> iff a solution set by that name existed and was
      *         cleared.
      */
-    boolean clearSolutions(AST2BOpContext ctx, String solutionSet);
+    boolean clearSolutions(IEvaluationContext ctx, String solutionSet);
 
     /**
      * Clear all named solution sets.
      */
-    void clearAllSolutions(AST2BOpContext ctx);
+    void clearAllSolutions(IEvaluationContext ctx);
 
     /**
      * Create a named solution set.
@@ -79,7 +79,7 @@ public interface ISparqlCache {
      * @throws RuntimeException
      *             if a solution set exists for that name.
      */
-    void createSolutions(AST2BOpContext ctx, String solutionSet, ISPO[] params);
+    void createSolutions(IEvaluationContext ctx, String solutionSet, ISPO[] params);
 
     /**
      * Save the solutions a named solution set.
@@ -90,7 +90,7 @@ public interface ISparqlCache {
      * @param src
      *            The solutions.
      */
-    void putSolutions(AST2BOpContext ctx, String solutionSet,
+    void putSolutions(IEvaluationContext ctx, String solutionSet,
             ICloseableIterator<IBindingSet[]> src);
 
     /**
@@ -105,7 +105,7 @@ public interface ISparqlCache {
      * @throws IllegalStateException
      *             if no solution set with that name exists.
      */
-    ICloseableIterator<IBindingSet[]> getSolutions(AST2BOpContext ctx,
+    ICloseableIterator<IBindingSet[]> getSolutions(IEvaluationContext ctx,
             String solutionSet);
 
     /**
@@ -117,7 +117,7 @@ public interface ISparqlCache {
      *            
      * @return <code>true</code> iff a solution set having that name exists.
      */
-    boolean existsSolutions(AST2BOpContext ctx, String solutionSet);
+    boolean existsSolutions(IEvaluationContext ctx, String solutionSet);
     
 //    /**
 //     * Return the result from the cache -or- <code>null</code> if there is a

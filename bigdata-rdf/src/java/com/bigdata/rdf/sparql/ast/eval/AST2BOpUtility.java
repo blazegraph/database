@@ -205,7 +205,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         astContainer.setOptimizedAST(optimizedQuery);
 
         // Final static analysis object for the optimized query.
-        ctx.sa = new StaticAnalysis(optimizedQuery);
+        ctx.sa = new StaticAnalysis(optimizedQuery, ctx);
 
         // The set of known materialized variables.
         final LinkedHashSet<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>();
@@ -986,8 +986,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //      anns.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
         anns.put(PipelineOp.Annotations.SHARED_STATE, true);// live stats.
         anns.put(ServiceCallJoin.Annotations.SERVICE_NODE, serviceNode);
-        anns.put(ServiceCallJoin.Annotations.NAMESPACE, ctx.db.getNamespace());
-        anns.put(ServiceCallJoin.Annotations.TIMESTAMP, ctx.db.getTimestamp());
+        anns.put(ServiceCallJoin.Annotations.NAMESPACE, ctx.getNamespace());
+        anns.put(ServiceCallJoin.Annotations.TIMESTAMP, ctx.getTimestamp());
         anns.put(ServiceCallJoin.Annotations.JOIN_VARS,
                 joinVarSet.toArray(new IVariable[] {}));
         anns.put(JoinAnnotations.CONSTRAINTS, joinConstraints);
@@ -2748,8 +2748,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         left = new DataSetJoin(leftOrEmpty(left), NV.asMap(new NV[] {//
                 new NV(DataSetJoin.Annotations.VAR, var),//
-                new NV(DataSetJoin.Annotations.BOP_ID, ctx.idFactory
-                        .incrementAndGet()),//
+                new NV(DataSetJoin.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(DataSetJoin.Annotations.GRAPHS, ivs) //
                 }));
 
@@ -3380,7 +3379,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         final QueryRoot query = ctx.astContainer.getOptimizedAST();
         
-        final AbstractTripleStore database = ctx.db;
+        final AbstractTripleStore database = ctx.getAbstractTripleStore();
 
         final DatasetNode dataset = query.getDataset();
 
@@ -3409,8 +3408,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 .getSPORelation().getTimestamp()));
 
         // bopId for the predicate.
-        anns.add(new NV(IPredicate.Annotations.BOP_ID, ctx.idFactory
-                .incrementAndGet()));
+        anns.add(new NV(IPredicate.Annotations.BOP_ID, ctx.nextId()));
 
         // Propagate the estimated cardinality to the Predicate.
         anns.add(new NV(Annotations.ESTIMATED_CARDINALITY,

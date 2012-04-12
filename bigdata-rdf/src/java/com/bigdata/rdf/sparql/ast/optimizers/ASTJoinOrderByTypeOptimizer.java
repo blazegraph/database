@@ -55,6 +55,7 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -79,7 +80,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // Main WHERE clause
         {
@@ -153,7 +154,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * <p>
      * Note: Join filters are now attached to {@link IJoinNode}s.
      */
-    private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
+    private void optimize(final IEvaluationContext ctx, final StaticAnalysis sa,
     		final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {
@@ -208,7 +209,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      *            The {@link JoinGroupNode}.
      * @param sa
      */
-    private void doOrderByType(final AST2BOpContext ctx,
+    private void doOrderByType(final IEvaluationContext ctx,
             final JoinGroupNode joinGroup, final StaticAnalysis sa) {
 
         final List<IGroupMemberNode> ordered = new LinkedList<IGroupMemberNode>();

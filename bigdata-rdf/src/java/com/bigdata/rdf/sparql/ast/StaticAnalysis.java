@@ -47,7 +47,9 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
@@ -197,6 +199,8 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 //    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
+
+    private final IEvaluationContext evaluationContext;
     
     /**
      * FIXME This will go away now once we have the ability to resolve named
@@ -214,16 +218,42 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
      * 
-     *            FIXME The constructor should have access to the
-     *            {@link SolutionSetStats}, which are on the
-     *            {@link AST2BOpContext}.
+     * @deprecated By the other form of this constructor. The constructor should
+     *             have access to the {@link SolutionSetStats}, which are on the
+     *             {@link AST2BOpContext}. It also needs access to the
+     *             {@link SparqlCache} for named solution sets.
+     */
+    // Note: Only exposed to the same package for unit tests.
+    StaticAnalysis(final QueryRoot queryRoot) {
+        
+        this(queryRoot, null/* evaluationContext */);
+
+    }
+
+    /**
+     * 
+     * @param queryRoot
+     *            The root of the query. We need to have this on hand in order
+     *            to resolve {@link NamedSubqueryInclude}s during static
+     *            analysis.
+     * @param evaluationContext
+     *            The evaluation context provides access to the
+     *            {@link SolutionSetStats} and the {@link SparqlCache} for named
+     *            solution sets.
+     * 
+     *            TODO It could make sense to generalize the solution set
+     *            interface to include access to the precomputed
+     *            {@link SolutionSetStats}.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
-    public StaticAnalysis(final QueryRoot queryRoot) {
-     
+    public StaticAnalysis(final QueryRoot queryRoot,
+            final IEvaluationContext evaluationContext) {
+
         super(queryRoot);
+        
+        this.evaluationContext = evaluationContext;
 
     }
 

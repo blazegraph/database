@@ -978,7 +978,7 @@ public class ASTEvalHelper {
 
     }
 
-    private static void setupLoggingContext(final AST2BOpContext context) {
+    private static void setupLoggingContext(final IEvaluationContext context) {
 
         MDC.put("tx", TimestampUtility.toString(context.getTimestamp()));
 

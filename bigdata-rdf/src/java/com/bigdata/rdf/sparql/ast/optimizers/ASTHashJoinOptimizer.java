@@ -48,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -72,7 +73,7 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // First, process any pre-existing named subqueries.
         {
@@ -107,7 +108,7 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
      * between the sub-group and the parent (this condition is satisified if one
      * of the joins shares a variable with the parent group).
      */
-    private void optimizeJoinGroups(final AST2BOpContext context,
+    private void optimizeJoinGroups(final IEvaluationContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> group) {
 

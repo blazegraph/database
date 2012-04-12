@@ -42,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
  * This optimizer simply puts each type of {@link IGroupMemberNode} within a
@@ -62,15 +63,15 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
 //            .getLogger(ASTJoinOrderByTypeOptimizer.class);
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // Main WHERE clause
         {
@@ -127,7 +128,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
 	 * <p> 
 	 * 3. Find the run last optimizer if it exists. Put it last.
 	 */
-    private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
+    private void optimize(final IEvaluationContext ctx, final StaticAnalysis sa,
     		final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {

@@ -46,6 +46,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
+import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -60,6 +61,9 @@ import com.bigdata.striterator.ICloseableIterator;
  * organized into the checkpoint, perhaps as an ISPO[], perhaps using a rigid
  * schema. The size of the solution set should be visible when its metadata is
  * looked at as a graph.
+ * 
+ * TODO We should compute and save the {@link SolutionSetStats} when writing the
+ * solutions.
  */
 final class SolutionSetMetadata {
 

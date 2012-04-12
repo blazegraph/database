@@ -111,7 +111,7 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
             if (whereClause != null) {
 
-                liftOutServiceNodes(queryRoot, whereClause, true/* all */);
+                liftOutServiceNodes(queryRoot, context, whereClause, true/* all */);
 
             }
 
@@ -144,7 +144,7 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
                 if (whereClause == null)
                     continue;
 
-                liftOutServiceNodes(queryRoot, whereClause, false/* all */);
+                liftOutServiceNodes(queryRoot, context, whereClause, false/* all */);
 
             }
 
@@ -173,8 +173,12 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
      *            not be evaluated in an embedded location without causing
      *            multiple invocations of the SERVICE.
      */
-    private void liftOutServiceNodes(final QueryRoot queryRoot,
-            final GroupNodeBase<IGroupMemberNode> parent, final boolean all) {
+    private void liftOutServiceNodes(//
+            final QueryRoot queryRoot,//
+            final AST2BOpContext context,//
+            final GroupNodeBase<IGroupMemberNode> parent, //
+            final boolean all//
+            ) {
 
         boolean first = true;
 
@@ -195,7 +199,8 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
                     if (all || !first) {
 
-                        liftOutServiceNode(queryRoot, parent, serviceNode);
+                        liftOutServiceNode(queryRoot, context, parent,
+                                serviceNode);
 
                     }
 
@@ -210,7 +215,7 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
                 
-                liftOutServiceNodes(queryRoot, childGroup, true/* all */);
+                liftOutServiceNodes(queryRoot, context, childGroup, true/* all */);
 
             }
 
@@ -239,16 +244,19 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
      * @param serviceNode
      *            The {@link ServiceNode}.
      */
-    private void liftOutServiceNode(final QueryRoot queryRoot,
-            final GroupNodeBase<IGroupMemberNode> parent,
-            final ServiceNode serviceNode) {
+    private void liftOutServiceNode(//
+            final QueryRoot queryRoot,//
+            final AST2BOpContext context,//
+            final GroupNodeBase<IGroupMemberNode> parent,//
+            final ServiceNode serviceNode//
+            ) {
 
         /*
          * TODO Lift up into caller and pass through (QueryRoot is available
          * from SA)? However, if we start caching the SA then we have to be
          * careful when reusing it across structural modifications.
          */
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         final String namedSolutionSet = "%-anon-service-call-" + nrewrites++;
 

@@ -119,7 +119,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final Properties queryHints//
             ) {
 
-        final int joinId = ctx.idFactory.incrementAndGet();
+        final int joinId = ctx.nextId();
 
         // annotations for this join.
         final List<NV> anns = new LinkedList<NV>();

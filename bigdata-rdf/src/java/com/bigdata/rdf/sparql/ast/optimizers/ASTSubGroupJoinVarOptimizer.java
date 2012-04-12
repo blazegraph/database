@@ -57,7 +57,7 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // First, process any pre-existing named subqueries.
         {

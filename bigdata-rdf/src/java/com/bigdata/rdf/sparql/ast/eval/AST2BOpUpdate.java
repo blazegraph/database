@@ -199,7 +199,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             throw new UnsupportedOperationException("Not a mutable view.");
         
         if (log.isTraceEnabled())
-            log.trace("beforeUpdate:\n" + context.db.dumpStore());
+            log.trace("beforeUpdate:\n" + context.getAbstractTripleStore().dumpStore());
 
         final ASTContainer astContainer = context.astContainer;
 
@@ -226,7 +226,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         left = convertCommit(left, context);
 
         if (log.isTraceEnabled())
-            log.trace("afterCommit:\n" + context.db.dumpStore());
+            log.trace("afterCommit:\n" + context.getAbstractTripleStore().dumpStore());
 
         return left;
 
@@ -398,7 +398,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
              */
             {
 
-                final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+                final StaticAnalysis sa = new StaticAnalysis(queryRoot,context);
 
                 final Set<IVariable<?>> projectedVars = sa
                         .getMaybeProducedBindings(whereClause,

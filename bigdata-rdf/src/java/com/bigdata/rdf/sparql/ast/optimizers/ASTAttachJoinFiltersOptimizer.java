@@ -49,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
  * Optimizer attaches {@link FilterNode}s which will run as "join filters" to
@@ -76,11 +77,12 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+        
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
         // First, process any pre-existing named subqueries.
         {
@@ -115,7 +117,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
      * @param group
      */
     @SuppressWarnings("unchecked")
-    private void attachJoinFilters(final AST2BOpContext context,
+    private void attachJoinFilters(final IEvaluationContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> group) {
 
@@ -158,7 +160,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
      * Note: This handles re-attach by collecting previously attached FILTERS
      * from required joins.
      */
-    private void attachJoinFilters2(final AST2BOpContext context,
+    private void attachJoinFilters2(final IEvaluationContext context,
             final StaticAnalysis sa, final JoinGroupNode group) {
 
         /*
