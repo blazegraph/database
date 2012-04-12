@@ -29,9 +29,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -228,15 +231,23 @@ public class TermId<V extends BigdataValue>
         return (int) (termId ^ (termId >>> 32));
         
     }
-    
+
     public int byteLength() {
 
-        return 1 + Bytes.SIZEOF_LONG;
+        if (IVUtility.PACK_TIDS) {
+
+            return 1 + LongPacker.getByteLength(termId);
+
+        } else {
+            
+            return 1 + Bytes.SIZEOF_LONG;
+            
+        }
         
     }
 
     @Override
-    public int _compareTo(IV o) {
+    public int _compareTo(final IV o) {
         
         final long termId2 = ((TermId<?>) o).termId;
         
@@ -250,7 +261,17 @@ public class TermId<V extends BigdataValue>
         // First emit the flags byte.
         keyBuilder.appendSigned(flags());
 
-        keyBuilder.append(getTermId());
+        if (IVUtility.PACK_TIDS) {
+
+            // variable length encoding
+            ((KeyBuilder) keyBuilder).pack(termId);
+            
+        } else {
+            
+            // fixed length encoding.
+            keyBuilder.append(termId);
+            
+        }
         
         return keyBuilder;
         

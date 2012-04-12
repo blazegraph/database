@@ -164,15 +164,27 @@ public class TestTermIV extends TestCase2 {
 
     public void test_TermId_URI_Counter_MINUS_ONE() {
         
-        doTermIVTest(VTE.URI,-1L);
+        if (!IVUtility.PACK_TIDS)
+            doTermIVTest(VTE.URI, -1L);
         
     }
 
     public void test_TermId_URI_Counter_MIN_VALUE() {
 
-        doTermIVTest(VTE.URI, Long.MIN_VALUE);
+        if (!IVUtility.PACK_TIDS)
+            doTermIVTest(VTE.URI, Long.MIN_VALUE);
 
     }
+
+    /*
+     * Note: This is hitting odd fence posts having to do with equality and
+     * mock IVs.
+     */
+//    public void test_TermId_URI_Counter_ZERO() {
+//
+//        doTermIVTest(VTE.URI, 0);
+//
+//    }
 
     public void test_TermId_URI_Counter_MAX_VALUE() {
 
@@ -190,7 +202,8 @@ public class TestTermIV extends TestCase2 {
         for (VTE vte : VTE.values()) {
 
             // 64 bit random term identifier.
-            final long termId = r.nextLong();
+            final long termId = IVUtility.PACK_TIDS ? Math.abs(r.nextLong())
+                    : r.nextLong();
 
             final TermId<?> v = new TermId<BigdataValue>(vte, termId);
 

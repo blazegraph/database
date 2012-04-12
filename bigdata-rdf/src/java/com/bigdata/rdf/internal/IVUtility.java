@@ -43,6 +43,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
@@ -71,6 +72,7 @@ import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
+import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -91,6 +93,18 @@ public class IVUtility {
 
 //    private static final transient Logger log = Logger.getLogger(IVUtility.class);
 
+    /**
+     * When <code>true</code>, we will pack term identifiers using
+     * {@link LongPacker}.
+     * <p>
+     * Note: This option requires that term identifiers are non-negative. That
+     * is not currently true for the cluster due to the {@link TermIdEncoder}.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/529">
+     *      Improve load performance </a>
+     */
+    public static final boolean PACK_TIDS = false;
+    
     public static boolean equals(final IV iv1, final IV iv2) {
         
         // same IV or both null
@@ -386,7 +400,12 @@ public class IVUtility {
                  */ 
                 
                 // decode the term identifier.
-                final long termId = KeyBuilder.decodeLong(key, o);
+                final long termId;
+                if(PACK_TIDS) {
+                    termId = LongPacker.unpackLong(key, o);
+                } else {
+                    termId = KeyBuilder.decodeLong(key, o);
+                }
 
                 if (termId == TermId.NULL) {
                     if(nullIsNullRef) {

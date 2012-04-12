@@ -34,6 +34,7 @@ import java.io.ObjectOutput;
 import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataURI;
@@ -67,9 +68,16 @@ public class TestId2TermTupleSerializer extends TestCase2 {
         final Id2TermTupleSerializer fixture = new Id2TermTupleSerializer(
                 namespace, BigdataValueFactoryImpl.getInstance(namespace));
 
-        final TermId<?> id1 = new TermId<BigdataURI>(VTE.URI, -1);
-        final TermId<?> id2 = new TermId<BigdataURI>(VTE.URI, 0);
-        final TermId<?> id3 = new TermId<BigdataURI>(VTE.URI, 1);
+        final TermId<?> id1, id2, id3;
+        if (IVUtility.PACK_TIDS) {
+            id1 = new TermId<BigdataURI>(VTE.URI, 0);
+            id2 = new TermId<BigdataURI>(VTE.URI, 1);
+            id3 = new TermId<BigdataURI>(VTE.URI, 2);
+        } else {
+            id1 = new TermId<BigdataURI>(VTE.URI, -1);
+            id2 = new TermId<BigdataURI>(VTE.URI, 0);
+            id3 = new TermId<BigdataURI>(VTE.URI, 1);
+        }
 
         final byte[] k1 = fixture.id2key(id1);
         final byte[] k2 = fixture.id2key(id2);
