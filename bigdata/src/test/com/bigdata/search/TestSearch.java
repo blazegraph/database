@@ -154,7 +154,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<Hit<Long>> itr = ndx.search(query,
                         languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, timeout, unit);
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
 //                                query, languageCode, 0d/* minCosine */,
 //                                Integer.MAX_VALUE/* maxRank */);
                 

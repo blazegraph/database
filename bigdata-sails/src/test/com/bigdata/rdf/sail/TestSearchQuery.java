@@ -799,6 +799,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -866,6 +867,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             maxHits, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -936,6 +938,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1010,6 +1013,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1086,6 +1090,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1160,6 +1165,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1230,6 +1236,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             true, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1299,6 +1306,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             minRank,//1
                             maxRank,//10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1338,6 +1346,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK, // minRank
                             BD.DEFAULT_MAX_RANK, // maxRank
                             false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1477,6 +1486,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1542,6 +1552,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             maxHits, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1613,6 +1624,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1689,6 +1701,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1766,6 +1779,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1841,6 +1855,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1912,6 +1927,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             true, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -1983,6 +1999,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             minRank,//1
                             maxRank,//10000, // maxRank (=maxResults + 1)
                             false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -2022,6 +2039,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK, // minRank
                             BD.DEFAULT_MAX_RANK, // maxRank
                             false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -2167,6 +2185,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MIN_RANK,//1
                             BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
                             TimeUnit.MILLISECONDS // unit
                             );
@@ -2426,5 +2445,161 @@ LIMIT 10 OFFSET 0
 		  FILTER (?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category1 = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category1 = <http://www.ms2w.com/ontologies/file/Directory>  || ?category1 = <http://www.ms2w.com/ontologies/file/File>  || ?category1 = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category1 = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category1 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
 		  FILTER (?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlock>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockAttribute>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADBlockReference>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADFile>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADTable>  || ?category2 = <http://www.ms2w.com/ontologies/autocad/AutoCADTitleBlock>  || ?category2 = <http://www.ms2w.com/ontologies/file/Directory>  || ?category2 = <http://www.ms2w.com/ontologies/file/File>  || ?category2 = <http://www.ms2w.com/ontologies/pdffile/PdfAnnotation>  || ?category2 = <http://www.ms2w.com/ontologies/pdffile/PdfFile>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentAssembly>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeBOM>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/Component>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/Configuration>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentDrawing>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeIndented>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmDocumentPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypePartsOnly>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmTableTypeRevision>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxCopiedPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmToolboxStandardPart>  || ?category2 = <http://www.ms2w.com/ontologies/solidworks/20091023/swDmBOMTableTypeTopLevelOnly> ) . 
 	*/
+
+    /**
+     * FIXME This should be migrated to the data-driven test suite in
+     * {@link TestSearch}.
+     * 
+     * @see TestSearch
+     */
+    public void testExactMatch() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        try {
+            
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        
+        try {
+            
+            cxn.setAutoCommit(false);
+
+            final ValueFactory vf = sail.getValueFactory();
+
+        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final Literal l1 = vf.createLiteral("0");
+        	final Literal l2 = vf.createLiteral("0 0");
+        	final Literal l3 = vf.createLiteral("0 1 0");
+        	final Literal l4 = vf.createLiteral("0,0");
+        	final Literal l5 = vf.createLiteral("1 2 0 0 3");
+        	final Literal l6 = vf.createLiteral("brown cow");
+        	final Literal l7 = vf.createLiteral("how now brown cow");
+        	final Literal l8 = vf.createLiteral("toilet");
+        	
+            cxn.add(s1, RDFS.LABEL, l1);
+            cxn.add(s2, RDFS.LABEL, l2);
+            cxn.add(s3, RDFS.LABEL, l3);
+            cxn.add(s4, RDFS.LABEL, l4);
+            cxn.add(s5, RDFS.LABEL, l5);
+            cxn.add(s6, RDFS.LABEL, l6);
+            cxn.add(s7, RDFS.LABEL, l7);
+            cxn.add(s8, RDFS.LABEL, l8);
+            
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();
+            
+            final Map<IV, Literal> literals = new LinkedHashMap<IV, Literal>();
+            literals.put(((BigdataValue)l1).getIV(), l1);
+            literals.put(((BigdataValue)l2).getIV(), l2);
+            literals.put(((BigdataValue)l3).getIV(), l3);
+            literals.put(((BigdataValue)l4).getIV(), l4);
+            literals.put(((BigdataValue)l5).getIV(), l5);
+            literals.put(((BigdataValue)l6).getIV(), l6);
+            literals.put(((BigdataValue)l7).getIV(), l7);
+            literals.put(((BigdataValue)l8).getIV(), l8);
+            
+            final Map<IV, URI> uris = new LinkedHashMap<IV, URI>();
+            uris.put(((BigdataValue)l1).getIV(), s1);
+            uris.put(((BigdataValue)l2).getIV(), s2);
+            uris.put(((BigdataValue)l3).getIV(), s3);
+            uris.put(((BigdataValue)l4).getIV(), s4);
+            uris.put(((BigdataValue)l5).getIV(), s5);
+            uris.put(((BigdataValue)l6).getIV(), s6);
+            uris.put(((BigdataValue)l7).getIV(), s7);
+            uris.put(((BigdataValue)l8).getIV(), s8);
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { 
+            	final String searchQuery = "0 0";
+            	
+                final String query = 
+                    "select ?s ?o ?score " + 
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BD.MATCH_EXACT+"> \"true\" . " +
+                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "} " +
+                    "order by desc(?score)";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet tmp = result.next();
+                    if (log.isInfoEnabled())
+                        log.info(i + ": " + tmp.toString());
+                    i++;
+                }
+                assertEquals("wrong # of results", 2, i);
+                
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                
+                final ITextIndexer search = 
+                	sail.getDatabase().getLexiconRelation().getSearchEngine();
+                final Hiterator<IHit> hits = 
+                	search.search(searchQuery, 
+                            null, // languageCode
+                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BD.DEFAULT_MIN_RANK,//1
+                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            true, // matchExact
+                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            );
+                
+                while (hits.hasNext()) {
+                	final IHit hit = hits.next();
+                	final IV id = (IV)hit.getDocId();
+                	final Literal score = vf.createLiteral(hit.getCosine());
+                	final URI s = uris.get(id);
+                	final Literal o = literals.get(id);
+                    final BindingSet bs = createBindingSet(
+                    		new BindingImpl("s", s),
+                    		new BindingImpl("o", o),
+                    		new BindingImpl("score", score));
+                	if(log.isInfoEnabled())
+                		log.info(bs);
+                    answer.add(bs);
+                }
+                
+                result = tupleQuery.evaluate();
+                compare(result, answer);
+
+            }
+            
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+        
+    }
     
+
 }

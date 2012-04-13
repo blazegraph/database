@@ -281,6 +281,27 @@ public interface BD {
 
     final boolean DEFAULT_MATCH_ALL_TERMS = false;
     
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:matchExact "true" .
+     * }
+     * 
+     * </pre>
+     * <p>
+     * This operation will be rather expensive as it will require materializing
+     * all the hits to check their values.
+     */
+    final URI MATCH_EXACT = new URIImpl(SEARCH_NAMESPACE+"matchExact");
+
+    final boolean DEFAULT_MATCH_EXACT = false;
+    
     final boolean DEFAULT_PREFIX_MATCH = false;
     
     /**
