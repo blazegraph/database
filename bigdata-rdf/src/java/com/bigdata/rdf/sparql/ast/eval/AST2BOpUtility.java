@@ -117,6 +117,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -3430,6 +3431,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
         if (sp.isOptional()) {
             // Mark the join as optional.
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
+        }
+        
+        final RangeNode range = sp.getRange();
+        if (range != null) {
+        	// Add the RangeBOp
+        	anns.add(new NV(IPredicate.Annotations.RANGE, range.getRangeBOp()));
         }
 
         final Properties queryHints = sp.getQueryHints();

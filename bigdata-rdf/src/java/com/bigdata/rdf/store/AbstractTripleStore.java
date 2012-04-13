@@ -97,6 +97,7 @@ import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataSubjectCentricFullTextIndex;
@@ -1953,12 +1954,12 @@ abstract public class AbstractTripleStore extends
 
         if (exact) {
 
-            return getAccessPath(null/* s */, null/* p */, null/* o */, c, null/* filter */)
+            return getAccessPath(null/* s */, null/* p */, null/* o */, c)
                     .rangeCount(exact);
 
         } else {
 
-            return getAccessPath(null/* s */, null/* p */, null/* o */, c, null/* filter */)
+            return getAccessPath(null/* s */, null/* p */, null/* o */, c)
                     .rangeCount(exact);
 
         }
@@ -1980,7 +1981,7 @@ abstract public class AbstractTripleStore extends
     public long getExplicitStatementCount(final Resource c) {
 
         return getAccessPath(null/* s */, null/* p */, null/* o */, c,
-                ExplicitSPOFilter.INSTANCE).rangeCount(true/* exact */);
+                ExplicitSPOFilter.INSTANCE, null).rangeCount(true/* exact */);
 
     }
     
@@ -2531,7 +2532,7 @@ abstract public class AbstractTripleStore extends
     final public long removeStatements(final Resource s, final URI p,
             final Value o, final Resource c) {
 
-        return getAccessPath(s, p, o, c, null/* filter */).removeAll();
+        return getAccessPath(s, p, o, c).removeAll();
 
     }
 
@@ -2647,26 +2648,27 @@ abstract public class AbstractTripleStore extends
     public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
             final Value o) {
 
-        return getAccessPath(s, p, o, null/*c*/, null/* filter */);
+        return getAccessPath(s, p, o, null/*c*/, null/* filter */, null/* range */);
 
     }
 
     public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
             final Value o, final IElementFilter<ISPO> filter) {
 
-        return getAccessPath(s, p, o, null/* c */, filter);
+        return getAccessPath(s, p, o, null/* c */, filter, null/* range */);
         
     }
     
     final public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
             final Value o, Resource c) {
 
-        return getAccessPath(s, p, o, c, null/* filter */);
+        return getAccessPath(s, p, o, c, null/* filter */, null/* range */);
 
     }
 
     final public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
-            final Value o, final Resource c, final IElementFilter<ISPO> filter) {
+            final Value o, final Resource c, final IElementFilter<ISPO> filter,
+            final RangeBOp range) {
 
         /*
          * Convert other Value object types to our object types.
@@ -2776,7 +2778,7 @@ abstract public class AbstractTripleStore extends
             final IV o) {
 
         return getSPORelation()
-                .getAccessPath(s, p, o, null/* c */, null/* filter */);
+                .getAccessPath(s, p, o, null/* c */);
 
     }
 
@@ -2790,7 +2792,15 @@ abstract public class AbstractTripleStore extends
             final IV o,final IV c) {
 
         return getSPORelation()
-                .getAccessPath(s, p, o, c, null/* filter */);
+                .getAccessPath(s, p, o, c);
+
+    }
+
+	final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o,final IV c, final RangeBOp range) {
+
+        return getSPORelation()
+                .getAccessPath(s, p, o, c, range);
 
     }
 
@@ -3079,7 +3089,7 @@ abstract public class AbstractTripleStore extends
                 final IV p = term.getIV();
                 
                 final long n = getSPORelation().getAccessPath(null, p, null,
-                        null, null/* filter */).rangeCount(false/* exact */);
+                        null).rangeCount(false/* exact */);
 
                 /*
                  * FIXME do efficient term resolution for scale-out. This will

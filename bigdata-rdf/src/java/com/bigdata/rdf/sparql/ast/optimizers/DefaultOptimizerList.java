@@ -421,6 +421,17 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTRunFirstRunLastOptimizer());
 
+        /*
+         * FIXME Datatype and value range constraints. Per the notes immediately
+         * above, incorporate an optimizer which leverages information about
+         * ground and non-ground datatype constraints and value-range
+         * constraints within the allowable ground datatypes for a variable when
+         * it is first bound by an SP.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/238
+         */
+        add(new ASTRangeOptimizer());
+        
         /**
          * Run the static join order optimizer. This attaches the estimated
          * cardinality data (fast range counts) and uses fast algorithm to
@@ -459,17 +470,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTStaticJoinOptimizer());
 
-        /*
-         * FIXME Datatype and value range constraints. Per the notes immediately
-         * above, incorporate an optimizer which leverages information about
-         * ground and non-ground datatype constraints and value-range
-         * constraints within the allowable ground datatypes for a variable when
-         * it is first bound by an SP.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/238
-         */
-//        add(new ASTRangeConstraintOptimizer());
-        
         /*
          * The joins are now ordered. Everything from here down MUST NOT change
          * the join order when making changes to the join groups and MAY rely on

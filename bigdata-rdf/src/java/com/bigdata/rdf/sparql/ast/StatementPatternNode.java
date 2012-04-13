@@ -345,6 +345,23 @@ public class StatementPatternNode extends
         setProperty(Annotations.OPTIONAL, optional);
 
     }
+    
+    /**
+     * Attach a {@link RangeNode} that describes a range for the statement 
+     * pattern's O value.
+     * @param range
+     */
+    final public void setRange(final RangeNode range) {
+    	
+    	setProperty(Annotations.RANGE, range);
+    	
+    }
+    
+    final public RangeNode getRange() {
+    	
+    	return (RangeNode) getProperty(Annotations.RANGE);
+    	
+    }
 
     final public List<FilterNode> getAttachedJoinFilters() {
 

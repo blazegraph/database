@@ -45,6 +45,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
@@ -57,6 +58,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
@@ -174,6 +176,10 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
 
+        if (log.isDebugEnabled()) {
+        	log.debug("before:\n"+queryNode);
+        }
+        
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final IBindingSet exogenousBindings = getExogenousBindings(bindingSets);
@@ -221,6 +227,10 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
+        if (log.isDebugEnabled()) {
+        	log.debug("after:\n"+queryNode);
+        }
+        
         return queryNode;
 
     }
@@ -543,8 +553,11 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
                 final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
                 final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
+                
+                final RangeNode rangeNode = sp.getRange();
+                final RangeBOp range = rangeNode != null ? rangeNode.getRangeBOp() : null;
     			
-                final IAccessPath<?> ap = db.getAccessPath(s, p, o, c);
+                final IAccessPath<?> ap = db.getAccessPath(s, p, o, c, range);
                 
                 final long cardinality = ap.rangeCount(false/* exact */);
 

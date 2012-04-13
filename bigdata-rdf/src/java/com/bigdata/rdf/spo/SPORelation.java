@@ -33,7 +33,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -77,6 +79,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -931,21 +934,38 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (keyArity != 3)
             throw new UnsupportedOperationException();
 
-        return getAccessPath(s, p, o, null/* c */, null/* filter */);
+        return getAccessPath(s, p, o, null/* c */, null/* filter */, null/* range */);
 
     }
 
     /**
-     * Return the access path for a triple or quad pattern with an optional
-     * filter.
+     * Return the access path for a triple or quad pattern.
      */
     public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
             final IV o, final IV c) {
         
-        return getAccessPath(s, p, o, c, null/*filter*/);
+        return getAccessPath(s, p, o, c, null/*filter*/, null/*range*/);
         
     }
 
+    /**
+     * Return the access path for a triple or quad pattern with a range.
+     */
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, final RangeBOp range) {
+        
+        return getAccessPath(s, p, o, c, null/*filter*/, range);
+        
+    }
+
+    /**
+     * Return the access path for a triple or quad pattern with a filter.
+     */
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, IElementFilter<ISPO> filter) {
+    	return getAccessPath(s, p, o, c, filter, null);
+    }
+    
     /**
      * Return the access path for a triple or quad pattern with an optional
      * filter (core implementation). All arguments are optional. Any bound
@@ -965,16 +985,18 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            store).
      * @param filter
      *            The filter (optional).
-     * 
+     * @param range
+     *            The range (optional).
+     *            
      * @return The best access path for that triple or quad pattern.
      * 
      * @throws UnsupportedOperationException
      *             for a triple store without statement identifiers if the
      *             <i>c</i> is non-{@link #NULL}.
      */
-    @SuppressWarnings("unchecked")
     public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
-            final IV o, final IV c, IElementFilter<ISPO> filter) {
+            final IV o, final IV c, IElementFilter<ISPO> filter,
+            final RangeBOp range) {
         
         final IVariableOrConstant<IV> S = (s == null ? Var.var("s")
                 : new Constant<IV>(s));
@@ -1008,12 +1030,18 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
+        final Map<String, Object> anns = new LinkedHashMap<String, Object>();
+        anns.put(IPredicate.Annotations.RELATION_NAME,
+                new String[] { getNamespace() });
+        if (range != null) {
+        	anns.put(IPredicate.Annotations.RANGE, range);
+        }
+        
         Predicate<ISPO> pred = new SPOPredicate(
 //				keyArity == 4 ?
         		(keyArity == 4 || statementIdentifiers) ?
 						new BOp[] { S, P, O, C } : new BOp[] { S, P, O },
-                new NV(IPredicate.Annotations.RELATION_NAME,
-                        new String[] { getNamespace() }));
+                anns);
 
         if (filter != null) {
             // Layer on an optional filter.

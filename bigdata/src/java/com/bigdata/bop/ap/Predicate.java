@@ -330,7 +330,39 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
      */
     public Predicate<E> asBound(final IBindingSet bindingSet) {
 
-        return new Predicate<E>(argsCopy(), annotationsRef())
+    	Map<String, Object> anns = annotationsRef();
+    	
+        final RangeBOp rangeBOp = range();
+
+        if (rangeBOp != null) {
+
+	        /*
+	         * Attempt to evaluate the RangeBOp.
+	         */
+	        final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+	
+	        // reference test is ok here
+	        if (asBound != rangeBOp) {
+	        	
+	        	// make a copy of the anns
+	        	// set the asBound range on it
+	        	// use those for the pred below
+	        	
+	        	anns = annotationsCopy();
+	        	anns.put(Annotations.RANGE, asBound);
+	        	
+	        }
+	        
+        }
+        
+//		/*
+//		 * If we have a range we need to modify the annotations with the asBound
+//		 * range.
+//		 */
+//    	final Map<String, Object> anns = 
+//    		range() != null ? annotationsCopy() : annotationsRef();
+    	
+        return new Predicate<E>(argsCopy(), anns)
                 ._asBound(bindingSet);
 
     }
@@ -376,30 +408,29 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         }
         
-        /*
-         * FIXME When putting the RangeBOp back into use, be very careful of the
-         * optimization in asBound(). Predicate#asBound() is NOT making a copy
-         * of the annotations map. The code below will therefore cause a
-         * modification to the source predicate's annotations, not the copy's.
-         * This violates the "effectively immutable" contract.
-         * 
-         * What the code should probably do is check in asBound() and only use
-         * the code path which avoids the annotations map copy when the RANGE is
-         * not to be set on the new Predicate instance.
-         */
-        
+//        /*
+//         * FIXME When putting the RangeBOp back into use, be very careful of the
+//         * optimization in asBound(). Predicate#asBound() is NOT making a copy
+//         * of the annotations map. The code below will therefore cause a
+//         * modification to the source predicate's annotations, not the copy's.
+//         * This violates the "effectively immutable" contract.
+//         * 
+//         * What the code should probably do is check in asBound() and only use
+//         * the code path which avoids the annotations map copy when the RANGE is
+//         * not to be set on the new Predicate instance.
+//         */
+//        
 //        final RangeBOp rangeBOp = range();
 //        
-//        // we don't have a range bop for ?o
-//        if (rangeBOp == null)
-//            return tmp;
+//        if (rangeBOp != null) {
 //
-//        /*
-//         * Attempt to evaluate the RangeBOp.
-//         */
-//        final RangeBOp asBound = rangeBOp.asBound(bindingSet);
-//
-//        tmp._setProperty(Annotations.RANGE, asBound);
+//	        /*
+//	         * Attempt to evaluate the RangeBOp.
+//	         */
+//	        final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+//	
+//	        _setProperty(Annotations.RANGE, asBound);
+//        }
 
         return this;
 
