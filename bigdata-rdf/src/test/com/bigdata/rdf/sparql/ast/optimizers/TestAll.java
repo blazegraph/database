@@ -133,6 +133,9 @@ public class TestAll extends TestCase {
         // Unit tests for optimizer which attaches join filters to SPs.
         suite.addTestSuite(TestASTAttachJoinFiltersOptimizer.class);
 
+        // Unit tests for optimizer which attaches join filters to SPs.
+        suite.addTestSuite(TestASTRangeOptimizer.class);
+
         return suite;
 
     }
