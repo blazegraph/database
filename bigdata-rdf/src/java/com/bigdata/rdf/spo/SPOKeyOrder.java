@@ -517,8 +517,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         boolean noneBound = true;
 
-        final RangeBOp range = (RangeBOp)
-    		predicate.getProperty(IPredicate.Annotations.RANGE);
+        final RangeBOp range = getRange(predicate);
 
         for (int i = 0; i < keyArity; i++) {
 
@@ -527,10 +526,20 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             final IVariableOrConstant<?> term = predicate.get(index);
 
             if (term == null || term.isVar()) {
-            	if (index == 2 && range != null && range.isFullyBound()) {
+            	if (index == 2 && range != null && range.isFromBound()) {
+                	/*
+                	 * We are on the O term, it's a variable, and we have a 
+                	 * lower bound for it.
+                	 */
             		final IConstant<IV> c = (IConstant<IV>) range.from();
     	            appendKeyComponent(keyBuilder, i, c.get());
     	            noneBound = false;
+    	            
+    	            if (log.isInfoEnabled()) {
+    	            	log.info("used range to build to key: " + c);
+    	            	log.info(predicate);
+    	            }
+    	            
             	} else {
                     break;
             	}
@@ -547,6 +556,36 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         
     }
 
+    
+    /*
+     * Ranges are only useful when O is not bound and either SP bound or just P
+	 * SP?: SPO index
+	 * ?P?: POS index
+	 * S??: SPO index, range is not useful without an SOP index
+	 * ???: SPO index, range is not useful unless we switch to OSP
+	 * 
+	 * This reduces to when O == null && P != null
+     */
+    private RangeBOp getRange(final IPredicate<ISPO> predicate) {
+    
+    	final RangeBOp range = (RangeBOp)
+			predicate.getProperty(IPredicate.Annotations.RANGE);
+    	
+    	if (range == null)
+    		return null;
+
+//    	final IVariableOrConstant<?> s = predicate.get(0); 
+    	final IVariableOrConstant<?> p = predicate.get(1); 
+    	final IVariableOrConstant<?> o = predicate.get(2); 
+    	
+    	if ((o == null || o.isVar()) && (p != null && p.isConstant())) {
+    		return range;
+    	} else {
+    		return null;
+    	}
+    	
+    }
+    
     /**
      * {@inheritDoc}
      * 
@@ -570,8 +609,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         boolean noneBound = true;
         
-        final RangeBOp range = (RangeBOp)
-        	predicate.getProperty(IPredicate.Annotations.RANGE);
+        final RangeBOp range = getRange(predicate);
 
         for (int i = 0; i < keyArity; i++) {
 
@@ -581,10 +619,20 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
             // Note: term MAY be null for the context position.
             if (term == null || term.isVar()) {
-            	if (index == 2 && range != null && range.isFullyBound()) {
+            	if (index == 2 && range != null && range.isToBound()) {
+                	/*
+                	 * We are on the O term, it's a variable, and we have an 
+                	 * upper bound for it.
+                	 */
             		final IConstant<IV> c = (IConstant<IV>) range.to();
     	            appendKeyComponent(keyBuilder, i, c.get());
     	            noneBound = false;
+    	            
+    	            if (log.isInfoEnabled()) {
+    	            	log.info("used range to build to key: " + c);
+    	            	log.info(predicate);
+    	            }
+
             	} else {
                     break;
             	}
@@ -842,16 +890,16 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             return keyOrder;
         }
         
-    	final RangeBOp range = (RangeBOp) 
-    		predicate.getProperty(IPredicate.Annotations.RANGE);
-    	
-    	final boolean rangeIsBound = range != null && range.isFullyBound();
+//    	final RangeBOp range = (RangeBOp) 
+//    		predicate.getProperty(IPredicate.Annotations.RANGE);
+//    	
+//    	final boolean rangeIsBound = range != null && range.isFullyBound();
     	
         final boolean s = !predicate.get(0).isVar();
         
         final boolean p = !predicate.get(1).isVar();
         
-        final boolean o = !predicate.get(2).isVar() || rangeIsBound;
+        final boolean o = !predicate.get(2).isVar(); // || rangeIsBound;
 
         if (keyArity == 3) {
 

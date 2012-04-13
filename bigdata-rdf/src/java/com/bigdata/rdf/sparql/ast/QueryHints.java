@@ -398,4 +398,11 @@ public interface QueryHints {
 
     boolean DEFAULT_SOLUTION_SET_CACHE = false;
     
+    /**
+     * Used to mark a predicate as "range safe" - that is, we can safely
+     * apply the range bop to constrain the predicate.  This can only be
+     * used currently when there is a single datatype for attribute values.
+     */
+    String RANGE_SAFE = "rangeSafe";
+    
 }

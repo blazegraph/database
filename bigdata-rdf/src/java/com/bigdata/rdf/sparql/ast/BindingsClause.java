@@ -194,14 +194,26 @@ public class BindingsClause extends ASTBase {
 
         sb.append("{");
         
-        for(IBindingSet bset : bindingSets) {
-        
+        if (bindingSets.size() <= 10) {
+        	
+	        for(IBindingSet bset : bindingSets) {
+	        
+	            sb.append("\n");
+	            
+	            sb.append(s1);
+	            
+	            sb.append(bset.toString());
+	        
+	        }
+	        
+        } else {
+        	
             sb.append("\n");
             
             sb.append(s1);
             
-            sb.append(bset.toString());
-        
+            sb.append("[ count=" + bindingSets.size() + " ]");
+        	
         }
         
         sb.append("\n");

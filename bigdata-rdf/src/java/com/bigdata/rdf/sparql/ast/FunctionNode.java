@@ -113,7 +113,7 @@ public class FunctionNode extends ValueExpressionNode {
 	    super.clearProperty(Annotations.VALUE_EXPR);
 	    
         super.invalidate();
-
+        
     }
 
     /**
@@ -188,6 +188,16 @@ public class FunctionNode extends ValueExpressionNode {
     }
 
     /**
+     * Return <code>t1 - t2</code> (aka SUBTRACT).
+     */
+    static public FunctionNode subtract(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.SUBTRACT, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
      * Return <code>sameTerm(t1,t2)</code> (aka EQ).
      */
     static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
@@ -237,6 +247,28 @@ public class FunctionNode extends ValueExpressionNode {
 
     }
 
+    /**
+     * Return <code>min(v1,v2)</code>
+     */
+    static public FunctionNode MIN(
+    		final ValueExpressionNode v1, final ValueExpressionNode v2) {
+
+        return new FunctionNode(FunctionRegistry.MIN, null/* scalarValues */,
+                new ValueExpressionNode[] { v1, v2 });
+
+    }
+    
+    /**
+     * Return <code>max(v1,v2)</code>
+     */
+    static public FunctionNode MAX(
+    		final ValueExpressionNode v1, final ValueExpressionNode v2) {
+
+        return new FunctionNode(FunctionRegistry.MAX, null/* scalarValues */,
+                new ValueExpressionNode[] { v1, v2 });
+
+    }
+    
     /**
      * Return a binary function <code>op(t1,t2)</code>
      */

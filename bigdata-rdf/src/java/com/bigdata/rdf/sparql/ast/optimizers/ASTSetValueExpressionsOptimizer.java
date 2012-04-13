@@ -40,6 +40,9 @@ import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.RangeNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
@@ -155,6 +158,8 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
                             return true;
                         if (obj instanceof HavingNode)
                             return true;
+                        if (obj instanceof StatementPatternNode)
+                            return true;
                         return false;
                     }
                 });
@@ -183,8 +188,8 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
             if (op instanceof IValueExpressionNodeContainer) {
 
                 // AssignmentNode, FilterNode, OrderByExpr
-                AST2BOpUtility.toVE(globals, ((IValueExpressionNodeContainer) op)
-                        .getValueExpressionNode());
+        		AST2BOpUtility.toVE(globals, 
+        				((IValueExpressionNodeContainer) op).getValueExpressionNode());
                 
             } else if (op instanceof HavingNode) {
                 
@@ -195,6 +200,22 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
                     AST2BOpUtility.toVE(globals, node);
                     
                 }
+                
+            } else if (op instanceof StatementPatternNode) {
+                
+            	final StatementPatternNode sp = (StatementPatternNode) op;
+            	
+            	final RangeNode range = sp.getRange();
+            	
+            	if (range != null) {
+            		
+            		if (range.from() != null)
+            			AST2BOpUtility.toVE(globals, range.from());
+            			
+            		if (range.to() != null)
+            			AST2BOpUtility.toVE(globals, range.to());
+            		
+            	}
                 
             }
             

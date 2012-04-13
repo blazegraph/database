@@ -213,6 +213,15 @@ public class BOpBase extends CoreBaseBOp {
     }
 
     /**
+     * A copy of the annotations.
+     */
+    final protected Map<String, Object> annotationsCopy() {
+        
+        return new LinkedHashMap<String, Object>(annotations);
+
+    }
+
+    /**
      * A reference to the actual annotations map object. This is used in some
      * hot spots to avoid creating a new annotations map when we know that the
      * annotations will not be modified (annotations are always set within the

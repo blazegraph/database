@@ -101,6 +101,7 @@ public class QueryHintRegistry {
         add(new RunOnceHint());
         add(new OptimizerQueryHint());
         add(new OptimisticQueryHint());
+        add(new RangeHint());
 
         add(new AnalyticQueryHint());
         add(new NativeDistinctQueryHint());

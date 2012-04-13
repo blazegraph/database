@@ -2150,7 +2150,7 @@ public class BigdataSail extends SailBase implements Sail {
                  */
                 
                 database.getAccessPath((Resource)null/* s */, (URI)null/* p */, 
-                        (Value)null/* o */, null/* c */, null/* filter */).removeAll();
+                        (Value)null/* o */, null/* c */).removeAll();
 
                 return;
                 
@@ -2164,7 +2164,7 @@ public class BigdataSail extends SailBase implements Sail {
                  */
 
                 database.getAccessPath(null/* s */, null/* p */, null/* o */,
-                        quads ? NULL_GRAPH : null, null/* filter */)
+                        quads ? NULL_GRAPH : null)
                         .removeAll();
 
                 return;
@@ -2176,8 +2176,8 @@ public class BigdataSail extends SailBase implements Sail {
             for (Resource c : contexts) {
 
                 size += database.getAccessPath(null/* s */, null/* p */,
-                        null/* o */, (c == null && quads) ? NULL_GRAPH : c,
-                        null/* filter */).removeAll();
+                        null/* o */, (c == null && quads) ? NULL_GRAPH : c
+                        ).removeAll();
 
             }
 
@@ -3040,7 +3040,7 @@ public class BigdataSail extends SailBase implements Sail {
                     : ExplicitSPOFilter.INSTANCE;
 
             final IAccessPath<ISPO> accessPath = database.getAccessPath(s, p,
-                    o, c, filter);
+                    o, c, filter, null/* range */);
 
             if(accessPath instanceof EmptyAccessPath) {
                 
