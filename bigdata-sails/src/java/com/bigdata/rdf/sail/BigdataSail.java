@@ -2150,7 +2150,7 @@ public class BigdataSail extends SailBase implements Sail {
                  */
                 
                 database.getAccessPath((Resource)null/* s */, (URI)null/* p */, 
-                        (Value)null/* o */, null/* c */).removeAll();
+                        (Value)null/* o */, (Resource) null/* c */).removeAll();
 
                 return;
                 
