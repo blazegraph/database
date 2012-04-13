@@ -836,48 +836,75 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		try {
 
-			/*
-			 * "bufferMode" mode.
-			 * 
-			 * Note: very large journals MUST use the disk-based mode.
-			 */
-			if (BufferMode.valueOf(getProperty(Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE)) == BufferMode.Transient) {
+            /*
+             * Peek at the buffer mode as configured in the properties. If it is
+             * a memory-only buffer mode, then we will take one code path. If it
+             * is a disk-backed buffer mode, then FileMetadata will figure out
+             * what the actual mode should be. If it is a new file, then it is
+             * just the mode configured in the Properties. If the file exists,
+             * then it is the mode as recorded in the file.
+             */
+	        
+            if (BufferMode.valueOf(
+                    getProperty(Options.BUFFER_MODE,
+                            Options.DEFAULT_BUFFER_MODE)).isFullyBuffered()) {
 
 				/*
-				 * Setup the buffer strategy.
+				 * Memory only buffer modes.
 				 */
 
 				if (readOnly) {
 
-					throw new RuntimeException("readOnly not supported for transient journals.");
+                    throw new RuntimeException(
+                            "readOnly not supported for transient journals.");
 
 				}
 
 				fileMetadata = null;
 
-				final boolean useDirectBuffers = Boolean
-						.parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
-								Options.DEFAULT_USE_DIRECT_BUFFERS));
+                final long createTime = Long.parseLong(getProperty(
+                        Options.CREATE_TIME, "" + System.currentTimeMillis()));
 
-				final int offsetBits = getProperty(
-						Options.OFFSET_BITS,
-						Integer
-								.toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
-										: WormAddressManager.SCALE_OUT_OFFSET_BITS)),
-						new IntegerRangeValidator(
-								WormAddressManager.MIN_OFFSET_BITS,
-								WormAddressManager.MAX_OFFSET_BITS));
+                // Note: Only used by WORM mode stores.
+                final int offsetBits = getProperty(
+                        Options.OFFSET_BITS,
+                        Integer.toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
+                                : WormAddressManager.SCALE_OUT_OFFSET_BITS)),
+                        new IntegerRangeValidator(
+                                WormAddressManager.MIN_OFFSET_BITS,
+                                WormAddressManager.MAX_OFFSET_BITS));
 
-				final long createTime = Long.parseLong(getProperty(
-						Options.CREATE_TIME, "" + System.currentTimeMillis()));
+                final BufferMode bufferMode = BufferMode.valueOf(
+                        getProperty(Options.BUFFER_MODE, 
+                                    Options.DEFAULT_BUFFER_MODE)
+                                    );
 
-				_bufferStrategy = new TransientBufferStrategy(offsetBits, initialExtent, 0L/*
-																							 * soft
-																							 * limit
-																							 * for
-																							 * maximumExtent
-																							 */, useDirectBuffers);
+                switch (bufferMode) {
+                case Transient: {
 
+                    final boolean useDirectBuffers = Boolean
+                            .parseBoolean(getProperty(
+                                    Options.USE_DIRECT_BUFFERS,
+                                    Options.DEFAULT_USE_DIRECT_BUFFERS));
+
+                    _bufferStrategy = new TransientBufferStrategy(offsetBits,
+                            initialExtent, 0L/*
+                                              * soft limit for maximumExtent
+                                              */, useDirectBuffers);
+                    break;
+                }
+                case MemStore: {
+
+                    _bufferStrategy = new MemStrategy(new MemoryManager(
+                            DirectBufferPool.INSTANCE));
+
+                    break;
+
+                }
+                default:
+                    throw new AssertionError("bufferMode=" + bufferMode);
+                }
+                
 				/*
 				 * setup the root blocks.
 				 */
@@ -889,27 +916,54 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				final long commitRecordIndexAddr = 0L;
 				final UUID uuid = UUID.randomUUID(); // Journal's UUID.
 				final long closedTime = 0L;
-				final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken, 0L, // metaStartAddr
-						0L, // metaStartBits
-						StoreTypeEnum.WORM,//
-						createTime, closedTime, RootBlockView.currentVersion, checker);
-				final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken, 0L, // metaStartAddr
-						0L, // metaStartBits
-						StoreTypeEnum.WORM,//
-						createTime, closedTime, RootBlockView.currentVersion, checker);
-				_bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
+                final StoreTypeEnum stenum = bufferMode.getStoreType();
+                if (createTime == 0L) {
+                    throw new IllegalArgumentException(
+                            "Create time may not be zero.");
+                }
+                final IRootBlockView rootBlock0 = new RootBlockView(true,
+                        offsetBits, nextOffset, firstCommitTime,
+                        lastCommitTime, commitCounter, commitRecordAddr,
+                        commitRecordIndexAddr, uuid, quorumToken,
+                        0L, // metaStartAddr
+                        0L, // metaStartBits
+                        stenum,//
+                        createTime, closedTime, RootBlockView.currentVersion,
+                        checker);
+                final IRootBlockView rootBlock1 = new RootBlockView(false,
+                        offsetBits, nextOffset, firstCommitTime,
+                        lastCommitTime, commitCounter, commitRecordAddr,
+                        commitRecordIndexAddr, uuid, quorumToken,
+                        0L, // metaStartAddr
+                        0L, // metaStartBits
+                        stenum,//
+                        createTime, closedTime, RootBlockView.currentVersion,
+                        checker);
+                
+                _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
 				_bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
 				this._rootBlock = rootBlock1;
-
+			
+				/*
+				 * End memory backed modes.
+				 */
+				
 			} else {
 
+			    /*
+			     * Disk backed modes.
+			     */
+			    
 				/*final FileMetadata*/ fileMetadata = FileMetadata.createInstance(
 						properties, !(this instanceof Journal), quorumToken);
 
-				final BufferMode bufferMode = fileMetadata.bufferMode;
+                /*
+                 * Note: Use the BufferMode as reported by FileMetadata. This
+                 * will be the right mode on a restart as it checks what is
+                 * actually in the store header / root blocks.
+                 */
+                final BufferMode bufferMode = fileMetadata.bufferMode;
 
 //				/*
 //				 * Note: The caller SHOULD specify an explicit [createTime] when
@@ -1055,28 +1109,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 				}
 
-				case MemStore: {
-
-					/*
-					 * Setup the buffer strategy.
-					 * 
-					 * FIXME define property for number of direct buffers
-					 */
-					_bufferStrategy = new MemStrategy(new MemoryManager(DirectBufferPool.INSTANCE /*, 10*/));
-
-					this._rootBlock = fileMetadata.rootBlock;
-
-					break;
-
-				}
+//				case MemStore: {
+//
+//					/*
+//					 * Setup the buffer strategy.
+//					 * 
+//					 * FIXME define property for number of direct buffers
+//					 */
+//					_bufferStrategy = new MemStrategy(new MemoryManager(DirectBufferPool.INSTANCE /*, 10*/));
+//
+//					this._rootBlock = fileMetadata.rootBlock;
+//
+//					break;
+//
+//				}
 
 				default:
 
 					throw new AssertionError();
 
 				}
-			}
 
+			}
+			
             /*
              * Note: Creating a new journal registers some internal indices but
              * does NOT perform a commit. Those indices will become restart safe

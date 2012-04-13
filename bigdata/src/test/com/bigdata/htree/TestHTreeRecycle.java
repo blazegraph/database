@@ -10,13 +10,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.sector.MemStore;
 
-import junit.framework.TestCase;
-
 /**
  * Tests recycling of HTree storage.
- * 
- * 
- *
  */
 public class TestHTreeRecycle extends AbstractHTreeTestCase {
 
@@ -35,8 +30,7 @@ public class TestHTreeRecycle extends AbstractHTreeTestCase {
     
     class MemStoreListener extends MemStore {
     	MemStoreListener() {
-    		super(DirectBufferPool.INSTANCE,
-                    Integer.MAX_VALUE);
+    		super(DirectBufferPool.INSTANCE);
     	}
     	
         private final Set<Long> addrs = new HashSet<Long>();

@@ -95,11 +95,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     
     /**
      * Text of the error message used when a write operation would exceed the
-     * #of bytes that can be addressed by a {@link ByteBuffer} backed by an
-     * array or native memory (both are limited to int32 bytes since they
-     * are addressed by a Java <code>int</code>).
+     * maximum extent for a backing store.
      */
-    public static final String ERR_INT32 = "Would exceed int32 bytes (not allowed unless backed by disk).";
+    public static final String ERR_MAX_EXTENT = "Would exceed maximum extent.";
     
     /**
      * Text of the error message used when
@@ -347,13 +345,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         final long required = userExtent + needed;
         
-        if (required > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
+        if (required > bufferMode.getMaxExtent()) {
             
             /*
              * Would overflow int32 bytes and data are buffered in RAM.
              */
 
-            log.error(ERR_INT32);
+            log.error(ERR_MAX_EXTENT);
             
             return false;
             
@@ -383,22 +381,21 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
                 + Math.max(needed, Math.max(initialExtent,
                                 getMinimumExtension()));
         
-        if (newExtent > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
+        if (newExtent > bufferMode.getMaxExtent()) {
 
             /*
-             * Do not allocate more than int32 bytes when using a buffered mode
-             * (anything not backed by the disk).
+             * Do not allocate more than the maximum extent.
              */
 
-            newExtent = Integer.MAX_VALUE;
+            newExtent = bufferMode.getMaxExtent();
 
             if (newExtent - userExtent < needed) {
 
                 /*
-                 * Not enough room in memory for the requested extension.
+                 * Not enough room for the requested extension.
                  */
 
-                log.error(ERR_INT32);
+                log.error(ERR_MAX_EXTENT);
                 
                 return false;
                 
@@ -417,35 +414,6 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         // Retry the write operation.
         return true;
-        
-    }
-    
-    /**
-     * Throws an exception if the extent is too large for an in-memory buffer.
-     * 
-     * @param extent
-     *            The extent.
-     * 
-     * @return The extent.
-     */
-    static long assertNonDiskExtent(final long extent) {
-
-        if( extent > Integer.MAX_VALUE ) {
-            
-            /*
-             * The file image is too large to address with an int32. This
-             * rules out both the use of a direct buffer image and the use
-             * of a memory-mapped file. Therefore, the journal must use a
-             * disk-based strategy.
-             */
-           
-            throw new RuntimeException(
-                    "The extent requires a disk-backed buffer mode: extent="
-                            + extent);
-            
-        }
-
-        return extent;
         
     }
 

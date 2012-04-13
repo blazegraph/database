@@ -1,9 +1,6 @@
 package com.bigdata.htree;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.TreeMap;
 import java.util.UUID;
 
 import com.bigdata.btree.BTreeCounters;
@@ -84,8 +81,7 @@ public class ShowHTreeResourceUsage {
 		
         System.out.println("HTree init used: " + (runtime.totalMemory() - runtime.freeMemory()));
 
-        final MemStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final MemStore store = new MemStore(DirectBufferPool.INSTANCE);
 
         final HTree htree = getHTree(store, 8, false/* rawRecords */, 50);
 		

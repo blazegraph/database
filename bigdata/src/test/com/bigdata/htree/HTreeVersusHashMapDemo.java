@@ -44,7 +44,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
@@ -338,8 +337,7 @@ public class HTreeVersusHashMapDemo {
 
             final long start = System.currentTimeMillis();
 
-            final MemStore store = new MemStore(DirectBufferPool.INSTANCE,
-                    Integer.MAX_VALUE);
+            final MemStore store = new MemStore(DirectBufferPool.INSTANCE);
 
             try {
 

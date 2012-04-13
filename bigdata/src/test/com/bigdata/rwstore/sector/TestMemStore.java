@@ -45,6 +45,26 @@ public class TestMemStore extends AbstractJournalTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.MemStore
                 .toString());
+        
+        /*
+         * Make sure that we are not create a backing file. The CREATE_TEMP_FILE
+         * option does not require a file name.  So, make sure there is no file
+         * name and make sure that we CREATE_TEMP_FILE is not true.
+         */
+        {
+
+            assertNull(properties.getProperty(Options.FILE));
+
+            if (Boolean
+                    .valueOf(properties.getProperty(Options.CREATE_TEMP_FILE,
+                            Options.DEFAULT_CREATE_TEMP_FILE))) {
+
+                properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+                
+            }
+
+        }
+
 		// properties.setProperty(Options.BUFFER_MODE,
 		// BufferMode.TemporaryRW.toString());
 
@@ -120,15 +140,6 @@ public class TestMemStore extends AbstractJournalTestCase {
 			store.destroy();
 		}
     }
-
-	/**
-	 * TODO This is a hack because we can not currently pass
-	 * {@link Integer#MAX_VALUE} for the #of buffers into the underlying
-	 * {@link MemoryManager}. Once that issue is resolved, this should be
-	 * {@link Integer#MAX_VALUE} in order to identify the {@link IRawStore} as
-	 * having an unbounded capacity.
-	 */
-    private static final int maxBuffers = 10;
     
     /**
      * Test suite integration for {@link AbstractRawStoreTestCase}.
@@ -154,7 +165,7 @@ public class TestMemStore extends AbstractJournalTestCase {
 
 		protected IRawStore getStore() {
 
-			return new MemStore(DirectBufferPool.INSTANCE, maxBuffers);
+			return new MemStore(DirectBufferPool.INSTANCE);
 
         }
 
@@ -184,7 +195,7 @@ public class TestMemStore extends AbstractJournalTestCase {
 
 		protected IRawStore getStore() {
 
-			return new MemStore(DirectBufferPool.INSTANCE, maxBuffers);
+			return new MemStore(DirectBufferPool.INSTANCE);
 
 		}
 
@@ -214,7 +225,7 @@ public class TestMemStore extends AbstractJournalTestCase {
 
 		protected IRawStore getStore() {
 
-			return new MemStore(DirectBufferPool.INSTANCE, maxBuffers);
+			return new MemStore(DirectBufferPool.INSTANCE);
 
         }
 

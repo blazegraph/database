@@ -23,14 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.htree;
 
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.DirectBufferPool;
@@ -187,8 +184,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 		final Random r = new Random();
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
 		try {
 
@@ -273,8 +269,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 		final PseudoRandom psr = new PseudoRandom(2000, 13);
 		final PseudoRandom psr2 = new PseudoRandom(4000, 13);
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
 		try {
 
@@ -362,8 +357,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 		final PseudoRandom psr = new PseudoRandom(100, 13);
 		final PseudoRandom psr2 = new PseudoRandom(255, 13);
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
 		try {
 
