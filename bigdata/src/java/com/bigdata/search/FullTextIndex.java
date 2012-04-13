@@ -885,34 +885,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
     /**
      * Performs a full text search against indexed documents returning a hit
-     * list using the configured default timeout.
-     * 
-     * @param query
-     *            The query (it will be parsed into tokens).
-     * @param languageCode
-     *            The language code that should be used when tokenizing the
-     *            query -or- <code>null</code> to use the default
-     *            {@link Locale}).
-     * @param minCosine
-     *            The minimum cosine that will be returned.
-     * @param maxRank
-     *            The upper bound on the #of hits in the result set.
-     * 
-     * @return The hit list.
-     * 
-     * @see Options#INDEXER_TIMEOUT
-     */
-    public Hiterator<Hit<V>> search(final String query, final String languageCode,
-            final double minCosine, final int maxRank) {
-        
-        return search(query, languageCode, false/* prefixMatch */, minCosine,
-                1.0d/* maxCosine */, 1/* minRank */, maxRank,
-                false/* matchAllTerms */, this.timeout, TimeUnit.MILLISECONDS);
-
-    }
-
-    /**
-     * Performs a full text search against indexed documents returning a hit
      * list.
      * <p>
      * The basic algorithm computes cosine between the term-frequency vector of
@@ -976,11 +948,12 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     public Hiterator<Hit<V>> search(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
-            final int minRank, final int maxRank, final boolean matchAllTerms,
+            final int minRank, final int maxRank, 
+            final boolean matchAllTerms, final boolean matchExact,
             long timeout, final TimeUnit unit) {
         
 		final Hit<V>[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
+				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit);
     	
         return new Hiterator<Hit<V>>(//
                 Arrays.asList(a)// 
@@ -997,7 +970,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     		final boolean prefixMatch) {
     	
     	return count(query, languageCode, prefixMatch, 0.0d, 1.0d, 1, 10000, 
-    			false, this.timeout,//
+    			false, false, this.timeout,//
                 TimeUnit.MILLISECONDS);
     	
     }
@@ -1006,11 +979,12 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     public int count(final String query, final String languageCode,
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
-            final int minRank, final int maxRank, final boolean matchAllTerms,
+            final int minRank, final int maxRank, 
+            final boolean matchAllTerms, final boolean matchExact,
             long timeout, final TimeUnit unit) {
     	
 		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, timeout, unit);
+				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit);
 		
 		return a.length;
 		
@@ -1021,7 +995,8 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     		final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
-            final boolean matchAllTerms, long timeout, final TimeUnit unit) {
+            final boolean matchAllTerms, final boolean matchExact, 
+            long timeout, final TimeUnit unit) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1063,7 +1038,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         }
         
         final FullTextSearchQuery cacheKey = new FullTextSearchQuery(
-        		query, matchAllTerms, prefixMatch, timeout, unit
+        		query, matchAllTerms, matchExact, prefixMatch, timeout, unit
         		);
         
         Hit<V>[] a;
@@ -1218,9 +1193,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	
 	        /*
 	         * If match all is specified, remove any hits with a term count less
-	         * than the number of search tokens.
+	         * than the number of search tokens.  It's also an optimization to
+	         * run the pruning if we're going to do matchExact.
 	         */
-	        if (matchAllTerms && qdata.distinctTermCount() > 1) {
+	        if ((matchAllTerms || matchExact) && qdata.distinctTermCount() > 1) {
 	        	
 		        final int nterms = qdata.terms.size();
 		        
@@ -1244,6 +1220,15 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        		System.arraycopy(tmp, 0, a, 0, i);
 	        		
 	        	}
+	        	
+	        }
+	        
+	        /*
+	         * Delegate match exact to subclasses.
+	         */
+	        if (matchExact) {
+	        	
+	        	a = matchExact(a, query);
 	        	
 	        }
 	        
@@ -1421,6 +1406,19 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         
     }
     
+    /**
+     * Subclasses can override this method to do exact match processing.  This
+     * involves materializing the hits into their original text values and
+     * checking for the query string in the materialized value.  Not possible
+     * from the base class.  The value-centric RDF version can use the
+     * lexicon to materialize the hits and check them for exact match.
+     */
+    protected Hit<V>[] matchExact(final Hit<V>[] hits, final String query) {
+    	
+    	throw new UnsupportedOperationException();
+    	
+    }
+    
     /*
      * @todo implement the relevant methods.
      */
@@ -1465,6 +1463,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	
 		private final String search;
     	private final boolean matchAllTerms;
+    	private final boolean matchExact;
     	private final boolean prefixMatch;
     	private final long timeout;
     	private final TimeUnit unit;
@@ -1472,12 +1471,14 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	public FullTextSearchQuery(
     	    	final String search,
     	    	final boolean matchAllTerms,
+    	    	final boolean matchExact,
     	    	final boolean prefixMatch,
     	    	final long timeout,
     	    	final TimeUnit unit) {
     		
     		this.search = search;
     		this.matchAllTerms = matchAllTerms;
+    		this.matchExact = matchExact;
     		this.prefixMatch = prefixMatch;
     		this.timeout = timeout;
     		this.unit = unit;
@@ -1492,6 +1493,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + (matchAllTerms ? 1231 : 1237);
+			result = prime * result + (matchExact ? 1231 : 1237);
 			result = prime * result + (prefixMatch ? 1231 : 1237);
 			result = prime * result
 					+ ((search == null) ? 0 : search.hashCode());
@@ -1514,6 +1516,8 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 			FullTextSearchQuery other = (FullTextSearchQuery) obj;
 			if (matchAllTerms != other.matchAllTerms)
 				return false;
+			if (matchExact != other.matchExact)
+				return false;
 			if (prefixMatch != other.prefixMatch)
 				return false;
 			if (search == null) {
@@ -1527,7 +1531,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 				return false;
 			return true;
 		}
-
+    	
     }
     
 }

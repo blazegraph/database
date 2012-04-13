@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.io.StringReader;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -42,6 +45,8 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -121,7 +126,7 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 
         assertWritable();
         
-        final String name = getNamespace() + "."+NAME_SEARCH;
+        final String name = getNamespace() + "." + NAME_SEARCH;
 
         final IIndexManager indexManager = getIndexManager();
 
@@ -302,5 +307,147 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
             log.info("indexed " + n + " new terms");
 
     }
+    
+    final synchronized public LexiconRelation getLexiconRelation() {
+
+        if (lexiconRelation == null) {
+
+            long t = getTimestamp();
+            
+            if (TimestampUtility.isReadWriteTx(t)) {
+             
+                /*
+                 * A read-write tx must use the unisolated view of the lexicon.
+                 */
+                t = ITx.UNISOLATED;
+                
+            }
+
+            // lexicon namespace, since this index is inside the lexicon
+            final String ns = getNamespace();
+            
+            if (log.isDebugEnabled())
+            	log.debug(ns);
+
+            lexiconRelation = (LexiconRelation) getIndexManager()
+                    .getResourceLocator().locate(ns, t);
+
+        }
+
+        return lexiconRelation;
+
+    }
+    private LexiconRelation lexiconRelation;
+    
+//    protected Hit[] matchExact2(final Hit[] hits, final String query) {
+//
+//    	final Map<IV<?,?>, Hit> iv2Hit = new HashMap<IV<?,?>, Hit>(hits.length);
+//    	
+//    	for (Hit h : hits) {
+//    		
+//    		iv2Hit.put((IV<?,?>) h.getDocId(), h);
+//    		
+//    	}
+//    	
+//    	final LexiconRelation lex = getLexiconRelation();
+//    	
+//    	final Map<IV<?,?>, BigdataValue> terms = lex.getTerms(iv2Hit.keySet());
+//    	
+//    	final Hit[] tmp = new Hit[hits.length];
+//    	
+//    	int i = 0;
+//    	for (Map.Entry<IV<?,?>, BigdataValue> e : terms.entrySet()) {
+//    		
+//    		final IV<?,?> iv = e.getKey();
+//    		
+//    		final BigdataValue term = e.getValue();
+//    		
+//    		if (term.stringValue().contains(query)) {
+//    			
+//    			tmp[i++] = iv2Hit.get(iv);
+//    			
+//    		}
+//    		
+//    	}
+//    	
+//    	if (i < hits.length) {
+//    		
+//    		final Hit[] a = new Hit[i];
+//    		System.arraycopy(tmp, 0, a, 0, i);
+//    		return a;
+//    		
+//    	} else {
+//    	
+//    		return hits;
+//    		
+//    	}
+//    	
+//    }
+
+    @Override
+    protected Hit[] matchExact(final Hit[] hits, final String query) {
+
+//    	/*
+//    	 * Too big to do efficient exact matching.
+//    	 */
+//    	if (hits.length > 10000) {
+//    		
+//    		return hits;
+//    		
+//    	}
+    	
+    	final int chunkSize = 1000;
+    	
+    	final Hit[] tmp = new Hit[hits.length];
+    	
+    	final Map<IV<?,?>, Hit> iv2Hit = new HashMap<IV<?,?>, Hit>(chunkSize);
+    	
+    	final LexiconRelation lex = getLexiconRelation();
+    	
+    	int i = 0, k = 0;
+    	while (i < hits.length) {
+    	
+    		iv2Hit.clear();
+    		
+	    	for (int j = 0; j < chunkSize && i < hits.length; j++) {
+
+	    		final Hit h = hits[i++];
+	    		
+	    		iv2Hit.put((IV<?,?>) h.getDocId(), h);
+	    		
+	    	}
+	    	
+	    	final Map<IV<?,?>, BigdataValue> terms = lex.getTerms(iv2Hit.keySet());
+
+	    	for (Map.Entry<IV<?,?>, BigdataValue> e : terms.entrySet()) {
+	    		
+	    		final IV<?,?> iv = e.getKey();
+	    		
+	    		final BigdataValue term = e.getValue();
+	    		
+	    		if (term.stringValue().contains(query)) {
+	    			
+	    			tmp[k++] = iv2Hit.get(iv);
+	    			
+	    		}
+	    		
+	    	}
+	    	
+    	}
+    	
+    	if (k < hits.length) {
+    		
+    		final Hit[] a = new Hit[k];
+    		System.arraycopy(tmp, 0, a, 0, k);
+    		return a;
+    		
+    	} else {
+    	
+    		return hits;
+    		
+    	}
+    	
+    }
+    
     
 }

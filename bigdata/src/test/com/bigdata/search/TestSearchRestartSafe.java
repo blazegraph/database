@@ -144,7 +144,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
 //                        );
                 ndx.search(text,
                         languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, timeout, unit);
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
                 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
@@ -177,7 +177,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
                 final Hiterator<?> itr = // ndx.search(text, languageCode);
                     ndx.search(text,
                             languageCode, prefixMatch, minCosine, maxCosine,
-                            minRank, maxRank, matchAllTerms, timeout, unit);
+                            minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 

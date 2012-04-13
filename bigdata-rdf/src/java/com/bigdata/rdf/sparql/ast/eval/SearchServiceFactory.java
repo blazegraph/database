@@ -283,6 +283,10 @@ public class SearchServiceFactory implements ServiceFactory {
                 
                 assertObjectIsLiteral(sp);
                 
+            } else if(uri.equals(BD.MATCH_EXACT)) {
+                
+                assertObjectIsLiteral(sp);
+                
             } else if(uri.equals(BD.SUBJECT_SEARCH)) {
                 
                 assertObjectIsLiteral(sp);
@@ -348,6 +352,7 @@ public class SearchServiceFactory implements ServiceFactory {
         private final Literal minRelevance;
         private final Literal maxRelevance;
         private final boolean matchAllTerms;
+        private final boolean matchExact;
         private final boolean subjectSearch;
         private final Literal searchTimeout;
         
@@ -393,6 +398,7 @@ public class SearchServiceFactory implements ServiceFactory {
             Literal minRelevance = null;
             Literal maxRelevance = null;
             boolean matchAllTerms = false;
+            boolean matchExact = false;
             boolean subjectSearch = false;
             Literal searchTimeout = null;
 
@@ -420,6 +426,8 @@ public class SearchServiceFactory implements ServiceFactory {
                     maxRelevance = (Literal) oVal;
                 } else if (BD.MATCH_ALL_TERMS.equals(p)) {
                     matchAllTerms = ((Literal) oVal).booleanValue();
+                } else if (BD.MATCH_EXACT.equals(p)) {
+                    matchExact = ((Literal) oVal).booleanValue();
                 } else if (BD.SUBJECT_SEARCH.equals(p)) {
                     subjectSearch = ((Literal) oVal).booleanValue();
                 } else if (BD.SEARCH_TIMEOUT.equals(p)) {
@@ -438,6 +446,7 @@ public class SearchServiceFactory implements ServiceFactory {
             this.minRelevance = minRelevance;
             this.maxRelevance = maxRelevance;
             this.matchAllTerms = matchAllTerms;
+            this.matchExact = matchExact;
             this.subjectSearch = subjectSearch;
             this.searchTimeout = searchTimeout;
 
@@ -474,6 +483,7 @@ public class SearchServiceFactory implements ServiceFactory {
                 minRank == null ? BD.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
                 maxRank == null ? BD.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
                 matchAllTerms,
+                matchExact,
                 searchTimeout == null ? BD.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
                 TimeUnit.MILLISECONDS);
         

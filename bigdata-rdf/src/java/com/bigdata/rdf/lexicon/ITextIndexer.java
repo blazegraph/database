@@ -110,6 +110,8 @@ public interface ITextIndexer<A extends IHit> {
 	 *            The max rank of the search result.
 	 * @param matchAllTerms
 	 *            if true, return only hits that match all search terms
+	 * @param matchExact
+	 *            if true, return only hits that have an exact match of the search string
 	 * @param timeout
 	 *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
 	 *            to using {@link Long#MAX_VALUE}).
@@ -122,7 +124,8 @@ public interface ITextIndexer<A extends IHit> {
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
-            final boolean matchAllTerms, long timeout, final TimeUnit unit);
+            final boolean matchAllTerms, final boolean matchExact, 
+            long timeout, final TimeUnit unit);
 
 	/**
 	 * Count free text search results.
@@ -154,6 +157,8 @@ public interface ITextIndexer<A extends IHit> {
 	 *            The max rank of the search result.
 	 * @param matchAllTerms
 	 *            if true, return only hits that match all search terms
+	 * @param matchExact
+	 *            if true, return only hits that have an exact match of the search string
 	 * @param timeout
 	 *            The timeout -or- ZERO (0) for NO timeout (this is equivalent
 	 *            to using {@link Long#MAX_VALUE}).
@@ -166,6 +171,7 @@ public interface ITextIndexer<A extends IHit> {
             final boolean prefixMatch, 
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
-            final boolean matchAllTerms, long timeout, final TimeUnit unit);
+            final boolean matchAllTerms, final boolean matchExact, 
+            long timeout, final TimeUnit unit);
 
 }
