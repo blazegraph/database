@@ -66,68 +66,116 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * 
  * TODO TEST SUITE!
  */
-public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
+public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer 
+		implements IASTOptimizer {
 
 //    private static final Logger log = Logger
 //            .getLogger(ASTJoinOrderByTypeOptimizer.class);
 
-    @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
-
-        if (!(queryNode instanceof QueryRoot))
-            return queryNode;
-
-        final QueryRoot queryRoot = (QueryRoot) queryNode;
-        
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
-
-        // Main WHERE clause
-        {
-
-            @SuppressWarnings("unchecked")
-			final GraphPatternGroup<IGroupMemberNode> whereClause = 
-            	(GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
-
-            if (whereClause != null) {
-
-                optimize(context, sa, whereClause);
-                
-            }
-
-        }
-
-        // Named subqueries
-        if (queryRoot.getNamedSubqueries() != null) {
-
-            final NamedSubqueriesNode namedSubqueries = queryRoot
-                    .getNamedSubqueries();
-
-            /*
-             * Note: This loop uses the current size() and get(i) to avoid
-             * problems with concurrent modification during visitation.
-             */
-            for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
-
-                @SuppressWarnings("unchecked")
-				final GraphPatternGroup<IGroupMemberNode> whereClause = 
-                	(GraphPatternGroup<IGroupMemberNode>) namedSubquery.getWhereClause();
-
-                if (whereClause != null) {
-
-                    optimize(context, sa, whereClause);
-
-                }
-
-            }
-
-        }
-
-        // log.error("\nafter rewrite:\n" + queryNode);
-
-        return queryNode;
-
-    }
+//    @Override
+//    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
+//            IBindingSet[] bindingSets) {
+//
+//        if (!(queryNode instanceof QueryRoot))
+//            return queryNode;
+//
+//        final QueryRoot queryRoot = (QueryRoot) queryNode;
+//        
+//        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
+//
+//        // Main WHERE clause
+//        {
+//
+//            @SuppressWarnings("unchecked")
+//			final GraphPatternGroup<IGroupMemberNode> whereClause = 
+//            	(GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
+//
+//            if (whereClause != null) {
+//
+//                optimize(context, sa, whereClause);
+//                
+//            }
+//
+//        }
+//
+//        // Named subqueries
+//        if (queryRoot.getNamedSubqueries() != null) {
+//
+//            final NamedSubqueriesNode namedSubqueries = queryRoot
+//                    .getNamedSubqueries();
+//
+//            /*
+//             * Note: This loop uses the current size() and get(i) to avoid
+//             * problems with concurrent modification during visitation.
+//             */
+//            for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
+//
+//                @SuppressWarnings("unchecked")
+//				final GraphPatternGroup<IGroupMemberNode> whereClause = 
+//                	(GraphPatternGroup<IGroupMemberNode>) namedSubquery.getWhereClause();
+//
+//                if (whereClause != null) {
+//
+//                    optimize(context, sa, whereClause);
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//        // log.error("\nafter rewrite:\n" + queryNode);
+//
+//        return queryNode;
+//
+//    }
+//
+//    private void optimize(final IEvaluationContext ctx, final StaticAnalysis sa,
+//    		final GraphPatternGroup<?> op) {
+//
+//    	if (op instanceof JoinGroupNode) {
+//    		
+//    		final JoinGroupNode joinGroup = (JoinGroupNode) op;
+//    		
+//    		if (ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup)) {
+//
+//                doOrderByType(ctx, joinGroup, sa);
+//
+//    		}
+//    		
+//    	} // is JoinGroupNode
+//    	
+//        /*
+//         * Recursion, but only into group nodes (including within subqueries).
+//         */
+//        final int arity = op.arity();
+//
+//        for (int i = 0; i < arity; i++) {
+//
+//            final BOp child = op.get(i);
+//
+//            if (child instanceof GraphPatternGroup<?>) {
+//
+//                @SuppressWarnings("unchecked")
+//                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
+//
+//                optimize(ctx, sa, childGroup);
+//                
+//            } else if (child instanceof QueryBase) {
+//
+//                final QueryBase subquery = (QueryBase) child;
+//
+//                @SuppressWarnings("unchecked")
+//                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
+//                        .getWhereClause();
+//
+//                optimize(ctx, sa, childGroup);
+//
+//            }
+//            
+//        }
+//
+//    }
 
     /**
      * Get the group member nodes into the right order:
@@ -154,64 +202,13 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * <p>
      * Note: Join filters are now attached to {@link IJoinNode}s.
      */
-    private void optimize(final IEvaluationContext ctx, final StaticAnalysis sa,
-    		final GraphPatternGroup<?> op) {
+	@Override
+    protected void optimizeJoinGroup(final AST2BOpContext ctx,
+    		final StaticAnalysis sa, final JoinGroupNode joinGroup) {
 
-    	if (op instanceof JoinGroupNode) {
-    		
-    		final JoinGroupNode joinGroup = (JoinGroupNode) op;
-    		
-    		if (ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup)) {
-
-                doOrderByType(ctx, joinGroup, sa);
-
-    		}
-    		
-    	} // is JoinGroupNode
-    	
-        /*
-         * Recursion, but only into group nodes (including within subqueries).
-         */
-        final int arity = op.arity();
-
-        for (int i = 0; i < arity; i++) {
-
-            final BOp child = op.get(i);
-
-            if (child instanceof GraphPatternGroup<?>) {
-
-                @SuppressWarnings("unchecked")
-                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
-
-                optimize(ctx, sa, childGroup);
-                
-            } else if (child instanceof QueryBase) {
-
-                final QueryBase subquery = (QueryBase) child;
-
-                @SuppressWarnings("unchecked")
-                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
-                        .getWhereClause();
-
-                optimize(ctx, sa, childGroup);
-
-            }
-            
-        }
-
-    }
-
-    /**
-     * Re-order the children in the {@link JoinGroupNode}.
-     * 
-     * @param ctx
-     * @param joinGroup
-     *            The {@link JoinGroupNode}.
-     * @param sa
-     */
-    private void doOrderByType(final IEvaluationContext ctx,
-            final JoinGroupNode joinGroup, final StaticAnalysis sa) {
-
+		if (!ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup))
+			return;
+			
         final List<IGroupMemberNode> ordered = new LinkedList<IGroupMemberNode>();
 
         final List<AssignmentNode> assignments = joinGroup.getAssignments();
