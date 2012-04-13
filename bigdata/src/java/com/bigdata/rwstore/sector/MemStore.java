@@ -58,6 +58,20 @@ public class MemStore extends AbstractRawStore {
 	 */
     private final UUID m_uuid;
 
+
+    /**
+     * Create a new instance.
+     * 
+     * @param pool
+     *            The pool from which the backing direct {@link ByteBuffer}s
+     *            will be allocated.
+     */
+    public MemStore(final DirectBufferPool pool) {
+
+        this(pool, Integer.MAX_VALUE);
+
+    }
+    
     /**
      * Create a new instance.
      * 

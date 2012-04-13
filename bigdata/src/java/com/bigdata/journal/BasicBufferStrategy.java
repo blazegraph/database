@@ -172,7 +172,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
             if (offset + nbytes > Integer.MAX_VALUE) {
 
-                throw new RuntimeException(ERR_INT32);
+                throw new RuntimeException(ERR_MAX_EXTENT);
 
             }
 
@@ -280,7 +280,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
              * Constraint when using a buffered mode.
              */
             
-            throw new IllegalArgumentException(ERR_INT32);
+            throw new IllegalArgumentException(ERR_MAX_EXTENT);
             
         }
         

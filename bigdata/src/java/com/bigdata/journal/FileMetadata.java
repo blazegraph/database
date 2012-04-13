@@ -680,18 +680,17 @@ public class FileMetadata {
 
 			// if (bufferMode != BufferMode.Disk
 			// && bufferMode != BufferMode.Temporary ) {
-			if (bufferMode.isFullyBuffered()) {
+            if (userExtent > bufferMode.getMaxExtent()) {
 
-				/*
-				 * Verify that we can address this many bytes with this
-				 * strategy. The strategies that rely on an in-memory buffer
-				 * are all limited to the #of bytes that can be addressed by
-				 * an int32.
-				 */
+                /*
+                 * Verify that we can address this many bytes with this
+                 * strategy.
+                 */
 
-				AbstractBufferStrategy.assertNonDiskExtent(userExtent);
+                throw new RuntimeException(
+                        AbstractBufferStrategy.ERR_MAX_EXTENT);
 
-			}
+            }
 
 			/*
 			 * The offset at which the first record will be written. This is
@@ -1034,16 +1033,15 @@ public class FileMetadata {
 
 			this.bufferMode = BufferMode.getDefaultBufferMode(rootBlock.getStoreType());
 
-			if (bufferMode.isFullyBuffered()) {
+            if (userExtent > bufferMode.getMaxExtent()) {
 
-				/*
-				 * Verify that we can address this many bytes with this
-				 * strategy. The strategies that rely on an in-memory buffer are
-				 * all limited to the #of bytes that can be addressed by an
-				 * int32.
-				 */
+                /*
+                 * Verify that we can address this many bytes with this
+                 * strategy.
+                 */
 
-				AbstractBufferStrategy.assertNonDiskExtent(userExtent);
+                throw new RuntimeException(
+                        AbstractBufferStrategy.ERR_MAX_EXTENT);
 
 			}
 

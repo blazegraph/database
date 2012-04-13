@@ -42,6 +42,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to
@@ -670,4 +672,22 @@ public interface Options {
      */
     String SEG = ".seg";
     
+    /**
+     * Maximum extent for the RW style stores ({@link MemStore} and
+     * {@link RWStore}).
+     */
+    long RW_MAX_EXTENT = Bytes.terabyte * 4L;
+
+    /**
+     * Maxmimum extent for stores backed by a byte[] in Java.
+     */
+    long MEM_MAX_EXTENT = Integer.MAX_VALUE;
+
+    /**
+     * A default used for {@link BufferMode}s which do not have a fixed maximum
+     * extent. For example, the WORM modes depend on the partitioning of the
+     * address bits into bits for the offset and bits for the data length.
+     */
+    long OTHER_MAX_EXTENT = Long.MAX_VALUE;
+
 }

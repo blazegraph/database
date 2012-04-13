@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.htree;
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.UUID;
 
 import junit.framework.TestCase;
@@ -44,14 +43,12 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.AbstractHTree.HTreePageStateException;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rwstore.sector.MemStore;
 
 /**
@@ -164,8 +161,7 @@ public class TestHTreeWithMemStore extends TestCase {
         
         final long start = System.currentTimeMillis();
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
         try {
 
@@ -369,8 +365,7 @@ public class TestHTreeWithMemStore extends TestCase {
     private void doStressTest(final int addressBits,
             final int writeRetentionQueueCapacity) {
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
         try {
 
@@ -516,8 +511,7 @@ public class TestHTreeWithMemStore extends TestCase {
     private void doOrderedTest(final int addressBits,
             final int writeRetentionQueueCapacity) {
 
-        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
-                Integer.MAX_VALUE);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE);
 
         try {
 

@@ -58,7 +58,8 @@ public enum BufferMode {
      * 
      * @see TransientBufferStrategy
      */
-    Transient(false/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
+    Transient(false/* stable */, true/* fullyBuffered */,
+            Options.MEM_MAX_EXTENT, StoreTypeEnum.WORM),
 
     /**
      * <strong>This mode is not being actively developed and should not be used
@@ -73,13 +74,14 @@ public enum BufferMode {
      * the file is (optionally) flushed to disk.
      * </p>
      * <p>
-     * This option offers wires an image of the journal file into memory and
+     * This option wires an image of the journal file into memory and
      * allows the journal to optimize IO operations.
      * </p>
      * 
      * @see DirectBufferStrategy
      */
-    Direct(true/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
+    Direct(true/* stable */, true/* fullyBuffered */, Options.MEM_MAX_EXTENT,
+            StoreTypeEnum.WORM),
 
     /**
      * <strong>This mode is not being actively developed and should not be used
@@ -102,7 +104,8 @@ public enum BufferMode {
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      * @see MappedBufferStrategy
      */
-    Mapped(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
+    Mapped(true/* stable */, false/* fullyBuffered */,
+            Options.OTHER_MAX_EXTENT, StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -111,7 +114,8 @@ public enum BufferMode {
      * 
      * @see WORMStrategy
      */
-    Disk(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
+    Disk(true/* stable */, false/* fullyBuffered */, Options.OTHER_MAX_EXTENT,
+            StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -123,7 +127,8 @@ public enum BufferMode {
      * 
      * @see WORMStrategy
      */
-    DiskWORM(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
+    DiskWORM(true/* stable */, false/* fullyBuffered */,
+            Options.OTHER_MAX_EXTENT, StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -137,7 +142,8 @@ public enum BufferMode {
      * 
      * @see RWStrategy
      */
-    DiskRW(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
+    DiskRW(true/* stable */, false/* fullyBuffered */, Options.RW_MAX_EXTENT,
+            StoreTypeEnum.RW),
 
     /**
      * <p>
@@ -149,7 +155,8 @@ public enum BufferMode {
      * 
      * @see RWStrategy
      */
-    TemporaryRW(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
+    TemporaryRW(false/* stable */, false/* fullyBuffered */,
+            Options.RW_MAX_EXTENT, StoreTypeEnum.RW),
 
     /**
      * <p>
@@ -162,28 +169,34 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
-    
+    Temporary(false/* stable */, false/* fullyBuffered */,
+            Options.OTHER_MAX_EXTENT, StoreTypeEnum.WORM),
+
     /**
      * A transient buffer mode backed by the {@link MemoryManager}, which is
      * similar to the {@link RWStore} but optimized for main memory. This can
      * scale up to 4TB of main memory.
      */
-    MemStore(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW)
+    MemStore(false/* stable */, true/* fullyBuffered */,
+            Options.RW_MAX_EXTENT, StoreTypeEnum.RW)
 
     ;
 
     private final boolean stable;
     private final boolean fullyBuffered;
+    private final long maxExtent;
 
     private final StoreTypeEnum storeType;
 
     private BufferMode(final boolean stable, final boolean fullyBuffered,
+            final long maxExtent,
             final StoreTypeEnum storeType) {
 
         this.stable = stable;
 
         this.fullyBuffered = fullyBuffered;
+        
+        this.maxExtent = maxExtent;
 
         this.storeType = storeType;
         
@@ -200,10 +213,8 @@ public enum BufferMode {
     }
     
     /**
-     * <code>true</code> iff this {@link BufferMode} is fully buffered 
-     * in memory - this implies that there is an absolute upper bound
-     * of {@link Integer#MAX_VALUE} bytes in the store since that is
-     * the limit on a byte[] in Java.
+     * <code>true</code> iff this {@link BufferMode} is fully buffered in
+     * memory.
      */
     public boolean isFullyBuffered() {
        
@@ -211,6 +222,15 @@ public enum BufferMode {
         
     }
 
+    /**
+     * The maximum extent for the {@link BufferMode}.
+     */
+    public long getMaxExtent() {
+        
+        return maxExtent;
+        
+    }
+    
     /**
      * The kind of persistence store (RW or WORM).
      * 
@@ -222,8 +242,8 @@ public enum BufferMode {
         
     }
     
-    public static BufferMode getDefaultBufferMode(StoreTypeEnum storeType) {
-    	switch (storeType) {
+    public static BufferMode getDefaultBufferMode(final StoreTypeEnum storeType) {
+        switch (storeType) {
     	case RW:
     		return DiskRW;
     	default:

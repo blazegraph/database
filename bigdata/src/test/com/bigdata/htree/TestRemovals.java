@@ -1,6 +1,5 @@
 package com.bigdata.htree;
 
-import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
 
@@ -10,8 +9,6 @@ import com.bigdata.io.TestCase3;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rwstore.sector.MemStore;
-
-import junit.framework.TestCase;
 
 public class TestRemovals extends AbstractHTreeTestCase {
 
@@ -125,7 +122,8 @@ public class TestRemovals extends AbstractHTreeTestCase {
 	 * Test removal with raw records.
 	 */
 	public void test_simpleRemovalWithRawRecords() {
-        final MemStore store = new MemStore(DirectBufferPool.INSTANCE, 5);
+        
+	    final MemStore store = new MemStore(DirectBufferPool.INSTANCE, 5);
 
         try {
         
