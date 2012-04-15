@@ -209,9 +209,7 @@ public class TestJoinGraphOnBarData extends AbstractJoinGraphTestCase {
 	 *         ?order <http://test/bar#orderItems> ?item .
 	 *         ?item <http://test/bar#beverageType> "Beer" .
 	 *         ?item <http://test/bar#beverageType> ?type .
-	 *       
 	 *         ?order <http://test/bar#employee> ?employee .
-	 *      
 	 *         ?employee <http://test/bar#employeeNum> ?employeeNum .
 	 * } GROUP BY ?employeeNum
 	 * </pre>
