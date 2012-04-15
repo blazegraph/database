@@ -46,6 +46,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rwstore.PSOutputStream;
@@ -64,6 +65,12 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * TODO We should compute and save the {@link SolutionSetStats} when writing the
  * solutions.
+ * 
+ * FIXME We MUST include at least the distinct variables for static analysis. We
+ * probably also need to know which ones are definitely bound (and those are our
+ * join variables). That information needs to get onto a summary interface which
+ * might be {@link ISolutionSetStats} (with some of the things that require
+ * multiple passes pulled out of the base interface).
  */
 final class SolutionSetMetadata {
 

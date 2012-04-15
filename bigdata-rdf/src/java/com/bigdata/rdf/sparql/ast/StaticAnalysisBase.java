@@ -37,6 +37,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
  * Base class for static analysis.
@@ -49,6 +51,8 @@ public class StaticAnalysisBase {
 //    private static final Logger log = Logger.getLogger(StaticAnalysisBase.class);
     
     protected final QueryRoot queryRoot;
+    
+    protected final IEvaluationContext evaluationContext;
     
     /**
      * Return the {@link QueryRoot} parameter given to the constructor.
@@ -65,14 +69,21 @@ public class StaticAnalysisBase {
      *            The root of the query. We need to have this on hand in order
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
+     * @param evaluationContext
+     *            The evaluation context provides access to the
+     *            {@link SolutionSetStats} and the {@link SparqlCache} for named
+     *            solution sets.
      */
-    protected StaticAnalysisBase(final QueryRoot queryRoot) {
+    protected StaticAnalysisBase(final QueryRoot queryRoot,
+            final IEvaluationContext evaluationContext) {
         
         if(queryRoot == null)
             throw new IllegalArgumentException();
         
         this.queryRoot = queryRoot;
-        
+                
+        this.evaluationContext = evaluationContext;
+
     }
     
     /**
@@ -170,8 +181,8 @@ public class StaticAnalysisBase {
 
             final NamedSubqueryInclude namedInclude = (NamedSubqueryInclude) op;
 
-            final NamedSubqueryRoot subquery = namedInclude
-                    .getRequiredNamedSubqueryRoot(queryRoot);
+            final NamedSubqueryRoot subquery = getRequiredNamedSubqueryRoot(namedInclude
+                    .getName());
 
             subquery.getProjectedVars(varSet);
 //            addProjectedVariables(subquery, varSet);
@@ -212,6 +223,57 @@ public class StaticAnalysisBase {
         }
 
         return varSet;
+
+    }
+
+    /**
+     * Return the corresponding {@link NamedSubqueryRoot}.
+     * 
+     * @param name
+     *            The name of the solution set.
+     *            
+     * @return The {@link NamedSubqueryRoot} and never <code>null</code>.
+     * 
+     * @throws RuntimeException
+     *             if no {@link NamedSubqueryRoot} was found for the named set
+     *             associated with this {@link NamedSubqueryInclude}.
+     */
+    private NamedSubqueryRoot getRequiredNamedSubqueryRoot(final String name) {
+        
+        final NamedSubqueryRoot nsr = getNamedSubqueryRoot(name);
+        
+        if(nsr == null)
+            throw new RuntimeException(
+                    "Named subquery does not exist for namedSet: " + name);
+        
+        return nsr;
+        
+    }
+
+    /**
+     * Return the corresponding {@link NamedSubqueryRoot}.
+     * 
+     * @param name
+     *            The name of the solution set.
+     *            
+     * @return The {@link NamedSubqueryRoot} -or- <code>null</code> if none was
+     *         found.
+     */
+    public NamedSubqueryRoot getNamedSubqueryRoot(final String name) {
+        
+        final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
+        
+        if(namedSubqueries == null)
+            return null;
+        
+        for(NamedSubqueryRoot namedSubquery : namedSubqueries) {
+            
+            if(name.equals(namedSubquery.getName()))
+                return namedSubquery;
+            
+        }
+        
+        return null;
 
     }
 
