@@ -193,53 +193,6 @@ public class NamedSubqueryInclude extends
     }
     
     /**
-     * Return the corresponding {@link NamedSubqueryRoot}.
-     * 
-     * @return The {@link NamedSubqueryRoot} -or- <code>null</code> if none was
-     *         found.
-     */
-    public NamedSubqueryRoot getNamedSubqueryRoot(final QueryRoot queryRoot) {
-        
-        final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
-        
-        if(namedSubqueries == null)
-            return null;
-        
-        final String name = getName();
-        
-        for(NamedSubqueryRoot namedSubquery : namedSubqueries) {
-            
-            if(name.equals(namedSubquery.getName()))
-                return namedSubquery;
-            
-        }
-        
-        return null;
-
-    }
-
-    /**
-     * Return the corresponding {@link NamedSubqueryRoot}.
-     * 
-     * @return The {@link NamedSubqueryRoot} and never <code>null</code>.
-     * 
-     * @throws RuntimeException
-     *             if no {@link NamedSubqueryRoot} was found for the named set
-     *             associated with this {@link NamedSubqueryInclude}.
-     */
-    public NamedSubqueryRoot getRequiredNamedSubqueryRoot(final QueryRoot queryRoot) {
-        
-        final NamedSubqueryRoot nsr = getNamedSubqueryRoot(queryRoot);
-        
-        if(nsr == null)
-            throw new RuntimeException(
-                    "Named subquery does not exist for namedSet: " + getName());
-        
-        return nsr;
-        
-    }
-
-    /**
      * Returns <code>false</code>.
      */
     final public boolean isOptional() {

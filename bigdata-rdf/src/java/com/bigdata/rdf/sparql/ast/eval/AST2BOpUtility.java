@@ -1068,8 +1068,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         {
 
             // Resolve the NamedSubqueryRoot for this INCLUDE.
-            final NamedSubqueryRoot nsr = subqueryInclude
-                    .getNamedSubqueryRoot(ctx.sa.getQueryRoot());
+            final NamedSubqueryRoot nsr = ctx.sa
+                    .getNamedSubqueryRoot(subqueryInclude.getName());
 
             if (nsr == null) {
                 // Paranoia check.
@@ -3432,7 +3432,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
             // Mark the join as optional.
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
         }
-        
+
         final RangeNode range = sp.getRange();
         if (range != null) {
         	// Add the RangeBOp

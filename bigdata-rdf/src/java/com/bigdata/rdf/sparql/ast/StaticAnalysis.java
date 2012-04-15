@@ -200,8 +200,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 //    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
 
-    private final IEvaluationContext evaluationContext;
-    
     /**
      * FIXME This will go away now once we have the ability to resolve named
      * subqueries against the {@link ISparqlCache}.
@@ -241,19 +239,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            {@link SolutionSetStats} and the {@link SparqlCache} for named
      *            solution sets.
      * 
-     *            TODO It could make sense to generalize the solution set
-     *            interface to include access to the precomputed
-     *            {@link SolutionSetStats}.
-     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     public StaticAnalysis(final QueryRoot queryRoot,
             final IEvaluationContext evaluationContext) {
 
-        super(queryRoot);
-        
-        this.evaluationContext = evaluationContext;
+        super(queryRoot, evaluationContext);
 
     }
 
@@ -843,7 +835,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryInclude nsi = (NamedSubqueryInclude) node;
 
-            final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(queryRoot);
+            final NamedSubqueryRoot nsr = getNamedSubqueryRoot(nsi.getName());
 
             if (nsr != null)
                 vars.addAll(getDefinitelyProducedBindings(nsr));
@@ -981,7 +973,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryInclude nsi = (NamedSubqueryInclude) node;
 
-            final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(queryRoot);
+            final NamedSubqueryRoot nsr = getNamedSubqueryRoot(nsi.getName());
 
             if (nsr != null)
                 vars.addAll(getMaybeProducedBindings(nsr));
