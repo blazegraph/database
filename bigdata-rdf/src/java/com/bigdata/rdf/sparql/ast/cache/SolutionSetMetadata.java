@@ -48,6 +48,7 @@ import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
+import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -62,15 +63,6 @@ import com.bigdata.striterator.ICloseableIterator;
  * organized into the checkpoint, perhaps as an ISPO[], perhaps using a rigid
  * schema. The size of the solution set should be visible when its metadata is
  * looked at as a graph.
- * 
- * TODO We should compute and save the {@link SolutionSetStats} when writing the
- * solutions.
- * 
- * FIXME We MUST include at least the distinct variables for static analysis. We
- * probably also need to know which ones are definitely bound (and those are our
- * join variables). That information needs to get onto a summary interface which
- * might be {@link ISolutionSetStats} (with some of the things that require
- * multiple passes pulled out of the base interface).
  */
 final class SolutionSetMetadata {
 
@@ -94,9 +86,15 @@ final class SolutionSetMetadata {
     private final IMemoryManager allocationContext;
 
     /**
-     * The #of solutions in this solutionset.
+     * The #of solutions in this solution set.
      */
     private long solutionCount;
+    
+    /**
+     * The {@link ISolutionSetStats} are collected when the solution are
+     * written by {@link #put(ICloseableIterator)}.
+     */
+    private ISolutionSetStats solutionSetStats;
     
     /**
      * The address from which the solution set may be read.
@@ -134,9 +132,21 @@ final class SolutionSetMetadata {
 
         allocationContext.clear();
         solutionSetAddr = IRawStore.NULL;
+        solutionSetStats = null;
 
     }
 
+    /**
+	 * Return the {@link ISolutionSetStats} for the saved solution set.
+	 * 
+	 * @return The {@link ISolutionSetStats}.
+	 */
+    public ISolutionSetStats getStats() {
+    	
+    		return solutionSetStats;
+    	
+    }
+    
     public ICloseableIterator<IBindingSet[]> get() {
 
         final long solutionSetAddr = this.solutionSetAddr;
@@ -317,11 +327,14 @@ final class SolutionSetMetadata {
 
     }
 
-    public void put(final ICloseableIterator<IBindingSet[]> src) {
+    public void put(final ICloseableIterator<IBindingSet[]> src2) {
 
-        if (src == null)
+        if (src2 == null)
             throw new IllegalArgumentException();
 
+        // wrap with class to compute statistics over the observed solutions.
+        final SolutionSetStatserator src = new SolutionSetStatserator(src2);
+        
         final IVSolutionSetEncoder encoder = new IVSolutionSetEncoder();
 
         // Stream writing onto the backing store.
@@ -430,6 +443,7 @@ final class SolutionSetMetadata {
         // TODO This is not atomic (needs lock).
         solutionSetAddr = newAddr;
         solutionCount = nsolutions;
+        solutionSetStats = src.getStats();
 
     }
 
