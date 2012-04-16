@@ -30,6 +30,8 @@ package com.bigdata.rdf.sparql.ast.eval;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -107,4 +109,13 @@ public interface IEvaluationContext {
      * Return the database.
      */
     AbstractTripleStore getAbstractTripleStore();
+    
+    /**
+	 * Return the cache for named solution sets (experimental feature).
+	 * 
+	 * @return The cache -or- <code>null</code>.
+	 * 
+	 * @see QueryHints#SOLUTION_SET_CACHE
+	 */
+    ISparqlCache getSparqlCache();
 }

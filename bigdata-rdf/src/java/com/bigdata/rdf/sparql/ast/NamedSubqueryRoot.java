@@ -45,11 +45,6 @@ public class NamedSubqueryRoot extends SubqueryBase implements
     public interface Annotations extends SubqueryRoot.Annotations,
             INamedSolutionSet.Annotations {
 
-//        /**
-//         * The name of the temporary solution set.
-//         */
-//        String SUBQUERY_NAME = "subqueryName";
-        
         /**
          * The {@link String}[] of the named solution sets on which this named
          * subquery has a dependency. This is computed by the

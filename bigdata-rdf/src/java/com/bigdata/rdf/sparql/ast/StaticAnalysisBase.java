@@ -37,7 +37,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SolutionSetMetadata;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
@@ -70,9 +71,9 @@ public class StaticAnalysisBase {
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
      * @param evaluationContext
-     *            The evaluation context provides access to the
-     *            {@link SolutionSetStats} and the {@link SparqlCache} for named
-     *            solution sets.
+	 *            The evaluation context provides access to the
+	 *            {@link ISolutionSetStats} and the {@link ISparqlCache} for
+	 *            named solution sets.
      */
     protected StaticAnalysisBase(final QueryRoot queryRoot,
             final IEvaluationContext evaluationContext) {
@@ -181,11 +182,37 @@ public class StaticAnalysisBase {
 
             final NamedSubqueryInclude namedInclude = (NamedSubqueryInclude) op;
 
-            final NamedSubqueryRoot subquery = getRequiredNamedSubqueryRoot(namedInclude
-                    .getName());
+            final String name = namedInclude.getName();
+            
+            final NamedSubqueryRoot subquery = getNamedSubqueryRoot(name);
 
-            subquery.getProjectedVars(varSet);
-//            addProjectedVariables(subquery, varSet);
+            if(subquery != null) {
+            	
+                subquery.getProjectedVars(varSet);
+//              addProjectedVariables(subquery, varSet);
+            	
+            } else {
+            	
+				final ISolutionSetStats stats = getSolutionSetStats(name);
+
+				if (stats != null) {
+
+					/*
+					 * Note: This is all variables which are bound in ANY
+					 * solution. It MAY include variables which are NOT bound in
+					 * some solutions.
+					 */
+
+					varSet.addAll(stats.getUsedVars());
+
+				} else {
+
+					throw new RuntimeException("Unresolved solution set: "
+							+ name);
+
+				}
+            	
+            }
             
             // DO NOT RECURSE INTO THE SUBQUERY!
             return varSet;
@@ -227,18 +254,25 @@ public class StaticAnalysisBase {
     }
 
     /**
-     * Return the corresponding {@link NamedSubqueryRoot}.
-     * 
-     * @param name
-     *            The name of the solution set.
-     *            
-     * @return The {@link NamedSubqueryRoot} and never <code>null</code>.
-     * 
-     * @throws RuntimeException
-     *             if no {@link NamedSubqueryRoot} was found for the named set
-     *             associated with this {@link NamedSubqueryInclude}.
-     */
-    private NamedSubqueryRoot getRequiredNamedSubqueryRoot(final String name) {
+	 * Return the corresponding {@link NamedSubqueryRoot}.
+	 * 
+	 * @param name
+	 *            The name of the solution set.
+	 * 
+	 * @return The {@link NamedSubqueryRoot} and never <code>null</code>.
+	 * 
+	 * @throws RuntimeException
+	 *             if no {@link NamedSubqueryRoot} was found for the named set
+	 *             associated with this {@link NamedSubqueryInclude}.
+	 * 
+	 * @deprecated Caller's MUST BE CHANGED to look for both a
+	 *             {@link NamedSubqueryRoot} and an {@link ISolutionSetStats}
+	 *             and then handle these as appropriate. In one case, that means
+	 *             static analysis of the {@link NamedSubqueryRoot}. In the
+	 *             other, the relevant information are present in pre-computed
+	 *             metadata on the {@link ISolutionSetStats}.
+	 */
+    protected NamedSubqueryRoot getRequiredNamedSubqueryRoot(final String name) {
         
         final NamedSubqueryRoot nsr = getNamedSubqueryRoot(name);
         
@@ -251,22 +285,35 @@ public class StaticAnalysisBase {
     }
 
     /**
-     * Return the corresponding {@link NamedSubqueryRoot}.
-     * 
-     * @param name
-     *            The name of the solution set.
-     *            
-     * @return The {@link NamedSubqueryRoot} -or- <code>null</code> if none was
-     *         found.
-     */
+	 * Return the corresponding {@link NamedSubqueryRoot}.
+	 * <p>
+	 * Note: You can not resolve pre-existing named solution sets with this
+	 * method, only those which are defined within the scope of a query by a
+	 * {@link NamedSubqueryRoot}.
+	 * <p>
+	 * Note: Typically, callers MUST look for both a {@link NamedSubqueryRoot}
+	 * and an {@link ISolutionSetStats} and then handle these as appropriate. In
+	 * one case, that means static analysis of the {@link NamedSubqueryRoot}. In
+	 * the other, the relevant information are present in pre-computed metadata
+	 * on the {@link ISolutionSetStats}.
+	 * 
+	 * @param name
+	 *            The name of the solution set.
+	 * 
+	 * @return The {@link NamedSubqueryRoot} -or- <code>null</code> if none was
+	 *         found.
+	 * 
+	 * @see #getSolutionSetStats(String)
+	 */
     public NamedSubqueryRoot getNamedSubqueryRoot(final String name) {
-        
-        final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
-        
-        if(namedSubqueries == null)
-            return null;
-        
-        for(NamedSubqueryRoot namedSubquery : namedSubqueries) {
+
+		final NamedSubqueriesNode namedSubqueries = queryRoot
+				.getNamedSubqueries();
+
+		if (namedSubqueries == null)
+			return null;
+
+		for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
             
             if(name.equals(namedSubquery.getName()))
                 return namedSubquery;
@@ -277,6 +324,46 @@ public class StaticAnalysisBase {
 
     }
 
+    /**
+	 * Return the {@link ISolutionSetStats} for the named solution set.
+	 * <p>
+	 * Note: This does NOT report on {@link NamedSubqueryRoot}s for the query.
+	 * It only checks the {@link ISparqlCache}.
+	 * <p>
+	 * Note: Typically, callers MUST look for both a {@link NamedSubqueryRoot}
+	 * and an {@link ISolutionSetStats} and then handle these as appropriate. In
+	 * one case, that means static analysis of the {@link NamedSubqueryRoot}. In
+	 * the other, the relevant information are present in pre-computed metadata
+	 * on the {@link ISolutionSetStats}.
+	 * 
+	 * @param name
+	 *            The name of the solution set.
+	 * 
+	 * @return The {@link ISolutionSetStats} -or- <code>null</code> if there is
+	 *         no such pre-existing named solution set.
+	 * 
+	 * @see #getNamedSubqueryRoot(String)
+	 */
+    public ISolutionSetStats getSolutionSetStats(final String name) {
+    	
+		final ISparqlCache sparqlCache = evaluationContext.getSparqlCache();
+		
+		if(sparqlCache != null) {
+			
+			final ISolutionSetStats stats = sparqlCache
+					.getSolutionSetStats(name);
+
+			if(stats != null) {
+				
+				return stats;
+				
+			}
+			
+		}
+		
+		return null;
+    }
+    
     /**
      * Add all variables spanned by the operator.
      * <p>

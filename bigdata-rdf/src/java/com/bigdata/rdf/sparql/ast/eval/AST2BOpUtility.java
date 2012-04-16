@@ -106,6 +106,7 @@ import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -120,6 +121,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
+import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
@@ -196,7 +198,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final QueryRoot originalQuery = astContainer.getOriginalAST();
         
         // Compute some summary statistics about the exogenous bindings.
-        ctx.setSolutionSetStats(new SolutionSetStats(bindingSets));
+        ctx.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         // Run the AST query rewrites / query optimizers.
         final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
@@ -1016,6 +1018,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * contains bindings for solutions projected by the subquery, we do not need
      * to adjust the visibility of bindings when we execute the hash join
      * against the named solution set.
+     * 
+     * @see ASTNamedSubqueryOptimizer
      */
     private static PipelineOp addNamedSubqueryInclude(PipelineOp left,
             final NamedSubqueryInclude subqueryInclude,
@@ -1066,35 +1070,65 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * we join in the named subquery solution set.
          */
         {
-
+        	
+        		final String name = subqueryInclude.getName();
+        	
             // Resolve the NamedSubqueryRoot for this INCLUDE.
             final NamedSubqueryRoot nsr = ctx.sa
-                    .getNamedSubqueryRoot(subqueryInclude.getName());
+                    .getNamedSubqueryRoot(name);
 
-            if (nsr == null) {
-                // Paranoia check.
-                throw new AssertionError("NamedSubqueryRoot not found: "
-                        + subqueryInclude.getName());
+            if(nsr != null) {
+
+                @SuppressWarnings("unchecked")
+                final Set<IVariable<?>> nsrDoneSet = (Set<IVariable<?>>) nsr
+                        .getProperty(NamedSubqueryRoot.Annotations.DONE_SET);
+
+				if (nsrDoneSet == null) {
+
+					// Make sure the doneSet was attached to the named subquery.
+					throw new AssertionError(
+							"NamedSubqueryRoot doneSet not found: " + name);
+				}
+
+				/*
+				 * Add in everything known to be materialized by the named
+				 * subquery.
+				 */
+				doneSet.addAll(nsrDoneSet);
+
+			} else {
+
+				/*
+				 * Attempt to resolve a pre-existing named solution set.
+				 */
+
+				final ISolutionSetStats stats = ctx.sa
+						.getSolutionSetStats(name);
+
+				if (stats != null) {
+
+					/*
+					 * Note: This is all variables whose IVCache association is
+					 * always present when that variable is bound in a solution
+					 * (that is, all variables which we do not need to
+					 * materialize for the solution set).
+					 */
+
+					doneSet.addAll(stats.getMaterialized());
+
+				} else {
+
+					throw new RuntimeException("Unresolved solution set: "
+							+ name);
+
+				}
+
             }
-            
-            @SuppressWarnings("unchecked")
-            final Set<IVariable<?>> nsrDoneSet = (Set<IVariable<?>>) nsr
-                    .getProperty(NamedSubqueryRoot.Annotations.DONE_SET);
-
-            if (nsrDoneSet == null) {
-                // Make sure the doneSet was attached to the named subquery.
-                throw new AssertionError(
-                        "NamedSubqueryRoot doneSet not found: "
-                                + subqueryInclude.getName());
-            }
-
-            // Add in everything known to be materialized by the named subquery.
-            doneSet.addAll(nsrDoneSet);
             
         }
 
-        @SuppressWarnings("rawtypes")
-        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+		@SuppressWarnings("rawtypes")
+		final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
 
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(subqueryInclude), needsMaterialization);

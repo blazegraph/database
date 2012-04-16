@@ -436,4 +436,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
     }
 
+    public ISparqlCache getSparqlCache() {
+    	
+    		return sparqlCache;
+    	
+    }
+    
 }

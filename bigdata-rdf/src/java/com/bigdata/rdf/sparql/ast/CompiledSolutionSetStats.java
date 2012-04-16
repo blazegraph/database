@@ -33,6 +33,7 @@ import java.util.Set;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.IVCache;
 
 /**
  * Class models the compiled statistics based on the observed solutions.
@@ -40,9 +41,6 @@ import com.bigdata.bop.IVariable;
 public class CompiledSolutionSetStats implements ISolutionSetStats,
 		Serializable {
 
-	/**
-		 * 
-		 */
 	private static final long serialVersionUID = 1L;
 
 	/**
@@ -67,6 +65,19 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 	private final Set<IVariable<?>> notAlwaysBound;
 
 	/**
+	 * The set of variables whose bound value has its {@link IVCache}
+	 * association set whenever the variable is bound in a solution.
+	 */
+	private final Set<IVariable<?>> materialized;
+	
+    /**
+     * The set of variables which are effective constants (they are bound in
+     * every solution and always to the same value) together with their constant
+     * bindings.
+     */
+    private final Map<IVariable<?>,IConstant<?>> constants;
+    
+    /**
 	 * Constructor exposes unmodifable versions of its arguments.
 	 * 
 	 * @param nsolutions
@@ -78,11 +89,21 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 	 * @param notAlwaysBound
 	 *            The set of variables which are NOT bound in at least one
 	 *            solution (e.g., MAYBE bound semantics).
+	 * @param materialized
+	 *            The set of variables whose bound value has its {@link IVCache}
+	 *            association set in all solutions in which that variable is
+	 *            bound.
+	 * @param constants
+	 *            The set of variables which are effective constants (they are
+	 *            bound in every solution and always to the same value) together
+	 *            with their constant bindings.
 	 */
 	public CompiledSolutionSetStats(final long nsolutions,
 			final Set<IVariable<?>> usedVars,
 			final Set<IVariable<?>> alwaysBound,
-			final Set<IVariable<?>> notAlwaysBound) {
+			final Set<IVariable<?>> notAlwaysBound,
+			final Set<IVariable<?>> materialized,
+			final Map<IVariable<?>, IConstant<?>> constants) {
 
 		this.nsolutions = nsolutions;
 		
@@ -90,6 +111,8 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 		this.usedVars = Collections.unmodifiableSet(usedVars);
 		this.alwaysBound = Collections.unmodifiableSet(alwaysBound);
 		this.notAlwaysBound = Collections.unmodifiableSet(notAlwaysBound);
+		this.materialized = Collections.unmodifiableSet(materialized);
+		this.constants = Collections.unmodifiableMap(constants);
 
 	}
 
@@ -113,15 +136,15 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 		return notAlwaysBound;
 	}
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * This is not computed in a streaming pass over the solutions.
-	 */
+	@Override
+	public Set<IVariable<?>> getMaterialized() {
+		return materialized;
+	}
+	
 	@Override
 	public Map<IVariable<?>, IConstant<?>> getConstants() {
 
-		return null;
+		return constants;
 
 	}
 

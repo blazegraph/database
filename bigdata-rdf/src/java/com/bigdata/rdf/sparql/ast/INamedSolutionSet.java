@@ -47,7 +47,7 @@ public interface INamedSolutionSet {
     /**
      * Return the name of the solution set.
      * 
-     * @return The name of the soltution set.
+     * @return The name of the solution set.
      */
     String getName();
 

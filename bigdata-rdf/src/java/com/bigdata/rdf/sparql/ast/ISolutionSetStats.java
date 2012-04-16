@@ -32,6 +32,7 @@ import java.util.Set;
 
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.IVCache;
 
 /**
  * A set of interesting statistics on a solution set.
@@ -62,12 +63,19 @@ public interface ISolutionSetStats {
     Set<IVariable<?>> getNotAlwaysBound();
 
     /**
+	 * Return the subset of the variables which are materialized in all
+	 * solutions in which they appear (the variables do not have to be bound in
+	 * every solution, but if they are bound then their {@link IVCache}
+	 * association is set.
+	 */
+    Set<IVariable<?>> getMaterialized();
+    
+    /**
 	 * The set of variables which are effective constants (they are bound in
 	 * every solution and always to the same value) together with their constant
 	 * bindings.
 	 * 
-	 * @return The set of variables which are effective constants -or-
-	 *         <code>null</code> if this information has not been computed.
+	 * @return The set of variables which are effective constants.
 	 */
     Map<IVariable<?>, IConstant<?>> getConstants();
 

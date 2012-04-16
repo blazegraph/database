@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
@@ -62,9 +62,9 @@ public class StaticAnalysis_CanJoin extends StaticAnalysisBase {
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
      * @param evaluationContext
-     *            The evaluation context provides access to the
-     *            {@link SolutionSetStats} and the {@link SparqlCache} for named
-     *            solution sets.
+	 *            The evaluation context provides access to the
+	 *            {@link ISolutionSetStats} and the {@link ISparqlCache} for
+	 *            named solution sets.
      */
     public StaticAnalysis_CanJoin(final QueryRoot queryRoot,
             final IEvaluationContext evaluationContext) {

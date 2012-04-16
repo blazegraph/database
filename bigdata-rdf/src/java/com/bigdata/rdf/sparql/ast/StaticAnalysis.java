@@ -217,7 +217,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            analysis.
      * 
      * @deprecated By the other form of this constructor. The constructor should
-     *             have access to the {@link SolutionSetStats}, which are on the
+     *             have access to the {@link ISolutionSetStats}, which are on the
      *             {@link AST2BOpContext}. It also needs access to the
      *             {@link SparqlCache} for named solution sets.
      */
@@ -229,19 +229,19 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
-     * 
-     * @param queryRoot
-     *            The root of the query. We need to have this on hand in order
-     *            to resolve {@link NamedSubqueryInclude}s during static
-     *            analysis.
-     * @param evaluationContext
-     *            The evaluation context provides access to the
-     *            {@link SolutionSetStats} and the {@link SparqlCache} for named
-     *            solution sets.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
-     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
-     */
+	 * 
+	 * @param queryRoot
+	 *            The root of the query. We need to have this on hand in order
+	 *            to resolve {@link NamedSubqueryInclude}s during static
+	 *            analysis.
+	 * @param evaluationContext
+	 *            The evaluation context provides access to the
+	 *            {@link ISolutionSetStats} and the {@link ISparqlCache} for
+	 *            named solution sets.
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+	 *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
+	 */
     public StaticAnalysis(final QueryRoot queryRoot,
             final IEvaluationContext evaluationContext) {
 
@@ -835,13 +835,35 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryInclude nsi = (NamedSubqueryInclude) node;
 
-            final NamedSubqueryRoot nsr = getNamedSubqueryRoot(nsi.getName());
+            final String name = nsi.getName();
+            
+			final NamedSubqueryRoot nsr = getNamedSubqueryRoot(name);
 
-            if (nsr != null)
-                vars.addAll(getDefinitelyProducedBindings(nsr));
-            else if(requireDeclaredNamedSubquery)
-                throw new RuntimeException("No named subquery declared: name="
-                        + nsi.getName());
+			if (nsr != null) {
+
+				vars.addAll(getDefinitelyProducedBindings(nsr));
+
+			} else {
+
+				final ISolutionSetStats stats = getSolutionSetStats(name);
+
+				if (stats != null) {
+
+					/*
+					 * Note: This is all variables which are bound in ALL
+					 * solutions.
+					 */
+
+					vars.addAll(stats.getAlwaysBound());
+
+				} else {
+
+					throw new RuntimeException("Unresolved solution set: "
+							+ name);
+
+				}
+
+			}
 
         } else if(node instanceof ServiceNode) {
 
@@ -973,13 +995,35 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final NamedSubqueryInclude nsi = (NamedSubqueryInclude) node;
 
-            final NamedSubqueryRoot nsr = getNamedSubqueryRoot(nsi.getName());
+            final String name = nsi.getName();
+            
+			final NamedSubqueryRoot nsr = getNamedSubqueryRoot(name);
 
-            if (nsr != null)
-                vars.addAll(getMaybeProducedBindings(nsr));
-            else if(requireDeclaredNamedSubquery)
-                throw new RuntimeException("No named subquery declared: name="
-                        + nsi.getName());
+			if (nsr != null) {
+
+				vars.addAll(getMaybeProducedBindings(nsr));
+				
+			} else {
+				
+				final ISolutionSetStats stats = getSolutionSetStats(name);
+
+				if (stats != null) {
+
+					/*
+					 * Note: This is all variables bound in ANY solution. It MAY
+					 * include variables which are NOT bound in some solutions.
+					 */
+
+					vars.addAll(stats.getUsedVars());
+
+				} else {
+
+					throw new RuntimeException("Unresolved solution set: "
+							+ name);
+
+				}
+
+			}
 
         } else if(node instanceof ServiceNode) {
 
