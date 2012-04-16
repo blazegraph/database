@@ -61,6 +61,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SolutionSetStats;
+import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TestStaticAnalysis;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -303,17 +304,17 @@ public class TestASTBottomUpOptimizer extends
         final IBindingSet[] bindingSets = new IBindingSet[] {
                 new ListBindingSet(//
                         new IVariable[]{v},//
-                        new IConstant[]{new Constant(c1)}//
+                        new IConstant[]{new Constant(c1.getIV())}//
                         ),//
                 new ListBindingSet(//
                         new IVariable[]{v},//
-                        new IConstant[]{new Constant(c1)}//
+                        new IConstant[]{new Constant(c1.getIV())}//
                         )
         };
         
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
-        context.setSolutionSetStats(new SolutionSetStats(bindingSets));
+        context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
                 context, queryRoot, bindingSets);
@@ -1010,7 +1011,7 @@ public class TestASTBottomUpOptimizer extends
                 new IConstant[] { new Constant(x.getIV()) })
         };
 
-        context.setSolutionSetStats(new SolutionSetStats(bindingSets));
+        context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
                 context, queryRoot, bindingSets);

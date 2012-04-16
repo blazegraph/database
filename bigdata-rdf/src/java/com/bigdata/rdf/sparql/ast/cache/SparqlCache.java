@@ -56,6 +56,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -115,6 +116,9 @@ import com.bigdata.striterator.ICloseableIterator;
  *      makes the cache somewhat more difficult to integration since the same
  *      query is not always the same (e.g., include the hash of the exogenous
  *      solutions in the query hash code and we will get less reuse).
+ *      
+ *      TODO If the {@link IEvaluationContext} is not required, then back it
+ *      out of the method signatures.
  */
 public class SparqlCache implements ISparqlCache {
 
@@ -448,6 +452,23 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
+	public ISolutionSetStats getSolutionSetStats(final String solutionSet) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+
+        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        
+        if(sset != null) {
+        	
+        		return sset.getStats();
+        	
+        }
+        
+        return null;
+        
+    }
+    
     public ICloseableIterator<IBindingSet[]> getSolutions(final IEvaluationContext ctx,
             final String solutionSet) {
 

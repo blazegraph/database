@@ -37,9 +37,8 @@ import java.util.Set;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.TermId;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
 
 /**
  * A set of interesting statistics on a solution set.
@@ -47,20 +46,9 @@ import com.bigdata.rdf.internal.impl.TermId;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          TODO Compute the distinct values for each variable for which we have
- *          a binding, or at least the #of such values and offer a method to
- *          obtain the distinct values which could cache them. We can do the
- *          exact #of distinct values trivially for small solution sets. For
- *          very large solution sets this is more expensive and approximate
- *          techniques for obtaining the distinct set only when it is likely to
- *          be small would be appropriate.
- *          <p>
- *          Note that this must correctly handle {@link TermId#mockIV(VTE)}s.
- *          <p>
- *          Or compute a bloom filter for a statistical summary.
- * 
- * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/490"> Mock IV /
- *      TermId hashCode()/equals() problems</a>
+ * @deprecated by {@link SolutionSetStatserator} since the latter can compute
+ *             all of the same information can be used over streaming solution
+ *             sets.
  */
 public class SolutionSetStats implements ISolutionSetStats {
 
@@ -85,6 +73,12 @@ public class SolutionSetStats implements ISolutionSetStats {
      */
     private final Set<IVariable<?>> alwaysBound;
 
+    /**
+     * The set of variables whose {@link IVCache} association is always
+     * present when the variable is bound in a solution.
+     */
+    private final Set<IVariable<?>> materialized;
+    
     /**
      * The set of variables which are effective constants (they are bound in
      * every solution and always to the same value) together with their constant
@@ -111,6 +105,7 @@ public class SolutionSetStats implements ISolutionSetStats {
         
         final Set<IVariable<?>> usedVars = new HashSet<IVariable<?>>();
         final Set<IVariable<?>> notAlwaysBound = new HashSet<IVariable<?>>();
+        final Set<IVariable<?>> notMaterialized = new HashSet<IVariable<?>>();
         final Set<IVariable<?>> currentVars = new HashSet<IVariable<?>>();
         final Set<IVariable<?>> notBoundThisSolution = new HashSet<IVariable<?>>();
 
@@ -145,6 +140,33 @@ public class SolutionSetStats implements ISolutionSetStats {
 
                     currentVars.add(v);
 
+					/*
+					 * Check for a variable which has a bound value but the
+					 * bound value is not materialized.
+					 */
+					if (!notMaterialized.contains(v)) {
+
+						@SuppressWarnings("unchecked")
+						final IConstant<IV<?, ?>> c = bset.get(v);
+
+						if (c != null) {
+
+							/*
+							 * Note: ClassCastException if bound value is not an
+							 * IV.
+							 */
+							final IV<?, ?> iv = c.get();
+
+							if (!iv.hasValue()) {
+
+								notMaterialized.add(v);
+
+							}
+
+						}
+					
+					}
+
                 }
                 
             }
@@ -163,15 +185,23 @@ public class SolutionSetStats implements ISolutionSetStats {
 
         // #of solutions counted.
         this.nsolutions = nsolutions;
-        
-        // Figure out which variables were bound in every solution.
-        final Set<IVariable<?>> alwaysBound = new HashSet<IVariable<?>>(usedVars);
-        alwaysBound.removeAll(notAlwaysBound);
-        
+
+		// Figure out which variables were bound in every solution.
+		final Set<IVariable<?>> alwaysBound = new HashSet<IVariable<?>>(
+				usedVars);
+		alwaysBound.removeAll(notAlwaysBound);
+
+		// Figure out which variables were always materialized when they were
+		// bound.
+		final Set<IVariable<?>> materialized = new HashSet<IVariable<?>>(
+				usedVars);
+		materialized.removeAll(notMaterialized);
+
         // Expose immutable versions of these collections.
         this.usedVars = Collections.unmodifiableSet(usedVars);
         this.alwaysBound = Collections.unmodifiableSet(alwaysBound);
         this.notAlwaysBound = Collections.unmodifiableSet(notAlwaysBound);
+        this.materialized = Collections.unmodifiableSet(materialized);
         
         /*
          * Figure out which bindings are the same in every solution. These are
@@ -247,6 +277,12 @@ public class SolutionSetStats implements ISolutionSetStats {
         
     }
 
+    public final Set<IVariable<?>> getMaterialized() {
+    	
+    		return materialized;
+    	
+    }
+    
     @Override
     public final Map<IVariable<?>, IConstant<?>> getConstants() {
         

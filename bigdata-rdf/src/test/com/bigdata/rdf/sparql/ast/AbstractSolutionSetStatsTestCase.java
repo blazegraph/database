@@ -37,15 +37,23 @@ import java.util.Set;
 
 import junit.framework.TestCase2;
 
+import org.semanticweb.yars.nx.namespace.XSD;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
- * Test suite for {@link SolutionSetStats}.
+ * Test suite for {@link ISolutionSetStats}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestSolutionSetStats.java 6099 2012-03-09 16:35:55Z thompsonbry $
@@ -134,6 +142,35 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
 		return map;
 
 	}
+
+    protected String namespace;
+    protected BigdataValueFactory f;
+    
+    protected void setUp() throws Exception {
+    	
+    		super.setUp();
+
+    		namespace = getName();
+    		
+    		f = BigdataValueFactoryImpl.getInstance(namespace);
+    	
+    }
+    
+    protected void tearDown() throws Exception {
+    	
+    		if(f != null) {
+    			
+    			f.remove();
+    			
+    			f = null;
+    			
+    		}
+    	
+    		namespace = null;
+    	
+    		super.tearDown();
+    		
+    }
     
     /**
      * Unit test with an empty solution set.
@@ -144,9 +181,10 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
 
         final ISolutionSetStats expected = new MySolutionStats(//
         		0, // nsolutions
-        		emptySet, // usedVars
+        		emptySet,// usedVars
         		emptySet,// notAlwaysBound
         		emptySet,// alwaysBound
+        		emptySet,// materialized
         		asMap(new IVariable[0],new IConstant[0])// constants
         );
 
@@ -157,16 +195,21 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
     }
 
     /**
-     * Unit test with a single solution having a single bound variable.
-     */
+	 * Unit test with a single solution having a single bound variable where the
+	 * bound variable does NOT have its {@link IVCache} association set.
+	 */
     public void test_003() {
         
         final IVariable x = Var.var("x");
+
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+//		one.setValue(f.createLiteral(1));
         
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
+            bset.set(x, asConst(one));
             bsets.add(bset);
         }
 
@@ -174,8 +217,9 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 1,// nsolutions
                 asSet(x),// usedVars
                 emptySet,// notAlwaysBound
-                asSet(x), // alwaysBound
-                asMap(asArray(x),asArray(asConst("1")))// constants
+                asSet(x),// alwaysBound
+                emptySet,// materialized
+                asMap(asArray(x),asArray(asConst(one)))// constants
         );
 
         final ISolutionSetStats actual = newFixture(
@@ -186,18 +230,63 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
     }
     
     /**
-     * Unit test with a single solution having a two bound variables.
+     * Unit test with a single solution having a single bound variable 
+     * and where the bound variable has its {@link IVCache} association
+     * set.
      */
+    public void test_003a() {
+        
+        final IVariable x = Var.var("x");
+
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+        
+        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(one));
+            bsets.add(bset);
+        }
+
+        final ISolutionSetStats expected = new MySolutionStats(//
+                1,// nsolutions
+                asSet(x),// usedVars
+                emptySet,// notAlwaysBound
+                asSet(x),// alwaysBound
+                asSet(x),// materialized
+                asMap(asArray(x),asArray(asConst(one)))// constants
+        );
+
+        final ISolutionSetStats actual = newFixture(
+                bsets.toArray(new IBindingSet[] {}));
+
+        assertSameStats(expected, actual);
+        
+    }
+    
+	/**
+	 * Unit test with a single solution having a two bound variables. One of the
+	 * variables has its {@link IVCache} set and the other does not.
+	 */
     public void test_004() {
         
         final IVariable x = Var.var("x");
         final IVariable y = Var.var("y");
         
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+//		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				1);
+		two.setValue(f.createLiteral(2));
+
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
             bsets.add(bset);
         }
 
@@ -206,7 +295,8 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 asSet(x, y),// usedVars
                 emptySet,// notAlwaysBound
                 asSet(x, y), // alwaysBound
-                asMap(new IVariable[]{x,y},new IConstant[]{asConst("1"),asConst("2")})
+                asSet(y),// materialized
+                asMap(new IVariable[]{x,y},new IConstant[]{asConst(one),asConst(two)})
         );
 
         final ISolutionSetStats actual = newFixture(
@@ -217,25 +307,42 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
     }
 
     /**
-     * Unit test with two solutions having two variables which are bound in both
-     * solutions.
-     */
+	 * Unit test with two solutions having two variables which are bound in both
+	 * solutions and where the {@link IVCache} is set for all variables in all
+	 * solutions.
+	 */
     public void test_005() {
         
         final IVariable x = Var.var("x");
         final IVariable y = Var.var("y");
-        
-        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("3"));
-            bset.set(y, asConst("4"));
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
             bsets.add(bset);
         }
 
@@ -244,6 +351,63 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 asSet(x, y),// usedVars
                 emptySet,// notAlwaysBound
                 asSet(x, y), // alwaysBound
+                asSet(x,y),// materialized
+                emptyMap// constants
+        );
+
+        final ISolutionSetStats actual = newFixture(
+                bsets.toArray(new IBindingSet[] {}));
+        
+        assertSameStats(expected, actual);
+        
+    }
+
+    /**
+	 * Unit test with two solutions having two variables which are bound in both
+	 * solutions, but in this case the {@link IVCache} is not always set for all
+	 * variables.
+	 */
+    public void test_005a() {
+        
+        final IVariable x = Var.var("x");
+        final IVariable y = Var.var("y");
+
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+//		four.setValue(f.createLiteral(4));
+		
+		final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bsets.add(bset);
+        }
+
+        final ISolutionSetStats expected = new MySolutionStats(//
+                2,// nsolutions
+                asSet(x, y),// usedVars
+                emptySet,// notAlwaysBound
+                asSet(x, y), // alwaysBound
+                asSet(x),// materialized
                 emptyMap// constants
         );
 
@@ -257,7 +421,8 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
     /**
      * Unit test with two solutions having two variables which are bound in
      * every solution plus one variable which is bound in just one of the
-     * solutions.
+     * solutions.  The {@link IVCache} association is set for all bound
+     * variables in each solution.
      */
     public void test_006() {
         
@@ -265,28 +430,112 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         final IVariable y = Var.var("y");
         final IVariable z = Var.var("z");
         
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+		five.setValue(f.createLiteral(5));
+		
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("3"));
-            bset.set(y, asConst("4"));
-            bset.set(z, asConst("5"));
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bset.set(z, asConst(five));
             bsets.add(bset);
         }
 
         final ISolutionSetStats expected = new MySolutionStats(//
-                2,// nsolutions
-                asSet(x, y, z),// usedVars
-                asSet(z),// notAlwaysBound
-                asSet(x, y), // alwaysBound
-                emptyMap// constants
-        );
+				2,// nsolutions
+				asSet(x, y, z),// usedVars
+				asSet(z),// notAlwaysBound
+				asSet(x, y), // alwaysBound
+				asSet(x, y, z),// materialized
+				emptyMap// constants
+		);
+
+        final ISolutionSetStats actual = newFixture(
+                bsets.toArray(new IBindingSet[] {}));
+        
+        assertSameStats(expected, actual);
+        
+    }
+
+    /**
+	 * Unit test with two solutions having two variables which are bound in
+	 * every solution plus one variable which is bound in just one of the
+	 * solutions. The {@link IVCache} association is not set for all bound
+	 * variables in each solution.
+	 */
+    public void test_006a() {
+        
+        final IVariable x = Var.var("x");
+        final IVariable y = Var.var("y");
+        final IVariable z = Var.var("z");
+        
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+//		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+//		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+		five.setValue(f.createLiteral(5));
+		
+        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bset.set(z, asConst(five));
+            bsets.add(bset);
+        }
+
+        final ISolutionSetStats expected = new MySolutionStats(//
+				2,// nsolutions
+				asSet(x, y, z),// usedVars
+				asSet(z),// notAlwaysBound
+				asSet(x, y), // alwaysBound
+				asSet(z),// materialized
+				emptyMap// constants
+		);
 
         final ISolutionSetStats actual = newFixture(
                 bsets.toArray(new IBindingSet[] {}));
@@ -308,18 +557,38 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         final IVariable y = Var.var("y");
         final IVariable z = Var.var("z");
         
-        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+		five.setValue(f.createLiteral(5));
+
+		final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("3"));
-            bset.set(y, asConst("4"));
-            bset.set(z, asConst("5"));
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bset.set(z, asConst(five));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
             bsets.add(bset);
         }
 
@@ -328,6 +597,72 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 asSet(x, y, z),// usedVars
                 asSet(z),// notAlwaysBound
                 asSet(x, y), // alwaysBound
+                asSet(x, y, z),// materialized
+                emptyMap// constants
+        );
+
+        final ISolutionSetStats actual = newFixture(
+                bsets.toArray(new IBindingSet[] {}));
+        
+        assertSameStats(expected, actual);
+        
+    }
+
+    /**
+     * Unit test with two solutions having two variables which are bound in
+     * every solution plus one variable which is bound in just one of the
+     * solutions (this is the same as the previous test except that it presents
+     * the solutions in a different order to test the logic which detects
+     * variables which are not always bound and the variable which only 
+     * appears in one solution is not materialized in that solution).
+     */
+    public void test_007a() {
+        
+        final IVariable x = Var.var("x");
+        final IVariable y = Var.var("y");
+        final IVariable z = Var.var("z");
+        
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+//		five.setValue(f.createLiteral(5));
+
+		final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bset.set(z, asConst(five));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bsets.add(bset);
+        }
+
+        final ISolutionSetStats expected = new MySolutionStats(//
+                2,// nsolutions
+                asSet(x, y, z),// usedVars
+                asSet(z),// notAlwaysBound
+                asSet(x, y), // alwaysBound
+                asSet(x, y),// materialized
                 emptyMap// constants
         );
 
@@ -348,12 +683,32 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         final IVariable y = Var.var("y");
         final IVariable z = Var.var("z");
         
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+		five.setValue(f.createLiteral(5));
+        
         final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("3"));
-            bset.set(y, asConst("4"));
-            bset.set(z, asConst("5"));
+            bset.set(x, asConst(three));
+            bset.set(y, asConst(four));
+            bset.set(z, asConst(five));
             bsets.add(bset);
         }
         {
@@ -362,8 +717,8 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
             bsets.add(bset);
         }
 
@@ -371,7 +726,8 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 3,// nsolutions
                 asSet(x, y, z),// usedVars
                 asSet(x, y, z),// notAlwaysBound
-                asSet(), // alwaysBound,
+                asSet(), // alwaysBound
+                asSet(x, y, z),// materialized
                 emptyMap// constants
         );
 
@@ -393,26 +749,54 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         final IVariable y = Var.var("y");
         final IVariable z = Var.var("z");
         
-        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(f.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(f.createLiteral(2));
+		
+		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+				3);
+		three.setValue(f.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(f.createLiteral(4));
+		
+		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+				5);
+		five.setValue(f.createLiteral(5));
+
+		final XSDNumericIV<BigdataLiteral> six = new XSDNumericIV<BigdataLiteral>(
+				6);
+		six.setValue(f.createLiteral(6));
+
+		final XSDNumericIV<BigdataLiteral> seven = new XSDNumericIV<BigdataLiteral>(
+				7);
+		seven.setValue(f.createLiteral(7));
+
+		final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
-            bset.set(z, asConst("5"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bset.set(z, asConst(five));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
-            bset.set(z, asConst("6"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bset.set(z, asConst(six));
             bsets.add(bset);
         }
         {
             final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst("1"));
-            bset.set(y, asConst("2"));
-            bset.set(z, asConst("7"));
+            bset.set(x, asConst(one));
+            bset.set(y, asConst(two));
+            bset.set(z, asConst(seven));
             bsets.add(bset);
         }
 
@@ -421,8 +805,9 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 asSet(x, y, z),// usedVars
                 asSet(),// notAlwaysBound
                 asSet(x, y, z), // alwaysBound
+				asSet(x, y, z),// materialized
                 asMap(asArray(x, y),
-                        asArray(asConst("1"), asConst("2")))// constants
+                        asArray(asConst(one), asConst(two)))// constants
         );
 
         final ISolutionSetStats actual = newFixture(
@@ -452,20 +837,11 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         assertEquals("notAlwaysBound", expected.getNotAlwaysBound(),
                 actual.getNotAlwaysBound());
 
-		final Map<IVariable<?>, IConstant<?>> actualConstants = actual
-				.getConstants();
-
-		if (actualConstants != null) {
-			
-			/*
-			 * Since getConstants() is an optional method, we only check
-			 * the results when it is non-null.
-			 */
-
-			assertEquals("constants", expected.getConstants(),
-					actual.getConstants());
-		
-		}
+		assertEquals("materialized", expected.getMaterialized(),
+				actual.getMaterialized());
+        
+		assertEquals("constants", expected.getConstants(),
+				actual.getConstants());
 
     }
     
@@ -495,6 +871,12 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
          */
         protected final Set<IVariable> alwaysBound;
 
+		/**
+		 * The set of variables whose bound values always have their
+		 * {@link IVCache} assertion set (if the variable is bound).
+		 */
+        protected final Set<IVariable> materialized;
+        
         /**
          * The set of variables which are effective constants (they are bound in
          * every solution and always to the same value) together with their constant
@@ -506,6 +888,7 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
                 final Set<IVariable> usedVars,
                 final Set<IVariable> notAlwaysBound,
                 final Set<IVariable> alwaysBound,
+                final Set<IVariable> materialized,
                 final Map<IVariable, IConstant> constants
                 ) {
 
@@ -513,6 +896,7 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
             this.usedVars = usedVars;
             this.notAlwaysBound = notAlwaysBound;
             this.alwaysBound = alwaysBound;
+            this.materialized = materialized;
             this.constants = constants;
             
         }
@@ -535,6 +919,11 @@ abstract public class AbstractSolutionSetStatsTestCase extends TestCase2 {
         @Override
         public Set<IVariable<?>> getNotAlwaysBound() {
             return (Set) notAlwaysBound;
+        }
+
+        @Override
+        public Set<IVariable<?>> getMaterialized() {
+            return (Set) materialized;
         }
 
         @Override

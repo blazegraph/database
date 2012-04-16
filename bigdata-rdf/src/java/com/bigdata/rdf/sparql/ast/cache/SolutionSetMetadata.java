@@ -64,7 +64,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * schema. The size of the solution set should be visible when its metadata is
  * looked at as a graph.
  */
-final class SolutionSetMetadata {
+public final class SolutionSetMetadata {
 
     private static final Logger log = Logger
             .getLogger(SolutionSetMetadata.class);

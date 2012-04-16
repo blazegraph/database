@@ -71,6 +71,11 @@ public class EmptySolutionSetStats implements ISolutionSetStats {
     }
 
     @Override
+    public Set<IVariable<?>> getMaterialized() {
+        return Collections.emptySet();
+    }
+
+    @Override
     public Map<IVariable<?>, IConstant<?>> getConstants() {
         return Collections.emptyMap();
     }

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.cache;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.striterator.ICloseableIterator;
@@ -107,6 +108,17 @@ public interface ISparqlCache {
      */
     ICloseableIterator<IBindingSet[]> getSolutions(IEvaluationContext ctx,
             String solutionSet);
+
+    /**
+	 * Return computed statistics for a named solution set.
+	 * 
+	 * @param solutionSet
+	 *            The name of the solution set.
+	 *            
+	 * @return The statistics -or- <code>null</code> if there is no such named
+	 *         solution set.
+	 */
+	ISolutionSetStats getSolutionSetStats(String solutionSet);
 
     /**
      * Return <code>true</code> iff a named solution set exists.
