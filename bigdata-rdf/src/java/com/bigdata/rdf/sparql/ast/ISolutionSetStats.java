@@ -44,7 +44,7 @@ public interface ISolutionSetStats {
     /**
      * Return the #of solutions.
      */
-    int getSolutionSetSize();
+    long getSolutionSetSize();
 
     /**
      * Return the set of variables which in at least one solution.
@@ -62,10 +62,13 @@ public interface ISolutionSetStats {
     Set<IVariable<?>> getNotAlwaysBound();
 
     /**
-     * The set of variables which are effective constants (they are bound in
-     * every solution and always to the same value) together with their constant
-     * bindings.
-     */
+	 * The set of variables which are effective constants (they are bound in
+	 * every solution and always to the same value) together with their constant
+	 * bindings.
+	 * 
+	 * @return The set of variables which are effective constants -or-
+	 *         <code>null</code> if this information has not been computed.
+	 */
     Map<IVariable<?>, IConstant<?>> getConstants();
 
 }

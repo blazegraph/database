@@ -51,7 +51,7 @@ public class EmptySolutionSetStats implements ISolutionSetStats {
     }
     
     @Override
-    public int getSolutionSetSize() {
+    public long getSolutionSetSize() {
         return 1;
     }
 

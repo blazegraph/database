@@ -40,6 +40,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 
+
 /**
  * A set of interesting statistics on a solution set.
  * 
@@ -55,6 +56,8 @@ import com.bigdata.rdf.internal.impl.TermId;
  *          be small would be appropriate.
  *          <p>
  *          Note that this must correctly handle {@link TermId#mockIV(VTE)}s.
+ *          <p>
+ *          Or compute a bloom filter for a statistical summary.
  * 
  * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/490"> Mock IV /
  *      TermId hashCode()/equals() problems</a>
@@ -64,7 +67,7 @@ public class SolutionSetStats implements ISolutionSetStats {
     /**
      * The #of solutions.
      */
-    private final int nsolutions;
+    private final long nsolutions;
     
     /**
      * The set of variables observed across all solutions.
@@ -165,6 +168,11 @@ public class SolutionSetStats implements ISolutionSetStats {
         final Set<IVariable<?>> alwaysBound = new HashSet<IVariable<?>>(usedVars);
         alwaysBound.removeAll(notAlwaysBound);
         
+        // Expose immutable versions of these collections.
+        this.usedVars = Collections.unmodifiableSet(usedVars);
+        this.alwaysBound = Collections.unmodifiableSet(alwaysBound);
+        this.notAlwaysBound = Collections.unmodifiableSet(notAlwaysBound);
+        
         /*
          * Figure out which bindings are the same in every solution. These are
          * effective constants.
@@ -213,14 +221,9 @@ public class SolutionSetStats implements ISolutionSetStats {
             
         }
 
-        // Expose immutable versions of these collections.
-        this.usedVars = Collections.unmodifiableSet(usedVars);
-        this.alwaysBound = Collections.unmodifiableSet(alwaysBound);
-        this.notAlwaysBound = Collections.unmodifiableSet(notAlwaysBound);
-        
     }
-    
-    public final int getSolutionSetSize() {
+
+	public final long getSolutionSetSize() {
 
         return nsolutions;
         
