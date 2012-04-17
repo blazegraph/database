@@ -1,0 +1,4 @@
+# Note: By using SELECT * we can verify which bindings are present in the
+# named solution set.
+
+SELECT * WHERE { INCLUDE %solutionSet1 }

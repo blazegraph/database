@@ -47,7 +47,9 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -999,6 +1001,22 @@ public class BOpUtility {
      * An empty {@link IBindingSet}[].
      */
     public static final IBindingSet[] EMPTY_CHUNK = new IBindingSet[0];
+
+    /**
+	 * Wrap the solutions with an {@link ICloseableIterator}.
+	 * 
+	 * @param bindingSets
+	 *            The solutions.
+	 *            
+	 * @return The {@link ICloseableIterator}.
+	 */
+	public static ICloseableIterator<IBindingSet[]> asIterator(
+			final IBindingSet[] bindingSets) {
+
+		return new CloseableIteratorWrapper<IBindingSet[]>(
+				new SingleValueIterator<IBindingSet[]>(bindingSets));
+
+	}
     
     /**
      * Pretty print a bop.

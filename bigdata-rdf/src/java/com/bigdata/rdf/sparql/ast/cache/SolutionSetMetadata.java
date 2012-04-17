@@ -47,7 +47,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetDecoder;
 import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rwstore.PSOutputStream;
@@ -149,16 +148,20 @@ public final class SolutionSetMetadata {
     
     public ICloseableIterator<IBindingSet[]> get() {
 
-        final long solutionSetAddr = this.solutionSetAddr;
+		final long solutionSetAddr = this.solutionSetAddr;
 
-        if (solutionSetAddr == IRawStore.NULL)
-            throw new IllegalStateException();
+		if (solutionSetAddr == IRawStore.NULL)
+			throw new IllegalStateException();
 
-        try {
-            return new SolutionSetStreamDecoder(solutionSetAddr, solutionCount);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+		try {
+
+			return new SolutionSetStreamDecoder(solutionSetAddr, solutionCount);
+
+		} catch (IOException e) {
+
+			throw new RuntimeException(e);
+
+		}
 
     }
 
@@ -259,9 +262,10 @@ public final class SolutionSetMetadata {
 
                 // Nothing more to be read.
 
-                if (log.isDebugEnabled())
-                    log.debug("Read solutionSet: solutionSetSize=" + nsolutions);
-                
+				if (log.isDebugEnabled())
+					log.debug("Read solutionSet: name=" + name
+							+ ", solutionSetSize=" + nsolutions);
+
                 return null;
 
             }
@@ -290,15 +294,19 @@ public final class SolutionSetMetadata {
                 t[i] = decoder
                         .decodeSolution(buf, true/* resolveCachedValues */);
 
+				if (log.isTraceEnabled())
+					log.trace("Read: name=" + name + ", solution=" + t[i]);
+
             }
 
             // Update the #of solution sets which have been decoded.
             nsolutions += chunkSize;
 
             if (log.isTraceEnabled())
-                log.trace("Read chunk: chunkSize=" + chunkSize + ", bytesRead="
-                        + (CHUNK_HEADER_SIZE + byteLength)
-                        + ", solutionSetSize=" + nsolutions);
+				log.trace("Read chunk: name=" + name + ", chunkSize="
+						+ chunkSize + ", bytesRead="
+						+ (CHUNK_HEADER_SIZE + byteLength)
+						+ ", solutionSetSize=" + nsolutions);
 
             // Return the decoded solutions.
             return t;
@@ -369,6 +377,10 @@ public final class SolutionSetMetadata {
 
                         encoder.encodeSolution(buf, chunk[i]);
 
+						if (log.isTraceEnabled())
+							log.trace("Wrote name=" + name + ", solution="
+									+ chunk[i]);
+
                     }
 
                     // #of bytes written onto the buffer.
@@ -391,10 +403,10 @@ public final class SolutionSetMetadata {
                     chunkCount++;
 
                     if (log.isDebugEnabled())
-                        log.debug("Wrote chunk: chunkSize=" + chunk.length
-                                + ", chunkCount=" + chunkCount
-                                + ", bytesBuffered=" + bytesBuffered
-                                + ", solutionSetSize=" + nsolutions);
+						log.debug("Wrote chunk: name=" + name + ", chunkSize="
+								+ chunk.length + ", chunkCount=" + chunkCount
+								+ ", bytesBuffered=" + bytesBuffered
+								+ ", solutionSetSize=" + nsolutions);
 
                 }
 
@@ -411,9 +423,10 @@ public final class SolutionSetMetadata {
             newAddr = out.getAddr();
 
             if (log.isDebugEnabled())
-                log.debug("Wrote solutionSet: solutionSetSize=" + nsolutions
-                        + ", chunkCount=" + chunkCount + ", encodedBytes="
-                        + nbytes + ", bytesWritten=" + out.getBytesWritten());
+				log.debug("Wrote solutionSet: name=" + name
+						+ ", solutionSetSize=" + nsolutions + ", chunkCount="
+						+ chunkCount + ", encodedBytes=" + nbytes
+						+ ", bytesWritten=" + out.getBytesWritten());
 
         } catch (IOException e) {
 
@@ -448,9 +461,9 @@ public final class SolutionSetMetadata {
     }
 
     /**
-     * TODO Test performance with and without gzip. Extract into the CREATE
-     * schema.
-     */
+	 * TODO Test performance with and without gzip. Extract into the CREATE
+	 * schema so we can do this declaratively.
+	 */
     private static final boolean zip = true;
     
     private OutputStream wrapOutputStream(final OutputStream out)

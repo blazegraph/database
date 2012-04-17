@@ -22,13 +22,43 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
+Portions of this code are:
+
+Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+    * Neither the name of the copyright holder nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*/
+/*
  * Created on Sep 5, 2011
  */
 
 package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.Iterations;
-import info.aduna.text.StringUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,9 +69,7 @@ import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -50,14 +78,11 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.util.ModelUtil;
-import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
-import org.openrdf.query.QueryResultUtil;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.dawg.DAWGTestResultSetUtil;
-import org.openrdf.query.impl.MutableTupleQueryResult;
 import org.openrdf.query.impl.TupleQueryResultBuilder;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.BooleanQueryResultParserRegistry;
@@ -74,6 +99,7 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.rio.helpers.StatementCollector;
 
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
@@ -462,240 +488,25 @@ public class AbstractDataDrivenSPARQLTestCase extends
             
         }
 
-        private void compareTupleQueryResults(
-                final TupleQueryResult queryResult,
-                final TupleQueryResult expectedResult) throws Exception {
-            
-            /*
-             * Create MutableTupleQueryResult to be able to re-iterate over the
-             * results.
-             */
-            
-            final MutableTupleQueryResult queryResultTable = new MutableTupleQueryResult(queryResult);
-            
-            final MutableTupleQueryResult expectedResultTable = new MutableTupleQueryResult(expectedResult);
+		private void compareTupleQueryResults(
+				final TupleQueryResult queryResult,
+				final TupleQueryResult expectedResult)
+				throws QueryEvaluationException {
 
-            boolean resultsEqual;
-            if (laxCardinality) {
-                resultsEqual = QueryResultUtil.isSubset(queryResultTable, expectedResultTable);
-            }
-            else {
-                resultsEqual = QueryResultUtil.equals(queryResultTable, expectedResultTable);
-                
-                if (checkOrder) {
-                    // also check the order in which solutions occur.
-                    queryResultTable.beforeFirst();
-                    expectedResultTable.beforeFirst();
+			AbstractQueryEngineTestCase.compareTupleQueryResults(getName(),
+					testURI, store, astContainer, queryResult, expectedResult,
+					laxCardinality, checkOrder);
 
-                    while (queryResultTable.hasNext()) {
-                        final BindingSet bs = queryResultTable.next();
-                        final BindingSet expectedBs = expectedResultTable.next();
-                        
-                        if (! bs.equals(expectedBs)) {
-                            resultsEqual = false;
-                            break;
-                        }
-                    }
-                }
-            }
+		}
 
-            // Note: code block shows the expected and actual results.
-            StringBuilder expectedAndActualResults = null;
-            if (!resultsEqual && true) {
-                queryResultTable.beforeFirst();
-                expectedResultTable.beforeFirst();
-                final StringBuilder message = new StringBuilder(2048);
-                message.append("\n============ ");
-                message.append(getName());
-                message.append(" =======================\n");
-                message.append("Expected result: \n");
-                while (expectedResultTable.hasNext()) {
-                    message.append(expectedResultTable.next());
-                    message.append("\n");
-                }
-                message.append("=============");
-                StringUtil.appendN('=', getName().length(), message);
-                message.append("========================\n");
-                message.append("Query result: \n");
-                while (queryResultTable.hasNext()) {
-                    message.append(queryResultTable.next());
-                    message.append("\n");
-                }
-                message.append("=============");
-                StringUtil.appendN('=', getName().length(), message);
-                message.append("========================\n");
-                expectedAndActualResults = message;
-//                log.error(message);
-            }
+		private void compareGraphs(final Set<Statement> queryResult,
+				final Set<Statement> expectedResult) {
 
-            if (!resultsEqual) {
+			AbstractQueryEngineTestCase.compareGraphs(getName(), queryResult,
+					expectedResult);
+		}
 
-                queryResultTable.beforeFirst();
-                expectedResultTable.beforeFirst();
-
-                final List<BindingSet> queryBindings = Iterations.asList(queryResultTable);
-                final List<BindingSet> expectedBindings = Iterations.asList(expectedResultTable);
-
-                final List<BindingSet> missingBindings = new ArrayList<BindingSet>(expectedBindings);
-                missingBindings.removeAll(queryBindings);
-
-                final List<BindingSet> unexpectedBindings = new ArrayList<BindingSet>(queryBindings);
-                unexpectedBindings.removeAll(expectedBindings);
-
-                final StringBuilder message = new StringBuilder(2048);
-                message.append("\n");
-                message.append(testURI);
-                message.append("\n");
-                message.append(getName());
-                message.append("\n===================================\n");
-
-                if (!missingBindings.isEmpty()) {
-
-                    message.append("Missing bindings: \n");
-                    for (BindingSet bs : missingBindings) {
-                        message.append(bs);
-                        message.append("\n");
-                    }
-
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-                }
-
-                if (!unexpectedBindings.isEmpty()) {
-                    message.append("Unexpected bindings: \n");
-                    for (BindingSet bs : unexpectedBindings) {
-                        message.append(bs);
-                        message.append("\n");
-                    }
-
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-                }
-                
-                if (checkOrder && missingBindings.isEmpty() && unexpectedBindings.isEmpty()) {
-                    message.append("Results are not in expected order.\n");
-                    message.append(" =======================\n");
-                    message.append("query result: \n");
-                    for (BindingSet bs: queryBindings) {
-                        message.append(bs);
-                        message.append("\n");
-                    }
-                    message.append(" =======================\n");
-                    message.append("expected result: \n");
-                    for (BindingSet bs: expectedBindings) {
-                        message.append(bs);
-                        message.append("\n");
-                    }
-                    message.append(" =======================\n");
-
-                    log.error(message.toString());
-                }
-
-                if (expectedAndActualResults != null) {
-                    message.append(expectedAndActualResults);
-                }
-                
-//                    RepositoryConnection con = ((DatasetRepository)dataRep).getDelegate().getConnection();
-//                    System.err.println(con.getClass());
-//                    try {
-                    message.append("\n===================================\n");
-                    message.append(astContainer.toString());
-                    if(store.getStatementCount()<100) {
-                    message.append("\n===================================\n");
-                    message.append("database dump:\n");
-                    message.append(store.dumpStore());
-                    }
-//                        RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
-//                        while (stmts.hasNext()) {
-//                            message.append(stmts.next());
-//                            message.append("\n");
-//                        }
-//                    } finally {
-//                        con.close();
-//                    }
-                    
-                log.error(message.toString());
-                fail(message.toString());
-            }
-                /* debugging only: print out result when test succeeds 
-                else {
-                    queryResultTable.beforeFirst();
-
-                    List<BindingSet> queryBindings = Iterations.asList(queryResultTable);
-                    StringBuilder message = new StringBuilder(128);
-
-                    message.append("\n============ ");
-                    message.append(getName());
-                    message.append(" =======================\n");
-
-                    message.append(" =======================\n");
-                    message.append("query result: \n");
-                    for (BindingSet bs: queryBindings) {
-                        message.append(bs);
-                        message.append("\n");
-                    }
-                    
-                    System.out.print(message.toString());
-                }
-                */
-            }
-
-            private void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
-                throws Exception
-            {
-                if (!ModelUtil.equals(expectedResult, queryResult)) {
-                    // Don't use RepositoryUtil.difference, it reports incorrect diffs
-                    /*
-                     * Collection<? extends Statement> unexpectedStatements =
-                     * RepositoryUtil.difference(queryResult, expectedResult); Collection<?
-                     * extends Statement> missingStatements =
-                     * RepositoryUtil.difference(expectedResult, queryResult);
-                     * StringBuilder message = new StringBuilder(128);
-                     * message.append("\n=======Diff: "); message.append(getName());
-                     * message.append("========================\n"); if
-                     * (!unexpectedStatements.isEmpty()) { message.append("Unexpected
-                     * statements in result: \n"); for (Statement st :
-                     * unexpectedStatements) { message.append(st.toString());
-                     * message.append("\n"); } message.append("============="); for (int i =
-                     * 0; i < getName().length(); i++) { message.append("="); }
-                     * message.append("========================\n"); } if
-                     * (!missingStatements.isEmpty()) { message.append("Statements missing
-                     * in result: \n"); for (Statement st : missingStatements) {
-                     * message.append(st.toString()); message.append("\n"); }
-                     * message.append("============="); for (int i = 0; i <
-                     * getName().length(); i++) { message.append("="); }
-                     * message.append("========================\n"); }
-                     */
-                    StringBuilder message = new StringBuilder(128);
-                    message.append("\n============ ");
-                    message.append(getName());
-                    message.append(" =======================\n");
-                    message.append("Expected result: \n");
-                    for (Statement st : expectedResult) {
-                        message.append(st.toString());
-                        message.append("\n");
-                    }
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-
-                    message.append("Query result: \n");
-                    for (Statement st : queryResult) {
-                        message.append(st.toString());
-                        message.append("\n");
-                    }
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-
-                    log.error(message.toString());
-                    fail(message.toString());
-                }
-            }
-            
-        protected InputStream getResourceAsStream(final String resource) {
+		protected InputStream getResourceAsStream(final String resource) {
 
             // try the classpath
             InputStream is = getClass().getResourceAsStream(resource);

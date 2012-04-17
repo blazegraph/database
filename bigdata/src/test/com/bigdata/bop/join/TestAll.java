@@ -78,6 +78,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHTreeHashIndexOp.class);
         suite.addTestSuite(TestHTreeSolutionSetHashJoin.class);
         
+		/*
+		 * Test suite for join against a named solution set when the left
+		 * cardinality is low.
+		 */
+		suite.addTestSuite(TestNamedSolutionSetScanOp.class);
+
         return suite;
         
     }

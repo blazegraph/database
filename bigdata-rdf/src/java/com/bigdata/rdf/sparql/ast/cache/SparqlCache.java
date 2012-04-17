@@ -116,9 +116,6 @@ import com.bigdata.striterator.ICloseableIterator;
  *      makes the cache somewhat more difficult to integration since the same
  *      query is not always the same (e.g., include the hash of the exogenous
  *      solutions in the query hash code and we will get less reuse).
- *      
- *      TODO If the {@link IEvaluationContext} is not required, then back it
- *      out of the method signatures.
  */
 public class SparqlCache implements ISparqlCache {
 
@@ -364,7 +361,7 @@ public class SparqlCache implements ISparqlCache {
     }
 
     @Override
-    public boolean clearSolutions(final IEvaluationContext ctx, final String solutionSet) {
+    public boolean clearSolutions(final String solutionSet) {
 
         if (log.isInfoEnabled())
             log.info("solutionSet: " + solutionSet);
@@ -382,8 +379,8 @@ public class SparqlCache implements ISparqlCache {
         
     }
 
-    public void putSolutions(final IEvaluationContext ctx, final String solutionSet,
-            final ICloseableIterator<IBindingSet[]> src) {
+	public void putSolutions(final String solutionSet,
+			final ICloseableIterator<IBindingSet[]> src) {
 
         if (solutionSet == null)
             throw new IllegalArgumentException();
@@ -415,8 +412,7 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
-    public void createSolutions(final IEvaluationContext ctx,
-            final String solutionSet, final ISPO[] params) {
+	public void createSolutions(final String solutionSet, final ISPO[] params) {
 
         if (solutionSet == null)
             throw new IllegalArgumentException();
@@ -469,8 +465,8 @@ public class SparqlCache implements ISparqlCache {
         
     }
     
-    public ICloseableIterator<IBindingSet[]> getSolutions(final IEvaluationContext ctx,
-            final String solutionSet) {
+	public ICloseableIterator<IBindingSet[]> getSolutions(
+			final String solutionSet) {
 
         if (solutionSet == null)
             throw new IllegalArgumentException();
@@ -485,8 +481,7 @@ public class SparqlCache implements ISparqlCache {
 
     }
 
-    public boolean existsSolutions(final IEvaluationContext ctx,
-            final String solutionSet) {
+    public boolean existsSolutions(final String solutionSet) {
 
         if (solutionSet == null)
             throw new IllegalArgumentException();

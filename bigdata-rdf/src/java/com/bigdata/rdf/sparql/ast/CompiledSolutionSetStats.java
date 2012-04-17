@@ -148,4 +148,21 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 
 	}
 
+	public String toString() {
+
+		final StringBuilder sb = new StringBuilder();
+
+		sb.append(super.toString());
+		sb.append("{size=" + nsolutions);
+		sb.append(",usedVars=" + usedVars);
+		sb.append(",alwaysBound=" + alwaysBound);
+		sb.append(",notAlwaysBound=" + notAlwaysBound);
+		sb.append(",materialized=" + materialized);
+		sb.append(",constants=" + constants);
+		sb.append("}");
+
+		return sb.toString();
+		
+	}
+	
 }

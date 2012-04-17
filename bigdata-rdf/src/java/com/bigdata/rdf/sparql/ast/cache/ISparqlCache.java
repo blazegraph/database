@@ -61,7 +61,7 @@ public interface ISparqlCache {
      * @return <code>true</code> iff a solution set by that name existed and was
      *         cleared.
      */
-    boolean clearSolutions(IEvaluationContext ctx, String solutionSet);
+    boolean clearSolutions(String solutionSet);
 
     /**
      * Clear all named solution sets.
@@ -71,7 +71,6 @@ public interface ISparqlCache {
     /**
      * Create a named solution set.
      * 
-     * @param ctx
      * @param solutionSet
      *            The name of the solution set.
      * @param params
@@ -80,24 +79,21 @@ public interface ISparqlCache {
      * @throws RuntimeException
      *             if a solution set exists for that name.
      */
-    void createSolutions(IEvaluationContext ctx, String solutionSet, ISPO[] params);
+    void createSolutions(String solutionSet, ISPO[] params);
 
     /**
      * Save the solutions a named solution set.
      * 
-     * @param ctx
      * @param solutionSet
      *            The name of the solution set.
      * @param src
      *            The solutions.
      */
-    void putSolutions(IEvaluationContext ctx, String solutionSet,
-            ICloseableIterator<IBindingSet[]> src);
+	void putSolutions(String solutionSet, ICloseableIterator<IBindingSet[]> src);
 
     /**
      * Read the solutions from a named solution set.
      * 
-     * @param ctx
      * @param solutionSet
      *            The name of the solution set.
      * 
@@ -106,8 +102,7 @@ public interface ISparqlCache {
      * @throws IllegalStateException
      *             if no solution set with that name exists.
      */
-    ICloseableIterator<IBindingSet[]> getSolutions(IEvaluationContext ctx,
-            String solutionSet);
+	ICloseableIterator<IBindingSet[]> getSolutions(String solutionSet);
 
     /**
 	 * Return computed statistics for a named solution set.
@@ -123,13 +118,12 @@ public interface ISparqlCache {
     /**
      * Return <code>true</code> iff a named solution set exists.
      * 
-     * @param ctx
      * @param solutionSet
      *            The name of the solution set.
      *            
      * @return <code>true</code> iff a solution set having that name exists.
      */
-    boolean existsSolutions(IEvaluationContext ctx, String solutionSet);
+    boolean existsSolutions(String solutionSet);
     
 //    /**
 //     * Return the result from the cache -or- <code>null</code> if there is a

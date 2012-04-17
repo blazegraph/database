@@ -60,14 +60,17 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * Test suite for the {@link ASTNamedSubqueryOptimizer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestASTNamedSubqueryOptimizer.java 6281 2012-04-12 17:27:36Z
+ *          thompsonbry $
  * 
  *          FIXME Add unit test where there are no join variables because there
  *          is nothing which must be bound in one context or the other.
  * 
  *          FIXME Add unit test where there are no join variables because the
  *          named solution set is included from multiple locations without any
- *          overlap in the incoming bindings.
+ *          overlap in the incoming bindings (consider doing a hash index build
+ *          for each include location other than the most specific location (the
+ *          one with the most possible join variables)).
  * 
  *          FIXME Add unit test where there are join variables, but they are
  *          only those which overlap for the different locations at which the

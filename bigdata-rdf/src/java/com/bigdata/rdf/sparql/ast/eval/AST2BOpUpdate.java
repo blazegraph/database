@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import info.aduna.iteration.CloseableIteration;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -37,6 +39,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -46,6 +49,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.UpdateExecutionException;
@@ -78,13 +82,16 @@ import com.bigdata.bop.rdf.update.InsertStatementsOp;
 import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.AddGraph;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
@@ -95,6 +102,7 @@ import com.bigdata.rdf.sparql.ast.DropGraph;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
@@ -110,7 +118,12 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
+import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Class handles SPARQL update query plan generation.
@@ -475,31 +488,39 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             if (isDeleteInsert) {
                 
                 /*
-                 * DELETE + INSERT.
-                 * 
-                 * Note: The semantics of DELETE + INSERT are that the WHERE
-                 * clause is executed once. The solutions to that need to be fed
-                 * once through the DELETE clause. After the DELETE clauss has
-                 * been processed for all solutions to the WHERE clause, the
-                 * INSERT clause is then processed. So, we need to materalize
-                 * the WHERE clause results when both the DELETE clause and the
-                 * INSERT clause are present.
-                 * 
-                 * FIXME For large intermediate results, we would be much better
-                 * off putting the data onto an HTree and processing the
-                 * bindings as IVs rather than materializing them as RDF Values
-                 * (and even for small data sets, we would be better off
-                 * avoiding materialization of the RDF Values and using an
-                 * ASTConstructIterator which builds ISPOs using IVs rather than
-                 * Values).
-                 * 
-                 * FIXME Support INSERT INTO / DELETE FROM here.
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
-                 * (SPARQL Cache)
-                 */
+				 * DELETE + INSERT.
+				 * 
+				 * Note: The semantics of DELETE + INSERT are that the WHERE
+				 * clause is executed once. The solutions to that need to be fed
+				 * once through the DELETE clause. After the DELETE clauss has
+				 * been processed for all solutions to the WHERE clause, the
+				 * INSERT clause is then processed. So, we need to materalize
+				 * the WHERE clause results when both the DELETE clause and the
+				 * INSERT clause are present.
+				 * 
+				 * FIXME For large intermediate results, we would be much better
+				 * off putting the data onto an HTree (or, better yet, a chain
+				 * of blocks) and processing the bindings as IVs rather than
+				 * materializing them as RDF Values (and even for small data
+				 * sets, we would be better off avoiding materialization of the
+				 * RDF Values and using an ASTConstructIterator which builds
+				 * ISPOs using IVs rather than Values).
+				 * 
+				 * Note: Unlike operations against a graph, we do NOT perform
+				 * truth maintenance for updates against solution sets,
+				 * therefore we could get by nicely with operations on
+				 * IBindingSet[]s without RDF Value materialization.
+				 * 
+				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/524
+				 * (SPARQL Cache)
+				 */
 
-                // Run as a SELECT query.
+				final LexiconRelation lexicon = context
+						.getAbstractTripleStore().getLexiconRelation();
+
+				final int chunkSize = 100; // TODO configure.
+				
+            		// Run as a SELECT query.
                 final MutableTupleQueryResult result = new MutableTupleQueryResult(
                         ASTEvalHelper.evaluateTupleQuery(context.db,
                                 astContainer, null/* bindingSets */));
@@ -512,23 +533,170 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         // rewind.
                         result.beforeFirst();
 
-                        final ConstructNode template = op.getDeleteClause()
-                                .getQuadData().flatten();
+                        // Figure out if operating on solutions or graphs.
+                        final boolean isSolutionSet = deleteClause.isSolutions();
 
-                        final ASTConstructIterator itr = new ASTConstructIterator(
-                                context.conn.getTripleStore(), template, result);
+						if (isSolutionSet) {
 
-                        while (itr.hasNext()) {
+							/*
+							 * Target is solution set.
+							 * 
+							 * @see
+							 * https://sourceforge.net/apps/trac/bigdata/ticket
+							 * /524 (SPARQL Cache)
+							 * 
+							 * FIXME The DELETE+INSERT code path is failing
+							 * because it is based on the DELETE FROM SELECT
+							 * code path below and attempts to rewrite the query
+							 * to use a MINUS operator. However, the setup is
+							 * different in this case since we have already run
+							 * the original WHERE clause into a rewindable tuple
+							 * result set.
+							 * 
+							 * The best way to fix this would be to stay within
+							 * the native IBindingSet[] model and write the
+							 * solutions from the WHERE clause onto a chained
+							 * list of blocks, just as we do when writing on a
+							 * named solution set. That chained list could then
+							 * be joined into the query with an INCLUDE. Since
+							 * we do not want this "temporary" solution set to
+							 * be visible, we could prefix it with a UUID and
+							 * make sure that it is written onto a memory
+							 * manager, and also make sure that we eventually
+							 * delete the named solution set since it should be
+							 * temporary.
+							 * 
+							 * Another way to handle this is to flow the
+							 * solutions from a solution set into a new query
+							 * which as the appropriate MINUS logic [This does
+							 * not work because the solutions wind up on the
+							 * LEFT side of the MINUS but they need to be on the
+							 * RIGHT]. Here, the solutions would appear on the
+							 * pipeline rather than being joined in. The result
+							 * is the same. This would make it easier to manage
+							 * the visibility of the solutions. Note that there
+							 * is no API to flow an
+							 * ICloseableIterator<IBindingSet[]> into an
+							 * IRunningQuery. Only an IBindingSet[]. However, we
+							 * might be able to wrap up the named solution set
+							 * as an IChunkMessage.
+							 */
 
-                            final BigdataStatement stmt = itr.next();
+							// The named solution set on which we will write.
+							final String solutionSet = deleteClause.getName();
 
-                            addOrRemoveStatement(
-                                    context.conn.getSailConnection(), stmt,
-                                    false/* insert */);
+							// A unique named solution set used to INCLUDE the
+							// solutions to be deleted.
+							final String tempSolutionSet = "-" + solutionSet
+									+ "-" + UUID.randomUUID();
 
-                        }
+							// Write solutions to be deleted onto temp set.
+							context.sparqlCache.putSolutions(
+									tempSolutionSet,
+									asBigdataIterator(lexicon, chunkSize,
+											result));
 
-                    }
+							try {
+
+								/*
+								 * Replace WHERE clause with an join group
+								 * containing an INCLUDE for the solutions to be
+								 * removed.
+								 * 
+								 * WHERE := { INCLUDE %namedSet MINUS {INCLUDE %temp} }
+								 * 
+								 * FIXME This is failing (I think) because
+								 * the named solution set is not visible. 
+								 * It looks like it might be only visible
+								 * when using a SCAN?!?
+								 */
+//								final JoinGroupNode oldWhereClause = (JoinGroupNode) queryRoot
+//										.getWhereClause();
+						    	    
+								final JoinGroupNode newWhereClause = new JoinGroupNode();
+								queryRoot.setWhereClause(newWhereClause);
+						    	    
+								// Include the source solutions.
+								newWhereClause.addArg(new NamedSubqueryInclude(
+										solutionSet));
+								
+								// MINUS solutions to be removed.
+								final JoinGroupNode minusOp = new JoinGroupNode(
+										new NamedSubqueryInclude(
+												tempSolutionSet));
+								newWhereClause.addArg(minusOp);
+								minusOp.setMinus(true);
+
+//						    	    log.error("oldWhereClause="+oldWhereClause);
+//						    	    log.error("newWhereClause="+newWhereClause);
+
+//								/*
+//								 * Re-write the AST to handle DELETE solutions.
+//								 */
+//								convertQueryForDeleteSolutions(queryRoot,
+//										solutionSet);
+
+								// Set the projection node.
+								queryRoot.setProjection(deleteClause
+										.getProjection());
+
+								// Run as a SELECT query : Do NOT materialize IVs.
+								final ICloseableIterator<IBindingSet[]> titr = ASTEvalHelper
+										.evaluateTupleQuery2(context.db,
+												astContainer,
+												null/* bindingSets */, false/* materialize */);
+
+								try {
+
+									// Write onto named solution set.
+									context.sparqlCache.putSolutions(
+											solutionSet, titr);
+
+								} finally {
+
+									titr.close();
+
+								}
+
+							} finally {
+
+								/*
+								 * Make sure that we do not leave this hanging
+								 * around.
+								 */
+
+								context.sparqlCache
+										.clearSolutions(tempSolutionSet);
+
+							}
+
+						} else {
+
+							/*
+							 * DELETE triples/quads constructed from the
+							 * solutions.
+							 */
+							
+							final ConstructNode template = op.getDeleteClause()
+									.getQuadData().flatten();
+
+							final ASTConstructIterator itr = new ASTConstructIterator(
+									context.conn.getTripleStore(), template,
+									result);
+
+							while (itr.hasNext()) {
+
+								final BigdataStatement stmt = itr.next();
+
+								addOrRemoveStatement(
+										context.conn.getSailConnection(), stmt,
+										false/* insert */);
+
+							}
+
+						}
+
+					}
 
                     // Play it once through the INSERT clause.
                     {
@@ -536,23 +704,67 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         // rewind.
                         result.beforeFirst();
 
-                        final ConstructNode template = op.getInsertClause()
-                                .getQuadData().flatten();
+                        // Figure out if operating on solutions or graphs.
+                        final boolean isSolutionSet = insertClause.isSolutions();
 
-                        final ASTConstructIterator itr = new ASTConstructIterator(
-                                context.conn.getTripleStore(), template, result);
+						if (isSolutionSet) {
 
-                        while (itr.hasNext()) {
+							/*
+							 * Target is solution set.
+							 * 
+							 * @see
+							 * https://sourceforge.net/apps/trac/bigdata/ticket
+							 * /524 (SPARQL Cache)
+							 */
 
-                            final BigdataStatement stmt = itr.next();
+							// The named solution set on which we will write.
+							final String solutionSet = insertClause.getName();
 
-                            addOrRemoveStatement(
-                                    context.conn.getSailConnection(), stmt,
-                                    true/* insert */);
+							// Set the projection node.
+							queryRoot.setProjection(insertClause.getProjection());
 
-                        }
+							final ICloseableIterator<IBindingSet[]> titr = asBigdataIterator(
+									lexicon, chunkSize, result);
 
-                    }
+							try {
+
+								// Write the solutions onto the named solution
+								// set.
+								context.sparqlCache.putSolutions(solutionSet,
+										titr);
+
+							} finally {
+
+								titr.close();
+
+							}
+
+						} else {
+							
+							/*
+							 * INSERT triples/quads CONSTRUCTed from solutions.
+							 */
+							
+							final ConstructNode template = op.getInsertClause()
+									.getQuadData().flatten();
+
+							final ASTConstructIterator itr = new ASTConstructIterator(
+									context.conn.getTripleStore(), template,
+									result);
+
+							while (itr.hasNext()) {
+
+								final BigdataStatement stmt = itr.next();
+
+								addOrRemoveStatement(
+										context.conn.getSailConnection(), stmt,
+										true/* insert */);
+
+							}
+
+						}
+
+					}
 
                 } finally {
 
@@ -581,7 +793,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 
                 assert clause != null;
 
-                // Figure out whether we are insert or deleting solutions.
+                // Figure out if operating on solutions or graphs.
                 final boolean isSolutionSet = clause.isSolutions();
 
                 if(isSolutionSet) {
@@ -599,19 +811,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     // Set the projection node.
                     queryRoot.setProjection(clause.getProjection());
 
-                    if (!isInsert) {
-                        /*
-                         * FIXME We need to find and remove the matching
-                         * solutions. Probably the best way to do that is to
-                         * transform the WHERE clause with a MINUS joining
-                         * against the target solution set via an INCLUDE. The
-                         * solutions which are produced by the query can then be
-                         * written directly onto the named solution set. That
-                         * way, both DELETE and INSERT will wind up as
-                         * putSolutions().
-                         */
-                        throw new UnsupportedOperationException();
-                    }
+					if (!isInsert) {
+
+						/*
+						 * Re-write the AST to handle DELETE solutions.
+						 */
+						
+						convertQueryForDeleteSolutions(queryRoot, solutionSet);
+						
+					}
                     
                     // Run as a SELECT query : Do NOT materialize IVs.
                     final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
@@ -621,8 +829,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     try {
 
                         // Write the solutions onto the named solution set.
-                        context.sparqlCache.putSolutions(context, solutionSet,
-                                result);
+						context.sparqlCache.putSolutions(solutionSet, result);
 
                     } finally {
 
@@ -685,6 +892,110 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
     }
 
+	/**
+	 * Efficiently resolve openrdf {@link BindingSet} into a chunked bigdata
+	 * {@link IBindingSet}[] iterator. The closeable semantics of the iteration
+	 * pattern are preserved.
+	 * 
+	 * @param r
+	 *            The {@link LexiconRelation}.
+	 * @param chunkSize
+	 *            When converting the openrdf binding set iteration pattern into
+	 *            a chunked iterator pattern, this will be the target chunk
+	 *            size.
+	 * @param result
+	 *            The openrdf solutions.
+	 * @return An iterator visiting chunked bigdata solutions.
+	 * 
+	 *         TODO We should not have to do this. We should stay within native
+	 *         bigdata IBindingSet[]s and the native bigdata iterators
+	 */
+	private static ICloseableIterator<IBindingSet[]> asBigdataIterator(
+			final LexiconRelation r,
+			final int chunkSize,
+			final CloseableIteration<BindingSet, QueryEvaluationException> result) {
+		
+		// Wrap with streaming iterator pattern.
+		final Striterator sitr = new Striterator(
+				// Chunk up the openrdf solutions.
+				new Chunkerator<BindingSet>(
+						// Convert the Sesame iteration into a Bigdata iterator.
+						new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+								result), chunkSize));
+
+		// Add filter to batch resolve BindingSet[] => IBindingSet[].
+		sitr.addFilter(new Resolver() {
+			
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			protected Object resolve(Object obj) {
+
+				// Visiting openrdf BindingSet[] chunks.
+				final BindingSet[] in = (BindingSet[]) obj;
+				
+				// Batch resolve to IBindingSet[].
+				final IBindingSet[] out = BigdataOpenRDFBindingSetsResolverator
+						.resolveChunk(r, in);
+				
+				// Return Bigdata IBindingSet[].
+				return out;
+			}
+		});
+		
+		return sitr;
+
+	}
+
+    /**
+	 * We need to find and remove the matching solutions. We handle this by
+	 * transforming the WHERE clause with a MINUS joining against the target
+	 * solution set via an INCLUDE. The solutions which are produced by the
+	 * query can then be written directly onto the named solution set. That way,
+	 * both DELETE and INSERT will wind up as putSolutions().
+	 * 
+	 * <pre>
+	 * WHERE {...}
+	 * </pre>
+	 * 
+	 * is rewritten as
+	 * 
+	 * <pre>
+	 * WHERE { INCLUDE %namedSet MINUS { ... } }
+	 * </pre>
+	 * 
+	 * TODO If there is a BIND() to a constant in the SELECT expression, then
+	 * this transform will not capture that binding. We would also need to
+	 * process the PROJECTION and pull down any constants into BIND()s in the
+	 * WHERE clause.
+	 */
+	private static void convertQueryForDeleteSolutions(
+			final QueryRoot queryRoot, final String solutionSet) {
+
+		final JoinGroupNode oldWhereClause = (JoinGroupNode) queryRoot
+				.getWhereClause();
+    	    
+		final JoinGroupNode newWhereClause = new JoinGroupNode();
+    	    
+		queryRoot.setWhereClause(newWhereClause);
+    	    
+		final NamedSubqueryInclude includeOp = new NamedSubqueryInclude(solutionSet);
+    	    
+		newWhereClause.addArg(includeOp);
+    	    
+		final JoinGroupNode minusOp = new JoinGroupNode();
+    	    
+		minusOp.setMinus(true);
+    	    
+		newWhereClause.addArg(minusOp);
+    	    
+		minusOp.addArg(oldWhereClause.clone());
+		
+//    	    log.error("oldWhereClause="+oldWhereClause);
+//    	    log.error("newWhereClause="+newWhereClause);
+
+    }
+    
     /**
      * Copy all statements from source to target.
      * 
@@ -1222,7 +1533,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (solutionSet != null) {
 
             // Clear the named solution set.
-            if (!context.sparqlCache.clearSolutions(context, solutionSet) && !silent) {
+            if (!context.sparqlCache.clearSolutions(solutionSet) && !silent) {
 
                 throw new SailException("solutionSet=" + solutionSet);
                 
@@ -1314,38 +1625,38 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
-     * GRAPHS : If the graph already exists (context has at least one
-     * statement), then this is an error (unless SILENT). Otherwise it is a NOP.
-     * <p>
-     * SOLUTIONS : If the named solution set already exists (is registered, but
-     * may be empty), then this is an error (unless SILENT). Otherwise, the
-     * named solution set is provisioned according to the optional parameters.
-     * 
-     * @param left
-     * @param op
-     * @param context
-     * @return
-     */
-    private static PipelineOp convertCreateGraph(final PipelineOp left,
-            final CreateGraph op, final AST2BOpUpdateContext context) {
+	 * GRAPHS : If the graph already exists (context has at least one
+	 * statement), then this is an error (unless SILENT). Otherwise it is a NOP.
+	 * <p>
+	 * SOLUTIONS : If the named solution set already exists (is registered, but
+	 * may be empty), then this is an error (unless SILENT). Otherwise, the
+	 * named solution set is provisioned according to the optional parameters.
+	 * 
+	 * @param left
+	 * @param op
+	 * @param context
+	 * @return
+	 */
+	private static PipelineOp convertCreateGraph(final PipelineOp left,
+			final CreateGraph op, final AST2BOpUpdateContext context) {
 
-        if (op.isTargetSolutionSet()) {
+		if (op.isTargetSolutionSet()) {
 
-            final String solutionSet = op.getTargetSolutionSet();
+			final String solutionSet = op.getTargetSolutionSet();
 
-            final boolean exists = context.sparqlCache.existsSolutions(context,
-                    solutionSet);
-            
-            if (!op.isSilent() && exists) {
+			final boolean exists = context.sparqlCache
+					.existsSolutions(solutionSet);
 
-                throw new RuntimeException("Solutions exists:" + solutionSet);
+			if (!op.isSilent() && exists) {
 
-            }
+				throw new RuntimeException("Solutions exists:" + solutionSet);
 
-            if (!exists) {
+			}
 
-                context.sparqlCache.createSolutions(context, solutionSet,
-                        op.getParams());
+			if (!exists) {
+
+				context.sparqlCache
+						.createSolutions(solutionSet, op.getParams());
 
             }
             

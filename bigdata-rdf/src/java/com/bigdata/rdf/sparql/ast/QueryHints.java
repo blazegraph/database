@@ -404,5 +404,5 @@ public interface QueryHints {
      * used currently when there is a single datatype for attribute values.
      */
     String RANGE_SAFE = "rangeSafe";
-    
+        
 }

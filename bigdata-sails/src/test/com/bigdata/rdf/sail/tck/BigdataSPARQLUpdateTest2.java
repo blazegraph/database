@@ -48,6 +48,7 @@ import junit.framework.TestCase2;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.QueryResultUtil;
 import org.openrdf.query.TupleQueryResult;
@@ -60,6 +61,7 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -303,7 +305,26 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
     }
 
-    /**
+	protected void compareTupleQueryResults(
+			final TupleQueryResult queryResult,
+			final TupleQueryResult expectedResult
+			)
+			throws QueryEvaluationException {
+
+		AbstractQueryEngineTestCase.compareTupleQueryResults(
+				getName(),
+				getName(),//testURI,
+				null, // store
+				null, // astContainer
+				queryResult,//
+				expectedResult,//
+				false,// laxCardinality,
+				false // checkOrder
+				);
+
+	}
+
+	/**
      * Note: This method may be overridden in order to run the test suite
      * against other variations of the bigdata backend.
      */
@@ -353,11 +374,15 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     }
 
 //    @Override
-    protected Repository createRepository() throws Exception {
-        Repository repo = newRepository();
-        repo.initialize();
-        return repo;
-    }
+	protected Repository createRepository() throws Exception {
+
+		Repository repo = newRepository();
+
+		repo.initialize();
+
+		return repo;
+
+	}
 
 //    @Override
     protected Repository newRepository() throws RepositoryException {
@@ -399,7 +424,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * solutions are present using a query and an INCLUDE join against the named
      * solution set.
      */
-    public void test_insertIntoSolutions() throws Exception {
+    public void test_insertIntoSolutions_01() throws Exception {
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -432,6 +457,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
             sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
             sb.append("SELECT ?x ?name\n");
+//            sb.append("SELECT *\n");
             sb.append("WHERE {\n");
             sb.append("  INCLUDE %namedSet1 .\n");
             sb.append("  ?x rdfs:label \"Mike\" .\n");
@@ -440,10 +466,10 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             final TupleQueryResult ret = con.prepareTupleQuery(
                     QueryLanguage.SPARQL, sb.toString()).evaluate();
             
-            final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
-                    + "test01.srx");
+			final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
+					+ "test_insertIntoSolutions_01.srx");
 
-            QueryResultUtil.equals(ret, expected);
+            compareTupleQueryResults(ret, expected);
 
         }
         
@@ -455,7 +481,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
      * solutions and verifies that they are no longer reported by query as a
      * post-condition.
      */
-    public void test_deleteFromSolutions() throws Exception {
+    public void test_deleteFromSolutions_01() throws Exception {
 
         loadDataset(packagePath + "dataset-01.trig");
 
@@ -487,8 +513,84 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
             sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
             sb.append("DELETE FROM %namedSet1\n");
-            sb.append("SELECT (<http://www.bigdata.com/> as ?x) (\"Mike\" as ?name)\n");
-            sb.append("WHERE { }\n");
+			sb.append("SELECT * \n");
+			sb.append("WHERE { \n");
+			sb.append("   BIND(<http://www.bigdata.com/Mike> as ?x)\n");
+			sb.append("   BIND(\"Mike\" as ?name)\n");
+			sb.append("}\n");
+
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+
+        // Query it.
+        {
+         
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  INCLUDE %namedSet1 .\n");
+            sb.append("}\n");
+            
+            final TupleQueryResult ret = con.prepareTupleQuery(
+                    QueryLanguage.SPARQL, sb.toString()).evaluate();
+            
+            final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
+                    + "test_deleteFromSolutions_01.srx");
+
+            compareTupleQueryResults(ret, expected);
+
+        }
+
+    }
+
+    /**
+     * Unit test for <code>DELETE FROM ... SELECT</code>. This loads some data
+     * into the end point, creates a named solution set, then removes some
+     * solutions and verifies that they are no longer reported by query as a
+     * post-condition.
+     */
+    public void test_deleteFromSolutions_02() throws Exception {
+
+        loadDataset(packagePath + "dataset-01.trig");
+
+        // Build the solution set.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("INSERT INTO %namedSet1\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  ?x rdf:type foaf:Person .\n");
+            sb.append("  ?x rdfs:label ?name .\n");
+            sb.append("}\n");
+            
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+        
+        // Remove some solutions.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("DELETE FROM %namedSet1\n");
+            sb.append("SELECT ?x ?name\n");
+			sb.append("WHERE { \n");
+			sb.append("  ?x rdfs:label ?name .\n");
+			sb.append("  FILTER (?x = <http://www.bigdata.com/Mike> ) .\n");
+			sb.append("}\n");
             
             con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
             
@@ -511,29 +613,212 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
                     QueryLanguage.SPARQL, sb.toString()).evaluate();
             
             final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
-                    + "test02.srx");
+                    + "test_deleteFromSolutions_02.srx");
 
-            QueryResultUtil.equals(ret, expected);
+            compareTupleQueryResults(ret, expected);
 
         }
 
     }
 
     /**
-     * TODO Unit test where we are deleting from one solution set and inserting
-     * into another.
-     * 
-     * TODO Unit test where we are deleting some solutions from a solution set
-     * and inserting other solutions into the same solution set.
-     * 
-     * TODO Unit test where we are deleting some triples from a graph and
-     * inserting some solutions into a named solution set.
-     * 
-     * TODO Unit test where we are deleting some solutions from a named solution
-     * set and inserting some triples into a graph.
+     * Unit test for <code>DELETE FROM ... SELECT</code>. This loads some data
+     * into the end point, creates a named solution set, then removes some
+     * solutions and verifies that they are no longer reported by query as a
+     * post-condition.
      */
-    public void test_deleteInsert01() {
-        fail("write test");
+    public void test_deleteFromSolutions_03() throws Exception {
+
+        loadDataset(packagePath + "dataset-01.trig");
+
+        // Build the solution set.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("INSERT INTO %namedSet1\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  ?x rdf:type foaf:Person .\n");
+            sb.append("  ?x rdfs:label ?name .\n");
+            sb.append("}\n");
+            
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+        
+        // Remove some solutions.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("DELETE FROM %namedSet1\n");
+            sb.append("SELECT ?x ?name\n");
+			sb.append("WHERE { \n");
+			sb.append("  ?x rdfs:label ?name .\n");
+			sb.append("  FILTER (?x = <http://www.bigdata.com/Bryan> ) .\n");
+			sb.append("}\n");
+            
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+
+        // Query it.
+        {
+         
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  INCLUDE %namedSet1 .\n");
+            sb.append("}\n");
+            
+            final TupleQueryResult ret = con.prepareTupleQuery(
+                    QueryLanguage.SPARQL, sb.toString()).evaluate();
+            
+            final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
+                    + "test_deleteFromSolutions_03.srx");
+
+            compareTupleQueryResults(ret, expected);
+
+        }
+
+    }
+
+    /**
+	 * Unit test where we INSERT some solutions into the same named solution set
+	 * on which we are reading. This is done using an INCLUDE to join against
+	 * the named solution set within an UPDATE operation which writes on that
+	 * named solution set. The isolation semantics should provide one view for
+	 * the reader and a different view for the writer.
+	 * <p>
+	 * Note: In order to setup this test, we will have to pre-populate the
+	 * solution set. E.g., first load the data into graphs, then INSERT INTO
+	 * SOLUTIONS. At that point we can do the INSERT which is also doing the
+	 * "self-join" against the named solution set.
+	 * 
+	 * TODO DO a variant test where the operation is a DELETE.
+	 */
+	public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
+
+		fail("write test");
+		
+	}
+
+    /**
+	 * Unit test where we are deleting from one solution set and inserting into
+	 * another.
+	 * 
+	 * TODO Unit test where we are deleting some solutions from a solution set
+	 * and inserting other solutions into the same solution set.
+	 * 
+	 * TODO Unit test where we are deleting some triples from a graph and
+	 * inserting some solutions into a named solution set.
+	 * 
+	 * TODO Unit test where we are deleting some solutions from a named solution
+	 * set and inserting some triples into a graph.
+	 * 
+     * @throws Exception 
+	 */
+	public void test_deleteInsertSolutions_01() throws Exception {
+
+        loadDataset(packagePath + "dataset-01.trig");
+
+        // Build the solution set.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("INSERT INTO %namedSet1\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  ?x rdf:type foaf:Person .\n");
+            sb.append("  ?x rdfs:label ?name .\n");
+            sb.append("}\n");
+            
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+        
+        // Remove some solutions, inserting them into a different solution set.
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("DELETE FROM %namedSet1\n");
+            sb.append("  SELECT ?x ?name\n");
+            sb.append("INSERT INTO %namedSet2\n");
+            sb.append("  SELECT ?x ?name\n"); // TODO Variant with different projection.
+			sb.append("WHERE { \n");
+			sb.append("  ?x rdfs:label ?name .\n");
+			sb.append("  FILTER (?x = <http://www.bigdata.com/Bryan> ) .\n");
+			sb.append("}\n");
+            
+            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            
+        }
+
+        // Query the solution set from which the solution were removed.
+        {
+         
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  INCLUDE %namedSet1 .\n");
+            sb.append("}\n");
+            
+            final TupleQueryResult ret = con.prepareTupleQuery(
+                    QueryLanguage.SPARQL, sb.toString()).evaluate();
+            
+            final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
+                    + "test_deleteInsertSolutions_01a.srx");
+
+            compareTupleQueryResults(ret, expected);
+
+        }
+
+        // Query the solution set into which the solution were inserted.
+        {
+         
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n");
+            sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
+            sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
+            sb.append("SELECT ?x ?name\n");
+            sb.append("WHERE {\n");
+            sb.append("  INCLUDE %namedSet2 .\n");
+            sb.append("}\n");
+            
+            final TupleQueryResult ret = con.prepareTupleQuery(
+                    QueryLanguage.SPARQL, sb.toString()).evaluate();
+            
+            final TupleQueryResult expected = readExpectedTupleQueryResult(packagePath
+                    + "test_deleteInsertSolutions_01b.srx");
+
+            compareTupleQueryResults(ret, expected);
+
+        }
+
     }
     
     /**

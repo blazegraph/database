@@ -1,0 +1,1 @@
+SELECT ?x ?z WHERE { INCLUDE %solutionSet1 } OFFSET 2 LIMIT 1
