@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 29, 2011
+ */
 package com.bigdata.rdf.store;
 
 import java.util.Collection;
@@ -29,12 +55,14 @@ import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Efficiently resolve openrdf {@link BindingSet}s to bigdata {@link IBindingSet}s.
+ * Efficiently resolve openrdf {@link BindingSet}s to bigdata
+ * {@link IBindingSet}s (this is a streaming API).
  * 
  * @see BigdataValueReplacer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BigdataOpenRDFBindingSetsResolverator.java 6151 2012-03-16
+ *          17:56:22Z thompsonbry $
  */
 public class BigdataOpenRDFBindingSetsResolverator
         extends
@@ -82,6 +110,18 @@ public class BigdataOpenRDFBindingSetsResolverator
      * {@link IV}s.
      */
     protected IBindingSet[] resolveChunk(final BindingSet[] chunk) {
+    	
+    		return resolveChunk(state.getLexiconRelation(), chunk);
+    	
+    }
+
+    /**
+     * Resolve a chunk of {@link BindingSet}s into a chunk of
+     * {@link IBindingSet}s in which RDF {@link Value}s have been resolved to
+     * {@link IV}s.
+     */
+	static public IBindingSet[] resolveChunk(final LexiconRelation r,
+			final BindingSet[] chunk) {
 
         if (log.isInfoEnabled())
             log.info("Fetched chunk: size=" + chunk.length);
@@ -118,7 +158,7 @@ public class BigdataOpenRDFBindingSetsResolverator
         if (log.isInfoEnabled())
             log.info("Resolving " + valueSet.size() + " term identifiers");
 
-        final LexiconRelation r = state.getLexiconRelation();
+//        final LexiconRelation r = state.getLexiconRelation();
         
         final BigdataValueFactory vf = r.getValueFactory();
         
@@ -188,7 +228,7 @@ public class BigdataOpenRDFBindingSetsResolverator
      *             {@link ISolution}.
      */
     @SuppressWarnings("unchecked")
-    private IBindingSet getBindingSet(final BindingSet bindingSet,
+    static private IBindingSet getBindingSet(final BindingSet bindingSet,
             final Map<Value,BigdataValue> map) {
 
         if (bindingSet == null)

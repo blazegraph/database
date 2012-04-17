@@ -207,37 +207,5 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             }
             logger.debug("dataset loaded.");
         }
-
-    /**
-     * Unit test of a bigdata extension which allows you to insert the solutions
-     * from the WHERE clause into a named solution set.
-     * 
-     * FIXME Write test. Also write test for DELETE FROM and for combinations.
-     * You could be able to insert/delete on a solution set and then access that
-     * solution set in the same UPDATE sequence as well as from a query which
-     * runs after the UDPATE. Exposing access to QUERY will require that we test
-     * a map of known named solution sets. Some AST optimizers will have to be
-     * modified as well (they check that all named solution sets were defined
-     * within the scope of the query).
-     * 
-     * FIXME Add "DROP %namedSet" support and unit test.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/524 (SPARQL Cache)
-     */
-    public void test_deleteInsert_insertInto_01() {
-
-//        final StringBuilder update = new StringBuilder();
-//        update.append(getNamespaceDeclarations());
-//        update.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
-//
-//        assertFalse(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//        assertFalse(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-//
-//        m_repo.prepareUpdate(update.toString()).evaluate();
-//
-//        assertTrue(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
-//        assertTrue(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-        
-    }
     
 }

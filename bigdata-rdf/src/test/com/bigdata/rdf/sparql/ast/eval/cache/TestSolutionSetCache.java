@@ -240,17 +240,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(ctx, solutionSet,
+        cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(ctx,
+        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -289,17 +289,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(ctx, solutionSet,
+        cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(ctx,
+        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -348,17 +348,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(ctx, solutionSet,
+        cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(ctx,
+        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -424,17 +424,17 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
 
-        cache.putSolutions(ctx, solutionSet,
+        cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
-        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(ctx,
+        final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
                 solutionSet);
 
         assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
@@ -499,7 +499,7 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet = getName();
 
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -507,13 +507,13 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         // write the solution set.
-        cache.putSolutions(ctx, solutionSet,
+        cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
 
         // read them back
         {
             final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
-                    ctx, solutionSet);
+                    solutionSet);
 
             assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
         }
@@ -521,17 +521,17 @@ public class TestSolutionSetCache extends TestCase2 {
         // read them back again.
         {
             final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
-                    ctx, solutionSet);
+                    solutionSet);
 
             assertSameSolutionsAnyOrder(flatten(in.iterator()), out);
         }
         
         // Clear the solution set.
-        cache.clearSolutions(ctx, solutionSet);
+        cache.clearSolutions(solutionSet);
 
         // Verify gone.
         try {
-            cache.getSolutions(ctx, solutionSet);
+            cache.getSolutions(solutionSet);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -581,7 +581,7 @@ public class TestSolutionSetCache extends TestCase2 {
         final String solutionSet2 = getName() + 2;
 
         try {
-            cache.getSolutions(ctx, solutionSet1);
+            cache.getSolutions(solutionSet1);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -589,7 +589,7 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         try {
-            cache.getSolutions(ctx, solutionSet2);
+            cache.getSolutions(solutionSet2);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -597,23 +597,23 @@ public class TestSolutionSetCache extends TestCase2 {
         }
 
         // write the solution sets.
-        cache.putSolutions(ctx, solutionSet1,
+        cache.putSolutions(solutionSet1,
                 new CloseableIteratorWrapper<IBindingSet[]>(in1.iterator()));
-        cache.putSolutions(ctx, solutionSet2,
+        cache.putSolutions(solutionSet2,
                 new CloseableIteratorWrapper<IBindingSet[]>(in2.iterator()));
 
         // read them back
         assertSameSolutionsAnyOrder(flatten(in1.iterator()),
-                cache.getSolutions(ctx, solutionSet1));
+                cache.getSolutions(solutionSet1));
         assertSameSolutionsAnyOrder(flatten(in2.iterator()),
-                cache.getSolutions(ctx, solutionSet2));
+                cache.getSolutions(solutionSet2));
 
         // Clear all named solution set.
         cache.clearAllSolutions(ctx);
 
         // Verify gone.
         try {
-            cache.getSolutions(ctx, solutionSet1);
+            cache.getSolutions(solutionSet1);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
@@ -622,7 +622,7 @@ public class TestSolutionSetCache extends TestCase2 {
 
         // Verify gone.
         try {
-            cache.getSolutions(ctx, solutionSet2);
+            cache.getSolutions(solutionSet2);
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())

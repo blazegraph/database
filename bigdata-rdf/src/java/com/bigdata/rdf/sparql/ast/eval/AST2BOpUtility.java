@@ -57,6 +57,7 @@ import com.bigdata.bop.join.JVMMergeJoin;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
+import com.bigdata.bop.join.NamedSolutionSetScanOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DropOp;
@@ -106,6 +107,7 @@ import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -120,10 +122,10 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.SliceNode;
-import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -1011,73 +1013,81 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
 
     /**
-     * Add a join against a pre-computed temporary solution set into a join
-     * group.
-     * <p>
-     * Note: Since the subquery solution set has already been computed and only
-     * contains bindings for solutions projected by the subquery, we do not need
-     * to adjust the visibility of bindings when we execute the hash join
-     * against the named solution set.
-     * 
-     * @see ASTNamedSubqueryOptimizer
-     */
+	 * Add a join against a pre-computed temporary solution set into a join
+	 * group.
+	 * <p>
+	 * Note: Since the subquery solution set has already been computed and only
+	 * contains bindings for solutions projected by the subquery, we do not need
+	 * to adjust the visibility of bindings when we execute the hash join
+	 * against the named solution set.
+	 * 
+	 * @see ASTNamedSubqueryOptimizer
+	 * 
+	 *      TODO If the named solution set has variables which are not
+	 *      materialized but those variables are visible in this query, then we
+	 *      can no longer conclude that they are materialized. We MUST either
+	 *      (A) remove them from the doneSet; (B) we need to materialize them
+	 *      when reading from the named solution set (or after the join) such
+	 *      that we have a consistent doneSet (only variables which are
+	 *      materialized in all solutions) after the INCLUDE join; (C) remove
+	 *      them from the solutions (if they are no longer required after the
+	 *      join).
+	 * 
+	 *      TODO If we have mock IVs in solutions for a join variable then we
+	 *      need to materialize that join variable in all source solutions
+	 *      flowing into the join. This is <a
+	 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/490"> MockIVs
+	 *      in hash joins</a>. The {@link ISolutionSetStats} should track this
+	 *      information. Static analysis should also flag this information based
+	 *      on inspection (if the variable is bound to a computed expression and
+	 *      that expression is not known to be a fully inline data type, then we
+	 *      could have mock IVs for the variable binding and we must resolve
+	 *      those IVs against the database). (There could be an exception when
+	 *      the variable is known to be based on a computed expression in both
+	 *      the left and right hand solutions. That suggests that we *might*
+	 *      also be able to handle this by converting the variable binding into
+	 *      MockIVs for all solutions, but it seems likely that this would
+	 *      produce some unpleasant surprises - for example, the hash join would
+	 *      have the same hash code for all values for that variable since the
+	 *      termId would always be zero).
+	 */
     private static PipelineOp addNamedSubqueryInclude(PipelineOp left,
-            final NamedSubqueryInclude subqueryInclude,
+            final NamedSubqueryInclude nsi,
             final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
 
+    		final String name = nsi.getName();
+    	
         if (log.isInfoEnabled())
-            log.info("include: solutionSet=" + subqueryInclude.getName());
+            log.info("include: solutionSet=" + name);
 
-        final VarNode[] joinvars = subqueryInclude.getJoinVars();
-
-        if (joinvars == null) {
-
-            /*
-             * The most likely explanation is not running the
-             * ASTNamedSubqueryOptimizer.
-             */
-
-            throw new AssertionError();
-
-        }
-
-//        if (joinvars.length == 0) {
-//
-//            /*
-//             * Note: If there are no join variables then the join will examine
-//             * the full N x M cross product of solutions. That is very
-//             * inefficient, so we are logging a warning.
-//             */
-//
-//            log.warn("No join variables: " 
-//                    + subqueryInclude.getName()
-//                    + ", subquery="
-//                    + subqueryInclude.getNamedSubqueryRoot(ctx.sa
-//                            .getQueryRoot())
-//                            );
-//
-//        }
-
-        final IVariable<?>[] joinVars = ASTUtil.convert(joinvars);
-
-        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
-                ctx.queryId, subqueryInclude.getName(), joinVars);
+        // The join variables.
+        final IVariable<?>[] joinVars;
 
         /*
-         * Get the known materialized variables from the named subquery and
-         * combine them with those which are known to be materialized in the
-         * parent to get the full set of variables known to be materialized once
-         * we join in the named subquery solution set.
-         */
-        {
-        	
-        		final String name = subqueryInclude.getName();
+		 * When true, the named solution set will be released after the INCLUDE.
+		 * 
+		 * Note: We MUST NOT [release] a named solution set whose scope is
+		 * outside of the query (durable or cached).
+		 */
+        boolean release;
+        
+		{
         	
             // Resolve the NamedSubqueryRoot for this INCLUDE.
             final NamedSubqueryRoot nsr = ctx.sa
                     .getNamedSubqueryRoot(name);
 
             if(nsr != null) {
+
+				/*
+				 * We will do a hash join against the named solution set
+				 * generated by that named subquery root.
+				 * 
+				 * TODO We run into problems here where the join variables
+				 * were not predicted correctly, especially when there are
+				 * multiple INCLUDEs for the same solution set and when the
+				 * INCLUDE is the first operator in the query plan.
+				 */
 
                 @SuppressWarnings("unchecked")
                 final Set<IVariable<?>> nsrDoneSet = (Set<IVariable<?>>) nsr
@@ -1091,15 +1101,76 @@ public class AST2BOpUtility extends AST2BOpJoins {
 				}
 
 				/*
-				 * Add in everything known to be materialized by the named
-				 * subquery.
+				 * Get the known materialized variables from the named subquery
+				 * and combine them with those which are known to be
+				 * materialized in the parent to get the full set of variables
+				 * known to be materialized once we join in the named subquery
+				 * solution set.
+				 * 
+				 * TODO Should add all variables not in scope in the parent
+				 * which are materialized in the named solution set and retain
+				 * only the variables which are in scope in the parent which are
+				 * materialized in the named solution set. Or we should
+				 * materialize things which were materialized in the pipeline
+				 * solutions and no longer possess that property because they
+				 * were not materialized in the named solution set (especially
+				 * if they will need to be materialized later in the query; if
+				 * they will not need to be materialized later in the query then
+				 * we should just drop them from the doneSet since they are only
+				 * partly materialized).
 				 */
+				
 				doneSet.addAll(nsrDoneSet);
 
+		        final VarNode[] joinvars = nsi.getJoinVars();
+
+		        if (joinvars == null) {
+
+		            /*
+					 * The most likely explanation is not running the
+					 * ASTNamedSubqueryOptimizer.
+					 */
+
+		            throw new AssertionError();
+
+		        }
+
+				// Convert to IVariable[].
+		        joinVars = ASTUtil.convert(joinvars);
+
+				/*
+				 * TODO This should be set based on the #of INCLUDEs for the
+				 * named subquery. We can not release the associated hash index
+				 * until all includes are done.
+				 */
+
+		        	release = false;
+				
 			} else {
 
 				/*
 				 * Attempt to resolve a pre-existing named solution set.
+				 * 
+				 * If we find the named solution set, then we will handle it in
+				 * one of two ways.
+				 * 
+				 * 1) If the cardinality of solutions flowing into this
+				 * operation on the pipeline is known to small, then we will use
+				 * a SCAN of the named solution set (it does not have an index,
+				 * at least, not at this time) and use a nested inner loop to
+				 * join against the left solutions. This provides a critical
+				 * optimization for the case where the INCLUDE appears at the
+				 * head of the WHERE clause. It also provides the guarantee that
+				 * the ORDER of the solutions in the named solution set is
+				 * preserved, which we depend on when SLICING a pre-existing
+				 * solution set.
+				 * 
+				 * 2) Otherwise, we build a hash index over the named solution
+				 * set. The join variables for that hash index will be the
+				 * intersection of what is known bound on entry to the INCLUDE
+				 * operator and what is known bound in the named solution set
+				 * itself. We will then do a hash join against the generated
+				 * hash index.
 				 */
 
 				final ISolutionSetStats stats = ctx.sa
@@ -1112,9 +1183,106 @@ public class AST2BOpUtility extends AST2BOpJoins {
 					 * always present when that variable is bound in a solution
 					 * (that is, all variables which we do not need to
 					 * materialize for the solution set).
+					 * 
+					 * TODO Should add all variables not in scope in the parent
+					 * which are materialized in the named solution set and
+					 * retain only the variables which are in scope in the
+					 * parent which are materialized in the named solution set.
+					 * Or we should materialize things which were materialized
+					 * in the pipeline solutions and no longer possess that
+					 * property because they were not materialized in the named
+					 * solution set (especially if they will need to be
+					 * materialized later in the query; if they will not need to
+					 * be materialized later in the query then we should just
+					 * drop them from the doneSet since they are only partly
+					 * materialized).
 					 */
 
 					doneSet.addAll(stats.getMaterialized());
+
+					if (isNamedSolutionSetScan(ctx, nsi)) {
+
+						/*
+						 * Optimize with SCAN and nested loop join.
+						 * 
+						 * Note: This optimization also preserves the ORDER in
+						 * the named solution set.
+						 */
+
+						return convertNamedSolutionSetScan(left, nsi, doneSet,
+								ctx);
+					
+					}
+
+					/*
+					 * Find the join variables. This is the set of variables
+					 * which are both definately bound on entry to the INCLUDE
+					 * and which are known to be bound by all solutions in the
+					 * named solution set.
+					 * 
+					 * TODO If we provide CREATE SOLUTIONS semantics to specify
+					 * the type of the data structure in which the named
+					 * solution set is stored *AND* it is a hash index (or a
+					 * BTree with a primary key which is either to our join
+					 * variables or a sub-set of those join variables) then
+					 * we can use that index without building a hash index on
+					 * the desired join variables.
+					 */
+					final Set<IVariable<?>> joinvars = ctx.sa.getJoinVars(nsi,
+							name/* solutionSet */,
+							new LinkedHashSet<IVariable<?>>());
+					
+					// flatten into IVariable[].
+					joinVars = joinvars.toArray(new IVariable[]{});
+					
+			        /*
+			         * Pass all variable bindings along.
+			         * 
+			         * Note: If we restrict the [select] annotation to only those variables
+			         * projected by the subquery, then we will wind up pruning any variables
+			         * used in the join group which are NOT projected into the subquery.
+			         * 
+			         * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
+			         */
+			        @SuppressWarnings("rawtypes")
+			        final IVariable[] selectVars = null;
+			        
+			        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+			                ctx.queryId, name, joinVars);
+			        
+			        final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+
+			        if(ctx.nativeHashJoins) {
+			            left = new HTreeHashIndexOp(leftOrEmpty(left),//
+			                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+			                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+			                        BOpEvaluationContext.CONTROLLER),//
+			                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+			                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+			                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+			                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
+			                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+			                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+			                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
+			                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+			        );
+			        } else {
+			            left = new JVMHashIndexOp(leftOrEmpty(left),//
+			                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+			                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+			                        BOpEvaluationContext.CONTROLLER),//
+			                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+			                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+			                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+			                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+			                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+			                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
+			                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+			            ); 
+			        }
+
+			        // true since we are building the hash index.
+					release = true;
 
 				} else {
 
@@ -1127,21 +1295,42 @@ public class AST2BOpUtility extends AST2BOpJoins {
             
         }
 
+//      if (joinVars.length == 0) {
+//
+//          /*
+//           * Note: If there are no join variables then the join will examine
+//           * the full N x M cross product of solutions. That is very
+//           * inefficient, so we are logging a warning.
+//           */
+//
+//          log.warn("No join variables: " 
+//                  + subqueryInclude.getName()
+//                  + ", subquery="
+//                  + subqueryInclude.getNamedSubqueryRoot(ctx.sa
+//                          .getQueryRoot())
+//                          );
+//
+//      }
+        
+		/*
+		 * At this point, we have either have a hash index which was generated
+		 * by a named subquery or we have build a hash index from a pre-existing
+		 * named solution set. Now we can do the hash join.
+		 */
+        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
+                ctx.queryId, name, joinVars);
+
 		@SuppressWarnings("rawtypes")
 		final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
 
         final IConstraint[] joinConstraints = getJoinConstraints(
-                getJoinConstraints(subqueryInclude), needsMaterialization);
+                getJoinConstraints(nsi), needsMaterialization);
 
-        /*
-         * TODO This should be set based on the #of INCLUDEs for the named
-         * subquery. We can not release the associated hash index until all
-         * includes are done.
-         * 
-         * Note: We MUST NOT [release] a named solution set whose scope is
-         * outside of the query (durable or cached).
-         */
-        final boolean release = false;
+		/*
+		 * TODO In order to release the named solution set, we need to specify
+		 * [lastPass=true] and [maxParallel=1].
+		 */
+        release = false;
         
         if (ctx.nativeHashJoins) {
             
@@ -1154,10 +1343,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             namedSolutionSetRef),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
 //                            joinVars),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
-                                    joinConstraints),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE,
-                                release)//
+					new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
+							joinConstraints),//
+					new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE,
+							release)//
+//					new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS,
+//							isLastPassRequested)//
             );
 
         } else {
@@ -1175,6 +1366,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             joinConstraints),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE,
                             release)//
+//    					new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS,
+//    							isLastPassRequested)//
             );
             
         }
@@ -1185,12 +1378,127 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * pipeline.
          */
         left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
-                subqueryInclude.getQueryHints());
+                nsi.getQueryHints());
 
         return left;
 
     }
 
+    /**
+	 * Return <code>true</code> if we can optimize this INCLUDE with a SCAN of
+	 * the named solution set and a nested inner loop to join against left
+	 * solutions from the pipeline having a known low cardinality.
+	 * 
+	 * @param ctx
+	 * @param nsi
+	 *            The INCLUDE operator.
+	 * @return <code>true</code> if this optimization can be used.
+	 */
+	static private boolean isNamedSolutionSetScan(final AST2BOpContext ctx,
+			final NamedSubqueryInclude nsi) {
+
+		// The immediately dominating join group (never null).
+		final JoinGroupNode parentJoinGroup = nsi.getParentJoinGroup();
+
+		// True iff the INCLUDE is the first operator in the group
+		// (the group is in its evaluation order by this point).
+		final boolean firstInJoinGroup = parentJoinGroup.get(0) == nsi;
+
+		// The parent of that join group. Null if the join group is
+		// the WHERE clause of some (Sub-)Query.
+		if (firstInJoinGroup && parentJoinGroup.getParent() == null) {
+
+			/*
+			 * The INCLUDE is the first operator in the join group.
+			 * 
+			 * There is no direct parent for that join group, so this is a
+			 * top-level INCLUDE in some WHERE clause of the query.
+			 * 
+			 * If the query for that WHERE clause is a top-level query or a
+			 * NamedSubqueryRoot, then we consider the exogenous solutions
+			 * (exogenous solutions are not directly visible in a Sub-Select
+			 * unless it gets lifted out as a NamedSubqueryRoot).
+			 * 
+			 * If the exogenous solutions are (effectively) empty, then we
+			 * optimize the INCLUDE and just stream the named solution set
+			 * directly into the pipeline.
+			 */
+
+			final QueryBase dominatingQuery = (QueryBase) ctx.sa
+					.findParent(parentJoinGroup);
+
+			if (dominatingQuery instanceof QueryRoot
+					|| dominatingQuery instanceof NamedSubqueryRoot) {
+
+				// The stats associated with the exogenous solutions.
+				final ISolutionSetStats exogenousStats = ctx
+						.getSolutionSetStats();
+
+				// TODO Extract threshold to AST2BOpContext and QueryHint.
+				if (exogenousStats.getSolutionSetSize() <= 100) {
+
+					return true;
+
+				}
+		
+			}
+		
+		}
+		
+		return false;
+
+	}
+
+	/**
+	 * If the cardinality of the exogenous solutions is low, then we can SCAN
+	 * the named solution set and use an inner loop to test each solution read
+	 * from the named solution set against each exogenous solution.
+	 * <p>
+	 * Note: This code path MUST NOT change the order of the solutions read from
+	 * the named solution set. We rely on that guarantee to provide fast ordered
+	 * SLICEs from a pre-computed named solution set.
+	 * 
+	 * @see #isNamedSolutionSetScan(AST2BOpContext, NamedSubqueryInclude)
+	 */
+	private static PipelineOp convertNamedSolutionSetScan(PipelineOp left,
+			final NamedSubqueryInclude nsi, final Set<IVariable<?>> doneSet,
+			final AST2BOpContext ctx) {
+
+		@SuppressWarnings("rawtypes")
+		final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(nsi), needsMaterialization);
+
+		left = new NamedSolutionSetScanOp(
+				leftOrEmpty(left),
+				new NV(BOp.Annotations.BOP_ID, ctx
+						.nextId()),//
+				new NV( BOp.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.CONTROLLER),//
+				new NV( PipelineOp.Annotations.SHARED_STATE,
+						true),// live stats.
+				new NV( NamedSolutionSetScanOp.Annotations.NAME,
+						nsi.getName()),//
+				new NV( NamedSolutionSetScanOp.Annotations.CONSTRAINTS,
+						joinConstraints)//
+		);
+		
+		/*
+		 * For each filter which requires
+		 * materialization steps, add the
+		 * materializations steps to the pipeline and
+		 * then add the filter to the pipeline.
+		 */
+		left = addMaterializationSteps(ctx, left,
+				doneSet, needsMaterialization,
+				nsi.getQueryHints());
+
+		return left;
+
+	}
+
+	
     /**
      * Add an explicit SPARQL 1.1 subquery into a join group.
      * <p>

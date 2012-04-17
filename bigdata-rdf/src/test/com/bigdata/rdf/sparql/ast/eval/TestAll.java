@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -100,6 +102,13 @@ public class TestAll extends TestCase {
         
         // Test suite for NAMED SUBQUERIES
         suite.addTestSuite(TestNamedSubQuery.class);
+        
+		if (QueryHints.DEFAULT_SOLUTION_SET_CACHE) {
+		
+			// Test suite for INCLUDE of pre-existing named solution sets.
+			suite.addTestSuite(TestInclude.class);
+
+		}
 
         // Test suite for negation (EXISTS, NOT EXISTS, MINUS).
         suite.addTestSuite(TestNegation.class);

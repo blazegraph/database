@@ -38,7 +38,6 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SolutionSetMetadata;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
@@ -127,7 +126,7 @@ public class StaticAnalysisBase {
      * @return The caller's {@link Set}.
      * 
      *         TODO Unit tests for different kinds of AST nodes to make sure
-     *         that we always get/ignore the variables in filters as approriate.
+     *         that we always get/ignore the variables in filters as appropriate.
      *         For example, an optional {@link StatementPatternNode} can have
      *         filter nodes attached.
      */

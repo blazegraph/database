@@ -201,15 +201,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
 
     /**
-     * FIXME This will go away now once we have the ability to resolve named
-     * subqueries against the {@link ISparqlCache}.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
-     *      SPARQL Update for Named Solution Sets </a>
-     */
-    private static boolean requireDeclaredNamedSubquery = !QueryHints.DEFAULT_SOLUTION_SET_CACHE;
-
-    /**
      * 
      * @param queryRoot
      *            The root of the query. We need to have this on hand in order
@@ -2020,6 +2011,65 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         boundByService.retainAll(incomingBindings);
             
         vars.addAll(boundByService);
+
+        return vars;
+
+    }
+    
+
+    /**
+	 * Return the join variables for an INCLUDE of a pre-existing named solution
+	 * set.
+	 * 
+	 * @param nsi
+	 *            The {@link NamedSubqueryInclude}
+	 * @param solutionSet
+	 *            The name of a pre-existing solution set.
+	 * @param vars
+	 *            The caller's collection.
+	 *            
+	 * @return The caller's collection.
+	 */
+	public Set<IVariable<?>> getJoinVars(final NamedSubqueryInclude nsi,
+			final String solutionSet, final Set<IVariable<?>> vars) {
+
+		final String name = solutionSet;
+		
+        /*
+         * The variables which will be definitely bound based on the statistics
+         * collected for that solution set.
+         */
+		final ISolutionSetStats stats = getSolutionSetStats(name);
+		
+		if(stats == null)
+			throw new RuntimeException("Not found: "+name);
+		
+		/*
+		 * All variables which are bound in each solution of this solution set.
+		 * 
+		 * Note: The summary data for a named solution set is typically
+		 * immutable, so we insert the variables into a mutable collection in
+		 * order to make changes to that collection below.
+		 */
+		final Set<IVariable<?>> boundInSolutionSet = new LinkedHashSet<IVariable<?>>(
+				stats.getAlwaysBound());
+
+		/*
+		 * The variables which are definitely bound on entry to the INCLUDE
+		 * operator based on the static analysis of the query, including where
+		 * it appears in the join order of the query.
+		 */
+		final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
+				nsi, new LinkedHashSet<IVariable<?>>());
+        
+        /*
+		 * This is only those variables which are bound on entry into the
+		 * INCLUDE *and* which are "must" bound variables projected by the
+		 * pre-existing named solution set.
+		 */
+        boundInSolutionSet.retainAll(incomingBindings);
+            
+        vars.addAll(boundInSolutionSet);
 
         return vars;
 

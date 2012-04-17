@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -123,8 +124,7 @@ public class SolutionSetStatserator implements
 	static public ISolutionSetStats get(final IBindingSet[] bindingSets) {
 
 		final SolutionSetStatserator itr = new SolutionSetStatserator(
-				new CloseableIteratorWrapper<IBindingSet[]>(
-						new SingleValueIterator(bindingSets)));
+				BOpUtility.asIterator(bindingSets));
 
 		try {
 
