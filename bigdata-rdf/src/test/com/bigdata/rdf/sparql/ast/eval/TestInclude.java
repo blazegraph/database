@@ -45,10 +45,11 @@ import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -280,6 +281,120 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         // the INCLUDE should be evaluated using a solution set SCAN.
         assertTrue(includeOp instanceof NamedSolutionSetScanOp);
         
+    }
+
+    /**
+	 * A unit test for an INCLUDE which is NOT the first JOIN in the WHERE
+	 * clause. This condition is enforced by turning off the join order
+	 * optimizer for this query.
+	 * <p>
+	 * Note: Since there is another JOIN in this query, there is no longer any
+	 * order guarantee for the resulting solutions.
+	 * 
+	 * <pre>
+	 * SELECT ?x ?z WHERE { INCLUDE %solutionSet1 }
+	 * </pre>
+	 */
+    public void test_include_03() throws Exception {
+    	
+        final TestHelper testHelper = new TestHelper(
+        		"include_03",// name
+        		"include_03.rq",// query URL
+        		"include_03.trig",// data URL
+        		"include_03.srx",// results URL
+        		false,// lax cardinality
+        		false // check order
+        		);
+
+        final AbstractTripleStore tripleStore = testHelper.getTripleStore();
+        
+        final BigdataValueFactory vf = tripleStore.getValueFactory();
+        
+		final QueryEngine queryEngine = QueryEngineFactory
+				.getQueryController(tripleStore.getIndexManager());
+		
+		final ISparqlCache sparqlCache = SparqlCacheFactory
+				.getSparqlCache(queryEngine);
+
+		final String solutionSet = "%solutionSet1";
+		
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+
+        // Resolve terms pre-loaded into the kb.
+        final BigdataURI Mike = vf.createURI("http://www.bigdata.com/Mike"); 
+        final BigdataURI Bryan = vf.createURI("http://www.bigdata.com/Bryan");
+        final BigdataURI DC = vf.createURI("http://www.bigdata.com/DC");
+		{
+			tripleStore.addTerms(new BigdataValue[] { Mike, Bryan, DC });
+			assertNotNull(Mike.getIV());
+			assertNotNull(Bryan.getIV());
+			assertNotNull(DC.getIV());
+		}
+
+		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
+				1);
+		one.setValue(vf.createLiteral(1));
+		
+		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
+				2);
+		two.setValue(vf.createLiteral(2));
+		
+//		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
+//				3);
+//		three.setValue(vf.createLiteral(3));
+		
+		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
+				4);
+		four.setValue(vf.createLiteral(4));
+		
+//		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
+//				5);
+//		five.setValue(vf.createLiteral(5));
+		
+        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(Mike.getIV()));
+            bset.set(y, asConst(two));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(Bryan.getIV()));
+            bset.set(y, asConst(four));
+            bsets.add(bset);
+        }
+        {
+            final IBindingSet bset = new ListBindingSet();
+            bset.set(x, asConst(DC.getIV()));
+            bset.set(y, asConst(one));
+            bsets.add(bset);
+        }
+
+        final IBindingSet[] bindingSets = bsets.toArray(new IBindingSet[]{});
+
+		sparqlCache.putSolutions(solutionSet,
+				BOpUtility.asIterator(bindingSets));
+
+        final ASTContainer astContainer = testHelper.runTest();
+
+//        final PipelineOp queryPlan = astContainer.getQueryPlan();
+//        
+//        // top level should be the SLICE operator.
+//        assertTrue(queryPlan instanceof SliceOp);
+//
+//        // sole argument should be the PROJECTION operator.
+//        final PipelineOp projectionOp = (PipelineOp) queryPlan.get(0);
+//
+//        assertTrue(projectionOp instanceof ProjectionOp);
+//
+//        // sole argument should be the INCLUDE operator.
+//        final PipelineOp includeOp = (PipelineOp) projectionOp.get(0);
+//        
+//        // the INCLUDE should be evaluated using a solution set SCAN.
+//        assertTrue(includeOp instanceof NamedSolutionSetScanOp);
+
     }
     
 }

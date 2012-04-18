@@ -557,29 +557,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							 * the native IBindingSet[] model and write the
 							 * solutions from the WHERE clause onto a chained
 							 * list of blocks, just as we do when writing on a
-							 * named solution set. That chained list could then
-							 * be joined into the query with an INCLUDE. Since
-							 * we do not want this "temporary" solution set to
-							 * be visible, we could prefix it with a UUID and
-							 * make sure that it is written onto a memory
-							 * manager, and also make sure that we eventually
-							 * delete the named solution set since it should be
-							 * temporary.
-							 * 
-							 * Another way to handle this is to flow the
-							 * solutions from a solution set into a new query
-							 * which as the appropriate MINUS logic [This does
-							 * not work because the solutions wind up on the
-							 * LEFT side of the MINUS but they need to be on the
-							 * RIGHT]. Here, the solutions would appear on the
-							 * pipeline rather than being joined in. The result
-							 * is the same. This would make it easier to manage
-							 * the visibility of the solutions. Note that there
-							 * is no API to flow an
-							 * ICloseableIterator<IBindingSet[]> into an
-							 * IRunningQuery. Only an IBindingSet[]. However, we
-							 * might be able to wrap up the named solution set
-							 * as an IChunkMessage.
+							 * named solution set (or an htree with appropriate
+							 * join variables). That could then be joined into
+							 * the query with an INCLUDE. Since we do not want
+							 * this "temporary" solution set to be visible, we
+							 * could prefix it with a UUID and make sure that it
+							 * is written onto a memory manager, and also make
+							 * sure that we eventually delete the named solution
+							 * set since it should be temporary.
 							 */
 
 							// The named solution set on which we will write.
