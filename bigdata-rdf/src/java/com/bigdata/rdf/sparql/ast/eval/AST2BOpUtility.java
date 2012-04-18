@@ -1216,7 +1216,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
 					/*
 					 * Find the join variables. This is the set of variables
-					 * which are both definately bound on entry to the INCLUDE
+					 * which are both definitely bound on entry to the INCLUDE
 					 * and which are known to be bound by all solutions in the
 					 * named solution set.
 					 * 
@@ -1234,16 +1234,42 @@ public class AST2BOpUtility extends AST2BOpJoins {
 					
 					// flatten into IVariable[].
 					joinVars = joinvars.toArray(new IVariable[]{});
-					
+
+					if (true) {
+						/*
+						 * @see
+						 * https://sourceforge.net/apps/trac/bigdata/ticket/531
+						 * (SPARQL UPDATE for NAMED SOLUTION SETS)
+						 * 
+						 * FIXME This is building the hash index over the
+						 * solutions from the pipeline rather than the solutions
+						 * from the named solution set. That is Ok if we are
+						 * going to do a hash join against the access path scan
+						 * for that named solution set, but not if we are going
+						 * to join the hash index of the named solution set
+						 * against the solutions flowing from the pipeline.
+						 * 
+						 * TODO Do an alternative code path for hash join
+						 * against an access path, where the access path is the
+						 * named solution set. This would be efficient when the
+						 * named solution set has greater cardinality than the
+						 * solutions flowing into the hash join. This requires
+						 * the ability to express a predicate which resolves to
+						 * the named solution set.
+						 */
+						throw new UnsupportedOperationException();
+					}
+
 			        /*
-			         * Pass all variable bindings along.
-			         * 
-			         * Note: If we restrict the [select] annotation to only those variables
-			         * projected by the subquery, then we will wind up pruning any variables
-			         * used in the join group which are NOT projected into the subquery.
-			         * 
-			         * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
-			         */
+					 * Pass all variable bindings along.
+					 * 
+					 * Note: If we restrict the [select] annotation to only
+					 * those variables projected by the subquery, then we will
+					 * wind up pruning any variables used in the join group
+					 * which are NOT projected into the subquery.
+					 * 
+					 * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
+					 */
 			        @SuppressWarnings("rawtypes")
 			        final IVariable[] selectVars = null;
 			        
@@ -1313,6 +1339,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //      }
         
 		/*
+		 * Common code path.
+		 * 
 		 * At this point, we have either have a hash index which was generated
 		 * by a named subquery or we have build a hash index from a pre-existing
 		 * named solution set. Now we can do the hash join.
