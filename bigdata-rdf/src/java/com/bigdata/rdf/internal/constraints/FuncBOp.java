@@ -114,32 +114,18 @@ public class FuncBOp extends IVValueExpression<IV> implements
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public IV get(final IBindingSet bs) {
         
-//    	final List<BOp> args = args();
-    	
     	final Value[] vals = new Value[arity()];
     	
     	for (int i = 0; i < vals.length; i++) {
 
-    		final IV<?,?> iv = get(i).get(bs);
+    		final IV<?,?> iv = getAndCheckBound(i, bs);
     		
-//            if (log.isDebugEnabled()) {
-//            	log.debug(iv);
-//            }
-
-            // not yet bound
-            if (iv == null)
-            	throw new SparqlTypeErrorException();
-            
-//            final BigdataValue val = iv.getValue();
             final Value val = asValue(iv);
             
     		if (log.isDebugEnabled()) {
 	            log.debug("iv: " + iv + ", class="+iv.getClass());
 	            log.debug("val: " + val + ", class="+val.getClass());
     		}
-            
-            if (val == null)
-            	throw new NotMaterializedException();
             
             vals[i] = val;
             
@@ -162,23 +148,6 @@ public class FuncBOp extends IVValueExpression<IV> implements
             
             return iv;
 	    	
-//	    	final BigdataValue val = (BigdataValue) func.evaluate(vf, vals);
-//	    	
-//            IV iv = val.getIV();
-//	    	
-//	    	if (iv == null) {
-//	    		
-//	    		iv = TermId.mockIV(VTE.valueOf(val));
-//	    		
-//		    	val.setIV(iv);
-//		    	
-//	    	}
-//	    	
-//	    	// cache the value on the IV
-//	    	iv.setValue(val);
-//	    	
-//	    	return iv;
-	    	
 	    } catch (ValueExprEvaluationException ex) {
 	    	
 	    	throw new SparqlTypeErrorException();
@@ -192,7 +161,7 @@ public class FuncBOp extends IVValueExpression<IV> implements
      */
     public Requirement getRequirement() {
     	
-    	return INeedsMaterialization.Requirement.ALWAYS;
+    	return INeedsMaterialization.Requirement.SOMETIMES;
     	
     }
         

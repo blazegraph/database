@@ -106,7 +106,6 @@ public class TryBeforeMaterializationConstraint extends BOpBase implements
     		}
     		
     		return accept;
-
     		
     	} catch (Throwable t) {
 
