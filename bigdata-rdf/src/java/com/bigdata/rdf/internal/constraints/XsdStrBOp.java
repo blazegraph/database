@@ -163,7 +163,7 @@ public class XsdStrBOp extends IVValueExpression<IV>
      */
     public Requirement getRequirement() {
 
-        return INeedsMaterialization.Requirement.ALWAYS;
+        return INeedsMaterialization.Requirement.SOMETIMES;
 
     }
 

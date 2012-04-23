@@ -387,7 +387,7 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
     }
 
     /**
-     * Return the {@link Literal} for the {@link IV}.
+     * Return the {@link Value} for the {@link IV}.
      * 
      * @param iv
      *            The {@link IV}.
