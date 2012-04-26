@@ -17,11 +17,11 @@
 	<target name="run-load"
 		    description="Load a data set.">
 		<!-- delete file if it exists so we load into a new journal. -->
-		<delete file="${perf.journalFile}" />
+		<!-- <delete file="${perf.journalFile}" /> -->
 		<java classname="com.bigdata.rdf.store.DataLoader"
 		      fork="true" failonerror="true"
 		      >
-			<arg line="-namespace ${perf.namespace} ${perf.journalPropertyFile} ${perf.dataset}${perf.compressType}" />
+			<arg line="-namespace ${perf.namespace} -defaultGraph ${perf.defaultGraph} ${perf.journalPropertyFile} ${perf.dataset}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${perf.journalFile}
 				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
