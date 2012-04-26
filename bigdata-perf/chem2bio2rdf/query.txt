@@ -1,5 +1,5 @@
 PREFIX c2b2r_chembl: <http://chem2bio2rdf.org/chembl/resource/>
-PREFIX drugbank: <http://chem2bio2rdf.org/drugbank/resource/>
+PREFIX drugbank: <http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugbank/>
 
 SELECT ?alogp ?hha ?hhd ?molformula ?molweight ?mw_freebase ?num_ro5_violations ?psa ?rtb
 ?affectedOrganism ?biotransformation ?description ?indication ?meltingPoint ?proteinBinding ?toxicity
@@ -19,14 +19,14 @@ OPTIONAL { <http://chem2bio2rdf.org/chembl/resource/chembl_compounds/276734> c2b
 }
 
 GRAPH <http://linkedlifedata.com/resource/drugbank> {
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:affectedOrganism ?affectedOrganism }
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:biotransformation ?biotransformation }
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:description ?description }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:affectedOrganism ?affectedOrganism }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:biotransformation ?biotransformation }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:description ?description }
 }
 
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:indication ?indication }
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:proteinBinding ?proteinBinding }
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:toxicity ?toxicity }
-OPTIONAL {<http://chem2bio2rdf.org/drugbank/resource/drugbank_drug/DB00398> drugbank:meltingPoint ?meltingPoint}
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:indication ?indication }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:proteinBinding ?proteinBinding }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:toxicity ?toxicity }
+OPTIONAL {<http://www4.wiwiss.fu-berlin.de/drugbank/resource/drugs/DB00398> drugbank:meltingPoint ?meltingPoint}
 
 }
