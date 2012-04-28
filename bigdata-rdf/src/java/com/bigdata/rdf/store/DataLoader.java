@@ -1290,6 +1290,7 @@ public class DataLoader {
         boolean verbose = false;
         boolean quiet = false;
         RDFFormat rdfFormat = null;
+        String defaultGraph = null;
         String baseURI = null;
         
         int i = 0;
@@ -1311,6 +1312,12 @@ public class DataLoader {
                 } else if (arg.equals("-baseURI")) {
 
                     baseURI = args[++i];
+
+                } else if (arg.equals("-defaultGraph")) {
+
+                	defaultGraph = args[++i];
+                    if (defaultGraph.length() == 0)
+                    	defaultGraph = null;
 
                 } else if (arg.equals("-closure")) {
 
@@ -1467,7 +1474,7 @@ public class DataLoader {
 //                        rdfFormat, filter);
 
                 dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
-                        rdfFormat, null, filter, true/* endOfBatch */
+                        rdfFormat, defaultGraph, filter, true/* endOfBatch */
                 );
 
             }
