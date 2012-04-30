@@ -47,6 +47,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -263,6 +264,20 @@ public class DumpJournal {
                     ", bytesAvailable="+bytesAvailable+"("+bytesAvailable/Bytes.megabyte+"M)"+
                     ", nextOffset="+fmd.nextOffset);
 
+            final IBufferStrategy strategy = journal.getBufferStrategy();
+            
+            if (strategy instanceof RWStrategy) {
+                
+                final RWStore store = ((RWStrategy) strategy).getRWStore();
+                
+                final StringBuilder sb = new StringBuilder();
+                
+                store.showAllocators(sb);
+                
+                System.out.println(sb);
+                
+            }
+            
 			final CommitRecordIndex commitRecordIndex = journal
 					.getCommitRecordIndex();
 
