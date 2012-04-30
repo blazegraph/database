@@ -83,48 +83,6 @@ public class VocabBuilder {
 		
 	}
 	
-    /**
-     * 
-     * @param source
-     * @param baseURL
-     * @param rdfFormat
-     * 
-     * @throws IOException 
-     * @throws RDFHandlerException 
-     * @throws RDFParseException 
-     */
-//	private void parse(final Reader source, final String baseURL,
-//			final RDFFormat fmt) throws RDFParseException, RDFHandlerException,
-//			IOException {
-//
-//        final RDFParserFactory rdfParserFactory = RDFParserRegistry
-//                .getInstance().get(fmt);
-//
-//        if (rdfParserFactory == null) {
-//
-//            throw new RuntimeException(
-//                    "Parser factory not found: source=" + uriStr
-//                            + ", fmt=" + fmt);
-//
-//        }
-//
-//        final RDFParser rdfParser = rdfParserFactory.getParser();
-////        rdfParser.setValueFactory(database.getValueFactory());
-//        rdfParser.setVerifyData(parserOptions.getVerifyData());
-//        rdfParser.setStopAtFirstError(parserOptions.getStopAtFirstError());
-//        rdfParser.setDatatypeHandling(parserOptions.getDatatypeHandling());
-//        rdfParser.setPreserveBNodeIDs(parserOptions.getPreserveBNodeIDs());
-//
-//        rdfParser.setRDFHandler(new AddStatementHandler());
-//
-//        /*
-//         * Run the parser, which will cause statements to be inserted.
-//         */
-//
-//        rdfParser.parse(source, baseURL);
-//
-//    }
-
 	protected void loadFiles(final int depth, final File file,
 			final String baseURI, final RDFFormat rdfFormat,
 			final FilenameFilter filter) throws IOException {
@@ -134,17 +92,12 @@ public class VocabBuilder {
             if (log.isDebugEnabled())
                 log.debug("loading directory: " + file);
 
-//            final LoadStats loadStats = new LoadStats();
-
             final File[] files = (filter != null ? file.listFiles(filter)
                     : file.listFiles());
 
             for (int i = 0; i < files.length; i++) {
 
                 final File f = files[i];
-
-//                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
-//                        rdfFormat);
 
                 loadFiles(depth + 1, f, baseURI, rdfFormat, filter);
                 
@@ -240,80 +193,6 @@ public class VocabBuilder {
 
     }
 
-//    /**
-//	 * Loads data from the <i>source</i>. The caller is responsible for closing
-//	 * the <i>source</i> if there is an error.
-//	 * 
-//	 * @param totals
-//	 *            Used to report out the total {@link LoadStats}.
-//	 * @param source
-//	 *            A {@link Reader} or {@link InputStream}.
-//	 * @param baseURL
-//	 *            The baseURI (optional, when not specified the name of the each
-//	 *            file load is converted to a URL and used as the baseURI for
-//	 *            that file).
-//	 * @param rdfFormat
-//	 *            The format of the file (optional, when not specified the
-//	 *            format is deduced for each file in turn using the
-//	 *            {@link RDFFormat} static methods).
-//	 * @param defaultGraph
-//	 *            The value that will be used for the graph/context co-ordinate
-//	 *            when loading data represented in a triple format into a quad
-//	 *            store.
-//	 * @param endOfBatch
-//	 *            Signal indicates the end of a batch.
-//	 */
-//	public void loadData3(final Object source, final String baseURL,
-//			final RDFFormat rdfFormat) throws IOException {
-//
-//		final long begin = System.currentTimeMillis();
-//
-//        try {
-//            
-//          /*
-//           * Run the parser, which will cause statements to be inserted.
-//           */
-//
-//
-//          if(source instanceof Reader) {
-//
-//				loader.loadRdf((Reader) source, baseURL, rdfFormat,
-//						parserOptions);
-//
-//			} else if (source instanceof InputStream) {
-//
-//				loader.loadRdf((InputStream) source, baseURL, rdfFormat,
-//						parserOptions);
-//
-//            } else
-//                throw new AssertionError();
-//
-//            
-//            return;
-//            
-//        } catch ( Exception ex ) {
-//
-//            if (ex instanceof RuntimeException)
-//                throw (RuntimeException) ex;
-//
-//            if (ex instanceof IOException)
-//                throw (IOException) ex;
-//            
-//            final IOException ex2 = new IOException("Problem loading data?");
-//            
-//            ex2.initCause(ex);
-//            
-//            throw ex2;
-//            
-////        } finally {
-////            
-////            // aggregate regardless of the outcome.
-////            totals.add(stats);
-//            
-//        }
-//
-//    }
-    
     private class AddStatementHandler extends RDFHandlerBase {
 
 		public AddStatementHandler() {
@@ -330,6 +209,9 @@ public class VocabBuilder {
 			if (i == null) {
 
 				preds.put(p, i = new P(p));
+
+				if (log.isDebugEnabled())
+					log.debug("New " + p);
 
 			}
 
@@ -359,6 +241,9 @@ public class VocabBuilder {
 
 		for (String file : args) {
 
+			if (log.isInfoEnabled())
+				log.info("file: " + file);
+			
 			try {
 
 				v.loadFiles(0/* depth */, new File(file), baseURI, rdfFormat,
@@ -375,11 +260,12 @@ public class VocabBuilder {
 		final int size = v.preds.size();
 		
 		final P[] a = v.preds.values().toArray(new P[size]);
+
+		if (log.isInfoEnabled())
+			log.info("Sorting " + a.length + " vocabulary items from "
+					+ args.length + " files");
 		
 		Arrays.sort(a);
-
-		System.out.println("There are " + a.length
-				+ " vocabulary items across " + args.length + " files");
 
 		if (!generate) {
 			/*
