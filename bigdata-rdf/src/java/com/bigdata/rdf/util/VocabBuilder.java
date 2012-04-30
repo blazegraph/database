@@ -211,7 +211,7 @@ public class VocabBuilder {
 				preds.put(p, i = new P(p));
 
 				if (log.isDebugEnabled())
-					log.debug("New " + p);
+					log.debug("New " + p + " : total=" + preds.size());
 
 			}
 
