@@ -35,6 +35,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
 import com.bigdata.btree.BytesUtil;
@@ -59,6 +60,8 @@ import junit.framework.TestCase;
  */
 public class TestFileChannelUtility extends TestCase {
 
+	private static final Logger log = Logger.getLogger(TestFileChannelUtility.class);
+
     /**
      * 
      */
@@ -75,16 +78,35 @@ public class TestFileChannelUtility extends TestCase {
     /**
      * The file size for the tests (20M).
      */
-    final int FILE_SIZE = 20 * Bytes.megabyte32;
+    private final int FILE_SIZE = 20 * Bytes.megabyte32;
     
-    final Random r = new Random();
+    private Random r;
+    
+    @Override
+    protected void setUp() throws Exception {
+    	
+    		super.setUp();
+    		
+    		r = new Random();
+    	
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+    	
+    		r = null;
+    	
+    		super.tearDown();
+    	
+    }
    
     // size of a single buffer.
-    final int bufferSize = DirectBufferPool.INSTANCE.getBufferCapacity();
+    static private final int bufferSize = DirectBufferPool.INSTANCE.getBufferCapacity();
 
     /** Start at any position in the source file (up to int32 offset). */
-    protected long getRandomPosition(RandomAccessFile raf) throws IOException {
-        
+	protected long getRandomPosition(final RandomAccessFile raf)
+			throws IOException {
+
         final long pos = r.nextInt((int)raf.length());
         
         return pos;
@@ -92,17 +114,18 @@ public class TestFileChannelUtility extends TestCase {
     }
 
     /**
-     * Choose #of bytes for the an operation which is no more bytes than exist
-     * from that position to the end of the file but up to 4 times the capacity
-     * of the direct buffers in use by the pool (and no more than
-     * Integer.MAX_VALUE bytes regardless).
-     * 
-     * @param pos
-     *            A position within that file.
-     * 
-     * @throws IOException
-     */
-    protected int getRandomLength(RandomAccessFile raf, long pos) throws IOException {
+	 * Choose #of bytes for the an operation which is no more bytes than exist
+	 * from that position to the end of the file but up to 4 times the capacity
+	 * of the direct buffers in use by the pool (and no more than
+	 * Integer.MAX_VALUE bytes regardless).
+	 * 
+	 * @param pos
+	 *            A position within that file.
+	 * 
+	 * @throws IOException
+	 */
+	protected int getRandomLength(final RandomAccessFile raf, final long pos)
+			throws IOException {
 
         final int count = (int) Math.min(Integer.MAX_VALUE, Math.min(
             raf.length() - pos, bufferSize
@@ -112,8 +135,8 @@ public class TestFileChannelUtility extends TestCase {
         
     }
 
-    protected void assertSameData(byte[] expected, byte[] actual) {
-        
+	protected void assertSameData(final byte[] expected, final byte[] actual) {
+
         for (int i = 0; i < expected.length; i++) {
 
             if (expected[i] != actual[i]) {
@@ -236,8 +259,9 @@ public class TestFileChannelUtility extends TestCase {
                     // length of purturbed region.
                     final int len = r.nextInt(expected.length - off);
                     
-                    System.err.println("purturbing region after trial: trial="
-                            + trial + ", off=" + off + ", len=" + len);
+					if (log.isInfoEnabled())
+						log.info("purturbing region after trial: trial="
+								+ trial + ", off=" + off + ", len=" + len);
                     
                     final byte[] a = new byte[len];
                     
@@ -305,8 +329,9 @@ public class TestFileChannelUtility extends TestCase {
             
             final int count = getRandomLength(raf, pos);
             
-            System.err.println("verifying data: pos="+pos+", count="+count);
-            
+			if (log.isInfoEnabled())
+				log.info("verifying data: pos=" + pos + ", count=" + count);
+
             final ByteBuffer actual = ByteBuffer.wrap(new byte[count]);
 
             // seek to a random position since readAll() should not effect the
@@ -324,9 +349,10 @@ public class TestFileChannelUtility extends TestCase {
             assert actual.limit() == count;
 
             if (ioCount > 1) {
-                
-                System.err.println("Note: read required: "+ioCount+" IOs");
-                
+
+				if (log.isInfoEnabled())
+					log.info("Note: read required: " + ioCount + " IOs");
+
             }
             
             if (0 != BytesUtil.compareBytesWithLenAndOffset((int) pos, count,
@@ -399,7 +425,9 @@ public class TestFileChannelUtility extends TestCase {
                 
                 final int count = getRandomLength(source, fromPosition);
                 
-                System.err.println("fromPosition="+fromPosition+", count="+count);
+				if (log.isInfoEnabled())
+					log.info("fromPosition=" + fromPosition + ", count="
+							+ count);
 
                 /*
                  * Transfer some number of bytes from the source channel to the
