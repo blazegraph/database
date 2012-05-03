@@ -34,6 +34,9 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
+import com.bigdata.bop.join.HTreeHashJoinOp;
+import com.bigdata.bop.join.JVMHashJoinOp;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -338,6 +341,20 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * an allowable value range for some slot in that predicate.
          */
         String RANGE = IPredicate.class.getName() + ".range";
+        
+        /**
+         * Limits the number of elements read from the access path for this
+         * predicate when used in a join ({@link HTreeHashJoinOp}, 
+         * {@link JVMHashJoinOp}, {@link PipelineJoin}).  Note that this is
+         * limiting INPUT to a join, it says nothing about the output from
+         * a join.
+         */
+        String CUTOFF_LIMIT = IPredicate.class.getName() + ".cutoffLimit";
+        
+        /**
+         * Deault is to not cut off the join.
+         */
+        final long DEFAULT_CUTOFF_LIMIT = Long.MAX_VALUE;
 
     }
     

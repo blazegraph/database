@@ -23,20 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -60,11 +57,11 @@ final public class RangeBOp extends ModifiableBOpBase { // implements IVariable<
 	
     public interface Annotations extends ImmutableBOp.Annotations {
 
-        /**
-         * The variable whose range is restricted by the associated
-         * {@link #FROM} and/or {@link #TO} filters.
-         */
-		String VAR = RangeBOp.class.getName() + ".var";
+//        /**
+//         * The variable whose range is restricted by the associated
+//         * {@link #FROM} and/or {@link #TO} filters.
+//         */
+//		String VAR = RangeBOp.class.getName() + ".var";
 
 		/** The inclusive lower bound. */
 		String FROM = RangeBOp.class.getName() + ".from";
@@ -77,18 +74,24 @@ final public class RangeBOp extends ModifiableBOpBase { // implements IVariable<
 //    /** Cached to/from lookups. */
 //    private transient volatile IValueExpression<IV> to, from;
 
-    public RangeBOp(final IVariable<? extends IV> var) {
+    public RangeBOp() {
     	
-        this(BOp.NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
+        this(BOp.NOARGS, new LinkedHashMap<String,Object>());
         
     }
     
-    public RangeBOp(final IVariable<? extends IV> var,
+//    public RangeBOp(final IVariable<? extends IV> var) {
+//    	
+//        this(BOp.NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
+//        
+//    }
+    
+    public RangeBOp(//final IVariable<? extends IV> var,
     		final IValueExpression<? extends IV> from, 
     		final IValueExpression<? extends IV> to) {
 
         this(BOp.NOARGS, NV.asMap(
-    			new NV(Annotations.VAR, var),
+//    			new NV(Annotations.VAR, var),
 			    new NV(Annotations.FROM, from),
 				new NV(Annotations.TO, to)));
 
@@ -108,10 +111,10 @@ final public class RangeBOp extends ModifiableBOpBase { // implements IVariable<
         super(op);
     }
 
-    @SuppressWarnings("unchecked")
-    public IVariable<? extends IV> var() {
-    	return (IVariable<? extends IV>) getProperty(Annotations.VAR);
-    }
+//    @SuppressWarnings("unchecked")
+//    public IVariable<? extends IV> var() {
+//    	return (IVariable<? extends IV>) getProperty(Annotations.VAR);
+//    }
     
     @SuppressWarnings("unchecked")
 	public IValueExpression<? extends IV> from() {
@@ -219,7 +222,7 @@ final public class RangeBOp extends ModifiableBOpBase { // implements IVariable<
 			return this;
 		}
 		
-		final RangeBOp asBound = new RangeBOp(var());
+		final RangeBOp asBound = new RangeBOp();
 		if (asBoundFrom != null)
 			asBound.setFrom(asBoundFrom);
 		if (asBoundTo != null)

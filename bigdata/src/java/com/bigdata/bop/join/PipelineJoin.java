@@ -1527,8 +1527,16 @@ public class PipelineJoin<E> extends PipelineOp implements
              */
 			protected void handleJoin() {
 
+	        	final long cutoffLimit = predicate.getProperty(
+	        			IPredicate.Annotations.CUTOFF_LIMIT, 
+	        			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
+	        	
 				// Obtain the iterator for the current join dimension.
-				final IChunkedOrderedIterator<?> itr = accessPath.iterator();
+				final IChunkedOrderedIterator<?> itr;
+	            if (cutoffLimit == Long.MAX_VALUE) 
+					itr = accessPath.iterator();
+	            else
+	            	itr = accessPath.iterator(0, limit, (int) limit);
 
 				try {
 
@@ -1638,9 +1646,16 @@ public class PipelineJoin<E> extends PipelineOp implements
              */
             protected void handleJoin2() {
 
+            	final long cutoffLimit = predicate.getProperty(
+            			IPredicate.Annotations.CUTOFF_LIMIT, 
+            			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
+            	
                 // Obtain the iterator for the current join dimension.
-                final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
-                        .solutions(stats);
+                final ICloseableIterator<IBindingSet> itr;
+                if (cutoffLimit == Long.MAX_VALUE) 
+                	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(stats);
+                else
+                	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(cutoffLimit, stats);
 
                 try {
 

@@ -2769,7 +2769,7 @@ abstract public class AbstractTripleStore extends
                 p == null ? null : _p.getIV(),//
                 o == null ? null : _o.getIV(),//
                 (c == null || !quads) ? null : _c.getIV(),//
-                filter//
+                filter, range//
         );
 
     }

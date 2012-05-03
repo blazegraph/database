@@ -101,7 +101,6 @@ public class QueryHintRegistry {
         add(new RunOnceHint());
         add(new OptimizerQueryHint());
         add(new OptimisticQueryHint());
-        add(new RangeHint());
 
         add(new AnalyticQueryHint());
         add(new NativeDistinctQueryHint());
@@ -142,7 +141,21 @@ public class QueryHintRegistry {
         add(new PipelineMaxParallelHint());
         add(new PipelineMaxMessagesPerTaskHint());
         add(new PipelineQueueCapacityHint());
+
+        /*
+         * Mark a statement pattern as "range safe", which in effect means it 
+         * uses only one datatype in it value space (for bindings for O) and
+         * that the filters in the query are respecting that datatype.
+         */
+        add(new RangeHint());
         
+        /*
+         * Limit the input into joins by limiting the number of elements read
+         * from an access path.  Not exactly a cutoff join, which limits output
+         * from the join rather than input into it.
+         */
+        add(new CutoffLimitHint());
+
     }
 
 }

@@ -49,6 +49,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A hash join against an {@link IAccessPath} based on the {@link HTree} and
@@ -389,8 +390,19 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
+        	final long cutoffLimit = pred.getProperty(
+        			IPredicate.Annotations.CUTOFF_LIMIT, 
+        			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
+        	
+            // Obtain the iterator for the current join dimension.
+            final ICloseableIterator<IBindingSet> itr;
+            if (cutoffLimit == Long.MAX_VALUE) 
+            	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(stats);
+            else
+            	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(cutoffLimit, stats);
+            
             state.hashJoin(
-                    ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
+                    itr,// left
                     unsyncBuffer// out
                     );
 

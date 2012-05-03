@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -404,5 +405,14 @@ public interface QueryHints {
      * used currently when there is a single datatype for attribute values.
      */
     String RANGE_SAFE = "rangeSafe";
+        
+    /**
+     * Used to mark a statement pattern with a cutoff limit for how many
+     * elements (maximum) should be read from its access path.  This
+     * effectively limits the input into the join.
+     * 
+     * @see {@link Annotations#CUTOFF_LIMIT}.
+     */
+    String CUTOFF_LIMIT = "cutoffLimit";
         
 }
