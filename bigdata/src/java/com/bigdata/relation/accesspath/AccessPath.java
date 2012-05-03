@@ -732,6 +732,22 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     }
     
+    /**
+     * {@inheritDoc}
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
+     *      should visit solutions for high level query).
+     */
+    public ICloseableIterator<IBindingSet> solutions(final long limit,
+    		final BaseJoinStats stats) {
+
+//        final IVariable<?>[] vars = BOpUtility
+//                .getDistinctArgumentVariables(predicate);
+
+        return BOpContext.solutions(iterator(0, limit, (int) limit), predicate, /*vars,*/ stats);
+
+    }
+    
     final public IChunkedOrderedIterator<R> iterator() {
         
         return iterator(0L/* offset */, 0L/* limit */, 0);

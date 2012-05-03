@@ -3808,6 +3808,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
         	// Add the RangeBOp
         	anns.add(new NV(IPredicate.Annotations.RANGE, range.getRangeBOp()));
         }
+        
+        final String cutoffLimit = sp.getQueryHint(QueryHints.CUTOFF_LIMIT);
+        if (cutoffLimit != null) {
+        	// Add the cutoff limit
+        	anns.add(new NV(IPredicate.Annotations.CUTOFF_LIMIT, Long.valueOf(cutoffLimit)));
+        }
 
         final Properties queryHints = sp.getQueryHints();
         

@@ -157,9 +157,9 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     public static RangeBOp toRangeBOp(
     		final RangeNode range, final GlobalAnnotations globals) {
     	
-    	final IVariable<? extends IV> var = range.var().getValueExpression();
+//    	final IVariable<? extends IV> var = range.var().getValueExpression();
     	
-    	final RangeBOp bop = new RangeBOp(var);
+    	final RangeBOp bop = new RangeBOp();
     	
     	final ValueExpressionNode from = range.from();
 
