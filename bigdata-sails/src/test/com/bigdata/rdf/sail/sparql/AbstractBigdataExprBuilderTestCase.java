@@ -46,9 +46,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.ast.Node;
-import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
-import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
@@ -235,7 +233,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
      * Applies the {@link Bigdata2ASTSPARQLParser}.
      */
     protected QueryRoot parse(final String queryStr, final String baseURI)
-            throws MalformedQueryException, TokenMgrError, ParseException {
+            throws MalformedQueryException {
 
         return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
                 baseURI).getOriginalAST();
@@ -246,7 +244,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
      * Applies the {@link Bigdata2ASTSPARQLParser}.
      */
     protected UpdateRoot parseUpdate(final String updateStr, final String baseURI)
-            throws MalformedQueryException, TokenMgrError, ParseException {
+            throws MalformedQueryException {
 
         return new Bigdata2ASTSPARQLParser(tripleStore).parseUpdate2(updateStr,
                 baseURI).getOriginalUpdateAST();

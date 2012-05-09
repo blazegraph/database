@@ -30,14 +30,24 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTBind;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNodePropertyList;
 import com.bigdata.rdf.sail.sparql.ast.ASTCollection;
 import com.bigdata.rdf.sail.sparql.ast.ASTObjectList;
 import com.bigdata.rdf.sail.sparql.ast.ASTPropertyList;
 import com.bigdata.rdf.sail.sparql.ast.ASTPropertyListPath;
+import com.bigdata.rdf.sail.sparql.ast.ASTTRefPattern;
+import com.bigdata.rdf.sail.sparql.ast.ASTVar;
+import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -52,12 +62,12 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
     /**
      * @param context
      */
-    public TriplePatternExprBuilder(BigdataASTContext context) {
+    public TriplePatternExprBuilder(final BigdataASTContext context) {
         super(context);
     }
 
     @Override
-    final public Object visit(final ASTPropertyList propListNode, Object data)
+    final public Object visit(final ASTPropertyList propListNode, final Object data)
             throws VisitorException {
         
         final TermNode subject = (TermNode) data;
@@ -89,7 +99,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 
     @Override
     final public Object visit(final ASTPropertyListPath propListNode,
-            Object data) throws VisitorException {
+    			final Object data) throws VisitorException {
 
         final TermNode subject = (TermNode) data;
 
@@ -150,7 +160,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
     }
 
     @Override
-    final public List<TermNode> visit(final ASTObjectList node, Object data)
+    final public List<TermNode> visit(final ASTObjectList node, final Object data)
             throws VisitorException {
         
         final int childCount = node.jjtGetNumChildren();
@@ -167,7 +177,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
     }
 
     @Override
-    final public VarNode visit(final ASTBlankNodePropertyList node, Object data)
+    final public VarNode visit(final ASTBlankNodePropertyList node, final Object data)
             throws VisitorException {
         
         final VarNode bnodeVar = context.createAnonVar(node.getVarName());
@@ -182,10 +192,11 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
      * Handle the RDF Collection syntax.
      */
     @Override
-    public VarNode visit(final ASTCollection node, Object data)
+    public VarNode visit(final ASTCollection node, final Object data)
             throws VisitorException {
 
         final String listVarName = node.getVarName();
+        
         final VarNode rootListVar = context.createAnonVar(listVarName);
 
         TermNode listVar = rootListVar;
@@ -669,4 +680,172 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //            }
 //        }
 
+    /*
+	 * Reification done right.
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/526 (Reification
+	 * done right)
+	 */
+    
+    /**
+	 * This is invoked in two different contexts. One for a bare triple
+	 * reference pattern:
+	 * 
+	 * <pre>
+	 * <<a b c>> d e
+	 * </pre>
+	 * 
+	 * and the other for a BIND() of a triple reference pattern onto a statement
+	 * identifier variable:
+	 * 
+	 * <pre>
+	 * BIND(<<a b c>> as ?sidVar)
+	 * </pre>
+	 * 
+	 * In both cases we translate the triple reference pattern into a new
+	 * {@link StatementPatternNode}. We reach back to the parent to decide which
+	 * of the two invocation contexts applies and either generate a new SID
+	 * variable or use the one from the BIND(). Then we set the SID variable on
+	 * the {@link StatementPatternNode} and add it to the current graph pattern
+	 * group.
+	 * 
+	 * <p>
+	 * If either the subject or object position in the triple reference pattern
+	 * is a triple reference pattern, then it will have been turned into a
+	 * {@link StatementPatternNode} by recursion through this method and we
+	 * replace it with the SID variable which was assigned to that
+	 * {@link StatementPatternNode}.
+	 * 
+	 * @return The SID variable.  This allows the existing code paths to
+	 * handle nested triple reference patterns without change.
+	 */
+	public VarNode visit(final ASTTRefPattern node,
+			final Object data) throws VisitorException {
+		
+		/*
+		 * Accept and convert.
+		 */
+
+		final TermNode s = (TermNode) node.jjtGetChild(0).jjtAccept(this, data);
+		
+		final TermNode p = (TermNode) node.jjtGetChild(1).jjtAccept(this, data);
+		
+		final TermNode o = (TermNode) node.jjtGetChild(2).jjtAccept(this, data);
+		
+		/*
+		 * Check constraints.
+		 */
+
+		if(s instanceof ConstantNode) {
+
+			final BigdataValue v = ((ConstantNode)s).getValue();
+			
+			if (v instanceof Literal) {
+
+				throw new VisitorException(
+						"Subject in triple reference pattern may not be literal.");
+			
+			}
+			
+		} else {
+			if (((VarNode) s).isAnonymous()) {
+				/*
+				 * Blank nodes have already been translated into variables.
+				 * 
+				 * TODO We could run into trouble here if there anonymous
+				 * variables are introduced for anything other than a blank node
+				 * (and there are). We need to explicitly mark anonymous
+				 * variables which correspond to blank nodes in the original
+				 * query and then test for isBlankNode() here.
+				 */
+				throw new VisitorException(
+						"Subject in triple reference pattern may not be blank node.");
+			}
+		}
+
+		if (p instanceof ConstantNode) {
+
+			final BigdataValue v = ((ConstantNode) p).getValue();
+
+			if (!(v instanceof URI)) {
+
+				throw new VisitorException(
+						"Predicate in triple reference pattern must be IRI.");
+
+			}
+
+		}
+
+		if (o instanceof ConstantNode) {
+
+			final BigdataValue v = ((ConstantNode) o).getValue();
+
+			if (v instanceof BNode) {
+
+				throw new VisitorException(
+						"Object in triple reference pattern may not be blank node.");
+
+			}
+
+		} else {
+			
+			if (((VarNode) o).isAnonymous()) {
+				/*
+				 * Blank nodes have already been translated into variables.
+				 */
+				throw new VisitorException(
+						"Object in triple reference pattern may not be blank node.");
+			}
+			
+		}
+		
+		/*
+		 * Note: The caller will associate the SID variable with this
+		 * StatementPatternNode if it appears in a BIND(<<...>> AS ?sid)
+		 * construction. That will overwrite the variable which we assign here.
+		 * 
+		 * @see GroupGraphPatternBuilder#visit(ASTBind,Object)
+		 */
+
+		final StatementPatternNode sp = new StatementPatternNode(s, p, o,
+				graphPattern.getContext(),
+				graphPattern.getStatementPatternScope());
+
+		final Node parent = node.jjtGetParent();
+		
+		final VarNode sidVar;
+		
+		if(parent instanceof ASTBind) {
+			
+			final ASTBind bind = (ASTBind) parent;
+
+	        final Node aliasNode = bind.jjtGetChild(1);
+
+	        final String alias = ((ASTVar) aliasNode).getName();
+
+	        // Use the specified variable.
+			sidVar = new VarNode(alias);
+			
+//			sidVar.setSID(true);
+			
+		} else {
+
+			// Create a new variable.
+			sidVar = context.createSidVar();
+
+		}
+
+		// Set the SID variable on the SP.
+		sp.setSid(sidVar);
+		
+		// add to the current join group.
+		graphPattern.addSP(sp);
+
+//		log.error("node:=" + node + " => " + sp);
+
+		// Return the SID variable.
+		return sidVar;
+		
+    }
+ 
 }

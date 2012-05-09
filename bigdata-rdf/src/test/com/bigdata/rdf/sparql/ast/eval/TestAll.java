@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -134,6 +135,15 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
+
+			/*
+			 * Test suite for the SPARQL extension for "reification done right".
+			 */
+			suite.addTestSuite(TestReificationDoneRightEval.class);
+
+        }
+        
         // Test suite for embedded bigdata query hints.
         suite.addTestSuite(TestQueryHints.class);
 

@@ -1,0 +1,22 @@
+# prefix : <http://example.com/> .
+# :a1  :b  :c .
+# :a2  :b  :c .
+# <<:a2 :b :c>>  :d  :e .
+# <<:a3 :b :c>>  :d  :e .
+
+@prefix :          <http://example.com/> . 
+@prefix rdf:       <http://www.w3.org/1999/02/22-rdf-syntax-ns#> . 
+
+_:s1 rdf:subject   :a1 .
+_:s1 rdf:predicate :b .
+_:s1 rdf:object    :c .
+_:s1 rdf:type      rdf:Statement .
+
+_:s2 rdf:subject   :a2 .
+_:s2 rdf:predicate :b .
+_:s2 rdf:object    :c .
+_:s2 rdf:type      rdf:Statement .
+
+_:s1 :d :e .
+
+_:s2 :d :e .

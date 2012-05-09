@@ -141,4 +141,18 @@ public class BigdataASTContext {
 
     }
 
+    /**
+	 * Return a new variable for a SID (Statement Identifier)
+	 * 
+	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+	 *      Reification Done Right</a>
+	 */
+    protected VarNode createSidVar() {
+    	
+    		final VarNode var = new VarNode("-sid-" + constantVarID++);
+        
+        return var;
+    	
+    }
+    
 }

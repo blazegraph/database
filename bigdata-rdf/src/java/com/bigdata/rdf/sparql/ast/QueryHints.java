@@ -400,6 +400,17 @@ public interface QueryHints {
     boolean DEFAULT_SOLUTION_SET_CACHE = false;
     
     /**
+	 * Option controls whether or not the proposed SPARQL extension for
+	 * reification done right is enabled.
+	 * 
+	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+	 *      Reification Done Right</a>
+	 */
+    String REIFICATION_DONE_RIGHT = "reificationDoneRight";
+
+    boolean DEFAULT_REIFICATION_DONE_RIGHT = false;
+    
+    /**
      * Used to mark a predicate as "range safe" - that is, we can safely
      * apply the range bop to constrain the predicate.  This can only be
      * used currently when there is a single datatype for attribute values.

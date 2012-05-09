@@ -31,15 +31,33 @@ public class VarNode extends TermNode {
          * interpretation of the parse tree, AST, etc rather than one given
          * directly in the original query).
          */
-        String ANONYMOUS = VarNode.class.getName() + ".anonymous";
+        String ANONYMOUS = "anon";
 
         boolean DEFAULT_ANONYMOUS = false;
+
+		/*
+		 * Note: Annotating variables which are "SIDS" does not work out because
+		 * we lack sufficient context in the parser to make this determination
+		 * when the variable appears outside of the BIND( <<...>> as ?sid )
+		 * context. In order for the parser to do this it would have to reason
+		 * about the visibility of variables as well, which is just too much
+		 * effort.
+		 */
+//        /**
+//		 * Annotation marks a variable which is a statement identifier.
+//		 * 
+//		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+//		 *      Reification Done Right</a>
+//		 */
+//        String SID = "sid";
+//
+//        boolean DEFAULT_SID = false;
 
         /**
          * Annotation marks a variable which is actually the name of a solution
          * set.
          */
-        String SOLUTION_SET = VarNode.class.getName() + ".solutionSet";
+        String SOLUTION_SET = "solutionSet";
 
         boolean DEFAULT_SOLUTION_SET = false;
 
@@ -102,7 +120,31 @@ public class VarNode extends TermNode {
 	    
 	}
 
-    /**
+//	/**
+//	 * Return <code>true</code> if this is an SID variable (a variable which
+//	 * binds statement identifiers composed from triples). This marker is useful
+//	 * mainly when reading the AST tree as an aid to understanding where a given
+//	 * variable came from in the original query.
+//	 */
+//    public boolean isSID() {
+//
+//        return getProperty(Annotations.SID, Annotations.DEFAULT_SID);
+//
+//	}
+//
+//	/**
+//	 * Mark this as an SID variable (one which represents a triple reference
+//	 * pattern).
+//	 * 
+//	 * @param val
+//	 */
+//	public void setSID(final boolean val) {
+//
+//	    setProperty(Annotations.SID, val);
+//	    
+//	}
+
+	/**
      * Return <code>true</code> if the variable represents a solution set name.
      */
     public boolean isSolutionSet() {
@@ -145,15 +187,14 @@ public class VarNode extends TermNode {
 	}
 	
     /**
-     * Overridden to mark anonymous variables.
-     * 
-     * @see #isAnonymous()
-     */
+	 * Overridden to mark metadata about variables.
+	 */
     @Override
     public String toString() {
 
         return "VarNode(" + getValueExpression() + ")"
                 + (isAnonymous() ? "[anonymous]" : "")
+//                + (isSID() ? "[sid]" : "")
                 + (isSolutionSet() ? "[solutionSet]" : "")
                 ;
 
