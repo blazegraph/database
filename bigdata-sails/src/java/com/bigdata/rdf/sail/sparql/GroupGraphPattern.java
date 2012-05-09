@@ -183,10 +183,18 @@ class GroupGraphPattern {
             log.info("pattern=" + sp);
 
         // Fill in the inherited context and scope.
-        final StatementPatternNode t = new StatementPatternNode(sp.s(), sp.p(),
-                sp.o(), context, spScope);
+//        final StatementPatternNode t = new StatementPatternNode(sp.s(), sp.p(),
+//                sp.o(), context, spScope);
+		
+        if (context != null) {
+		
+        		sp.setC(context);
+        	
+		}
+        
+        sp.setScope(spScope);
 
-        children.add(t);
+        children.add(sp);
 
     }
     

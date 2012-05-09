@@ -148,6 +148,7 @@ public interface SyntaxTreeBuilderTreeConstants
   public int JJTDELETECLAUSE = 142;
   public int JJTINSERTCLAUSE = 143;
   public int JJTMODIFY = 144;
+  public int JJTTREFPATTERN = 145;
 
 
   public String[] jjtNodeName = {
@@ -296,6 +297,7 @@ public interface SyntaxTreeBuilderTreeConstants
     "DeleteClause",
     "InsertClause",
     "Modify",
+    "TRefPattern",
   };
 }
-/* JavaCC - OriginalChecksum=4c6fe208e0beb49c9afab793e4fc6088 (do not edit this line) */
+/* JavaCC - OriginalChecksum=c046f8d2b4fc5d2e0a9d4b4a888b6648 (do not edit this line) */

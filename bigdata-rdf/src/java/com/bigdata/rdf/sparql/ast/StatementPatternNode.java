@@ -159,6 +159,19 @@ public class StatementPatternNode extends
          */
         String RANGE = "range";
         
+        /**
+		 * An optional annotation whose value is the variable which will be
+		 * bound to the statement identifier for the matched statement patterns.
+		 * The statement identifier is always formed from the subject, predicate
+		 * and object (the triple). The context is NOT represented in the
+		 * statement identifier. This keeps the semantics consistent with RDF
+		 * reification.
+		 * 
+		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+		 *      Reification Done Right</a>
+		 */
+        String SID = "sid";
+        
     }
     
     /**
@@ -263,30 +276,71 @@ public class StatementPatternNode extends
 		
 	}
 
+	/**
+	 * The variable or constant for the subject position (required).
+	 */
     final public TermNode s() {
 
         return (TermNode) get(0);
 
     }
 
+	/**
+	 * The variable or constant for the predicate position (required).
+	 */
     final public TermNode p() {
 
         return (TermNode) get(1);
 
     }
 
+	/**
+	 * The variable or constant for the object position (required).
+	 */
     final public TermNode o() {
 
         return (TermNode) get(2);
 
     }
 
+	/**
+	 * The variable or constant for the context position (required iff in quads
+	 * mode).
+	 */
     final public TermNode c() {
 
         return (TermNode) get(3);
 
     }
-	
+
+	final public void setC(final TermNode c) {
+
+		this.setArg(3, c);
+		
+    }
+    
+	/**
+	 * The statement identifier variable for triples which match this statement
+	 * pattern (optional). The statement identifier is the composition of the
+	 * (subject, predicate, and object) positions of the matched statements.
+	 * 
+	 * @see Annotations#SID
+	 */
+	final public VarNode sid() {
+
+		return (VarNode) getProperty(Annotations.SID);
+
+    }
+
+	/**
+	 * Set the SID variable.
+	 */
+	final public void setSid(final VarNode sid) {
+
+		setProperty(Annotations.SID, sid);
+
+	}
+    
     /**
      * The scope for this statement pattern (either named graphs or default
      * graphs).
@@ -300,6 +354,15 @@ public class StatementPatternNode extends
         
     }
 
+	final public void setScope(final Scope scope) {
+
+		if (scope == null)
+			throw new IllegalArgumentException();
+    	
+    		setProperty(Annotations.SCOPE, scope);
+    	
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -503,13 +566,18 @@ public class StatementPatternNode extends
             sb.append(", ").append(c);
         }
 
-        final Scope scope = getScope();
-        if (scope != null) {
-            sb.append(", ").append(scope);
-        }
-
         sb.append(")");
         
+		final VarNode sid = sid();
+		if (sid != null) {
+			sb.append(" [sid=" + sid + "]");
+		}
+
+		final Scope scope = getScope();
+		if (scope != null) {
+			sb.append(" [scope=" + scope + "]");
+		}
+
         if(isOptional()) {
             sb.append(" [optional]");
         }

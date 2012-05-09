@@ -1,0 +1,14 @@
+# Who knows Alice, what is our source for that fact, and what is our confidence
+# in that fact?
+
+prefix foaf:       <http://xmlns.com/foaf/0.1/> 
+prefix dc:         <http://purl.org/dc/terms/> 
+prefix rv:         <http://reasoner.example.com/vocabulary#> 
+
+select ?who ?src ?conf where {
+  ?x foaf:name "Alice" .
+  ?y foaf:name ?who .
+  BIND( <<?x foaf:knows ?y>> as ?sid ) .
+  ?sid dc:source ?src .
+  ?sid rv:confidence ?src .
+}

@@ -50,6 +50,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTMinusGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTNamedSubqueryInclude;
 import com.bigdata.rdf.sail.sparql.ast.ASTOptionalGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
+import com.bigdata.rdf.sail.sparql.ast.ASTTRefPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTUnionGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.ASTWhereClause;
@@ -472,30 +473,54 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
     }
 
     /**
-     * A BIND (or FILTER) can appear in an {@link ASTBasicGraphPattern}.
-     * 
-     * @return The {@link AssignmentNode} for the BIND.
-     */
+	 * A BIND (or FILTER) can appear in an {@link ASTBasicGraphPattern}.
+	 * 
+	 * @return The {@link AssignmentNode} for the BIND -or- the
+	 *         <code>null</code> if this is <code>BIND(tripleRef AS var)<code>.
+	 */
     @Override
-    final public AssignmentNode visit(final ASTBind node, Object data)
+    final public Object visit(final ASTBind node, final Object data)
             throws VisitorException {
 
         if (node.jjtGetNumChildren() != 2)
             throw new AssertionError("Expecting two children, not "
                     + node.jjtGetNumChildren() + ", node=" + node.dump(">>>"));
 
-        final ValueExpressionNode ve = (ValueExpressionNode) node
-                .jjtGetChild(0).jjtAccept(this, data);
+		if (node.jjtGetChild(0) instanceof ASTTRefPattern) {
+
+			/*
+			 * Note: This case is handled by visit(ASTTRefPattern,Object) when
+			 * we invoke jjtAccept() for the expression node. That method has
+			 * already added the appropriate SP to the group. We do not want to
+			 * do anything more here.
+			 * 
+			 * Note: The caller does not actually do anything with the return
+			 * value from this method, so returning a [null] here is Ok.
+			 * 
+			 * @see <a
+			 * href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+			 * Reification Done Right</a>
+			 */
+			
+			node.jjtGetChild(0).jjtAccept(this, data);
+
+			return null;
+			
+		}
+
+		final Object expr = node.jjtGetChild(0).jjtAccept(this, data);
+
+		final ValueExpressionNode ve = (ValueExpressionNode) expr;
 
         final Node aliasNode = node.jjtGetChild(1);
 
         final String alias = ((ASTVar) aliasNode).getName();
 
-        final AssignmentNode bind = new AssignmentNode(new VarNode(alias), ve);
+		final AssignmentNode bind = new AssignmentNode(new VarNode(alias), ve);
 
-        graphPattern.add(bind);
+		graphPattern.add(bind);
 
-        return bind;
+		return bind;
         
     }
     
@@ -505,7 +530,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * @return The {@link AssignmentNode}.
      */
     @Override
-    final public AssignmentNode visit(final ASTLet node, Object data)
+    final public AssignmentNode visit(final ASTLet node, final Object data)
             throws VisitorException {
 
         if (node.jjtGetNumChildren() != 2)
@@ -535,7 +560,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * @return The constraint.
      */
     @Override
-    final public ValueExpressionNode visit(final ASTConstraint node, Object data)
+    final public ValueExpressionNode visit(final ASTConstraint node, final Object data)
             throws VisitorException {
 
         final ValueExpressionNode valueExpr = (ValueExpressionNode) node
@@ -551,7 +576,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * INCLUDE for a named subquery result set.
      */
     @Override
-    final public Void visit(final ASTNamedSubqueryInclude node, Object data)
+    final public Void visit(final ASTNamedSubqueryInclude node, final Object data)
             throws VisitorException {
 
         final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
@@ -629,7 +654,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * declarations for that.)
      */
     @Override
-    final public Void visit(final ASTServiceGraphPattern node, Object data)
+    final public Void visit(final ASTServiceGraphPattern node, final Object data)
             throws VisitorException {
 
         // left arg is the service reference (a value expression).

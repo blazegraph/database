@@ -72,7 +72,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(ASTBasicGraphPattern node, Object data)
+		public Object visit(final ASTBasicGraphPattern node, final Object data)
 			throws VisitorException
 		{
 			// The same Blank node ID cannot be used across Graph Patterns
@@ -85,10 +85,10 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(ASTBlankNode node, Object data)
+		public Object visit(final ASTBlankNode node, final Object data)
 			throws VisitorException
 		{
-			String bnodeID = node.getID();
+			final String bnodeID = node.getID();
 			String varName = findVarName(bnodeID);
 
 			if (varName == null) {
@@ -99,7 +99,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 				}
 			}
 
-			ASTVar varNode = new ASTVar(SyntaxTreeBuilderTreeConstants.JJTVAR);
+			final ASTVar varNode = new ASTVar(SyntaxTreeBuilderTreeConstants.JJTVAR);
 			varNode.setName(varName);
 			varNode.setAnonymous(true);
 
@@ -108,10 +108,10 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 			return super.visit(node, data);
 		}
 
-		private String findVarName(String bnodeID) throws VisitorException {
+		private String findVarName(final String bnodeID) throws VisitorException {
 			if (bnodeID == null)
 				return null;
-			String varName = conversionMap.get(bnodeID);
+			final String varName = conversionMap.get(bnodeID);
 			if (varName == null && usedBNodeIDs.contains(bnodeID))
 				throw new VisitorException(
 						"BNodeID already used in another scope: " + bnodeID);
@@ -119,7 +119,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(ASTBlankNodePropertyList node, Object data)
+		public Object visit(final ASTBlankNodePropertyList node, final Object data)
 			throws VisitorException
 		{
 			node.setVarName(createAnonVarName());
@@ -127,7 +127,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(ASTCollection node, Object data)
+		public Object visit(final ASTCollection node, final Object data)
 			throws VisitorException
 		{
 			node.setVarName(createAnonVarName());

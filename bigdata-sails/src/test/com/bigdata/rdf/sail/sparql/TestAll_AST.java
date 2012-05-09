@@ -60,12 +60,22 @@ public class TestAll_AST extends TestCase {
         suite.addTestSuite(TestValueExprBuilder.class);
 
         /*
-         * Test suite for building up triple patterns, including those which are
-         * covered by the property paths extension in SPARQL 1.1 (a triple
-         * pattern which a constant in the predicate position is treated by the
-         * sesame SPARQL grammar as a degenerate case of a property path.)
-         */
-        suite.addTestSuite(TestTriplePatternBuilder.class);
+		 * Test suite for building up triple patterns, including those which are
+		 * covered by the property paths extension in SPARQL 1.1 (a triple
+		 * pattern which a constant in the predicate position is treated by the
+		 * Sesame SPARQL grammar as a degenerate case of a property path.)
+		 */
+		suite.addTestSuite(TestTriplePatternBuilder.class);
+
+		/*
+		 * Test suite for the proposed standardization of
+		 * "reification done right".
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/526
+		 * (Reification done right)
+		 */
+		if (false) // TODO Integrate into CI.
+			suite.addTestSuite(TestReificationDoneRightParser.class);
 
         /*
          * Test suite for group graph patterns (join groups, unions, optional,

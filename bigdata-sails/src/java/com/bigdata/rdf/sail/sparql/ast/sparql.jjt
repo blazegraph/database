@@ -246,6 +246,8 @@ TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 |   <VIRTUAL_GRAPH: "virtual graph">
 |	<GRAPHS: "graphs">
 |   <SOLUTIONS: "solutions">
+|   <TREF_OPEN: "<<">
+|   <TREF_CLOSE: ">>">
 }
 
 TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
@@ -779,7 +781,9 @@ void ObjectList():
 void TriplesSameSubjectPath() :
 {}
 {
-    VarOrTerm() PropertyListPath()
+// Extension for triple reference pattern.
+//  VarOrTerm() PropertyListPath()
+    VarOrTermOrTRefP() PropertyListPath()
     |
     TriplesNode() [PropertyListPath()]
 }
@@ -884,6 +888,7 @@ void Object() #void :
 {}
 {
 	GraphNode()
+|   TRefPattern() // extension for triple reference patterns.
 }
 
 void Verb() #void :
@@ -933,9 +938,9 @@ void VarOrTerm() #void :
 void VarOrIRIref() #void :
 {}
 {
-	Var()
+    Var()
 |
-	IRIref()
+    IRIref()
 }
 
 void Var() :
@@ -1518,7 +1523,9 @@ void StrLang() :
 void Bind() :
 {}
 {
-	<BIND> <LPAREN> Expression() <AS> Var() <RPAREN>
+  // Note: Extension for triple pattern references.
+//    <BIND> <LPAREN> Expression() <AS> Var() <RPAREN>
+    <BIND> <LPAREN> ( Expression() | TRefPattern() ) <AS> Var() <RPAREN>
 }
 
 // LET ( ?x := expr ) is an alternative for BIND( expr AS ?x). They do the same thing.
@@ -1831,3 +1838,33 @@ void Modify() :
     ( DeleteClause() [InsertClause()] | InsertClause() ) (UsingClause())* 
     <WHERE> GroupGraphPattern()
 }
+
+/*
+ * Extension for triple pattern references.
+ */
+
+void VarOrIRIrefOrIsA() #void :
+{}
+{
+    VarOrIRIref()
+| 
+    <IS_A> { jjtThis.setValue(RDF.TYPE.toString()); } #IRI
+}
+
+// See VarOrTerm()
+void VarOrTermOrTRefP() #void :
+{}
+{
+    Var()
+|
+    GraphTerm()
+|
+    TRefPattern()
+}
+
+// Note: The subject position is constrained to not permit a literal.
+void TRefPattern() :
+{}
+{
+  <TREF_OPEN> VarOrTermOrTRefP() VarOrIRIrefOrIsA() VarOrTermOrTRefP() <TREF_CLOSE>} 
+
