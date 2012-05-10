@@ -28,7 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.reif;
 
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 
 /**
  * Reification Done Right test suite.
@@ -83,9 +96,147 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
         super(name);
 	}
 
+	/**
+	 * Bootstrap test. The data are explicitly entered into the KB by hand. This
+	 * makes it possible to test evaluation without having to fix the RDF data
+	 * loader. The query is based on <code>rdf-02</code>.
+	 */
+    public void test_reificationDoneRight_00() throws Exception {
+
+		final BigdataValueFactory vf = store.getValueFactory();
+
+		final BigdataURI SAP = vf.createURI("http://example.com/SAP");
+		final BigdataURI bought = vf.createURI("http://example.com/bought");
+		final BigdataURI sybase = vf.createURI("http://example.com/sybase");
+		final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
+		final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+		final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
+		final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
+		final BigdataURI g1 = vf.createURI("http://example.com/g1");
+
+		// Add/resolve the terms against the lexicon.
+		final BigdataValue[] terms = new BigdataValue[] { SAP, bought, sybase,
+				dcSource, dcCreated, newsSybase, createdDate, g1 };
+
+		final BigdataURI context = store.isQuads() ? g1 : null;
+		
+		store.addTerms(terms);
+		
+		// ground statement.
+		final BigdataStatement s0 = vf.createStatement(SAP, bought, sybase,
+				context, StatementEnum.Explicit);
+		
+		// Setup blank node with SidIV for that Statement.
+		final BigdataBNode s1 = vf.createBNode("s1");
+		s1.setStatementIdentifier(true);
+		final ISPO spo = new SPO(SAP.getIV(), bought.getIV(), sybase.getIV(),
+				null/* NO CONTEXT */, StatementEnum.Explicit);
+		s1.setIV(new SidIV<BigdataBNode>(spo));
+
+		// metadata statements.
+
+		final BigdataStatement mds1 = vf.createStatement(s1, dcSource,
+				newsSybase, context, StatementEnum.Explicit);
+
+		final BigdataStatement mds2 = vf.createStatement(s1, dcCreated,
+				createdDate, context, StatementEnum.Explicit);
+
+		final ISPO[] stmts = new ISPO[] { s0, mds1, mds2 };
+
+		store.addStatements(stmts, stmts.length);
+
+		/*
+		 * Now that we have populated the database, we can go ahead and compile
+		 * the query. (If we compile the query first then it will not find any
+		 * matching lexical items.)
+		 */
+
+		final TestHelper h = new TestHelper("reif/rdr-00", // testURI,
+				"reif/rdr-02.rq",// queryFileURL
+				"reif/empty.ttl",// dataFileURL
+				"reif/rdr-02.srx"// resultFileURL
+		);
+
+		h.runTest();
+
+    }
+    
+	/**
+	 * Bootstrap test. The data are explicitly entered into the KB by hand. This
+	 * makes it possible to test evaluation without having to fix the RDF data
+	 * loader. The query is based on <code>rdf-02a</code>.
+	 */
+    public void test_reificationDoneRight_00a() throws Exception {
+
+		final BigdataValueFactory vf = store.getValueFactory();
+
+		final BigdataURI SAP = vf.createURI("http://example.com/SAP");
+		final BigdataURI bought = vf.createURI("http://example.com/bought");
+		final BigdataURI sybase = vf.createURI("http://example.com/sybase");
+		final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
+		final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+		final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
+		final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
+		final BigdataURI g1 = vf.createURI("http://example.com/g1");
+
+		// Add/resolve the terms against the lexicon.
+		final BigdataValue[] terms = new BigdataValue[] { SAP, bought, sybase,
+				dcSource, dcCreated, newsSybase, createdDate, g1 };
+
+		final BigdataURI context = store.isQuads() ? g1 : null;
+		
+		store.addTerms(terms);
+		
+		// ground statement.
+		final BigdataStatement s0 = vf.createStatement(SAP, bought, sybase,
+				context, StatementEnum.Explicit);
+		
+		// Setup blank node with SidIV for that Statement.
+		final BigdataBNode s1 = vf.createBNode("s1");
+		s1.setStatementIdentifier(true);
+		final ISPO spo = new SPO(SAP.getIV(), bought.getIV(), sybase.getIV(),
+				null/* NO CONTEXT */, StatementEnum.Explicit);
+		s1.setIV(new SidIV<BigdataBNode>(spo));
+
+		// metadata statements.
+
+		final BigdataStatement mds1 = vf.createStatement(s1, dcSource,
+				newsSybase, context, StatementEnum.Explicit);
+
+		final BigdataStatement mds2 = vf.createStatement(s1, dcCreated,
+				createdDate, context, StatementEnum.Explicit);
+
+		final ISPO[] stmts = new ISPO[] { s0, mds1, mds2 };
+
+		store.addStatements(stmts, stmts.length);
+
+		/*
+		 * Now that we have populated the database, we can go ahead and compile
+		 * the query. (If we compile the query first then it will not find any
+		 * matching lexical items.)
+		 */
+
+		final TestHelper h = new TestHelper("reif/rdr-00a", // testURI,
+				"reif/rdr-02a.rq",// queryFileURL
+				"reif/empty.ttl",// dataFileURL
+				"reif/rdr-02a.srx"// resultFileURL
+		);
+
+		h.runTest();
+
+    }
+    
     /**
-     * Simple query involving alice, bob, and an information extractor.
-     */
+	 * Simple query involving alice, bob, and an information extractor.
+	 * 
+	 * <pre>
+	 * select ?src where {
+	 *   ?x foaf:name "Alice" .
+	 *   ?y foaf:name "Bob" .
+	 *   <<?x foaf:knows ?y>> dc:source ?src .
+	 * }
+	 * </pre>
+	 */
 	public void test_reificationDoneRight_01() throws Exception {
 
 		new TestHelper("reif/rdr-01", // testURI,
@@ -97,8 +248,18 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	}
 
 	/**
-	 * Same data, but the query uses the BIND() syntax and pulls out some
-	 * more information.
+	 * Same data, but the query uses the BIND() syntax and pulls out some more
+	 * information.
+	 * 
+	 * <pre>
+	 * select ?who ?src ?conf where {
+	 *   ?x foaf:name "Alice" .
+	 *   ?y foaf:name ?who .
+	 *   BIND( <<?x foaf:knows ?y>> as ?sid ) .
+	 *   ?sid dc:source ?src .
+	 *   ?sid rv:confidence ?src .
+	 * }
+	 * </pre>
 	 */
 	public void test_reificationDoneRight_01a() throws Exception {
 
@@ -112,6 +273,12 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 
 	/**
 	 * Simple query ("who bought sybase").
+	 * 
+	 * <pre>
+	 * SELECT ?src ?who {
+	 *    <<?who :bought :sybase>> dc:source ?src
+	 * }
+	 * </pre>
 	 */
 	public void test_reificationDoneRight_02() throws Exception {
 
@@ -124,8 +291,16 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	}
 
 	/**
-	 * Same data, but the query uses the BIND() syntax and pulls out some
-	 * more information.
+	 * Same data, but the query uses the BIND() syntax and pulls out some more
+	 * information.
+	 * 
+	 * <pre>
+	 * SELECT ?src ?who ?created {
+	 *    BIND( <<?who :bought :sybase>> as ?sid ) .
+	 *    ?sid dc:source ?src .
+	 *    OPTIONAL {?sid dc:created ?created}
+	 * }
+	 * </pre>
 	 */
 	public void test_reificationDoneRight_02a() throws Exception {
 

@@ -43,6 +43,12 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -549,7 +555,7 @@ public class BOpContext<E> extends BOpContextBase {
     static public void copyValues(final IElement e, final IPredicate<?> pred,
             final IBindingSet bindingSet) {
 
-        final int arity = pred.arity();
+    		final int arity = pred.arity();
         
         for (int i = 0; i < arity; i++) {
 
@@ -594,6 +600,39 @@ public class BOpContext<E> extends BOpContextBase {
 
             }
 
+        }
+
+		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT
+				&& pred instanceof SPOPredicate) {
+
+			final SPOPredicate tmp = (SPOPredicate) pred;
+
+			final IVariable<?> sidVar = tmp.sid();
+
+			if (sidVar != null) {
+
+				/*
+				 * Build a SidIV for the (s,p,o) and binding it on the sid
+				 * variable.
+				 * 
+				 * @see <a
+				 * href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+				 * Reification Done Right</a>
+				 * 
+				 * TODO This is RDF specific code. It would be nice if we
+				 * did not have to put it into BOpContext.
+				 */
+
+				final IV s = (IV) e.get(0);
+				final IV p = (IV) e.get(1);
+				final IV o = (IV) e.get(2);
+				final ISPO spo = new SPO(s, p, o);
+				final SidIV sidIV = new SidIV<BigdataBNode>(spo);
+
+				bindingSet.set(sidVar, new Constant(sidIV));
+
+			}
+			
         }
 
     }

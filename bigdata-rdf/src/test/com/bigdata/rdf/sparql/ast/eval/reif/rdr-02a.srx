@@ -18,7 +18,7 @@
             <uri>http://example.com/news/us-sybase</uri>
         </binding>
         <binding name="created">
-            <literal datatype="xsd:dateTime">2011-04-05T12:00:00Z</literal>
+            <literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2011-04-05T12:00:00Z</literal>
         </binding>
      </result>
    </results>

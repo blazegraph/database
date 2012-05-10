@@ -27,10 +27,12 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
@@ -51,6 +53,15 @@ public class SPOPredicate extends Predicate<ISPO> {
 	 */
 	private static final long serialVersionUID = 3517916629931687107L;
 
+	public static interface Annotations extends Predicate.Annotations {
+
+		/**
+		 * The SID {@link IVariable} (optional).
+		 */
+		String SID = SPOPredicate.class.getName() + ".sid";
+
+	}
+	
     /**
      * Variable argument version of the shallow copy constructor.
      */
@@ -267,6 +278,9 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
     
+	/**
+	 * The variable or constant for the subject position (required).
+	 */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> s() {
         
@@ -274,6 +288,9 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
     
+	/**
+	 * The variable or constant for the predicate position (required).
+	 */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> p() {
         
@@ -281,6 +298,9 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
 
+	/**
+	 * The variable or constant for the object position (required).
+	 */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> o() {
         
@@ -288,12 +308,31 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
     
+	/**
+	 * The variable or constant for the context position (required iff in quads
+	 * mode).
+	 */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> c() {
         
         return (IVariableOrConstant<IV>) get(3/* c */);
         
     }
+
+	/**
+	 * The variable for the statement identifier (optional). The statement
+	 * identifier is the composition of the (subject, predicate, and object)
+	 * positions of the fully predicate. When this variable is declared, it will
+	 * be bound to a {@link SidIV} for matched statements.
+	 * 
+	 * @see Annotations#SID
+	 */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	final public IVariable<IV> sid() {
+
+		return (IVariable<IV>) getProperty(Annotations.SID);
+
+	}
     
     /*
      * Note: Moved to Predicate. See notes there before putting back into

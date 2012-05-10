@@ -200,12 +200,20 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 		return bi.toString();
 	}
 
-	public boolean equals(Object o) {
+	/**
+	 * Two {@link SidIV} are equal if their (s,p,o) IVs are equal.
+	 */
+	public boolean equals(final Object o) {
         if (this == o)
             return true;
         if (o instanceof SidIV) {
-    		final ISPO spo2 = ((SidIV) o).spo;
-            return spo.equals(spo2);
+        		final ISPO stmt2 = ((SidIV<?>) o).spo;
+        		return
+                        IVUtility.equals(spo.s(), stmt2.s()) && //
+                        IVUtility.equals(spo.p(), stmt2.p()) && //
+                        IVUtility.equals(spo.o(), stmt2.o())//
+                        ;
+//            return spo.equals(spo2);
         }
         return false;
 	}

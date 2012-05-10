@@ -18,7 +18,7 @@
             <uri>http://reasoner.example.com/engines#engine_1</uri>
         </binding>
         <binding name="conf">
-            <literal datatype="xsd:decimal">0.9835</literal>
+            <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.9835</literal>
         </binding>
      </result>
    </results>
