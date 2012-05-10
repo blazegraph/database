@@ -40,7 +40,6 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 
 /**
@@ -108,8 +107,8 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		final BigdataURI SAP = vf.createURI("http://example.com/SAP");
 		final BigdataURI bought = vf.createURI("http://example.com/bought");
 		final BigdataURI sybase = vf.createURI("http://example.com/sybase");
-		final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
-		final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+		final BigdataURI dcSource = vf.createURI(DCTermsVocabularyDecl.NAMESPACE+"source");
+		final BigdataURI dcCreated = vf.createURI(DCTermsVocabularyDecl.NAMESPACE+"created");
 		final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
 		final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
 		final BigdataURI g1 = vf.createURI("http://example.com/g1");
@@ -173,8 +172,8 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		final BigdataURI SAP = vf.createURI("http://example.com/SAP");
 		final BigdataURI bought = vf.createURI("http://example.com/bought");
 		final BigdataURI sybase = vf.createURI("http://example.com/sybase");
-		final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
-		final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+		final BigdataURI dcSource = vf.createURI(DCTermsVocabularyDecl.NAMESPACE+"source");
+		final BigdataURI dcCreated = vf.createURI(DCTermsVocabularyDecl.NAMESPACE+"created");
 		final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
 		final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
 		final BigdataURI g1 = vf.createURI("http://example.com/g1");
