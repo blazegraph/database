@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore.sector;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicLong;
@@ -32,9 +33,14 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.IStore;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
@@ -291,12 +297,12 @@ public class AllocationContext implements IMemoryManager, IStore {
 	}
 
 	@Override
-	public PSOutputStream getOutputStream() {
+	public IPSOutputStream getOutputStream() {
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, null);
 	}
 
 	@Override
-	public PSInputStream getInputStream(long addr) {
+	public InputStream getInputStream(long addr) {
 		return new PSInputStream(this, addr);
 	}
 
@@ -356,6 +362,63 @@ public class AllocationContext implements IMemoryManager, IStore {
 	@Override
 	public void commit() {
 		m_root.commit();
+	}
+
+	@Override
+	public void registerExternalCache(
+			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			int byteCount) {
+		m_root.registerExternalCache(historicalIndexCache, byteCount);
+	}
+
+	@Override
+	public int checkDeferredFrees(AbstractJournal abstractJournal) {
+		return m_root.checkDeferredFrees(abstractJournal);
+	}
+
+	@Override
+	public IRawTx newTx() {
+		return m_root.newTx();
+	}
+
+	@Override
+	public long saveDeferrals() {
+		return m_root.saveDeferrals();
+	}
+
+	@Override
+	public long getLastReleaseTime() {
+		return m_root.getLastReleaseTime();
+	}
+
+	@Override
+	public void abortContext(final IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void detachContext(final IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void registerContext(final IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void setRetention(final long parseLong) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public boolean isCommitted(final long addr) {
+		return m_root.isCommitted(addr);
+	}
+
+	@Override
+	public long getPhysicalAddress(final long addr) {
+		return m_root.getPhysicalAddress(addr);
 	}
 
 //	private SectorAllocation m_head = null;

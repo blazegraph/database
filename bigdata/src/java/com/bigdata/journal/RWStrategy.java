@@ -32,6 +32,8 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
 import com.bigdata.io.IBufferAccess;
@@ -41,6 +43,8 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.RWStore.StoreCounters;
 import com.bigdata.util.ChecksumError;
@@ -73,7 +77,7 @@ import com.bigdata.util.ChecksumError;
  * 
  * @author Martyn Cutcher
  */
-public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
+public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy, IRWStrategy {
 
     private static final transient Logger log = Logger.getLogger(RWStrategy.class);
 
@@ -667,7 +671,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * earlier than this.
 	 * @return latest data release time
 	 */
-	long getLastReleaseTime() {
+	public long getLastReleaseTime() {
 		return m_store.getLastDeferredReleaseTime();
 	}
 
@@ -675,12 +679,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * Lifted to provide a direct interface from the Journal so that the
 	 * CommitRecordIndex can be pruned prior to store commit.
 	 */
-	public void checkDeferredFrees(final AbstractJournal journal) {
+	public int checkDeferredFrees(final AbstractJournal journal) {
 		final int totalFreed = m_store.checkDeferredFrees(true, journal); // free now if possible
 		
 		if (totalFreed > 0 && log.isInfoEnabled()) {
 			log.info("Freed " + totalFreed + " deferralls on commit");
 		}
+		
+		return totalFreed;
 	}
 
     /**
@@ -708,5 +714,28 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         return m_store.inWriteCache(decodeAddr(addr));
         
     }
+
+	@Override
+	public IRawTx newTx() {
+
+		return m_store.newTx();
+	}
+
+	@Override
+	public void registerContext(final IAllocationContext context) {
+		m_store.registerContext(context);
+	}
+
+	@Override
+	public void registerExternalCache(
+			final ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			final int byteCount) {
+		m_store.registerExternalCache(historicalIndexCache, byteCount);
+	}
+
+	@Override
+	public long saveDeferrals() {
+		return m_store.saveDeferrals();
+	}
 
 }

@@ -74,7 +74,7 @@ import org.apache.log4j.Logger;
  * It is <em>important</em>  that output streams are bound to the IStore they
  *	are requested for.
  **/
-public class PSOutputStream extends OutputStream {
+public class PSOutputStream extends IPSOutputStream {
     
     private static final Logger log = Logger.getLogger(FixedAllocator.class);
 

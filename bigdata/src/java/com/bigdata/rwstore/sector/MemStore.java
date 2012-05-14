@@ -129,6 +129,10 @@ public class MemStore extends AbstractRawStore {
 		m_uuid = storeId;
 
 	}
+	
+	public MemStrategy getStrategy() {
+		return m_strategy;
+	}
 
 	/**
 	 * Return the backing {@link IMemoryManager}.

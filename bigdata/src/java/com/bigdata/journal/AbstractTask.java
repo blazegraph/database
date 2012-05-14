@@ -72,7 +72,8 @@ import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.RWStore.RawTx;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -2247,7 +2248,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 		}
 
 		// RawTx encapsulates the transaction protocol to prevent multiple calls to close()
-		private final RawTx m_rawTx;
+		private final IRawTx m_rawTx;
 		
 		public void completeTask() {
             if (m_rawTx != null) {
@@ -2284,12 +2285,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             );
 
             final IBufferStrategy bufferStrategy = source.getBufferStrategy();
-            if (bufferStrategy instanceof RWStrategy) {
+            if (bufferStrategy instanceof IRWStrategy) {
             	// must grab the tx BEFORE registering the context to correctly
             	//	bracket, since the tx count is decremented AFTER the
             	//	context is released
-                m_rawTx = ((RWStrategy) bufferStrategy).getRWStore().newTx();
-                ((RWStrategy) bufferStrategy).getRWStore().registerContext(this);
+                m_rawTx = ((IRWStrategy) bufferStrategy).newTx();
+                ((IRWStrategy) bufferStrategy).registerContext(this);
             } else {
             	m_rawTx = null;
             }

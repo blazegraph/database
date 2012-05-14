@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import com.bigdata.rwstore.IRWStrategy;
+
 /**
  * Defines the callback object called on commit that enables the deferred 
  * delete blocks to be associated with a CommitRecord.
@@ -33,9 +35,9 @@ package com.bigdata.journal;
  */
 public class DeleteBlockCommitter implements ICommitter {
 
-	private final RWStrategy m_strategy;
+	private final IRWStrategy m_strategy;
 	
-	public DeleteBlockCommitter(final RWStrategy strategy) {
+	public DeleteBlockCommitter(final IRWStrategy strategy) {
 	
 	    m_strategy = strategy;
 	    
@@ -43,7 +45,7 @@ public class DeleteBlockCommitter implements ICommitter {
 
 	public long handleCommit(final long commitTime) {
 		
-	    return m_strategy.getRWStore().saveDeferrals();
+	    return m_strategy.saveDeferrals();
 	    
 	}
 

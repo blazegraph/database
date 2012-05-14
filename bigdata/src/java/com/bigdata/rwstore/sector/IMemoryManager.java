@@ -24,12 +24,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.PSInputStream;
-import com.bigdata.rwstore.PSOutputStream;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rwstore.IRawTx;
 
 /**
  * Abstraction for managing data in {@link ByteBuffer}s. Typically those buffers
@@ -261,13 +266,12 @@ public interface IMemoryManager extends ICounterSetAccess {
 	 * @return an outputstream to stream data to the memory manager and to retrieve
 	 * an address to later stream the data back.
 	 */
-	public PSOutputStream getOutputStream();
+	public IPSOutputStream getOutputStream();
 	
 	/**
-	 * @return an outputstream to stream data to the memory manager and to retrieve
-	 * an address to later stream the data back.
+	 * @return an inputstream for the data for provided address
 	 */
-	public PSInputStream getInputStream(long addr);
+	public InputStream getInputStream(long addr);
 
 	public int getSectorSize();
 
@@ -278,5 +282,29 @@ public interface IMemoryManager extends ICounterSetAccess {
 	public void close();
 
 	public void commit();
+
+	public void registerExternalCache(
+			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			int byteCount);
+
+	public long saveDeferrals();
+
+	public int checkDeferredFrees(AbstractJournal abstractJournal);
+
+	public IRawTx newTx();
+
+	public long getLastReleaseTime();
+
+	public void abortContext(IAllocationContext context);
+
+	public void detachContext(IAllocationContext context);
+
+	public void registerContext(IAllocationContext context);
+
+	public void setRetention(long parseLong);
+
+	public boolean isCommitted(long addr);
+
+	public long getPhysicalAddress(long addr);
 	
 }
