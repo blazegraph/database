@@ -2,6 +2,7 @@ package com.bigdata.rwstore.sector;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.util.InnerCause;
@@ -149,7 +151,7 @@ public class TestMemoryManager extends TestCase2 {
 		final String ss = "Just a simple string object";
 		for (int i = 0; i < 500; i++) {
 
-			PSOutputStream pout = context.getOutputStream();
+			IPSOutputStream pout = context.getOutputStream();
 			ObjectOutputStream out = new ObjectOutputStream(pout);
 
 			for (int t = 0; t < 100; t++) {
@@ -159,7 +161,7 @@ public class TestMemoryManager extends TestCase2 {
 			out.close();
 
 			final long addr = pout.getAddr();
-			PSInputStream pin = context.getInputStream(addr);
+			InputStream pin = context.getInputStream(addr);
 			ObjectInputStream in = new ObjectInputStream(pin);
 			int reads = 0;
 			try {

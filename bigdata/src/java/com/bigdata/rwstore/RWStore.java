@@ -37,8 +37,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,18 +47,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
-import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
@@ -70,16 +65,12 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.JournalTransactionService;
-import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
@@ -4539,7 +4530,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_storageStats;
 	}
 
-	public class RawTx {
+	public class RawTx implements IRawTx {
 		final AtomicBoolean m_open = new AtomicBoolean(true);
 		RawTx() {
 			activateTx();
@@ -4552,7 +4543,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 	
-	public RawTx newTx() {
+	public IRawTx newTx() {
 		return new RawTx();
 	}
 	

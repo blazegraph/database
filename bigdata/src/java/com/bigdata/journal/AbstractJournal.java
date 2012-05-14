@@ -96,6 +96,7 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.util.ChecksumUtility;
@@ -896,7 +897,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 case MemStore: {
 
                     _bufferStrategy = new MemStrategy(new MemoryManager(
-                            DirectBufferPool.INSTANCE));
+                            DirectBufferPool.INSTANCE), properties);
 
                     break;
 
@@ -1151,8 +1152,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * If the store can recycle storage then we must provide a hook to
 			 * allow the removal of cached data when it is available for recycling.
 			 */
-			if (_bufferStrategy instanceof RWStrategy) {
-				((RWStrategy) _bufferStrategy).getRWStore().registerExternalCache(historicalIndexCache,
+			if (_bufferStrategy instanceof IRWStrategy) {
+				((IRWStrategy) _bufferStrategy).registerExternalCache(historicalIndexCache,
 						getByteCount(_commitRecordIndex.getCheckpoint().getCheckpointAddr()));
 			}
 
@@ -2529,8 +2530,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * Do this BEFORE adding new commit record which will otherwise
 			 * be immediately removed if no history is retained
 			 */
-			if (_bufferStrategy instanceof RWStrategy) {
-				((RWStrategy) _bufferStrategy).checkDeferredFrees(this);
+			if (_bufferStrategy instanceof IRWStrategy) {
+				((IRWStrategy) _bufferStrategy).checkDeferredFrees(this);
 			}
 			
 			/*
@@ -2871,9 +2872,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         assertCanWrite();
 
-        if (_bufferStrategy instanceof RWStrategy) {
+        if (_bufferStrategy instanceof IRWStrategy) {
 
-            return ((RWStrategy) _bufferStrategy).write(data, oldAddr, context);
+            return ((IRWStrategy) _bufferStrategy).write(data, oldAddr, context);
 
         } else {
 
@@ -2887,9 +2888,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         assertCanWrite();
 
-        if (_bufferStrategy instanceof RWStrategy) {
+        if (_bufferStrategy instanceof IRWStrategy) {
 
-            return ((RWStrategy) _bufferStrategy).write(data, context);
+            return ((IRWStrategy) _bufferStrategy).write(data, context);
             
         } else {
 
@@ -2912,9 +2913,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         assertCanWrite();
 
-        if(_bufferStrategy instanceof RWStrategy) {
+        if(_bufferStrategy instanceof IRWStrategy) {
         
-            ((RWStrategy) _bufferStrategy).delete(addr, context);
+            ((IRWStrategy) _bufferStrategy).delete(addr, context);
             
         } else {
             
@@ -2928,9 +2929,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
         assertCanWrite();
 
-        if(_bufferStrategy instanceof RWStrategy) {
+        if(_bufferStrategy instanceof IRWStrategy) {
 
-            ((RWStrategy) _bufferStrategy).detachContext(context);
+            ((IRWStrategy) _bufferStrategy).detachContext(context);
             
         }
     	
@@ -2940,9 +2941,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
         assertCanWrite();
 
-        if(_bufferStrategy instanceof RWStrategy) {
+        if(_bufferStrategy instanceof IRWStrategy) {
 
-            ((RWStrategy) _bufferStrategy).abortContext(context);
+            ((IRWStrategy) _bufferStrategy).abortContext(context);
             
         }
         
@@ -3088,8 +3089,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * block committer to store the deferred deletes for each
 			 * commit record.
 			 */
-			if (_bufferStrategy instanceof RWStrategy)
-				setCommitter(DELETEBLOCK, new DeleteBlockCommitter((RWStrategy) _bufferStrategy));
+			if (_bufferStrategy instanceof IRWStrategy)
+				setCommitter(DELETEBLOCK, new DeleteBlockCommitter((IRWStrategy) _bufferStrategy));
 
             /*
              * Responsible for writing the ICUVersionRecord exactly once onto
@@ -3443,8 +3444,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	private boolean isHistoryGone(final long commitTime) {
 
-	    if (this._bufferStrategy instanceof RWStrategy) {
-	            if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
+	    if (this._bufferStrategy instanceof IRWStrategy) {
+	            if (commitTime <= ((IRWStrategy) _bufferStrategy).getLastReleaseTime()) {
 	                return true; // no index available
 	            }
 	        }
@@ -3833,7 +3834,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * 
 			 * Note: Does not set lastCommitTime.
 			 */
-
 			btree = BTree.load(this, checkpointAddr, true/* readOnly */);
 			
 		}
@@ -3993,7 +3993,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	    if(ndx == null)
 	        throw new NoSuchIndexException(name);
 	    
-	    if(getBufferStrategy() instanceof RWStrategy) {
+	    if (getBufferStrategy() instanceof IRWStrategy) {
             /*
              * Reclaim storage associated with the index.
              */

@@ -1496,7 +1496,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
-			RawTx tx = rw.newTx();
+			IRawTx tx = rw.newTx();
 
 			bs.delete(faddr); // delettion protected by session
 
@@ -1536,7 +1536,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			ByteBuffer bb = ByteBuffer.wrap(buf);
 			
-			RawTx tx = rw.newTx();
+			IRawTx tx = rw.newTx();
 			ArrayList<Long> addrs = new ArrayList<Long>();
 			
 			// We just want to stress a single allocator, so make 5000
@@ -2066,7 +2066,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	
             	store.commit();
             	
-            	RawTx tx = bs.getRWStore().newTx();
+            	IRawTx tx = bs.newTx();
             	
             	bs.delete(addr);
             	
@@ -2109,7 +2109,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	
             	store.commit();
             	
-            	RawTx tx = bs.getRWStore().newTx();
+            	IRawTx tx = bs.newTx();
             	
             	bs.delete(addr);
             	

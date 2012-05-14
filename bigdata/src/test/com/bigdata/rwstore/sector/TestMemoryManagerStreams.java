@@ -4,6 +4,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
@@ -15,6 +16,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 
@@ -103,7 +105,7 @@ public class TestMemoryManagerStreams extends TestCase {
 	}
 
 	public void testSimpleStreams() throws IOException, ClassNotFoundException {
-		PSOutputStream out = manager.getOutputStream();
+		IPSOutputStream out = manager.getOutputStream();
 		
 		ObjectOutputStream outdat = new ObjectOutputStream(out);
 		
@@ -114,7 +116,7 @@ public class TestMemoryManagerStreams extends TestCase {
 		
 		long addr = out.getAddr();
 		
-		PSInputStream instr = manager.getInputStream(addr);
+		InputStream instr = manager.getInputStream(addr);
 		
 		ObjectInputStream inobj = new ObjectInputStream(instr);
 		final String tst = (String) inobj.readObject();
@@ -128,7 +130,7 @@ public class TestMemoryManagerStreams extends TestCase {
 	}
 
 	public void testBlobStreams() throws IOException, ClassNotFoundException {
-		PSOutputStream out = manager.getOutputStream();
+		IPSOutputStream out = manager.getOutputStream();
 		
 		ObjectOutputStream outdat = new ObjectOutputStream(out);
 		final String blobBit = "A bit of a blob...";
@@ -139,7 +141,7 @@ public class TestMemoryManagerStreams extends TestCase {
 		
 		long addr = out.getAddr(); // save and retrieve the address
 		
-		PSInputStream instr = manager.getInputStream(addr);
+		InputStream instr = manager.getInputStream(addr);
 		
 		ObjectInputStream inobj = new ObjectInputStream(instr);
 		for (int i = 0; i < 40000; i++) {
@@ -169,7 +171,7 @@ public class TestMemoryManagerStreams extends TestCase {
 	}
 
 	public void testZipStreams() throws IOException, ClassNotFoundException {
-		PSOutputStream out = manager.getOutputStream();
+		IPSOutputStream out = manager.getOutputStream();
 		ObjectOutputStream outdat = new ObjectOutputStream(new GZIPOutputStream(out));
 		final String blobBit = "A bit of a blob...";
 		
@@ -179,7 +181,7 @@ public class TestMemoryManagerStreams extends TestCase {
 		
 		long addr = out.getAddr(); // save and retrieve the address
 			
-		PSInputStream instr = manager.getInputStream(addr);
+		InputStream instr = manager.getInputStream(addr);
 		
 		ObjectInputStream inobj = new ObjectInputStream(new GZIPInputStream(instr));
 		for (int i = 0; i < 40000; i++) {

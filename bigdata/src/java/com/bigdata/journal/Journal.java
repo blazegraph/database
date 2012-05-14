@@ -73,6 +73,8 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.RWStore.RawTx;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
@@ -334,7 +336,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * @see http://sourceforge.net/apps/trac/bigdata/ticket/445 (RWStore
              * does not track tx release correctly)
              */
-            final private ConcurrentHashMap<Long, RawTx> m_rawTxs = new ConcurrentHashMap<Long, RawTx>();
+            final private ConcurrentHashMap<Long, IRawTx> m_rawTxs = new ConcurrentHashMap<Long, IRawTx>();
 
 			{
                 
@@ -355,11 +357,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             protected void activateTx(final TxState state) {
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
-                if (bufferStrategy instanceof RWStrategy) {
+                if (bufferStrategy instanceof IRWStrategy) {
                     if (txLog.isInfoEnabled())
                         txLog.info("OPEN : txId=" + state.tx
                                 + ", readsOnCommitTime=" + state.readsOnCommitTime);
-                    final RawTx tx = ((RWStrategy)bufferStrategy).getRWStore().newTx();
+                    final IRawTx tx = ((IRWStrategy)bufferStrategy).newTx();
                     if (m_rawTxs.put(state.tx, tx) != null) {
                         throw new IllegalStateException(
                                 "Unexpected existing RawTx");
@@ -380,7 +382,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  */
                 super.deactivateTx(state);
                 
-                final RawTx tx = m_rawTxs.remove(state.tx);
+                final IRawTx tx = m_rawTxs.remove(state.tx);
                 if (tx != null) {
                     tx.close();
                 }
@@ -1039,7 +1041,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public long newTx(final long timestamp) {
 
-        RawTx tx = null;
+        IRawTx tx = null;
         try {
             if (getBufferStrategy() instanceof RWStrategy) {
                 

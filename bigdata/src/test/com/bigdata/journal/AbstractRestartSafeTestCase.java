@@ -34,6 +34,7 @@ import java.util.Random;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.PhysicalAddressResolutionException;
 import com.bigdata.util.InnerCause;
 
@@ -438,7 +439,7 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         try {
 
-            if (store.getBufferStrategy() instanceof RWStrategy)
+            if (store.getBufferStrategy() instanceof IRWStrategy)
                 return; // void test
 
             final int nrecs = 1000;

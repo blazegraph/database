@@ -24,27 +24,47 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.CommitRecordIndex;
+import com.bigdata.journal.CommitRecordSerializer;
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.IStore;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
+import com.bigdata.service.AbstractTransactionService;
 
 /**
  * The MemoryManager manages an off-heap Direct {@link ByteBuffer}. It uses the
@@ -63,7 +83,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 	private static final Logger log = Logger.getLogger(MemoryManager.class);
 
-	/**
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+
+    /**
 	 * The backing pool from which direct {@link ByteBuffer}s are recruited as
 	 * necessary and returned when possible.
 	 */
@@ -113,6 +135,15 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	
 	/** The #of slot bytes in current allocations. */
 	private final AtomicLong m_slotBytes = new AtomicLong();
+	
+	   /**
+     * The #of open transactions (read-only or read-write).
+     * 
+     * This is guarded by the {@link #m_allocationLock}.
+     */
+    private int m_activeTxCount = 0;
+    
+	private final PSOutputStream m_deferredFreeOut;
 
     /**
      * Create a new {@link MemoryManager}.
@@ -216,6 +247,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		m_sectorSize = pool.getBufferCapacity();
 		
+		m_deferredFreeOut = PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*allow for checksum*/, null);
 	}
 
 	protected void finalize() throws Throwable {
@@ -409,6 +441,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				// Note: The sector will add itself to the free list.
 				sector.setSectorAddress(m_extent.get(), m_sectorSize);
 				sector.setIndex(m_sectors.size());
+				
+				if (m_activeTxCount > 0 || !m_contexts.isEmpty())
+					sector.preserveSessionData();
 
 				m_sectors.add(sector);
 
@@ -498,6 +533,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				m_userBytes.addAndGet(nbytes);
 				m_slotBytes.addAndGet(sector.getPhysicalSize(SectorAllocator
 						.getSectorOffset(rwaddr)));
+
+				if (m_debugAddrs != null) {
+					m_debugAddrs[m_debugCurs++] = rwaddr;
+					if (m_debugCurs == m_debugAddrs.length) {
+						m_debugCurs = 0;
+					}
+				}
 
 				return makeAddr(rwaddr, nbytes);
 				
@@ -668,6 +710,19 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		return get(hdraddr)[0];
 	}
+	
+	String debugInfo(int rwaddr) {
+		StringBuilder out = new StringBuilder("Debug: " + rwaddr);
+		for (int i = 0; i < this.m_debugCurs; i++) {
+			if (m_debugAddrs[i] == rwaddr) {
+				out.append("A");
+			} else if (m_debugAddrs[i] == -rwaddr) {
+				out.append("X");
+			}
+		}
+		
+		return out.toString();
+	}
 
 	/**
 	 * Return a mutable view of the user allocation.
@@ -683,7 +738,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 		final SectorAllocator sector = getSector(rwaddr);
 		
+		
 		final int offset = SectorAllocator.getSectorOffset(rwaddr);
+		
+		if (!sector.isGettable(offset)) {
+			throw new IllegalArgumentException("Address not gettable: " + rwaddr);
+		}
 		
 		final long paddr = sector.getPhysicalAddress(offset);
 		
@@ -694,10 +754,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		}
 		final ByteBuffer ret = ba.buffer().duplicate();
 		
-		final int bufferAddr = (int) (paddr - (sector.m_index * m_sectorSize));
+		final int bufferAddr = (int) (paddr - sector.m_sectorAddress);
 		
 		// Set position and limit of the view onto the backing buffer.
-		ret.limit(bufferAddr + size);
+		final int nlimit = bufferAddr + size;
+		if (nlimit > ret.capacity() || nlimit < 0) {
+			throw new IllegalStateException("Buffer Limit Error - Capacity: " + ret.capacity() + ", new limit: " + nlimit);
+		}
+		ret.limit(nlimit);
 		ret.position(bufferAddr);
 		
 		// Take a slice to fix the view of the buffer we return to the caller.
@@ -759,7 +823,36 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		m_allocationLock.lock();
 		try {
+			
+			if (m_retention > 0) {
+				deferFree(rwaddr, size);
+			} else {
+				immediateFree(addr);
+			}
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+	
+	int[] m_debugAddrs = new int[100000]; // 100K alloc/frees
+	int m_debugCurs = 0;
+	private void immediateFree(final long addr) {
 
+		if (addr == 0L)
+			throw new IllegalArgumentException();
+
+		final int rwaddr = getAllocationAddress(addr);
+		
+		final int size = getAllocationSize(addr);
+		
+		if (size == 0)
+			throw new IllegalArgumentException();
+		
+		if (log.isTraceEnabled())
+			log.trace("Releasing allocation at: " + rwaddr + "[" + size + "]");
+		
+		m_allocationLock.lock();
+		try {
 			if (size <= SectorAllocator.BLOB_SIZE) {
 				
 				final int offset = SectorAllocator.getSectorOffset(rwaddr);
@@ -782,6 +875,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 				 * back to the pool.
 				 */
 				
+				if (m_debugAddrs != null) {
+					m_debugAddrs[m_debugCurs++] = -rwaddr;
+					if (m_debugCurs == m_debugAddrs.length) {
+						m_debugCurs = 0;
+					}
+				}
 			} else {
 
 				// free of a blob.
@@ -804,19 +903,31 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 					 * BLOB RECURSION
 					 */
 
-					free(mkaddr);
+					immediateFree(mkaddr);
 					
 				}
 				
 //				hdrbuf.position(spos);
 
 				// now free the header
-				free(makeAddr(rwaddr, hdrsize));
+				immediateFree(makeAddr(rwaddr, hdrsize));
 				
 			}
+			
+			removeFromExternalCache(getPhysicalAddress(addr), 0);
 		} finally {
 			m_allocationLock.unlock();
 		}
+	}
+	
+	public long getPhysicalAddress(final long addr) {
+		// Should this compute based on sector index and sector size?
+		final int rwaddr = getAllocationAddress(addr);
+		final int sector = SectorAllocator.getSectorIndex(rwaddr);
+		final int soffset = SectorAllocator.getSectorOffset(rwaddr);
+		final long paddr = getSectorSize();
+		
+		return (paddr * sector) + soffset;
 	}
 	
 	private long makeAddr(final int rwaddr, final int size) {
@@ -872,6 +983,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		// Do not trim when using buffer pool
 	}
 
+	/**
+	 * Maintain allocationContext to check for session protection
+	 */
 	public IMemoryManager createAllocationContext() {
 		return new AllocationContext(this);
 	}
@@ -989,28 +1103,459 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	}
 
 	@Override
-	public PSOutputStream getOutputStream() {
+	public IPSOutputStream getOutputStream() {
 		return getOutputStream(null/*AllocationContext*/);
 	}
 
-	public PSOutputStream getOutputStream(final IAllocationContext context) {
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, context);
 	}
 
 	@Override
-	public PSInputStream getInputStream(long addr) {
+	public InputStream getInputStream(long addr) {
 		return new PSInputStream(this, addr);
 	}
 
 	@Override
 	public void commit() {
-		final Iterator<SectorAllocator> sectors = m_sectors.iterator();
-		while (sectors.hasNext()) {
-			sectors.next().commit();
+		m_allocationLock.lock();
+		try {
+			final Iterator<SectorAllocator> sectors = m_sectors.iterator();
+			while (sectors.hasNext()) {
+				sectors.next().commit();
+			}
+		} finally {
+			m_allocationLock.unlock();
 		}
 	}
 
-	/*
+	private ConcurrentWeakValueCache<Long, BTree> m_externalCache = null;
+	private int m_cachedDatasize = 0;
+
+	private long m_lastReleaseTime;
+
+	private long m_lastDeferredReleaseTime = 0;
+	/**
+	 * Call made from AbstractJournal to register the cache used.  This can then
+	 * be accessed to clear entries when storage is made availabel for re-cycling.
+	 * 
+	 * It is not safe to clear at the point of the delete request since the data
+	 * could still be loaded if the data is retained for a period due to a non-zero
+	 * retention period or session protection.
+	 * 
+	 * @param externalCache - used by the Journal to cache historical BTree references
+	 * @param dataSize - the size of the checkpoint data (fixed for any version)
+	 */
+	public void registerExternalCache(
+			final ConcurrentWeakValueCache<Long, BTree> externalCache, final int dataSize) {
+		
+		m_allocationLock.lock();
+		try {
+			m_externalCache = externalCache;
+			m_cachedDatasize = getSlotSize(dataSize);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	/**
+	 * immediateFree
+	 * @param clr
+	 * @param sze
+	 */
+	void removeFromExternalCache(final long clr, final int sze) {
+		assert m_allocationLock.isLocked();
+		if (m_externalCache != null && sze == 0 || sze == m_cachedDatasize) {
+			Object rem = m_externalCache.remove(clr);
+			
+			if (rem != null && log.isTraceEnabled()) {
+				log.trace("ExternalCache, removed: " + rem.getClass().getName() + " with addr: " + clr);
+			}
+		}
+	}
+
+	private int getSlotSize(int size) {
+		return SectorAllocator.getBlockForSize(size);
+	}
+
+	@Override
+	public long saveDeferrals() {
+	    m_allocationLock.lock();
+		try {
+			if (m_deferredFreeOut.getBytesWritten() == 0) {
+				return 0;
+			}
+			m_deferredFreeOut.writeInt(0); // terminate!
+			final int outlen = m_deferredFreeOut.getBytesWritten();
+			
+			long addr = m_deferredFreeOut.save();
+			
+			addr <<= 32;
+			addr += outlen;
+			
+			m_deferredFreeOut.reset();
+			return addr;			
+		} catch (IOException e) {
+			throw new RuntimeException("Cannot write to deferred free", e);
+		} finally {
+		    m_allocationLock.unlock();
+		}
+	}
+
+	public void deferFree(final int rwaddr, final int sze) {
+		assert rwaddr != 0;
+	    m_allocationLock.lock();
+		try {
+			if (sze > (SectorAllocator.BLOB_SIZE)) {
+				m_deferredFreeOut.writeInt(-rwaddr);
+				m_deferredFreeOut.writeInt(sze);
+			} else {
+				m_deferredFreeOut.writeInt(rwaddr);				
+			}
+		} catch (IOException e) {
+            throw new RuntimeException("Could not free: rwaddr=" + rwaddr
+                    + ", size=" + sze, e);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	@Override
+	public int checkDeferredFrees(final AbstractJournal journal) {
+		final AbstractTransactionService transactionService = (AbstractTransactionService) journal
+				.getLocalTransactionManager().getTransactionService();
+
+		// the previous commit point.
+		final long lastCommitTime = journal.getLastCommitTime();
+
+		if (lastCommitTime == 0L) {
+			// Nothing committed.
+			return 0;
+		}
+
+		/*
+		 * The timestamp for which we may release commit state.
+		 */
+		final long latestReleasableTime = transactionService.getReleaseTime();
+		
+        return freeDeferrals(journal, m_lastDeferredReleaseTime  + 1,
+                latestReleasableTime);
+	}
+
+	/**
+	 * Provided with the address of a block of addresses to be freed
+	 * @param blockAddr
+	 * @return the total number of addresses freed
+	 */
+	private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
+		m_allocationLock.lock();
+		int totalFreed = 0;
+		final DataInputStream strBuf = new DataInputStream(getInputStream(blockAddr));		
+		try {
+			int nxtAddr = strBuf.readInt();
+			
+			int cnt = 0;
+			
+			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
+				
+				if (nxtAddr > 0) { // Blob
+					final int bloblen = strBuf.readInt();
+					assert bloblen > 0; // a Blob address MUST have a size
+
+					immediateFree(makeAddr(-nxtAddr, bloblen));
+				} else {
+					// The lack of size messes with the stats
+					immediateFree(makeAddr(nxtAddr, 1)); // size ignored for FixedAllocators
+				}
+				
+				totalFreed++;
+				
+				nxtAddr = strBuf.readInt();
+			}
+			// now free delete block
+			immediateFree(blockAddr);
+            m_lastDeferredReleaseTime = lastReleaseTime;
+            if (log.isTraceEnabled())
+                log.trace("Updated m_lastDeferredReleaseTime="
+                        + m_lastDeferredReleaseTime);
+			strBuf.close();
+		} catch (IOException e) {
+			throw new RuntimeException("Problem freeing deferrals", e);
+		} finally {
+			m_allocationLock.unlock();
+		}
+		
+		return totalFreed;
+	}
+
+    /**
+     * Provided with an iterator of CommitRecords, process each and free any
+     * deferred deletes associated with each.
+     * 
+     * @param journal
+     * @param fromTime
+     *            The inclusive lower bound.
+     * @param toTime
+     *            The exclusive upper bound.
+     */
+    private int freeDeferrals(final AbstractJournal journal,
+            final long fromTime,
+            final long toTime) {
+        
+        final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
+            /*
+             * Commit can be called prior to Journal initialisation, in which
+             * case the commitRecordIndex will not be set.
+             */
+            final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+            if (commitRecordIndex == null) { // TODO Why is this here?
+                return 0;
+            }
+    
+            final IndexMetadata metadata = commitRecordIndex
+                    .getIndexMetadata();
+
+            final byte[] fromKey = metadata.getTupleSerializer()
+                    .serializeKey(fromTime);
+
+            final byte[] toKey = metadata.getTupleSerializer()
+                    .serializeKey(toTime);
+
+            commitRecords = commitRecordIndex
+                    .rangeIterator(fromKey, toKey);
+            
+
+        int totalFreed = 0;
+        int commitPointsRecycled = 0;
+        
+        while (commitRecords.hasNext()) {
+            
+            final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
+
+            final CommitRecordIndex.Entry entry = tuple.getObject();
+            
+            try {   
+
+                final ICommitRecord record = CommitRecordSerializer.INSTANCE
+                        .deserialize(journal.read(entry.addr));
+    
+                final long blockAddr = record
+                        .getRootAddr(AbstractJournal.DELETEBLOCK);
+                
+                if (blockAddr != 0) {
+                
+                    totalFreed += freeDeferrals(blockAddr,
+                            record.getTimestamp());
+                    
+                }
+                
+// Note: This is releasing the ICommitRecord itself.  I've moved the responsibilty
+// for that into AbstractJournal#removeCommitRecordEntries() (invoked below).
+//              
+//                immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+
+                commitPointsRecycled++;
+                
+            } catch (RuntimeException re) {
+
+                throw new RuntimeException("Problem with entry at "
+                        + entry.addr, re);
+                
+            }
+
+        }
+        
+        /*
+         *  
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+         */
+        
+        // Now remove the commit record entries from the commit record index.
+        final int commitPointsRemoved = journal.removeCommitRecordEntries(
+        		fromKey, toKey);
+
+        if (txLog.isInfoEnabled())
+            txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
+                    + ", totalFreed=" + totalFreed 
+                    + ", commitPointsRecycled=" + commitPointsRecycled
+                    + ", commitPointsRemoved=" + commitPointsRemoved
+                    );
+
+        if (commitPointsRecycled != commitPointsRemoved)
+            throw new AssertionError("commitPointsRecycled="
+                    + commitPointsRecycled + " != commitPointsRemoved="
+                    + commitPointsRemoved);
+
+        return totalFreed;
+    }
+    
+    @Override
+	public IRawTx newTx() {
+		activateTx();
+
+		return new IRawTx() {
+			final AtomicBoolean m_open = new AtomicBoolean(true);
+			
+			public void close() {
+				if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
+					deactivateTx();
+				}
+			}
+		};
+	}
+	
+    private void activateTx() {
+        m_allocationLock.lock();
+        try {
+            m_activeTxCount++;
+            if(log.isInfoEnabled())
+                log.info("#activeTx="+m_activeTxCount);
+            
+            // check for new session protection
+            if (m_activeTxCount == 1 && m_contexts.isEmpty()) {
+            	acquireSessions();
+            }
+        } finally {
+            m_allocationLock.unlock();
+        }
+    }
+    
+    private void deactivateTx() {
+        m_allocationLock.lock();
+        try {
+        	if (m_activeTxCount == 0) {
+        		throw new IllegalStateException("Tx count must be positive!");
+        	}
+            m_activeTxCount--;
+            if(log.isInfoEnabled())
+                log.info("#activeTx="+m_activeTxCount);
+            
+            if (m_activeTxCount == 0 /* FIXME && m_contexts.isEmpty()*/) {
+            	releaseSessions();
+            }
+        } finally {
+            m_allocationLock.unlock();
+        }
+    }
+
+	private void releaseSessions() {
+		for (SectorAllocator sector: m_sectors) {
+			sector.releaseSession(null);
+		}
+	}
+
+	private void acquireSessions() {
+		for (SectorAllocator sector: m_sectors) {
+			sector.preserveSessionData();
+		}
+	}
+
+	@Override
+	public long getLastReleaseTime() {
+		return m_lastReleaseTime;
+	}
+
+	@Override
+	public void abortContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			final AllocationContext alloc = m_contexts.remove(context);
+			
+			if (alloc != null) {
+				m_contextRemovals++;
+				alloc.clear();
+				
+				if (m_activeTxCount == 0 && m_contexts.isEmpty())
+					releaseSessions();
+			}
+			
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	@Override
+	public void detachContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			final AllocationContext alloc = m_contexts.remove(context);
+			
+			if (alloc != null) {
+				m_contextRemovals++;
+				alloc.commit();			
+			} else {
+				throw new IllegalStateException("Multiple call to detachContext");
+			}
+			
+			if (m_contexts.isEmpty() && this.m_activeTxCount == 0) {
+				releaseSessions();
+			}
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	@Override
+	public void registerContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			establishContextAllocation(context);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	private final Map<IAllocationContext, AllocationContext> m_contexts = 
+		new ConcurrentHashMap<IAllocationContext, AllocationContext>();
+	
+	private int m_contextRequests = 0;
+	private int m_contextRemovals = 0;
+
+	private long m_retention = 0; // retention period
+	
+    private AllocationContext establishContextAllocation(
+            final IAllocationContext context) {
+
+        /*
+         * The allocation lock MUST be held to make changes in the membership of
+         * m_contexts atomic with respect to free().
+         */
+        assert m_allocationLock.isHeldByCurrentThread();
+        
+        AllocationContext ret = m_contexts.get(context);
+        
+        if (ret == null) {
+        	
+            ret = new AllocationContext(this);
+
+            if (m_contexts.put(context, ret) != null) {
+                
+                throw new AssertionError();
+                
+            }
+        
+            if (log.isTraceEnabled())
+				log.trace("Establish ContextAllocation: " + ret 
+						+ ", total: " + m_contexts.size() 
+						+ ", requests: " + ++m_contextRequests 
+						+ ", removals: " + m_contextRemovals );
+      
+            
+            if (log.isInfoEnabled())
+                log.info("Context: ncontexts=" + m_contexts.size()
+                        + ", context=" + context);
+            
+			if (m_activeTxCount == 0 && m_contexts.size() == 1)
+				acquireSessions();
+
+            
+        }
+
+        return ret;
+    
+    }
+    /*
 	 * DONE: The constructor must be able to accept nsectors :=
 	 * Integer.MAX_VALUE in order to indicate that the #of backing buffers is
 	 * (conceptually) unbounded. This will require m_resources to be a data
@@ -1036,5 +1581,28 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * Maintain a free list per size and do not pre-provision allocators of any
 	 * given size against a new sector.
 	 */
+
+	@Override
+	public void setRetention(final long retention) {
+		m_retention = retention;
+	}
+
+	@Override
+	public boolean isCommitted(long addr) {
+		
+		m_allocationLock.lock();
+		try {
+			final int rwaddr = getAllocationAddress(addr);
+
+			final int offset = SectorAllocator.getSectorOffset(rwaddr);
+				
+			// free of a simple allocation.
+			final SectorAllocator sector = getSector(rwaddr);
+			
+			return sector.isCommitted(offset);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
 
 }

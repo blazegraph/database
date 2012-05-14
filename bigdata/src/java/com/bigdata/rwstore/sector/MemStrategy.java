@@ -4,9 +4,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IBufferStrategy;
@@ -16,6 +20,10 @@ import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.IRawTx;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -24,7 +32,7 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:matyncutcher@users.sourceforge.net">Martyn Cutcher</a>
  * @version $Id$
  */
-public class MemStrategy implements IBufferStrategy {
+public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	
 	final private IMemoryManager m_mmgr;
 	final private IAddressManager m_am;
@@ -38,6 +46,10 @@ public class MemStrategy implements IBufferStrategy {
 	private volatile IRootBlockView m_rb1 = null;
 	
 	public MemStrategy(final IMemoryManager mmgr) {
+		this(mmgr, null);
+	}
+	
+	public MemStrategy(final IMemoryManager mmgr, final Properties props) {
         
 	    if (mmgr == null)
             throw new IllegalArgumentException();
@@ -58,13 +70,7 @@ public class MemStrategy implements IBufferStrategy {
 
 			@Override
 			public long getPhysicalAddress(final long addr) {
-				// Should this compute based on sector index and sector size?
-				final int saddr = (int) getOffset(addr);
-				final int sector = SectorAllocator.getSectorIndex(saddr);
-				final int soffset = SectorAllocator.getSectorOffset(saddr);
-				final long paddr = m_mmgr.getSectorSize();
-				
-				return (paddr * sector) + soffset;
+				return m_mmgr.getPhysicalAddress(addr);
 			}
 
 			@Override
@@ -96,6 +102,14 @@ public class MemStrategy implements IBufferStrategy {
 	            0, 0, 0,
 	            StoreTypeEnum.RW,
 	            createTime, 0, RootBlockView.currentVersion, checker);	
+		
+		// store minimum release age
+		if (props != null) {
+			m_mmgr.setRetention(Long.parseLong(props.getProperty(
+		                AbstractTransactionService.Options.MIN_RELEASE_AGE,
+		                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE)));
+		}
+
 	}
 	
 	public IMemoryManager getMemoryManager() {
@@ -330,7 +344,7 @@ public class MemStrategy implements IBufferStrategy {
 		return ret;
 	}
 
-	// AddressManager delagates
+	// AddressManager delegates
 	
 	@Override
 	public int getByteCount(final long addr) {
@@ -355,6 +369,67 @@ public class MemStrategy implements IBufferStrategy {
 	@Override
 	public String toString(long addr) {
 		return m_am.toString(addr);
+	}
+
+	@Override
+	public IRawTx newTx() {
+		return m_mmgr.newTx();
+	}
+
+	@Override
+	public void abortContext(IAllocationContext context) {
+		m_mmgr.abortContext(context);
+	}
+
+	@Override
+	public void detachContext(IAllocationContext context) {
+		m_mmgr.detachContext(context);
+	}
+
+	@Override
+	public void registerContext(IAllocationContext context) {
+		m_mmgr.registerContext(context);
+	}
+
+	@Override
+	public int checkDeferredFrees(final AbstractJournal abstractJournal) {
+		return m_mmgr.checkDeferredFrees(abstractJournal);
+	}
+
+	@Override
+	public void delete(long addr, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public long getLastReleaseTime() {
+		return m_mmgr.getLastReleaseTime();
+	}
+
+	@Override
+	public void registerExternalCache(
+			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			int byteCount) {
+		m_mmgr.registerExternalCache(historicalIndexCache, byteCount);
+	}
+
+	@Override
+	public long saveDeferrals() {
+		return m_mmgr.saveDeferrals();
+	}
+
+	@Override
+	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public long write(ByteBuffer data, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	public boolean isCommitted(long addr) {
+		return m_mmgr.isCommitted(addr);
 	}
 
 }

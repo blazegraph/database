@@ -333,7 +333,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                      * Other kinds of exceptions are errors.
                      */
                     
-                    log.warn("Not expecting: "+ex, ex);
+                    fail("Not expecting: "+ex, ex);
                     
                 }
                 

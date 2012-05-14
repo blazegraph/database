@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.IRWStrategy;
 
 /**
  * Test suite for correct handling of {@link ClosedByInterruptException}s. When
@@ -417,7 +418,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             if(!(store instanceof Journal)) return;
             
-            if(((Journal)store).getBufferStrategy() instanceof RWStrategy) {
+            if(((Journal)store).getBufferStrategy() instanceof IRWStrategy) {
                 return;
             }
             

@@ -132,6 +132,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	boolean m_onFreeList = false;
 	private int m_diskAddr;
 	private final IWriteCacheManager m_writes;
+	private boolean m_preserveSession;
 
 	public SectorAllocator(ISectorManager store, IWriteCacheManager writes) {
 		m_store = store;
@@ -280,12 +281,15 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 				throw new IllegalStateException("Request to free transient bit not set" + bit);
 			}
 			
-			clrBit(m_transientbits, bit);
-			int tag = bit2tag(bit);
-			m_free[tag]++;
-			
-			m_recycles[tag]++;
-			
+			if (!m_preserveSession) {
+				clrBit(m_transientbits, bit);
+				
+				final int tag = bit2tag(bit);
+				m_free[tag]++;
+				
+				m_recycles[tag]++;
+			}
+					
 			// The hasFree test is too coarse, ideally we should test for
 			//	percentage of free bits - say 10% PLUS a minimum of say 10
 			//	for each tag type.
@@ -372,7 +376,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	}
 	/**
 	 * Since we know that all allocations are 32 bits each, there is no need to
-	 * san through the array.
+	 * scan through the array.
 	 * 
 	 * @param bit
 	 * @return the tag of the bit
@@ -380,6 +384,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	public int bit2tag(int bit) {
 		return m_tags[bit/32];
 	}
+	
 	/**
 	 * 
 	 */
@@ -426,8 +431,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	}
 
 	public void preserveSessionData() {
-		// TODO Auto-generated method stub
-
+		m_preserveSession = true;
 	}
 
 	public void read(DataInputStream str) {
@@ -618,9 +622,13 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		return m_index;
 	}
 
-	public void releaseSession(IWriteCacheManager cache) {
-		// TODO Auto-generated method stub
+	public void releaseSession(IWriteCacheManager cache /* ignored */) {
 		
+		for (int i = 0; i < m_bits.length; i++) {
+			m_transientbits[i] = m_commitbits[i] | m_bits[i];
+		}
+		
+		m_preserveSession = false;
 	}
 
 	public boolean addressInRange(int addr) {
@@ -657,8 +665,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	}
 
 	public void setAllocationContext(IAllocationContext m_context) {
-		// TODO Auto-generated method stub
-		
+		throw new UnsupportedOperationException();
 	}
 
 	public int alloc(int size, IAllocationContext context) {
@@ -687,7 +694,18 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	 */
 	public void commit() {
 		m_commitbits = m_bits.clone();
-		m_transientbits = m_bits.clone();
+		
+		if (!m_preserveSession) {
+			m_transientbits = m_bits.clone();
+		}
+	}
+
+	public boolean isCommitted(int offset) {
+		return tstBit(m_commitbits, offset);
+	}
+
+	public boolean isGettable(int offset) {
+		return tstBit(m_transientbits, offset);
 	}
 
 }
