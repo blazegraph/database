@@ -1165,7 +1165,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 */
 	void removeFromExternalCache(final long clr, final int sze) {
 		assert m_allocationLock.isLocked();
-		if (m_externalCache != null && sze == 0 || sze == m_cachedDatasize) {
+		if (m_externalCache != null && (sze == 0 || sze == m_cachedDatasize)) {
 			Object rem = m_externalCache.remove(clr);
 			
 			if (rem != null && log.isTraceEnabled()) {
