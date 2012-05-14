@@ -49,7 +49,7 @@ import com.bigdata.rdf.internal.encoder.IVSolutionSetEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rwstore.PSOutputStream;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -346,7 +346,7 @@ public final class SolutionSetMetadata {
         final IVSolutionSetEncoder encoder = new IVSolutionSetEncoder();
 
         // Stream writing onto the backing store.
-        final PSOutputStream out = allocationContext.getOutputStream();
+        final IPSOutputStream out = allocationContext.getOutputStream();
         // Address from which the solutions may be read.
         final long newAddr;
         // #of solutions written.
@@ -426,7 +426,8 @@ public final class SolutionSetMetadata {
 				log.debug("Wrote solutionSet: name=" + name
 						+ ", solutionSetSize=" + nsolutions + ", chunkCount="
 						+ chunkCount + ", encodedBytes=" + nbytes
-						+ ", bytesWritten=" + out.getBytesWritten());
+					  //	+ ", bytesWritten=" + out.getBytesWritten()
+					  );
 
         } catch (IOException e) {
 
