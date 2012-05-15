@@ -1043,7 +1043,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         IRawTx tx = null;
         try {
-            if (getBufferStrategy() instanceof RWStrategy) {
+            if (getBufferStrategy() instanceof IRWStrategy) {
                 
                 /*
                  * This code pre-increments the active transaction count within
@@ -1054,7 +1054,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13
                  */
-                tx = ((RWStrategy) getBufferStrategy()).getRWStore().newTx();
+                tx = ((IRWStrategy) getBufferStrategy()).newTx();
             }
             try {
 
