@@ -32,6 +32,12 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
@@ -40,6 +46,7 @@ import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -207,5 +214,86 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             }
             logger.debug("dataset loaded.");
         }
-    
+
+    /**
+	 * Unit test for isolation semantics for a sequences of updates.
+	 * 
+	 * @throws UpdateExecutionException
+	 * @throws MalformedQueryException
+	 * @throws RepositoryException
+     * @throws QueryEvaluationException 
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+	 */
+	public void test_ticket538() throws UpdateExecutionException,
+			RepositoryException, MalformedQueryException, QueryEvaluationException {
+
+		// the [in] and [out] graphs.
+        final URI gin = f.createURI("http://example/in");
+        final URI gout = f.createURI("http://example/out");
+
+//		((BigdataSailRepository) con.getRepository()).getDatabase().addTerms(
+//				new BigdataValue[] { (BigdataValue) gin, (BigdataValue) gout });
+
+//		// Make sure the target graphs are empty.
+//		{
+//			final String s = "# Update 1\n"
+//					+ "DROP SILENT GRAPH <http://example/in>;\n"
+//					+ "DROP SILENT GRAPH <http://example/out> ;\n";
+//
+//			con.prepareUpdate(QueryLanguage.SPARQL, s).execute();
+//		}
+
+		con.prepareUpdate(QueryLanguage.SPARQL, "DROP SILENT ALL").execute();
+        // Make sure the graphs are empty.
+        assertFalse(con.hasStatement(null,null,null, true, (Resource)gin));
+        assertFalse(con.hasStatement(null,null,null, true, (Resource)gout));
+
+		/*
+		 * The mutation.
+		 * 
+		 * A statement is inserted into the [in] graph in one operation. Then
+		 * all statements in the [in] graph are copied into the [out] graph.
+		 */
+		final String s = "# Update 2\n"//
+				+ "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n"//
+				+ "INSERT DATA {\n"//
+				+ "  GRAPH <http://example/in> {\n"//
+				+ "        <http://example/president25> foaf:givenName \"William\" .\n"//
+				+ "  }\n"//
+				+ "};\n"//
+				+ "INSERT {\n"//
+				+ "   GRAPH <http://example/out> {\n"//
+				+ "       ?s ?p ?v .\n"//
+				+ "        }\n"//
+				+ "    }\n"//
+				+ "WHERE {\n"//
+				+ "   GRAPH <http://example/in> {\n"//
+				+ "       ?s ?p ?v .\n"//
+				+ "        }\n"//
+				+ "  }\n"//
+				+ ";";
+
+//		// The query - how many statements are in the [out] graph.
+//		final String q = "# Query\n"//
+//				+ "SELECT (COUNT(*) as ?cnt) {\n"//
+//				+ "    GRAPH <http://example/out> {\n"//
+//				+ "        ?s ?p ?v .\n"//
+//				+ "  }\n"//
+//				+ "} LIMIT 10";//
+
+		// run update once.
+		con.prepareUpdate(QueryLanguage.SPARQL, s).execute();
+
+		// Both graphs should now have some data.
+        assertTrue(con.hasStatement(null,null,null, true, (Resource)gin));
+
+		// Note: Succeeds if you do this a 2nd time.
+		if (false)
+			con.prepareUpdate(QueryLanguage.SPARQL, s).execute();
+
+		assertTrue(con.hasStatement(null,null,null, true, (Resource)gout));
+
+	}
+
 }
