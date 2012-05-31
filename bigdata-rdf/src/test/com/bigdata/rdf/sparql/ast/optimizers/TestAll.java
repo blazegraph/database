@@ -136,6 +136,9 @@ public class TestAll extends TestCase {
         // Unit tests for optimizer which attaches join filters to SPs.
         suite.addTestSuite(TestASTRangeOptimizer.class);
 
+        // Test suite for resolving mock IVs.
+        suite.addTestSuite(TestASTBatchResolveTermsOptimizer.class);
+
         return suite;
 
     }

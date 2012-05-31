@@ -115,6 +115,7 @@ import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.UpdateType;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBatchResolveTermsOptimizer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -216,8 +217,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         final ASTContainer astContainer = context.astContainer;
 
-        // * Note: Change this to the optimized AST if we start doing AST
-        // optimizations for UPDATE. */
+		/*
+		 * Note: Change this to the optimized AST if we start doing AST
+		 * optimizations for UPDATE.
+		 */
         final UpdateRoot updateRoot = astContainer.getOriginalUpdateAST();
         
         // Set as annotation on the ASTContainer.
@@ -227,10 +230,45 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * Evaluate each update operation in the optimized UPDATE AST in turn.
          */
         PipelineOp left = null;
-        for (Update op : updateRoot) {
+		int updateIndex = 0;
+		for (Update op : updateRoot) {
 
-            left = convertUpdateSwitch(left, op, context);
+			if (updateIndex > 0) {
 
+				/*
+				 * There is more than one update operation in this request.
+				 */
+				
+				/*
+				 * Note: We need to flush the assertion / retraction buffers if
+				 * the Sail is local since some of the code paths supporting
+				 * UPDATEs do not go through the BigdataSail and would otherwise
+				 * not have their updates flushed until the commit (which does
+				 * go through the BigdataSail).
+				 * 
+				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+				 */
+				context.conn.flush();
+
+				// log.error("\nafter op=" + op + "\n" + context.db.dumpStore());
+
+				/*
+				 * We need to re-resolve any RDF Values appearing in this UPDATE
+				 * operation which have a 0L term identifier in case they have
+				 * become defined through the previous update(s).
+				 * 
+				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+				 */
+				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
+						op/* queryNode */, null/* bindingSets */);
+
+			}
+			
+			// convert/run the update operation.
+			left = convertUpdateSwitch(left, op, context);
+
+			updateIndex++;
+			
         }
 
         /*

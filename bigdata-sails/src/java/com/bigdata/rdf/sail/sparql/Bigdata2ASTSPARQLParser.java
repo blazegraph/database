@@ -223,17 +223,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 BlankNodeVarProcessor.process(uc);
 
                 /*
-                 * Batch resolve ASTRDFValue to BigdataValues with their
-                 * associated IVs.
-                 * 
-                 * TODO IV resolution might need to proceed separately for each
-                 * UPDATE operation in a sequence since some operations can
-                 * cause new IVs to be declared in the lexicon. Resolution
-                 * before those IVs have been declared would produce a different
-                 * result than resolution afterward (it will be a null IV before
-                 * the Value is added to the lexicon and a TermId or BlobIV
-                 * afterward).
-                 */
+				 * Batch resolve ASTRDFValue to BigdataValues with their
+				 * associated IVs.
+				 * 
+				 * Note: IV resolution must proceed separately (or be
+				 * re-attempted) for each UPDATE operation in a sequence since
+				 * some operations can cause new IVs to be declared in the
+				 * lexicon. Resolution before those IVs have been declared would
+				 * produce a different result than resolution afterward (it will
+				 * be a null IV before the Value is added to the lexicon and a
+				 * TermId or BlobIV afterward).
+				 * 
+				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+				 */
                 new BatchRDFValueResolver(context, true/* readOnly */)
                         .process(uc);
 

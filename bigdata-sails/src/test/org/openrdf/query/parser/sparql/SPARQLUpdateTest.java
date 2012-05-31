@@ -49,7 +49,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	protected RepositoryConnection con;
 
-	private ValueFactory f;
+	protected ValueFactory f;
 
 	private URI bob;
 
