@@ -250,7 +250,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 */
 				context.conn.flush();
 
-				// log.error("\nafter op=" + op + "\n" + context.db.dumpStore());
+				// log.error("\nafter op=" + op + "\n" + context.conn.getTripleStore().dumpStore());
 
 				/*
 				 * We need to re-resolve any RDF Values appearing in this UPDATE
@@ -558,10 +558,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 				final int chunkSize = 100; // TODO configure.
 				
-            		// Run as a SELECT query.
-                final MutableTupleQueryResult result = new MutableTupleQueryResult(
-                        ASTEvalHelper.evaluateTupleQuery(context.db,
-                                astContainer, null/* bindingSets */));
+				/*
+				 * Run as a SELECT query.
+				 * 
+				 * Note: This *MUST* use the view of the tripleStore which is
+				 * associated with the SailConnection in case the view is
+				 * isolated by a transaction.
+				 */
+				final MutableTupleQueryResult result = new MutableTupleQueryResult(
+						ASTEvalHelper.evaluateTupleQuery(
+								context.conn.getTripleStore(), astContainer,
+								null/* bindingSets */));
 
                 try {
 
@@ -663,9 +670,18 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 								queryRoot.setProjection(deleteClause
 										.getProjection());
 
-								// Run as a SELECT query : Do NOT materialize IVs.
+								/*
+								 * Run as a SELECT query : Do NOT materialize
+								 * IVs.
+								 * 
+								 * Note: This *MUST* use the view of the
+								 * tripleStore which is associated with the
+								 * SailConnection in case the view is isolated
+								 * by a transaction.
+								 */
 								final ICloseableIterator<IBindingSet[]> titr = ASTEvalHelper
-										.evaluateTupleQuery2(context.db,
+										.evaluateTupleQuery2(
+												context.conn.getTripleStore(),
 												astContainer,
 												null/* bindingSets */, false/* materialize */);
 
@@ -844,10 +860,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 						
 					}
                     
-                    // Run as a SELECT query : Do NOT materialize IVs.
-                    final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
-                            .evaluateTupleQuery2(context.db, astContainer,
-                                    null/* bindingSets */, false/* materialize */);
+                    /*
+					 * Run as a SELECT query : Do NOT materialize IVs.
+					 * 
+					 * Note: This *MUST* use the view of the tripleStore which
+					 * is associated with the SailConnection in case the view is
+					 * isolated by a transaction.
+					 */
+					final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
+							.evaluateTupleQuery2(context.conn.getTripleStore(),
+									astContainer, null/* bindingSets */, false/* materialize */);
 
                     try {
 
@@ -875,16 +897,21 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     queryRoot.setConstruct(template);
 
                     /*
-                     * Run as a CONSTRUCT query
-                     * 
-                     * FIXME Can we avoid IV materialization for this code path?
-                     * Note that we have to do Truth Maintenance. However, I
-                     * suspect that we do not need to do IV materialization if
-                     * we can tunnel into the Sail's assertion and retraction
-                     * buffers.
-                     */
+					 * Run as a CONSTRUCT query
+					 * 
+					 * FIXME Can we avoid IV materialization for this code path?
+					 * Note that we have to do Truth Maintenance. However, I
+					 * suspect that we do not need to do IV materialization if
+					 * we can tunnel into the Sail's assertion and retraction
+					 * buffers.
+					 * 
+					 * Note: This *MUST* use the view of the tripleStore which
+					 * is associated with the SailConnection in case the view is
+					 * isolated by a transaction.
+					 */
                     final GraphQueryResult result = ASTEvalHelper
-                            .evaluateGraphQuery(context.db, astContainer, null/* bindingSets */);
+							.evaluateGraphQuery(context.conn.getTripleStore(),
+									astContainer, null/* bindingSets */);
 
                     try {
 
@@ -1693,8 +1720,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             if (!op.isSilent()) {
 
-                if (context.db.getAccessPath(null/* s */, null/* p */,
-                        null/* o */, c.getIV()).rangeCount(false/* exact */) != 0) {
+				/*
+				 * Note: This *MUST* use the view of the tripleStore which is
+				 * associated with the SailConnection in case the view is
+				 * isolated by a transaction.
+				 */
+				if (context.conn
+						.getTripleStore()
+						.getAccessPath(null/* s */, null/* p */, null/* o */,
+								c.getIV()).rangeCount(false/* exact */) != 0) {
 
                     throw new RuntimeException("Graph exists: " + c);
 
