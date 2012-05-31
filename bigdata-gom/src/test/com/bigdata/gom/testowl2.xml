@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rdf:RDF
+    xmlns="http://a.com/ontology#"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xml:base="http://a.com/ontology">
+  <owl:Ontology rdf:about=""/>
+  <owl:Class rdf:ID="Employee"/>
+  <owl:Class rdf:ID="Department"/>
+  <owl:Class rdf:ID="Project"/>
+  <owl:Class rdf:ID="Name"/>
+  <owl:Class rdf:ID="Location"/>
+  <owl:Class rdf:ID="Dependent"/>
+  <owl:Class rdf:ID="WorksOn">
+    <rdfs:subClassOf>
+      <owl:Class rdf:ID="ReifiedRelationshipClass"/>
+    </rdfs:subClassOf>
+  </owl:Class>
+  <owl:Class rdf:ID="Manages">
+    <rdfs:subClassOf rdf:resource="#ReifiedRelationshipClass"/>
+  </owl:Class>
+  <owl:ObjectProperty rdf:ID="controls">
+    <rdfs:domain rdf:resource="#Department"/>
+    <rdfs:range rdf:resource="#Project"/>
+    <owl:inverseOf>
+      <owl:FunctionalProperty rdf:about="#toDepartment"/>
+    </owl:inverseOf>
+  </owl:ObjectProperty>
+  <owl:ObjectProperty rdf:ID="locations">
+    <rdfs:domain rdf:resource="#Department"/>
+    <rdfs:range rdf:resource="#Location"/>
+  </owl:ObjectProperty>
+  <owl:ObjectProperty rdf:ID="project">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:range rdf:resource="#Project"/>
+    <rdfs:domain rdf:resource="#WorksOn"/>
+  </owl:ObjectProperty>
+  <owl:ObjectProperty rdf:ID="supervision">
+    <rdfs:range rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+  </owl:ObjectProperty>
+  <owl:DatatypeProperty rdf:ID="plocation">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Project"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="locationName">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Location"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="hours">
+    <rdfs:domain rdf:resource="#WorksOn"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="lname">
+    <rdfs:domain rdf:resource="#Name"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="sex">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="depSex">
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="address">
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="dname">
+    <rdfs:domain rdf:resource="#Department"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+  </owl:DatatypeProperty>
+  <owl:DatatypeProperty rdf:ID="pname">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Project"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+  <owl:FunctionalProperty rdf:ID="bdate">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="startDate">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:domain rdf:resource="#Manages"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="minit">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="#Name"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="hasManager">
+    <owl:inverseOf>
+      <owl:FunctionalProperty rdf:about="#manager"/>
+    </owl:inverseOf>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:range rdf:resource="#Employee"/>
+    <rdfs:domain rdf:resource="#Manages"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="pnumber">
+    <rdfs:domain rdf:resource="#Project"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="ename">
+    <rdfs:range rdf:resource="#Name"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="depBdate">
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="worksFor">
+    <rdfs:range rdf:resource="#Department"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="dependentName">
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="managedBy">
+    <rdfs:domain rdf:resource="#Department"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:range rdf:resource="#Manages"/>
+    <owl:inverseOf>
+      <owl:FunctionalProperty rdf:about="#departmentManaged"/>
+    </owl:inverseOf>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="numberOfEmployees">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:domain rdf:resource="#Department"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="toDepartment">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+    <rdfs:domain rdf:resource="#Project"/>
+    <rdfs:range rdf:resource="#Department"/>
+    <owl:inverseOf rdf:resource="#controls"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="ssn">
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="dependentsOf">
+    <rdfs:range rdf:resource="#Employee"/>
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="fname">
+    <rdfs:domain rdf:resource="#Name"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="salary">
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="worker">
+    <rdfs:range rdf:resource="#Employee"/>
+    <rdfs:domain rdf:resource="#WorksOn"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="depRelationship">
+    <rdfs:domain rdf:resource="#Dependent"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="manager">
+    <owl:inverseOf rdf:resource="#hasManager"/>
+    <rdfs:domain rdf:resource="#Employee"/>
+    <rdfs:range rdf:resource="#Manages"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="departmentManaged">
+    <owl:inverseOf rdf:resource="#managedBy"/>
+    <rdfs:range rdf:resource="#Department"/>
+    <rdfs:domain rdf:resource="#Manages"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+  </owl:FunctionalProperty>
+  <owl:FunctionalProperty rdf:ID="dnumber">
+    <rdfs:domain rdf:resource="#Department"/>
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:FunctionalProperty>
+</rdf:RDF>
+
+<!-- Created with Protege (with OWL Plugin 1.1 beta, Build 114)  http://protege.stanford.edu -->

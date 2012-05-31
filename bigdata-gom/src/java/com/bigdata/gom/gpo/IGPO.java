@@ -111,6 +111,9 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     /** Replace (self,p,?x) with (self,p,newValue). */
     void setValue(URI property, Value newValue);
 
+    /** Assert (self,p,newValue). */
+    void addValue(URI property, Value newValue);
+
     /** All (self,?p,?o). */
     Set<Statement> getStatements();
 
@@ -188,5 +191,16 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
      * @see GenericSkinRegistry
      */
     IGenericSkin asClass(Class theClassOrInterface);
+
+    /**
+     * @return a pretty printed representation of the GPO
+     */
+	String pp();
+	
+	/**
+	 * FIXME: this method will be moved to an as yet unnamed derived class
+	 * that will become the superclass for alchemist generated subclasses.
+	 */
+	IGPO getType();
 
 }

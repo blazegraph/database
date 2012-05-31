@@ -436,7 +436,7 @@ public class GenericSkinRegistry
     {
         
         Constructor c = implClass.getDeclaredConstructor
-            ( new Class[] { IGenericSkin.class }
+            ( new Class[] { IGPO.class }
               );
         
         return (IGenericSkin) c.newInstance

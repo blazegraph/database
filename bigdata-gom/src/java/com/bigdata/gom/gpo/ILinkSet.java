@@ -32,6 +32,15 @@ import org.openrdf.model.URI;
 /**
  * A collection of links into (edges in) or links out of (edges out) of an
  * {@link IGPO}.
+ * 
+ * <p>Note that the links out are only intended to be used to represent
+ * many-many associations.  Standard one-many associations should be represented
+ * by linksIn (many links pointing to one resource rather than many links from
+ * one resource pointing to many other resources).
+ * 
+ * <p>The LinksOut as the low-cardinality part of a many-many association reflect
+ * common asymmetry of such associations.  Experience suggests that if the 
+ * association is more symmetric the cardinalities tend not to be large.
  */
 public interface ILinkSet extends Set<IGPO> {
     

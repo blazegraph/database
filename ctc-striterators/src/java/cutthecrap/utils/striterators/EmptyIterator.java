@@ -34,12 +34,12 @@ import java.util.*;
  * <p>It allows calls to be made without needing to check for a null iterator.</p>
  */
 
-public final class EmptyIterator implements Iterator {
+public final class EmptyIterator<T> implements Iterator<T> {
   public boolean hasNext() {
     return false;
   }
   
-  public Object next() {
+  public T next() {
     return null;
   }
   

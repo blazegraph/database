@@ -1,0 +1,25 @@
+# Simple GOM Data
+# Type Class
+<gpo:#1> <attr:/type#name> "Class" .
+# Type Employee
+<gpo:#100> <attr:/type> <gpo:#1> .
+<gpo:#100> <attr:/type#name> "Employee" .
+# Type Company
+<gpo:#101> <attr:/type> <gpo:#1> .
+<gpo:#101> <attr:/type#name> "Company" .
+# Employee 123
+<gpo:#123> <attr:/type> <gpo:#100> .
+<gpo:#123> <attr:/employee#name> "Martyn" .
+<gpo:#123> <attr:/employee#dob> "28031959" .
+<gpo:#123> <attr:/employee#town> "Wokingham" .
+<gpo:#123> <attr:/employee#worksFor> <gpo:#456> .
+# Employee 124
+<gpo:#124> <attr:/type> <gpo:#100> .
+<gpo:#124> <attr:/employee#name> "Bryan" .
+<gpo:#124> <attr:/employee#town> "Washington" .
+<gpo:#124> <attr:/employee#worksFor> <gpo:#456> .
+# Company 456
+<gpo:#456> <attr:/type> <gpo:#101> .
+<gpo:#456> <attr:/company#name> "Systap" .
+# Root
+<gpo:#root> <attr:/root> <gpo:#456> .
