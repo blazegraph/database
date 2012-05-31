@@ -28,7 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.gom.om;
 
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
+import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.striterator.ICloseableIterator;
@@ -92,4 +97,39 @@ public interface IObjectManager extends INativeTransaction {
      */
     void execute(String updateStr);
 
+	URI internKey(URI key);
+
+	void retract(Resource id, URI key, Value value) throws RepositoryException;
+
+	void insert(Resource id, URI key, Value value) throws RepositoryException;
+
+	/**
+	 * The ObjectManager is able to assign automatic ids for a new object.  These
+	 * will be of the form "gpo:#[genid]"
+	 * 
+	 * @return a new GPO
+	 */
+	IGPO createGPO();
+
+	/**
+	 * Simple save/recall interface that the ObjectManager provides to simplify
+	 * other pattern implementations.  Internally it uses a NameManager GPO
+	 */
+	void save(URI key, Value value);
+
+	/**
+	 * Simple save/recall interface that the ObjectManager provides to simplify
+	 * other pattern implementations.  Internally it uses a NameManager GPO
+	 */
+	Value recall(URI key);
+	
+	IGPO recallAsGPO(URI key);
+
+	void remove(IGPO gpo);
+
+	ICloseableIterator<Statement> evaluateGraph(String query);
+
+	ValueFactory getValueFactory();
+
+	void checkValue(Value newValue);
 }
