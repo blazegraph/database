@@ -56,6 +56,15 @@ import org.openrdf.model.BNode;
  * @version $Id$
  */
 public interface BigdataBNode extends BigdataResource, BNode {
-    public void setStatementIdentifier(boolean isStmtIdentifier);
-    public boolean isStatementIdentifier();
+
+	/**
+	 * Set flag indicating that this blank node models a statement.
+	 */
+	public void setStatementIdentifier(boolean isStmtIdentifier);
+
+	/**
+	 * <code>true</code> if this blank node models a statement.
+	 */
+	public boolean isStatementIdentifier();
+	
 }

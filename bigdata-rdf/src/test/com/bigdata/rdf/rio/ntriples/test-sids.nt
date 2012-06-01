@@ -1,0 +1,24 @@
+<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en .
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://purl.org/dc/terms/source> <http://en.wikipedia.org/wiki/Anarchism> .
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://example.com/rtst/section> "\"External link\"" .
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://example.com/rtst/absolute-line> "288" .
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://example.com/rtst/relative-line> "2" .
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://example.com/rtst/certainty> "0.86"^^<http://www.w3.org/2001/XMLSchema#double> .
+
+<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en .
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en>> <http://purl.org/dc/terms/source> <http://en.wikipedia.org/wiki/Anarchism> .
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en >> <http://example.com/rtst/section> "\"External link\"" .
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en >> <http://example.com/rtst/absolute-line> "288" .
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en>> <http://example.com/rtst/relative-line> "2" .
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> "no"@en>> <http://example.com/rtst/certainty> "0.7"^^<http://www.w3.org/2001/XMLSchema#double> .
+
+<<_:alice <http://xmlns.com/foaf/0.1/mbox> <mailto:alice@work> >> <http://purl.org/dc/terms/source>   <http://hr.example.com/employees#bob> .
+<<_:alice <http://xmlns.com/foaf/0.1/mbox> <mailto:alice@work> >> <http://purl.org/dc/terms/created>  "2012-02-05T12:34:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+
+<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> <<<http://example.org> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://dbpedia.org/resource>>>.
+<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> <<<http://example.org> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://dbpedia.org/resource> >>.
+<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/n> << <http://example.org> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://dbpedia.org/resource>>>.
+
+<<<http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en>> <http://dbpedia.org/property/n> <<<http://example.org> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://dbpedia.org/resource>>>.
+
+<< <http://dbpedia.org/resource/Anarchism> <http://dbpedia.org/property/v> "no"@en >> <http://dbpedia.org/property/n> << <http://example.org> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://dbpedia.org/resource> >>.

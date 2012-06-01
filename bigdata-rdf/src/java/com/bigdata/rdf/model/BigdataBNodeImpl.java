@@ -82,7 +82,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
      * into the internal {@link SPO} model if the blank node is a statement
      * identifier.
      */
-    public boolean statementIdentifier;
+    private boolean statementIdentifier;
 
 //    public BigdataBNodeImpl(String id) {
 //
@@ -168,5 +168,32 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
         
         return this.statementIdentifier;
         
-    }
+	}
+
+	/*
+	 * Mechanism permitting the attachment of a statement to a blank node when
+	 * we know the correlation between the blank node and the statement.
+	 * 6/1/2012.
+	 */
+    
+	/**
+	 * Marks this as a blank node which models the specified statement.
+	 * 
+	 * @param stmt
+	 *            The statement.
+	 */
+	final public void setStatement(final BigdataStatement sid) {
+		this.statementIdentifier = true;
+		this.sid = sid;
+	}
+
+	/**
+	 * Return the statement modeled by this blank node.
+	 */
+	final public BigdataStatement getStatement() {
+		return sid;
+	}
+
+	private transient BigdataStatement sid;
+
 }

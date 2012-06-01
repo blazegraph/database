@@ -75,6 +75,13 @@ public class TestAll extends TestCase {
          * obtained.
          */
         suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
+        
+        /*
+		 * Test suite for "SIDS" support for NTRIPLES data. This test targets a
+		 * hybrid capability in which the old SIDS mode is extended to consume
+		 * NTRIPLES. 
+		 */
+        suite.addTestSuite(TestNTriplesWithSids.class);
 
         /*
          * Correctness tests for the asynchronous bulk data loader. This

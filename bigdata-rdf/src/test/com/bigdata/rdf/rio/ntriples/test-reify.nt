@@ -1,0 +1,9 @@
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <http://dbpedia.org/resource/Anarchism> .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://dbpedia.org/property/n> .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#object> "no"@en .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://purl.org/dc/terms/source> <http://en.wikipedia.org/wiki/Anarchism> .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://example.com/rtst/section> "\"External link\"" .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://example.com/rtst/absolute-line> "288" .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://example.com/rtst/relative-line> "2" .
+_:_42bd1c8e-bfb8-4378-a1ff-8ae6ebc504f6 <http://example.com/rtst/certainty> "0.97"^^<http://www.w3.org/2001/XMLSchema#double> .

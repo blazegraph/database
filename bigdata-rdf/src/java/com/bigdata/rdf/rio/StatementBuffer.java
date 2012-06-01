@@ -45,6 +45,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -144,7 +145,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * blank node is observed in the context position of a statement; or (b)
      * {@link #flush()} is invoked, indicating that no more data will be loaded
      * from the current source and therefore that the blank node is NOT a
-     * statement identifier. This map is used IFF statement identifers are
+     * statement identifier. This map is used IFF statement identifiers are
      * enabled. When statement identifiers are NOT enabled blank nodes are
      * always blank nodes and we do not need to defer statements, only maintain
      * the canonicalizing {@link #bnodes} mapping.
@@ -154,7 +155,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     /**
      * <code>true</code> if statement identifiers are enabled.
      * <p>
-     * Note: This is set by the ctor but temporarily overriden during
+     * Note: This is set by the ctor but temporarily overridden during
      * {@link #processDeferredStatements()} in order to reuse the
      * {@link StatementBuffer} for batch writes of the deferred statement as
      * well.
@@ -401,9 +402,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * know whether or not the blank node is being used as a statement
      * identifier (blank nodes are not allowed in the predicate position by the
      * RDF data model). If the blank node is being used as a statement
-     * identifier then its internal 64-bit identifier will be assigned based on
+     * identifier then its {@link IV}  will be assigned based on
      * the {s,p,o} triple. If it is being used as a blank node, then the
-     * internal identifier is assigned using the blank node ID.
+     * {@link IV} is assigned using the blank node ID.
      * <p>
      * Deferred statements are processed as follows:
      * <ol>
@@ -1335,7 +1336,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                      * node's ID.
                      */
 
-                    ((BigdataBNode) c).setStatementIdentifier( true);
+                	// Note: done automatically by setStatement();
+//                    ((BigdataBNode) c).setStatementIdentifier( true);
+					((BigdataBNodeImpl) c).setStatement(stmt);
 
                 }
 
