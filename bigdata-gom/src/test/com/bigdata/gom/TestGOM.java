@@ -12,6 +12,7 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
@@ -52,6 +53,7 @@ import junit.framework.TestCase;
  *
  */
 public class TestGOM extends TestCase {
+	protected static final Logger log = Logger.getLogger(IObjectManager.class);
 	BigdataSailRepositoryConnection m_cxn = null;
 
 	/**
@@ -75,12 +77,14 @@ public class TestGOM extends TestCase {
 		
 		final IGPO rootGPO = om.getGPO(rootId);
 		
-		System.out.println("--------");
-		System.out.println(rootGPO.pp());
+		if (log.isInfoEnabled()) {
+			System.out.println("--------");
+			System.out.println(rootGPO.pp());
 		
-		System.out.println(rootGPO.getType().pp());
+			System.out.println(rootGPO.getType().pp());
 		
-		System.out.println(rootGPO.getType().getStatements());
+			System.out.println(rootGPO.getType().getStatements());
+		}
 		
 		final URI typeName = vf.createURI("attr:/type#name");
 		assertTrue("Company".equals(rootGPO.getType().getValue(typeName).stringValue()));
@@ -90,7 +94,7 @@ public class TestGOM extends TestCase {
 	    ILinkSet linksIn = rootGPO.getLinksIn(worksFor);
 	    Iterator<IGPO> workers = linksIn.iterator();
 	    while (workers.hasNext()) {
-	    	System.out.println("Returned: " + workers.next().pp());
+	    	log.info("Returned: " + workers.next().pp());
 	    }
 	    
 	}
@@ -322,19 +326,21 @@ public class TestGOM extends TestCase {
 	}
 	
 	void print(final URL n3) throws IOException {
-		InputStream in = n3.openConnection().getInputStream();
-		Reader reader = new InputStreamReader(in);
-		try {
-		char[] buf = new char[256];
-		int rdlen = 0;
-		while ((rdlen = reader.read(buf)) > -1) {
-			if (rdlen == 256)
-				System.out.print(buf);
-			else
-				System.out.print(new String(buf, 0, rdlen));
-		}
-		} finally {
-			reader.close();
+		if (log.isInfoEnabled()) {
+			InputStream in = n3.openConnection().getInputStream();
+			Reader reader = new InputStreamReader(in);
+			try {
+			char[] buf = new char[256];
+			int rdlen = 0;
+			while ((rdlen = reader.read(buf)) > -1) {
+				if (rdlen == 256)
+					System.out.print(buf);
+				else
+					System.out.print(new String(buf, 0, rdlen));
+			}
+			} finally {
+				reader.close();
+			}
 		}
 	}
 	

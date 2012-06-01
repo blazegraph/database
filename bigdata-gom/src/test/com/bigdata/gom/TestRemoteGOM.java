@@ -90,12 +90,12 @@ public class TestRemoteGOM extends TestCase {
 		
 		final IGPO rootGPO = om.getGPO(rootId);
 		
-		System.out.println("--------");
-		System.out.println(rootGPO.pp());
+		log.info("--------");
+		log.info(rootGPO.pp());
 		
-		System.out.println(rootGPO.getType().pp());
+		log.info(rootGPO.getType().pp());
 		
-		System.out.println(rootGPO.getType().getStatements());
+		log.info(rootGPO.getType().getStatements());
 		
 		final URI typeName = vf.createURI("attr:/type#name");
 		assertTrue("Company".equals(rootGPO.getType().getValue(typeName).stringValue()));
@@ -105,7 +105,7 @@ public class TestRemoteGOM extends TestCase {
 	    ILinkSet linksIn = rootGPO.getLinksIn(worksFor);
 	    Iterator<IGPO> workers = linksIn.iterator();
 	    while (workers.hasNext()) {
-	    	System.out.println("Returned: " + workers.next().pp());
+	    	log.info("Returned: " + workers.next().pp());
 	    }
 	}
 
@@ -342,19 +342,21 @@ public class TestRemoteGOM extends TestCase {
 
 	
 	void print(final URL n3) throws IOException {
-		InputStream in = n3.openConnection().getInputStream();
-		Reader reader = new InputStreamReader(in);
-		try {
-		char[] buf = new char[256];
-		int rdlen = 0;
-		while ((rdlen = reader.read(buf)) > -1) {
-			if (rdlen == 256)
-				System.out.print(buf);
-			else
-				System.out.print(new String(buf, 0, rdlen));
-		}
-		} finally {
-			reader.close();
+		if (log.isInfoEnabled()) {
+			InputStream in = n3.openConnection().getInputStream();
+			Reader reader = new InputStreamReader(in);
+			try {
+			char[] buf = new char[256];
+			int rdlen = 0;
+			while ((rdlen = reader.read(buf)) > -1) {
+				if (rdlen == 256)
+					System.out.print(buf);
+				else
+					System.out.print(new String(buf, 0, rdlen));
+			}
+			} finally {
+				reader.close();
+			}
 		}
 	}
 }
