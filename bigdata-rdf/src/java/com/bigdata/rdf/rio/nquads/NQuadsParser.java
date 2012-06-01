@@ -81,22 +81,26 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
     static public final RDFFormat nquads;
 
     /**
-     * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
-     *      Class loader problems </a>
-     */
+	 * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
+	 * 
+	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+	 *      Class loader problems </a>
+	 * @see <a href="http://www.openrdf.org/issues/browse/SES-802"> Please add
+	 *      support for NQuads format </a>
+	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/559"> Use
+	 *      RDFFormat.NQUADS as the format identifier for the NQuads parser </a>
+	 */
     static {
 
         nquads = new RDFFormat(
                 // format name.
-                "nquads",
+                "N-Quads",
                 // registered mime types.
                 Arrays.asList(new String[] {"text/x-nquads"}), //
                 Charset.forName("US-ASCII"), // charset
                 // file extensions
                 Arrays.asList(new String[]{"nq"}),
-                true, // supportsNamespaces,
+                false, // supportsNamespaces,
                 true // supportsContexts
         );
         
