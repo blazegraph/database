@@ -141,6 +141,11 @@ public class TestAll_BTreeBasics extends TestCase {
         suite.addTestSuite(TestRawRecords.class);
         
         /*
+         * stress test join processing
+         */
+        suite.addTestSuite(StressTestBTreeRemove.class);
+        
+        /*
          * Test bloom filters for a BTree (vs an IndexSegment, which is handled
          * in the IndexSegment test suite).
          */
