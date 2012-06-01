@@ -50,7 +50,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
+//import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 
 /**
  * Test suite for {@link StatementBuffer}.
@@ -312,8 +312,8 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 			final BigdataURI SAP = vf.createURI("http://example.com/SAP");
 			final BigdataURI bought = vf.createURI("http://example.com/bought");
 			final BigdataURI sybase = vf.createURI("http://example.com/sybase");
-			final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
-			final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+			final BigdataURI dcSource = vf.createURI("http://purl.org/dc/terms/source");
+			final BigdataURI dcCreated = vf.createURI("http://purl.org/dc/terms/created");
 			final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
 			final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
 			final BigdataBNode s1 = vf.createBNode("s1");
@@ -461,8 +461,8 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 			final BigdataURI SAP = vf.createURI("http://example.com/SAP");
 			final BigdataURI bought = vf.createURI("http://example.com/bought");
 			final BigdataURI sybase = vf.createURI("http://example.com/sybase");
-			final BigdataURI dcSource = vf.asValue(DCTermsVocabularyDecl.source);
-			final BigdataURI dcCreated = vf.asValue(DCTermsVocabularyDecl.created);
+			final BigdataURI dcSource = vf.createURI("http://purl.org/dc/terms/source");
+			final BigdataURI dcCreated = vf.createURI("http://purl.org/dc/terms/created");
 			final BigdataURI newsSybase = vf.createURI("http://example.com/news/us-sybase");
 			final BigdataLiteral createdDate = vf.createLiteral("2011-04-05T12:00:00Z",XSD.DATETIME);
 			final BigdataBNode s1 = vf.createBNode("s1");
