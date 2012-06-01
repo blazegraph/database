@@ -38,6 +38,7 @@ import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.nquads.NQuadsParser;
+import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
 import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLParserFactory;
 import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 
@@ -112,6 +113,8 @@ public class ServiceProviderHook {
             // Note: This ensures that the RDFFormat for NQuads is loaded.
             r.get(NQuadsParser.nquads);
 
+            r.add(new BigdataNTriplesParserFactory());
+            
         }
 
         // Ditto, but for the writer.

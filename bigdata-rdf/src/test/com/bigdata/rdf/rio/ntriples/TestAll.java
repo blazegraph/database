@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,37 +21,32 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Feb 28, 2012
- */
-
-package com.bigdata.rdf.rio;
+package com.bigdata.rdf.rio.ntriples;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Test suite for RIO extensions but NOT the integration tests.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestAll.java 6045 2012-02-27 17:33:44Z thompsonbry $
  */
-public class TestAll_RIO extends TestCase {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestAll_RIO() {
+    public TestAll() {
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestAll_RIO(String name) {
-        super(name);
+    public TestAll(String arg0) {
+        super(arg0);
     }
-
 
     /**
      * Returns a test that will run each of the implementation specific test
@@ -59,18 +54,12 @@ public class TestAll_RIO extends TestCase {
      */
     public static Test suite() {
 
-        final TestSuite suite = new TestSuite("RIO Extensions");
+        final TestSuite suite = new TestSuite("Bigdata NTriples Support");
 
-        // bigdata RDF/XML parser/writer extension.
-        suite.addTest(com.bigdata.rdf.rio.rdfxml.TestAll.suite());
-
-        // bigdata nquads interchange integration.
-        suite.addTest(com.bigdata.rdf.rio.nquads.TestAll.suite());
-
-        // bigdata support for SIDS in ntriples.
-        suite.addTest(com.bigdata.rdf.rio.ntriples.TestAll.suite());
+        suite.addTestSuite(BigdataNTriplesParserTest.class);
 
         return suite;
+        
     }
-
+    
 }
