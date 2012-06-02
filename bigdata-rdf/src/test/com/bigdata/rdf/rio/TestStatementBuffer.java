@@ -441,6 +441,13 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
         try {
        
+        		if(!QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
+        			/*
+        			 * Disabled.
+        			 */
+        			return;
+        		}
+        	
 			// * @prefix : <http://example.com/> .
 			// * @prefix news: <http://example.com/news/> .
 			// * @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
