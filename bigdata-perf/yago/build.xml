@@ -1,0 +1,61 @@
+<!-- $Id: build.xml 5779 2011-12-14 18:17:54Z thompsonbry $ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
+<project name="yago" basedir=".">
+
+	<property file="build.properties" />
+
+	<path id="runtime.classpath">
+		<!-- The bigdata dependencies (for the nano-server). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
+	<target name="run-load"
+		    description="Load a data set.">
+		<!-- delete file if it exists so we load into a new journal. -->
+		<delete file="${yago.journalFile}" />
+		<java classname="com.bigdata.rdf.store.DataLoader"
+		      fork="true" failonerror="true"
+		      >
+			<arg line="-namespace ${yago.namespace} ${yago.journalPropertyFile} ${yago.sourceData}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${yago.journalFile}
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="start-sparql-server"
+		    description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+		      fork="true" failonerror="true"
+		      >
+			<arg line="-nthreads 32 ${yago.nanoServerPort} ${yago.namespace} ${yago.journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${yago.journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+		
+	<target name="dump-journal" 
+		    description="Dump interesting facts about the loaded data.">
+		<java classname="com.bigdata.journal.DumpJournal"
+                           fork="true" failonerror="true">
+			<arg line="-pages ${yago.journalFile}"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+</project>
