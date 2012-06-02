@@ -2,7 +2,7 @@
 <!--                                                        -->
 <!-- do "ant bundle-jar" in the parent directory first.     -->
 <!--                                                        -->
-<project name="yago" basedir=".">
+<project name="dbpedia" basedir=".">
 
 	<property file="build.properties" />
 
@@ -17,15 +17,16 @@
 	<target name="run-load"
 		    description="Load a data set.">
 		<!-- delete file if it exists so we load into a new journal. -->
-		<delete file="${yago.journalFile}" />
+		<delete file="${dbpedia.journalFile}" />
 		<java classname="com.bigdata.rdf.store.DataLoader"
 		      fork="true" failonerror="true"
 		      >
-			<arg line="-namespace ${yago.namespace} ${yago.journalPropertyFile} ${yago.sourceData}" />
+			<arg line="-namespace ${dbpedianamespace} ${dbpedia.journalPropertyFile} ${dbpedia.sourceData}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${yago.journalFile}
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${dbpedia.journalFile}
 				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
 				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				-Dcom.bigdata.rdf.rio.RDFParserOptions.stopAtFirstError=false
 				" />
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -38,9 +39,9 @@
 		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
 		      fork="true" failonerror="true"
 		      >
-			<arg line="-nthreads 32 ${yago.nanoServerPort} ${yago.namespace} ${yago.journalPropertyFile}" />
+			<arg line="-nthreads 32 ${dbpedia.nanoServerPort} ${dbpedia.namespace} ${dbpedia.journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${yago.journalFile}" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${dbpedia.journalFile}" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -51,7 +52,7 @@
 		    description="Dump interesting facts about the loaded data.">
 		<java classname="com.bigdata.journal.DumpJournal"
                            fork="true" failonerror="true">
-			<arg line="-pages ${yago.journalFile}"/>
+			<arg line="-pages ${dbpedia.journalFile}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>

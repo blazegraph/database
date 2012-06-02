@@ -1,4 +1,4 @@
-This directory contains a setup for loading YAGO into bigdata.  
+This directory contains a setup for loading dbpedia into bigdata.  
 
 The files in this directory include:
 
@@ -10,6 +10,6 @@ The files in this directory include:
               benchmark against that SPARQL end point.
 
 - RWStore.properties - configuration properties for a bigdata database instance
-                       suitable for YAGO and backed by the RW persistence engine
+                       suitable for dbpedia and backed by the RW persistence engine
                        (single machine read/write bigdata database). This is the
                        recommended database mode.
