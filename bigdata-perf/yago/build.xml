@@ -24,7 +24,7 @@
 			<arg line="-namespace ${dbpedianamespace} ${dbpedia.journalPropertyFile} ${dbpedia.sourceData}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${dbpedia.journalFile}
-				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=100000
 				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
 				-Dcom.bigdata.rdf.rio.RDFParserOptions.stopAtFirstError=false
 				" />
