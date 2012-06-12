@@ -36,12 +36,27 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.IRunningQuery;
 
 /**
- * Class models the information which uniquely describes a named solution
- * set.
+ * Class models the information which uniquely describes a named solution set.
+ * The "name" is comprised of the following components:
+ * <dl>
+ * <dt>queryId</dt>
+ * <dd>The {@link UUID} of the query which generated the named solution set.
+ * This provides the scope for the named solution set. It is used to (a) locate
+ * the data; and (b) release the data when the query goes out of scope.</dd>
+ * <dt>namedSet</dt>
+ * <dd>The "name" of the solution set as given in the query. The name is not a
+ * sufficient identifier since the same solution set name may be used in
+ * different queries and with different join variables.</dd>
+ * <dt>joinVars[]</dt>
+ * <dd>The ordered array of the join variable. This serves to differentiate
+ * among named solution sets having the same data but different join variables.</dd>
+ * </dl>
+ * Together, these components provide for a name that is unique within the scope
+ * of a query.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
- *         Thompson</a>
- * @version $Id$
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id: NamedSolutionSetRef.java 5716 2011-11-21 20:47:10Z thompsonbry
+ *          $
  */
 public class NamedSolutionSetRef implements Serializable {
 
