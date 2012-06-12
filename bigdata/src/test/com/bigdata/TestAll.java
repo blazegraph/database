@@ -130,6 +130,12 @@ public class TestAll extends TestCase {
         // The REST API test suite.
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
+		/*
+		 * The Generic Object Model and Graph API (includes remote tests against
+		 * the NanoSparqlServer layer).
+		 */
+        suite.addTest(com.bigdata.gom.TestAll.suite());
+
         return suite;
         
     }
