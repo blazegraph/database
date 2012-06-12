@@ -543,13 +543,13 @@ public class LexiconConfiguration<V extends BigdataValue>
 
             }
 
-            /*
-             * Some sort of parse error in the literal value most likely.
-             * 
-             * TODO Should this error be thrown out instead?
-             */
+			/*
+			 * Some sort of parse error in the literal value most likely. By
+			 * returning [null], it will be inserted into the lexicon indices
+			 * instead of being inlined.
+			 */
             
-            log.error(t.getMessage() + ": value=" + value.stringValue(), t);
+            log.error(t.getMessage() + ": value=" + value.stringValue());// t);
 
             // fall through.
             return null;
