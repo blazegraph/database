@@ -141,15 +141,10 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
     /**
      * Visits the entire array of elements.
      */
-    public IChunkedOrderedIterator<E> iterator() {
-        
-    	if (e.length == 0) {
-    		return new ChunkedWrappedIterator<E>(
-    				Collections.EMPTY_LIST.iterator());
-    	}
-    	
-    	return new ChunkedArrayIterator<E>(e);
-        
+	public IChunkedOrderedIterator<E> iterator() {
+
+		return iterator(0/* limit */, 0/* capacity */);
+
     }
 
     /**
@@ -168,23 +163,73 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
      */
     @SuppressWarnings("unchecked")
     public IChunkedOrderedIterator<E> iterator(final long offset, 
-    		final long limit, final int capacity) {
+    		long limit, final int capacity) {
 
-    	if (e.length == 0) {
-    		return new ChunkedWrappedIterator<E>(
-    				Collections.EMPTY_LIST.iterator());
-    	}
-    	
-    	final E[] a = (E[]) java.lang.reflect.Array.newInstance(
-//    			e[0].getClass(),
-    	        e.getClass().getComponentType(),
-    			(int) limit);
-    	
-    	System.arraycopy(e, (int) offset, a, 0, (int) limit);
-    	
-    	return new ChunkedArrayIterator<E>(a);
+		if (offset < 0)
+			throw new IllegalArgumentException();
 
-    }
+		if (offset > e.length || e.length == 0) {
+		
+			// Nothing to visit.
+
+			return new ChunkedWrappedIterator<E>(
+					Collections.EMPTY_LIST.iterator());
+
+		}
+
+		if (limit >= Long.MAX_VALUE) {
+			// Treat MAX_VALUE as meaning NO limit.
+			limit = 0L;
+		}
+
+		if (limit >= offset+e.length) {
+			/*
+			 * The caller requested more data than is available. Treat as
+			 * meaning NO limit since we will read everything after the
+			 * [offset].
+			 */
+			limit = 0L;
+		}
+
+		final int n;
+
+		if (limit == 0L) {
+
+			// No limit. Deliver everything after the offset.
+
+			n = e.length - (int) offset;
+
+		} else {
+
+			// Limit. Deliver no more than [limit] elements.
+			
+			n = Math.min((int) limit, e.length - (int) offset);
+
+		}
+
+		if (offset == 0 && n == e.length) {
+
+			/*
+			 * Array is already dense. No allocation is required.
+			 */
+
+			// Wrap as iterator and return.
+			return new ChunkedArrayIterator<E>(e);
+
+		}
+
+		// Allocate dense array.
+		final E[] a = (E[]) java.lang.reflect.Array.newInstance(e.getClass()
+				.getComponentType(), n);
+
+		// Copy into array.
+		System.arraycopy(e/* src */, (int) offset/* srcPos */, a/* dst */,
+				0/* dstPos */, n/* length */);
+
+		// Wrap as iterator and return.
+		return new ChunkedArrayIterator<E>(a);
+
+	}
 
     /**
      * Does nothing and always returns ZERO(0).
