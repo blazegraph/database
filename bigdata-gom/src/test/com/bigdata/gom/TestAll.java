@@ -29,11 +29,18 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("GOM");
 
-        suite.addTestSuite(com.bigdata.gom.TestGOM.class);
-
-        suite.addTestSuite(com.bigdata.gom.TestRemoteGOM.class);
-
-        suite.addTestSuite(com.bigdata.gom.TestOwlGOM.class);
+        /*
+		 * FIXME Clean up the test suite. The tests need to be cleaned up before
+		 * they can run in CI. They use System.out, unconditional logging, and
+		 * fail to clear out the per-test variables (memory leak).
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/560
+		 */
+//        suite.addTestSuite(com.bigdata.gom.TestGOM.class);
+//
+//        suite.addTestSuite(com.bigdata.gom.TestRemoteGOM.class);
+//
+//        suite.addTestSuite(com.bigdata.gom.TestOwlGOM.class);
 
         return suite;
 
