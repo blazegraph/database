@@ -189,7 +189,20 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 	 * and handle the creation of the named solution set in the test setup.
 	 * 
 	 * <pre>
-	 * SELECT ?x ?z WHERE { INCLUDE %solutionSet1 } OFFSET 2 LIMIT 1
+	 * SELECT ?x ?y WHERE { 
+	 * 
+	 *    # Turn off the join order optimizer.
+	 *    hint:Query hint:optimizer "None" .
+	 * 
+	 *    # Run joins in the given order (INCLUDE is 2nd).
+	 *    
+	 *    # bind x => {Mike;Bryan}
+	 *    ?x rdf:type foaf:Person .
+	 *    
+	 *    # join on (x) => {(x=Mike,y=2);(x=Bryan;y=4)} 
+	 *    INCLUDE %solutionSet1 .
+	 * 
+	 * }
 	 * </pre>
 	 */
     public void test_include_02() throws Exception {
