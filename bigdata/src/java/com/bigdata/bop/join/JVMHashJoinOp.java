@@ -326,17 +326,14 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-        	final long cutoffLimit = pred.getProperty(
-        			IPredicate.Annotations.CUTOFF_LIMIT, 
-        			IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
-        	
+			final long cutoffLimit = pred.getProperty(
+					IPredicate.Annotations.CUTOFF_LIMIT,
+					IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
+
             // Obtain the iterator for the current join dimension.
-            final ICloseableIterator<IBindingSet> itr;
-            if (cutoffLimit == Long.MAX_VALUE) 
-            	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(stats);
-            else
-            	itr = ((IBindingSetAccessPath<?>) accessPath).solutions(cutoffLimit, stats);
-            
+			final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
+					.solutions(cutoffLimit, stats);
+
             state.hashJoin(
                     itr,// left
                     unsyncBuffer // where to write the solutions which join.

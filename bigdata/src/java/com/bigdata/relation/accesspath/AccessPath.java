@@ -717,20 +717,20 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
-     *      should visit solutions for high level query).
-     */
-    public ICloseableIterator<IBindingSet> solutions(final BaseJoinStats stats) {
-
-//        final IVariable<?>[] vars = BOpUtility
-//                .getDistinctArgumentVariables(predicate);
-
-        return BOpContext.solutions(iterator(), predicate, /*vars,*/ stats);
-
-    }
+//    /**
+//     * {@inheritDoc}
+//     * 
+//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
+//     *      should visit solutions for high level query).
+//     */
+//    public ICloseableIterator<IBindingSet> solutions(final BaseJoinStats stats) {
+//
+////        final IVariable<?>[] vars = BOpUtility
+////                .getDistinctArgumentVariables(predicate);
+//
+//        return BOpContext.solutions(iterator(), predicate, /*vars,*/ stats);
+//
+//    }
     
     /**
      * {@inheritDoc}
@@ -744,7 +744,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 //        final IVariable<?>[] vars = BOpUtility
 //                .getDistinctArgumentVariables(predicate);
 
-        return BOpContext.solutions(iterator(0, limit, (int) limit), predicate, /*vars,*/ stats);
+		return BOpContext.solutions(iterator(0, limit, 0/* (int) limit */),
+				predicate, /* vars, */stats);
 
     }
     
@@ -1195,7 +1196,6 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      * buffer.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static private class ChunkConsumerTask<R> implements Callable<Void> {
 

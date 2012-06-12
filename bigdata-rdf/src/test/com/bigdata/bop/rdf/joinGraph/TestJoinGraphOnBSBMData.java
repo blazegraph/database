@@ -409,7 +409,6 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
 					new NV(IPredicate.Annotations.RANGE, new RangeBOp(//
-//							origProperty1,// FIXME verify correct var w/ MikeP
 							new MathBOp(origProperty1, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(120))),
 									MathOp.MINUS,globals),//
@@ -440,7 +439,6 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new NV(BOp.Annotations.BOP_ID, nextId++),//
                     new NV(Annotations.TIMESTAMP, timestamp),//
 					new NV(IPredicate.Annotations.RANGE, new RangeBOp(//
-//							origProperty2,// FIXME verify correct var with MikeP
 							new MathBOp(origProperty2, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(170))),
 									MathOp.MINUS,globals),//
