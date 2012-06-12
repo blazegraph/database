@@ -3803,12 +3803,26 @@ public class AST2BOpUtility extends AST2BOpJoins {
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
         }
 
+        /*
+		 * Statements about statements.
+		 * 
+		 * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+		 * Reification Done Right</a>
+		 */
+		final VarNode sidVar = sp.sid();
+		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT && sidVar != null) {
+
+			anns.add(new NV(SPOPredicate.Annotations.SID, sidVar
+					.getValueExpression()));
+
+		}
+        
         final RangeNode range = sp.getRange();
         if (range != null) {
         	// Add the RangeBOp
         	anns.add(new NV(IPredicate.Annotations.RANGE, range.getRangeBOp()));
         }
-        
+
         final String cutoffLimit = sp.getQueryHint(QueryHints.CUTOFF_LIMIT);
         if (cutoffLimit != null) {
         	// Add the cutoff limit
