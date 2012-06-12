@@ -28,6 +28,7 @@
 	<classpathentry kind="src" path="bigdata-gom/src/java"/>
 	<classpathentry kind="src" path="bigdata-gom/src/test"/>
 	<classpathentry kind="src" path="bigdata-gom/src/resources"/>
+	<classpathentry kind="src" path="bigdata-gom/src/samples"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
@@ -64,7 +65,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-5.1.5.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-3.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-3.0.0.jar"/>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.6.3.jar" sourcepath="/org.openrdf.sesame-2.6.1"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.6.3.jar" sourcepath="/org.openrdf.sesame-2.6.3"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8.jar"/>
@@ -72,7 +73,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.6.3-onejar.jar" sourcepath="/org.openrdf.sesame-2.6.1"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.6.3-onejar.jar" sourcepath="/Users/bryan/Documents/workspace/org.openrdf.sesame-2.6.3"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.6.3.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.6.3.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-codec-1.4.jar"/>

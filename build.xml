@@ -65,6 +65,9 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 		<fileset dir="${bigdata.dir}/bigdata-sails/lib">
 			<include name="**/*.jar" />
 		</fileset>
+      <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+         <include name="**/*.jar" />
+      </fileset>
 		<!--
 		<fileset dir="${bigdata.dir}/ctc-striterator/lib">
 			<include name="**/*.jar" />
@@ -224,8 +227,9 @@ public class BuildInfo {
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
-			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
+         <src path="${bigdata.dir}/bigdata-rdf/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
+         <src path="${bigdata.dir}/bigdata-gom/src/java" />
 			<src path="${bigdata.dir}/ctc-striterators/src/java" />
 			<!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
@@ -254,6 +258,10 @@ public class BuildInfo {
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
+         <fileset dir="${bigdata.dir}/bigdata-gom/src/java">
+            <exclude name="**/*.java" />
+            <exclude name="**/package.html" />
+         </fileset>
 		    <!-- Note: This simple copy works so long as there is just one service
 		         provider file per interface.  It will not combine (append) multiple
 		         files for the same interface. -->
@@ -286,6 +294,8 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/samples" />
+            <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
             <fileset dir="${bigdata.dir}/ctc-striterators/src/java" />
         </jar>
     </target>
@@ -304,7 +314,7 @@ public class BuildInfo {
 		    <fileset dir="${bigdata.dir}/bigdata">
 		        <include name="LEGAL/apache-license-2_0.txt"/>
 			</fileset>
-		    <fileset dir="${bigdata.dir}/bigdata-rdf">
+		   <fileset dir="${bigdata.dir}/bigdata-rdf">
 				<include name="LEGAL/sesame2.x-license.txt"/>
 			</fileset>
 			<manifest>
@@ -330,8 +340,9 @@ public class BuildInfo {
 			</manifest>
 			<fileset dir="bigdata/src/java" />
 			<fileset dir="bigdata-jini/src/java" />
-			<fileset dir="bigdata-rdf/src/java" />
+         <fileset dir="bigdata-rdf/src/java" />
 			<fileset dir="bigdata-sails/src/java" />
+         <fileset dir="bigdata-gom/src/java" />
 		</jar>
 		<bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
 
@@ -368,6 +379,8 @@ public class BuildInfo {
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
+         <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
 			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
@@ -405,6 +418,9 @@ public class BuildInfo {
 	<fileset dir="${bigdata.dir}/bigdata-sails/lib">
 		<include name="**/*.jar" />
 	</fileset>
+   <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+      <include name="**/*.jar" />
+   </fileset>
      </copy>
      <!-- Do NOT flatten the jini jars. We need the to preserve the -->
      <!-- lib, lib-dl, and lib-ext distinctions.                    -->
@@ -470,6 +486,7 @@ public class BuildInfo {
 		  <fileset dir="${bigdata.dir}/bigdata" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-rdf" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-sails" includes="LEGAL/*"/>
+        <fileset dir="${bigdata.dir}/bigdata-gom" includes="LEGAL/*"/>
 		  <fileset dir="${bigdata.dir}/bigdata-jini" includes="LEGAL/*"/>
 		  <!-- Basic RWStore configuration. -->
 		  <file file="bigdata-war/src/resources/RWStore.properties"/>
@@ -578,8 +595,9 @@ an "NOP" bash script or edit your crontab.
 		<include name="README-JINI" />
 		<include name="bigdata/LEGAL/*" />
 		<include name="bigdata-jini/LEGAL/*" />
-		<include name="bigdata-rdf/LEGAL/*" />
+      <include name="bigdata-rdf/LEGAL/*" />
 		<include name="bigdata-sails/LEGAL/*" />
+      <include name="bigdata-gom/LEGAL/*" />
 	</fileset>
 </copy>
 <!-- install JARs. -->
@@ -841,6 +859,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
+      <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" />
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
@@ -877,6 +896,9 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/slf4j.jar" />
       <copy file="${bigdata-rdf.lib}/slf4j-log4j12-${slf4j.version}.jar"
             tofile="${dist.lib}/slf4j-log4j.jar" />
+
+      <!-- GOM library -->
+      <!-- Note: Nothing yet for GOM -->
 
       <!-- jetty library -->
       <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
@@ -1153,6 +1175,9 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/bigdata-sails/src">
         <fileset dir="${bigdata.dir}/bigdata-sails/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-gom/src">
+        <fileset dir="${bigdata.dir}/bigdata-gom/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-war/src">
         <fileset dir="${bigdata.dir}/bigdata-war/src" />
       </copy>
@@ -1178,6 +1203,10 @@ ${postInstallMessage}</echo>
       <mkdir dir="${build.dir}/bigdata-rdf/lib" />
       <copy toDir="${build.dir}/bigdata-rdf/lib">
         <fileset dir="${bigdata.dir}/bigdata-rdf/lib" />
+      </copy>
+      <mkdir dir="${build.dir}/bigdata-gom/lib" />
+      <copy toDir="${build.dir}/bigdata-gom/lib">
+        <fileset dir="${bigdata.dir}/bigdata-gom/lib" />
       </copy>
       <mkdir dir="${build.dir}/bigdata-sails/lib" />
       <copy toDir="${build.dir}/bigdata-sails/lib">
@@ -1236,6 +1265,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
           <include name="bigdata-sails/src/**" />
+          <include name="bigdata-gom/src/**" />
           <include name="bigdata-war/src/**" />
           <include name="ctc-striterators/src/**" />
           <include name="lgpl-utils/src/**" />
@@ -1244,6 +1274,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-jini/lib/**" />
           <include name="bigdata-rdf/lib/**" />
           <include name="bigdata-sails/lib/**" />
+          <include name="bigdata-gom/lib/**" />
           <include name="src/**" />
           <exclude name="classes/**" />
           <exclude name="${version}.jar" />
@@ -1301,6 +1332,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-jini/LEGAL/*" />
           <include name="bigdata-rdf/LEGAL/*" />
           <include name="bigdata-sails/LEGAL/*" />
+          <include name="bigdata-gom/LEGAL/*" />
         </fileset>
       </copy>
 
@@ -1553,6 +1585,7 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-jini/src/test" />
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
+        <src path="${bigdata.dir}/bigdata-gom/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
 <!--
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
@@ -1600,6 +1633,9 @@ ${postInstallMessage}</echo>
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-jini/src/test">
