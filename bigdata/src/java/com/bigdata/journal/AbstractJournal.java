@@ -79,6 +79,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
@@ -394,7 +395,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
      */
 	// final private WeakValueCache<Long, ICommitter> historicalIndexCache;
-	final private ConcurrentWeakValueCache<Long, BTree> historicalIndexCache;
+	final private ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache;
 
     /**
      * A cache that is used to avoid lookups against the
@@ -769,7 +770,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
 
 			// Cache by addr
-			historicalIndexCache = new ConcurrentWeakValueCacheWithTimeout<Long, BTree>(historicalIndexCacheCapacity,
+			historicalIndexCache = new ConcurrentWeakValueCacheWithTimeout<Long, ICommitter>(historicalIndexCacheCapacity,
 					TimeUnit.MILLISECONDS.toNanos(historicalIndexCacheTimeout));
 
 			// Cache by (name,commitTime). This cache is in front of the cache by addr.
@@ -3252,7 +3253,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			if (log.isInfoEnabled())
 				log.info("Loading " + Name2Addr.class.getName() + " from " + addr);
 
-			_name2Addr = (Name2Addr) BTree.load(this, addr);
+			_name2Addr = (Name2Addr) BTree.load(this, addr, false/* readOnly */);
 
 		}
 
@@ -3423,7 +3424,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * Reload the mutable btree from its root address.
 			 */
 
-			ndx = (CommitRecordIndex) BTree.load(this, addr);
+			ndx = (CommitRecordIndex) BTree.load(this, addr, false/* readOnly */);
 
 		}
 
@@ -3572,7 +3573,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         BTree ndx = null;
         
-//      FIXME Restore indexCache
         /*
          * Form the key for the cache.
          * 
@@ -3648,7 +3648,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             }
 
-//            FIXME Restore indexCache
             // Add the index to the cache.
             final BTree ndx2 = indexCache.putIfAbsent(nt, ndx);
 
@@ -3818,14 +3817,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		 * 
 		 * DO NOT use the checkpointAddr but rather the physical address
 		 * without the length, this will enable the RWStore to clear the
-		 * cache efficiently without mocking up an address requiring
-		 * access to the checkpointAddr size
+		 * cache efficiently without mocking up an address (which requires
+		 * access to the checkpointAddr size).
 		 */
-		// synchronized (historicalIndexCache) {
-		// DO NOT use checkpointAddr but rather determine the physical
-		//	address and store against that
+		
 		final long offset  = getPhysicalAddress(checkpointAddr);
-		BTree btree = historicalIndexCache.get(offset);
+		
+		BTree btree = (BTree) historicalIndexCache.get(offset);
 
 		if (btree == null) {
 
@@ -3839,7 +3837,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
 		// Note: putIfAbsent is used to make concurrent requests atomic.
-		BTree oldval = historicalIndexCache.putIfAbsent(offset, btree);
+		BTree oldval = (BTree) historicalIndexCache.putIfAbsent(offset, btree);
 
 		if (oldval != null) {
 
@@ -3851,44 +3849,112 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		}
 		
-		// historicalIndexCache.put(checkpointAddr, (ICommitter)btree,
-		// false/*dirty*/);
-
 		return btree;
 
-		// }
-
 	}
 
-	/**
-	 * Registers a named index. Once registered the index will participate in
-	 * atomic commits.
-	 * <p>
-	 * Note: A named index must be registered outside of any transaction before
-	 * it may be used inside of a transaction.
-	 * <p>
-	 * Note: You MUST {@link #commit()} before the registered index will be
-	 * either restart-safe or visible to new transactions.
-	 * 
-	 * @param name
-	 *            The name that can be used to recover the index.
-	 * 
-	 * @return The object that would be returned by {@link #getIndex(String)}.
-	 * 
-	 * @exception IllegalStateException
-	 *                if there is an index already registered under that name.
-	 * 
-	 * @see Options#BTREE_BRANCHING_FACTOR
-	 * 
-	 * @deprecated This is only used by the test suites.
-	 */
-	public BTree registerIndex(final String name) {
+//	/**
+//	 * A canonicalizing mapping for <em>historical</em> {@link HTree}s.
+//	 * <p>
+//	 * Note: This method imposes a canonicalizing mapping and ensures that there
+//	 * will be at most one instance of the historical index at a time. This
+//	 * guarentee is used to facilitate buffer management. Writes on indices
+//	 * returned by this method are NOT allowed.
+//	 * <p>
+//	 * Note: This method marks the {@link BTree} as read-only but does not set
+//	 * {@link BTree#setLastCommitTime(long)} since it does not have access to
+//	 * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
+//	 * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
+//	 * which does set {@link BTree#setLastCommitTime(long)}.
+//	 * <p>
+//	 * Note: The canonicalizing mapping for unisolated {@link BTree}s is
+//	 * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
+//	 * 
+//	 * @param checkpointAddr
+//	 *            The address of the {@link Checkpoint} record for the
+//	 *            {@link HTree}.
+//	 * 
+//	 * @return The {@link HTree} loaded from that {@link Checkpoint}.
+//	 * 
+//	 * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+//	 */
+//	final public HTree getHTree(final long checkpointAddr) {
+//
+//		/*
+//		 * Note: There are potentially three IO operations here. Reading the
+//		 * Checkpoint record, reading the IndexMetadata record, then reading the
+//		 * root node/leaf of the BTree.
+//		 * 
+//		 * Note: We use putIfAbsent() here rather than the [synchronized]
+//		 * keyword for higher concurrency with atomic semantics.
+//		 * 
+//		 * DO NOT use the checkpointAddr but rather the physical address
+//		 * without the length, this will enable the RWStore to clear the
+//		 * cache efficiently without mocking up an address (which requires
+//		 * access to the checkpointAddr size).
+//		 */
+//		
+//		final long offset  = getPhysicalAddress(checkpointAddr);
+//		
+//		HTree htree = (HTree) historicalIndexCache.get(offset);
+//
+//		if (htree == null) {
+//
+//			/*
+//			 * Load HTree from the store.
+//			 * 
+//			 * Note: Does not set lastCommitTime.
+//			 */
+//			htree = HTree.load(this, checkpointAddr, true/* readOnly */);
+//			
+//		}
+//
+//		// Note: putIfAbsent is used to make concurrent requests atomic.
+//		HTree oldval = (HTree) historicalIndexCache.putIfAbsent(offset, htree);
+//
+//		if (oldval != null) {
+//
+//			/*
+//			 * If someone beat us to it then use the BTree instance that they
+//			 * loaded.
+//			 */
+//			htree = oldval;
+//
+//		}
+//		
+//		return htree;
+//
+//	}
 
-		final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
-
-		return registerIndex(name, metadata);
-
-	}
+//	/**
+//	 * Registers a named index. Once registered the index will participate in
+//	 * atomic commits.
+//	 * <p>
+//	 * Note: A named index must be registered outside of any transaction before
+//	 * it may be used inside of a transaction.
+//	 * <p>
+//	 * Note: You MUST {@link #commit()} before the registered index will be
+//	 * either restart-safe or visible to new transactions.
+//	 * 
+//	 * @param name
+//	 *            The name that can be used to recover the index.
+//	 * 
+//	 * @return The object that would be returned by {@link #getIndex(String)}.
+//	 * 
+//	 * @exception IllegalStateException
+//	 *                if there is an index already registered under that name.
+//	 * 
+//	 * @see Options#BTREE_BRANCHING_FACTOR
+//	 * 
+//	 * @deprecated This is only used by the test suites.
+//	 */
+//	public BTree registerIndex(final String name) {
+//
+//		final IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+//
+//		return registerIndex(name, metadata);
+//
+//	}
 
 	/**
 	 * Registers a named index. Once registered the index will participate in
@@ -3954,7 +4020,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * Note: You MUST {@link #commit()} before the registered index will be
 	 * either restart-safe or visible to new transactions.
 	 */
-	public BTree registerIndex(final String name, final BTree ndx) {
+	final public BTree registerIndex(final String name, final BTree ndx) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -4034,7 +4100,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * 
 	 * @see #getIndex(String, long)
 	 */
-	public BTree getIndex(final String name) {
+	final public BTree getIndex(final String name) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 

@@ -152,8 +152,8 @@ public class TestReopen extends AbstractBTreeTestCase {
         btree.dump(Level.DEBUG,System.out);
 
         // reload the tree from the store.
-        final BTree btree2 = BTree.load(store, btree.getCheckpoint()
-                .getCheckpointAddr());
+		final BTree btree2 = BTree.load(store, btree.getCheckpoint()
+				.getCheckpointAddr(), true/* readOnly */);
 
         // verify same data.
         assertSameBTree(btree, btree2);

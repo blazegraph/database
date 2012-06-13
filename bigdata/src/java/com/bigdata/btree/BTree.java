@@ -229,7 +229,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * record containing the only address of the {@link IndexMetadata} for the
      * index. Thereafter this reference is maintained as the {@link Checkpoint}
      * record last written by {@link #writeCheckpoint()} or read by
-     * {@link #load(IRawStore, long)}.
+     * {@link #load(IRawStore, long, boolean)}.
      */
     private Checkpoint checkpoint = null;
     
@@ -846,7 +846,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * @see #writeCheckpoint2(), which returns the {@link Checkpoint} record
      *      itself.
      *      
-     * @see #load(IRawStore, long)
+     * @see #load(IRawStore, long, boolean)
      */
     final public long writeCheckpoint() {
     
@@ -858,7 +858,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
     /**
      * {@inheritDoc}
      * 
-     * @see #load(IRawStore, long)
+     * @see #load(IRawStore, long, boolean)
      */
     final public Checkpoint writeCheckpoint2() {
         
@@ -1559,7 +1559,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * 
      * @return The newly created {@link BTree}.
      * 
-     * @see #load(IRawStore, long)
+     * @see #load(IRawStore, long, boolean)
      * 
      * @exception IllegalStateException
      *                If you attempt to create two btree objects from the same
@@ -1675,41 +1675,41 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
         
     }
 
-    /**
-     * Load an instance of a {@link BTree} or derived class from the store. The
-     * {@link BTree} or derived class MUST declare a constructor with the
-     * following signature: <code>
-     * 
-     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
-     * 
-     * </code>
-     * 
-     * @param store
-     *            The store.
-     * 
-     * @param addrCheckpoint
-     *            The address of a {@link Checkpoint} record for the index.
-     * 
-     * @return The {@link BTree} or derived class loaded from that
-     *         {@link Checkpoint} record.
-     * 
-     * @deprecated by {@link #load(IRawStore, long, boolean)} which specifies
-     *             whether or not the {@link BTree} will be opened in a
-     *             read-only mode and therefore allows for certain
-     *             optimizations within the {@link BTree} constructor.
-     */
-    public static BTree load(final IRawStore store, final long addrCheckpoint) {
-
-        return load(store, addrCheckpoint, false/* readOnly */);
-        
-    }
+//    /**
+//     * Load an instance of a {@link BTree} or derived class from the store. The
+//     * {@link BTree} or derived class MUST declare a constructor with the
+//     * following signature: <code>
+//     * 
+//     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
+//     * 
+//     * </code>
+//     * 
+//     * @param store
+//     *            The store.
+//     * 
+//     * @param addrCheckpoint
+//     *            The address of a {@link Checkpoint} record for the index.
+//     * 
+//     * @return The {@link BTree} or derived class loaded from that
+//     *         {@link Checkpoint} record.
+//     * 
+//     * @deprecated by {@link #load(IRawStore, long, boolean)} which specifies
+//     *             whether or not the {@link BTree} will be opened in a
+//     *             read-only mode and therefore allows for certain
+//     *             optimizations within the {@link BTree} constructor.
+//     */
+//    public static BTree load(final IRawStore store, final long addrCheckpoint) {
+//
+//        return load(store, addrCheckpoint, false/* readOnly */);
+//        
+//    }
 
 	/**
 	 * Load an instance of a {@link BTree} or derived class from the store. The
 	 * {@link BTree} or derived class MUST declare a constructor with the
 	 * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
+     * <i>className</i>(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly)
      * 
      * </code>
 	 * 

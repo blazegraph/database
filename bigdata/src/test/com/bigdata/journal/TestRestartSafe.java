@@ -209,7 +209,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
             {
                 journal = reopenStore(journal);
 
-                final BTree btree = BTree.load(journal, addr1);
+				final BTree btree = BTree
+						.load(journal, addr1, false/* readOnly */);
 
                 assertTrue(btree.dump(Level.DEBUG, System.err));
 
@@ -237,7 +238,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
 
                 journal = reopenStore(journal);
 
-                final BTree btree = BTree.load(journal, addr2);
+				final BTree btree = BTree
+						.load(journal, addr2, true/* readOnly */);
 
                 assertTrue(btree.dump(Level.DEBUG, System.err));
 
@@ -334,7 +336,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
                 assertEquals("offsetBits", offsetBits, journal
                         .getRootBlockView().getOffsetBits());
 
-                final BTree btree = BTree.load(journal, addr1);
+				final BTree btree = BTree
+						.load(journal, addr1, false/* readOnly */);
 
                 assertTrue(btree.dump(Level.DEBUG, System.err));
 
@@ -362,7 +365,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
 
                 journal = reopenStore(journal);
 
-                final BTree btree = BTree.load(journal, addr2);
+				final BTree btree = BTree
+						.load(journal, addr2, true/* readOnly */);
 
                 assertTrue(btree.dump(Level.DEBUG, System.err));
 
@@ -415,7 +419,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
 
             journal = reopenStore(journal);
             
-            final BTree btree = BTree.load(journal, addr1);
+			final BTree btree = BTree
+					.load(journal, addr1, true/* readOnly */);
 
             // verify the counter.
             assertEquals(1,btree.getCounter().get());
@@ -431,9 +436,9 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
     }
 
     /**
-     * Test verifies that classes which extend {@link BTree} are correctly
-     * restored by {@link BTree#load(com.bigdata.rawstore.IRawStore, long)}.
-     */
+	 * Test verifies that classes which extend {@link BTree} are correctly
+	 * restored by {@link BTree#load(IRawStore, long, boolean)}.
+	 */
     public void test_restartSafeSubclass() {
 
         Journal journal = new Journal(getProperties());
@@ -503,7 +508,8 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
 
             journal = reopenStore(journal);
 
-            final MyBTree btree = (MyBTree) BTree.load(journal, addr1);
+			final MyBTree btree = (MyBTree) BTree
+					.load(journal, addr1, true/* readOnly */);
 
             assertTrue(btree.dump(Level.DEBUG, System.err));
 

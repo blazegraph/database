@@ -1791,7 +1791,7 @@ public class HTree extends AbstractHTree
 	 * {@link HTree} or derived class MUST declare a constructor with the
 	 * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
+     * <i>className</i>(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly)
      * 
      * </code>
 	 * 

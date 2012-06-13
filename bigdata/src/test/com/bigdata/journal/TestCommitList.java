@@ -156,9 +156,11 @@ public class TestCommitList extends ProxyTestCase<Journal> {
 
             final String name = "abc";
 
-            // register index.
-            BTree ndx = (BTree) journal.registerIndex(name);
+            final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
 
+			// register index.
+			BTree ndx = journal.registerIndex(name, md);
+			
             // verify index was flushed to the backing store.
             assertFalse(ndx.needsCheckpoint());
 
@@ -218,8 +220,10 @@ public class TestCommitList extends ProxyTestCase<Journal> {
 
             final String name = "abc";
 
-            // register index.
-            IIndex ndx = journal.registerIndex(name);
+			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+			// register index.
+			IIndex ndx = journal.registerIndex(name, md);
 
             // verify a new index is on the commit list.
             assertTrue(journal._getName2Addr().willCommit(name));
@@ -296,9 +300,11 @@ public class TestCommitList extends ProxyTestCase<Journal> {
 
             final String name = "abc";
 
-            // register index.
-            IIndex ndx = journal.registerIndex(name);
+            final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
 
+			// register index.
+			IIndex ndx = journal.registerIndex(name, md);
+			
             // verify a new index is on the commit list.
             assertTrue(journal._getName2Addr().willCommit(name));
 

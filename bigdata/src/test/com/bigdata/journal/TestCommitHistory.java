@@ -30,11 +30,11 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rwstore.IRWStrategy;
-import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.service.AbstractTransactionService;
 
 /**
@@ -520,9 +520,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
              * register an index and commit the journal.
              */
 
-            final BTree liveIndex = (BTree) journal.registerIndex(name);
+			final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
 
-            journal.commit();
+			final BTree liveIndex = journal.registerIndex(name, md);
+
+			journal.commit();
 
             assertEquals("commitCounter", 1, journal.getCommitRecord()
                     .getCommitCounter());

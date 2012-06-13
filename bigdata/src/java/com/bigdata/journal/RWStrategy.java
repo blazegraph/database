@@ -32,7 +32,6 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
@@ -728,7 +727,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	@Override
 	public void registerExternalCache(
-			final ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			final ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			final int byteCount) {
 		m_store.registerExternalCache(historicalIndexCache, byteCount);
 	}

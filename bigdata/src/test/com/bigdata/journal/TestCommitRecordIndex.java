@@ -115,7 +115,8 @@ public class TestCommitRecordIndex extends AbstractCommitRecordTestCase {
         {
             
             // reload the index from the store.
-            ndx = (CommitRecordIndex)BTree.load(store, ndx_addr);
+			ndx = (CommitRecordIndex) BTree
+					.load(store, ndx_addr, true/* readOnly */);
 
             // verify existence test.
             assertTrue(ndx.hasTimestamp(cr1.getTimestamp()));
