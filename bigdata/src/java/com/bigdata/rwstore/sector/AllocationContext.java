@@ -33,11 +33,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
@@ -366,7 +366,7 @@ public class AllocationContext implements IMemoryManager, IStore {
 
 	@Override
 	public void registerExternalCache(
-			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			int byteCount) {
 		m_root.registerExternalCache(historicalIndexCache, byteCount);
 	}

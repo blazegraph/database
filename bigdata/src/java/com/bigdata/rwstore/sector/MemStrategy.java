@@ -7,13 +7,13 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
@@ -408,7 +408,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 
 	@Override
 	public void registerExternalCache(
-			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			int byteCount) {
 		m_mmgr.registerExternalCache(historicalIndexCache, byteCount);
 	}

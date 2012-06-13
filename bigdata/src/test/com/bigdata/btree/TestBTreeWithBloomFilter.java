@@ -551,8 +551,9 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         // load the btree from the store using the new checkpoint.
         {
             
-            final BTree btree2 = BTree.load(store, addrCheckpoint);
-            
+			final BTree btree2 = BTree
+					.load(store, addrCheckpoint, true/* readOnly */);
+
             // the bloom filter is gone.
             assertNull(btree2.getBloomFilter());
             

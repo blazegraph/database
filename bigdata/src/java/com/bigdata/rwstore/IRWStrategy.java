@@ -2,9 +2,9 @@ package com.bigdata.rwstore;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ICommitter;
 
 /**
  * Defines a marker interface to be used to indicate strategies
@@ -30,7 +30,7 @@ public interface IRWStrategy {
 	void abortContext(IAllocationContext context);
 
 	void registerExternalCache(
-			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			int byteCount);
 
 	long write(ByteBuffer data, long oldAddr, IAllocationContext context);

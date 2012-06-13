@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
+import java.util.UUID;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.service.AbstractClient;
 
 /**
@@ -27,9 +30,15 @@ import com.bigdata.service.AbstractClient;
 public class TestSimpleReleaseTimes {
 
 	public static void main(String[] args) throws IOException, InterruptedException {
-        Journal journal = new Journal(getProperties("2000"));
         
-        IIndex ti = journal.registerIndex("TestIndex");
+		Journal journal = new Journal(getProperties("2000"));
+
+		final String name = "TestIndex";
+		
+		final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+		final BTree ti = journal.registerIndex(name, md);
+
         journal.commit();
         
         final long start = journal.getLastCommitTime();

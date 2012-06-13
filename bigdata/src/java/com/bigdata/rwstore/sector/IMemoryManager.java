@@ -27,11 +27,11 @@ package com.bigdata.rwstore.sector;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
@@ -284,7 +284,7 @@ public interface IMemoryManager extends ICounterSetAccess {
 	public void commit();
 
 	public void registerExternalCache(
-			ConcurrentWeakValueCache<Long, BTree> historicalIndexCache,
+			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
 			int byteCount);
 
 	public long saveDeferrals();

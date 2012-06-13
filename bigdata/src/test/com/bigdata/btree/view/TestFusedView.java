@@ -473,8 +473,8 @@ public class TestFusedView extends AbstractBTreeTestCase {
         }
 
         // recover the view from the checkpoints.
-        btree1 = BTree.load(store, btree1Checkpoint.getCheckpointAddr());
-        btree2 = BTree.load(store, btree2Checkpoint.getCheckpointAddr());
+        btree1 = BTree.load(store, btree1Checkpoint.getCheckpointAddr(), false/*readOnly*/);
+        btree2 = BTree.load(store, btree2Checkpoint.getCheckpointAddr(), false/*readOnly*/);
         view = new FusedView(new AbstractBTree[] { btree1, btree2 });
         
         /*

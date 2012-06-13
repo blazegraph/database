@@ -100,8 +100,9 @@ public class TestCommit extends TestCase2 {
         {
 
             // Load the tree.
-            BTree btree = BTree.load(store, addrMetadata);
-            
+			final BTree btree = BTree
+					.load(store, addrMetadata, false/* readOnly */);
+
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());
             assertFalse(btree.root.isDirty());
@@ -123,7 +124,8 @@ public class TestCommit extends TestCase2 {
         {   // re-verify.
 
             // Load the tree.
-            BTree btree = BTree.load(store, addrMetadata);
+			final BTree btree = BTree
+					.load(store, addrMetadata, false/* readOnly */);
 
             // verify addrRoot.
             assertEquals(rootId,btree.root.getIdentity());

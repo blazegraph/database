@@ -32,24 +32,11 @@ import java.util.UUID;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
+import com.bigdata.htree.HTree;
 
 /**
- * Test suite for api supporting registration, lookup, use, and atomic commit
- * of named indices.
- * 
- * @todo write a test that creates a named btree, stores some data, commits the
- *       store, re-opens the store, and verifies that the named btree can be
- *       recovered and the data was correctly preserved.
- * 
- * @todo do a variant test in which closing the journal without a commit causes
- *       the named btree to be lost.
- * 
- * @todo do a variant test in which we commit the journal after we register the
- *       named btree, write some data on the named btree, and then closing the
- *       journal without a commit causes the named btree to be lost.
- * 
- * @todo reuse this test suite to test the basic features of a
- *       {@link MasterJournal}.
+ * Test suite for api supporting registration, lookup, use, and atomic commit of
+ * named indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -67,7 +54,7 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
      * Test the ability to register and use named index, including whether the
      * named index is restart safe.
      */
-    public void test_registerAndUse() {
+    public void test_registerAndUseBTree() {
 
         Journal journal = new Journal(getProperties());
 
@@ -94,8 +81,8 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
             assertTrue(btree == journal.getIndex(name));
 
-            final byte[] k0 = new byte[] { 0 };
-            final Object v0 = new SimpleEntry(0);
+			final byte[] k0 = new byte[] { 0 };
+			final byte[] v0 = new byte[] { 1, 2, 3 };
 
             btree.insert(k0, v0);
 
@@ -129,4 +116,64 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
     }
 
+//	public void test_registerAndUseHTree() {
+//
+//		Journal journal = new Journal(getProperties());
+//
+//		try {
+//
+//			final String name = "abc";
+//
+//			final UUID indexUUID = UUID.randomUUID();
+//
+//			HTree btree;
+//			{
+//
+//				final IndexMetadata metadata = new IndexMetadata(indexUUID);
+//
+//				btree = HTree.create(journal, metadata);
+//
+//			}
+//
+//			assertNull(journal.getHTree(name));
+//
+//			journal.registerIndex(name, btree);
+//
+//			assertTrue(btree == journal.getHTree(name));
+//
+//			final byte[] k0 = new byte[] { 0 };
+//			final byte[] v0 = new byte[] { 1, 2, 3 };
+//
+//			btree.insert(k0, v0);
+//
+//			/*
+//			 * commit and close the journal
+//			 */
+//			journal.commit();
+//
+//			if (journal.isStable()) {
+//
+//				/*
+//				 * re-open the journal and test restart safety.
+//				 */
+//				journal = reopenStore(journal);
+//
+//				btree = (HTree) journal.getIndex(name);
+//
+//				assertNotNull("btree", btree);
+//				assertEquals("indexUUID", indexUUID, btree.getIndexMetadata()
+//						.getIndexUUID());
+//				assertEquals("entryCount", 1, btree.getEntryCount());
+//				assertEquals(v0, btree.lookupFirst(k0));
+//
+//			}
+//
+//		} finally {
+//
+//			journal.destroy();
+//
+//		}
+//
+//    }
+    
 }

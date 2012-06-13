@@ -47,11 +47,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTree.Counter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -70,6 +70,7 @@ import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
@@ -4613,7 +4614,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_lastDeferredReleaseTime;
 	}
 
-	private ConcurrentWeakValueCache<Long, BTree> m_externalCache = null;
+	private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
 	private int m_cachedDatasize = 0;
 	/**
 	 * Call made from AbstractJournal to register the cache used.  This can then
@@ -4627,7 +4628,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * @param dataSize - the size of the checkpoint data (fixed for any version)
 	 */
 	public void registerExternalCache(
-			final ConcurrentWeakValueCache<Long, BTree> externalCache, final int dataSize) {
+			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
 		
 		m_allocationLock.lock();
 		try {

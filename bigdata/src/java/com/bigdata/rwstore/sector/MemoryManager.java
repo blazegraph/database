@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -43,7 +42,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -58,6 +56,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
@@ -1129,7 +1128,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		}
 	}
 
-	private ConcurrentWeakValueCache<Long, BTree> m_externalCache = null;
+	private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
 	private int m_cachedDatasize = 0;
 
 	private long m_lastReleaseTime;
@@ -1147,7 +1146,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * @param dataSize - the size of the checkpoint data (fixed for any version)
 	 */
 	public void registerExternalCache(
-			final ConcurrentWeakValueCache<Long, BTree> externalCache, final int dataSize) {
+			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
 		
 		m_allocationLock.lock();
 		try {

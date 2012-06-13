@@ -146,10 +146,10 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
         {
             
             // helper class listens for dirty events.
-            MyDirtyListener listener = new MyDirtyListener();
+            final MyDirtyListener listener = new MyDirtyListener();
 
             // reload the btree from the store.
-            BTree btree = BTree.load(store, addr2);
+			final BTree btree = BTree.load(store, addr2, false/* readOnly */);
 
             // a newly loaded tree is always clean.
             assertFalse("dirty",btree.root.dirty);
@@ -173,10 +173,10 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
         {
 
             // helper class listens for dirty events.
-            MyDirtyListener listener = new MyDirtyListener();
+        		final MyDirtyListener listener = new MyDirtyListener();
 
             // reload the btree from the store.
-            BTree btree = BTree.load(store, addr2);
+			final BTree btree = BTree.load(store, addr2, false/* readOnly */);
 
             // a newly loaded tree is always clean.
             assertFalse("dirty",btree.root.dirty);
@@ -210,10 +210,10 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
         {
 
             // helper class listens for dirty events.
-            MyDirtyListener listener = new MyDirtyListener();
+            final MyDirtyListener listener = new MyDirtyListener();
 
             // reload the btree from the store.
-            BTree btree = BTree.load(store, addr3);
+			final BTree btree = BTree.load(store, addr3, false/* readOnly */);
 
             // a newly loaded tree is always clean.
             assertFalse("dirty",btree.root.dirty);

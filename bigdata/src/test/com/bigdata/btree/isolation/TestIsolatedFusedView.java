@@ -142,8 +142,9 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
         final long addrCheckpoint1 = unisolatedIndex.writeCheckpoint();
 
         // load the ground state from that checkpoint.
-        final BTree groundState = BTree.load(journal, addrCheckpoint1);
-        
+		final BTree groundState = BTree.load(journal, addrCheckpoint1,
+					false/* readOnly */);
+
         /*
          * Create the isolated write set. Keys found in the isolated write set
          * will cause the search to halt. If the key is not in the isolated
