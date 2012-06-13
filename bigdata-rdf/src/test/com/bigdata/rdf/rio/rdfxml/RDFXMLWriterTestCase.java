@@ -41,30 +41,56 @@ public abstract class RDFXMLWriterTestCase extends RDFWriterTest {
 		Repository rep1 = new SailRepository(new MemoryStore());
 		rep1.initialize();
 
-		RepositoryConnection con1 = rep1.getConnection();
-		// FIXME There appears to be a problem resolving these resources in the classpath. They are in the test jar.  we might need to modify the classpath search to find them.  See DataLoader for how.
-		URL ciaScheme = this.getClass().getResource("/cia-factbook/CIA-onto-enhanced.rdf");
-		URL ciaFacts = this.getClass().getResource("/cia-factbook/CIA-facts-enhanced.rdf");
+		/*
+		 * FIXME There appears to be a problem resolving these resources in the
+		 * classpath. They are in the test jar. we might need to modify the
+		 * classpath search to find them. See DataLoader for how.
+		 */
+		final String resource1 = "/cia-factbook/CIA-onto-enhanced.rdf";
+		final String resource2 = "/cia-factbook/CIA-facts-enhanced.rdf";
+		
+		final URL ciaScheme = this.getClass().getResource(resource1);
+		if (ciaScheme == null)
+			throw new RuntimeException("Could not locate resource: "
+					+ resource1);
+		
+		final URL ciaFacts = this.getClass().getResource(resource2);
+		if (ciaFacts == null)
+			throw new RuntimeException("Could not locate resource: "
+					+ resource2);
 
-		con1.add(ciaScheme, ciaScheme.toExternalForm(), RDFFormat.forFileName(ciaScheme.toExternalForm()));
-		con1.add(ciaFacts, ciaFacts.toExternalForm(), RDFFormat.forFileName(ciaFacts.toExternalForm()));
+		final StringWriter writer = new StringWriter();
+		final RDFWriter rdfWriter = rdfWriterFactory.getWriter(writer);
 
-		StringWriter writer = new StringWriter();
-		RDFWriter rdfWriter = rdfWriterFactory.getWriter(writer);
-		con1.export(rdfWriter);
+		final RepositoryConnection con1 = rep1.getConnection();
+		try {
 
-		con1.close();
+			con1.add(ciaScheme, ciaScheme.toExternalForm(),
+					RDFFormat.forFileName(resource1));// ciaScheme.toExternalForm()));
 
-		Repository rep2 = new SailRepository(new MemoryStore());
+			con1.add(ciaFacts, ciaFacts.toExternalForm(),
+					RDFFormat.forFileName(resource2));// ciaFacts.toExternalForm()));
+
+			con1.export(rdfWriter);
+
+		} finally {
+		
+			con1.close();
+			
+		}
+
+		final Repository rep2 = new SailRepository(new MemoryStore());
 		rep2.initialize();
 
-		RepositoryConnection con2 = rep2.getConnection();
-
+		final RepositoryConnection con2 = rep2.getConnection();
+		try {
 		con2.add(new StringReader(writer.toString()), "foo:bar", RDFFormat.RDFXML);
-		con2.close();
 
 		Assert.assertTrue("result of serialization and re-upload should be equal to original", RepositoryUtil.equals(
 				rep1, rep2));
+		} finally {
+			con2.close();
+		}
 	}
 
 	
