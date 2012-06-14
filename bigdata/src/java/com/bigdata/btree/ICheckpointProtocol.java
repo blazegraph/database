@@ -1,5 +1,6 @@
 package com.bigdata.btree;
 
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Name2Addr;
@@ -10,7 +11,7 @@ import com.bigdata.journal.Name2Addr.Entry;
  * 
  * @author thompsonbry@users.sourceforge.net
  */
-public interface ICheckpointProtocol extends ICommitter {
+public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 
 	/**
 	 * The value of the record version number that will be assigned to the next
@@ -108,4 +109,19 @@ public interface ICheckpointProtocol extends ICommitter {
      */
     public void setDirtyListener(final IDirtyListener listener) ;
     
+	/**
+	 * The metadata for the index. This is full of good stuff about the index.
+	 * <p>
+	 * Note: The same method is also declared by {@link IIndex} in order to
+	 * provide access to the {@link IndexMetadata} for remote clients in
+	 * scale-out.
+	 * 
+	 * @see IIndex#getIndexMetadata()
+	 * 
+	 *      TODO This needs to be abstracted to an interface with different
+	 *      implementation classes for different kinds of persistence capable
+	 *      data structures (HTree, BTree, named solution sets, etc).
+	 */
+	public IndexMetadata getIndexMetadata();
+
 }

@@ -207,7 +207,7 @@ public class Name2Addr extends BTree {
             if(!needsCheckpoint) {
                 
                 /*
-                 * Grab the checkpointAddr from the BTree.
+                 * Grab the checkpointAddr for the object.
                  */
                 
                 try {
@@ -351,7 +351,8 @@ public class Name2Addr extends BTree {
      * @param metadata
      *            The metadata record for the index.
      */
-    public Name2Addr(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
+	public Name2Addr(final IRawStore store, final Checkpoint checkpoint,
+			final IndexMetadata metadata, final boolean readOnly) {
 
         super(store, checkpoint, metadata, readOnly);
         
@@ -473,42 +474,43 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Commit processing for named indices.
-     * <p>
-     * This method applies the {@link #commitList} and then flushes the backing
-     * {@link BTree} to the store. The {@link #commitList} consists of
-     * {@link DirtyListener}s. If the listener has its
-     * {@link DirtyListener#needsCheckpoint} flag set, then the {@link BTree} to
-     * which that listener is attached will have its
-     * {@link BTree#writeCheckpoint() checkpoint written}. Otherwise the
-     * {@link BTree} current {@link Checkpoint} address is recovered. Either
-     * way, the {@link Entry} in {@link Name2Addr}s backing {@link BTree} is
-     * updated to reflect the <i>commitTime</i> and {@link Checkpoint} address
-     * for the index.
-     * <p>
-     * Finally {@link Name2Addr} {@link Checkpoint}s itself using
-     * {@link BTree#handleCommit(long)} and returns the address from which
-     * {@link Name2Addr} may be reloaded.
-     * <p>
-     * Note: The {@link #commitList} MUST be protected against concurrent
-     * modification during the commit otherwiser concurrent tasks could be
-     * reporting dirty {@link BTree}s while we are doing a commit and those
-     * notices would be lost. {@link BTree}s get onto the {@link #commitList}
-     * via the {@link DirtyListener}, so it is also synchronized.
-     * <p>
-     * Note: {@link Name2Addr} DOES NOT obtain a resource lock on the
-     * {@link BTree}. Therefore it MUST NOT checkpoint an index on which an
-     * {@link AbstractTask} has obtained a resource lock. Otherwise we have
-     * concurrent writers on the {@link BTree} and the {@link BTree} is not
-     * thread-safe for concurrent writers. Instead, the {@link AbstractTask}
-     * checkpoints the {@link BTree} itself while it is holding the resource
-     * lock and then sets {@link DirtyListener#needsCheckpoint} to
-     * <code>false</code> using
-     * {@link #putOnCommitList(String, BTree, boolean)} as an indication to
-     * {@link Name2Addr} that it MUST persist the current checkpointAddr for the
-     * {@link BTree} on its next commit (and MUST NOT write on the index when it
-     * does that commit).
-     */
+	 * Commit processing for named indices.
+	 * <p>
+	 * This method applies the {@link #commitList} and then flushes the backing
+	 * {@link ICheckpointProtocol} object to the store. The {@link #commitList}
+	 * consists of {@link DirtyListener}s. If the listener has its
+	 * {@link DirtyListener#needsCheckpoint} flag set, then the
+	 * {@link ICheckpointProtocol} implementation to which that listener is
+	 * attached will have its {@link BTree#writeCheckpoint() checkpoint written}
+	 * . Otherwise the current {@link Checkpoint} address is recovered. Either
+	 * way, the {@link Entry} in {@link Name2Addr}s backing {@link BTree} is
+	 * updated to reflect the <i>commitTime</i> and {@link Checkpoint} address
+	 * for the index.
+	 * <p>
+	 * Finally {@link Name2Addr} {@link Checkpoint}s itself using
+	 * {@link ICommitter#handleCommit(long)} and returns the address from which
+	 * {@link Name2Addr} may be reloaded.
+	 * <p>
+	 * Note: The {@link #commitList} MUST be protected against concurrent
+	 * modification during the commit otherwise concurrent tasks could be
+	 * reporting dirty objects while we are doing a commit and those notices
+	 * would be lost. Persistence capable objects ({@link ICheckpointProtocol}
+	 * implementations) get onto the {@link #commitList} via the
+	 * {@link DirtyListener}, so it is also synchronized.
+	 * <p>
+	 * Note: {@link Name2Addr} DOES NOT obtain a resource lock on the
+	 * {@link ICheckpointProtocol} implementation. Therefore it MUST NOT
+	 * checkpoint an index on which an {@link AbstractTask} has obtained a
+	 * resource lock. Otherwise we have concurrent writers on the {@link BTree}
+	 * and the {@link BTree} is not thread-safe for concurrent writers. Instead,
+	 * the {@link AbstractTask} checkpoints the {@link BTree} itself while it is
+	 * holding the resource lock and then sets
+	 * {@link DirtyListener#needsCheckpoint} to <code>false</code> using
+	 * {@link #putOnCommitList(String, ICheckpointProtocol, boolean)} as an
+	 * indication to {@link Name2Addr} that it MUST persist the current
+	 * checkpointAddr for the {@link BTree} on its next commit (and MUST NOT
+	 * write on the index when it does that commit).
+	 */
     synchronized
     public long handleCommit(final long commitTime) {
 
@@ -658,22 +660,24 @@ public class Name2Addr extends BTree {
     }
 
     /**
-     * Return the named {@link ITx#UNISOLATED} index - this method tests a cache
-     * of the named {@link BTree}s and will return the same instance if the
-     * index is found in the cache.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @return The named index or <code>null</code> iff there is no index with
-     *         that name.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>name</i> is <code>null</code>.
-     * @throws IllegalStateException
-     *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
-     *             instance.
-     */
+	 * Return the {@link ITx#UNISOLATED} view of the named persistence capable
+	 * data structure - this method tests a cache of the named persistence
+	 * capable data structures and will return the existing instance if the
+	 * index is found in the cache and will otherwise load the
+	 * {@link ITx#UNISOLATED} view of the data structure from the backing store.
+	 * 
+	 * @param name
+	 *            The index name.
+	 * 
+	 * @return The named index or <code>null</code> iff there is no index with
+	 *         that name.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if <i>name</i> is <code>null</code>.
+	 * @throws IllegalStateException
+	 *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
+	 *             instance.
+	 */
     public BTree getIndex(final String name) {
 
         assertUnisolatedInstance();
@@ -733,7 +737,8 @@ public class Name2Addr extends BTree {
         
         // deserialize entry.
 //        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
-        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
+		final Entry entry = EntrySerializer.INSTANCE
+				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
 
 //        /*
 //         * Reload the index from the store using the object cache to ensure a
@@ -752,8 +757,8 @@ public class Name2Addr extends BTree {
         putIndexCache(name, btree, false/*replace*/);
         
         // listen for dirty events so that we know when to add this to the commit list.
-        
-        final DirtyListener l = new DirtyListener(name, btree, false/* needsCheckpoint */);
+
+		final DirtyListener l = new DirtyListener(name, btree, false/* needsCheckpoint */);
         
         btree.setDirtyListener( l );
         
@@ -813,7 +818,8 @@ public class Name2Addr extends BTree {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-    synchronized public void registerIndex(final String name, final BTree btree) {
+	synchronized public void registerIndex(final String name,
+			final ICheckpointProtocol btree) {
 
         assertUnisolatedInstance();
 
@@ -855,19 +861,21 @@ public class Name2Addr extends BTree {
     }
 
     /**
-     * Adds the named index to the commit list and sets a {@link DirtyListener}
-     * on the {@link BTree} so that this {@link Name2Addr} object will be
-     * informed if the {@link BTree} becomes dirty.
-     * 
-     * @param name
-     *            The index name.
-     * @param btree
-     *            The {@link BTree}.
-     * @param needsCheckpoint
-     *            Specify <code>true</code> if {@link Name2Addr} should
-     *            {@link BTree#writeCheckpoint()} the index rather than just
-     *            updating the {@link Entry} from {@link BTree#getCheckpoint()}
-     */
+	 * Adds the named index to the commit list and sets a {@link DirtyListener}
+	 * on the {@link ICheckpointProtocol} so that this {@link Name2Addr} object
+	 * will be informed if the associated persistent data structure becomes
+	 * dirty.
+	 * 
+	 * @param name
+	 *            The index name.
+	 * @param btree
+	 *            The persistence capable data structure.
+	 * @param needsCheckpoint
+	 *            Specify <code>true</code> if {@link Name2Addr} should invoke
+	 *            {@link ICheckpointProtocol#writeCheckpoint()} rather than just
+	 *            updating the {@link Entry} for the persistenc capable data
+	 *            structure using {@link ICheckpointProtocol#getCheckpoint()}
+	 */
     synchronized protected void putOnCommitList(final String name,
             final ICheckpointProtocol btree, final boolean needsCheckpoint) {
 
@@ -901,15 +909,16 @@ public class Name2Addr extends BTree {
     }
 
     /**
-     * Adds the named index to the {@link ITx#UNISOLATED} index cache.
-     * 
-     * @param name
-     *            The index name.
-     * @param btree
-     *            The {@link ITx#UNISOLATED} {@link BTree}.
-     * @param replace
-     *            If an existing entry for that name may be replaced.
-     */
+	 * Adds the named index to the {@link ITx#UNISOLATED} index cache.
+	 * 
+	 * @param name
+	 *            The index name.
+	 * @param btree
+	 *            The {@link ITx#UNISOLATED} view of the persistence capable
+	 *            data structure.
+	 * @param replace
+	 *            If an existing entry for that name may be replaced.
+	 */
     synchronized protected void putIndexCache(final String name,
             final ICheckpointProtocol btree, final boolean replace) {
 
@@ -941,19 +950,20 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Return the current entry, if any, for the named {@link ITx#UNISOLATED}
-     * index in the {@link #indexCache}.
-     * <p>
-     * Note: This method is more direct than {@link #getIndex(String)}.
-     * {@link AbstractTask} uses this method together with
-     * {@link #putIndexCache(String, BTree, boolean)} to allow different tasks
-     * access to the same pool of {@link ITx#UNISOLATED} indices.
-     * 
-     * @param name
-     *            The index name.
-     *            
-     * @return The index iff it was found in the cache.
-     */
+	 * Return the current entry, if any, for the named {@link ITx#UNISOLATED}
+	 * index in the {@link #indexCache}.
+	 * <p>
+	 * Note: This method is more direct than {@link #getIndex(String)}.
+	 * {@link AbstractTask} uses this method together with
+	 * {@link #putIndexCache(String, ICheckpointProtocol, boolean)} to allow
+	 * different tasks access to the same pool of {@link ITx#UNISOLATED}
+	 * indices.
+	 * 
+	 * @param name
+	 *            The index name.
+	 * 
+	 * @return The index iff it was found in the cache.
+	 */
     synchronized protected BTree getIndexCache(final String name) {
         
         assertUnisolatedInstance();
@@ -993,7 +1003,7 @@ public class Name2Addr extends BTree {
         }
         
         // remove the name -> btree mapping from the transient cache.
-        final BTree btree = (BTree)indexCache.remove(name);
+        final ICommitter btree = indexCache.remove(name);
         
         if (btree != null) {
 
@@ -1006,7 +1016,7 @@ public class Name2Addr extends BTree {
             commitList.remove(name);
             
             // clear our listener.
-            ((BTree) btree).setDirtyListener(null);
+            ((ICheckpointProtocol) btree).setDirtyListener(null);
 
         }
 
@@ -1065,7 +1075,7 @@ public class Name2Addr extends BTree {
                 
             }
             
-			final IndexMetadata md = ((BTree) btree).getIndexMetadata();
+			final IndexMetadata md = btree.getIndexMetadata();
 
             final LocalPartitionMetadata pmd = md.getPartitionMetadata();
 
@@ -1089,8 +1099,7 @@ public class Name2Addr extends BTree {
 			 * as the caller holds the CounterSet object!
 			 */
 
-			final CounterSet counterSet = ((ICounterSetAccess) btree)
-					.getCounters();
+			final CounterSet counterSet = btree.getCounters();
 
 			tmp.makePath(path).attach(counterSet);
 
@@ -1104,7 +1113,6 @@ public class Name2Addr extends BTree {
      * An entry in the persistent index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class Entry {
        
@@ -1149,7 +1157,6 @@ public class Name2Addr extends BTree {
      * The values are {@link Entry}s.
      *
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class EntrySerializer {
 
@@ -1212,7 +1219,6 @@ public class Name2Addr extends BTree {
      * Encapsulates key and value formation for {@link Name2Addr}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static public class Name2AddrTupleSerializer extends
             DefaultTupleSerializer<String, Entry> {
@@ -1259,7 +1265,7 @@ public class Name2Addr extends BTree {
          *            The name of an index.
          */
         @Override
-        public byte[] serializeKey(Object obj) {
+        public byte[] serializeKey(final Object obj) {
 
             return getKeyBuilder().reset().append((String) obj).getKey();
 
@@ -1272,14 +1278,14 @@ public class Name2Addr extends BTree {
          *            An Entry.
          */
         @Override
-        public byte[] serializeVal(Entry entry) {
+        public byte[] serializeVal(final Entry entry) {
             
             return ser.serialize(entry);
 
         }
 
         @Override
-        public Entry deserialize(ITuple tuple) {
+        public Entry deserialize(final ITuple tuple) {
 
             return ser.deserialize(tuple.getValueStream());
 
