@@ -75,7 +75,6 @@ import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.rwstore.RWStore.RawTx;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;

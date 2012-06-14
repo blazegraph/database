@@ -36,10 +36,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -328,7 +328,7 @@ public class TestHTreeWithMemStore extends TestCase {
                 new SimpleRabaCoder() // vals
                 );
         
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 
         if (rawRecords) {
             metadata.setRawRecords(true);

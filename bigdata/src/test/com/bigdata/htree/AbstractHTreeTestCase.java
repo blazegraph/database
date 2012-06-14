@@ -26,20 +26,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
@@ -189,7 +187,7 @@ public class AbstractHTreeTestCase extends TestCase2 {
 			final boolean rawRecords, final boolean persistent,
 			final ITupleSerializer tupleSer) {
 
-		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 
 		if (rawRecords) {
 			metadata.setRawRecords(true);

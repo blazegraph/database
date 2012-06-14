@@ -3,7 +3,7 @@ package com.bigdata.htree;
 import java.util.Random;
 import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.TestCase3;
 import com.bigdata.rawstore.IRawStore;
@@ -30,7 +30,7 @@ public class TestRemovals extends AbstractHTreeTestCase {
         
 			final Random r = new Random();
 			
-	        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+	        final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 	
 	        metadata.setAddressBits(2);
 	        
@@ -75,7 +75,7 @@ public class TestRemovals extends AbstractHTreeTestCase {
         
 			final Random r = new Random();
 			
-	        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+	        final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 	
 	        metadata.setAddressBits(2);
 	        
@@ -129,7 +129,7 @@ public class TestRemovals extends AbstractHTreeTestCase {
         
 		final Random r = new Random();
 		
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 
         metadata.setAddressBits(2);
         

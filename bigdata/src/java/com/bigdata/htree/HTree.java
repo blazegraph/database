@@ -44,6 +44,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ICounter;
@@ -52,6 +53,7 @@ import com.bigdata.btree.IIndexLocalCounter;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.ReadOnlyCounter;
@@ -348,8 +350,8 @@ public class HTree extends AbstractHTree
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
-    final public void setIndexMetadata(final IndexMetadata indexMetadata) {
-        
+	final public void setIndexMetadata(final HTreeIndexMetadata indexMetadata) {
+
         assertNotReadOnly();
 
         if (indexMetadata == null)
@@ -418,22 +420,22 @@ public class HTree extends AbstractHTree
     }
     
     /**
-     * Required constructor form for {@link BTree} and any derived subclasses.
-     * This constructor is used both to create a new {@link BTree}, and to load
-     * a {@link BTree} from the store using a {@link Checkpoint} record.
-     * 
-     * @param store
-     *            The store.
-     * @param checkpoint
-     *            A {@link Checkpoint} record for that {@link BTree}.
-     * @param metadata
-     *            The metadata record for that {@link BTree}.
-     * @param readOnly
-     *            When <code>true</code> the {@link BTree} will be immutable.
-     * 
-     * @see BTree#create(IRawStore, IndexMetadata)
-     * @see BTree#load(IRawStore, long, boolean)
-     */
+	 * Required constructor form for {@link HTree} and any derived subclasses.
+	 * This constructor is used both to create a new {@link HTree}, and to load
+	 * a {@link HTree} from the store using a {@link Checkpoint} record.
+	 * 
+	 * @param store
+	 *            The store.
+	 * @param checkpoint
+	 *            A {@link Checkpoint} record for that {@link BTree}.
+	 * @param metadata
+	 *            The metadata record for that {@link BTree}.
+	 * @param readOnly
+	 *            When <code>true</code> the {@link BTree} will be immutable.
+	 * 
+	 * @see BTree#create(IRawStore, IndexMetadata)
+	 * @see BTree#load(IRawStore, long, boolean)
+	 */
 //	 * @throws IllegalArgumentException
 //	 *             if addressBits is LT ONE (1).
 //	 * @throws IllegalArgumentException
@@ -444,7 +446,7 @@ public class HTree extends AbstractHTree
         super(  store, 
                 NodeFactory.INSTANCE, //
                 readOnly, // read-only
-                metadata,//
+                (HTreeIndexMetadata)metadata,//
                 metadata.getBtreeRecordCompressorFactory()
                 );
 
@@ -1672,16 +1674,28 @@ public class HTree extends AbstractHTree
 	 *             can use {@link IndexMetadata#clone()} to obtain a new copy of
 	 *             the metadata object with the metadata address set to
 	 *             <code>0L</code>.
+     * @exception IllegalStateException
+     *                if the {@link IndexTypeEnum} in the supplied
+     *                {@link IndexMetadata} object is not
+     *                {@link IndexTypeEnum#BTree}.
 	 */
-    public static HTree create(final IRawStore store, final IndexMetadata metadata) {
+	public static HTree create(final IRawStore store,
+			final HTreeIndexMetadata metadata) {
 
-    	if(store == null) {
-    	
-    		// Create an htree which is NOT backed by a persistence store.
-    		return createTransient(metadata);
+	    if (metadata.getIndexType() != IndexTypeEnum.HTree) {
 
-    	}
-    	
+            throw new IllegalStateException("Wrong index type: "
+                    + metadata.getIndexType());
+
+        }
+
+		if (store == null) {
+
+			// Create an htree which is NOT backed by a persistence store.
+			return createTransient(metadata);
+
+		}
+
         if (metadata.getMetadataAddr() != 0L) {
 
             throw new IllegalStateException("Metadata record already in use");
@@ -1740,8 +1754,15 @@ public class HTree extends AbstractHTree
      * @return The transient {@link HTree}.
      */
     @SuppressWarnings("unchecked")
-    public static HTree createTransient(final IndexMetadata metadata) {
+    public static HTree createTransient(final HTreeIndexMetadata metadata) {
         
+        if (metadata.getIndexType() != IndexTypeEnum.HTree) {
+
+            throw new IllegalStateException("Wrong index type: "
+                    + metadata.getIndexType());
+
+        }
+
         /*
          * Create checkpoint for the new HTree.
          */
@@ -1833,15 +1854,16 @@ public class HTree extends AbstractHTree
 					+ store.toString(addrCheckpoint), t);
 		}
 
-//        if (checkpoint.getIndexType() != IndexTypeEnum.HTree)
-//            throw new RuntimeException("Not an HTree checkpoint: " + checkpoint);
+		if (checkpoint.getIndexType() != IndexTypeEnum.HTree)
+			throw new RuntimeException("Not an HTree checkpoint: " + checkpoint);
 
 		/*
 		 * Read metadata record from store.
 		 */
-		final IndexMetadata metadata;
+		final HTreeIndexMetadata metadata;
 		try {
-			metadata = IndexMetadata.read(store, checkpoint.getMetadataAddr());
+			metadata = (HTreeIndexMetadata) IndexMetadata.read(store,
+					checkpoint.getMetadataAddr());
 		} catch (Throwable t) {
 			throw new RuntimeException("Could not read IndexMetadata: store="
 					+ store + ", checkpoint=" + checkpoint, t);

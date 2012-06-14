@@ -2,6 +2,7 @@ package com.bigdata.htree;
 
 import java.util.UUID;
 
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -27,7 +28,7 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 		final IRawStore store = new SimpleMemoryRawStore();
 		try {
 			final int addressBits = 1;
-			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+			final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 			metadata.setAddressBits(addressBits);
 			final HTree htree = HTree.create(store, metadata);
 			assertEquals(addressBits, htree.addressBits);
@@ -42,7 +43,7 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 		final IRawStore store = new SimpleMemoryRawStore();
 		try {
 			final int addressBits = 2;
-			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+			final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 			metadata.setAddressBits(addressBits);
 			final HTree htree = HTree.create(store, metadata);
 			assertEquals(addressBits, htree.addressBits);
@@ -57,7 +58,7 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 		final IRawStore store = new SimpleMemoryRawStore();
 		try {
 			final int addressBits = 16;
-			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+			final HTreeIndexMetadata metadata = new HTreeIndexMetadata(UUID.randomUUID());
 			metadata.setAddressBits(addressBits);
 			final HTree htree = HTree.create(store, metadata);
 			assertEquals(addressBits, htree.addressBits);

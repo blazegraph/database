@@ -50,6 +50,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
@@ -427,9 +428,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
      * {@link #joinSet}.
      */
-    static private IndexMetadata getIndexMetadata(final PipelineOp op) {
+    static private HTreeIndexMetadata getIndexMetadata(final PipelineOp op) {
 
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
+				UUID.randomUUID());
 
         final int addressBits = op.getProperty(HTreeAnnotations.ADDRESS_BITS,
                 HTreeAnnotations.DEFAULT_ADDRESS_BITS);

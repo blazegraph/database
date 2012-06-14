@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.Checkpoint.IndexTypeEnum;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.isolation.IConflictResolver;
@@ -78,7 +77,7 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * The persistent and mostly immutable metadata for a {@link AbstractBTree}.
  * This class allows you to configured several very important aspects of the
- * B+Tree behavior. Read on.
+ * B+Tree (and other persistence capable data structures) behavior. Read on.
  * </p>
  * <p>
  * An instance of this class is required in order to create a {@link BTree} or
@@ -222,7 +221,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     private static final long serialVersionUID = 4370669592664382720L;
     
-    protected static final transient Logger log = Logger
+    private static final transient Logger log = Logger
             .getLogger(IndexMetadata.class);
 
     /**
@@ -1003,50 +1002,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
 
-        /*
-         * htree package options.
-         */
-        
-        /**
-         * The name of a class derived from {@link HTree} that will be used to
-         * re-load the index. 
-         */
-        String HTREE_CLASS_NAME = HTree.class.getName()+".className";
-
-        /**
-         * The name of an optional property whose value specifies the number of
-         * address bits for an {@link HTree} (default
-         * {@value #DEFAULT_HTREE_ADDRESS_BITS}).
-         * <p>
-         * The #of children for a directory is <code>2^addressBits</code>. For
-         * example, a value of <code>10</code> means a <code>10</code> bit
-         * address space in the directory. Such a directory would provide direct
-         * addressing for <code>1024</code> child references. Given an overhead
-         * of <code>8</code> bytes per child address, that would result in an
-         * expected page size of 8k before compression.
-         * 
-         * @see #DEFAULT_HTREE_ADDRESS_BITS
-         */
-        String HTREE_ADDRESS_BITS = HTree.class.getPackage().getName()
-                + ".addressBits";
-
-        String DEFAULT_HTREE_ADDRESS_BITS = "10";
-
-        /**
-         * The name of an optional property whose value specifies the fixed by
-         * length of the keys in the {@link HTree} -or- ZERO (0) if the key
-         * length is unconstrained, in which case variable length keys may be
-         * used (default {@value #DEFAULT_HTREE_KEY_LEN}). This may be used in
-         * combination with an appropriate {@link IRabaCoder} to optimize to
-         * search and encoding of int32 or int64 keys.
-         * 
-         * @see #DEFAULT_HTREE_KEY_LEN
-         */
-        String HTREE_KEY_LEN = HTree.class.getPackage().getName()
-                + ".keyLen";
-
-        String DEFAULT_HTREE_KEY_LEN = "0";
-
     }
 
     /**
@@ -1103,6 +1058,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     private UUID indexUUID;
     private String name;
+    /**
+	 * The type of the index.
+	 * 
+	 * @see #VERSION4
+	 */
+    private IndexTypeEnum indexType;
     private int branchingFactor;
     private int writeRetentionQueueCapacity;
     private int writeRetentionQueueScan;
@@ -1111,13 +1072,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private LocalPartitionMetadata pmd;
     private String btreeClassName;
     private String checkpointClassName;
-//    private IAddressSerializer addrSer;
     private IRabaCoder nodeKeysCoder;
     private ITupleSerializer<?, ?> tupleSer;
     private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
     private IRecordCompressorFactory<?> indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
-//    private boolean childLocks;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private boolean versionTimestampFilters;
@@ -1125,9 +1084,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private short maxRecLen;
     private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
-//    private ISplitHandler splitHandler;
     private ISimpleSplitHandler splitHandler2;
-//    private Object historyPolicy;
     private AsynchronousIndexWriteConfiguration asynchronousIndexWriteConfiguration;
     private ScatterSplitConfiguration scatterSplitConfiguration;
 
@@ -1145,35 +1102,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     private boolean indexSegmentBufferNodes;
 
-//    /**
-//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
-//     */
-//    private int indexSegmentLeafCacheCapacity;
-//    
-//    /**
-//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
-//     */
-//    private long indexSegmentLeafCacheTimeout;
-    
-    /*
-     * HTree
-     */
-
-    /**
-     * @see Options#HTREE_CLASS_NAME
-     */
-    private String htreeClassName;
-
-    /**
-     * @see Options#HTREE_ADDRESS_BITS
-     */
-    private int addressBits;
-    
-    /**
-     * @see Options#HTREE_KEY_LEN
-     */
-    private int keyLen;
-    
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
      * this B+Tree data structure.
@@ -1185,6 +1113,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * they belong.
      */
     public final UUID getIndexUUID() {return indexUUID;}
+
+    /**
+	 * The type of the associated persistence capable data structure.
+	 */
+	public final IndexTypeEnum getIndexType() {
+		return indexType;
+	}
 
     /**
      * The name associated with the index -or- <code>null</code> iff the index
@@ -1310,54 +1245,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-//    /**
-//     * Return the capacity of the LRU cache of leaves for an
-//     * {@link IndexSegment}.
-//     * 
-//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
-//     */
-//    public final int getIndexSegmentLeafCacheCapacity() {
-//        
-//        return indexSegmentLeafCacheCapacity;
-//        
-//    }
-//
-//    public final void setIndexSegmentLeafCacheCapacity(final int newValue) {
-//        
-//        if (newValue <= 0) {
-//            
-//            throw new IllegalArgumentException();
-//            
-//        }
-//        
-//        this.indexSegmentLeafCacheCapacity = newValue;
-//        
-//    }
-//    
-//    /**
-//     * Return the timeout in nanoseconds of the LRU cache of leaves of
-//     * an {@link IndexSegment}.
-//     * 
-//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
-//     */
-//    public final long getIndexSegmentLeafCacheTimeout() {
-//        
-//        return indexSegmentLeafCacheTimeout;
-//        
-//    }
-//
-//    public final void setIndexSegmentLeafCacheTimeout(final long nanos) {
-//        
-//        if (nanos <= 0) {
-//            
-//            throw new IllegalArgumentException();
-//            
-//        }
-//        
-//        this.indexSegmentLeafCacheTimeout = nanos;
-//        
-//    }
-    
     /**
      * @see Options#WRITE_RETENTION_QUEUE_CAPACITY
      */
@@ -1463,11 +1350,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-//    /**
-//     * Object used to (de-)serialize the addresses of the children of a node.
-//     */
-//    public final IAddressSerializer getAddressSerializer() {return addrSer;}
-
     /**
      * Object used to code (compress) the keys in a node.
      * <p>
@@ -1510,17 +1392,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
-//    /**
-//     * @see Options#CHILD_LOCKS
-//     */
-//    public final boolean getChildLocks() {return childLocks;}
-//    
-//    public final void setChildLocks(final boolean newValue) {
-//
-//        this.childLocks = newValue;
-//        
-//    }
-
     /**
      * When <code>true</code> the index will write a delete marker when an
      * attempt is made to delete the entry under a key. Delete markers will be
@@ -1714,15 +1585,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-//    public void setAddressSerializer(final IAddressSerializer addrSer) {
-//        
-//        if (addrSer == null)
-//            throw new IllegalArgumentException();
-//        
-//        this.addrSer = addrSer;
-//        
-//    }
-
     public void setNodeKeySerializer(final IRabaCoder nodeKeysCoder) {
         
         if (nodeKeysCoder == null)
@@ -1914,56 +1776,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     }
 
-    /*
-     * HTree
-     */
-    
-
-    /**
-     * The name of a class derived from {@link HTree} that will be used to
-     * re-load the index.
-     * 
-     * @see Options#HTREE_CLASS_NAME
-     */
-    public final String getHTreeClassName() {
-
-        return htreeClassName;
-
-    }
-    
-    public void setHTreeClassName(final String className) {
-
-        if (className == null)
-            throw new IllegalArgumentException();
-
-        this.htreeClassName = className;
-        
-    }
-
-    public int getAddressBits() {
-
-        return addressBits;
-
-    }
-    
-    public void setAddressBits(final int addressBits) {
-
-        this.addressBits = addressBits;
-
-    }
-    
-    public int getKeyLen() {
-
-        return keyLen;
-
-    }
-    
-    public void setKeyLen(final int keyLen) {
-
-        this.keyLen = keyLen;
-
-    }
-    
     /**
      * Create an instance of a class known to implement the specified interface
      * from a class name.
@@ -2037,73 +1849,82 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public IndexMetadata(final UUID indexUUID) {
 
-        this(null, indexUUID);
-        
+		this(null/* name */, indexUUID);
+
     }
         
-    /**
-     * Constructor used to configure a new <em>named</em> B+Tree. The index
-     * UUID is set to the given value and all other fields are defaulted as
-     * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
-     * defaults may be overridden using the various setter methods, but some
-     * values can not be safely overridden after the index is in use.
-     * 
-     * @param name
-     *            The index name. When this is a scale-out index, the same
-     *            <i>name</i> is specified for each index resource. However
-     *            they will be registered on the journal under different names
-     *            depending on the index partition to which they belong.
-     * 
-     * @param indexUUID
-     *            The indexUUID. The same index UUID MUST be used for all
-     *            component indices in a scale-out index.
-     * 
-     * @throws IllegalArgumentException
-     *             if the indexUUID is <code>null</code>.
-     */
-    public IndexMetadata(final String name, final UUID indexUUID) {
+	/**
+	 * Constructor used to configure a new <em>named</em> {@link BTree}. The
+	 * index UUID is set to the given value and all other fields are defaulted
+	 * as explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
+	 * defaults may be overridden using the various setter methods, but some
+	 * values can not be safely overridden after the index is in use.
+	 * 
+	 * @param name
+	 *            The index name. When this is a scale-out index, the same
+	 *            <i>name</i> is specified for each index resource. However they
+	 *            will be registered on the journal under different names
+	 *            depending on the index partition to which they belong.
+	 * 
+	 * @param indexUUID
+	 *            The indexUUID. The same index UUID MUST be used for all
+	 *            component indices in a scale-out index.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the indexUUID is <code>null</code>.
+	 */
+	public IndexMetadata(final String name, final UUID indexUUID) {
 
-        this(null, System.getProperties(), name, indexUUID);
-    
-    }
+		this(null/* name */, System.getProperties(), name, indexUUID,
+				IndexTypeEnum.BTree);
+
+	}
 
     /**
-     * Constructor used to configure a new <em>named</em> B+Tree. The index
-     * UUID is set to the given value and all other fields are defaulted as
-     * explained at {@link #getProperty(Properties, String, String, String)}.
-     * Those defaults may be overridden using the various setter methods.
-     * 
-     * @param indexManager
-     *            Optional. When given and when the {@link IIndexManager} is a
-     *            scale-out {@link IBigdataFederation}, this object will be
-     *            used to interpret the {@link Options#INITIAL_DATA_SERVICE}
-     *            property.
-     * @param properties
-     *            Properties object used to overridden the default values for
-     *            this {@link IndexMetadata} instance.
-     * @param namespace
-     *            The index name. When this is a scale-out index, the same
-     *            <i>name</i> is specified for each index resource. However
-     *            they will be registered on the journal under different names
-     *            depending on the index partition to which they belong.
-     * @param indexUUID
-     *            The indexUUID. The same index UUID MUST be used for all
-     *            component indices in a scale-out index.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>properties</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <i>indexUUID</i> is <code>null</code>.
-     */
-    public IndexMetadata(final IIndexManager indexManager,
-            final Properties properties, final String namespace,
-            final UUID indexUUID) {
+	 * Constructor used to configure a new <em>named</em> B+Tree. The index UUID
+	 * is set to the given value and all other fields are defaulted as explained
+	 * at {@link #getProperty(Properties, String, String, String)}. Those
+	 * defaults may be overridden using the various setter methods.
+	 * 
+	 * @param indexManager
+	 *            Optional. When given and when the {@link IIndexManager} is a
+	 *            scale-out {@link IBigdataFederation}, this object will be used
+	 *            to interpret the {@link Options#INITIAL_DATA_SERVICE}
+	 *            property.
+	 * @param properties
+	 *            Properties object used to overridden the default values for
+	 *            this {@link IndexMetadata} instance.
+	 * @param namespace
+	 *            The index name. When this is a scale-out index, the same
+	 *            <i>name</i> is specified for each index resource. However they
+	 *            will be registered on the journal under different names
+	 *            depending on the index partition to which they belong.
+	 * @param indexUUID
+	 *            The indexUUID. The same index UUID MUST be used for all
+	 *            component indices in a scale-out index.
+	 * @param indexType
+	 *            Type-safe enumeration specifying the type of the persistence
+	 *            class data structure (historically, this was always a B+Tree).
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if <i>properties</i> is <code>null</code>.
+	 * @throws IllegalArgumentException
+	 *             if <i>indexUUID</i> is <code>null</code>.
+	 */
+	public IndexMetadata(final IIndexManager indexManager,
+			final Properties properties, final String namespace,
+			final UUID indexUUID, final IndexTypeEnum indexType) {
 
         if (indexUUID == null)
             throw new IllegalArgumentException();
-        
+
+        if (indexType == null)
+            throw new IllegalArgumentException();
+
         this.name = namespace;
 
+        this.indexType = indexType;
+        
         this.indexUUID = indexUUID;
 
         {
@@ -2484,24 +2305,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             
         }
         
-        /*
-         * HTree
-         */
-        
-        /* Intern'd to reduce duplication on the heap. Will be com.bigdata.btree.BTree or
-         * com.bigdata.btree.IndexSegment and occasionally a class derived from BTree.
-         */
-        this.htreeClassName = getProperty(indexManager, properties, namespace,
-                Options.HTREE_CLASS_NAME, HTree.class.getName()).intern();
-
-        this.addressBits = Integer.parseInt(getProperty(indexManager,
-                properties, namespace, Options.HTREE_ADDRESS_BITS,
-                Options.DEFAULT_HTREE_ADDRESS_BITS));
-
-        this.keyLen = Integer.parseInt(getProperty(indexManager,
-                properties, namespace, Options.HTREE_KEY_LEN,
-                Options.DEFAULT_HTREE_KEY_LEN));
-
         if (log.isInfoEnabled())
             log.info(toString());
         
@@ -2580,6 +2383,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         // persistent
         sb.append(", name=" + (name == null ? "N/A" : name));
+		sb.append(", indexType=" + indexType);
         sb.append(", indexUUID=" + indexUUID);
         if (initialDataServiceUUID != null) {
             sb.append(", initialDataServiceUUID=" + initialDataServiceUUID);
@@ -2619,19 +2423,28 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                         : indexSegmentRecordCompressorFactory));
         sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
         sb.append(", scatterSplitConfiguration=" + scatterSplitConfiguration);
-        // htree
-        sb.append(", htreeClassName=" + htreeClassName);
-        sb.append(", addressBits=" + addressBits);
-        sb.append(", keyLen=" + keyLen);
+        toString(sb); // extension hook
 
         return sb.toString();
         
     }
     
+	/**
+	 * Extension hook for {@link #toString()}.
+	 * 
+	 * @param sb
+	 *            Where to write additional metadata.
+	 */
+    protected void toString(final StringBuilder sb) {
+    	
+    		// NOP
+    	
+    }
+    
     /**
      * The initial version.
      */
-    private static transient final int VERSION0 = 0x0;
+    protected static transient final int VERSION0 = 0x0;
 
 	/**
 	 * This version adds support for {@link ILeafData#getRawRecord(int)} and
@@ -2639,101 +2452,40 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * earlier versions and {@link IndexMetadata#getMaxRecLen()} will report
 	 * {@link Options#DEFAULT_MAX_REC_LEN}.
 	 */
-    private static transient final int VERSION1 = 0x1;
+    protected static transient final int VERSION1 = 0x1;
 
     /**
      * This version adds support for {@link HTree}. This includes
      * {@link #addressBits} and {@link #htreeClassName}.
      */
-    private static transient final int VERSION2 = 0x2;
+    protected static transient final int VERSION2 = 0x2;
 
     /**
      * This version adds support for a fixed length key option for the
      * {@link HTree} using {@link #keyLen}.
      */
-    private static transient final int VERSION3 = 0x3;
+    protected static transient final int VERSION3 = 0x3;
 
-//    /**
-//     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
-//     * Reads of an earlier version create a instance of that field based on a
-//     * default configuration.
-//     */
-//    private static transient final int VERSION1 = 0x1;
-//    
-//    /**
-//     * This version introduced the {@link #scatterSplitConfiguration}. Reads of
-//     * an earlier version create a instance of that field based on a default
-//     * configuration.
-//     */
-//    private static transient final int VERSION2 = 0x2;
-//
-//    /**
-//     * This version introduced {@link #indexSegmentLeafCacheTimeout}. Reads of
-//     * an earlier version use the
-//     * {@link Options#DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT} for this field.
-//     */
-//    private static transient final int VERSION3 = 0x3;
-//
-//    /**
-//     * This version introduced {@link #btreeRecordCompressorFactory} and
-//     * {@link #indexSegmentRecordCompressorFactory}. Both of these fields are
-//     * optional, which implies no compression provider. Reads of prior versions
-//     * set these fields to <code>null</code>.
-//     * 
-//     * @see Options#BTREE_RECORD_COMPRESSOR_FACTORY
-//     * @see Options#INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
-//     */
-//    private static transient final int VERSION4 = 0x04;
-//
-//    /**
-//     * This version introduced {@link #childLocks}. Reads of prior versions set
-//     * this field to <code>true</code>.
-//     * 
-//     * @see Options#CHILD_LOCKS
-//     */
-//    private static transient final int VERSION5 = 0x05;
-//    
-//    /**
-//     * This version introduced {@link #versionTimestampFilters}.  Reads of prior
-//     * versions set this field to <code>false</code>.
-//     */
-//    private static transient final int VERSION6 = 0x06;
-//
-//    /**
-//     * This version gets rid of the read-retention queue capacity and nscan
-//     * properties and the index segment leaf cache capacity and timeout
-//     * properties.
-//     */
-//    private static transient final int VERSION7 = 0x07;
-//    
-//    /**
-//     * This version gets rid of the IAddressSerializer interface used by the
-//     * older {@link NodeSerializer} class to (de-)serialize the child addresses
-//     * for a {@link Node}.
-//     */
-//    private static transient final int VERSION8 = 0x08;
-//    
-//    /**
-//     * The childLocks feature was dropped in this version.
-//     */
-//    private static transient final int VERSION9 = 0x09;
-//
-//    /**
-//     * The split handler was changed from an implementation based on the #of
-//     * tuples to one based on the size on disk of an index segment after a
-//     * compacting merge. The old split handlers are replaced by a
-//     * <code>null</code> reference when they are de-serialized.
-//     * 
-//     * @see ISplitHandler
-//     * @see ISimpleSplitHandler
-//     */
-//    private static transient final int VERSION10 = 0x10;
+	/**
+	 * This version moves the {@link HTree} specific metadata into a derived
+	 * class. Prior to this version, the {@link HTree} was not used in a durable
+	 * context. Thus, there is no need to recover HTree specific index metadata
+	 * records before {@link #VERSION4}. This version also introduces the
+	 * {@link #indexType} field. This field defaults to
+	 * {@link IndexTypeEnum#BTree} for all prior versions.
+	 */
+    protected static transient final int VERSION4 = 0x4;
 
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION3;
-//    private static transient final int CURRENT_VERSION = VERSION10;
+    protected static transient final int CURRENT_VERSION = VERSION4;
+
+    /**
+	 * The actual version as set by {@link #readExternal(ObjectInput)} and
+	 * {@link #writeExternal(ObjectOutput)}.
+	 */
+    protected transient int version;
     
     /**
      * @todo review generated record for compactness.
@@ -2741,14 +2493,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
-        final int version = (int) LongPacker.unpackLong(in);
+		final int version = this.version = (int) LongPacker.unpackLong(in);
 
         switch (version) {
         case VERSION0:
         case VERSION1:
         case VERSION2:
         case VERSION3:
-//        case VERSION4:
+        case VERSION4:
 //        case VERSION5:
 //        case VERSION6:
 //        case VERSION7:
@@ -2767,15 +2519,25 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             name = in.readUTF();
 
         }
+
+		if (version >= VERSION4) {
+
+			indexType = IndexTypeEnum.valueOf(in.readShort());
+			
+		} else {
+			
+			indexType = IndexTypeEnum.BTree;
+			
+        }
         
         indexUUID = new UUID(in.readLong()/* MSB */, in.readLong()/* LSB */);
 
-        branchingFactor = (int)LongPacker.unpackLong(in);
+        branchingFactor = (int) LongPacker.unpackLong(in);
 
-        writeRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
-        
-        writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
-        
+        writeRetentionQueueCapacity = (int) LongPacker.unpackLong(in);
+
+        writeRetentionQueueScan = (int) LongPacker.unpackLong(in);
+
 //        if (version < VERSION7) {
 //        
 //            /* btreeReadRetentionQueueCapacity = (int) */LongPacker
@@ -2785,47 +2547,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //
 //        }
 
-        pmd = (LocalPartitionMetadata)in.readObject();
-        
-        btreeClassName = in.readUTF();
-        
-        checkpointClassName = in.readUTF();
+        pmd = (LocalPartitionMetadata) in.readObject();
 
-//        if (version < VERSION8) {
-//
-//            // Read and discard the IAddressSerializer object.
-//            in.readObject();
-//            
-//        }
+        btreeClassName = in.readUTF();
+
+        checkpointClassName = in.readUTF();
 
         nodeKeysCoder = (IRabaCoder) in.readObject();
 
-        tupleSer = (ITupleSerializer) in.readObject();
-        
-//        if (version < VERSION4) {
-//
-//            btreeRecordCompressorFactory = null;
-//
-//        } else {
+        tupleSer = (ITupleSerializer<?,?>) in.readObject();
 
-            btreeRecordCompressorFactory = (IRecordCompressorFactory) in
-                    .readObject();
+        btreeRecordCompressorFactory = (IRecordCompressorFactory<?>) in
+                .readObject();
 
-//        }
-        
-        conflictResolver = (IConflictResolver)in.readObject();
+        conflictResolver = (IConflictResolver) in.readObject();
 
-//        if (version < VERSION5 || version >= VERSION9) {
-//
-////            childLocks = true;
-//            
-//        } else {
-//            
-////            childLocks = 
-//                in.readBoolean();
-//            
-//        }
-        
         deleteMarkers = in.readBoolean();
 
 		if (version >= VERSION1) {
@@ -2838,40 +2574,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         versionTimestamps = in.readBoolean();
 
-//        if (version < VERSION6) {
-//
-//            versionTimestampFilters = false;
-//
-//        } else {
-
-            versionTimestampFilters = in.readBoolean();
-//            
-//        }
+        versionTimestampFilters = in.readBoolean();
 
         bloomFilterFactory = (BloomFilterFactory) in.readObject();
 
-        overflowHandler = (IOverflowHandler)in.readObject();
+        overflowHandler = (IOverflowHandler) in.readObject();
 
-//        if (version < VERSION10) {
-//
-//            /*
-//             * The old style of split handler is discarded. The default behavior
-//             * for the new style of split handler covers all known uses of the
-//             * old style split handler. While some indices (the sparse row store
-//             * for example) will have to register a new split handler for
-//             * safety, those indices were not safe for splits historically.
-//             */
-//
-//            // read and discard the old split handler.
-//            in.readObject();
-//
-//            splitHandler2 = null;
-//            
-//        } else {
-
-            splitHandler2 = (ISimpleSplitHandler) in.readObject();
-            
-//        }
+        splitHandler2 = (ISimpleSplitHandler) in.readObject();
 
         /*
          * IndexSegment.
@@ -2879,150 +2588,45 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         indexSegmentBranchingFactor = (int) LongPacker.unpackLong(in);
 
-//        if (version < VERSION7) {
-//
-//            /* indexSegmentLeafCacheCapacity = (int) */LongPacker
-//                    .unpackLong(in);
-//
-//            if (version < VERSION3) {
-//
-//                /*
-//                 * indexSegmentLeafCacheTimeout = Long
-//                 * .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
-//                 */
-//
-//            } else {
-//
-//                /* indexSegmentLeafCacheTimeout = (long) */LongPacker
-//                        .unpackLong(in);
-//
-//            }
-//
-//        }
-
         indexSegmentBufferNodes = in.readBoolean();
 
-//        if (version < VERSION4) {
-//
-//            indexSegmentRecordCompressorFactory = null;
-//
-//        } else {
+        indexSegmentRecordCompressorFactory = (IRecordCompressorFactory<?>) in
+                .readObject();
 
-            indexSegmentRecordCompressorFactory = (IRecordCompressorFactory) in
-                    .readObject();
+        asynchronousIndexWriteConfiguration = (AsynchronousIndexWriteConfiguration) in
+                .readObject();
 
-//        }
-        
-//        if (version < VERSION1) {
-//
-//            /*
-//             * Use the default configuration since not present in the serialized
-//             * form before VERSION1.
-//             */
-//
-//            final int masterQueueCapacity = Integer
-//                    .parseInt(Options.DEFAULT_MASTER_QUEUE_CAPACITY);
-//
-//            final int masterChunkSize = Integer
-//                    .parseInt(Options.DEFAULT_MASTER_CHUNK_SIZE);
-//
-//            final long masterChunkTimeoutNanos = Long
-//                    .parseLong(Options.DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS);
-//
-//            final long sinkIdleTimeoutNanos = Long
-//                    .parseLong(Options.DEFAULT_SINK_IDLE_TIMEOUT_NANOS);
-//
-//            final long sinkPollTimeoutNanos = Long
-//                    .parseLong(Options.DEFAULT_SINK_POLL_TIMEOUT_NANOS);
-//
-//            final int sinkQueueCapacity = Integer
-//                    .parseInt(Options.DEFAULT_SINK_QUEUE_CAPACITY);
-//
-//            final int sinkChunkSize = Integer
-//                    .parseInt(Options.DEFAULT_SINK_CHUNK_SIZE);
-//
-//            final long sinkChunkTimeoutNanos = Long
-//                    .parseLong(Options.DEFAULT_SINK_CHUNK_TIMEOUT_NANOS);
-//
-//            asynchronousIndexWriteConfiguration = new AsynchronousIndexWriteConfiguration(
-//                    masterQueueCapacity,//
-//                    masterChunkSize,//
-//                    masterChunkTimeoutNanos,//
-//                    sinkIdleTimeoutNanos,//
-//                    sinkPollTimeoutNanos,//
-//                    sinkQueueCapacity,//
-//                    sinkChunkSize,//
-//                    sinkChunkTimeoutNanos//
-//                    );
-//            
-//        } else {
-        
-            asynchronousIndexWriteConfiguration = (AsynchronousIndexWriteConfiguration) in
-                    .readObject();
-            
-//        }
+        scatterSplitConfiguration = (ScatterSplitConfiguration) in.readObject();
 
-//        if (version < VERSION2) {
-//
-//            /*
-//             * Use the default configuration since not present in the serialized
-//             * form before VERSION2.
-//             */
-//
-//            final boolean scatterSplitEnabled = Boolean
-//                    .parseBoolean(Options.DEFAULT_SCATTER_SPLIT_ENABLED);
-//
-//            final double scatterSplitPercentOfSplitThreshold = Double
-//                    .parseDouble(Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD);
-//
-//            final int scatterSplitDataServicesCount = Integer
-//                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT);
-//
-//            final int scatterSplitIndexPartitionsCount = Integer
-//                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT);
-//
-//            this.scatterSplitConfiguration = new ScatterSplitConfiguration(
-//                    scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
-//                    scatterSplitDataServicesCount,
-//                    scatterSplitIndexPartitionsCount);
-//
-//        } else {
+		if (version >= VERSION2 && version < VERSION4) {
 
-            scatterSplitConfiguration = (ScatterSplitConfiguration) in.readObject();
-            
-//        }
-            
-		if (version >= VERSION2) {
+			/*
+			 * These data were moved into the HTreeIndexMetadata subclass
+			 * in VERSION4. The HTree was only used against the memory
+			 * manager before VERSION4. Therefore, we never have durable
+			 * data for an HTree before VERSION4.
+			 */
+			
+			if (version >= VERSION3) {
 
-            if (version >= VERSION3) {
+				// keyLen
+				LongPacker.unpackInt(in);
 
-                keyLen = LongPacker.unpackInt(in);
+			}
 
-            } else {
-                
-                keyLen = 0;
-                
-            }
-            
-			addressBits = LongPacker.unpackInt(in);
-		
-			htreeClassName = in.readUTF();
+			// addressBits
+			LongPacker.unpackInt(in);
 
-		} else {
+			// htreeClassName
+			in.readUTF();
 
-        	addressBits = 10;
-        	
-        	htreeClassName = HTree.class.getName();
-        	
-        	keyLen = 0;
-        	
-        }
-        
+		}
+
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
-
-    	final int version = CURRENT_VERSION;
+    	
+    		final int version = CURRENT_VERSION;
         
         LongPacker.packLong(out, version);
 
@@ -3035,6 +2639,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             out.writeUTF(name);
             
         }
+        
+		if (version >= VERSION4) {
+
+			out.writeShort(indexType.getCode());
+
+		}
         
         out.writeLong(indexUUID.getMostSignificantBits());
         
@@ -3051,50 +2661,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //        LongPacker.packLong(out, btreeReadRetentionQueueScan);
 
         out.writeObject(pmd);
-        
+
         out.writeUTF(btreeClassName);
 
         out.writeUTF(checkpointClassName);
-        
-        // Note: This field was dropped as of VERSION8.
-//        out.writeObject(addrSer);
-        
+
         out.writeObject(nodeKeysCoder);
-        
+
         out.writeObject(tupleSer);
-        
-//        if (version >= VERSION4) {
-            
-            out.writeObject(btreeRecordCompressorFactory);
-            
-//        }
+
+        out.writeObject(btreeRecordCompressorFactory);
 
         out.writeObject(conflictResolver);
 
-//        if (version >= VERSION5 && version < VERSION9 ) {
-//
-////            out.writeBoolean(childLocks);
-//            out.writeBoolean(false/* childLocks */);
-//            
-//        }
-
         out.writeBoolean(deleteMarkers);
-        
-		if (version >= VERSION1) {
-			out.writeBoolean(rawRecords);
-			out.writeShort(maxRecLen);
-		}
-        
-        out.writeBoolean(versionTimestamps);
-        
-//        if (version >= VERSION6) {
 
-            out.writeBoolean(versionTimestampFilters);
-            
-//        }
+        if (version >= VERSION1) {
+            out.writeBoolean(rawRecords);
+            out.writeShort(maxRecLen);
+        }
+
+        out.writeBoolean(versionTimestamps);
+
+        out.writeBoolean(versionTimestampFilters);
 
         out.writeObject(bloomFilterFactory);
-        
+
         out.writeObject(overflowHandler);
 
         out.writeObject(splitHandler2);
@@ -3105,56 +2697,38 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         LongPacker.packLong(out, indexSegmentBranchingFactor);
 
-        // Note: gone with version7.
-//        LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
-//
-//        if (version >= VERSION3) {
-//
-//            LongPacker.packLong(out, indexSegmentLeafCacheTimeout);
-//            
-//        }
-
         out.writeBoolean(indexSegmentBufferNodes);
 
-//        if (version >= VERSION4) {
-            
-            out.writeObject(btreeRecordCompressorFactory);
-            
-//        }
-//
-//        if (version >= VERSION1) {
+        out.writeObject(btreeRecordCompressorFactory);
 
-            // introduced in VERSION1
-            out.writeObject(asynchronousIndexWriteConfiguration);
+        // introduced in VERSION1
+        out.writeObject(asynchronousIndexWriteConfiguration);
 
-//        }
-//
+        // introduced in VERSION2
+        out.writeObject(scatterSplitConfiguration);
+
 //        if (version >= VERSION2) {
-
-            // introduced in VERSION2
-            out.writeObject(scatterSplitConfiguration);
-
+//
+//            if (version >= VERSION3) {
+//
+//                LongPacker.packLong(out, keyLen);
+//
+//            }
+//
+//			LongPacker.packLong(out, addressBits);
+//
+//			out.writeUTF(htreeClassName);
+//
 //        }
-
-        if (version >= VERSION2) {
-
-            if (version >= VERSION3) {
-
-                LongPacker.packLong(out, keyLen);
-
-            }
-
-			LongPacker.packLong(out, addressBits);
-
-			out.writeUTF(htreeClassName);
-
-        }
             
     }
 
-    /**
-     * Makes a copy of the persistent data, clearing the
-     */
+	/**
+	 * Makes a copy of the persistent data, clearing the address of the
+	 * {@link IndexMetadata} record on the cloned copy.
+	 * 
+	 * @return The cloned copy.
+	 */
     public IndexMetadata clone() {
         
         try {
@@ -3188,12 +2762,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * </pre>
      * 
      * @return The {@link Checkpoint}.
-     * 
-     *         FIXME This fails to communicate the {@link IndexTypeEnum} when
-     *         the index is first created. Either that should be indicated by a
-     *         setIndexTypeEnum() method or it should be pass in here as an
-     *         argument and from here into the Checkpoint constructor (which is
-     *         discovered via reflection).
      */
     @SuppressWarnings("unchecked")
     final public Checkpoint firstCheckpoint() {

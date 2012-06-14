@@ -20,6 +20,7 @@ import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -590,7 +591,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
      * 
      * @return The metadata record for this btree and never <code>null</code>.
      */
-    public IndexMetadata getIndexMetadata() {
+    public HTreeIndexMetadata getIndexMetadata() {
 
         if (isReadOnly()) {
 
@@ -615,13 +616,13 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         return metadata;
         
     }
-    private volatile IndexMetadata metadata2;
+    private volatile HTreeIndexMetadata metadata2;
 
     /**
      * The metadata record for the index. This data rarely changes during the
      * life of the {@link HTree} object, but it CAN be changed.
      */
-    protected IndexMetadata metadata;
+    protected HTreeIndexMetadata metadata;
 
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree.
@@ -1022,7 +1023,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
             final IRawStore store,//
             final INodeFactory nodeFactory,//
             final boolean readOnly,
-            final IndexMetadata metadata,//
+            final HTreeIndexMetadata metadata,//
             final IRecordCompressorFactory<?> recordCompressorFactory
             ) {
 

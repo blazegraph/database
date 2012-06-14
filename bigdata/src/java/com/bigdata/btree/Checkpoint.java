@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.btree;
 
 import java.io.Externalizable;
@@ -51,43 +74,6 @@ public class Checkpoint implements Externalizable {
 	 * different possible index types.
 	 */
     private IndexTypeEnum indexType;
-
-	/**
-	 * Type safe enumeration of index types.
-	 */
-	public static enum IndexTypeEnum {
-
-		/** BTree. */
-		BTree((short)0),
-		
-		/** Extendable hash tree. */
-		HTree((short)1);
-		
-		private IndexTypeEnum(final short code) {
-		
-			this.code = code;
-			
-		}
-
-		private final short code;
-
-		public short getCode() {
-			
-			return code;
-			
-		}
-		
-		static public IndexTypeEnum valueOf(final short code) {
-			switch (code) {
-			case 0:
-				return BTree;
-			case 1:
-				return HTree;
-			default:
-				throw new IllegalArgumentException("code=" + code);
-			}
-		}
-	}
 
 	/**
      * The address used to read this {@link Checkpoint} record from the
@@ -300,7 +286,7 @@ public class Checkpoint implements Externalizable {
                 0L, // nentries
                 0L, // counter
                 0L, // recordVersion
-                IndexTypeEnum.BTree // indexType
+                metadata.getIndexType() // indexType
                 
         );
         
@@ -331,7 +317,7 @@ public class Checkpoint implements Externalizable {
                 0L, // nentries
                 oldCheckpoint.counter,//
                 0L, // recordVersion 
-                IndexTypeEnum.BTree//
+                metadata.getIndexType()//
         );
         
     }
@@ -395,7 +381,7 @@ public class Checkpoint implements Externalizable {
 				 */
                 btree.counter.get(),//
                 btree.getRecordVersion(),//
-                IndexTypeEnum.BTree//
+                IndexTypeEnum.BTree // IndexTypeEnum
                 );
            
     }
@@ -450,7 +436,7 @@ public class Checkpoint implements Externalizable {
                 htree.getEntryCount(),//
                 htree.getCounter().get(),//
                 htree.getRecordVersion(),//
-                IndexTypeEnum.HTree//
+                IndexTypeEnum.HTree // IndexTypeEnum
                 );
            
     }
@@ -736,4 +722,88 @@ public class Checkpoint implements Externalizable {
 		
 	}
 
+    /**
+     * Utility method reads the {@link Checkpoint} record and then loads and
+     * returns a view of the associated read-only persistence capable data
+     * structure.
+     * <p>
+     * <strong>Note: The caller is responsible for marking the returned object
+     * as read-only or not depending on the context. This method should be used
+     * from trusted code such as {@link Name2Addr} and {@link AbstractJournal}
+     * which can make this decision.</strong>
+     * 
+     * @param store
+     *            The backing store.
+     * @param checkpointAddr
+     *            The address of the checkpoint record.
+     * @param readOnly
+     *            <code>true</code> if the object will be read-only.
+     * 
+     * @return The persistence capable data structure loaded from that
+     *         checkpoint.
+     */
+    public static ICheckpointProtocol loadFromCheckpoint(final IRawStore store,
+            final long checkpointAddr, final boolean readOnly) {
+
+        /*
+         * Read checkpoint record from store.
+         */
+        final Checkpoint checkpoint;
+        try {
+            checkpoint = Checkpoint.load(store, checkpointAddr);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not load Checkpoint: store="
+                    + store + ", addrCheckpoint="
+                    + store.toString(checkpointAddr), t);
+        }
+
+        // re-load from the store.
+        final ICheckpointProtocol ndx;
+        switch (checkpoint.getIndexType()) {
+        case BTree:
+            ndx = BTree.load(store, checkpointAddr, readOnly);
+            break;
+        case HTree:
+            ndx = HTree.load(store, checkpointAddr, readOnly);
+            break;
+        default:
+            throw new AssertionError("Unknown: " + checkpoint.getIndexType());
+        }
+
+        // // set the lastCommitTime on the index.
+        // btree.setLastCommitTime(lastCommitTime);
+
+        return ndx;
+
+    }
+
+    /**
+     * Create a persistence capable data structure.
+     * 
+     * @param store
+     *            The backing store.
+     * @param metadata
+     *            The metadata that describes the data structure to be created.
+     *            
+     * @return The persistence capable data structure.
+     */
+    public static ICheckpointProtocol create(final IRawStore store,
+            final IndexMetadata metadata) {
+
+        final ICheckpointProtocol ndx;
+        switch (metadata.getIndexType()) {
+        case BTree:
+            ndx = BTree.create(store, metadata);
+            break;
+        case HTree:
+            ndx = HTree.create(store, (HTreeIndexMetadata) metadata);
+            break;
+        default:
+            throw new AssertionError("Unknown: " + metadata.getIndexType());
+        }
+
+        return ndx;
+
+    }
+    
 }

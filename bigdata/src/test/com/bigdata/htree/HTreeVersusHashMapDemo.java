@@ -39,8 +39,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -112,7 +112,8 @@ public class HTreeVersusHashMapDemo {
 //                EmptyRabaValueCoder.INSTANCE // if no values.
                 );
 
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
+				UUID.randomUUID());
 
         if (rawRecords) {
             metadata.setRawRecords(true);

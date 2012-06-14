@@ -32,6 +32,7 @@ import java.util.UUID;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.MyHardReferenceQueue;
@@ -87,7 +88,7 @@ public class TestIncrementalWrite extends AbstractHTreeTestCase {
 	protected HTree getHTree(final IRawStore store, final int addressBits,
 			final int queueCapacity, final int queueScan) {
         
-        final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+        final HTreeIndexMetadata md = new HTreeIndexMetadata(UUID.randomUUID());
         
         md.setAddressBits(addressBits);
 

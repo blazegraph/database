@@ -29,9 +29,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.view.FusedView;
+import com.bigdata.htree.HTree;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.ndx.IClientIndex;
 
 /**
  * Extended to allow direct registration of a named {@link BTree}.
@@ -79,6 +84,10 @@ public interface IBTreeManager extends IIndexManager {
      * instead. The same method signature is also declared by
      * {@link IDataService#registerIndex(String, IndexMetadata)} in order to
      * support registration of index partitions.
+     * <p>
+     * Note: Due to the method signature, this method CAN NOT be used to create
+     * and register persistence capable data structures other than an
+     * {@link IIndex} (aka B+Tree).
      * 
      * @param name
      *            The name that can be used to recover the index.
@@ -88,10 +97,28 @@ public interface IBTreeManager extends IIndexManager {
      * 
      * @return The object that would be returned by {@link #getIndex(String)}.
      * 
+     * @see #register(String, IndexMetadata)
+     * 
      * @exception IndexExistsException
      *                if there is an index already registered under that name.
      *                Use {@link IIndexStore#getIndex(String)} to test whether
      *                there is an index registered under a given name.
+     * 
+     *                TODO Due to the method signature, this method CAN NOT be
+     *                used to create and register persistence capable data
+     *                structures other than an {@link IIndex} (aka B+Tree). It
+     *                is difficult to reconcile this method with other method
+     *                signatures since this method is designed for scale-out and
+     *                relies on {@link IIndex}. However, only the B+Tree is an
+     *                {@link IIndex}. Therefore, this method signature can not
+     *                be readily reconciled with the {@link HTree}. The only
+     *                interface which the {@link BTree} and {@link HTree} share
+     *                is the {@link ICheckpointProtocol} interface, but that is
+     *                a purely local (not remote) interface and is therefore not
+     *                suitable to scale-out. Also, it is only in scale-out where
+     *                the returned object can be a different type than the
+     *                simple {@link BTree} class, e.g., a {@link FusedView} or
+     *                even an {@link IClientIndex}.
      */
     public IIndex registerIndex(String name, IndexMetadata indexMetadata);
 

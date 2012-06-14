@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.sector.MemStore;
@@ -98,8 +98,8 @@ public class TestHTreeRecycle extends AbstractHTreeTestCase {
             final HTree htree;
             {
                 
-                final IndexMetadata md = new IndexMetadata(getName(),
-                        UUID.randomUUID());
+				final HTreeIndexMetadata md = new HTreeIndexMetadata(getName(),
+						UUID.randomUUID());
 
                 md.setAddressBits(6);
 
@@ -243,7 +243,7 @@ public class TestHTreeRecycle extends AbstractHTreeTestCase {
                 // HTree is clean.
                 assertFalse(htree.needsCheckpoint());
 
-                final IndexMetadata md = htree.getIndexMetadata().clone();
+                final HTreeIndexMetadata md = htree.getIndexMetadata().clone();
 
                 md.setIndexSegmentBranchingFactor(40);
 
