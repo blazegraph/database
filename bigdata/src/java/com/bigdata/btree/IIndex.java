@@ -41,20 +41,27 @@ import com.bigdata.service.Split;
  * Interface for mutable B+-Tree mapping arbitrary non-null keys to arbitrary
  * values.
  * </p>
- *
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery, IIndexLocalCounter, ICounterSetAccess {
+public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery,
+		IIndexLocalCounter, ICounterSetAccess {
 
-    /**
-     * The description of the resources comprising the index view.
-     */
+	/**
+	 * The description of the resources comprising the index view.
+	 */
     public IResourceMetadata[] getResourceMetadata();
-    
-    /**
-     * The metadata for the index. This is full of good stuff about the index.
-     */
+
+	/**
+	 * The metadata for the index. This is full of good stuff about the index.
+	 * <p>
+	 * Note: The same method is exposed by {@link ICheckpointProtocol}. It is
+	 * also exposed here in order to provide access to the {@link IndexMetadata}
+	 * to remote clients in the scale-out architecture.
+	 * 
+	 * @see ICheckpointProtocol#getIndexMetadata()
+	 */
     public IndexMetadata getIndexMetadata();
     
     /**
