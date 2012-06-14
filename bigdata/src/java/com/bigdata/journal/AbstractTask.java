@@ -645,13 +645,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      */
                     btree = null;
 
-                    final BTree tmpbtree = name2Addr.getIndexCache(name);
+                    final BTree tmpbtree = (BTree) name2Addr.getIndexCache(name);
                     if (tmpbtree != null)
                     	checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
                     
                 } else {
                     // recover from unisolated index cache.
-                    btree = name2Addr.getIndexCache(name);
+                    btree = (BTree) name2Addr.getIndexCache(name);
                 }
                 
                 if (btree == null) {

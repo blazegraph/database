@@ -57,6 +57,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -647,7 +648,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             final Properties p = getProperties();
             
             final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
-                    p, name, UUID.randomUUID());
+                    p, name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
             /*
              * Override the collator strength property to use the configured

@@ -5,8 +5,8 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -34,8 +34,8 @@ public class ShowHTreeResourceUsage {
 		final int values = 2 * 1000000;
 		inst.runTreeMap(values);
 		inst.runHTree(values);
-		//inst.runTreeMap(values);
 		//inst.runHTree(values);
+		//inst.runTreeMap(values);
 	}
 
 	private void runTreeMap(final int values) {
@@ -138,7 +138,8 @@ public class ShowHTreeResourceUsage {
                 new SimpleRabaCoder() // vals
                 );
         
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+		final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
+				UUID.randomUUID());
 
         if (rawRecords) {
             metadata.setRawRecords(true);

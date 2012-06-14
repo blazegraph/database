@@ -26,6 +26,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -457,7 +458,7 @@ public class BigdataFileSystem extends
                 final String name = getNamespace()+"."+FILE_METADATA_INDEX_BASENAME;
                 
                 final IndexMetadata md = new IndexMetadata(indexManager, tmp,
-                        name, UUID.randomUUID());
+                        name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
                 // Ensure that splits do not break logical rows.
                 md.setSplitHandler(LogicalRowSplitHandler.INSTANCE);
@@ -481,7 +482,7 @@ public class BigdataFileSystem extends
                 final String name = getNamespace()+"."+FILE_DATA_INDEX_BASENAME;
                 
                 final IndexMetadata md = new IndexMetadata(indexManager, tmp,
-                        name, UUID.randomUUID());
+                        name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
                 /*
                  * @todo unit tests for correct copying of blobs during overflow.

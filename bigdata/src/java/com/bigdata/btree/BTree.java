@@ -1568,6 +1568,10 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      *                You can use {@link IndexMetadata#clone()} to obtain a new
      *                copy of the metadata object with the metadata address set
      *                to <code>0L</code>.
+     * @exception IllegalStateException
+     *                if the {@link IndexTypeEnum} in the supplied
+     *                {@link IndexMetadata} object is not
+     *                {@link IndexTypeEnum#BTree}.
      */
     public static BTree create(final IRawStore store, final IndexMetadata metadata) {
         
@@ -1575,6 +1579,13 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
 
             throw new IllegalStateException("Metadata record already in use");
             
+        }
+        
+        if (metadata.getIndexType() != IndexTypeEnum.BTree) {
+
+            throw new IllegalStateException("Wrong index type: "
+                    + metadata.getIndexType());
+
         }
         
         /*
@@ -1751,8 +1762,8 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
 					+ store.toString(addrCheckpoint), t);
 		}
 
-//        if (checkpoint.getIndexType() != IndexTypeEnum.BTree)
-//            throw new RuntimeException("Not a BTree checkpoint: " + checkpoint);
+        if (checkpoint.getIndexType() != IndexTypeEnum.BTree)
+            throw new RuntimeException("Not a BTree checkpoint: " + checkpoint);
 		
 		/*
 		 * Read metadata record from store.

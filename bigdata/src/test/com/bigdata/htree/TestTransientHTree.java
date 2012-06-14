@@ -30,7 +30,7 @@ package com.bigdata.htree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.htree.AbstractHTree.HardReference;
@@ -58,8 +58,8 @@ public class TestTransientHTree extends AbstractHTreeTestCase {
      */
     public void test_createTransient() {
         
-        final HTree btree = HTree.createTransient(new IndexMetadata(UUID
-                .randomUUID()));
+		final HTree btree = HTree.createTransient(new HTreeIndexMetadata(UUID
+				.randomUUID()));
 
         assertNotNull(btree);
 
@@ -87,8 +87,8 @@ public class TestTransientHTree extends AbstractHTreeTestCase {
      */
     public void test_close() {
         
-        final HTree btree = HTree.createTransient(new IndexMetadata(UUID
-                .randomUUID()));
+		final HTree btree = HTree.createTransient(new HTreeIndexMetadata(UUID
+				.randomUUID()));
 
 		assertEquals(0, btree.getEntryCount());
 
@@ -121,7 +121,7 @@ public class TestTransientHTree extends AbstractHTreeTestCase {
      */
     public void test_eviction() {
 
-        final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+        final HTreeIndexMetadata md = new HTreeIndexMetadata(UUID.randomUUID());
 
 		final int addressBits = 3;
 		final int slotsPerPage = 1 << addressBits;

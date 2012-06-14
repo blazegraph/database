@@ -58,7 +58,6 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
@@ -119,16 +118,6 @@ public class Name2Addr extends BTree {
 
     private static final Logger log = Logger.getLogger(Name2Addr.class);
 
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final static protected boolean INFO = log.isInfoEnabled();
-
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final static protected boolean DEBUG = log.isDebugEnabled();
-
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
      * "live" {@link Name2Addr} instance.
@@ -144,7 +133,6 @@ public class Name2Addr extends BTree {
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link #commitList}.
      */
-//    private WeakValueCache<String, BTree> indexCache = null;
     private ConcurrentWeakValueCache<String, ICheckpointProtocol> indexCache = null;
 
     /**
@@ -678,7 +666,7 @@ public class Name2Addr extends BTree {
 	 *             if this is not the {@link ITx#UNISOLATED} {@link Name2Addr}
 	 *             instance.
 	 */
-    public BTree getIndex(final String name) {
+    public ICheckpointProtocol getIndex(final String name) {
 
         assertUnisolatedInstance();
 
@@ -688,21 +676,21 @@ public class Name2Addr extends BTree {
             
         }
 
-        BTree btree;
+        ICheckpointProtocol ndx;
         synchronized(this) {
         
             /*
              * Note: Synchronized since some operations (remove+add) are not
              * otherwise atomic.
              */
-            
-            btree = (BTree)indexCache.get(name);
-            
+
+            ndx = indexCache.get(name);
+
         }
 
-        if (btree != null) {
+        if (ndx != null) {
 
-            if (btree.getDirtyListener() == null) {
+            if (ndx.getDirtyListener() == null) {
 
                 /*
                  * Note: We can't return an unisolated view of a BTree to the
@@ -721,9 +709,9 @@ public class Name2Addr extends BTree {
              * Further verify that the dirty listener is reporting to this
              * name2addr instance.
              */
-            assert ((DirtyListener)btree.getDirtyListener()).getName2Addr() == this;
+            assert ((DirtyListener)ndx.getDirtyListener()).getName2Addr() == this;
 
-            return btree;
+            return ndx;
 
         }
 
@@ -740,33 +728,26 @@ public class Name2Addr extends BTree {
 		final Entry entry = EntrySerializer.INSTANCE
 				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
 
-//        /*
-//         * Reload the index from the store using the object cache to ensure a
-//         * canonicalizing mapping.
-//         */
-//        btree = journal.getIndex(entry.addr);
+		// Load from the backing store.
+        ndx = Checkpoint.loadFromCheckpoint(store, entry.checkpointAddr,
+                false/* readOnly */);
+
+        // Set the lastCommitTime on the index.
+        ndx.setLastCommitTime(entry.commitTime);
         
-        // re-load btree from the store.
-        btree = BTree.load(this.store, entry.checkpointAddr, false/*readOnly*/);
-        
-        // set the lastCommitTime on the index.
-        btree.setLastCommitTime(entry.commitTime);
-        
-        // save name -> btree mapping in transient cache.
-//        indexCache.put(name, btree, false/*dirty*/);
-        putIndexCache(name, btree, false/*replace*/);
+        // Save name -> btree mapping in transient cache.
+        putIndexCache(name, ndx, false/*replace*/);
         
         // listen for dirty events so that we know when to add this to the commit list.
-
-		final DirtyListener l = new DirtyListener(name, btree, false/* needsCheckpoint */);
+        final DirtyListener l = new DirtyListener(name, ndx, false/* needsCheckpoint */);
         
-        btree.setDirtyListener( l );
+        ndx.setDirtyListener( l );
         
         // report event (loaded btree).
         ResourceManager.openUnisolatedBTree(name);
 
         // return btree.
-        return btree;
+        return ndx;
 
     }
     
@@ -950,26 +931,26 @@ public class Name2Addr extends BTree {
     }
     
     /**
-	 * Return the current entry, if any, for the named {@link ITx#UNISOLATED}
-	 * index in the {@link #indexCache}.
-	 * <p>
-	 * Note: This method is more direct than {@link #getIndex(String)}.
-	 * {@link AbstractTask} uses this method together with
-	 * {@link #putIndexCache(String, ICheckpointProtocol, boolean)} to allow
-	 * different tasks access to the same pool of {@link ITx#UNISOLATED}
-	 * indices.
-	 * 
-	 * @param name
-	 *            The index name.
-	 * 
-	 * @return The index iff it was found in the cache.
-	 */
-    synchronized protected BTree getIndexCache(final String name) {
-        
+     * Return the current entry, if any, for the named {@link ITx#UNISOLATED}
+     * index in the {@link #indexCache}.
+     * <p>
+     * Note: This method is more direct than {@link #getIndex(String)}.
+     * {@link AbstractTask} uses this method together with
+     * {@link #putIndexCache(String, ICheckpointProtocol, boolean)} to allow
+     * different tasks access to the same pool of {@link ITx#UNISOLATED}
+     * indices.
+     * 
+     * @param name
+     *            The index name.
+     * 
+     * @return The index iff it was found in the cache.
+     */
+    synchronized protected ICheckpointProtocol getIndexCache(final String name) {
+
         assertUnisolatedInstance();
-        
-        return (BTree)indexCache.get(name);
-        
+
+        return indexCache.get(name);
+
     }
     
     /**

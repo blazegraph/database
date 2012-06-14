@@ -38,13 +38,13 @@ import org.openrdf.model.Literal;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.FullTextIndex;
@@ -145,7 +145,7 @@ public class BigdataSubjectCentricFullTextIndex extends FullTextIndex implements
             final Properties p = getProperties();
             
             final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
-                    p, name, UUID.randomUUID());
+                    p, name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
             /*
              * Override the collator strength property to use the configured

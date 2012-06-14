@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.io.StringReader;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -40,6 +39,7 @@ import org.openrdf.model.Literal;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -143,7 +143,7 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
             final Properties p = getProperties();
             
             final IndexMetadata indexMetadata = new IndexMetadata(indexManager,
-                    p, name, UUID.randomUUID());
+                    p, name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
             /*
              * Override the collator strength property to use the configured

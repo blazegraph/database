@@ -18,6 +18,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -235,7 +236,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
         /**
          * The metadata used to create the index.
          */
-        private final IndexMetadata metadata;
+        private final HTreeIndexMetadata metadata;
 
         /**
          * The object used to format the keys for the index.
@@ -302,7 +303,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
                 filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
 
-                metadata = new IndexMetadata(UUID.randomUUID());
+                metadata = new HTreeIndexMetadata(UUID.randomUUID());
 
                 // IFF BTree
                 metadata.setBranchingFactor(NativeDistinctFilter.this.getProperty(

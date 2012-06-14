@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.DirectBufferPool;
@@ -201,7 +202,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			final HTree groundTruth;
 			{
 
-				final IndexMetadata gmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata gmd = new HTreeIndexMetadata(indexUUID);
 
 				gmd.setWriteRetentionQueueCapacity(100);
 				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
@@ -210,7 +211,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 				groundTruth = HTree.create(store, gmd);
 				
-				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata hmd = new HTreeIndexMetadata(indexUUID);
 
 				hmd.setWriteRetentionQueueCapacity(30);
 				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
@@ -286,7 +287,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			final HTree groundTruth;
 			{
 
-				final IndexMetadata gmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata gmd = new HTreeIndexMetadata(indexUUID);
 
 				gmd.setWriteRetentionQueueCapacity(100);
 				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
@@ -295,7 +296,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 				groundTruth = HTree.create(store, gmd);
 				
-				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata hmd = new HTreeIndexMetadata(indexUUID);
 
 				hmd.setWriteRetentionQueueCapacity(30);
 				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
@@ -374,7 +375,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			final HTree groundTruth;
 			{
 
-				final IndexMetadata gmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata gmd = new HTreeIndexMetadata(indexUUID);
 
 				gmd.setWriteRetentionQueueCapacity(100);
 				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
@@ -383,7 +384,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 				groundTruth = HTree.create(store, gmd);
 				
-				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+				final HTreeIndexMetadata hmd = new HTreeIndexMetadata(indexUUID);
 
 				hmd.setWriteRetentionQueueCapacity(30);
 				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.

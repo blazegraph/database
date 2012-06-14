@@ -67,6 +67,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.filter.PrefixFilter;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
@@ -1258,8 +1259,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 	 */
     protected IndexMetadata getBlobsIndexMetadata(final String name) {
 
-        final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
-                getProperties(), name, UUID.randomUUID());
+		final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
+				getProperties(), name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
         metadata.setTupleSerializer(new BlobsTupleSerializer(getNamespace(),
                 valueFactory));

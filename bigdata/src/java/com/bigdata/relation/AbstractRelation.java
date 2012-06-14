@@ -37,6 +37,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -233,10 +234,10 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      */
     protected IndexMetadata newIndexMetadata(final String name) {
 
-        final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
-                getProperties(), name, UUID.randomUUID());
+		final IndexMetadata metadata = new IndexMetadata(getIndexManager(),
+				getProperties(), name, UUID.randomUUID(), IndexTypeEnum.BTree);
 
-        return metadata;
+		return metadata;
 
     }
 

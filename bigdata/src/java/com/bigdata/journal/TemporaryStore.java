@@ -39,8 +39,12 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.htree.HTree;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -249,26 +253,63 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     }
     
     public BTree registerIndex(final String name, final IndexMetadata metadata) {
-    
-        final BTree btree = BTree.create(this, metadata);
 
-        return registerIndex(name, btree);
+        return (BTree) register(name, metadata);
+
+    }
+
+    /**
+     * Variant method creates and registered a named persistence capable data
+     * structure but does not assume that the data structure will be a
+     * {@link BTree}.
+     * 
+     * @param store
+     *            The backing store.
+     * @param metadata
+     *            The metadata that describes the data structure to be created.
+     * 
+     * @return The persistence capable data structure.
+     * 
+     * @see Checkpoint#create(IRawStore, IndexMetadata)
+     */
+    public ICheckpointProtocol register(final String name,
+            final IndexMetadata metadata) {
+
+        final ICheckpointProtocol ndx = Checkpoint.create(this, metadata);
+
+        register(name, ndx);
+
+        return ndx;
+
+    }
+
+    final public BTree registerIndex(final String name, final BTree btree) {
+
+        registerIndex(name, btree);
+
+        return btree;
         
     }
     
-    public BTree registerIndex(final String name, final BTree btree) {
+    /**
+     * Register a named persistence capable data structure (core impl).
+     * 
+     * @param name
+     *            The name.
+     * @param ndx
+     *            The data structure.
+     */
+    final public void register(final String name, final ICheckpointProtocol ndx) {
 
         synchronized (name2Addr) {
 
             assertOpen();
 
             // add to the persistent name map.
-            name2Addr.registerIndex(name, btree);
-
-            return btree;
+            name2Addr.registerIndex(name, ndx);
 
         }
-        
+
     }
     
     public void dropIndex(final String name) {
@@ -294,7 +335,23 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
             assertOpen();
 
-            return name2Addr.getIndex(name);
+            return (BTree) name2Addr.getIndex(name);
+            
+        }
+
+    }
+
+    /**
+     * Return an {@link ITx#UNISOLATED} view of the named index -or-
+     * <code>null</code> if there is no registered index by that name.
+     */
+    public HTree getHTree(final String name) {
+
+        synchronized(name2Addr) {
+
+            assertOpen();
+
+            return (HTree) name2Addr.getIndex(name);
             
         }
 
