@@ -33,6 +33,8 @@ import junit.framework.TestCase2;
 /**
  * Test suite for low to no cardinality joins against a named solution set.
  * 
+ * @see NamedSolutionSetScanOp
+ * 
  * @author thompsonbry
  * 
  *         FIXME Verify that we are handling SELECT and CONSTRAINTS as well as
