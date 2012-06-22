@@ -1,0 +1,6 @@
+PREFIX ex: <http://example.org/>
+
+SELECT DISTINCT ?sub WHERE {
+#  hint:Query hint:analytic "true" .
+  ?sub ex:hasName ?name.
+} order by DESC(?name)
