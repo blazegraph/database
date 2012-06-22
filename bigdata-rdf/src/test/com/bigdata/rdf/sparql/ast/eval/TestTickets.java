@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
  * trac </a>.
@@ -56,6 +55,9 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
      * </pre>
      * 
      * @throws Exception
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/384">
+     *      IndexOutOfBoundsException during query evaluation </a>
      */
     public void test_ticket_384() throws Exception {
 
@@ -63,4 +65,28 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * <pre>
+     * PREFIX ex: <http://example.org/>
+     * 
+     * SELECT DISTINCT ?sub WHERE {
+     *   ?sub ex:hasName ?name.
+     * } order by DESC(?name)
+     * </pre>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/563">
+     *      DISTINCT ORDER BY</a>
+     */
+    public void test_ticket_563() throws Exception {
+
+        new TestHelper("ticket563-DistinctOrderBy",// testURI,
+                "ticket563-DistinctOrderBy.rq",// queryFileURL
+                "ticket563-DistinctOrderBy.n3",// dataFileURL
+                "ticket563-DistinctOrderBy.srx",// resultFileURL
+                false, // laxCardinality
+                true // checkOrder
+        ).runTest();
+
+    }
+   
 }

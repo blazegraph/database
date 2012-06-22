@@ -107,7 +107,6 @@ import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -125,7 +124,6 @@ import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -374,6 +372,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // The top-level "WHERE" clause.
         left = convertJoinGroupOrUnion(left, root, doneSet, ctx);
 
+        final OrderByNode orderBy = queryBase.getOrderBy();
+
         final ProjectionNode projection = queryBase.getProjection() == null ? null
                 : queryBase.getProjection().isEmpty() ? null : queryBase
                         .getProjection();
@@ -451,19 +451,46 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * by filtering out the duplicate solutions after the sort.
              */
 
+            // When true, DISTINCT must preserve ORDER BY ordering.
+            final boolean preserveOrder;
+
+            if (orderBy != null && !orderBy.isEmpty()) {
+
+                /*
+                 * Note: ORDER BY before DISTINCT, so DISTINCT must preserve
+                 * order.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/563
+                 * (ORDER BY + DISTINCT)
+                 */
+                
+                preserveOrder = true;
+
+                left = addOrderBy(left, orderBy, ctx);
+
+            } else {
+                
+                preserveOrder = false;
+                
+            }
+
             if (projection.isDistinct() || projection.isReduced()) {
 
-                left = addDistinct(left, queryBase, ctx);
+                left = addDistinct(left, queryBase, preserveOrder, ctx);
 
             }
 
-        }
+        } else {
 
-        final OrderByNode orderBy = queryBase.getOrderBy();
+            /*
+             * TODO Under what circumstances can the projection be [null]?
+             */
+            
+            if (orderBy != null && !orderBy.isEmpty()) {
 
-        if (orderBy != null && !orderBy.isEmpty()) {
+                left = addOrderBy(left, orderBy, ctx);
 
-            left = addOrderBy(left, orderBy, ctx);
+            }
 
         }
 
@@ -3380,13 +3407,19 @@ public class AST2BOpUtility extends AST2BOpJoins {
     /**
      * Add DISTINCT semantics to the pipeline.
      * 
+     * @param preserveOrder
+     *            When <code>true</code> the solution set order must be
+     *            preserved by the DISTINCT operator. This is necessary when
+     *            both ORDER BY and DISTINCT are specified in a query.
+     * 
      * TODO Support parallel decomposition of distinct on a cluster (DISTINCT
      * can be run on each node if we hash partition the DISTINCT operator based
      * on the variables on which DISTINCT will be imposed and the results when
      * streamed back to the controller will still be distinct.)
      */
     private static final PipelineOp addDistinct(PipelineOp left,
-            final QueryBase query, final AST2BOpContext ctx) {
+            final QueryBase query, final boolean preserveOrder,
+            final AST2BOpContext ctx) {
 
         final int bopId = ctx.nextId();
 
@@ -3398,22 +3431,40 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IVariable<?>[] vars = projection.getProjectionVars();
 
         final PipelineOp op;
-        if (!ctx.nativeDistinctSolutions) {
+        if (!ctx.nativeDistinctSolutions || preserveOrder) {
             /*
              * DISTINCT on the JVM heap.
              */
-            op = new JVMDistinctBindingSetsOp(
-                    leftOrEmpty(left),//
-                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID, bopId),
-                    new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES, vars),
-                    new NV(JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
-                           BOpEvaluationContext.CONTROLLER),
-                    new NV(JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true)//
+            final List<NV> anns = new LinkedList<NV>();
+            anns.add(new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID, bopId));
+            anns.add(new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,
+                    vars));
+            anns.add(new NV(
+                    JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+                    BOpEvaluationContext.CONTROLLER));
+            anns.add(new NV(JVMDistinctBindingSetsOp.Annotations.SHARED_STATE,
+                    true));
+            if (preserveOrder) {
+                /*
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/563 (ORDER
+                 * BY + DISTINCT)
+                 */
+                anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+            }
+            op = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
+                    anns.toArray(new NV[anns.size()])//
             );
         } else {
             /*
              * DISTINCT on the native heap.
              */
+            if(preserveOrder) {
+                /*
+                 * FIXME The HTree DISTINCT operator is not preserving the input
+                 * order. This is probably due to vectoring.
+                 */
+                throw new UnsupportedOperationException();
+            }
             final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                     ctx.queryId, "--distinct-"+ctx.nextId(), vars);
             op = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
