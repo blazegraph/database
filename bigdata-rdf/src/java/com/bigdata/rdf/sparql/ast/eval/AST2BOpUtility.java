@@ -3460,8 +3460,24 @@ public class AST2BOpUtility extends AST2BOpJoins {
              */
             if(preserveOrder) {
                 /*
-                 * FIXME The HTree DISTINCT operator is not preserving the input
-                 * order. This is probably due to vectoring.
+                 * TODO The HTree DISTINCT operator is not preserving the input
+                 * order. This is probably due to vectoring. This limits the
+                 * scalablity of DISTINCT + ORDER BY since the HTree is not
+                 * being used.
+                 * 
+                 * Note: It is possible to implement a DISTINCT operator which
+                 * relies on the fact that the solutions are already ordered IFF
+                 * the ordering is consistent with the projected variables such
+                 * that we can compare the last solution output with the current
+                 * solution and decide (without maintaining a hash index)
+                 * whether the current solution has distinct bindings for the
+                 * projected variables. However, this operator would not handle
+                 * all cases of DISTINCT + ORDER BY for analytic query. In order
+                 * to have a scalable solution which covers all cases, we would
+                 * have to ensure that the HTree DISTINCT + ORDER BY operator
+                 * DID NOT reorder solutions. That probably means that we would
+                 * have to turn off vectoring in the HTree DISTINCT + ORDER BY
+                 * operator.
                  */
                 throw new UnsupportedOperationException();
             }
