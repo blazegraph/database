@@ -52,9 +52,12 @@ import com.bigdata.rdf.sparql.ast.InsertData;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
@@ -2682,4 +2685,126 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     }
 
+    /**
+     * <pre>
+     * INSERT {
+     * 
+     *     GRAPH <http://example/out> { ?s ?p ?v . }
+     * 
+     * }
+     * WHERE {
+     * 
+     *     SELECT ?s ?p ?v
+     *     WHERE {
+     * 
+     *         GRAPH <http://example/in> { ?s ?p ?v . }
+     * 
+     *     }
+     * 
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/562" >
+     *      Sub-select in INSERT cause NPE in UpdateExprBuilder </a>
+     */
+    public void test_ticket_562() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "INSERT {\n" + //
+                "  GRAPH <http://example/out> { ?s ?p ?v . }\n" + //
+                "}\n" + //
+                "WHERE {\n" + //
+                "  SELECT ?s ?p ?v\n" + //
+                "  WHERE {\n" + //
+                "    GRAPH <http://example/in> { ?s ?p ?v . }\n" + //
+                "    }\n" + //
+                "}";
+
+        @SuppressWarnings("rawtypes")
+        final IV out = makeIV(valueFactory.createURI("http://example/out"));
+
+        @SuppressWarnings("rawtypes")
+        final IV in = makeIV(valueFactory.createURI("http://example/in"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            {
+
+                final DeleteInsertGraph op = new DeleteInsertGraph();
+
+                expected.addChild(op);
+
+                {
+
+                    final QuadData insertClause = new QuadData();
+
+                    op.setInsertClause(new QuadsDataOrNamedSolutionSet(
+                            insertClause));
+
+                    final QuadData innerGroup = new QuadData();
+                    insertClause.addChild(innerGroup);
+                    
+                    innerGroup.addChild(new StatementPatternNode(new VarNode(
+                            "s"), new VarNode("p"), new VarNode("v"),
+                            new ConstantNode(out), Scope.NAMED_CONTEXTS));
+
+                }
+
+                final SubqueryRoot subquery;
+                
+                // Top-level WHERE clause.
+                {
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    op.setWhereClause(whereClause);
+
+                    subquery = new SubqueryRoot(QueryType.SELECT);
+                    whereClause.addChild(subquery);
+
+                }
+                
+                // Subquery
+                {
+                    
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("p"));
+                    projection.addProjectionVar(new VarNode("v"));
+                    subquery.setProjection(projection);
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    subquery.setWhereClause(whereClause);
+
+                    final JoinGroupNode graphClause = new JoinGroupNode();
+                    graphClause.setContext(new ConstantNode(in));
+                    whereClause.addChild(graphClause);
+                    
+                    graphClause.addChild(new StatementPatternNode(new VarNode(
+                            "s"), new VarNode("p"), new VarNode("v"),
+                            new ConstantNode(in), Scope.NAMED_CONTEXTS));
+
+                }
+
+//                final Set<IV> namedGraphs = new LinkedHashSet<IV>();
+//                namedGraphs.add(addresses);
+//
+//                @SuppressWarnings({ "unchecked", "rawtypes" })
+//                final DatasetNode dataset = new DatasetNode(
+//                        (Set) Collections.emptySet(),// defaultGraph
+//                        (Set) Collections.emptySet(),// namedGraphs
+//                        true // update
+//                );
+//
+//                op.setDataset(dataset);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
 }

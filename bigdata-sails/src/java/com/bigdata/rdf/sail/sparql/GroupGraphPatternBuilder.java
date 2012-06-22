@@ -127,9 +127,11 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * inner graph patterns should do this as well.
      * 
      * @return The {@link GroupNodeBase}. This return value is used by the
-     *         visitor method for the {@link ASTWhereClause}. If the child was a
-     *         SubSelect, then the immediate parent is NOT an
-     *         {@link ASTWhereClause} and the return value is ignored.
+     *         visitor method for the {@link ASTWhereClause} and also in SPARQL
+     *         UPDATE.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/562">
+     *      Sub-select in INSERT cause NPE in UpdateExprBuilder </a>
      */
     @Override
     final public GroupNodeBase<?> visit(final ASTGraphPatternGroup node,
@@ -183,11 +185,21 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
                  * <pre>
                  * SELECT ?s { ?s ?x ?o . {SELECT ?x where {?x ?p ?x}}}
                  * </pre>
+                 * 
+                 * Note: This no longer returns [null] due to the problem
+                 * cited in the ticket below.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/562">
+                 *      Sub-select in INSERT cause NPE in UpdateExprBuilder </a>
                  */
                 
-                parentGP.add(new JoinGroupNode(subqueryRoot));
+                @SuppressWarnings("rawtypes")
+                final GroupNodeBase group = new JoinGroupNode(subqueryRoot);
+
+                parentGP.add(group);
                 
-                ret2 = null;
+                ret2 = group;
                 
             }
 
