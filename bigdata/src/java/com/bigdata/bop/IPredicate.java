@@ -500,7 +500,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * query optimizer.
      * 
      * @return The assigned {@link IKeyOrder} or <code>null</code> if the
-     *         {@link IKeyOrder} was not overriden.
+     *         {@link IKeyOrder} was not overridden.
      * 
      * @see Annotations#KEY_ORDER
      */

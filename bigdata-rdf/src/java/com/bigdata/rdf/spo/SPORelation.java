@@ -652,6 +652,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
     
     /**
      * Overrides for the statement indices.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/150" >
+     *      Choosing the index for testing fully bound access paths based on
+     *      index locality</a>
      */
     protected IndexMetadata getStatementIndexMetadata(final SPOKeyOrder keyOrder) {
 
@@ -714,19 +718,48 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        if (bloomFilter && keyOrder.equals(SPOKeyOrder.SPO)) {
+        if (bloomFilter) {// && keyOrder.equals(SPOKeyOrder.SPO)) {
+            
+//          * Enable the bloom filter for the SPO index only.
+//          * 
+//          * Note: This SPO index is used any time we have an access path that
+//          * is a point test. Therefore this is the only index for which it
+//          * makes sense to maintain a bloom filter.
             
             /*
-             * Enable the bloom filter for the SPO index only.
+             * Enable the bloom filter.
              * 
-             * Note: This SPO index is used any time we have an access path that
-             * is a point test. Therefore this is the only index for which it
-             * makes sense to maintain a bloom filter.
+             * Historically, the bloom filter was only enabled in for the SPO
+             * index because the SPO index was always used for a point test.
+             * Further, by oversight, it was never enabled for a quads mode KB
+             * instance. However, in order to improve the locality of reference
+             * for point tests, the SPOKeyOrder#getKeyOrder() method was
+             * modified to use the index which would be used if we evaluated the
+             * original predicate rather than the "as-bound" predicate. This
+             * change provides better locality of access since the variables
+             * indicate the region of variability in the index while the
+             * constants indicate the region of locality. Therefore, fully bound
+             * (aka point tests) can now occur on ANY statement index and the
+             * bloom filter is now enabled on all statement indices.
              * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/150
+             * (chosing the index for testing fully bound access paths based on
+             * index locality)
+             */
+            
+            /*
              * Note: The maximum error rate (maxP) applies to the mutable BTree
              * only. For scale-out indices, there is one mutable BTree per index
              * partition and a new (empty) BTree is allocated each time the live
              * journal for the index partitions overflows.
+             * 
+             * Note: The bloom filter is disabled once the error rate grows too
+             * large. However, in scale-out, we are able to put a perfect fit
+             * bloom filter in each index segment. This can significantly reduce
+             * the IO costs associated with point tests. This can not be done in
+             * the single machine database mode because the error rate of the
+             * bloom filter is a function of the size of the bloom filter and
+             * the #of entries in the index.
              */
 
 //            // good performance up to ~2M triples.
