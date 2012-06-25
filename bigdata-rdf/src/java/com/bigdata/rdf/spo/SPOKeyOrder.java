@@ -46,7 +46,9 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.striterator.AbstractKeyOrder;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Represents the key order used by an index for a triple relation.
@@ -876,6 +878,10 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      *       the keyArity parameter. That parameter is only there because we
      *       support two distinct families of natural orders in this class: one
      *       for triples and one for quads.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/150" >
+     *      Choosing the index for testing fully bound access paths based on
+     *      index locality</a>
      */
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
@@ -906,7 +912,24 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             // Note: Context is ignored!
 
             if (s && p && o) {
-                return SPO;
+                
+                /*
+                 * If the access path is all bound, then we want to use the
+                 * index associated with the original predicate (which typically
+                 * had variables in one or more positions). This index will have
+                 * better locality since it will naturally group the index
+                 * accesses in the same region of the index.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/150
+                 * (chosing the index for testing fully bound access paths based
+                 * on index locality)
+                 */
+
+                final SPOKeyOrder tmp = predicate.getProperty(
+                        AST2BOpBase.Annotations.ORIGINAL_INDEX, SPO);
+                
+                return tmp; // SPO
+                
             } else if (s && p) {
                 return SPO;
             } else if (s && o) {
@@ -956,7 +979,22 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
                 return SOPC;
             }
 
-            return SPOC;
+            /*
+             * If the access path is all bound, then we want to use the
+             * index associated with the original predicate (which typically
+             * had variables in one or more positions). This index will have
+             * better locality since it will naturally group the index
+             * accesses in the same region of the index.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/150
+             * (chosing the index for testing fully bound access paths based
+             * on index locality)
+             */
+
+            final SPOKeyOrder tmp = predicate.getProperty(
+                    AST2BOpBase.Annotations.ORIGINAL_INDEX, SPOC);
+
+            return tmp;// SPOC;
 
         }
 
