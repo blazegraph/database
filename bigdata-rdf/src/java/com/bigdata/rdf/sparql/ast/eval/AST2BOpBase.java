@@ -104,6 +104,14 @@ public class AST2BOpBase {
          * Note: The actual index will be chosen at runtime based on the asBound
          * predicate. In scale-out, the binding sets are send to the node having
          * the shard on which the asBound predicate would read.
+         * 
+         * TODO It would make sense to lift this annotation into a different AST
+         * optimizer so it is always present. An optimization for index locality
+         * for as-bound evaluation depends on the presence of this annotation.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/150" >
+         *      Choosing the index for testing fully bound access paths based on
+         *      index locality</a>
          */
         String ORIGINAL_INDEX = AST2BOpBase.class.getName()
                 + ".originalIndex";

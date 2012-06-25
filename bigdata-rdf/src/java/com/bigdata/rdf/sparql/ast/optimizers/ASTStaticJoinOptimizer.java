@@ -568,6 +568,15 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                  * Annotate with the index which would be used if we did not run
                  * access path "as-bound". This is the index that will be used
                  * if we wind up doing a hash join for this predicate.
+                 * 
+                 * TODO It would make sense to lift this annotation into a
+                 * different AST optimizer so it is always present. An
+                 * optimization for index locality for as-bound evaluation
+                 * depends on the presence of this annotation.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/150"
+                 * (Choosing the index for testing fully bound access paths
+                 * based on index locality)
                  */
                 sp.setProperty(Annotations.ORIGINAL_INDEX, ap.getKeyOrder());
 
