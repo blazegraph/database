@@ -718,8 +718,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        if (bloomFilter) {// && keyOrder.equals(SPOKeyOrder.SPO)) {
-            
+        if (bloomFilter
+                && (keyOrder.equals(SPOKeyOrder.SPO) || keyOrder
+                        .equals(SPOKeyOrder.SPOC))) {
+
 //          * Enable the bloom filter for the SPO index only.
 //          * 
 //          * Note: This SPO index is used any time we have an access path that
