@@ -791,8 +791,20 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (nearCapacity()) {
 
             // bulk insert the buffered data into the store.
-            incrementalWrite();
-            
+            if (true) {
+                // THIS IS THE CORRECT ACTION!
+                incrementalWrite();
+            } else {
+                /*
+                 * This will flush all blank nodes. It may be necessary on very
+                 * large files. It also resets the blank node and deferred
+                 * statement maps afterwards (since they are set to null by
+                 * reset()).
+                 */
+                flush();
+                bnodes = new HashMap<String, BigdataBNode>(capacity);
+                deferredStmts = new HashSet<BigdataStatement>(stmts.length);
+            }
         }
         
         // add to the buffer.
