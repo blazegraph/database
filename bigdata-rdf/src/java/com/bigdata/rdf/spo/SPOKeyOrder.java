@@ -72,6 +72,16 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     private static final long serialVersionUID = 87501920529732159L;
     
     private static final transient Logger log = Logger.getLogger(SPOKeyOrder.class);
+
+    /**
+     * Enables or disables the index locality optimization.
+     * 
+     * @see #getKeyOrder(IPredicate, int)
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/150" >
+     *      Choosing the index for testing fully bound access paths based on
+     *      index locality</a>
+     */
+    private static final boolean LOCALITY_OPTIMIZATION = false;
     
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
@@ -925,10 +935,18 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
                  * on index locality)
                  */
 
-                final SPOKeyOrder tmp = predicate.getProperty(
-                        AST2BOpBase.Annotations.ORIGINAL_INDEX, SPO);
-                
-                return tmp; // SPO
+                if (LOCALITY_OPTIMIZATION) {
+
+                    final SPOKeyOrder tmp = predicate.getProperty(
+                            AST2BOpBase.Annotations.ORIGINAL_INDEX, SPO);
+
+                    return tmp;
+                    
+                } else {
+                    
+                    return SPO;
+                    
+                }
                 
             } else if (s && p) {
                 return SPO;
@@ -990,11 +1008,18 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
              * (chosing the index for testing fully bound access paths based
              * on index locality)
              */
+            if (LOCALITY_OPTIMIZATION) {
 
-            final SPOKeyOrder tmp = predicate.getProperty(
-                    AST2BOpBase.Annotations.ORIGINAL_INDEX, SPOC);
+                final SPOKeyOrder tmp = predicate.getProperty(
+                        AST2BOpBase.Annotations.ORIGINAL_INDEX, SPOC);
 
-            return tmp;// SPOC;
+                return tmp;
+                
+            } else {
+                
+                return SPOC;
+                
+            }
 
         }
 
