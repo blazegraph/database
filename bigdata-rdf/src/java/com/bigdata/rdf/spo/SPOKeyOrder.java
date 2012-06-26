@@ -81,7 +81,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      *      Choosing the index for testing fully bound access paths based on
      *      index locality</a>
      */
-    private static final boolean LOCALITY_OPTIMIZATION = false;
+    private static final transient boolean LOCALITY_OPTIMIZATION = false;
     
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
