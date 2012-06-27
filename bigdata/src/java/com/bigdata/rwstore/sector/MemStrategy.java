@@ -2,6 +2,7 @@ package com.bigdata.rwstore.sector;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Properties;
@@ -21,6 +22,7 @@ import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.service.AbstractTransactionService;
@@ -430,6 +432,21 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 
 	public boolean isCommitted(long addr) {
 		return m_mmgr.isCommitted(addr);
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		return m_mmgr.getInputStream(addr);
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		return m_mmgr.getOutputStream();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+		return m_mmgr.getOutputStream(context);
 	}
 
 }

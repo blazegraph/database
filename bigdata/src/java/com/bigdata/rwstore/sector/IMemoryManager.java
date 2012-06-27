@@ -269,6 +269,14 @@ public interface IMemoryManager extends ICounterSetAccess {
 	public IPSOutputStream getOutputStream();
 	
 	/**
+	 * @param context within which any allocations are made by the
+	 * returned IPSOutputStream
+	 * @return an outputstream to stream data to and to retrieve
+	 * an address to later stream the data back.
+	 */
+	public IPSOutputStream getOutputStream(final IAllocationContext context);
+	
+	/**
 	 * @return an inputstream for the data for provided address
 	 */
 	public InputStream getInputStream(long addr);

@@ -26,6 +26,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
@@ -42,6 +43,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.RWStore;
@@ -735,6 +737,21 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	@Override
 	public long saveDeferrals() {
 		return m_store.saveDeferrals();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		return m_store.getInputStream(addr);
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		return m_store.getOutputStream();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(IAllocationContext context) {
+		return m_store.getOutputStream(context);
 	}
 
 }

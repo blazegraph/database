@@ -28,6 +28,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -346,20 +347,6 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
 	static private final int META_ALLOCATION = 8; // 8 * 32K is size of meta Allocation
-
-	/**
-	 * Maximum fixed allocs in a BLOB, but do restrict to size that will fit
-	 * within a single fixed allocation Ignored.
-	 * 
-	 * FIXME Javadoc. Is this ignored or not? (what is the Ignored doing at the
-	 * end of the comment above?) Is this in units of int32 values or bytes?
-	 */
-	static final int BLOB_FIXED_ALLOCS = 2048;
-//	private ICommitCallback m_commitCallback;
-//
-//	public void setCommitCallback(final ICommitCallback callback) {
-//		m_commitCallback = callback;
-//	}
 
 	// If required, then allocate 1M direct buffers
 	private static final int cDirectBufferCapacity = 1024 * 1024;
@@ -732,12 +719,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			}
 			
             final int maxBlockLessChk = m_maxFixedAlloc-4;
-            // ensure that BLOB header cannot itself be a BLOB
-//            int blobFixedAlocs = maxBlockLessChk/4;
-//            if (blobFixedAlocs > RWStore.BLOB_FIXED_ALLOCS)
-//            	blobFixedAlocs = RWStore.BLOB_FIXED_ALLOCS;
-//            m_maxBlobAllocSize = ((maxBlockLessChk/4) * maxBlockLessChk);
-            
+             
             m_maxBlobAllocSize = Integer.MAX_VALUE;
             
 			assert m_maxFixedAlloc > 0;
@@ -1340,7 +1322,8 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	        try {
 	        	
-	        	if (getBlock((int) addr).getBlockSize() < length) {
+	        	final int slotSize = getBlock((int) addr).getBlockSize();
+	        	if (slotSize < length) {
 	        		throw new IllegalStateException("Bad Address: length requested greater than allocated slot");
 	        	}
 
@@ -4648,6 +4631,18 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	public boolean inWriteCache(int rwaddr) {
 		return m_writeCache.isPresent(physicalAddress(rwaddr, true));
+	}
+
+	public InputStream getInputStream(long addr) {
+		return new PSInputStream(this, addr);
+	}
+
+	public IPSOutputStream getOutputStream() {
+		return getOutputStream(null);
+	}  
+
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+		return PSOutputStream.getNew(this, m_maxFixedAlloc, context);
 	}  
 
 //    /**
