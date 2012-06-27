@@ -233,6 +233,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 		int updateIndex = 0;
 		for (Update op : updateRoot) {
 
+//          log.error("\nbefore op=" + op + "\n" + context.conn.getTripleStore().dumpStore());
+
 			if (updateIndex > 0) {
 
 				/*
@@ -249,8 +251,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				context.conn.flush();
-
-				// log.error("\nafter op=" + op + "\n" + context.conn.getTripleStore().dumpStore());
 
 				/*
 				 * We need to re-resolve any RDF Values appearing in this UPDATE
