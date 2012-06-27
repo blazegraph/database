@@ -16,6 +16,7 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.Update;
 import org.openrdf.query.UpdateExecutionException;
@@ -1075,6 +1076,64 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(msg, con.hasStatement(book1, DC.TITLE, null, true, bookStore2));
 	}
 
+    /**
+     * Unit test for
+     * 
+     * <pre>
+     * DROP ALL;
+     * INSERT DATA {
+     * GRAPH <http://example.org/one> {
+     * <a> <b> <c> .
+     * <d> <e> <f> .
+     * }};
+     * ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;
+     * DROP SILENT GRAPH <http://example.org/one>  ;
+     * </pre>
+     * 
+     * The IV cache was not not being propagated correctly with the result that
+     * we were seeing mock IVs for "one" and "two". The UPDATE would work
+     * correctly the 2nd time since the URIs had been entered into the
+     * dictionary by then.
+     * 
+     * @throws RepositoryException 
+     * @throws MalformedQueryException 
+     * @throws UpdateExecutionException 
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/567" >
+     *      Failure to set cached value on IV results in incorrect behavior for
+     *      complex UPDATE operation </a>
+     */
+	public void testTicket567() throws RepositoryException, MalformedQueryException, UpdateExecutionException {
+
+        // replace the standard dataset with one specific to this case.
+        con.clear();
+        con.commit();
+
+        StringBuilder update = new StringBuilder();
+        update.append("DROP ALL;\n");
+        update.append("INSERT DATA {\n");
+        update.append(" GRAPH <http://example.org/one> {\n");
+        update.append("   <http://example.org/a> <http://example.org/b> <http://example.org/c> .\n");
+        update.append("   <http://example.org/d> <http://example.org/e> <http://example.org/f> .\n");
+        update.append("}};\n");
+        update.append("ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;\n");
+        update.append("DROP SILENT GRAPH <http://example.org/one>  ;\n");
+        
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        operation.execute();
+
+        URI one = f.createURI("http://example.org/one");
+        URI two = f.createURI("http://example.org/two");
+
+        String msg = "Nothing in graph <one>";
+        assertFalse(msg, con.hasStatement(null, null, null, true, one));
+
+        msg = "statements are in graph <two>";
+        assertTrue(msg, con.hasStatement(null, null, null, true, two));
+	    
+	}
+	
 	//@Test
 	public void testLoad()
 		throws Exception
