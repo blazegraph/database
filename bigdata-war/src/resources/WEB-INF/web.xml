@@ -60,14 +60,22 @@
   	<description>Performance counters.</description>
   	<servlet-class>com.bigdata.rdf.sail.webapp.CountersServlet</servlet-class>
   </servlet>
+  <!-- Mapping for the default KB namespace (as configured above). -->
   <servlet-mapping>
   <servlet-name>REST API</servlet-name>
   <url-pattern>/sparql</url-pattern>
   </servlet-mapping>
+  <!-- Mapping for access to non-default KB namespaces. -->
+  <servlet-mapping>
+  <servlet-name>REST API</servlet-name>
+  <url-pattern>/sparql/*</url-pattern>
+  </servlet-mapping>
+  <!-- Mapping for the status page. -->
   <servlet-mapping>
   <servlet-name>Status</servlet-name>
   <url-pattern>/status</url-pattern>
   </servlet-mapping>
+  <!-- Mapping for the performance counters page. -->
   <servlet-mapping>
   <servlet-name>Counters</servlet-name>
   <url-pattern>/counters</url-pattern>
