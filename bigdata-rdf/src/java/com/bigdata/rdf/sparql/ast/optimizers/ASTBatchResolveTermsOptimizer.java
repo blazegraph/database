@@ -157,6 +157,23 @@ public class ASTBatchResolveTermsOptimizer implements IASTOptimizer {
 						final Constant<?> oldc = (Constant<?>) cnode
 								.getValueExpression();
 
+						final IV<?, ?> oldIv = (IV<?, ?>) oldc.get();
+
+						if(oldIv.hasValue()) {
+
+                            /*
+                             * Propagate the cached Value onto the resolved IV.
+                             * 
+                             * @see
+                             * https://sourceforge.net/apps/trac/bigdata/ticket
+                             * /567 (Failure to set cached value on IV results
+                             * in incorrect behavior for complex UPDATE
+                             * operation)
+                             */
+                            ((IV) iv).setValue(oldIv.getValue());
+
+						}
+
 						final IVariable<?> var = (IVariable<?>) oldc
 								.getProperty(Constant.Annotations.VAR);
 
