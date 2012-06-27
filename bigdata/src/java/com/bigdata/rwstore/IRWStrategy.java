@@ -1,5 +1,6 @@
 package com.bigdata.rwstore;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -38,6 +39,25 @@ public interface IRWStrategy {
 	long write(ByteBuffer data, IAllocationContext context);
 
 	void delete(long addr, IAllocationContext context);
+
+	/**
+	 * @return an outputstream to stream data to and to retrieve
+	 * an address to later stream the data back.
+	 */
+	public IPSOutputStream getOutputStream();
+	
+	/**
+	 * @param context within which any allocations are made by the
+	 * returned IPSOutputStream
+	 * @return an outputstream to stream data to and to retrieve
+	 * an address to later stream the data back.
+	 */
+	public IPSOutputStream getOutputStream(IAllocationContext context);
+	
+	/**
+	 * @return an inputstream for the data for provided address
+	 */
+	public InputStream getInputStream(long addr);
 
 	/**
 	 * Called by DeleteBlockCommitter

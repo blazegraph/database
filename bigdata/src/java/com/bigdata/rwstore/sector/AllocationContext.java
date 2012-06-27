@@ -42,7 +42,6 @@ import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.IStore;
-import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 
 /**
@@ -302,6 +301,14 @@ public class AllocationContext implements IMemoryManager, IStore {
 	}
 
 	@Override
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+		if (context != null)
+			throw new IllegalArgumentException("Nested AllocationContexts are not supported");
+		
+		return getOutputStream();
+	}
+
+	@Override
 	public InputStream getInputStream(long addr) {
 		return new PSInputStream(this, addr);
 	}
@@ -309,7 +316,7 @@ public class AllocationContext implements IMemoryManager, IStore {
 	@Override
 	public long alloc(byte[] buf, int size, IAllocationContext context) {
 		if (context != null)
-			throw new IllegalArgumentException("The MemoryManager does not support AllocationContexts");
+			throw new IllegalArgumentException("Nested AllocationContexts are not supported");
 		
 		return MemoryManager.getAllocationAddress(allocate(ByteBuffer.wrap(buf, 0, size))); // return the rwaddr!
 	}

@@ -218,15 +218,10 @@ public class PSOutputStream extends IPSOutputStream {
   	
   	if (m_count == m_blobThreshold && !m_writingHdr) {
   		if (m_blobHeader == null) {
-  			int hdrSize = m_blobThreshold/4;
-  			if (hdrSize > RWStore.BLOB_FIXED_ALLOCS)
-  				hdrSize = RWStore.BLOB_FIXED_ALLOCS;
   			m_blobHeader = new ArrayList<Integer>(); // only support header
-  			// m_blobHdrIdx = 0;
   		}
   		
   		final int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
-  		// m_blobHeader[m_blobHdrIdx++] = curAddr;
   		m_blobHeader.add(curAddr);
   		
   		m_count = 0;

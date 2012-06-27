@@ -27,15 +27,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -2422,6 +2429,170 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			
 			return buf;
 		}
+		
+		public void testSimpleStream() throws IOException, ClassNotFoundException {
+			final Journal store = (Journal) getStore();
+
+			try {
+
+				RWStrategy strategy = (RWStrategy) store.getBufferStrategy();
+				
+				IPSOutputStream psout = strategy.getOutputStream();
+				
+				final byte[] outb = new byte[] {1, 2, 3, 4};
+				
+				psout.write(outb);
+				
+				long addr = psout.getAddr();
+				
+				InputStream instr = strategy.getInputStream(addr);
+				
+				final byte[] inb = new byte[outb.length];
+				assertTrue(instr.read(inb) == outb.length);
+				
+				assertTrue(Arrays.equals(inb, outb));
+				
+				// confirm that the stream address can be freed
+				strategy.delete(addr);
+				
+
+			} finally {
+
+				store.destroy();
+
+			}
+			
+		}
+		
+		public void testSimpleStringStream() throws IOException, ClassNotFoundException {
+			final Journal store = (Journal) getStore();
+
+			try {
+
+				RWStrategy strategy = (RWStrategy) store.getBufferStrategy();
+				
+				IPSOutputStream psout = strategy.getOutputStream();
+				ObjectOutputStream outdat = new ObjectOutputStream(psout);
+				
+				final String hw = "Hello World";
+				
+				outdat.writeObject(hw);
+				outdat.flush();
+				
+				long addr = psout.getAddr();
+				
+				InputStream instr = strategy.getInputStream(addr);
+				
+				ObjectInputStream inobj = new ObjectInputStream(instr);
+				final String tst = (String) inobj.readObject();
+				
+				assertTrue(hw.equals(tst));
+				
+				// confirm that the stream address can be freed
+				strategy.delete(addr);
+				
+
+			} finally {
+
+				store.destroy();
+
+			}
+			
+		}
+
+		/**
+		 * Writing a blob sized object stream is an excellent test since the ObjectInputStream
+		 * will likely throw an exception if there is a data error.
+		 */
+		public void testBlobObjectStreams() throws IOException, ClassNotFoundException {
+			final Journal store = (Journal) getStore();
+
+			try {
+
+				RWStrategy strategy = (RWStrategy) store.getBufferStrategy();
+				IPSOutputStream psout = strategy.getOutputStream();
+							
+				ObjectOutputStream outdat = new ObjectOutputStream(psout);
+				final String blobBit = "A bit of a blob...";
+				
+				for (int i = 0; i < 40000; i++)
+					outdat.writeObject(blobBit);
+				outdat.close();
+				
+				long addr = psout.getAddr(); // save and retrieve the address
+				
+				InputStream instr = strategy.getInputStream(addr);
+				
+				ObjectInputStream inobj = new ObjectInputStream(instr);
+				for (int i = 0; i < 40000; i++) {
+					try {
+						final String tst = (String) inobj.readObject();
+					
+						assertTrue(blobBit.equals(tst));
+					} catch (IOException ioe) {
+						System.err.println("Problem at " + i);
+						throw ioe;
+					}
+				}
+				
+				try {
+					inobj.readObject();
+					fail("Expected EOFException");
+				} catch (EOFException eof) {
+					// expected
+				} catch (Exception ue) {
+					fail("Expected EOFException not " + ue.getMessage());
+				}
+			
+				// confirm that the stream address can be freed
+				strategy.delete(addr);
+			} finally {
+				store.destroy();
+			}
+		}
+
+		/**
+		 * This test exercises the stream interface and serves as an example of
+		 * stream usage for compressed IO.
+		 */
+		public void testZipStreams() throws IOException, ClassNotFoundException {
+			final Journal store = (Journal) getStore();
+
+			try {
+
+				RWStrategy strategy = (RWStrategy) store.getBufferStrategy();
+				IPSOutputStream psout = strategy.getOutputStream();
+				
+				ObjectOutputStream outdat = new ObjectOutputStream(new GZIPOutputStream(psout));
+				final String blobBit = "A bit of a blob...";
+				
+				for (int i = 0; i < 40000; i++)
+					outdat.writeObject(blobBit);
+				outdat.close();
+				
+				long addr = psout.getAddr(); // save and retrieve the address
+					
+				InputStream instr = strategy.getInputStream(addr);
+				
+				ObjectInputStream inobj = new ObjectInputStream(new GZIPInputStream(instr));
+				for (int i = 0; i < 40000; i++) {
+					try {
+						final String tst = (String) inobj.readObject();
+					
+						assertTrue(blobBit.equals(tst));
+					} catch (IOException ioe) {
+						System.err.println("Problem at " + i);
+						throw ioe;
+					}
+				}
+				
+				strategy.delete(addr);
+			
+			} finally {
+				store.destroy();
+			}
+		}
+
 	}
 	
 	/**

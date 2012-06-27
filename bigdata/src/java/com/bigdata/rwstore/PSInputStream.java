@@ -35,104 +35,103 @@ import com.bigdata.rwstore.sector.SectorAllocator;
  * PSInputStream
  * 
  * Unlike the original PSInputStream this does not incrementally read
- * from the store but rather
+ * from the store but rather immediate maps the ByteBuffers to the
+ * in-memory storage.
  **/
 public class PSInputStream extends InputStream {
 	
-	final ByteBuffer[] m_buffers;
+	final RWStore m_store;
 	
-	int m_index = 0;
-	int m_cursor = 0;
+	final byte[] m_buffer;
+	final int m_maxCursor;
+	final DataInputStream m_hdrIn;
+	final int m_blobBuffers;
 	
-	public PSInputStream(IMemoryManager mm, long addr) {
-		int sze = mm.allocationSize(addr);
+	int m_cursor = 0;	
+	int m_size = 0;
+	
+	public PSInputStream(final RWStore store, long addr) {
+		m_store = store;
 		
-		if (sze > SectorAllocator.BLOB_SIZE) {
-			int buffers = 1 + sze/SectorAllocator.BLOB_SIZE;
-			m_buffers = new ByteBuffer[buffers];
-			// blob header
-			ByteBuffer[] hdr = mm.get((addr & 0xFFFFFFFF00000000L) + ((buffers+1)*4));
-			
-			if (hdr.length > 1)
-				throw new IllegalStateException("Check header size assumptions");
-			
-			int rem = sze;
-			int hdrsze = hdr[0].getInt();
-			if (hdrsze != buffers) 
-				throw new IllegalStateException("Check blob header assumptions");
-			
-			if (hdr[0].remaining() != (buffers*4))
-				throw new IllegalStateException("Check blob header assumptions, remaining: " 
-						+ hdr[0].remaining() + " for " + buffers + " buffers");
-			
-			int index = 0;
-			while (rem > SectorAllocator.BLOB_SIZE) {
-				long ba = hdr[0].getInt();
-				ba <<= 32;
-				ByteBuffer[] block = mm.get(ba + SectorAllocator.BLOB_SIZE);
-				m_buffers[index++] = block[0];
-				
-				rem -= SectorAllocator.BLOB_SIZE;
-			}
-			if (rem > 0) {
-				long ba = hdr[0].getInt();
-				ba <<= 32;
-				ByteBuffer[] block = mm.get(ba + rem);
-				m_buffers[index] = block[0];
-				
-			}
+		m_size = (int) (addr & 0xFFFFFFFF);
+		if (m_size < (store.m_maxFixedAlloc-4)) {
+			m_buffer = new byte[m_size+4]; // allow for checksum
+
+			store.getData((addr >> 32), m_buffer);
+			m_hdrIn = null;
+			m_blobBuffers = 0;
+			m_maxCursor = m_size;
 		} else {
-			m_buffers = mm.get(addr);
+			m_buffer = new byte[store.m_maxFixedAlloc];
+			m_maxCursor = store.m_maxFixedAlloc-4;
+		    final int alloc = m_maxCursor;
+			final int nblocks = (alloc - 1 + (m_size-4))/alloc;
+			final int hdrsize = 4 * (nblocks + 1) + 4; // plus 4 for checksum
+			// FIXME: if hdrsize is blob then use recursive stream!
+			if (hdrsize > store.m_maxFixedAlloc) {
+				throw new UnsupportedOperationException("Header is a blob not yet supported");
+			}
+            final byte[] hdrbuf = new byte[hdrsize]; // plus 4 bytes for checksum
+			store.getData((addr >> 32), hdrbuf);
+            m_hdrIn = new DataInputStream(new ByteArrayInputStream(hdrbuf));
+            try {
+				m_blobBuffers = m_hdrIn.readInt();
+			} catch (IOException e) {
+				throw new RuntimeException("Unable to initialize blob header", e);
+			}
+            m_cursor = m_maxCursor; // force lazy read
 		}
 	}
 	
 	@Override
 	public int read() throws IOException {
-		if (m_index >= m_buffers.length)
+		if (m_size == 0) {
 			return -1;
+		}
+		if (m_cursor >= m_maxCursor) {
+			loadBuffer();
+		}
+		m_size--;
 		
-		final ByteBuffer buf = m_buffers[m_index];
-		final int rem = buf.remaining();
-		assert rem > 0;
-		
-		if (rem == 1)
-			m_index++;
-		
-		return 0xFF & buf.get();
+		return 0xFF & m_buffer[m_cursor++];
 	}
 	
-	public synchronized int read(byte b[], int off, int len) throws IOException {
-		if (m_index >= m_buffers.length)
+	private int loadBuffer() throws IOException {
+		final int nxtaddr = m_hdrIn.readInt();
+		final int rdlen = m_size > m_maxCursor ? m_maxCursor : m_size;
+		m_store.getData(nxtaddr, m_buffer, 0, rdlen+4);
+		m_cursor = 0;
+		
+		return rdlen;
+	}
+	
+	public synchronized int read(final byte dst[], final int off, final int len) throws IOException {
+		if (m_size == 0) {
 			return -1;
-
-		ByteBuffer buf = m_buffers[m_index];
-		int rem = buf.remaining();
-		int retlen = 0;
-		
-		while (len > rem) {
-			buf.get(b, off, rem);
-			retlen += rem;
-			off += rem;
-			len -= rem;
-			
-			if (++m_index == m_buffers.length) 
-				return retlen;
-			
-			buf = m_buffers[m_index];
-			rem = buf.remaining();
 		}
 		
-		if (len > 0) {
-			buf.get(b, off, len);
-			rem -= len;
-			retlen += len;
-			
-			if (rem == 0)
-				m_index++;
+		if (m_cursor >= m_maxCursor) {
+			loadBuffer();
+		}
+
+		final int rdlen = len > m_size ? m_size : len;
+		int avail = m_maxCursor - m_cursor;
+		int delta = 0;
+		
+		while (avail < (rdlen-delta)) {
+			System.arraycopy(m_buffer, m_cursor, dst, off+delta, avail);
+			m_cursor += avail;
+			delta += avail;
+			m_size -= avail;
+			avail = loadBuffer();
 		}
 		
-
-		return retlen;
+		final int lastRead = (rdlen-delta);
+		System.arraycopy(m_buffer, m_cursor, dst, off+delta, lastRead);			
+		m_size -= lastRead;
+		m_cursor += lastRead;
+			
+		return rdlen;
 	}
 
  }
