@@ -243,6 +243,12 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
 	}
 
+    /**
+     * <pre>
+     * DELETE WHERE {?x foaf:name ?y }
+     * </pre>
+     * @throws Exception
+     */
 	//@Test
 	public void testDeleteWhereShortcut()
 		throws Exception
@@ -269,7 +275,48 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(msg, con.hasStatement(alice, FOAF.KNOWS, null, true));
 	}
 
-	//@Test
+    /**
+     * <pre>
+     * DELETE WHERE {GRAPH ?g {?x foaf:name ?y} }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/568 (DELETE WHERE
+     *      fails with Java AssertionError)
+     */
+    //@Test
+    public void testDeleteWhereShortcut2()
+        throws Exception
+    {
+        
+        logger.debug("executing testDeleteWhereShortcut2");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE WHERE { GRAPH ?g {?x foaf:name ?y } }");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        String msg = "foaf:name properties should have been deleted";
+        assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        msg = "foaf:knows properties should not have been deleted";
+        assertTrue(msg, con.hasStatement(bob, FOAF.KNOWS, null, true));
+        assertTrue(msg, con.hasStatement(alice, FOAF.KNOWS, null, true));
+
+    }
+    
+    /**
+     * <pre>
+     * DELETE {?x foaf:name ?y } WHERE {?x foaf:name ?y }
+     * </pre>
+     */
+    //@Test
 	public void testDeleteWhere()
 		throws Exception
 	{

@@ -196,6 +196,15 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * This is similar to a CONSTRUCT without an explicit template. The WHERE
      * clause provides both the pattern to match and the template for the quads
      * to be removed.
+     * <p>
+     * Note: The grammar production for the WHERE clause for the DELETE WHERE
+     * shortcut form is the same production that is used for the DELETE and
+     * INSERT clauses. This results in a {@link QuadData} object containing
+     * {@link StatementPatternNode}s. That object must be transformed into a
+     * {@link JoinGroupNode} in order to be valid as a WHERE clause.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/568 (DELETE WHERE
+     *      fails with Java AssertionError)
      */
 	@Override
     public DeleteInsertGraph visit(final ASTDeleteWhere node, final Object data)
