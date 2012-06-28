@@ -46,13 +46,21 @@ public interface IStore extends IAllocationManager, IStreamStore,
 	public long alloc(byte buf[], int size, IAllocationContext context);
 
 	/**
-	 * Frees allocated storage
+	 * Frees allocated storage (clears the bit to enable recycling after
+	 * the next commit).
 	 * 
 	 * @param addr
 	 *            the storage address to be freed
 	 */
 	public void free(long addr, int size);
 
+    /**
+     * Global commit on the backing store. Previously committed data which has
+     * been marked as {@link #free(long, int)} is now available for recycling.
+     * However, recycling can not occur if session protection is active.
+     */
+	public void commit();
+	
 //	/**************************************************************
 //	 * Odd method needed by PSInputStream to fetch data of unknown
 //	 *	size into a buffer
@@ -122,7 +130,7 @@ public interface IStore extends IAllocationManager, IStreamStore,
 	 * @return the File object
 	 */
 	public File getStoreFile();
-
+	
 //	/**
 //	 * Called by the PSOutputStream to register the header block of a blob. The
 //	 * store must return a new address that is used to retrieve the blob header.

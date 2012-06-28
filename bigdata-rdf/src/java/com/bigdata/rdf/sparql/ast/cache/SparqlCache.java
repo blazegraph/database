@@ -61,9 +61,9 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
+import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
-import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
@@ -322,16 +322,13 @@ public class SparqlCache implements ISparqlCache {
     }
 
     /**
-     * Return the {@link IMemoryManager} backing all transient named solution
-     * sets. The caller is responsible for creating a child allocation context
-     * when writing a named solution set onto the {@link IMemoryManager}.
+     * Return the store backing the named solution sets.
      * 
-     * @return The shared {@link IMemoryManager}.
+     * @return The backing store.
      */
-    protected IMemoryManager getMemoryManager() {
+    protected IRWStrategy getStore() {
         
-        return ((MemStrategy) cache
-                .getBufferStrategy()).getMemoryManager();
+        return (IRWStrategy) cache.getBufferStrategy();
         
     }
     
@@ -397,11 +394,8 @@ public class SparqlCache implements ISparqlCache {
 
         if (sset == null) {
 
-            final IMemoryManager mmrgr = getMemoryManager()
-                    .createAllocationContext();
-
-            sset = new SolutionSetMetadata(solutionSet, mmrgr,
-                    getDefaultMetadata());
+            sset = new SolutionSetMetadata(solutionSet, getStore(),
+                    getDefaultMetadata(), false/* readOnly */);
 
             cacheMap.put(solutionSet, sset);
             
@@ -427,11 +421,8 @@ public class SparqlCache implements ISparqlCache {
         if (sset != null)
             throw new RuntimeException("Exists: " + solutionSet);
         
-        final IMemoryManager mmrgr = getMemoryManager()
-                .createAllocationContext();
-
-        sset = new SolutionSetMetadata(solutionSet, mmrgr,
-                params == null ? getDefaultMetadata() : params);
+        sset = new SolutionSetMetadata(solutionSet, getStore(),
+                params == null ? getDefaultMetadata() : params, false/* readOnly */);
 
         cacheMap.put(solutionSet, sset);
 

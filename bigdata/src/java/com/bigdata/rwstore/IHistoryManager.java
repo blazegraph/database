@@ -93,4 +93,12 @@ public interface IHistoryManager {
             ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
             int byteCount);
 
+    /**
+     * If history is retained this returns the time for which data was most
+     * recently released. No request can be made for data earlier than this.
+     * 
+     * @return latest data release time
+     */
+    public long getLastReleaseTime();
+    
 }

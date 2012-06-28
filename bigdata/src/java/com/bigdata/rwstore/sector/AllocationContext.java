@@ -412,10 +412,10 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		throw new UnsupportedOperationException();
 	}
 
-	@Override
-	public void setRetention(final long parseLong) {
-		throw new UnsupportedOperationException();
-	}
+//	@Override
+//	public void setRetention(final long parseLong) {
+//		throw new UnsupportedOperationException();
+//	}
 
 	@Override
 	public boolean isCommitted(final long addr) {

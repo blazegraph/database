@@ -302,8 +302,8 @@ public class LoadNamedGraphs extends SampleCode {
     	final StringBuilder sb = new StringBuilder();
     	
     	((RWStrategy) ((Journal) sail.getDatabase()
-				.getIndexManager()).getBufferStrategy()).getRWStore()
-				.getStorageStats().showStats(sb);
+				.getIndexManager()).getBufferStrategy()).getStore()
+				.showAllocators(sb);
     	
     	System.err.println(sb.toString());
 

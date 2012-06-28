@@ -514,14 +514,14 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			try {
 
-				byte[] buf = new byte[1024]; // 2Mb buffer of random data
+				final byte[] buf = new byte[1024]; // 2Mb buffer of random data
 				r.nextBytes(buf);
 
-				ByteBuffer bb = ByteBuffer.wrap(buf);
+				final ByteBuffer bb = ByteBuffer.wrap(buf);
 
-				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+				final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bs.getRWStore();
+				final RWStore rw = bs.getStore();
 
 				long faddr1 = bs.write(bb);
 				bb.position(0);
@@ -565,25 +565,25 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			try {
 
-				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
-				ArrayList<Integer> sizes = new ArrayList<Integer>();
-				TreeMap<Long, Integer> paddrs = new TreeMap<Long, Integer>();
+				final RWStore rw = bufferStrategy.getStore();
+				final ArrayList<Integer> sizes = new ArrayList<Integer>();
+				final TreeMap<Long, Integer> paddrs = new TreeMap<Long, Integer>();
 				for (int i = 0; i < 100000; i++) {
-					int s = r.nextInt(250) + 1;
+					final int s = r.nextInt(250) + 1;
 					sizes.add(s);
-					int a = rw.alloc(s, null);
-					long pa = rw.physicalAddress(a);
+					final int a = rw.alloc(s, null);
+					final long pa = rw.physicalAddress(a);
 					assertTrue(paddrs.get(pa) == null);
 					paddrs.put(pa, a);
 				}
 
 				for (int i = 0; i < 50; i++) {
-					int s = r.nextInt(500) + 1;
+					final int s = r.nextInt(500) + 1;
 					sizes.add(s);
-					int a = rw.alloc(s, null);
-					long pa = rw.physicalAddress(a);
+					final int a = rw.alloc(s, null);
+					final long pa = rw.physicalAddress(a);
 					paddrs.put(pa, a);
 				}
 
@@ -609,11 +609,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			try {
 
-				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
-				long numAllocs = rw.getTotalAllocations();
-				long startAllocations = rw.getTotalAllocationsSize();
+				final RWStore rw = bufferStrategy.getStore();
+				final long numAllocs = rw.getTotalAllocations();
+				final long startAllocations = rw.getTotalAllocationsSize();
 				long faddr = allocBatch(rw, 1000, 275, 320);
 				faddr = allocBatch(rw, 10000, 90, 128);
 				faddr = allocBatch(rw, 20000, 45, 64);
@@ -727,7 +727,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
+				RWStore rw = bufferStrategy.getStore();
 				long numAllocs = rw.getTotalAllocations();
 				long startAllocations = rw.getTotalAllocationsSize();
 
@@ -737,7 +737,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 				store = new Journal(properties);
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
-				rw = bufferStrategy.getRWStore();
+				rw = bufferStrategy.getStore();
 
 				reallocBatch(rw, 1000, 100, 1000);
 
@@ -745,7 +745,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 				store = new Journal(properties);
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
-				rw = bufferStrategy.getRWStore();
+				rw = bufferStrategy.getStore();
 
 				reallocBatch(rw, 1000, 100, 1000);
 
@@ -753,7 +753,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 				store = new Journal(properties);
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
-				rw = bufferStrategy.getRWStore();
+				rw = bufferStrategy.getStore();
 
 				if(log.isInfoEnabled())
 				    log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
@@ -794,7 +794,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
+				RWStore rw = bufferStrategy.getStore();
 
 				final int tcount = 5000; // increase to ramp up stress levels
 
@@ -837,7 +837,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				rw = bufferStrategy.getRWStore();
+				rw = bufferStrategy.getStore();
 
 				if(log.isInfoEnabled())log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
 						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
@@ -858,13 +858,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		
 		public void testAllocationContexts() {
 			
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
 
 			try {
 
-				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
+				final RWStore rw = bufferStrategy.getStore();
 				
 				IAllocationContext cntxt1 = new IAllocationContext() {};
 				
@@ -897,7 +897,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			
 		    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-			final RWStore rw = bufferStrategy.getRWStore();
+			final RWStore rw = bufferStrategy.getStore();
 
 			if(log.isInfoEnabled())log.info("Fixed Allocators: " + rw.getFixedAllocatorCount() + ", heap allocated: "
 					+ rw.getFileStorage() + ", utilised bytes: " + rw.getAllocatedSlots() + ", file length: "
@@ -912,21 +912,21 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				boolean reopen) {
 			allocChar = (byte) (allocChar + 1);
 
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			byte[] buf = new byte[sze + 4]; // extra for checksum
+			final byte[] buf = new byte[sze + 4]; // extra for checksum
 			// r.nextBytes(buf);
 			for (int i = 0; i < buf.length; i++) {
 				buf[i] = allocChar;
 			}
 
-			RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 
-			long[] addr = new long[grp / 5];
-			int[] szes = new int[grp];
+			final long[] addr = new long[grp / 5];
+			final int[] szes = new int[grp];
 			for (int i = 0; i < grp; i++) {
 				szes[i] = min + r.nextInt(sze - min);
-				ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
+				final ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
 				if (i % 5 == 0)
 					addr[i / 5] = bs.write(bb);
 			}
@@ -944,7 +944,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 						throw new RuntimeException("problem handling read: " + i + " in test: " + t + " from address: "
 								+ old, e);
 					}
-					ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
+					final ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
 					addr[i] = bs.write(bb);
 					bb.flip();
 					bs.delete(old);
@@ -972,9 +972,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final int tcount = 1000; // increase to ramp up stress levels
 
-				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
+				final RWStore rw = bufferStrategy.getStore();
 
 				long numAllocs = rw.getTotalAllocations();
 				long startAllocations = rw.getTotalAllocationsSize();
@@ -1044,26 +1044,28 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * allocation
 		 */
 		public void test_blob_allocs() {
-			if (false) {
-				return;
-			}
+//			if (false) {
+//				return;
+//			}
 
 			final Journal store = (Journal) getStore();
 
 			try {
 
-				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bufferStrategy.getRWStore();
-				long numAllocs = rw.getTotalAllocations();
-				long startAllocations = rw.getTotalAllocationsSize();
-				int startBlob = 1024 * 256;
-				int endBlob = 1024 * 1256;
-				int[] faddrs = allocBatchBuffer(rw, 100, startBlob, endBlob);
+				final RWStore rw = bufferStrategy.getStore();
+				final long numAllocs = rw.getTotalAllocations();
+				final long startAllocations = rw.getTotalAllocationsSize();
+				final int startBlob = 1024 * 256;
+				final int endBlob = 1024 * 1256;
+				final int[] faddrs = allocBatchBuffer(rw, 100, startBlob, endBlob);
 
-				final StringBuilder str = new StringBuilder();
-				rw.getStorageStats().showStats(str);
-				if(log.isInfoEnabled())log.info(str);
+                if (log.isInfoEnabled()) {
+                    final StringBuilder str = new StringBuilder();
+                    rw.showAllocators(str);
+                    log.info(str);
+				}
 			} finally {
 
 				store.destroy();
@@ -1083,15 +1085,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			try {
 				final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-				final RWStore rw = bs.getRWStore();
+				final RWStore rw = bs.getStore();
 
-				byte[] buf = new byte[2 * 1024 * 1024]; // 5Mb buffer of random
+				final byte[] buf = new byte[2 * 1024 * 1024]; // 5Mb buffer of random
 														// data
 				r.nextBytes(buf);
 
-				ByteBuffer bb = ByteBuffer.wrap(buf);
+				final ByteBuffer bb = ByteBuffer.wrap(buf);
 
-				long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+				final long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
 				if(log.isInfoEnabled())log.info("Blob Allocation at " + rw.convertFromAddr(faddr));
 
@@ -1145,7 +1147,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-				final RWStore rw = bs.getRWStore();
+				final RWStore rw = bs.getStore();
 
 				long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
@@ -1296,9 +1298,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			Journal store = (Journal) getStore();
             try {
 
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 			long realAddr = 0;
 				for (int i = 0; i < 100000; i++) {
 					int allocAddr = rw.metaAlloc();
@@ -1331,18 +1333,18 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		public void test_allocationContexts() throws IOException {
 			Journal store = (Journal) getStore();
 			try {
-				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			    final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-				RWStore rw = bs.getRWStore();
+				final RWStore rw = bs.getStore();
 
 				// JournalShadow shadow = new JournalShadow(store);
 
 				// Create a couple of contexts
-				IAllocationContext allocContext1 = new DummyAllocationContext();
-				IAllocationContext allocContext2 = new DummyAllocationContext();
+				final IAllocationContext allocContext1 = new DummyAllocationContext();
+				final IAllocationContext allocContext2 = new DummyAllocationContext();
 
-				int sze = 650;
-				byte[] buf = new byte[sze + 4]; // extra for checksum
+				final int sze = 650;
+				final byte[] buf = new byte[sze + 4]; // extra for checksum
 				r.nextBytes(buf);
 
 				long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
@@ -1443,13 +1445,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 		
-		private void commitSomeData(Journal store) {
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+		private void commitSomeData(final Journal store) {
+			
+		    final IRWStrategy bs = (IRWStrategy) store.getBufferStrategy();
 
-			RWStore rw = bs.getRWStore();
+//			final IStore rw = bs.getStore();
 
 			// byte[] buf = new byte[r.nextInt(1024)]; // extra for checksum
-			byte[] buf = new byte[863]; // extra for checksum
+			final byte[] buf = new byte[863]; // extra for checksum
+			
 			r.nextBytes(buf);
 
 			bs.write(ByteBuffer.wrap(buf));
@@ -1464,7 +1468,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			final RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 			// long realAddr = 0;
 				// allocBatch(store, 1, 32, 650, 100000000);
 				allocBatch(store, 1, 32, 650, 50000);
@@ -1493,12 +1497,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			final Journal store = (Journal) getStore();
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-			final RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 
-			byte[] buf = new byte[300]; // Just some data
+			final byte[] buf = new byte[300]; // Just some data
 			r.nextBytes(buf);
 
-			ByteBuffer bb = ByteBuffer.wrap(buf);
+			final ByteBuffer bb = ByteBuffer.wrap(buf);
 
 			long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
@@ -1508,7 +1512,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			bb.position(0);
 
-			ByteBuffer rdBuf = bs.read(faddr);
+			final ByteBuffer rdBuf = bs.read(faddr);
 
 			// should be able to successfully read from freed address
 			assertEquals(bb, rdBuf);
@@ -1535,15 +1539,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			final Journal store = (Journal) getStore();
 			try {
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-			final RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 
-			byte[] buf = new byte[300]; // Just some data
+			final byte[] buf = new byte[300]; // Just some data
 			r.nextBytes(buf);
 
-			ByteBuffer bb = ByteBuffer.wrap(buf);
+			final ByteBuffer bb = ByteBuffer.wrap(buf);
 			
-			IRawTx tx = rw.newTx();
-			ArrayList<Long> addrs = new ArrayList<Long>();
+			final IRawTx tx = rw.newTx();
+			final ArrayList<Long> addrs = new ArrayList<Long>();
 			
 			// We just want to stress a single allocator, so make 5000
 			// allocations to force multiple allocBlocks.
@@ -1594,9 +1598,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			Journal store = (Journal) getStore();
             try {
 
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			RWStore rw = bs.getRWStore();
+			final RWStore rw = bs.getStore();
 			long realAddr = 0;
 				// allocBatch(store, 1, 32, 650, 100000000);
 				pureAllocBatch(store, 1, 32, rw.m_maxFixedAlloc - 4, 30000); // cover
@@ -1619,9 +1623,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		private long allocBatch(Journal store, int tsts, int min, int sze, int grp) {
 
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			byte[] buf = new byte[sze + 4]; // extra for checksum
+			final byte[] buf = new byte[sze + 4]; // extra for checksum
 			r.nextBytes(buf);
 
 			for (int i = 0; i < grp; i++) {
@@ -1636,16 +1640,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		/*
 		 * Allocate tests but save 50% to re-alloc
 		 */
-		private long pureAllocBatch(Journal store, int tsts, int min, int sze, int grp) {
+		private long pureAllocBatch(final Journal store, final int tsts, int min, int sze, int grp) {
 
-			RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+		    final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-			RWStore rw = bs.getRWStore();
-			int freeAddr[] = new int[512];
+			final RWStore rw = bs.getStore();
+			final int freeAddr[] = new int[512];
 			int freeCurs = 0;
 			for (int i = 0; i < grp; i++) {
-				int alloc = min + r.nextInt(sze - min);
-				int addr = rw.alloc(alloc, null);
+				final int alloc = min + r.nextInt(sze - min);
+				final int addr = rw.alloc(alloc, null);
 
 				if (i % 3 != 0) { // make avail 2 out of 3 for realloc
 					freeAddr[freeCurs++] = addr;
@@ -1805,7 +1809,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		        	Thread.currentThread().sleep(200);
 	        	}
 	        	
-				final String fname = bs.getRWStore().getStoreFile().getAbsolutePath();
+				final String fname = bs.getStore().getStoreFile().getAbsolutePath();
 				
 	        	store.close();
 	        	

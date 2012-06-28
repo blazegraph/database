@@ -1048,13 +1048,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Flushes the write cache (if enabled).
+     * {@inheritDoc}
+     * <p>
+     * This implementation flushes the write cache (if enabled).
      * 
      * @todo Should be a NOP for the WORM? Check
      *       {@link AbstractJournal#commitNow(long)}
      */
     @Override
-    public void commit(IJournal journal) {
+    public void commit() {
 
         flushWriteCache();
 

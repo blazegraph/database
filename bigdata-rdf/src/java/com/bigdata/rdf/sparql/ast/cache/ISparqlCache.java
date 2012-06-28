@@ -82,12 +82,14 @@ public interface ISparqlCache {
     void createSolutions(String solutionSet, ISPO[] params);
 
     /**
-     * Save the solutions a named solution set.
+     * Save the solutions into a named solution set.
      * 
      * @param solutionSet
      *            The name of the solution set.
      * @param src
      *            The solutions.
+     * 
+     *            TODO Is this APPEND or REPLACE?
      */
 	void putSolutions(String solutionSet, ICloseableIterator<IBindingSet[]> src);
 

@@ -1559,7 +1559,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 
                 if (strategy instanceof RWStrategy) {
                 
-                    final RWStore store = ((RWStrategy) strategy).getRWStore();
+                    final RWStore store = ((RWStrategy) strategy).getStore();
                     
                     store.showAllocators(sb);
                     

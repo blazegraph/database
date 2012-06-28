@@ -344,7 +344,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * re-computing the closure.
      * <p>
      * Note: This method does NOT commit the database. See
-     * {@link ITripleStore#commit()} and {@link #getTripleStore()}.
+     * {@link AbstractTripleStore#commit()} and {@link #getTripleStore()}.
      * 
      * @see #removeAllEntailments()
      */

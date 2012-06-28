@@ -32,10 +32,6 @@ import java.util.Properties;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.rwstore.RWStore;
 
 /**
@@ -79,7 +75,7 @@ public class VerifyCommitRecordIndex {
         }
         
         final RWStrategy rwstrategy = (RWStrategy) jrnl.getBufferStrategy();
-        final RWStore rwstore = rwstrategy.getRWStore();
+        final RWStore rwstore = rwstrategy.getStore();
         
         final IIndex commitRecordIndex = jrnl.getReadOnlyCommitRecordIndex();
         if (commitRecordIndex == null) {
@@ -94,7 +90,7 @@ public class VerifyCommitRecordIndex {
                 .serializeKey(0L);
 
         final byte[] releaseKey = metadata.getTupleSerializer()
-                .serializeKey( rwstore.getLastDeferredReleaseTime());
+                .serializeKey( rwstore.getLastReleaseTime());
 
         final int removed = jrnl.removeCommitRecordEntries(zeroKey, releaseKey);
         

@@ -47,7 +47,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -1474,7 +1473,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	    free(laddr, sze, null/* AlocationContext */);
 	    
 	}
-	private long m_unsafeFrees = 0;
+//	private long m_unsafeFrees = 0;
     /**
      * free
      * <p>
@@ -1588,7 +1587,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * either a positive activeTxCount incremented by the TransactionManager
 	 * or if there are active AllocationContexts.
 	 * 
-	 * The activeTxCount esentially protects read-only transactions while the
+	 * The activeTxCount essentially protects read-only transactions while the
 	 * AllocationContexts enable concurrent store allocations, whilst also
 	 * supporting immediate re-cycling of localized allocations (those made
 	 * and released within the same AllocationContext).
@@ -2151,7 +2150,7 @@ public class RWStore implements IStore, IBufferedWriter {
 //		return "RWStore " + s_version;
 //	}
 
-	public void commitChanges(final AbstractJournal journal) {
+	public void commit() {
 	    assertOpen();
 		checkCoreAllocations();
 
@@ -2167,13 +2166,13 @@ public class RWStore implements IStore, IBufferedWriter {
 //			}
 			// free old storageStatsAddr
 			if (m_storageStatsAddr != 0) {
-				int len = (int) (m_storageStatsAddr & 0xFFFF);				
-				int addr = (int) (m_storageStatsAddr >> 16);
-            	immediateFree(addr, len);
+				final int len = (int) (m_storageStatsAddr & 0xFFFF);				
+				final int addr = (int) (m_storageStatsAddr >> 16);
+            	    immediateFree(addr, len);
 			}
 			if (m_storageStats != null) {
-				byte[] buf = m_storageStats.getData();
-				long addr = alloc(buf, buf.length, null);
+				final byte[] buf = m_storageStats.getData();
+				final long addr = alloc(buf, buf.length, null);
 				m_storageStatsAddr = (addr << 16) + buf.length;
 			}
 			
@@ -2827,6 +2826,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * <dt>%StoreFile</dt><dd>How much of the backing file is reserved for each allocator (BytesReserved/Sum(BytesReserved)).</dd>
 	 * <dt>%StoreWaste</dt><dd>How much of the total waste on the store is waste for this allocator size ((BytesReserved-BytesAppData)/(Sum(BytesReserved)-Sum(BytesAppData))).</dd>
 	 * </dl>
+	 * @see StorageStats#showStats(StringBuilder)
 	 */
 	public void showAllocators(final StringBuilder str) {
 		m_storageStats.showStats(str);
@@ -2886,32 +2886,32 @@ public class RWStore implements IStore, IBufferedWriter {
 //        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
     }
 	
-	private String padLeft(String str, int minlen) {
-		if (str.length() >= minlen)
-			return str;
-		
-		StringBuffer out = new StringBuffer();
-		int pad = minlen - str.length();
-		while (pad-- > 0) {
-			out.append(' ');
-		}
-		out.append(str);
-		
-		return out.toString();
-	}
-	private String padRight(String str, int minlen) {
-		if (str.length() >= minlen)
-			return str;
-		
-		StringBuffer out = new StringBuffer();
-		out.append(str);
-		int pad = minlen - str.length();
-		while (pad-- > 0) {
-			out.append(' ');
-		}
-		
-		return out.toString();
-	}
+//	private String padLeft(String str, int minlen) {
+//		if (str.length() >= minlen)
+//			return str;
+//		
+//		StringBuffer out = new StringBuffer();
+//		int pad = minlen - str.length();
+//		while (pad-- > 0) {
+//			out.append(' ');
+//		}
+//		out.append(str);
+//		
+//		return out.toString();
+//	}
+//	private String padRight(String str, int minlen) {
+//		if (str.length() >= minlen)
+//			return str;
+//		
+//		StringBuffer out = new StringBuffer();
+//		out.append(str);
+//		int pad = minlen - str.length();
+//		while (pad-- > 0) {
+//			out.append(' ');
+//		}
+//		
+//		return out.toString();
+//	}
 
 //	public ArrayList<Allocator> getStorageBlockAddresses() {
 //		final ArrayList<Allocator> addrs = new ArrayList<Allocator>(m_allocs.size());
@@ -4575,13 +4575,13 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_writeCache.getCounters();
 	}
 
-	/**
-	 * If historical data is maintained then this will return the earliest time for which
-	 * data can be safely retrieved.
-	 * 
-	 * @return time of last release
-	 */
-	public long getLastDeferredReleaseTime() {
+//	/**
+//	 * If historical data is maintained then this will return the earliest time for which
+//	 * data can be safely retrieved.
+//	 * 
+//	 * @return time of last release
+//	 */
+	public long getLastReleaseTime() {
 		return m_lastDeferredReleaseTime;
 	}
 
@@ -4627,8 +4627,10 @@ public class RWStore implements IStore, IBufferedWriter {
         }
 	}
 
-	public boolean inWriteCache(int rwaddr) {
-		return m_writeCache.isPresent(physicalAddress(rwaddr, true));
+	public boolean inWriteCache(final int rwaddr) {
+		
+	    return m_writeCache.isPresent(physicalAddress(rwaddr, true));
+	    
 	}
 
 	public InputStream getInputStream(long addr) {

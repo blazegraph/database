@@ -902,7 +902,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 case MemStore: {
 
                     _bufferStrategy = new MemStrategy(new MemoryManager(
-                            DirectBufferPool.INSTANCE), properties);
+                            DirectBufferPool.INSTANCE,
+                            Integer.MAX_VALUE/* maxSectors */, properties));
 
                     break;
 
@@ -2558,7 +2559,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * until commit, leading to invalid addresses for recent store
 			 * allocations.
 			 */
-			_bufferStrategy.commit(this);
+			_bufferStrategy.commit();
 
 			/*
 			 *  next offset at which user data would be written.

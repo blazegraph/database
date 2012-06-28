@@ -78,7 +78,8 @@ import com.bigdata.util.ChecksumError;
  * 
  * @author Martyn Cutcher
  */
-public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy, IRWStrategy {
+public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
+        IHABufferStrategy, IRWStrategy {
 
     private static final transient Logger log = Logger.getLogger(RWStrategy.class);
 
@@ -427,9 +428,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		
 	}
 
-    public void commit(final IJournal journal) {
+	@Override
+    public void commit() {
 
-        m_store.commitChanges((Journal) journal); // includes a force(false)
+        m_store.commit();
         
 	}
 	
@@ -587,17 +589,24 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         
     }
 	
-	/**
-	 * Used for unit tests, could also be used to access raw statistics.
-	 * 
-	 * @return the associated RWStore
-	 */
-	public RWStore getRWStore() {
-		
-	    return m_store;
-	    
-	}
+//	/**
+//	 * Used for unit tests, could also be used to access raw statistics.
+//	 * 
+//	 * @return the associated RWStore
+//	 */
+//    @Deprecated
+//	public RWStore getRWStore() {
+//		
+//	    return m_store;
+//	    
+//	}
 
+    public RWStore getStore() {
+
+        return m_store;
+
+    }
+    
     public long getPhysicalAddress(final long addr) {
 
         final int rwaddr = decodeAddr(addr);        
@@ -671,14 +680,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return true;
 	}
 
-	/**
-	 * If history is retained this returns the time for which
-	 * data was most recently released.  No request can be made for data
-	 * earlier than this.
-	 * @return latest data release time
-	 */
+//	/**
+//	 * If history is retained this returns the time for which
+//	 * data was most recently released.  No request can be made for data
+//	 * earlier than this.
+//	 * @return latest data release time
+//	 */
+	@Override
 	public long getLastReleaseTime() {
-		return m_store.getLastDeferredReleaseTime();
+		return m_store.getLastReleaseTime();
 	}
 
 	/**

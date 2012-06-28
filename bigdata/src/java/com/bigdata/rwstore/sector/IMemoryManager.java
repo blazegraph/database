@@ -221,6 +221,10 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 	 */
 	public void clear();
 
+//  public void close();
+//
+//    public void commit();
+
     /**
      * Create a child allocation context within which the caller may make and
      * release allocations.
@@ -299,13 +303,9 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
      */
     public int getMaxSectors();
 
-//	public void close();
-
-	public void commit();
-
 //	public long saveDeferrals();
 
-	public long getLastReleaseTime();
+//	public long getLastReleaseTime();
 
 //	public void abortContext(IAllocationContext context);
 //
@@ -313,7 +313,7 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 //
 //	public void registerContext(IAllocationContext context);
 
-	public void setRetention(long parseLong);
+//	public void setRetention(long parseLong);
 
     /**
      * Return <code>true</code> iff the allocation having that address is

@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -235,7 +236,64 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 *             if <i>sectors</i> is non-positive.
 	 */
     public MemoryManager(final DirectBufferPool pool, final int sectors) {
-		
+
+        this(pool, sectors, null/* properties */);
+        
+    }
+
+    /**
+     * Create a new {@link MemoryManager}.
+     * <p>
+     * The backing {@link DirectBufferPool} may be either bounded or
+     * (effectively) unbounded. The {@link MemoryManager} may also be bounded or
+     * (effectively) unbounded. If either the pool or the memory manager is
+     * bounded, then <em>blocking</em> allocation requests may block. Neither
+     * non-blocking allocation requests nor allocation requests made against an
+     * unbounded memory manager backed by an unbounded pool will block. The
+     * preferred method for bounding the memory manager is to specify a maximum
+     * #of buffers which it may consume from the pool.
+     * <p>
+     * The garbage collection of direct {@link ByteBuffer}s depends on a full GC
+     * pass. In an application which managers its heap pressure well, full GC
+     * passes are rare. Therefore, the best practice is to share an unbounded
+     * pool across multiple purposes. Since there are typically multiple users
+     * of the pool, the demand can not always be predicated and deadlocks can
+     * arise with a bounded pool.
+     * <p>
+     * Individual buffers will be allocated as necessary and released if they
+     * become empty. However, since allocation patterns may cause the in use
+     * data to be scattered across the allocated buffers, the backing buffers
+     * may not be returned to the backing pool until the top-level allocation
+     * context is cleared.
+     * <p>
+     * Any storage allocated by this instance will be released no later than
+     * when the instance is {@link #finalize() finalized}. Storage may be
+     * returned to the pool within the life cycle of the {@link MemoryManager}
+     * using {@link #clear()}. Nested allocation contexts may be created and
+     * managed using {@link #createAllocationContext()}.
+     * 
+     * @param pool
+     *            The pool from which the {@link MemoryManager} will allocate
+     *            its buffers (each "sector" is one buffer).
+     * @param sectors
+     *            The maximum #of buffers which the {@link MemoryManager} will
+     *            allocate from that pool (each "sector" is one buffer). This
+     *            may be {@link Integer#MAX_VALUE} for an effectively unbounded
+     *            capacity.
+     * @param properties
+     *            Used to communicate various configuration properties,
+     *            including
+     *            {@link AbstractTransactionService.Options#MIN_RELEASE_AGE}
+     *            (optional).
+     *            
+     * @throws IllegalArgumentException
+     *             if <i>pool</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>sectors</i> is non-positive.
+     */
+    public MemoryManager(final DirectBufferPool pool, final int sectors,
+            final Properties properties) {
+            
 		if (pool == null)
 			throw new IllegalArgumentException();
 		
@@ -251,6 +309,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		m_sectorSize = pool.getBufferCapacity();
 		
 		m_deferredFreeOut = PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*allow for checksum*/, null);
+		
+        // store minimum release age
+        if (properties != null) {
+            m_retention = Long.parseLong(properties.getProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE,
+                    AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE));
+        }
+
 	}
 
 	protected void finalize() throws Throwable {
@@ -1076,13 +1142,16 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
-	public void free(long addr, int size) {
-		free((addr << 32) + size);
+	public void free(final long addr, final int size) {
+
+	    free((addr << 32) + size);
+	    
 	}
 
 	@Override
-	public int getAssociatedSlotSize(int addr) {
-		final SectorAllocator sector = getSector(addr);
+	public int getAssociatedSlotSize(final int addr) {
+
+	    final SectorAllocator sector = getSector(addr);
 		
 		final int offset = SectorAllocator.getSectorOffset(addr);
 		
@@ -1133,20 +1202,20 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
 	private int m_cachedDatasize = 0;
 
-	private long m_lastReleaseTime;
+//	private long m_lastReleaseTime;
 
 	private long m_lastDeferredReleaseTime = 0;
-	/**
-	 * Call made from AbstractJournal to register the cache used.  This can then
-	 * be accessed to clear entries when storage is made availabel for re-cycling.
-	 * 
-	 * It is not safe to clear at the point of the delete request since the data
-	 * could still be loaded if the data is retained for a period due to a non-zero
-	 * retention period or session protection.
-	 * 
-	 * @param externalCache - used by the Journal to cache historical BTree references
-	 * @param dataSize - the size of the checkpoint data (fixed for any version)
-	 */
+//	/**
+//	 * Call made from AbstractJournal to register the cache used.  This can then
+//	 * be accessed to clear entries when storage is made availabel for re-cycling.
+//	 * 
+//	 * It is not safe to clear at the point of the delete request since the data
+//	 * could still be loaded if the data is retained for a period due to a non-zero
+//	 * retention period or session protection.
+//	 * 
+//	 * @param externalCache - used by the Journal to cache historical BTree references
+//	 * @param dataSize - the size of the checkpoint data (fixed for any version)
+//	 */
 	public void registerExternalCache(
 			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
 		
@@ -1175,7 +1244,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 
-	private int getSlotSize(int size) {
+	private int getSlotSize(final int size) {
 		return SectorAllocator.getBlockForSize(size);
 	}
 
@@ -1454,11 +1523,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public long getLastReleaseTime() {
-		return m_lastReleaseTime;
+		return m_lastDeferredReleaseTime;
 	}
 
 	@Override
-	public void abortContext(IAllocationContext context) {
+	public void abortContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
 			final AllocationContext alloc = m_contexts.remove(context);
@@ -1477,7 +1546,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
-	public void detachContext(IAllocationContext context) {
+	public void detachContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
 			final AllocationContext alloc = m_contexts.remove(context);
@@ -1498,7 +1567,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	@Override
-	public void registerContext(IAllocationContext context) {
+	public void registerContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
 			establishContextAllocation(context);
@@ -1583,10 +1652,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 * given size against a new sector.
 	 */
 
-	@Override
-	public void setRetention(final long retention) {
-		m_retention = retention;
-	}
+//	@Override
+//	public void setRetention(final long retention) {
+//		m_retention = retention;
+//	}
 
 	@Override
 	public boolean isCommitted(final long addr) {
