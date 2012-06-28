@@ -41,7 +41,6 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.rwstore.IStore;
 import com.bigdata.rwstore.PSOutputStream;
 
 /**

@@ -3580,15 +3580,17 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 	
-	/**
-     * The ContextAllocation object manages a freeList of associated allocators
-     * and an overall list of allocators. When the context is detached, all
-     * allocators must be released and any that has available capacity will be
-     * assigned to the global free lists.
-	 * 	See {@link AllocBlock #releaseSession}
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The {@link ContextAllocation} object manages a freeList of associated
+     * allocators and an overall list of allocators. When the context is
+     * detached, all allocators must be released and any that has available
+     * capacity will be assigned to the global free lists. See
+     * {@link AllocBlock #releaseSession}
      * 
      * @param context
-     *            The context to be released from all FixedAllocators.
+     *            The context to be released from all {@link FixedAllocator}s.
      */
 	public void detachContext(final IAllocationContext context) {
 	    assertOpen();
@@ -3694,7 +3696,7 @@ public class RWStore implements IStore, IBufferedWriter {
          * 
          * @param encodeAddr
          */
-        public void deferFree(long encodeAddr) {
+        public void deferFree(final long encodeAddr) {
 			m_deferredFrees.add(encodeAddr);
 		}
 
@@ -3732,9 +3734,6 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_deferredFrees.clear();
 		}
 		
-        /**
-         * TODO
-         */
         void abort() {
             final ArrayList<FixedAllocator> freeFixed[] = m_parent != null ? m_parent.m_freeFixed
                     : m_store.m_freeFixed;

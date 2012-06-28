@@ -634,7 +634,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * B+Tree backed by a different shadow journal.]
                  */
                             	
-                if ((resourceManager.getLiveJournal().getBufferStrategy() instanceof RWStrategy)) {
+                if ((resourceManager.getLiveJournal().getBufferStrategy() instanceof IRWStrategy)) {
                     /*
                      * Note: Do NOT use the name2Addr cache for the RWStore.
                      * Each unisolated index view MUST be backed by a shadow
@@ -2653,9 +2653,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.write(data, this);
         }
 
-        public long write(final ByteBuffer data, final long oldAddr) {
-            return delegate.write(data, oldAddr, this);
-        }
+//        @Override
+//        public long write(final ByteBuffer data, final long oldAddr) {
+//            return delegate.write(data, oldAddr, this);
+//        }
 
         public void delete(final long addr) {
             delegate.delete(addr, this);
@@ -3010,9 +3011,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             throw new UnsupportedOperationException();
         }       
 
-        public long write(ByteBuffer data, long oldAddr) {
-            throw new UnsupportedOperationException();
-        }
+//        @Override
+//        public long write(ByteBuffer data, long oldAddr) {
+//            throw new UnsupportedOperationException();
+//        }
         
         public void delete(long addr) {
             throw new UnsupportedOperationException();

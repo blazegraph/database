@@ -123,23 +123,23 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess {
      */
     public long write(ByteBuffer data);
     
- 	/**
-     * 
-     * @param data
-     *            The data. The bytes from the current
-     *            {@link ByteBuffer#position()} to the
-     *            {@link ByteBuffer#limit()} will be written and the
-     *            {@link ByteBuffer#position()} will be advanced to the
-     *            {@link ByteBuffer#limit()} . The caller may subsequently
-     *            modify the contents of the buffer without changing the state
-     *            of the store (i.e., the data are copied into the store).
-     * @param oldAddr as returned from a previous write of the same object, or zero if a new write
-     * 
-     * @return  A long integer formed that encodes both the offset from which the
-     *         data may be read and the #of bytes to be read. See
-     *         {@link IAddressManager}.
-     */
-    public long write(ByteBuffer data, long oldAddr);
+// 	/**
+//     * 
+//     * @param data
+//     *            The data. The bytes from the current
+//     *            {@link ByteBuffer#position()} to the
+//     *            {@link ByteBuffer#limit()} will be written and the
+//     *            {@link ByteBuffer#position()} will be advanced to the
+//     *            {@link ByteBuffer#limit()} . The caller may subsequently
+//     *            modify the contents of the buffer without changing the state
+//     *            of the store (i.e., the data are copied into the store).
+//     * @param oldAddr as returned from a previous write of the same object, or zero if a new write
+//     * 
+//     * @return  A long integer formed that encodes both the offset from which the
+//     *         data may be read and the #of bytes to be read. See
+//     *         {@link IAddressManager}.
+//     */
+//    public long write(ByteBuffer data, long oldAddr);
 
     /**
      * Delete the data (unisolated).

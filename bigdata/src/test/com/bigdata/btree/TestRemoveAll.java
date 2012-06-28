@@ -313,10 +313,12 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 			return delegate.toString(addr);
 		}
 
-		public long write(ByteBuffer data, long oldAddr) {
-			return delegate.write(data, oldAddr);
-		}
+//		@Override
+//		public long write(ByteBuffer data, long oldAddr) {
+//			return delegate.write(data, oldAddr);
+//		}
 
+		@Override
 		public long write(ByteBuffer data) {
 			return delegate.write(data);
 		}

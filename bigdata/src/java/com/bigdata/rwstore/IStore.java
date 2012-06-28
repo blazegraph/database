@@ -25,18 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 import java.io.File;
-import java.io.InputStream;
-
-import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ICommitter;
 
 /**
- * The IStore interface provides persistent file-backed storage. It can be used
- * as a standalone utility, but has been primarily designed to support the
- * Generic Persistent Object model.
+ * The {@link IStore} interface provides persistent storage abstraction for
+ * fixed size allocations and allocation recycling.
  */
-public interface IStore {
+public interface IStore extends IAllocationManager, IStreamStore,
+        IHistoryManager {
 	
 //	/**************************************************************
 //	 * called when used as a server, returns whether facility is enabled
@@ -142,89 +137,86 @@ public interface IStore {
 //	 */
 //	public int registerBlob(int addr);
 
-    public void abortContext(IAllocationContext context);
+//    /**
+//     * Return an output stream which can be used to write on the backing store.
+//     * You can recover the address used to read back the data from the
+//     * {@link IPSOutputStream}.
+//     * 
+//     * @return The output stream.
+//     */
+//    public IPSOutputStream getOutputStream();
+//
+//    /**
+//     * Return an output stream which can be used to write on the backing store
+//     * within the given allocation context. You can recover the address used to
+//     * read back the data from the {@link IPSOutputStream}.
+//     * 
+//     * @param context
+//     *            The context within which any allocations are made by the
+//     *            returned {@link IPSOutputStream}.
+//     *            
+//     * @return an output stream to stream data to and to retrieve an address to
+//     *         later stream the data back.
+//     */
+//    public IPSOutputStream getOutputStream(final IAllocationContext context);
+//
+//    /**
+//     * @return an input stream for the data for provided address
+//     */
+//    public InputStream getInputStream(long addr);
 
-    public void detachContext(IAllocationContext context);
+//    /**
+//     * Call made from AbstractJournal to register the cache used. This can then
+//     * be accessed to clear entries when storage is made available for
+//     * re-cycling.
+//     * <p>
+//     * Note: It is not safe to clear at the point of the delete request since
+//     * the data could still be loaded if the data is retained for a period due
+//     * to a non-zero retention period or session protection.
+//     * 
+//     * @param externalCache
+//     *            - used by the Journal to cache historical BTree references
+//     * @param dataSize
+//     *            - the size of the checkpoint data (fixed for any version)
+//     */
+//    public void registerExternalCache(
+//            ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
+//            int byteCount);
 
-    public void registerContext(IAllocationContext context);
+//    /**
+//     * Saves the current list of delete blocks, returning the address allocated.
+//     * This can be used later to retrieve the addresses of allocations to be
+//     * freed.
+//     * 
+//     * Writes the content of currentTxnFreeList to the store.
+//     * 
+//     * These are the current buffered frees that have yet been saved into a
+//     * block referenced from the deferredFreeList
+//     * 
+//     * @return the address of the deferred addresses saved on the store, or zero
+//     *         if none.
+//     */
+//    public long saveDeferrals();
+//    
+//    /**
+//     * Called prior to commit, so check whether storage can be freed and then
+//     * whether the deferred header needs to be saved.
+//     * <p>
+//     * Note: The caller MUST be holding the {@link #m_allocationLock}.
+//     * <p>
+//     * Note: This method is package private in order to expose it to the unit
+//     * tests.
+//     * 
+//     * returns number of addresses freed
+//     */
+//    public int checkDeferredFrees(AbstractJournal abstractJournal);
 
-    /**
-     * Return an output stream which can be used to write on the backing store.
-     * You can recover the address used to read back the data from the
-     * {@link IPSOutputStream}.
-     * 
-     * @return The output stream.
-     */
-    public IPSOutputStream getOutputStream();
-
-    /**
-     * Return an output stream which can be used to write on the backing store
-     * within the given allocation context. You can recover the address used to
-     * read back the data from the {@link IPSOutputStream}.
-     * 
-     * @param context
-     *            The context within which any allocations are made by the
-     *            returned {@link IPSOutputStream}.
-     *            
-     * @return an output stream to stream data to and to retrieve an address to
-     *         later stream the data back.
-     */
-    public IPSOutputStream getOutputStream(final IAllocationContext context);
-
-    /**
-     * @return an input stream for the data for provided address
-     */
-    public InputStream getInputStream(long addr);
-
-    /**
-     * Call made from AbstractJournal to register the cache used.  This can then
-     * be accessed to clear entries when storage is made availabel for re-cycling.
-     * 
-     * It is not safe to clear at the point of the delete request since the data
-     * could still be loaded if the data is retained for a period due to a non-zero
-     * retention period or session protection.
-     * 
-     * @param externalCache - used by the Journal to cache historical BTree references
-     * @param dataSize - the size of the checkpoint data (fixed for any version)
-     */
-    public void registerExternalCache(
-            ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
-            int byteCount);
-
-    /**
-     * Saves the current list of delete blocks, returning the address allocated.
-     * This can be used later to retrieve the addresses of allocations to be
-     * freed.
-     * 
-     * Writes the content of currentTxnFreeList to the store.
-     * 
-     * These are the current buffered frees that have yet been saved into a
-     * block referenced from the deferredFreeList
-     * 
-     * @return the address of the deferred addresses saved on the store, or zero
-     *         if none.
-     */
-    public long saveDeferrals();
-    
-    /**
-     * Called prior to commit, so check whether storage can be freed and then
-     * whether the deferred header needs to be saved.
-     * <p>
-     * Note: The caller MUST be holding the {@link #m_allocationLock}.
-     * <p>
-     * Note: This method is package private in order to expose it to the unit
-     * tests.
-     * 
-     * returns number of addresses freed
-     */
-    public int checkDeferredFrees(AbstractJournal abstractJournal);
-
-    /**
-     * A hook used to support session protection by incrementing and
-     * decrementing a transaction counter within the {@link IStore}. As long as
-     * a transaction is active we can not release data which is currently marked
-     * as freed but was committed at the point the session started.
-     */
-    public IRawTx newTx();
-
+//    /**
+//     * A hook used to support session protection by incrementing and
+//     * decrementing a transaction counter within the {@link IStore}. As long as
+//     * a transaction is active we can not release data which is currently marked
+//     * as freed but was committed at the point the session started.
+//     */
+//    public IRawTx newTx();
+//
 }

@@ -18,59 +18,60 @@ import com.bigdata.journal.ICommitter;
  * @author Martyn Cutcher
  *
  */
-public interface IRWStrategy extends IBufferStrategy {
-	
-	/**
-	 * @return IRawTx to enable activate/deactvate
-	 */
-	IRawTx newTx();
+public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
+        IAllocationManagerStore, IStreamStore, IHistoryManager {
 
-	void registerContext(IAllocationContext context);
+//	/**
+//	 * @return IRawTx to enable activate/deactvate
+//	 */
+//	IRawTx newTx();
 
-	void detachContext(IAllocationContext context);
+//	void registerContext(IAllocationContext context);
+//
+//	void detachContext(IAllocationContext context);
+//
+//	void abortContext(IAllocationContext context);
 
-	void abortContext(IAllocationContext context);
+//	void registerExternalCache(
+//			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
+//			int byteCount);
 
-	void registerExternalCache(
-			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
-			int byteCount);
+//	long write(ByteBuffer data, long oldAddr, IAllocationContext context);
+//
+//	long write(ByteBuffer data, IAllocationContext context);
+//
+//	void delete(long addr, IAllocationContext context);
 
-	long write(ByteBuffer data, long oldAddr, IAllocationContext context);
+//	/**
+//	 * @return an outputstream to stream data to and to retrieve
+//	 * an address to later stream the data back.
+//	 */
+//	public IPSOutputStream getOutputStream();
+//	
+//	/**
+//	 * @param context within which any allocations are made by the
+//	 * returned IPSOutputStream
+//	 * @return an outputstream to stream data to and to retrieve
+//	 * an address to later stream the data back.
+//	 */
+//	public IPSOutputStream getOutputStream(IAllocationContext context);
+//	
+//	/**
+//	 * @return an inputstream for the data for provided address
+//	 */
+//	public InputStream getInputStream(long addr);
 
-	long write(ByteBuffer data, IAllocationContext context);
-
-	void delete(long addr, IAllocationContext context);
-
-	/**
-	 * @return an outputstream to stream data to and to retrieve
-	 * an address to later stream the data back.
-	 */
-	public IPSOutputStream getOutputStream();
-	
-	/**
-	 * @param context within which any allocations are made by the
-	 * returned IPSOutputStream
-	 * @return an outputstream to stream data to and to retrieve
-	 * an address to later stream the data back.
-	 */
-	public IPSOutputStream getOutputStream(IAllocationContext context);
-	
-	/**
-	 * @return an inputstream for the data for provided address
-	 */
-	public InputStream getInputStream(long addr);
-
-	/**
-	 * Called by DeleteBlockCommitter
-	 * 
-	 * @return the address of the deferred release data
-	 */
-	long saveDeferrals();
-
-	/**
-	 * Called from AbstractJournal commitNow
-	 */
-	int checkDeferredFrees(AbstractJournal abstractJournal);
+//	/**
+//	 * Called by DeleteBlockCommitter
+//	 * 
+//	 * @return the address of the deferred release data
+//	 */
+//	long saveDeferrals();
+//
+//	/**
+//	 * Called from AbstractJournal commitNow
+//	 */
+//	int checkDeferredFrees(AbstractJournal abstractJournal);
 
 	/**
 	 * Checked by AbstractJournal for index validation
