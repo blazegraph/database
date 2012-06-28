@@ -28,11 +28,8 @@ import java.util.Properties;
 import com.bigdata.rawstore.IMRMW;
 
 /**
- * <p>
- * An append-only persistence capable data structure supporting atomic commit,
- * scalable named indices, and transactions. Writes are logically appended to
- * the journal to minimize disk head movement.
- * </p>
+ * An persistence capable data structure supporting atomic commit, scalable
+ * named indices, and transactions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
