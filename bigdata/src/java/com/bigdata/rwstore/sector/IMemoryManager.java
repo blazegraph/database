@@ -35,6 +35,7 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
+import com.bigdata.rwstore.IStore;
 
 /**
  * Abstraction for managing data in {@link ByteBuffer}s. Typically those buffers
@@ -54,7 +55,7 @@ import com.bigdata.rwstore.IRawTx;
  * 
  * @author martyncutcher
  */
-public interface IMemoryManager extends ICounterSetAccess {
+public interface IMemoryManager extends IStore, ICounterSetAccess {
 
 	/**
 	 * Allocates space on the backing resource and copies the provided data.
@@ -262,24 +263,24 @@ public interface IMemoryManager extends ICounterSetAccess {
 	 */
 	public long getSlotBytes();
 	
-	/**
-	 * @return an outputstream to stream data to the memory manager and to retrieve
-	 * an address to later stream the data back.
-	 */
-	public IPSOutputStream getOutputStream();
-	
-	/**
-	 * @param context within which any allocations are made by the
-	 * returned IPSOutputStream
-	 * @return an outputstream to stream data to and to retrieve
-	 * an address to later stream the data back.
-	 */
-	public IPSOutputStream getOutputStream(final IAllocationContext context);
-	
-	/**
-	 * @return an inputstream for the data for provided address
-	 */
-	public InputStream getInputStream(long addr);
+//	/**
+//	 * @return an outputstream to stream data to the memory manager and to retrieve
+//	 * an address to later stream the data back.
+//	 */
+//	public IPSOutputStream getOutputStream();
+//	
+//	/**
+//	 * @param context within which any allocations are made by the
+//	 * returned IPSOutputStream
+//	 * @return an outputstream to stream data to and to retrieve
+//	 * an address to later stream the data back.
+//	 */
+//	public IPSOutputStream getOutputStream(final IAllocationContext context);
+//	
+//	/**
+//	 * @return an inputstream for the data for provided address
+//	 */
+//	public InputStream getInputStream(long addr);
 
 	public int getSectorSize();
 
@@ -287,32 +288,42 @@ public interface IMemoryManager extends ICounterSetAccess {
 
 	public int getMaxSectors();
 
-	public void close();
+//	public void close();
 
 	public void commit();
 
-	public void registerExternalCache(
-			ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache,
-			int byteCount);
-
-	public long saveDeferrals();
-
-	public int checkDeferredFrees(AbstractJournal abstractJournal);
-
-	public IRawTx newTx();
+//	public long saveDeferrals();
 
 	public long getLastReleaseTime();
 
-	public void abortContext(IAllocationContext context);
-
-	public void detachContext(IAllocationContext context);
-
-	public void registerContext(IAllocationContext context);
+//	public void abortContext(IAllocationContext context);
+//
+//	public void detachContext(IAllocationContext context);
+//
+//	public void registerContext(IAllocationContext context);
 
 	public void setRetention(long parseLong);
 
-	public boolean isCommitted(long addr);
+    /**
+     * Return <code>true</code> iff the allocation having that address is
+     * flagged as committed. The caller must be holding the allocation lock in
+     * order for the result to remain valid outside of the method call.
+     * 
+     * @param addr
+     *            The address.
+     * 
+     * @return <code>true</code> iff the address is currently committed.
+     */
+    public boolean isCommitted(long addr);
 
-	public long getPhysicalAddress(long addr);
-	
+    /**
+     * Determine the unencoded physical address
+     * 
+     * @param addr
+     *            The encoded address
+     * 
+     * @return an unencoded address offset
+     */
+    public long getPhysicalAddress(long addr);
+
 }

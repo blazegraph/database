@@ -2270,7 +2270,7 @@ public class RWStore implements IStore, IBufferedWriter {
      * 
      * returns number of addresses freed
      */
-    public /* public */int checkDeferredFrees(final boolean freeNowIsIgnored,
+    public /* public */int checkDeferredFrees(//final boolean freeNowIsIgnored,
             final AbstractJournal journal) {
 //        return 0;
 //        // Note: Invoked from unit test w/o the lock...
@@ -3387,19 +3387,6 @@ public class RWStore implements IStore, IBufferedWriter {
 //		}
 //	}
 
-    /**
-     * Saves the current list of delete blocks, returning the address allocated.
-     * This can be used later to retrieve the addresses of allocations to be
-     * freed.
-     * 
-     * Writes the content of currentTxnFreeList to the store.
-     * 
-     * These are the current buffered frees that have yet been saved into a
-     * block referenced from the deferredFreeList
-     * 
-     * @return the address of the deferred addresses saved on the store, or zero
-     *         if none.
-     */
 	public long saveDeferrals() {
 	    m_allocationLock.lock();
 		try {
@@ -4514,9 +4501,11 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_storageStats;
 	}
 
-	public class RawTx implements IRawTx {
-		final AtomicBoolean m_open = new AtomicBoolean(true);
-		RawTx() {
+	private final class RawTx implements IRawTx {
+
+	    private final AtomicBoolean m_open = new AtomicBoolean(true);
+		
+	    RawTx() {
 			activateTx();
 		}
 		
@@ -4599,20 +4588,11 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
 	private int m_cachedDatasize = 0;
-	/**
-	 * Call made from AbstractJournal to register the cache used.  This can then
-	 * be accessed to clear entries when storage is made availabel for re-cycling.
-	 * 
-	 * It is not safe to clear at the point of the delete request since the data
-	 * could still be loaded if the data is retained for a period due to a non-zero
-	 * retention period or session protection.
-	 * 
-	 * @param externalCache - used by the Journal to cache historical BTree references
-	 * @param dataSize - the size of the checkpoint data (fixed for any version)
-	 */
-	public void registerExternalCache(
-			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
-		
+
+    public void registerExternalCache(
+            final ConcurrentWeakValueCache<Long, ICommitter> externalCache,
+            final int dataSize) {
+	
 		m_allocationLock.lock();
 		try {
 			m_externalCache = externalCache;
@@ -4622,11 +4602,30 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 
-	public boolean isCommitted(int rwaddr) {
-		final FixedAllocator alloc = getBlockByAddress(rwaddr);
-		final int offset = getOffset(rwaddr);
 
-		return alloc.isCommitted(offset);
+    /**
+     * Return <code>true</code> iff the allocation having that address is
+     * flagged as committed. The caller must be holding the allocation lock in
+     * order for the result to remain valid outside of the method call.
+     * 
+     * @param addr
+     *            The address.
+     * 
+     * @return <code>true</code> iff the address is currently committed.
+     */
+    public boolean isCommitted(final int rwaddr) {
+        m_allocationLock.lock();
+        try {
+
+            final FixedAllocator alloc = getBlockByAddress(rwaddr);
+            
+            final int offset = getOffset(rwaddr);
+
+            return alloc.isCommitted(offset);
+            
+        } finally {
+            m_allocationLock.unlock();
+        }
 	}
 
 	public boolean inWriteCache(int rwaddr) {

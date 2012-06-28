@@ -67,7 +67,7 @@ import com.bigdata.rwstore.PSOutputStream;
  * 
  * @author Martyn Cutcher
  */
-public class AllocationContext implements IMemoryManager, IStore {
+public class AllocationContext implements IMemoryManager {//, IStore {
 	
 	private static final transient Logger log = Logger
 			.getLogger(AllocationContext.class);

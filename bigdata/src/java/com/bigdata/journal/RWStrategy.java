@@ -681,7 +681,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * CommitRecordIndex can be pruned prior to store commit.
 	 */
 	public int checkDeferredFrees(final AbstractJournal journal) {
-		final int totalFreed = m_store.checkDeferredFrees(true, journal); // free now if possible
+		final int totalFreed = m_store.checkDeferredFrees(/*true,*/ journal); // free now if possible
 		
 		if (totalFreed > 0 && log.isInfoEnabled()) {
 			log.info("Freed " + totalFreed + " deferralls on commit");

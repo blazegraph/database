@@ -69,13 +69,12 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
+import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.RWStore.RawTx;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
-import com.bigdata.journal.VerifyCommitRecordIndex;
 
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
@@ -1198,7 +1197,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 					Thread.currentThread().sleep(10); // to force deferredFrees
 
 					// Request release of deferred frees.
-					rw.checkDeferredFrees(true/* freeNow */, store);
+					rw.checkDeferredFrees(/*true freeNow */ store);
 					
 					// Now commit() to ensure the deferrals can be recycled
 					store.commit();
