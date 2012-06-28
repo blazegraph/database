@@ -430,12 +430,12 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 		throw new UnsupportedOperationException();
 	}
 
-	public boolean isCommitted(long addr) {
+	public boolean isCommitted(final long addr) {
 		return m_mmgr.isCommitted(addr);
 	}
 
 	@Override
-	public InputStream getInputStream(long addr) {
+	public InputStream getInputStream(final long addr) {
 		return m_mmgr.getInputStream(addr);
 	}
 

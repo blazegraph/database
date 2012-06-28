@@ -76,13 +76,20 @@ import com.bigdata.service.AbstractTransactionService;
  * 
  * @author Martyn Cutcher
  */
-public class MemoryManager implements IMemoryManager, ISectorManager,
-		ICounterSetAccess, IStore {
+public class MemoryManager implements IMemoryManager, ISectorManager {
+		// , ICounterSetAccess, IStore {
 
 	private static final Logger log = Logger.getLogger(MemoryManager.class);
 
     private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
 
+    /**
+     * Debug array. Should be [null] unless actively debugging this code.
+     */
+//  private int[] m_debugAddrs = new int[100000]; // 100K alloc/frees
+    private int[] m_debugAddrs = null;
+    private int m_debugCurs = 0;
+  
     /**
 	 * The backing pool from which direct {@link ByteBuffer}s are recruited as
 	 * necessary and returned when possible.
@@ -832,8 +839,6 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		}
 	}
 	
-	int[] m_debugAddrs = new int[100000]; // 100K alloc/frees
-	int m_debugCurs = 0;
 	private void immediateFree(final long addr) {
 
 		if (addr == 0L)
@@ -1393,7 +1398,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		activateTx();
 
 		return new IRawTx() {
-			final AtomicBoolean m_open = new AtomicBoolean(true);
+		    private final AtomicBoolean m_open = new AtomicBoolean(true);
 			
 			public void close() {
 				if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
@@ -1586,7 +1591,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	}
 
 	@Override
-	public boolean isCommitted(long addr) {
+	public boolean isCommitted(final long addr) {
 		
 		m_allocationLock.lock();
 		try {

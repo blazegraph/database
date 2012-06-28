@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ICommitter;
 
 /**
@@ -17,7 +18,7 @@ import com.bigdata.journal.ICommitter;
  * @author Martyn Cutcher
  *
  */
-public interface IRWStrategy {
+public interface IRWStrategy extends IBufferStrategy {
 	
 	/**
 	 * @return IRawTx to enable activate/deactvate
@@ -76,4 +77,16 @@ public interface IRWStrategy {
 	 */
 	long getLastReleaseTime();
 		
+    /**
+     * Return <code>true</code> iff the allocation having that address is
+     * flagged as committed. The caller must be holding the allocation lock in
+     * order for the result to remain valid outside of the method call.
+     * 
+     * @param addr
+     *            The address.
+     * 
+     * @return <code>true</code> iff the address is currently committed.
+     */
+    public boolean isCommitted(long addr);
+    
 }
