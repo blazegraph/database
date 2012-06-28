@@ -48,7 +48,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
@@ -60,7 +59,6 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.rwstore.IStore;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.service.AbstractTransactionService;
 

@@ -55,7 +55,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
@@ -65,7 +64,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.keys.ICUVersionRecord;
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -100,6 +98,7 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
@@ -175,7 +174,9 @@ import com.bigdata.util.NT;
  *       we could throw a single exception that indicated that the journal had
  *       been asynchronously closed.
  */
-public abstract class AbstractJournal implements IJournal/* , ITimestampService */{
+public abstract class AbstractJournal implements IJournal/* , ITimestampService */
+, IAllocationManager
+{
 
 	/**
 	 * Logger.
@@ -2847,31 +2848,32 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	
     }
 
-    // Note: RW store method.
-    public long write(final ByteBuffer data, final long oldAddr) {
+//    // Note: RW store method.
+//    @Override
+//    public long write(final ByteBuffer data, final long oldAddr) {
+//
+//        assertCanWrite();
+//
+//        return _bufferStrategy.write(data, oldAddr);
+//        
+//    }
 
-        assertCanWrite();
-
-        return _bufferStrategy.write(data, oldAddr);
-        
-    }
-
-    public long write(final ByteBuffer data, final long oldAddr,
-            final IAllocationContext context) {
-
-        assertCanWrite();
-
-        if (_bufferStrategy instanceof IRWStrategy) {
-
-            return ((IRWStrategy) _bufferStrategy).write(data, oldAddr, context);
-
-        } else {
-
-            return _bufferStrategy.write(data, oldAddr);
-
-        }
-
-    }
+//    public long write(final ByteBuffer data, final long oldAddr,
+//            final IAllocationContext context) {
+//
+//        assertCanWrite();
+//
+//        if (_bufferStrategy instanceof IRWStrategy) {
+//
+//            return ((IRWStrategy) _bufferStrategy).write(data, oldAddr, context);
+//
+//        } else {
+//
+//            return _bufferStrategy.write(data, oldAddr);
+//
+//        }
+//
+//    }
 
     public long write(final ByteBuffer data, final IAllocationContext context) {
 
@@ -2938,6 +2940,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
+    public void registerContext(final IAllocationContext context) {
+        
+        assertCanWrite();
+
+        if(_bufferStrategy instanceof IRWStrategy) {
+
+            ((IRWStrategy) _bufferStrategy).registerContext(context);
+            
+        }
+        
+    }
+    
 	final public long getRootAddr(final int index) {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -4045,22 +4059,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (ndx == null)
             throw new NoSuchIndexException(name);
 
-        final IndexTypeEnum indexType = ndx.getIndexMetadata().getIndexType();
-
+//        final IndexTypeEnum indexType = ndx.getIndexMetadata().getIndexType();
+//
         if (getBufferStrategy() instanceof IRWStrategy) {
             /*
              * Reclaim storage associated with the index.
              */
-            switch (indexType) {
-            case BTree:
-                ((AbstractBTree) ndx).removeAll();
-                break;
-            case HTree:
-                ((HTree) ndx).removeAll();
-                break;
-            default:
-                throw new AssertionError("Unknown: " + indexType);
-            }
+            ndx.removeAll();
+//            switch (indexType) {
+//            case BTree:
+//                ((AbstractBTree) ndx).removeAll();
+//                break;
+//            case HTree:
+//                ((HTree) ndx).removeAll();
+//                break;
+//            default:
+//                throw new AssertionError("Unknown: " + indexType);
+//            }
         }
 	    
 		final ReadLock lock = _fieldReadWriteLock.readLock();

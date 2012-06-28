@@ -1418,7 +1418,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
-     * Returns the metadata record for this btree.
+     * {@inheritDoc}
      * <p>
      * Note: If the B+Tree is read-only then the metadata object will be cloned
      * to avoid potential modification. However, only a single cloned copy of

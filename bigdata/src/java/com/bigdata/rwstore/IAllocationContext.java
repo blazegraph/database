@@ -25,11 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 /**
- * An IAllocationContext defines a shadow environment which may be
+ * An {@link IAllocationContext} defines a shadow environment which may be
  * associated with allocations made during a transaction.
  * 
  * @author Martyn Cutcher
- *
  */
 public interface IAllocationContext {
 

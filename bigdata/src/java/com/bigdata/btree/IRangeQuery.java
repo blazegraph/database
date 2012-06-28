@@ -59,6 +59,8 @@ public interface IRangeQuery {
      * including the special case where the overwrite is a delete.
      * 
      * @return The #of tuples in the index.
+     * 
+     * @see ICheckpointProtocol#rangeCount()
      */
     public long rangeCount();
     

@@ -329,22 +329,22 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	}
 
 	@Override
-	public long write(ByteBuffer data) {
+	public long write(final ByteBuffer data) {
 		m_dirty = true;
 
 		return m_mmgr.allocate(data);
 	}
 
-	@Override
-	public long write(ByteBuffer data, long oldAddr) {
-		m_dirty = true;
-		
-		final long ret =  write(data);
-		
-		m_mmgr.free(oldAddr);
-				
-		return ret;
-	}
+//	@Override
+//	public long write(ByteBuffer data, long oldAddr) {
+//		m_dirty = true;
+//		
+//		final long ret =  write(data);
+//		
+//		m_mmgr.free(oldAddr);
+//				
+//		return ret;
+//	}
 
 	// AddressManager delegates
 	
@@ -420,13 +420,18 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 		return m_mmgr.saveDeferrals();
 	}
 
-	@Override
-	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
-		throw new UnsupportedOperationException();
-	}
+//	@Override
+//	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+//		throw new UnsupportedOperationException();
+//	}
 
+    /**
+     * FIXME There are two unit tests for the {@link MemStore} which are failing
+     * due to this method not being implemented. Those methods are using an
+     * abstract task within an isolated action journal context.
+     */
 	@Override
-	public long write(ByteBuffer data, IAllocationContext context) {
+	public long write(final ByteBuffer data, final IAllocationContext context) {
 		throw new UnsupportedOperationException();
 	}
 

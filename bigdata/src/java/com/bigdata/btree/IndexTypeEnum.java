@@ -35,7 +35,10 @@ public enum IndexTypeEnum {
 	BTree((short) 0),
 
 	/** Extendable hash tree. */
-	HTree((short) 1);
+	HTree((short) 1),
+	
+    /** Order preserving solution set. */
+    SolutionSet((short) 2);
 
 	private IndexTypeEnum(final short code) {
 
@@ -55,10 +58,13 @@ public enum IndexTypeEnum {
 		switch (code) {
 		case 0:
 			return BTree;
-		case 1:
-			return HTree;
+        case 1:
+            return HTree;
+        case 2:
+            return SolutionSet;
 		default:
 			throw new IllegalArgumentException("code=" + code);
 		}
 	}
+
 }

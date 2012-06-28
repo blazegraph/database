@@ -1,10 +1,13 @@
 package com.bigdata.btree;
 
+import java.util.Iterator;
+
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Interface in support of the {@link Checkpoint} record protocol.
@@ -19,6 +22,8 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 	 * each time a node or leaf is written onto the backing store. The initial
 	 * value is ZERO (0). The first value assigned to a node or leaf will be
 	 * ZERO (0).
+	 * 
+	 * TODO Nobody is actually incrementing this value right now.
 	 */
 	public long getRecordVersion();
 
@@ -123,5 +128,39 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 	 *      data structures (HTree, BTree, named solution sets, etc).
 	 */
 	public IndexMetadata getIndexMetadata();
+
+	/*
+	 * Generic data access methods defined for all persistence capable 
+	 * data structures.
+	 */
+
+    /**
+     * Return the #of entries in the index.
+     * <p>
+     * Note: If the index supports deletion markers then the range count will be
+     * an upper bound and may double count tuples which have been overwritten,
+     * including the special case where the overwrite is a delete.
+     * 
+     * @return The #of tuples in the index.
+     * 
+     * @see IRangeQuery#rangeCount()
+     */
+    public long rangeCount();
+
+    /**
+     * Visit all entries in the index in the natural order of the index.
+     * <p>
+     * Note: Some implementations MAY return an {@link ICloseableIterator}. The
+     * caller needs to be aware of this and handle close any obtained iterator
+     * which implements that interface.
+     * 
+     * @see IRangeQuery#rangeIterator()
+     */
+    public Iterator rangeIterator();
+
+    /**
+     * Remove all entries in the index.
+     */
+    public void removeAll();
 
 }

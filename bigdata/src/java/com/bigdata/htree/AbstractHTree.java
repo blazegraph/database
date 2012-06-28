@@ -21,6 +21,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.HTreeIndexMetadata;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -57,7 +58,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractHTree implements ICounterSetAccess {
+abstract public class AbstractHTree implements ICounterSetAccess,
+        ICheckpointProtocol {
 
     /**
      * The index is already closed.

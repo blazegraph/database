@@ -185,6 +185,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
+//    @Override
+//    public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+//        return write(data, oldAddr);
+//    }
+
     /**
      * Overridden to integrate with the shadow allocator support of the
      * {@link RWStore}. Shadow allocators may be used to isolate allocation
@@ -740,7 +745,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	@Override
-	public InputStream getInputStream(long addr) {
+	public InputStream getInputStream(final long addr) {
 		return m_store.getInputStream(addr);
 	}
 
@@ -750,7 +755,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	@Override
-	public IPSOutputStream getOutputStream(IAllocationContext context) {
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
 		return m_store.getOutputStream(context);
 	}
 

@@ -24,17 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
-import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ICommitter;
 import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
-import com.bigdata.rwstore.IRawTx;
+import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IStore;
 
 /**
@@ -226,11 +221,16 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 	 */
 	public void clear();
 
-	/**
-	 * Create a child allocation context within which the caller may make and
-	 * release allocations.
-	 */
-	public IMemoryManager createAllocationContext();
+    /**
+     * Create a child allocation context within which the caller may make and
+     * release allocations.
+     * 
+     * TODO Why is the return not an {@link IAllocationContext} as well (that
+     * is, why does {@link IMemoryManager} not extend {@link IAllocationContext}
+     * ). Also, note that {@link #commit()} is similar to
+     * {@link IAllocationManager#detachContext(IAllocationContext)}.
+     */
+    public IMemoryManager createAllocationContext();
 
 	/**
 	 * Return the size of the application data for the allocation with the given
@@ -282,11 +282,22 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 //	 */
 //	public InputStream getInputStream(long addr);
 
+	/**
+	 * The size of a backing buffer in bytes.
+	 */
 	public int getSectorSize();
 
+	/**
+	 * The #of backing buffers in use.
+	 */
 	public int getSectorCount();
 
-	public int getMaxSectors();
+    /**
+     * The maximum number of backing buffers which may be allocated by the
+     * {@link IMemoryManager} and {@link Integer#MAX_VALUE} if there is no
+     * effective limit on the #of backing buffers which may be allocated.
+     */
+    public int getMaxSectors();
 
 //	public void close();
 

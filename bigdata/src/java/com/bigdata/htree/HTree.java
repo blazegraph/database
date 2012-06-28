@@ -45,8 +45,6 @@ import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.HTreeIndexMetadata;
-import com.bigdata.btree.IBloomFilter;
-import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndexLocalCounter;
@@ -100,8 +98,8 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class HTree extends AbstractHTree 
 	implements 
-	IIndexLocalCounter,
-	ICheckpointProtocol
+	IIndexLocalCounter
+//	ICheckpointProtocol // interface declaration moved to subclass
 //	IIndex, 
 //  ISimpleBTree//, IAutoboxBTree, ILinearList, IBTreeStatistics, ILocalBTreeView
 //  IRangeQuery
@@ -367,23 +365,23 @@ public class HTree extends AbstractHTree
         
     }
     
-    /**
-     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes
-     * and leaves onto the store, writing a new metadata record, and returning
-     * the address of that metadata record.
-     * <p>
-     * Note: In order to avoid needless writes the existing metadata record is
-     * always returned if {@link #needsCheckpoint()} is <code>false</code>.
-     * <p>
-     * Note: The address of the existing {@link Checkpoint} record is always
-     * returned if {@link #getAutoCommit() autoCommit} is disabled.
-     * 
-     * @return The address of a {@link Checkpoint} record from which the btree
-     *         may be reloaded.
-     */
+//    /**
+//     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes
+//     * and leaves onto the store, writing a new metadata record, and returning
+//     * the address of that metadata record.
+//     * <p>
+//     * Note: In order to avoid needless writes the existing metadata record is
+//     * always returned if {@link #needsCheckpoint()} is <code>false</code>.
+//     * <p>
+//     * Note: The address of the existing {@link Checkpoint} record is always
+//     * returned if {@link #getAutoCommit() autoCommit} is disabled.
+//     * 
+//     * @return The address of a {@link Checkpoint} record from which the btree
+//     *         may be reloaded.
+//     */
     public long handleCommit(final long commitTime) {
 
-    	return writeCheckpoint2().getCheckpointAddr();
+        return writeCheckpoint2().getCheckpointAddr();
     	
     }
 
@@ -739,20 +737,12 @@ public class HTree extends AbstractHTree
      */
     volatile private long lastCommitTime = 0L;// Until the first commit.
     
-    /**
-     * Return the {@link IDirtyListener}.
-     */
     final public IDirtyListener getDirtyListener() {
         
         return listener;
         
     }
 
-    /**
-     * Set or clear the listener (there can be only one).
-     * 
-     * @param listener The listener.
-     */
     final public void setDirtyListener(final IDirtyListener listener) {
 
         assertNotReadOnly();
@@ -842,24 +832,25 @@ public class HTree extends AbstractHTree
 
     }
 
+//    * Checkpoint operation {@link #flush()}es dirty nodes, the optional
+//    * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
+//    * and then writes a new {@link Checkpoint} record on the backing store,
+//    * saves a reference to the current {@link Checkpoint} and returns the
+//    * address of that {@link Checkpoint} record.
+//    * <p>
+//    * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
+//    * is at the store level and uses {@link Checkpoint}s to ensure that the
+//    * state of the {@link BTree} is current on the backing store.
+//    * 
+//    * @return The address at which the {@link Checkpoint} record for the
+//    *         {@link BTree} was written onto the store. The {@link BTree} can
+//    *         be reloaded from this {@link Checkpoint} record.
+//    * 
+//    * @see #writeCheckpoint2(), which returns the {@link Checkpoint} record
+//    *      itself.
     /**
-     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
-     * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
-     * and then writes a new {@link Checkpoint} record on the backing store,
-     * saves a reference to the current {@link Checkpoint} and returns the
-     * address of that {@link Checkpoint} record.
-     * <p>
-     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
-     * is at the store level and uses {@link Checkpoint}s to ensure that the
-     * state of the {@link BTree} is current on the backing store.
-     * 
-     * @return The address at which the {@link Checkpoint} record for the
-     *         {@link BTree} was written onto the store. The {@link BTree} can
-     *         be reloaded from this {@link Checkpoint} record.
-     * 
-     * @see #writeCheckpoint2(), which returns the {@link Checkpoint} record
-     *      itself.
-     *      
+     * {@inheritDoc}
+     *       
      * @see #load(IRawStore, long)
      */
     final public long writeCheckpoint() {

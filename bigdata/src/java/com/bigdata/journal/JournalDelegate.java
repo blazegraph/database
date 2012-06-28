@@ -158,9 +158,10 @@ public class JournalDelegate implements IJournal {
 		return delegate.write(data);
 	}
 
-	public long write(ByteBuffer data, long oldAddr) {
-		return delegate.write(data, oldAddr);
-	}
+//	@Override
+//	public long write(ByteBuffer data, long oldAddr) {
+//		return delegate.write(data, oldAddr);
+//	}
 
 	public int getByteCount(long addr) {
 		return delegate.getByteCount(addr);
