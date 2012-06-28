@@ -34,6 +34,7 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -41,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -265,8 +267,48 @@ class GroupGraphPattern {
 
             for (IGroupMemberNode child : children) {
 
-                groupNode.addChild(child);
+                if (child instanceof QuadData
+                        && groupNode instanceof JoinGroupNode) {
+                    
+                    /*
+                     * We need to flatten out the QuadData when it appears
+                     * within a WHERE clause for a DELETE WHERE shortcut.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/568
+                     * (DELETE WHERE fails with Java AssertionError)
+                     */
+                    
+                    final JoinGroupNode newGroup = new JoinGroupNode();
 
+                    ((QuadData) child).flatten(newGroup);
+
+                    // A statement pattern node from the nested GRAPH group.
+                    // They will all share the same context.
+                    
+                    final StatementPatternNode sp = (StatementPatternNode) newGroup
+                            .get(0);
+
+                    // The context for the SPs in that GRAPH group.
+                    final TermNode context = (TermNode) sp.get(3);
+                    
+                    // Must be defined.
+                    assert context != null;
+                    
+                    // Must be a named graph scope.
+                    assert sp.getScope() == Scope.NAMED_CONTEXTS;
+                    
+                    // Set on the new group.
+                    newGroup.setContext(context);
+
+                    // Add the new group to the outer group.
+                    groupNode.addChild(newGroup);
+                    
+                } else {
+                
+                    groupNode.addChild(child);
+
+                }
+                
             }
 
         }

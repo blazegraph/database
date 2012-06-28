@@ -2325,6 +2325,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * A unit test for the DELETE WHERE "shortcut" form.
      * <pre>
      * DELETE WHERE {?x foaf:name ?y }
      * </pre>
@@ -2345,6 +2346,110 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(foafName), new VarNode("y")));
+
+                op.setWhereClause(whereClause);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A unit test for the DELETE WHERE "shortcut" form.
+     * <pre>
+     * DELETE WHERE { GRAPH ?g { ?x foaf:name ?y } }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/568 (DELETE WHERE
+     *      fails with Java AssertionError)
+     */
+    public void test_delete_where_02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "DELETE WHERE { GRAPH ?g { ?x <http://xmlns.com/foaf/0.1/name> ?y } }";
+
+        @SuppressWarnings("rawtypes")
+        final IV foafName = makeIV(valueFactory
+                .createURI("http://xmlns.com/foaf/0.1/name"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+
+                final JoinGroupNode graphClause = new JoinGroupNode();
+                
+                graphClause.setContext(new VarNode("g"));
+
+                whereClause.addChild(graphClause);
+                
+                graphClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(foafName), new VarNode("y"),
+                        new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+                op.setWhereClause(whereClause);
+
+            }
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A unit test for the DELETE WHERE form without the shortcut, but
+     * there the template and the where clause are the same.
+     * <pre>
+     * DELETE {?x foaf:name ?y } WHERE {?x foaf:name ?y }
+     * </pre>
+     */
+    public void test_delete_where_without_shortcut_02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "DELETE {?x <http://xmlns.com/foaf/0.1/name> ?y}\n"
+                + " WHERE {?x <http://xmlns.com/foaf/0.1/name> ?y }";
+
+        @SuppressWarnings("rawtypes")
+        final IV foafName = makeIV(valueFactory
+                .createURI("http://xmlns.com/foaf/0.1/name"));
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final DeleteInsertGraph op = new DeleteInsertGraph();
+
+            expected.addChild(op);
+
+            {
+
+                final QuadData deleteClause = new QuadData();
+                
+                deleteClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(foafName), new VarNode("y")));
+
+                op.setDeleteClause(new QuadsDataOrNamedSolutionSet(deleteClause));
+
+            }
             {
 
                 final JoinGroupNode whereClause = new JoinGroupNode();

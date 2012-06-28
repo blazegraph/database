@@ -30,6 +30,9 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.spo.ISPO;
@@ -84,11 +87,14 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
      * {@link ConstructNode} MAY use variables as well as constants and supports
      * the context position, so this is really a quads construct template.
      * 
-     * TODO Maybe we could just flatten this in UpdateExprBuilder?
+     * @param template
+     *            The {@link ConstructNode} for the template.
+     * 
+     * @return The argument.
+     * 
+     *         TODO Maybe we could just flatten this in UpdateExprBuilder?
      */
-    public ConstructNode flatten() {
-
-        final ConstructNode template = new ConstructNode();
+    public ConstructNode flatten(final ConstructNode template) {
 
         final QuadData quadData = this;
 
@@ -105,6 +111,55 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
         }
 
         return template;
+
+    }
+    
+    /**
+     * Flatten the {@link StatementPatternNode}s into the caller's
+     * {@link JoinGroupNode}.
+     * 
+     * @param container
+     *            The caller's container.
+     *            
+     * @return The caller's container.
+     */
+    public JoinGroupNode flatten(final JoinGroupNode container) {
+
+        final QuadData quadData = this;
+
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                quadData, StatementPatternNode.class);
+
+        while (itr.hasNext()) {
+
+            final StatementPatternNode sp = (StatementPatternNode) (itr.next()
+                    .clone());
+
+//            if (sp.getScope() == Scope.NAMED_CONTEXTS) {
+//                
+//                /*
+//                 * Statement pattern must be in a GRAPH group.
+//                 * 
+//                 * TODO We should coalesce statement patterns which are observed
+//                 * to be in the same graph group (same constant or the same
+//                 * variable). Note that the lexical scope is not an issue for
+//                 * the QuadsData - there are no nested sub-groups or
+//                 * sub-selects.
+//                 */
+//
+//                container.addChild(new JoinGroupNode(sp.getContext(), sp));
+//                
+//            } else {
+//                
+//                container.addChild(sp);
+//             
+//            }
+
+            container.addChild(sp);
+
+        }
+
+        return container;
 
     }
 
