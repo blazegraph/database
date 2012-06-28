@@ -1,12 +1,6 @@
 package com.bigdata.rwstore;
 
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-
-import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IBufferStrategy;
-import com.bigdata.journal.ICommitter;
 
 /**
  * Defines a marker interface to be used to indicate strategies
@@ -21,6 +15,11 @@ import com.bigdata.journal.ICommitter;
 public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
         IAllocationManagerStore, IStreamStore, IHistoryManager {
 
+    /**
+     * Return the backing {@link IStore}.
+     */
+    IStore getStore();
+    
 //	/**
 //	 * @return IRawTx to enable activate/deactvate
 //	 */
@@ -73,10 +72,13 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
 //	 */
 //	int checkDeferredFrees(AbstractJournal abstractJournal);
 
-	/**
-	 * Checked by AbstractJournal for index validation
-	 */
-	long getLastReleaseTime();
+//    /**
+//     * If history is retained this returns the time for which data was most
+//     * recently released. No request can be made for data earlier than this.
+//     * 
+//     * @return latest data release time
+//     */
+//	long getLastReleaseTime();
 		
     /**
      * Return <code>true</code> iff the allocation having that address is

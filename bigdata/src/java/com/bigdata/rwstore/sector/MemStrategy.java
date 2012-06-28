@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package com.bigdata.rwstore.sector;
 
 import java.io.File;
@@ -5,7 +28,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
@@ -25,7 +47,6 @@ import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -47,12 +68,8 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	private volatile IRootBlockView m_rb0 = null;
 	private volatile IRootBlockView m_rb1 = null;
 	
-	public MemStrategy(final IMemoryManager mmgr) {
-		this(mmgr, null);
-	}
-	
-	public MemStrategy(final IMemoryManager mmgr, final Properties props) {
-        
+    public MemStrategy(final IMemoryManager mmgr) {
+
 	    if (mmgr == null)
             throw new IllegalArgumentException();
 		
@@ -87,7 +104,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 			
 		};
 		
-		// initialise RootBlocks
+		// initialize RootBlocks
 		final UUID uuid = UUID.randomUUID(); // Journal's UUID.
 		final long createTime = System.currentTimeMillis();
 		final ChecksumUtility checker = new ChecksumUtility();
@@ -105,18 +122,23 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	            StoreTypeEnum.RW,
 	            createTime, 0, RootBlockView.currentVersion, checker);	
 		
-		// store minimum release age
-		if (props != null) {
-			m_mmgr.setRetention(Long.parseLong(props.getProperty(
-		                AbstractTransactionService.Options.MIN_RELEASE_AGE,
-		                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE)));
-		}
+//		// store minimum release age
+//		if (props != null) {
+//			m_mmgr.setRetention(Long.parseLong(props.getProperty(
+//		                AbstractTransactionService.Options.MIN_RELEASE_AGE,
+//		                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE)));
+//		}
 
 	}
 	
-	public IMemoryManager getMemoryManager() {
-		return m_mmgr;
+	public IMemoryManager getStore() {
+	    return m_mmgr;
 	}
+	
+//	@Deprecated
+//	public IMemoryManager getMemoryManager() {
+//		return m_mmgr;
+//	}
 
 	@Override
 	public void abort() {
@@ -129,7 +151,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	}
 
 	@Override
-	public void commit(IJournal journal) {
+	public void commit() {
 		m_mmgr.commit();
 		m_dirty = false;
 	}

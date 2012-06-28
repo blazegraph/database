@@ -24,15 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore.sector;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rwstore.FixedOutputStream;
-import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IWriteCacheManager;
 
 /**
@@ -130,7 +125,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	
 	final ISectorManager m_store;
 	boolean m_onFreeList = false;
-	private int m_diskAddr;
+//	private int m_diskAddr;
 	private final IWriteCacheManager m_writes;
 	private boolean m_preserveSession;
 
@@ -230,7 +225,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		int allocated = 0;
 		for (int i = 0; i < m_tags.length; i++) {
 			if (m_tags[i] == -1) {
-				int block = this.ALLOC_SIZES[tag] * 32;
+				final int block = SectorAllocator.ALLOC_SIZES[tag] * 32;
 				if ((allocated + block) <= m_maxSectorSize) {
 					m_tags[i] = tag;
 					m_free[tag] += 32;
@@ -339,7 +334,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	 * @param bit
 	 * @return the offset in the sector
 	 */
-	int bit2Offset(int bit) {
+	int bit2Offset(final int bit) {
 		final int entry = bit / 32;
 		final int entryBit = bit % 32;
 		
@@ -350,30 +345,31 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		
 		return offset;
 	}
-	/**
-	 * A previous version of bit2Offset that calculated the offset dynamically
-	 * @param bit
-	 * @return the offset in the sector
-	 */
-	int calcBit2Offset(int bit) {
-		int offset = 0;
-		for (int t = 0; t < NUM_ENTRIES; t++) {
-			int tag = m_tags[t];
-			if (tag == -1) {
-				throw new IllegalStateException("bit offset too large");
-			}
-			int bits = ALLOC_BITS[tag];
-			if (bit < bits) {
-				offset += ALLOC_SIZES[tag] * bit;
-				return offset;
-			} else {
-				offset += ALLOC_SIZES[tag] * bits;
-				bit -= bits;
-			}
-		}
-		
-		return 0;
-	}
+	
+//	/**
+//	 * A previous version of bit2Offset that calculated the offset dynamically
+//	 * @param bit
+//	 * @return the offset in the sector
+//	 */
+//	int calcBit2Offset(int bit) {
+//		int offset = 0;
+//		for (int t = 0; t < NUM_ENTRIES; t++) {
+//			int tag = m_tags[t];
+//			if (tag == -1) {
+//				throw new IllegalStateException("bit offset too large");
+//			}
+//			int bits = ALLOC_BITS[tag];
+//			if (bit < bits) {
+//				offset += ALLOC_SIZES[tag] * bit;
+//				return offset;
+//			} else {
+//				offset += ALLOC_SIZES[tag] * bits;
+//				bit -= bits;
+//			}
+//		}
+//		
+//		return 0;
+//	}
 	/**
 	 * Since we know that all allocations are 32 bits each, there is no need to
 	 * scan through the array.
@@ -381,14 +377,14 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	 * @param bit
 	 * @return the tag of the bit
 	 */
-	public int bit2tag(int bit) {
+	public int bit2tag(final int bit) {
 		return m_tags[bit/32];
 	}
 	
 	/**
 	 * 
 	 */
-	public long getPhysicalAddress(int offset) {
+	public long getPhysicalAddress(final int offset) {
 		if (!tstBit(m_transientbits, offset)) {
 			return 0L;
 		} else {
@@ -396,7 +392,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		}
 	}
 
-	public int getPhysicalSize(int offset) {
+	public int getPhysicalSize(final int offset) {
 		return bit2Size(offset);
 	}
 
@@ -414,7 +410,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 	 * @param threshold the minimum number of bits free per 32 bit block
 	 * @return whether there are sufficient free for all block sizes
 	 */
-	public boolean hasFree(int threshold) {
+	public boolean hasFree(final int threshold) {
 		for (int i = 0; i < m_free.length; i++) {
 			if (m_free[i] < (threshold * m_total[i]))
 				return false;
@@ -434,77 +430,78 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		m_preserveSession = true;
 	}
 
-	public void read(DataInputStream str) {
-		try {
-			m_index = str.readInt();
-			m_sectorAddress = str.readLong();
-			
-			System.out.println("Sector: " + m_index + " managing sector at " + m_sectorAddress);
-			
-			int taglen = str.read(m_tags);
-			assert taglen == m_tags.length;
-			
-			m_addresses[0] = 0;
-			for (int i = 0; i < NUM_ENTRIES; i++) {
-				m_commitbits[i] = m_transientbits[i] = m_bits[i] = str.readInt();
-				
-				// maintain cached block offset
-				if (i < (NUM_ENTRIES-1)) {
-					final int tag = m_tags[i];
-					if (tag != -1) {
-						m_addresses[i+1] = m_addresses[i] + (32 * ALLOC_SIZES[tag]);
-					}
-				}
-			}
-		} catch (IOException ioe) {
-			throw new RuntimeException(ioe);
-		}
-	}
+//	public void read(DataInputStream str) {
+//		try {
+//			m_index = str.readInt();
+//			m_sectorAddress = str.readLong();
+//			
+//			System.out.println("Sector: " + m_index + " managing sector at " + m_sectorAddress);
+//			
+//			int taglen = str.read(m_tags);
+//			assert taglen == m_tags.length;
+//			
+//			m_addresses[0] = 0;
+//			for (int i = 0; i < NUM_ENTRIES; i++) {
+//				m_commitbits[i] = m_transientbits[i] = m_bits[i] = str.readInt();
+//				
+//				// maintain cached block offset
+//				if (i < (NUM_ENTRIES-1)) {
+//					final int tag = m_tags[i];
+//					if (tag != -1) {
+//						m_addresses[i+1] = m_addresses[i] + (32 * ALLOC_SIZES[tag]);
+//					}
+//				}
+//			}
+//		} catch (IOException ioe) {
+//			throw new RuntimeException(ioe);
+//		}
+//	}
 
-	public int getDiskAddr() {
-		return m_diskAddr;
-	}
-	
-	public void setDiskAddr(int addr) {
-		m_diskAddr = addr;
-	}
+//	public int getDiskAddr() {
+//		return m_diskAddr;
+//	}
+//	
+//	public void setDiskAddr(int addr) {
+//		m_diskAddr = addr;
+//	}
 
-	public boolean verify(int addr) {
-		// TODO Auto-generated method stub
-		return false;
-	}
+//	public boolean verify(int addr) {
+//		// TODO Auto-generated method stub
+//		return false;
+//	}
 
-	public byte[] write() {
-		byte[] buf = new byte[META_SIZE];
-		DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
-		try {
-			str.writeInt(m_index);
-			str.writeLong(m_sectorAddress);
-			str.write(m_tags);
-			for (int i = 0; i < NUM_ENTRIES; i++) {
-				str.writeInt(m_bits[i]);
-			}
-			
-			m_transientbits = (int[]) m_bits.clone();
-			m_commitbits = (int[]) m_bits.clone();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				str.close();
-			} catch (IOException e) {
-				// ignore
-			}
-		}
-		
-		return buf;
-	}
+//	public byte[] write() {
+//	    final byte[] buf = new byte[META_SIZE];
+//        final DataOutputStream str = new DataOutputStream(
+//                new FixedOutputStream(buf));
+//        try {
+//			str.writeInt(m_index);
+//			str.writeLong(m_sectorAddress);
+//			str.write(m_tags);
+//			for (int i = 0; i < NUM_ENTRIES; i++) {
+//				str.writeInt(m_bits[i]);
+//			}
+//			
+//			m_transientbits = (int[]) m_bits.clone();
+//			m_commitbits = (int[]) m_bits.clone();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		} finally {
+//			try {
+//				str.close();
+//			} catch (IOException e) {
+//				// ignore
+//			}
+//		}
+//		
+//		return buf;
+//	}
 
-	public int addressSize(int offset) {
+	public int addressSize(final int offset) {
 		return bit2Size(offset);
 	}
 
-	public void setIndex(int index) {
+	public void setIndex(final int index) {
 		assert m_index == 0;
 		
 		m_index = index;
@@ -514,27 +511,27 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		addrs.add(Long.valueOf(m_sectorAddress));
 	}
 
-	static void clrBit(int[] bits, int bitnum) {
-		int index = bitnum / 32;
-		int bit = bitnum % 32;
+	static void clrBit(final int[] bits, final int bitnum) {
+	    final int index = bitnum / 32;
+	    final int bit = bitnum % 32;
 
-		int val = bits[index];
+	    int val = bits[index];
 
 		val &= ~(1 << bit);
 
 		bits[index] = val;
 	}
 	
-	static void setBit(int[] bits, int bitnum) {
-		int index = bitnum / 32;
-		int bit = bitnum % 32;
+	static void setBit(final int[] bits, final int bitnum) {
+		final int index = bitnum / 32;
+		final int bit = bitnum % 32;
 
 		bits[index] |= 1 << bit;
 	}
 
-	static boolean tstBit(int[] bits, int bitnum) {
-		int index = bitnum / 32;
-		int bit = bitnum % 32;
+	static boolean tstBit(final int[] bits, final int bitnum) {
+	    final int index = bitnum / 32;
+		final int bit = bitnum % 32;
 
 		return (bits[index] & 1 << bit) != 0;
 	}
@@ -586,21 +583,21 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		m_store.addToFreeList(this);
 	}
 
-	public static int getSectorIndex(int rwaddr) {
+	public static int getSectorIndex(final int rwaddr) {
 		return ((-rwaddr) >>> SECTOR_OFFSET_BITS) - 1;
 	}
 
-	public static int getSectorOffset(int rwaddr) {
+	public static int getSectorOffset(final int rwaddr) {
 		return (-rwaddr) & SECTOR_OFFSET_MASK;
 	}
 
-	public static int getBlobBlockCount(int size) {
+	public static int getBlobBlockCount(final int size) {
 		final int nblocks = (size + BLOB_SIZE - 1) / BLOB_SIZE;
 		
 		return nblocks;
 	}
 
-	public static int getBlockForSize(int size) {
+	public static int getBlockForSize(final int size) {
 		for (int i = 0; i < ALLOC_SIZES.length; i++) {
 			if (size <= ALLOC_SIZES[i]) {
 				return ALLOC_SIZES[i];
@@ -631,47 +628,42 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		m_preserveSession = false;
 	}
 
-	public boolean addressInRange(int addr) {
-		// TODO Auto-generated method stub
-		return false;
-	}
+//	public boolean addressInRange(int addr) {
+//		return false;
+//	}
 
-	public int getAllocatedBlocks() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+//	public int getAllocatedBlocks() {
+//		return 0;
+//	}
 
-	public long getFileStorage() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+//	public long getFileStorage() {
+//		return 0;
+//	}
 
-	public long getAllocatedSlots() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+//	public long getAllocatedSlots() {
+//		return 0;
+//	}
 
-	public boolean canImmediatelyFree(int addr, int sze, IAllocationContext context) {
-		// TODO Auto-generated method stub
-		return false;
-	}
+//	public boolean canImmediatelyFree(int addr, int sze, IAllocationContext context) {
+//		return false;
+//	}
 
-	public boolean isAllocated(int addrOffset) {
-		return tstBit(m_bits, addrOffset);
-	}
+//	public boolean isAllocated(final int addrOffset) {
+//		return tstBit(m_bits, addrOffset);
+//	}
 
-	public void free(int addr, int sze, boolean overrideSession) {
-		free(addr);
-	}
+//	public void free(int addr, int sze, boolean overrideSession) {
+//		free(addr);
+//	}
 
-	public void setAllocationContext(IAllocationContext m_context) {
-		throw new UnsupportedOperationException();
-	}
-
-	public int alloc(int size, IAllocationContext context) {
-
-		return alloc(size);
-	}
+//	public void setAllocationContext(IAllocationContext m_context) {
+//		throw new UnsupportedOperationException();
+//	}
+//
+//	public int alloc(final int size, final IAllocationContext context) {
+//
+//		return alloc(size);
+//	}
 
 	public String toString() {
 
@@ -700,11 +692,11 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 		}
 	}
 
-	public boolean isCommitted(int offset) {
+	public boolean isCommitted(final int offset) {
 		return tstBit(m_commitbits, offset);
 	}
 
-	public boolean isGettable(int offset) {
+	public boolean isGettable(final int offset) {
 		return tstBit(m_transientbits, offset);
 	}
 

@@ -144,11 +144,14 @@ public interface IAddressManager {
      */
     public String toString(long addr);
 
-    /** 
+    /**
      * Determine the unencoded physical address
-     * @param addr - the encoded address
+     * 
+     * @param addr
+     *            The encoded address
+     * 
      * @return an unencoded address offset
      */
-	public long getPhysicalAddress(long addr);
+    public long getPhysicalAddress(long addr);
 
 }

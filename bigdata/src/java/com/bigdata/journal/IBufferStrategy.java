@@ -220,10 +220,8 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * must be managed as part of the protocol outside of the RootBlock, and
      * this is the method that triggers that management. The caller MUST provide
      * appropriate synchronization.
-     * 
-     * @param abstractJournal
      */
-    public void commit(IJournal journal);
+    public void commit();
 
     /**
      * A method that requires the implementation to discard its buffered write

@@ -47,6 +47,7 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.IRWStrategy;
 
 /**
  * <p>
@@ -1273,7 +1274,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
          * FIXME simplify conditionals - mgc
          */
         if (!getIndexMetadata().getDeleteMarkers()
-                && getStore() instanceof RWStrategy) {
+                && getStore() instanceof IRWStrategy) {
 
             /*
              * Per https://sourceforge.net/apps/trac/bigdata/ticket/221, we
@@ -1333,7 +1334,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
             replaceRootWithEmptyLeaf();
 
         } else if (getIndexMetadata().getDeleteMarkers()
-                || getStore() instanceof RWStrategy//
+                || getStore() instanceof IRWStrategy//
                 || metadata.getRawRecords()//
                 ) {
 

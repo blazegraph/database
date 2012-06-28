@@ -2686,7 +2686,7 @@ public class BigdataSail extends SailBase implements Sail {
          * Commit the write set.
          * <p>
          * Note: The semantics depend on the {@link Options#STORE_CLASS}. See
-         * {@link ITripleStore#commit()}.
+         * {@link AbstractTripleStore#commit()}.
          * 
          * @return The timestamp associated with the commit point. This will be
          *         <code>0L</code> if the write set was empty such that nothing
@@ -2722,7 +2722,7 @@ public class BigdataSail extends SailBase implements Sail {
          * Commit the write set.
          * <p>
          * Note: The semantics depend on the {@link Options#STORE_CLASS}.  See
-         * {@link ITripleStore#commit()}.
+         * {@link AbstractTripleStore#commit()}.
          */
         final public synchronized void commit() throws SailException {
             
@@ -3155,7 +3155,7 @@ public class BigdataSail extends SailBase implements Sail {
          * re-computing the closure.
          * <p>
          * Note: This method does NOT commit the database. See
-         * {@link ITripleStore#commit()} and {@link #getTripleStore()}.
+         * {@link AbstractTripleStore#commit()} and {@link #getTripleStore()}.
          * 
          * @see #removeAllEntailments()
          */

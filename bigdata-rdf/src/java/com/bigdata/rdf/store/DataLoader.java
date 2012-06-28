@@ -1169,8 +1169,8 @@ public class DataLoader {
 
 		final StringBuilder sb = new StringBuilder("\n");
 
-		((RWStrategy) ((Journal) store).getBufferStrategy()).getRWStore()
-				.getStorageStats().showStats(sb);
+		((RWStrategy) ((Journal) store).getBufferStrategy()).getStore()
+				.showAllocators(sb);
 
     	log.info(sb.toString());
 

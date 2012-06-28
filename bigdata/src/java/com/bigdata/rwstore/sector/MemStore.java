@@ -139,7 +139,7 @@ public class MemStore extends AbstractRawStore {
 	 */
     public IMemoryManager getMemoryManager() {
 
-        return m_strategy.getMemoryManager();
+        return m_strategy.getStore();
         
     }
     
@@ -154,7 +154,7 @@ public class MemStore extends AbstractRawStore {
 	 */
 	public MemStore createAllocationContext() {
 
-		return new MemStore(m_strategy.getMemoryManager().createAllocationContext(), m_uuid);
+		return new MemStore(m_strategy.getStore().createAllocationContext(), m_uuid);
 
 	}
 
@@ -183,7 +183,7 @@ public class MemStore extends AbstractRawStore {
 		root.addCounter("UUID", new OneShotInstrument<String>(getUUID()
 				.toString()));
 
-		root.attach(m_strategy.getMemoryManager().getCounters());
+		root.attach(m_strategy.getStore().getCounters());
 		
 		return root;
 

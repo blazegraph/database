@@ -268,7 +268,7 @@ public class DumpJournal {
             
             if (strategy instanceof RWStrategy) {
                 
-                final RWStore store = ((RWStrategy) strategy).getRWStore();
+                final RWStore store = ((RWStrategy) strategy).getStore();
                 
                 final StringBuilder sb = new StringBuilder();
                 
