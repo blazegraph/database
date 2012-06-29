@@ -31,7 +31,10 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.stream.Stream;
 
 /**
  * A checkpoint record is written each time the btree is flushed to the
@@ -335,6 +338,8 @@ public class Checkpoint implements Externalizable {
      * clean and the root address from the last {@link Checkpoint} record is
      * used. Otherwise the address of the root is used (in which case it MUST be
      * defined).
+     * <p>
+     * Note: <strong>This method is invoked by reflection.</strong>
      * 
      * @param btree
      *            The btree.
@@ -399,6 +404,8 @@ public class Checkpoint implements Externalizable {
      * clean and the root address from the last {@link Checkpoint} record is
      * used. Otherwise the address of the root is used (in which case it MUST be
      * defined).
+     * <p>
+     * Note: <strong>This method is invoked by reflection.</strong>
      * 
      * @param htree
      *            The {@link HTree}.
@@ -437,6 +444,63 @@ public class Checkpoint implements Externalizable {
                 htree.getCounter().get(),//
                 htree.getRecordVersion(),//
                 IndexTypeEnum.HTree // IndexTypeEnum
+                );
+           
+    }
+
+    /**
+     * Creates a {@link Checkpoint} record from an {@link HTree}.
+     * <p>
+     * Pre-conditions:
+     * <ul>
+     * <li>The root is clean.</li>
+     * <li>The metadata record is clean.</li>
+     * <li>The optional bloom filter is clean if it is defined.</li>
+     * </ul>
+     * Note: if the root is <code>null</code> then the root is assumed to be
+     * clean and the root address from the last {@link Checkpoint} record is
+     * used. Otherwise the address of the root is used (in which case it MUST be
+     * defined).
+     * <p>
+     * Note: <strong>This method is invoked by reflection.</strong>
+     * 
+     * @param stream
+     *            The {@link HTree}.
+     */
+    public Checkpoint(final Stream stream) {
+        
+        this(stream.getMetadataAddr(),//
+                /*
+                 * root node or leaf.
+                 * 
+                 * Note: if the [root] reference is not defined then we use the
+                 * address in the last checkpoint record. if that is 0L then
+                 * there is no root and a new root leaf will be created on
+                 * demand.
+                 */
+                stream.getRootAddr(),//
+                /*
+                 * optional bloom filter.
+                 * 
+                 * Note: if the [bloomFilter] reference is not defined then we
+                 * use the address in the last checkpoint record. if that is 0L
+                 * then there is no bloom filter. If the [bloomFilter] reference
+                 * is defined but the bloom filter has been disabled, then we
+                 * also write a 0L so that the bloom filter is no longer
+                 * reachable from the new checkpoint.
+                 */
+//                (htree.bloomFilter == null ? htree.getCheckpoint()
+//                        .getBloomFilterAddr()
+//                        : htree.bloomFilter.isEnabled() ? htree.bloomFilter
+//                                .getAddr() : 0L),//
+                0L, // TODO No bloom filter yet. Do we want to support this?
+                0, // htree.height,// Note: HTree is not balanced (height not uniform)
+                0L,//stream.getNodeCount(),//
+                0L,//stream.getLeafCount(),//
+                stream.rangeCount(),//
+                0L,//stream.getCounter().get(),//
+                stream.getRecordVersion(),//
+                IndexTypeEnum.Stream // IndexTypeEnum
                 );
            
     }

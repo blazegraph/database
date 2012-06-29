@@ -31,14 +31,14 @@ package com.bigdata.btree;
  */
 public enum IndexTypeEnum {
 
-	/** BTree. */
-	BTree((short) 0),
+    /** BTree. */
+    BTree((short) 0),
 
-	/** Extendable hash tree. */
-	HTree((short) 1),
-	
-    /** Order preserving solution set. */
-    SolutionSet((short) 2);
+    /** Extendible hash tree. */
+    HTree((short) 1),
+
+    /** Stream. */
+    Stream((short) 2);
 
 	private IndexTypeEnum(final short code) {
 
@@ -61,7 +61,7 @@ public enum IndexTypeEnum {
         case 1:
             return HTree;
         case 2:
-            return SolutionSet;
+            return Stream;
 		default:
 			throw new IllegalArgumentException("code=" + code);
 		}

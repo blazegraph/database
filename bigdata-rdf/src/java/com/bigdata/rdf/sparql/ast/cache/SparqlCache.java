@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -42,6 +43,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.solutions.SolutionSetStream;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
@@ -67,6 +70,7 @@ import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -163,7 +167,21 @@ public class SparqlCache implements ISparqlCache {
     private final CacheJournal cache;
     
     /**
-     * TODO There are several problems here.
+     * FIXME Convert over to Name2Addr and layered resolution with appropriate
+     * concurrency control at each layer. The problem with layering the MemStore
+     * journal mode over the RWStore journal mode is that we wind up with two
+     * journals. There should be one journal with layered addressing (that is,
+     * with a solution set cache in front of the Journal). That might mean using
+     * a concurrent hash map for the resolution and named locks to provide
+     * concurrency control. We could name the solution sets within a scope:
+     * 
+     * <pre>
+     * (cache|query|database)[.queryUUID].namespace[.joinVars]
+     * </pre>
+     * 
+     * or something like that.
+     * <p>
+     * There are several problems here.
      * <p>
      * 1. We need a common semantics for visibility for the named solution sets
      * and the query and update operations. This cache can not provide that
@@ -181,7 +199,7 @@ public class SparqlCache implements ISparqlCache {
      * 4. We need to have metadata about solution sets on hand for explicit
      * CREATEs (e.g., supporting declared join variables).
      */
-    private final ConcurrentHashMap<String/*name*/,SolutionSetMetadata> cacheMap;
+    private final ConcurrentHashMap<String/*name*/,SolutionSetStream> cacheMap;
 //    private final ConcurrentWeakValueCacheWithTimeout<String/* name */, IMemoryManager /* allocationContext */> cacheMap;
     
 //    /**
@@ -288,7 +306,7 @@ public class SparqlCache implements ISparqlCache {
 
 //        this.cacheMap = new ConcurrentWeakValueCacheWithTimeout<String, IMemoryManager>(
 //                0/* queueCapacity */, timeoutNanos);
-        this.cacheMap = new ConcurrentHashMap<String, SolutionSetMetadata>();
+        this.cacheMap = new ConcurrentHashMap<String, SolutionSetStream>();
 
     }
     
@@ -335,16 +353,16 @@ public class SparqlCache implements ISparqlCache {
     @Override
     public void clearAllSolutions(final IEvaluationContext ctx) {
 
-        final Iterator<Map.Entry<String, SolutionSetMetadata>> itr = cacheMap
+        final Iterator<Map.Entry<String, SolutionSetStream>> itr = cacheMap
                 .entrySet().iterator();
 
         while (itr.hasNext()) {
 
-            final Map.Entry<String, SolutionSetMetadata> e = itr.next();
+            final Map.Entry<String, SolutionSetStream> e = itr.next();
 
             final String solutionSet = e.getKey();
             
-            final SolutionSetMetadata sset = e.getValue();
+            final SolutionSetStream sset = e.getValue();
 
             if (log.isInfoEnabled())
                 log.info("solutionSet: " + solutionSet);
@@ -363,7 +381,7 @@ public class SparqlCache implements ISparqlCache {
         if (log.isInfoEnabled())
             log.info("solutionSet: " + solutionSet);
 
-        final SolutionSetMetadata sset = cacheMap.remove(solutionSet);
+        final SolutionSetStream sset = cacheMap.remove(solutionSet);
 
         if (sset != null) {
             sset.clear();
@@ -385,66 +403,84 @@ public class SparqlCache implements ISparqlCache {
         if (src == null)
             throw new IllegalArgumentException();
 
-        /*
-         * TODO Deal with visibility issues on update (when the modified
-         * solution set state becomes visible).
-         */
-
-        SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        SolutionSetStream sset = cacheMap.get(solutionSet);
 
         if (sset == null) {
 
-            sset = new SolutionSetMetadata(solutionSet, getStore(),
-                    getDefaultMetadata(), false/* readOnly */);
-
-            cacheMap.put(solutionSet, sset);
+            sset = _create(solutionSet, getDefaultMetadata());
             
         }
 
-        // write the solutions onto the memory manager.
-        sset.put(src);
+        // write out the solutions.
+        writeSolutions(sset, src);
 
     }
 
-	public void createSolutions(final String solutionSet, final ISPO[] params) {
-
+    /**
+     * Create iff it does not exist.
+     * 
+     * @param solutionSet
+     *            The name.
+     * @param params
+     *            The configuration parameters.
+     * @return A solution set with NOTHING written on it.
+     * 
+     *         TODO ISPO[] params is ignored (you can not configure for a BTree
+     *         or HTree index for the solutions with a specified set of join
+     *         variables for the index).
+     */
+    private SolutionSetStream _create(final String solutionSet,
+            final ISPO[] params) {
         if (solutionSet == null)
             throw new IllegalArgumentException();
-        
-        /*
-         * TODO Deal with visibility issues on update (when the modified
-         * solution set state becomes visible and race conditions on create).
-         */
 
-        SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        SolutionSetStream sset = cacheMap.get(solutionSet);
 
         if (sset != null)
             throw new RuntimeException("Exists: " + solutionSet);
+
+        final StreamIndexMetadata md = new StreamIndexMetadata(
+                solutionSet, UUID.randomUUID());
+
+        sset = SolutionSetStream.create(getStore(), md);
         
-        sset = new SolutionSetMetadata(solutionSet, getStore(),
-                params == null ? getDefaultMetadata() : params, false/* readOnly */);
+        // sset = new SolutionSetMetadata(getStore(),
+        // params == null ? getDefaultMetadata() : params, false/* readOnly */);
 
         cacheMap.put(solutionSet, sset);
 
-        {
+        return sset;
+    }
 
-            final List<IBindingSet[]> emptySolutionSet = new LinkedList<IBindingSet[]>();
-            
-            final ICloseableIterator<IBindingSet[]> src = new CloseableIteratorWrapper<IBindingSet[]>(
-                    emptySolutionSet.iterator());
+    public void createSolutions(final String solutionSet, final ISPO[] params) {
 
-            // write the solutions onto the memory manager.
-            sset.put(src);
-        }
+        final SolutionSetStream sset = _create(solutionSet, params);
+
+        /*
+         * Write an empty solution set.
+         */
+        final List<IBindingSet[]> emptySolutionSet = new LinkedList<IBindingSet[]>();
+
+        final ICloseableIterator<IBindingSet[]> src = new CloseableIteratorWrapper<IBindingSet[]>(
+                emptySolutionSet.iterator());
+
+        // write the solutions.
+        writeSolutions(sset,src);
 
     }
 
+    private void writeSolutions(final SolutionSetStream sset, final ICloseableIterator<IBindingSet[]> src) {
+        
+        sset.put(src);
+        
+    }
+    
 	public ISolutionSetStats getSolutionSetStats(final String solutionSet) {
 
         if (solutionSet == null)
             throw new IllegalArgumentException();
 
-        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        final SolutionSetStream sset = cacheMap.get(solutionSet);
         
         if(sset != null) {
         	
@@ -462,7 +498,7 @@ public class SparqlCache implements ISparqlCache {
         if (solutionSet == null)
             throw new IllegalArgumentException();
 
-        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        final SolutionSetStream sset = cacheMap.get(solutionSet);
 
         if (sset == null)
             throw new IllegalStateException("Not found: " + solutionSet);
@@ -477,7 +513,7 @@ public class SparqlCache implements ISparqlCache {
         if (solutionSet == null)
             throw new IllegalArgumentException();
 
-        final SolutionSetMetadata sset = cacheMap.get(solutionSet);
+        final SolutionSetStream sset = cacheMap.get(solutionSet);
 
         return sset != null;
 
@@ -488,11 +524,15 @@ public class SparqlCache implements ISparqlCache {
      * implicitly rather than explicitly.
      * 
      * @return The metadata describing that solution set.
+     * 
+     *         TODO This is ignored and needs to be reconciled with
+     *         {@link IndexMetadata}. However, we do want to provide
+     *         this metadata in a CREATE schema as triples.
      */
     protected ISPO[] getDefaultMetadata() {
-        
-        return new ISPO[]{};
-        
+
+        return new ISPO[] {};
+
     }
     
 //    @Override

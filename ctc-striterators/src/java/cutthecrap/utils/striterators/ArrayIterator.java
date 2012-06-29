@@ -33,11 +33,12 @@ import java.util.NoSuchElementException;
  *	be used as a source for a <code>Striterator</code>.
  */
 public class ArrayIterator implements Iterator {
-	Object[] m_src = null;
-	int m_index = 0;
+	
+    private Object[] m_src = null;
+	private int m_index = 0;
 
 	/** Constructor takes source object array **/
-	public ArrayIterator(Object[] src) {
+	public ArrayIterator(final Object[] src) {
 		m_src = src;
 	}
 
@@ -51,7 +52,7 @@ public class ArrayIterator implements Iterator {
 		if (m_index < m_src.length)
 			return m_src[m_index++];
 		else
-			throw new NoSuchElementException("ArrayIterator");
+			throw new NoSuchElementException();
 	}
 
 	/** void .. does nothing **/

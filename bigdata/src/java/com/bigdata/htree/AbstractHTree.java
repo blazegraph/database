@@ -632,22 +632,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
     final protected NodeSerializer nodeSer;
 
     /**
-     * The contract for {@link #close()} is to reduce the resource burden of the
-     * index (by discarding buffers) while not rendering the index inoperative.
-     * Unless the {@link AbstractHTree} {@link #isTransient()}, a HTree that
-     * has been {@link #close() closed} MAY be {@link #reopen() reopened} at any
-     * time (conditional on the continued availability of the backing store).
-     * Such an index reference remains valid after a {@link #close()}. A closed
-     * index is transparently restored by either {@link #getRoot()} or
-     * {@link #reopen()}.
-     * <p>
-     * Note: A {@link #close()} on a dirty index MUST discard writes rather than
-     * flushing them to the store and MUST NOT update its {@link Checkpoint}
-     * record - ({@link #close()} is used to discard indices with partial
-     * writes when an {@link AbstractTask} fails). If you are seeking to
-     * {@link #close()} a mutable {@link HTree} that it state can be recovered
-     * by {@link #reopen()} then you MUST write a new {@link Checkpoint} record
-     * before closing the index.
+     * {@inheritDoc}
      * <p>
      * Note: CLOSING A TRANSIENT INDEX WILL DISCARD ALL DATA!
      * <p>
@@ -739,19 +724,15 @@ abstract public class AbstractHTree implements ICounterSetAccess,
     }
 
     /**
-     * This is part of a {@link #close()}/{@link #reopen()} protocol that may
-     * be used to reduce the resource burden of an {@link AbstractBTree}. The
-     * method delegates to {@link #_reopen()} if double-checked locking
-     * demonstrates that the {@link #root} is <code>null</code> (indicating
-     * that the index has been closed). This method is automatically invoked by
-     * a variety of methods that need to ensure that the index is available for
+     * {@inheritDoc}.
+     * <p>
+     * This method delegates to {@link #_reopen()} if double-checked locking
+     * demonstrates that the {@link #root} is <code>null</code> (indicating that
+     * the index has been closed). This method is automatically invoked by a
+     * variety of methods that need to ensure that the index is available for
      * use.
-     * 
-     * @see #close()
-     * @see #isOpen()
-     * @see #getRoot()
      */
-    final protected void reopen() {
+    final public void reopen() {
 
         if (root == null) {
 
@@ -793,16 +774,6 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      */
     abstract protected void _reopen();
 
-    /**
-     * An "open" index has its buffers and root node in place rather than having
-     * to reallocate buffers or reload the root node from the store.
-     * 
-     * @return If the index is "open".
-     * 
-     * @see #close()
-     * @see #reopen()
-     * @see #getRoot()
-     */
     final public boolean isOpen() {
 
         return root != null;
