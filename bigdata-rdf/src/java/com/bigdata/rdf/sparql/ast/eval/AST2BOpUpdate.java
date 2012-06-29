@@ -81,6 +81,11 @@ import com.bigdata.bop.rdf.update.CommitOp;
 import com.bigdata.bop.rdf.update.InsertStatementsOp;
 import com.bigdata.bop.rdf.update.ParseOp;
 import com.bigdata.bop.rdf.update.RemoveStatementsOp;
+import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphEmptyException;
+import com.bigdata.rdf.error.SparqlDynamicErrorException.GraphExistsException;
+import com.bigdata.rdf.error.SparqlDynamicErrorException.SolutionSetDoesNotExistException;
+import com.bigdata.rdf.error.SparqlDynamicErrorException.SolutionSetExistsException;
+import com.bigdata.rdf.error.SparqlDynamicErrorException.UnknownContentTypeException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -91,7 +96,6 @@ import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.AddGraph;
-import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.CopyGraph;
@@ -1100,15 +1104,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
         if (!silent) {
 
-            if (context.conn
-                    .getTripleStore()
-                    .getAccessPath(null/* s */, null/* p */, null/* o */,
-                            sourceGraph).isEmpty()) {
-
-                throw new RuntimeException("Source graph is empty: "
-                        + sourceGraph);
-
-            }
+            assertGraphNotEmpty(context, sourceGraph);
 
         }
         
@@ -1375,19 +1371,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                         );
             }
             
-            if (format == null) {
-                throw new RuntimeException(
-                        "Content-Type not recognized as RDF: "
-                                + contentType);
-            }
+            if (format == null)
+                throw new UnknownContentTypeException(contentType);
 
             final RDFParserFactory rdfParserFactory = RDFParserRegistry
                     .getInstance().get(format);
 
-            if (rdfParserFactory == null) {
-                throw new RuntimeException(
-                        "Parser not found: Content-Type=" + contentType);
-            }
+            if (rdfParserFactory == null)
+                throw new UnknownContentTypeException(contentType);
 
             final RDFParser rdfParser = rdfParserFactory
                     .getParser();
@@ -1587,9 +1578,10 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             // Clear the named solution set.
             if (!context.sparqlCache.clearSolutions(solutionSet) && !silent) {
-
-                throw new SailException("solutionSet=" + solutionSet);
                 
+                // Named solution set does not exists, but should exist.
+                throw new SolutionSetDoesNotExistException(solutionSet);
+    
             }
             
         }
@@ -1702,7 +1694,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 			if (!op.isSilent() && exists) {
 
-				throw new RuntimeException("Solutions exists:" + solutionSet);
+                // Named solution set exists, but should not.
+                throw new SolutionSetExistsException(solutionSet);
 
 			}
 
@@ -1723,19 +1716,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             if (!op.isSilent()) {
 
-				/*
-				 * Note: This *MUST* use the view of the tripleStore which is
-				 * associated with the SailConnection in case the view is
-				 * isolated by a transaction.
-				 */
-				if (context.conn
-						.getTripleStore()
-						.getAccessPath(null/* s */, null/* p */, null/* o */,
-								c.getIV()).rangeCount(false/* exact */) != 0) {
-
-                    throw new RuntimeException("Graph exists: " + c);
-
-                }
+                assertGraphExists(context, c);
 
             }
             
@@ -2129,6 +2110,76 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
     }
 
+    /**
+     * Throw an exception if the graph is empty.
+     * 
+     * @throws GraphEmptyException
+     *             if the graph does not exist and/or is empty.
+     */
+    static private void assertGraphNotEmpty(final AST2BOpUpdateContext context,
+            final BigdataURI sourceGraph) {
+
+        if (sourceGraph == null || sourceGraph.equals(BD.NULL_GRAPH)) {
+
+            /*
+             * The DEFAULT graph is considered non-empty.
+             * 
+             * Note: [null] for the sourceGraph indicates the default graph. But
+             * the nullGraph can also indicate the default graph (empirically
+             * observed).
+             */
+            
+            return;
+
+        }
+
+        if (sourceGraph.getIV() == null) {
+
+            // Proof that the graph does not exist.
+            throw new GraphEmptyException(sourceGraph);
+            
+        }
+
+        if (context.conn
+                .getTripleStore()
+                .getAccessPath(null/* s */, null/* p */, null/* o */,
+                        sourceGraph).isEmpty()) {
+
+            // Proof that the graph is empty.
+            throw new GraphEmptyException(sourceGraph);
+            
+        }
+        
+    }
+    
+    /**
+     * Throw an exception unless the graph is non-empty.
+     * <p>
+     * Note: This *MUST* use the view of the tripleStore which is associated
+     * with the SailConnection in case the view is isolated by a transaction.
+     * <P>
+     * Note: If the IV could not be resolved, then that is proof that there is
+     * no named graph for that RDF Resource.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/569
+     *      (LOAD-CREATE-LOAD using virgin journal fails with "Graph exists"
+     *      exception)
+     */
+    static private void assertGraphExists(final AST2BOpUpdateContext context,
+            final BigdataURI c) {
+
+        if (c.getIV() != null
+                && context.conn
+                        .getTripleStore()
+                        .getAccessPath(null/* s */, null/* p */, null/* o */,
+                                c.getIV()).rangeCount(false/* exact */) != 0) {
+
+            throw new GraphExistsException(c);
+
+        }
+        
+    }
+    
     private static final IBindingSet[] EMPTY_BINDING_SETS = new IBindingSet[0];
     private static final Resource[] NO_CONTEXTS = new Resource[0];
 

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.error;
 
 /**
- * A SPARQL dynamic (runtime) error.
+ * A SPARQL error detected by static analysis.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -44,16 +44,16 @@ public class SparqlStaticErrorException extends W3CQueryLanguageException {
      * @param errorCode
      *            The four digit error code.
      */
-    public SparqlStaticErrorException(int errorCode) {
-        
-        super(LanguageFamily.SP, ErrorCategory.ST, errorCode, null/* msg */);
-        
+    public SparqlStaticErrorException(final int errorCode) {
+
+        super(LanguageFamily.SP, ErrorCategory.ST, errorCode, (String) null/* msg */);
+
     }
 
-    static protected String toURI(int errorCode) {
+    static protected String toURI(final int errorCode) {
 
         return W3CQueryLanguageException.toURI(LanguageFamily.SP,
-                ErrorCategory.ST, errorCode);
+                ErrorCategory.ST, errorCode, null/* params */);
 
     }
 }

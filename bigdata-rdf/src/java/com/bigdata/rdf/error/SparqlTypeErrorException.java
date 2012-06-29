@@ -84,14 +84,14 @@ public class SparqlTypeErrorException extends W3CQueryLanguageException {
 	 */
 	protected SparqlTypeErrorException(final int errorCode, final String uri) {
 
-        super(LanguageFamily.SP, ErrorCategory.TY, errorCode, null/* msg */);
+        super(LanguageFamily.SP, ErrorCategory.TY, errorCode, (String) null/* msg */);
 
     }
 
     static protected String toURI(final int errorCode) {
 
         return W3CQueryLanguageException.toURI(LanguageFamily.SP,
-                ErrorCategory.TY, errorCode);
+                ErrorCategory.TY, errorCode, null/* params */);
 
     }
 
