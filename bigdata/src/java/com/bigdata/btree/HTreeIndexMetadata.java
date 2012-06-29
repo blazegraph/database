@@ -273,12 +273,24 @@ public class HTreeIndexMetadata extends IndexMetadata {
 
 	}
 
-	@Override
+    /**
+     * The initial version.
+     */
+    private static transient final int VERSION0 = 0x0;
+
+    /**
+     * The version that will be serialized by this class.
+     */
+    private static transient final int CURRENT_VERSION = VERSION0;
+
+    @Override
 	public void readExternal(final ObjectInput in) throws IOException,
 			ClassNotFoundException {
 
 		super.readExternal(in);
 
+		final int version = LongPacker.unpackInt(in);
+		
 		keyLen = LongPacker.unpackInt(in);
 
 		addressBits = LongPacker.unpackInt(in);
@@ -290,10 +302,12 @@ public class HTreeIndexMetadata extends IndexMetadata {
 	@Override
 	public void writeExternal(final ObjectOutput out) throws IOException {
 
-		final int version = CURRENT_VERSION;
-
 		super.writeExternal(out);
 
+        final int version = CURRENT_VERSION;
+
+		LongPacker.packLong(out, version);
+		
 		LongPacker.packLong(out, keyLen);
 
 		LongPacker.packLong(out, addressBits);

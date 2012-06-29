@@ -1,9 +1,8 @@
 package com.bigdata.btree;
 
-import java.util.Iterator;
-
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -13,6 +12,15 @@ import com.bigdata.striterator.ICloseableIterator;
  * Interface in support of the {@link Checkpoint} record protocol.
  * 
  * @author thompsonbry@users.sourceforge.net
+ * 
+ *         TODO There should be a high level method to insert objects into the
+ *         index (index "entries" not tuples - the index will need to compute
+ *         the appropriate key, etc. in an implementation dependent manner).
+ * 
+ *         TODO Try to lift out an abstract implementation of this interface for
+ *         HTree, BTree, and Stream. This will be another step towards GIST
+ *         support. There are protected methods which are used on those classes
+ *         which should be lifted into the abstract base class.
  */
 public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 
@@ -42,8 +50,9 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
     public long getMetadataAddr();
     
     /**
-     * The address of the last written root node or leaf -or- 0L if there is
-     * no root and one should be created on demand.
+     * The address of the last written root of the persistent data structure
+     * -or- <code>0L</code> if there is no root. A <code>0L</code> return may be
+     * an indication that an empty data structure will be created on demand.
      */
     public long getRootAddr();
     
@@ -122,10 +131,6 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 	 * scale-out.
 	 * 
 	 * @see IIndex#getIndexMetadata()
-	 * 
-	 *      TODO This needs to be abstracted to an interface with different
-	 *      implementation classes for different kinds of persistence capable
-	 *      data structures (HTree, BTree, named solution sets, etc).
 	 */
 	public IndexMetadata getIndexMetadata();
 
@@ -149,18 +154,59 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess {
 
     /**
      * Visit all entries in the index in the natural order of the index.
-     * <p>
-     * Note: Some implementations MAY return an {@link ICloseableIterator}. The
-     * caller needs to be aware of this and handle close any obtained iterator
-     * which implements that interface.
-     * 
-     * @see IRangeQuery#rangeIterator()
      */
-    public Iterator rangeIterator();
+    public ICloseableIterator<?> scan();
 
     /**
      * Remove all entries in the index.
      */
     public void removeAll();
 
+    /*
+     * reopen() / close() protocol
+     */
+    
+    /**
+     * (Re-) open the index. This method is part of a {@link #close()} /
+     * {@link #reopen()} protocol. That protocol may be used to reduce the
+     * resource burden of an index. This method is automatically invoked by a
+     * variety of methods that need to ensure that the index is available for
+     * use.
+     * 
+     * @see #close()
+     * @see #isOpen()
+     * @see #getRoot()
+     */
+    public void reopen();
+    
+    /**
+     * The contract for {@link #close()} is to reduce the resource burden of the
+     * index while not rendering the index inoperative. An index that has been
+     * {@link #close() closed} MAY be {@link #reopen() reopened} at any time
+     * (conditional on the continued availability of the backing store). Such an
+     * index reference remains valid after a {@link #close()}. A closed index is
+     * transparently {@link #reopen() reopened} by any access to the index data
+     * (scanning the index, probing the index, etc).
+     * <p>
+     * Note: A {@link #close()} on a dirty index MUST discard writes rather than
+     * flushing them to the store and MUST NOT update its {@link Checkpoint}
+     * record - ({@link #close()} is used to discard indices with partial writes
+     * when an {@link AbstractTask} fails). If you are seeking to
+     * {@link #close()} a mutable index view that state can be recovered by
+     * {@link #reopen()} then you MUST write a new {@link Checkpoint} record
+     * before closing the index.
+     */
+    public void close();
+    
+    /**
+     * An "open" index has may have some buffered data. A closed index will have
+     * to re-read any backing data from the backing store.
+     * 
+     * @return If the index is "open".
+     * 
+     * @see #close()
+     * @see #reopen()
+     */
+    public boolean isOpen();
+    
 }

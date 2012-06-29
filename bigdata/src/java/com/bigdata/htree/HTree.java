@@ -44,6 +44,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.EntryScanIterator;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDirtyListener;
@@ -62,6 +63,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An mutable persistence capable extensible hash tree.
@@ -425,14 +427,14 @@ public class HTree extends AbstractHTree
 	 * @param store
 	 *            The store.
 	 * @param checkpoint
-	 *            A {@link Checkpoint} record for that {@link BTree}.
+	 *            A {@link Checkpoint} record for that {@link HTree}.
 	 * @param metadata
-	 *            The metadata record for that {@link BTree}.
+	 *            The metadata record for that {@link HTree}.
 	 * @param readOnly
-	 *            When <code>true</code> the {@link BTree} will be immutable.
+	 *            When <code>true</code> the {@link HTree} will be immutable.
 	 * 
-	 * @see BTree#create(IRawStore, IndexMetadata)
-	 * @see BTree#load(IRawStore, long, boolean)
+	 * @see HTree#create(IRawStore, IndexMetadata)
+	 * @see HTree#load(IRawStore, long, boolean)
 	 */
 //	 * @throws IllegalArgumentException
 //	 *             if addressBits is LT ONE (1).
@@ -521,13 +523,13 @@ public class HTree extends AbstractHTree
     }
 
     /**
-	 * Sets the {@link #checkpoint} and initializes the mutable fields from the
-	 * � * checkpoint record. In order for this operation to be atomic, the
-	 * caller must be synchronized on the {@link HTree} or otherwise guaranteed
-	 * to have exclusive access, e.g., during the ctor or when the {@link HTree}
-	 * is mutable and access is therefore required to be single-threaded.
-	 */
-    private void setCheckpoint(final Checkpoint checkpoint) {
+     * Sets the {@link #checkpoint} and initializes the mutable fields from the
+     * checkpoint record. In order for this operation to be atomic, the caller
+     * must be synchronized on the {@link HTree} or otherwise guaranteed to have
+     * exclusive access, e.g., during the ctor or when the {@link HTree} is
+     * mutable and access is therefore required to be single-threaded.
+     */
+    protected void setCheckpoint(final Checkpoint checkpoint) {
 
         this.checkpoint = checkpoint; // save reference.
         
@@ -1000,15 +1002,19 @@ public class HTree extends AbstractHTree
         
         if (checkpoint != null && getRoot() != null
                 && checkpoint.getRootAddr() != getRoot().getIdentity()) {
+            
             recycle(checkpoint.getRootAddr());
+            
         }
 
         if (checkpoint != null) {
-        	recycle(checkpoint.getCheckpointAddr());
+            
+            recycle(checkpoint.getCheckpointAddr());
+            
         }
         
         // create new checkpoint record.
-        checkpoint = metadata.newCheckpoint(this);
+        checkpoint = newCheckpoint();
         
         // write it on the store.
         checkpoint.write(store);
@@ -1026,6 +1032,55 @@ public class HTree extends AbstractHTree
         
         // return the checkpoint record.
         return checkpoint;
+        
+    }
+
+    /**
+     * Create a {@link Checkpoint} for a {@link HTree}.
+     * <p>
+     * The caller is responsible for writing the {@link Checkpoint} record onto
+     * the store.
+     * <p>
+     * The class identified by {@link IndexMetadata#getCheckpointClassName()}
+     * MUST declare a public constructor with the following method signature
+     * 
+     * <pre>
+     *   ...( HTree htree )
+     * </pre>
+     * 
+     * @return The {@link Checkpoint}.
+     */
+    @SuppressWarnings("unchecked")
+    final private Checkpoint newCheckpoint() {
+        
+        try {
+            
+            @SuppressWarnings("rawtypes")
+            final Class cl = Class.forName(metadata.getCheckpointClassName());
+            
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor on the Checkpoint class
+             * [cl].
+             */
+            
+            @SuppressWarnings("rawtypes")
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    HTree.class //
+                    });
+
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { //
+                            this //
+                    });
+            
+            return checkpoint;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
 
@@ -1609,7 +1664,13 @@ public class HTree extends AbstractHTree
 		}
 	}
 
-	public void removeAll() {
+    final public ICloseableIterator<?> scan() {
+        
+        return new EntryScanIterator(rangeIterator());
+        
+    }
+
+    public void removeAll() {
 		
 		DirectoryPage root = getRoot();
 		root.removeAll();
@@ -1656,7 +1717,7 @@ public class HTree extends AbstractHTree
 	 * 
 	 * @return The newly created {@link HTree}.
 	 * 
-	 * @see #load(IRawStore, long)
+	 * @see #load(IRawStore, long, boolean)
 	 * 
 	 * @throws IllegalStateException
 	 *             If you attempt to create two {@link HTree} objects from the

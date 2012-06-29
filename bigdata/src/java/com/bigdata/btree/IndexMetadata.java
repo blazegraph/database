@@ -2444,7 +2444,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     /**
      * The initial version.
      */
-    protected static transient final int VERSION0 = 0x0;
+    private static transient final int VERSION0 = 0x0;
 
 	/**
 	 * This version adds support for {@link ILeafData#getRawRecord(int)} and
@@ -2452,19 +2452,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * earlier versions and {@link IndexMetadata#getMaxRecLen()} will report
 	 * {@link Options#DEFAULT_MAX_REC_LEN}.
 	 */
-    protected static transient final int VERSION1 = 0x1;
+    private static transient final int VERSION1 = 0x1;
 
     /**
      * This version adds support for {@link HTree}. This includes
      * {@link #addressBits} and {@link #htreeClassName}.
      */
-    protected static transient final int VERSION2 = 0x2;
+    private static transient final int VERSION2 = 0x2;
 
     /**
      * This version adds support for a fixed length key option for the
      * {@link HTree} using {@link #keyLen}.
      */
-    protected static transient final int VERSION3 = 0x3;
+    private static transient final int VERSION3 = 0x3;
 
 	/**
 	 * This version moves the {@link HTree} specific metadata into a derived
@@ -2474,18 +2474,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * {@link #indexType} field. This field defaults to
 	 * {@link IndexTypeEnum#BTree} for all prior versions.
 	 */
-    protected static transient final int VERSION4 = 0x4;
+    private static transient final int VERSION4 = 0x4;
 
     /**
      * The version that will be serialized by this class.
      */
-    protected static transient final int CURRENT_VERSION = VERSION4;
+    private static transient final int CURRENT_VERSION = VERSION4;
 
     /**
 	 * The actual version as set by {@link #readExternal(ObjectInput)} and
 	 * {@link #writeExternal(ObjectOutput)}.
 	 */
-    protected transient int version;
+    private transient int version;
     
     /**
      * @todo review generated record for compactness.
@@ -2870,104 +2870,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
     
-    /**
-     * Create a {@link Checkpoint} for a {@link BTree}.
-     * <p>
-     * The caller is responsible for writing the {@link Checkpoint} record onto
-     * the store.
-     * <p>
-     * The class identified by {@link #getCheckpointClassName()} MUST declare a
-     * public constructor with the following method signature
-     * 
-     * <pre>
-     *   ...( BTree btree )
-     * </pre>
-     * 
-     * @param btree
-     *            The {@link BTree}.
-     * 
-     * @return The {@link Checkpoint}.
-     */
-    @SuppressWarnings("unchecked")
-    final public Checkpoint newCheckpoint(final BTree btree) {
-        
-        try {
-            
-            final Class cl = Class.forName(getCheckpointClassName());
-            
-            /*
-             * Note: A NoSuchMethodException thrown here means that you did not
-             * declare the required public constructor.
-             */
-            
-            final Constructor ctor = cl.getConstructor(new Class[] {
-                    BTree.class //
-                    });
-
-            final Checkpoint checkpoint = (Checkpoint) ctor
-                    .newInstance(new Object[] { //
-                            btree //
-                    });
-            
-            return checkpoint;
-            
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-
-    /**
-     * Create a {@link Checkpoint} for a {@link BTree}.
-     * <p>
-     * The caller is responsible for writing the {@link Checkpoint} record onto
-     * the store.
-     * <p>
-     * The class identified by {@link #getCheckpointClassName()} MUST declare a
-     * public constructor with the following method signature
-     * 
-     * <pre>
-     *   ...( HTree btree )
-     * </pre>
-     * 
-     * @param htree
-     *            The {@link HTree}.
-     * 
-     * @return The {@link Checkpoint}.
-     */
-    @SuppressWarnings("unchecked")
-    final public Checkpoint newCheckpoint(final HTree htree) {
-        
-        try {
-            
-            final Class cl = Class.forName(getCheckpointClassName());
-            
-            /*
-             * Note: A NoSuchMethodException thrown here means that you did not
-             * declare the required public constructor.
-             */
-            
-            final Constructor ctor = cl.getConstructor(new Class[] {
-                    HTree.class //
-                    });
-
-            final Checkpoint checkpoint = (Checkpoint) ctor
-                    .newInstance(new Object[] { //
-                            htree //
-                    });
-            
-            return checkpoint;
-            
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-
     /**
      * <p>
      * Factory for thread-safe {@link IKeyBuilder} objects for use by

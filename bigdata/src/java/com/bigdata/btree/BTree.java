@@ -41,13 +41,13 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * <p>
@@ -159,8 +159,9 @@ import com.bigdata.rwstore.IRWStrategy;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements ICommitter, ICheckpointProtocol {// ILocalBTreeView {
-    
+public class BTree extends AbstractBTree implements ICommitter,
+        ICheckpointProtocol {// ILocalBTreeView {
+
     final public int getHeight() {
         
         return height;
@@ -1009,11 +1010,14 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
          */
         if (checkpoint != null && getRoot() != null
                 && checkpoint.getRootAddr() != getRoot().identity) {
-            recycle(checkpoint != null ? checkpoint.getRootAddr() : IRawStore.NULL);
+
+            recycle(checkpoint != null ? checkpoint.getRootAddr()
+                    : IRawStore.NULL);
+
         }
         
         // create new checkpoint record.
-        checkpoint = metadata.newCheckpoint(this);
+        checkpoint = newCheckpoint();
         
         // write it on the store.
         checkpoint.write(store);
@@ -1034,6 +1038,55 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
         
     }
     
+    /**
+     * Create a {@link Checkpoint} for a {@link BTree}.
+     * <p>
+     * The caller is responsible for writing the {@link Checkpoint} record onto
+     * the store.
+     * <p>
+     * The class identified by {@link IndexMetadata#getCheckpointClassName()}
+     * MUST declare a public constructor with the following method signature
+     * 
+     * <pre>
+     *   ...( BTree btree )
+     * </pre>
+     * 
+     * @return The {@link Checkpoint}.
+     */
+    @SuppressWarnings("unchecked")
+    final private Checkpoint newCheckpoint() {
+        
+        try {
+            
+            @SuppressWarnings("rawtypes")
+            final Class cl = Class.forName(metadata.getCheckpointClassName());
+            
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor on the Checkpoint class
+             * [cl].
+             */
+            
+            @SuppressWarnings("rawtypes")
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    BTree.class //
+                    });
+
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { //
+                            this //
+                    });
+            
+            return checkpoint;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+
     final public Checkpoint getCheckpoint() {
 
         if (checkpoint == null)
@@ -1249,6 +1302,12 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
     	
     }
 
+    final public ICloseableIterator<?> scan() {
+        
+        return new EntryScanIterator(rangeIterator());
+        
+    }
+    
     /**
      * Remove all entries in the B+Tree.
      * <p>
