@@ -19,6 +19,7 @@ import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.HTreeIndexMetadata;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -41,7 +42,7 @@ import cutthecrap.utils.striterators.Filterator;
 /**
  * A scalable DISTINCT operator based for {@link SPO}s.
  * <p>
- * Note: While highly scalable, this class will absorb a miminum of one direct
+ * Note: While highly scalable, this class will absorb a minimum of one direct
  * buffer per use. This is because we do not have access to the memory manager
  * of the {@link IRunningQuery} on which the distinct filter is being run. For
  * this reason, it is allocating a private {@link MemStore} and using a
@@ -236,7 +237,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
         /**
          * The metadata used to create the index.
          */
-        private final HTreeIndexMetadata metadata;
+        private final IndexMetadata metadata;
 
         /**
          * The object used to format the keys for the index.
@@ -258,9 +259,22 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * Note: Maybe either a {@link BTree} or an {@link HTree}. The code has
          * paths for both.
          */
-        // TODO Edit HTree/BTree here.
-        private volatile BTree index;
-//        private volatile HTree index;
+        private volatile ICheckpointProtocol index;
+        
+        /**
+         * When <code>true</code>, the {@link BTree} will be used. When
+         * <code>false</code> the {@link HTree}.
+         * <p>
+         * Note: Hisorical testing indicated that the {@link BTree} was faster
+         * for this application.
+         * 
+         * TODO Edit HTree/BTree here.
+         */
+        private final boolean isBTree = true;
+        
+        /**
+         * The backing store (native memory).
+         */
         private volatile MemStore store;
         
         @Override
@@ -303,17 +317,23 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
                 filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
 
-                metadata = new HTreeIndexMetadata(UUID.randomUUID());
+                // Setup BTree/HTree.
+                metadata = isBTree ? new IndexMetadata(UUID.randomUUID())
+                        : new HTreeIndexMetadata(UUID.randomUUID());
 
                 // IFF BTree
                 metadata.setBranchingFactor(NativeDistinctFilter.this.getProperty(
                         BTreeAnnotations.BRANCHING_FACTOR,
-                        256));// TODO Overriden here. BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
+                        256));// TODO Overridden here. BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
 
                 // IFF HTree
-                metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
-                        HTreeAnnotations.ADDRESS_BITS,
-                        HTreeAnnotations.DEFAULT_ADDRESS_BITS));
+                if (metadata instanceof HTreeIndexMetadata) {
+                    ((HTreeIndexMetadata) metadata)
+                            .setAddressBits(NativeDistinctFilter.this
+                                    .getProperty(
+                                            HTreeAnnotations.ADDRESS_BITS,
+                                            HTreeAnnotations.DEFAULT_ADDRESS_BITS));
+                }
 
                 metadata.setRawRecords(NativeDistinctFilter.this.getProperty(
                         Annotations.RAW_RECORDS,
@@ -329,7 +349,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
                                 Annotations.WRITE_RETENTION_QUEUE_CAPACITY,
                                 Annotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
 
-                final int ratio = 32; // TODO Config/tune.
+                final int ratio = 32; // TODO Config/tune front-coding ratio.
 
                 @SuppressWarnings("rawtypes")
                 final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
@@ -370,9 +390,16 @@ public class NativeDistinctFilter extends BOpFilterBase {
             // Vector
             Arrays.sort(a, 0, a.length, UnsignedByteArrayComparator.INSTANCE);
             // Insert
-            for (int i = 0; i < a.length; i++) {
-                add(index, a[i]);
-            }
+            if (index instanceof BTree) {
+                for (int i = 0; i < a.length; i++) {
+                    add((BTree) index, a[i]);
+                }
+            } else if (index instanceof HTree) {
+                for (int i = 0; i < a.length; i++) {
+                    add((HTree) index, a[i]);
+                }
+            } else
+                throw new AssertionError();
         }
         
         /**
@@ -392,11 +419,13 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
             /*
              * Create the index. It will support incremental eviction and
-             * persistence.
+             * persistence (against the memory manager).
              */
-            // TODO Edit HTree/BTree here.
-            index = BTree.create(store, metadata);
-//            index = HTree.create(store, metadata);
+            if (isBTree) {
+                index = BTree.create(store, metadata);
+            } else {
+                index = HTree.create(store, (HTreeIndexMetadata) metadata);
+            }
             
         }
         
@@ -451,9 +480,20 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
             final byte[] key = keyBuilder.getKey();
             
-            if (index != null && index.contains(key)) {
-                // Already in the index.
-                return false;
+            if (index != null) {
+                // Test index for this key.
+                if (index instanceof BTree) {
+                    if (((BTree) index).contains(key)) {
+                        // Already in the index.
+                        return false;
+                    }
+                } else if (index instanceof HTree) {
+                    if (((HTree) index).contains(key)) {
+                        // Already in the index.
+                        return false;
+                    }
+                } else
+                    throw new AssertionError();
             }
             
             // Add to LRU.
