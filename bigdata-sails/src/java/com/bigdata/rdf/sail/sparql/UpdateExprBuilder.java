@@ -38,7 +38,11 @@ import java.util.List;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
@@ -130,7 +134,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         final InsertData op = new InsertData();
 
-        op.setData(doQuadsData(node, data));
+        op.setData(doQuadsData(node, data, true/* allowBlankNodes */));
 
         return op;
 
@@ -148,7 +152,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         final DeleteData op = new DeleteData();
 
-        op.setData(doQuadsData(node, data));
+        // blank nodes are disallowed within DELETE DATA (per the spec).
+        op.setData(doQuadsData(node, data, false/* allowBlankNodes */));
 
 	    return op;
    
@@ -403,14 +408,14 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             op.setTargetSolutionSet(target.getValueExpression().getName());
             
-            final ISPO[] params = doQuadsData(node, data);
+            final BigdataStatement[] params = doQuadsData(node, data, true/* allowBlankNodes */);
 
             if (params != null && params.length > 0) {
-                
+
                 op.setParams(params);
-                
+
             }
-            
+
         }
         
         if (node.isSilent())
@@ -689,9 +694,13 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * @return A flat {@link ISPO}[] modeling the quad data.
      * 
      * @throws VisitorException
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/573">
+     *      NullPointerException when attempting to INSERT DATA containing a
+     *      blank node </a>
      */
-    private ISPO[] doQuadsData(final Node node, final Object data)
-            throws VisitorException {
+    private BigdataStatement[] doQuadsData(final Node node, final Object data,
+            final boolean allowBlankNodes) throws VisitorException {
 
         final GroupGraphPattern parentGP = graphPattern;
         graphPattern = new GroupGraphPattern();
@@ -746,23 +755,85 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         while (itr.hasNext()) {
 
             final StatementPatternNode sp = itr.next();
+            
+            if (!allowBlankNodes) {
+                // Blank nodes are not permitted in DELETE DATA.
+                assertNotAnonymousVariable(sp.s());
+                assertNotAnonymousVariable(sp.o());
+            }
 
-            final ISPO spo = new SPO(//
-                    sp.s().getValue().getIV(), //
-                    sp.p().getValue().getIV(), //
-                    sp.o().getValue().getIV(),//
-                    (sp.c() != null ? sp.c().getValue().getIV() : null),//
-                    StatementEnum.Explicit//
-            );
+            final BigdataResource s = (BigdataResource) toValue(sp.s());
+            final BigdataValue o = toValue(sp.o());
+            
+            final BigdataStatement spo = context.valueFactory.createStatement(//
+                (BigdataResource) s, //
+                (BigdataURI) sp.p().getValue(), //
+                (BigdataValue) o,//
+                (BigdataResource) (sp.c() != null ? sp.c().getValue(): null),//
+                StatementEnum.Explicit//
+                );
+//            final ISPO spo = new SPO(//
+//                    sp.s().getValue().getIV(), //
+//                    sp.p().getValue().getIV(), //
+//                    sp.o().getValue().getIV(),//
+//                    (sp.c() != null ? sp.c().getValue().getIV() : null),//
+//                    StatementEnum.Explicit//
+//            );
 
             stmts.add(spo);
 
         }
 
-        final ISPO[] a = stmts.toArray(new ISPO[stmts.size()]);
+        final BigdataStatement[] a = stmts.toArray(new BigdataStatement[stmts
+                .size()]);
 
         return a;
 
+    }
+
+    /**
+     * Method used to correctly reject blank nodes in a DELETE DATA clause.
+     * 
+     * @param t
+     *            A Subject or Object term.
+     */
+    private void assertNotAnonymousVariable(final TermNode t)
+            throws VisitorException {
+
+        if (!t.isVariable())
+            return;
+        
+        final VarNode v = (VarNode) t;
+        
+        if (v.isAnonymous())
+            throw new VisitorException(
+                    "BlankNode not permitted in this context: " + t);
+        
+    }
+
+    /**
+     * Convert the {@link TermNode} to a {@link BigdataValue}. IFF the
+     * {@link TermNode} is an anonymous variable, then it is converted into a
+     * blank node whose ID is the name of that anonymous variable. This is used
+     * to turn anonymous variables back into blank nodes for INSERT DATA (DELETE
+     * DATA does not allow blank nodes).
+     * 
+     * @param t
+     *            The {@link TermNode}.
+     *            
+     * @return The {@link BigdataValue}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/573">
+     *      NullPointerException when attempting to INSERT DATA containing a
+     *      blank node </a>
+     */
+    private BigdataValue toValue(final TermNode t) {
+        if (t.isVariable() && ((VarNode) t).isAnonymous()) {
+            final BigdataBNode s = context.valueFactory.createBNode(t
+                    .getValueExpression().getName());
+            return s;
+        }
+        return t.getValue();
     }
 
     /**

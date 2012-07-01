@@ -30,7 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.model.BigdataStatement;
 
 /**
  * This operation creates a graph in the Graph Store (this operation is a NOP
@@ -55,9 +55,9 @@ public class CreateGraph extends AbstractOneGraphManagement {
     public interface Annotations extends AbstractOneGraphManagement.Annotations {
         
         /**
-         * The {@link ISPO}[] which provides the provisioning information for
-         * the named solution set (optional, even when creating a named solution
-         * set).
+         * The {@link BigdataStatement}[] which provides the provisioning
+         * information for the named solution set (optional, even when creating
+         * a named solution set).
          */
         String PARAMS = "params";
         
@@ -91,16 +91,16 @@ public class CreateGraph extends AbstractOneGraphManagement {
     /**
      * Return the parameters used to provision a named solution set.
      */
-    public ISPO[] getParams() {
+    public BigdataStatement[] getParams() {
 
-        return (ISPO[]) getProperty(Annotations.PARAMS);
-        
+        return (BigdataStatement[]) getProperty(Annotations.PARAMS);
+
     }
 
-    public void setParams(final ISPO[] params) {
+    public void setParams(final BigdataStatement[] params) {
 
         setProperty(Annotations.PARAMS, params);
-        
+
     }
 
 }

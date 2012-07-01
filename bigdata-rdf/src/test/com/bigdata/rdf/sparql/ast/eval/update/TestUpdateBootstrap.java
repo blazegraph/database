@@ -68,10 +68,15 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
 /**
- * Boot strapped test suite for core UPDATE functionality.
+ * Bootstrapped test suite for core UPDATE functionality based on BOP
+ * evaluation.
+ * <p>
+ * Note: We are not using BOP evaluation for SPARQL UPDATE at this time, so this
+ * test is NOT being run in CI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestUpdateBootstrap.java 6167 2012-03-20 17:47:30Z thompsonbry
+ *          $
  */
 public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
 
@@ -141,7 +146,22 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
                     new SPO(dc, rdfsLabel, dcL, g1, StatementEnum.Explicit),//
             };
             
-            op.setData(data);
+            /*
+             * FIXME Finish this test up (again). It is running into a conflict
+             * with the Value to IV resolution.  It seems that it should be using
+             * BigdataValues here since the lexicon add/resolve step has not yet
+             * been executed (it runs below). Note that this code is old. It was
+             * a mock up for the evaluation of SPARQL UPDATE on the query engine.
+             * We do not evaluate SPARQL update that way, so this class could just
+             * go away.
+             * 
+             * @see <a
+             * href="https://sourceforge.net/apps/trac/bigdata/ticket/573">
+             * NullPointerException when attempting to INSERT DATA containing a
+             * blank node </a>
+             */
+            //op.setData(data);
+            fail("Finish test");
             
         }
 

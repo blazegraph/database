@@ -66,6 +66,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.parser.sparql.DC;
 import org.openrdf.query.parser.sparql.FOAF;
+import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 
@@ -75,8 +76,16 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
  * Proxied test suite.
- *
+ * <p>
+ * Note: Also see {@link SPARQLUpdateTest}. These two test suites SHOULD be kept
+ * synchronized. {@link SPARQLUpdateTest} runs against a local kb instance while
+ * this class runs against the NSS. The two test suites are not exactly the same
+ * because one uses the {@link RemoteRepository} to commuicate with the NSS
+ * while the other uses the local API.
+ * 
  * @param <S>
+ * 
+ * @see SPARQLUpdateTest
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
@@ -109,12 +118,9 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
          * 
          * TODO Do this using LOAD or just write tests for LOAD?
          */
-        final AddOp add = new AddOp(
-                new File(
-                        "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig"),
+        loadFile(
+                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
                 RDFFormat.TRIG);
-        
-        m_repo.add(add);
 
         bob = f.createURI(EX_NS, "bob");
         alice = f.createURI(EX_NS, "alice");
@@ -132,7 +138,25 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 	    super.tearDown();
 	    
 	}
-	
+
+    /**
+     * Load a file.
+     * 
+     * @param file
+     *            The file.
+     * @param format
+     *            The file format.
+     * @throws Exception
+     */
+    protected void loadFile(final String file, RDFFormat format)
+            throws Exception {
+
+        final AddOp add = new AddOp(new File(file), format);
+
+        m_repo.add(add);
+
+    }
+
     /**
      * Get a set of useful namespace prefix declarations.
      * 
@@ -340,6 +364,40 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(msg, hasStatement(alice, FOAF.KNOWS, null, true));
     }
 
+    /**
+     * <pre>
+     * DELETE WHERE {GRAPH ?g {?x foaf:name ?y} }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/568 (DELETE WHERE
+     *      fails with Java AssertionError)
+     */
+    //@Test
+    public void testDeleteWhereShortcut2()
+        throws Exception
+    {
+        
+//        logger.debug("executing testDeleteWhereShortcut2");
+
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE WHERE { GRAPH ?g {?x foaf:name ?y } }");
+
+        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+        String msg = "foaf:name properties should have been deleted";
+        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        msg = "foaf:knows properties should not have been deleted";
+        assertTrue(msg, hasStatement(bob, FOAF.KNOWS, null, true));
+        assertTrue(msg, hasStatement(alice, FOAF.KNOWS, null, true));
+
+    }
+    
     //@Test
     public void testDeleteWhere()
         throws Exception
@@ -1170,6 +1228,113 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(msg, hasStatement(bob, FOAF.KNOWS, alice, true, graph2));
     }
 
+    //@Test
+    public void testUpdateSequenceInsertDeleteExample9()
+        throws Exception
+    {
+//        logger.debug("executing testUpdateSequenceInsertDeleteExample9");
+
+        // replace the standard dataset with one specific to this case.
+        m_repo.prepareUpdate("DROP ALL").evaluate();
+        // Note: local copy of: /testdata-update/dataset-update-example9.trig
+        m_repo.prepareUpdate(
+                "LOAD <file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update-example9.trig>")
+                .evaluate();
+
+        final URI book1 = f.createURI("http://example/book1");
+//        URI book3 = f.createURI("http://example/book3");
+        final URI bookStore = f.createURI("http://example/bookStore");
+        final URI bookStore2 = f.createURI("http://example/bookStore2");
+        
+        final StringBuilder update = new StringBuilder();
+        update.append("prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ");
+        update.append("prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>  ");
+        update.append("prefix xsd: <http://www.w3.org/2001/XMLSchema#>  ");
+        update.append("prefix dc: <http://purl.org/dc/elements/1.1/>  ");
+        update.append("prefix dcmitype: <http://purl.org/dc/dcmitype/>  ");
+        update.append("INSERT  { GRAPH <http://example/bookStore2> { ?book ?p ?v } } ");
+        update.append(" WHERE ");
+        update.append(" { GRAPH  <http://example/bookStore> ");
+        update.append("   { ?book dc:date ?date . ");
+        update.append("       FILTER ( ?date < \"2000-01-01T00:00:00-02:00\"^^xsd:dateTime ) ");
+        update.append("       ?book ?p ?v ");
+        update.append("      } ");
+        update.append(" } ;");
+        update.append("WITH <http://example/bookStore> ");
+        update.append(" DELETE { ?book ?p ?v } ");
+        update.append(" WHERE ");
+        update.append(" { ?book dc:date ?date ; ");
+        update.append("         a dcmitype:PhysicalObject .");
+        update.append("    FILTER ( ?date < \"2000-01-01T00:00:00-02:00\"^^xsd:dateTime ) ");
+        update.append("   ?book ?p ?v");
+        update.append(" } ");
+
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+        String msg = "statements about book1 should have been removed from bookStore";
+        assertFalse(msg, hasStatement(book1, null, null, true, bookStore));
+
+        msg = "statements about book1 should have been added to bookStore2";
+        assertTrue(msg, hasStatement(book1, RDF.TYPE, null, true, bookStore2));
+        assertTrue(msg, hasStatement(book1, DC.DATE, null, true, bookStore2));
+        assertTrue(msg, hasStatement(book1, DC.TITLE, null, true, bookStore2));
+    }
+
+    /**
+     * Unit test for
+     * 
+     * <pre>
+     * DROP ALL;
+     * INSERT DATA {
+     * GRAPH <http://example.org/one> {
+     * <a> <b> <c> .
+     * <d> <e> <f> .
+     * }};
+     * ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;
+     * DROP SILENT GRAPH <http://example.org/one>  ;
+     * </pre>
+     * 
+     * The IV cache was not not being propagated correctly with the result that
+     * we were seeing mock IVs for "one" and "two". The UPDATE would work
+     * correctly the 2nd time since the URIs had been entered into the
+     * dictionary by then.
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/567" >
+     *      Failure to set cached value on IV results in incorrect behavior for
+     *      complex UPDATE operation </a>
+     */
+    public void testTicket567() throws Exception {
+
+        // replace the standard dataset with one specific to this case.
+//        con.clear();
+//        con.commit();
+        m_repo.prepareUpdate("DROP ALL").evaluate();
+
+        final StringBuilder update = new StringBuilder();
+        update.append("DROP ALL;\n");
+        update.append("INSERT DATA {\n");
+        update.append(" GRAPH <http://example.org/one> {\n");
+        update.append("   <http://example.org/a> <http://example.org/b> <http://example.org/c> .\n");
+        update.append("   <http://example.org/d> <http://example.org/e> <http://example.org/f> .\n");
+        update.append("}};\n");
+        update.append("ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;\n");
+        update.append("DROP SILENT GRAPH <http://example.org/one>  ;\n");
+        
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+        final URI one = f.createURI("http://example.org/one");
+        final URI two = f.createURI("http://example.org/two");
+
+        String msg = "Nothing in graph <one>";
+        assertFalse(msg, hasStatement(null, null, null, true, one));
+
+        msg = "statements are in graph <two>";
+        assertTrue(msg, hasStatement(null, null, null, true, two));
+        
+    }
+    
     public void testLoad()
             throws Exception
         {

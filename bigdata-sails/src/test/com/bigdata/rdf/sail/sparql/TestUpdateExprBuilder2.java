@@ -30,6 +30,11 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
@@ -48,8 +53,6 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
 
 /**
  * Test suite for bigdata specific extensions in {@link UpdateExprBuilder}.
@@ -340,7 +343,7 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
      * 
      * TODO Maybe specify the implementation class for the persistence?
      */
-    @SuppressWarnings("rawtypes")
+//    @SuppressWarnings("rawtypes")
     public void test_create_solutions_silent_params()
             throws MalformedQueryException, TokenMgrError, ParseException {
 
@@ -350,12 +353,6 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
                 +"  hint:Query hint:expireAge \"100000\"^^<http://www.w3.org/2001/XMLSchema#long> .\n"
         		+"}"
         		;
-
-        final IV hintQuery = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+QueryHintScope.Query));
-        final IV hintEngine = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+"engine"));
-        final IV hintExpireAge = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+"expireAge"));
-        final IV cache = makeIV(valueFactory.createLiteral("cache"));
-        final IV millis = makeIV(valueFactory.createLiteral("100000",XSD.LONG));
 
         final UpdateRoot expected = new UpdateRoot();
         {
@@ -368,6 +365,12 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
 
             op.setSilent(true);
             
+//          final IV hintQuery = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+QueryHintScope.Query));
+//          final IV hintEngine = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+"engine"));
+//          final IV hintExpireAge = makeIV(valueFactory.createURI(QueryHints.NAMESPACE+"expireAge"));
+//          final IV cache = makeIV(valueFactory.createLiteral("cache"));
+//          final IV millis = makeIV(valueFactory.createLiteral("100000",XSD.LONG));
+
 //            final QuadData params = new QuadData();
 //            
 //            params.addChild(new StatementPatternNode(
@@ -378,11 +381,25 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
 //                    new ConstantNode(hintQuery), new ConstantNode(hintExpireAge),
 //                    new ConstantNode(millis)));
 
-            final ISPO[] params = new ISPO[] {
-                    new SPO(hintQuery, hintEngine,
-                    cache, null/* c */, StatementEnum.Explicit),//
-                    new SPO(hintQuery, hintExpireAge,
-                    millis, null/* c */, StatementEnum.Explicit),//
+          final BigdataURI hintQuery = valueFactory.createURI(QueryHints.NAMESPACE+QueryHintScope.Query);
+          final BigdataURI hintEngine = valueFactory.createURI(QueryHints.NAMESPACE+"engine");
+          final BigdataURI hintExpireAge = valueFactory.createURI(QueryHints.NAMESPACE+"expireAge");
+          final BigdataLiteral cache = valueFactory.createLiteral("cache");
+          final BigdataLiteral millis = valueFactory.createLiteral("100000",XSD.LONG);
+
+            final BigdataStatement[] params = new BigdataStatement[] {
+                    valueFactory.createStatement(//
+                            (BigdataResource)hintQuery, //
+                            (BigdataURI)hintEngine,//
+                            (BigdataValue)cache, //
+                            null, // c
+                            StatementEnum.Explicit),//
+                    valueFactory.createStatement(//
+                            (BigdataResource)hintQuery,//
+                            (BigdataURI)hintExpireAge,//
+                            (BigdataValue)millis,//
+                            null,// c 
+                            StatementEnum.Explicit),//
             };
             
             op.setParams(params);
