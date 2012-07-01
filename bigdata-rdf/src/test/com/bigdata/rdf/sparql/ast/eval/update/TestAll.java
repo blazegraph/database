@@ -64,10 +64,13 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("SPARQL Update Evaluation");
 
         /*
-         * Boot strapped test suite for core UPDATE functionality.
+         * Bootstrapped test suite for core UPDATE functionality based on
+         * BOP evaluation.
+         * 
+         * Note: This test has been disabled. We are not using the query
+         * engine to evaluate SPARQL update at this time. 
          */
-
-        suite.addTestSuite(TestUpdateBootstrap.class);
+//        suite.addTestSuite(TestUpdateBootstrap.class);
 
         /*
          * The openrdf SPARQL UPDATE test suite.

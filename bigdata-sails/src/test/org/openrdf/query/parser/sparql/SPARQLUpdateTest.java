@@ -10,6 +10,7 @@ import java.io.InputStream;
 
 import junit.framework.TestCase;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
@@ -28,12 +29,23 @@ import org.openrdf.rio.RDFParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.TestSparqlUpdate;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Tests for SPARQL 1.1 Update functionality.
+ * <p>
+ * Note: Also see {@link TestSparqlUpdate}. These two test suites SHOULD be kept
+ * synchronized. {@link TestSparqlUpdate} runs against the NSS while this test
+ * suite runs against a local kb instance. The two test suites are not exactly
+ * the same because one uses the {@link RemoteRepository} to commuicate with the
+ * NSS while the other uses the local API.
  * 
  * @author Jeen Broekstra
+ * 
+ * @see TestSparqlUpdate
  * 
  *         FIXME This was imported in order to expose {@link #con} to our
  *         implementation of the class, which let's us override
@@ -1082,12 +1094,12 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		con.commit();
 		loadDataset("/testdata-update/dataset-update-example9.trig");
 
-		URI book1 = f.createURI("http://example/book1");
-		URI book3 = f.createURI("http://example/book3");
-		URI bookStore = f.createURI("http://example/bookStore");
-		URI bookStore2 = f.createURI("http://example/bookStore2");
+		final URI book1 = f.createURI("http://example/book1");
+//		URI book3 = f.createURI("http://example/book3");
+		final URI bookStore = f.createURI("http://example/bookStore");
+		final URI bookStore2 = f.createURI("http://example/bookStore2");
 		
-		StringBuilder update = new StringBuilder();
+		final StringBuilder update = new StringBuilder();
 		update.append("prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ");
 		update.append("prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>  ");
 		update.append("prefix xsd: <http://www.w3.org/2001/XMLSchema#>  ");
@@ -1110,7 +1122,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		update.append("   ?book ?p ?v");
 		update.append(" } ");
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 		operation.execute();
 
@@ -1156,7 +1168,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
         con.clear();
         con.commit();
 
-        StringBuilder update = new StringBuilder();
+        final StringBuilder update = new StringBuilder();
         update.append("DROP ALL;\n");
         update.append("INSERT DATA {\n");
         update.append(" GRAPH <http://example.org/one> {\n");
@@ -1170,8 +1182,8 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
         operation.execute();
 
-        URI one = f.createURI("http://example.org/one");
-        URI two = f.createURI("http://example.org/two");
+        final URI one = f.createURI("http://example.org/one");
+        final URI two = f.createURI("http://example.org/two");
 
         String msg = "Nothing in graph <one>";
         assertFalse(msg, con.hasStatement(null, null, null, true, one));
@@ -1181,6 +1193,200 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	    
 	}
 	
+//    /**
+//     * File contains
+//     * 
+//     * <pre>
+//     * _:bnode <http://example/p> 2 .
+//     * _:bnode a <http://example/Foo> .
+//     * <http://example/s> <http://example/p> 2 .
+//     * </pre>
+//     * 
+//     * Load into graphA:
+//     * 
+//     * <pre>
+//     * PREFIX graphA:  <http://example/graphA>
+//     * PREFIX tempGraph:  <http://example/temp>
+//     * DROP SILENT GRAPH tempGraph: ;
+//     * DROP SILENT GRAPH graphA: ;
+//     * INSERT DATA {
+//     * GRAPH graphA: {
+//     *   <http://example/x> <http://example/p> 2 . 
+//     *   <http://example/x> a <http://example/Foo> . 
+//     *   <http://example/s> <http://example/p> 2 . 
+//     * }}
+//     * </pre>
+//     * // Note: was LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
+//     * 
+//     * Verify that all three triples are in graphA:
+//     * 
+//     * <pre>
+//     * PREFIX graphA:  <http://example/graphA>
+//     * PREFIX tempGraph:  <http://example/temp>
+//     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+//     * </pre>
+//     * 
+//     * Now delete some triples from graphA while inserting the deleted triples
+//     * into tempGraph:
+//     * 
+//     * <pre>
+//     * PREFIX graphA:  <http://example/graphA>
+//     * PREFIX tempGraph:  <http://example/temp>
+//     * DROP SILENT GRAPH tempGraph: ;
+//     * DELETE { GRAPH graphA:    { ?s ?p ?v . } }
+//     * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+//     * WHERE { GRAPH graphA: { 
+//     *     ?s a <http://example/Foo> .
+//     *     ?s ?p ?v . } }
+//     * </pre>
+//     * 
+//     * The result should be that the combination of tempGraph and graphA should
+//     * have the exact same number of triples that we started with. But now
+//     * notice that graphA has 0 triples:
+//     * 
+//     * <pre>
+//     * PREFIX graphA:  <http://example/graphA>
+//     * PREFIX tempGraph:  <http://example/temp>
+//     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+//     * </pre>
+//     * 
+//     * However, tempGraph has only 2 triples:
+//     * 
+//     * <pre>
+//     * PREFIX graphA:  <http://example/graphA>
+//     * PREFIX tempGraph:  <http://example/temp>
+//     * SELECT * WHERE { GRAPH tempGraph: { ?s ?p ?v . } }
+//     * </pre>
+//     * 
+//     * so one triple is missing:
+//     * 
+//     * <pre>
+//     * <http://example/s> <http://example/p> 2 .
+//     * </pre>
+//     */
+//    public void testTicket571() throws RepositoryException, MalformedQueryException, UpdateExecutionException {
+//
+//        final URI graphA = f.createURI("http://example.org/graphA");
+//        final URI tempGraph = f.createURI("http://example.org/tmp");
+//        final URI s = f.createURI("http://example/s>");
+//        final URI p = f.createURI("http://example/p>");
+//        final URI x = f.createURI("http://example/x>");
+//        final URI foo = f.createURI("http://example/Foo>");
+//        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
+//        final Literal two = f.createLiteral("2", XSD.INTEGER);
+//
+//        // replace the standard dataset with one specific to this case.
+//        con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
+//
+//        /**
+//         * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
+//         * ticket).
+//         * 
+//         * <pre>
+//         * PREFIX graphA:  <http://example/graphA>
+//         * PREFIX tempGraph:  <http://example/temp>
+//         * DROP SILENT GRAPH tempGraph: ;
+//         * DROP SILENT GRAPH graphA: ;
+//         * LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
+//         * </pre>
+//         */
+//        con.prepareUpdate(//
+//                QueryLanguage.SPARQL,//
+//                "PREFIX graphA:  <http://example/graphA> \n" + //
+//                "PREFIX tempGraph:  <http://example/temp> \n"+//
+//                "DROP SILENT GRAPH tempGraph: ;\n"+//
+//                "DROP SILENT GRAPH graphA: ;\n"+//
+//                "INSERT DATA { \n"+//
+//                " GRAPH graphA: { \n" +//
+//                "  <http://example/x> <http://example/p> 2 . \n"+//
+//                "   <http://example/x> a <http://example/Foo> . \n"+//
+//                "   <http://example/s> <http://example/p> 2 . \n"+//
+//                "}}\n"//
+////                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
+//        ).execute();
+//        
+//        /**
+//         * Now delete some triples from graphA while inserting the deleted
+//         * triples into tempGraph:
+//         * 
+//         * <pre>
+//         * PREFIX graphA:  <http://example/graphA>
+//         * PREFIX tempGraph:  <http://example/temp>
+//         * DROP SILENT GRAPH tempGraph: ;  ### Note: redundant
+//         * DELETE { GRAPH graphA:    { ?s ?p ?v . } } 
+//         * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+//         * WHERE { GRAPH graphA: { 
+//         *     ?s a <http://example/Foo> .
+//         *     ?s ?p ?v . } }
+//         * </pre>
+//         */
+//        con.prepareUpdate(//
+//                QueryLanguage.SPARQL, //
+//                "PREFIX graphA:  <http://example/graphA> \n" + //
+//                "PREFIX tempGraph:  <http://example/temp> \n" +//
+//                "DROP SILENT GRAPH tempGraph: ;\n"+//
+//                "DELETE { GRAPH graphA:    { ?s ?p ?v . } } \n"+//
+//                "INSERT { GRAPH tempGraph: { ?s ?p ?v . } } \n"+//
+//                "WHERE { GRAPH graphA: { \n"+//
+//                "    ?s a <http://example/Foo> . \n"+//
+//                "    ?s ?p ?v . } }\n"//
+//        ).execute();
+//
+//        /**
+//         * Verify that all three triples are in graphA:
+//         * 
+//         * <pre>
+//         * PREFIX graphA:  <http://example/graphA>
+//         * PREFIX tempGraph:  <http://example/temp>
+//         * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+//         * </pre>
+//         */
+//        {
+////            String msg = "Nothing in graph <one>";
+////            " <http://example/x> <http://example/p> 2. \n"+//
+////            " <http://example/x> a <http://example/Foo>. \n"+//
+////            " <http://example/s> <http://example/p> 2. \n"+//
+//            // _:bnode <http://example/p> 2 .
+//            // _:bnode a <http://example/Foo> .
+//            // <http://example/s> <http://example/p> 2 .
+////            assertTrue(msg, con.hasStatement(x, p, two, true, graphA));
+////            assertTrue(msg, con.hasStatement(x, rdfType, foo, true, graphA));
+////            assertTrue(msg, con.hasStatement(s, p, two, true, graphA));
+//            /*
+//             * FIXME There is an uncertainty about the correct behavior
+//             * for this ticket.  If the bnode should be treated as a 
+//             * variable, then the current implementation is correct and
+//             * the ticket should be closed. If the bnode should be treated
+//             * as data, then I am not sure what needs to be done here. I
+//             * think that it should be treated as a variable.
+//             */
+//            fail("Finish test");
+//        }
+//        
+////        final StringBuilder update = new StringBuilder();
+////        update.append("INSERT DATA {\n");
+////        update.append(" GRAPH <http://example.org/one> {\n");
+////        update.append("   <http://example.org/a> <http://example.org/b> <http://example.org/c> .\n");
+////        update.append("   <http://example.org/d> <http://example.org/e> <http://example.org/f> .\n");
+////        update.append("}};\n");
+////        update.append("ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;\n");
+////        update.append("DROP SILENT GRAPH <http://example.org/one>  ;\n");
+////        
+////        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+////
+////        operation.execute();
+////
+////        final URI one = f.createURI("http://example.org/one");
+////        final URI two = f.createURI("http://example.org/two");
+////
+////        String msg = "Nothing in graph <one>";
+////        assertFalse(msg, con.hasStatement(null, null, null, true, one));
+////
+////        msg = "statements are in graph <two>";
+////        assertTrue(msg, con.hasStatement(null, null, null, true, two));
+//        
+//    }
+    
 	//@Test
 	public void testLoad()
 		throws Exception

@@ -1755,7 +1755,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
         if (!runOnQueryEngine) {
 
-            final ISPO[] stmts = op.getData();
+            final BigdataStatement[] stmts = op.getData();
 
             if (log.isDebugEnabled())
                 log.debug((insert ? "INSERT" : "DELETE") + " DATA: #stmts="
@@ -1763,9 +1763,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final BigdataSailConnection conn = context.conn.getSailConnection();
             
-            for (ISPO spo : stmts) {
+            for (BigdataStatement s : stmts) {
  
-                addOrRemoveStatement(conn, spo, insert);
+                addOrRemoveStatementData(conn, s, insert);
                 
             }
 
@@ -1882,7 +1882,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
-     * Insert or remove a statement.
+     * Insert or remove a statement (INSERT DATA or DELETE DATA).
      * 
      * @param conn
      *            The connection on which to write the mutation.
@@ -1893,14 +1893,20 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      *            <code>false</code> iff the statement is to be removed.
      * @throws SailException
      */
-    private static void addOrRemoveStatement(final BigdataSailConnection conn,
-            final ISPO spo, final boolean insert) throws SailException {
+    private static void addOrRemoveStatementData(final BigdataSailConnection conn,
+            final BigdataStatement stmt, final boolean insert) throws SailException {
 
-        final Resource s = (Resource) spo.s().getValue();
+//        final Resource s = (Resource) spo.s().getValue();
+//
+//        final URI p = (URI) spo.p().getValue();
+//        
+//        final Value o = (Value) spo.o().getValue();
 
-        final URI p = (URI) spo.p().getValue();
+        final Resource s = stmt.getSubject();
         
-        final Value o = (Value) spo.o().getValue();
+        final URI p = stmt.getPredicate();
+        
+        final Value o = stmt.getObject();
         
         /*
          * If [c] is not bound, then using an empty Resource[] for the contexts.
@@ -1911,9 +1917,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
          * contexts (on remove it is interpreted as a wildcard).
          */
         
-        final Resource c = (Resource) (spo.c() == null ? null : spo.c()
-                .getValue());
-        
+        final Resource c = (Resource) (stmt.getContext() == null ? null : stmt
+                .getContext());
+
         final Resource[] contexts = (Resource[]) (c == null ? NO_CONTEXTS
                 : new Resource[] { c });
         

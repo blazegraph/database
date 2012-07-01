@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.spo.ISPO;
 
 /**
@@ -49,7 +50,7 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
     interface Annotations extends GraphUpdate.Annotations {
 
         /**
-         * The {@link ISPO}[] data.
+         * The {@link BigdataStatement}[] data.
          */
         String DATA = "data";
 
@@ -81,13 +82,13 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
         
     }
 
-    public ISPO[] getData() {
+    public BigdataStatement[] getData() {
 
-        return (ISPO[]) getProperty(Annotations.DATA);
+        return (BigdataStatement[]) getProperty(Annotations.DATA);
 
     }
 
-    public void setData(final ISPO[] data) {
+    public void setData(final BigdataStatement[] data) {
 
         setProperty(Annotations.DATA, data);
 
@@ -101,7 +102,7 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
         
         sb.append(getUpdateType());
 
-        final ISPO[] data = getData();
+        final BigdataStatement[] data = getData();
 
         if (data != null) {
             
