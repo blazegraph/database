@@ -1866,17 +1866,25 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             
         } else {
 
-            /*
-             * We need to handle blank nodes (which can appear in the subject or
-             * object position) as unbound variables.
-             */
-            
-            final Resource s1 = s instanceof BNode ? null : s;
+//            /*
+//             * We need to handle blank nodes (which can appear in the subject or
+//             * object position) as unbound variables.
+//             */
+//            
+//            final Resource s1 = s instanceof BNode ? null : s;
+//
+//            final Value o1 = o instanceof BNode ? null : o;
+//            
+//            conn.removeStatements(s1, p, o1, contexts);
 
-            final Value o1 = o instanceof BNode ? null : o;
-            
-            conn.removeStatements(s1, p, o1, contexts);
-            
+            /**
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+             *      DELETE/INSERT WHERE handling of blank nodes </a>
+             */
+            conn.removeStatements(s, p, o, contexts);
+
         }
 
     }

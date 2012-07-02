@@ -12,18 +12,23 @@ import junit.framework.TestCase;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.Update;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 import org.slf4j.Logger;
@@ -42,23 +47,31 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * suite runs against a local kb instance. The two test suites are not exactly
  * the same because one uses the {@link RemoteRepository} to commuicate with the
  * NSS while the other uses the local API.
+ * <p>
+ * Note: This was imported in order to expose {@link #con} to our implementation
+ * of the class, which let's us override {@link #loadDataset(String)} in order
+ * to turn off auto-commit. I've written Jeen to request the appropriate changes
+ * to the class in the openrdf SVN. Since then, we have added several of our own
+ * tests here.
  * 
  * @author Jeen Broekstra
+ * @author Bryan Thompson
  * 
  * @see TestSparqlUpdate
- * 
- *         FIXME This was imported in order to expose {@link #con} to our
- *         implementation of the class, which let's us override
- *         {@link #loadDataset(String)} in order to turn off auto-commit. I've
- *         written Jeen to request the appropriate changes to the class in the
- *         openrdf SVN, at which point we should be able to drop this class from
- *         our SVN repository.
  */
 public abstract class SPARQLUpdateTest extends TestCase {
 
 	static final Logger logger = LoggerFactory.getLogger(SPARQLUpdateTest.class);
 
-	private Repository rep;
+	/**
+     * When <code>true</code>, the unit tests of the BINDINGS clause are
+     * enabled.
+     * 
+     * FIXME BINDINGS does not work correctly for UPDATE.
+     */
+    private static boolean BINDINGS = false;
+    
+    private Repository rep;
 
 	protected RepositoryConnection con;
 
@@ -123,11 +136,11 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		throws Exception
 	{
 		logger.debug("executing test InsertWhere");
-		StringBuilder update = new StringBuilder();
+		final StringBuilder update = new StringBuilder();
 		update.append(getNamespaceDeclarations());
 		update.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 		assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
@@ -138,16 +151,235 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 	}
 
+	/**
+	 * @since openrdf 2.6.3
+	 */
+//	    @Test
+    public void testInsertWhereWithBinding()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testInsertWhereWithBinding");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+        operation.setBinding("x", bob);
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+    }
+
+    /**
+     * @since openrdf 2.6.6
+     */
+    public void testInsertWhereWithBindings2()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testInsertWhereWithBindings2");
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT {?x rdfs:label ?z . } WHERE {?x foaf:name ?y }");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+        operation.setBinding("z", f.createLiteral("Bobbie"));
+        operation.setBinding("x", bob);
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bobbie"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, null, true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bobbie"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertEmptyWhere()
+        throws Exception
+    {
+        logger.debug("executing test testInsertEmptyWhere");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { <" + bob + "> rdfs:label \"Bob\" . } WHERE { }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertEmptyWhereWithBinding()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testInsertEmptyWhereWithBinding");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT {?x rdfs:label ?y . } WHERE { }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+        operation.setBinding("x", bob);
+        operation.setBinding("y", f.createLiteral("Bob"));
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertNonMatchingWhere()
+        throws Exception
+    {
+        logger.debug("executing test testInsertNonMatchingWhere");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { ?x rdfs:label ?y . } WHERE { ?x rdfs:comment ?y }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+
+        operation.execute();
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertNonMatchingWhereWithBindings()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testInsertNonMatchingWhereWithBindings");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { ?x rdfs:label ?y . } WHERE { ?x rdfs:comment ?y }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+        operation.setBinding("x", bob);
+        operation.setBinding("y", f.createLiteral("Bob"));
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+
+        operation.execute();
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertWhereWithBindings()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testInsertWhereWithBindings");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { ?x rdfs:comment ?z . } WHERE { ?x foaf:name ?y }");
+
+        final Literal comment = f.createLiteral("Bob has a comment");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+        operation.setBinding("x", bob);
+        operation.setBinding("z", comment);
+
+        assertFalse(con.hasStatement(null, RDFS.COMMENT, comment, true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.COMMENT, comment, true));
+        assertFalse(con.hasStatement(alice, RDFS.COMMENT, comment, true));
+
+    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//	    @Test
+    public void testInsertWhereWithOptional()
+        throws Exception
+    {
+        logger.debug("executing testInsertWhereWithOptional");
+
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append(" INSERT { ?s ex:age ?incAge } ");
+        // update.append(" DELETE { ?s ex:age ?age } ");
+        update.append(" WHERE { ?s foaf:name ?name . ");
+        update.append(" OPTIONAL {?s ex:age ?age . BIND ((?age + 1) as ?incAge)  } ");
+        update.append(" } ");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        final URI age = f.createURI(EX_NS, "age");
+
+        assertFalse(con.hasStatement(alice, age, null, true));
+        assertTrue(con.hasStatement(bob, age, null, true));
+
+        operation.execute();
+
+        RepositoryResult<Statement> result = con.getStatements(bob, age, null, true);
+
+        while (result.hasNext()) {
+            final Statement stmt = result.next();
+            if (logger.isInfoEnabled())
+                logger.info(stmt.toString());
+        }
+
+        assertTrue(con.hasStatement(bob, age, f.createLiteral("43", XMLSchema.INTEGER), true));
+
+        result = con.getStatements(alice, age, null, true);
+
+        while (result.hasNext()) {
+            final Statement stmt = result.next();
+            if (logger.isInfoEnabled())
+                logger.info(stmt.toString());
+        }
+        assertFalse(con.hasStatement(alice, age, null, true));
+    }
+
 	//@Test
 	public void testDeleteInsertWhere()
 		throws Exception
 	{
 		logger.debug("executing test DeleteInsertWhere");
-		StringBuilder update = new StringBuilder();
+		final StringBuilder update = new StringBuilder();
 		update.append(getNamespaceDeclarations());
 		update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 		assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
@@ -166,7 +398,64 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	}
 
-	//@Test
+	/** @since OPENRDF 2.6.6. */
+//    @Test
+    public void testDeleteInsertWhereWithBindings2()
+        throws Exception
+    {
+        if (!BINDINGS)
+            return;
+        logger.debug("executing test testDeleteInsertWhereWithBindings2");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?z . } WHERE {?x foaf:name ?y }");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        operation.setBinding("z", f.createLiteral("person"));
+        
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("person"), true));
+        assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("person"), true));
+
+        assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+    }
+    
+	/** @since openrdf 2.6.3 */
+    public void testDeleteInsertWhereLoopingBehavior() throws Exception {
+        logger.debug("executing test testDeleteInsertWhereLoopingBehavior");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append(" DELETE { ?x ex:age ?y } INSERT {?x ex:age ?z }");
+        update.append(" WHERE { ");
+        update.append("   ?x ex:age ?y .");
+        update.append("   BIND((?y + 1) as ?z) ");
+        update.append("   FILTER( ?y < 46 ) ");
+        update.append(" } ");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL,
+                update.toString());
+
+        final URI age = f.createURI(EX_NS, "age");
+        final Literal originalAgeValue = f.createLiteral("42", XMLSchema.INTEGER);
+        final Literal correctAgeValue = f.createLiteral("43", XMLSchema.INTEGER);
+        final Literal inCorrectAgeValue = f.createLiteral("46", XMLSchema.INTEGER);
+
+        assertTrue(con.hasStatement(bob, age, originalAgeValue, true));
+
+        operation.execute();
+
+        assertFalse(con.hasStatement(bob, age, originalAgeValue, true));
+        assertTrue(con.hasStatement(bob, age, correctAgeValue, true));
+        assertFalse(con.hasStatement(bob, age, inCorrectAgeValue, true));
+    }
+
+    //@Test
 	public void testInsertTransformedWhere()
 		throws Exception
 	{
@@ -186,7 +475,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(con.hasStatement(bob, RDFS.LABEL, null, true));
 		assertTrue(con.hasStatement(alice, RDFS.LABEL, null, true));
 	}
-
+	
 	//@Test
 	public void testInsertWhereGraph()
 		throws Exception
@@ -240,19 +529,20 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	{
 		logger.debug("executing testInsertWhereWith");
 
-		StringBuilder update = new StringBuilder();
+		final StringBuilder update = new StringBuilder();
 		update.append(getNamespaceDeclarations());
 		update.append("WITH ex:graph1 INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
 		operation.execute();
 
 		String message = "label should have been inserted in graph1 only, for ex:bob only";
 		assertTrue(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph2));
-		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph2));
-		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
+//		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph2));
+//		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
+        assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
 	}
 
     /**
@@ -351,32 +641,38 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	}
 
-	//@Test
-	public void testDeleteTransformedWhere()
-		throws Exception
-	{
-		logger.debug("executing testDeleteTransformedWhere");
-
-		StringBuilder update = new StringBuilder();
-		update.append(getNamespaceDeclarations());
-		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }");
-
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		operation.execute();
-
-		String msg = "foaf:name properties should have been deleted";
-		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		msg = "ex:containsPerson properties should not have been deleted";
-		assertTrue(msg, con.hasStatement(graph1, f.createURI(EX_NS, "containsPerson"), bob, true));
-		assertTrue(msg, con.hasStatement(graph2, f.createURI(EX_NS, "containsPerson"), alice, true));
-
-	}
+    /*
+     * Note: blank nodes are not permitted in the DELETE clause template.
+     * 
+     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     * DELETE/INSERT WHERE handling of blank nodes </a>
+     */
+//	//@Test
+//	public void testDeleteTransformedWhere()
+//		throws Exception
+//	{
+//		logger.debug("executing testDeleteTransformedWhere");
+//
+//		StringBuilder update = new StringBuilder();
+//		update.append(getNamespaceDeclarations());
+//		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }");
+//
+//		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		operation.execute();
+//
+//		String msg = "foaf:name properties should have been deleted";
+//		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		msg = "ex:containsPerson properties should not have been deleted";
+//		assertTrue(msg, con.hasStatement(graph1, f.createURI(EX_NS, "containsPerson"), bob, true));
+//		assertTrue(msg, con.hasStatement(graph2, f.createURI(EX_NS, "containsPerson"), alice, true));
+//
+//	}
 
 	//@Test
 	public void testInsertData()
@@ -453,7 +749,31 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(msg, con.hasStatement(book1, DC.CREATOR, f.createLiteral("Ringo"), true, graph1));
 	}
 
-	//@Test
+	/** @since OPENRDF 2.6.3 */
+//    @Test
+    public void testInsertDataInGraph2()
+        throws Exception
+    {
+        logger.debug("executing testInsertDataInGraph2");
+
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT DATA { GRAPH ex:graph1 { ex:Human rdfs:subClassOf ex:Mammal. ex:Mammal rdfs:subClassOf ex:Animal. ex:george a ex:Human. ex:ringo a ex:Human. } } ");
+
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        final URI human = f.createURI(EX_NS, "Human");
+        final URI mammal = f.createURI(EX_NS, "Mammal");
+        final URI george = f.createURI(EX_NS, "george");
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(human, RDFS.SUBCLASSOF, mammal, true, graph1));
+        assertTrue(con.hasStatement(mammal, RDFS.SUBCLASSOF, null, true, graph1));
+        assertTrue(con.hasStatement(george, RDF.TYPE, human, true, graph1));
+    }
+    
+    //@Test
 	public void testDeleteData()
 		throws Exception
 	{
@@ -851,9 +1171,9 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		throws Exception
 	{
 		logger.debug("executing testClearAll");
-		String update = "CLEAR ALL";
+		final String update = "CLEAR ALL";
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
 		operation.execute();
 		assertFalse(con.hasStatement(null, null, null, false));
@@ -925,9 +1245,9 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		throws Exception
 	{
 		logger.debug("executing testDropAll");
-		String update = "DROP ALL";
+		final String update = "DROP ALL";
 
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+		final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
 		operation.execute();
 		assertFalse(con.hasStatement(null, null, null, false));
@@ -1000,61 +1320,73 @@ public abstract class SPARQLUpdateTest extends TestCase {
 //                        .dumpStore());
     }
 
-	//@Test
-	public void testUpdateSequenceDeleteInsert()
-		throws Exception
-	{
-		logger.debug("executing testUpdateSequenceDeleteInsert");
+    /*
+     * Note: blank nodes are not permitted in the DELETE clause template.
+     * 
+     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     * DELETE/INSERT WHERE handling of blank nodes </a>
+     */
+//	//@Test
+//	public void testUpdateSequenceDeleteInsert()
+//		throws Exception
+//	{
+//		logger.debug("executing testUpdateSequenceDeleteInsert");
+//
+//		StringBuilder update = new StringBuilder();
+//		update.append(getNamespaceDeclarations());
+//		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }; ");
+//		update.append(getNamespaceDeclarations());
+//		update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x} ");
+//
+//		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		operation.execute();
+//
+//		String msg = "foaf:name properties should have been deleted";
+//		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		msg = "foaf:name properties with value 'foo' should have been added";
+//		assertTrue(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+//		assertTrue(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+//	}
 
-		StringBuilder update = new StringBuilder();
-		update.append(getNamespaceDeclarations());
-		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }; ");
-		update.append(getNamespaceDeclarations());
-		update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x} ");
-
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		operation.execute();
-
-		String msg = "foaf:name properties should have been deleted";
-		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		msg = "foaf:name properties with value 'foo' should have been added";
-		assertTrue(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
-		assertTrue(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
-	}
-
-	//@Test
-	public void testUpdateSequenceInsertDelete()
-		throws Exception
-	{
-		logger.debug("executing testUpdateSequenceInsertDelete");
-
-		StringBuilder update = new StringBuilder();
-		update.append(getNamespaceDeclarations());
-		update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x}; ");
-		update.append(getNamespaceDeclarations());
-		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y } ");
-
-		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		operation.execute();
-
-		String msg = "foaf:name properties should have been deleted";
-		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-		msg = "foaf:name properties with value 'foo' should not have been added";
-		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
-		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
-	}
+    /*
+     * Note: blank nodes are not permitted in the DELETE clause template.
+     * 
+     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     * DELETE/INSERT WHERE handling of blank nodes </a>
+     */
+//	//@Test
+//	public void testUpdateSequenceInsertDelete()
+//		throws Exception
+//	{
+//		logger.debug("executing testUpdateSequenceInsertDelete");
+//
+//		StringBuilder update = new StringBuilder();
+//		update.append(getNamespaceDeclarations());
+//		update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x}; ");
+//		update.append(getNamespaceDeclarations());
+//		update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y } ");
+//
+//		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//		assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		operation.execute();
+//
+//		String msg = "foaf:name properties should have been deleted";
+//		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//		msg = "foaf:name properties with value 'foo' should not have been added";
+//		assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+//		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+//	}
 
 	//@Test
 	public void testUpdateSequenceInsertDelete2()
@@ -1193,199 +1525,192 @@ public abstract class SPARQLUpdateTest extends TestCase {
 	    
 	}
 	
-//    /**
-//     * File contains
-//     * 
-//     * <pre>
-//     * _:bnode <http://example/p> 2 .
-//     * _:bnode a <http://example/Foo> .
-//     * <http://example/s> <http://example/p> 2 .
-//     * </pre>
-//     * 
-//     * Load into graphA:
-//     * 
-//     * <pre>
-//     * PREFIX graphA:  <http://example/graphA>
-//     * PREFIX tempGraph:  <http://example/temp>
-//     * DROP SILENT GRAPH tempGraph: ;
-//     * DROP SILENT GRAPH graphA: ;
-//     * INSERT DATA {
-//     * GRAPH graphA: {
-//     *   <http://example/x> <http://example/p> 2 . 
-//     *   <http://example/x> a <http://example/Foo> . 
-//     *   <http://example/s> <http://example/p> 2 . 
-//     * }}
-//     * </pre>
-//     * // Note: was LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
-//     * 
-//     * Verify that all three triples are in graphA:
-//     * 
-//     * <pre>
-//     * PREFIX graphA:  <http://example/graphA>
-//     * PREFIX tempGraph:  <http://example/temp>
-//     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
-//     * </pre>
-//     * 
-//     * Now delete some triples from graphA while inserting the deleted triples
-//     * into tempGraph:
-//     * 
-//     * <pre>
-//     * PREFIX graphA:  <http://example/graphA>
-//     * PREFIX tempGraph:  <http://example/temp>
-//     * DROP SILENT GRAPH tempGraph: ;
-//     * DELETE { GRAPH graphA:    { ?s ?p ?v . } }
-//     * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
-//     * WHERE { GRAPH graphA: { 
-//     *     ?s a <http://example/Foo> .
-//     *     ?s ?p ?v . } }
-//     * </pre>
-//     * 
-//     * The result should be that the combination of tempGraph and graphA should
-//     * have the exact same number of triples that we started with. But now
-//     * notice that graphA has 0 triples:
-//     * 
-//     * <pre>
-//     * PREFIX graphA:  <http://example/graphA>
-//     * PREFIX tempGraph:  <http://example/temp>
-//     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
-//     * </pre>
-//     * 
-//     * However, tempGraph has only 2 triples:
-//     * 
-//     * <pre>
-//     * PREFIX graphA:  <http://example/graphA>
-//     * PREFIX tempGraph:  <http://example/temp>
-//     * SELECT * WHERE { GRAPH tempGraph: { ?s ?p ?v . } }
-//     * </pre>
-//     * 
-//     * so one triple is missing:
-//     * 
-//     * <pre>
-//     * <http://example/s> <http://example/p> 2 .
-//     * </pre>
-//     */
-//    public void testTicket571() throws RepositoryException, MalformedQueryException, UpdateExecutionException {
-//
-//        final URI graphA = f.createURI("http://example.org/graphA");
-//        final URI tempGraph = f.createURI("http://example.org/tmp");
-//        final URI s = f.createURI("http://example/s>");
-//        final URI p = f.createURI("http://example/p>");
-//        final URI x = f.createURI("http://example/x>");
-//        final URI foo = f.createURI("http://example/Foo>");
-//        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
-//        final Literal two = f.createLiteral("2", XSD.INTEGER);
-//
-//        // replace the standard dataset with one specific to this case.
-//        con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
-//
-//        /**
-//         * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
-//         * ticket).
-//         * 
-//         * <pre>
-//         * PREFIX graphA:  <http://example/graphA>
+    /**
+     * In the ticket, the source file contains the following triples. In this
+     * test, those are triples are written into the graph using INSERT DATA
+     * rather than LOAD so this test can be self-contained.
+     * 
+     * <pre>
+     * _:bnode <http://example/p> 2 .
+     * _:bnode a <http://example/Foo> .
+     * <http://example/s> <http://example/p> 2 .
+     * </pre>
+     * 
+     * Load into graphA:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * DROP SILENT GRAPH tempGraph: ;
+     * DROP SILENT GRAPH graphA: ;
+     * INSERT DATA {
+     * GRAPH graphA: {
+     *   _:bnode <http://example/p> 2 . 
+     *   _:bnode a <http://example/Foo> . 
+     *   <http://example/s> <http://example/p> 2 . 
+     * }}
+     * </pre>
+     * 
+     * Verify that all three triples are in graphA:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * Now delete some triples from graphA while inserting the deleted triples
+     * into tempGraph:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * DROP SILENT GRAPH tempGraph: ;
+     * DELETE { GRAPH graphA:    { ?s ?p ?v . } }
+     * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+     * WHERE { GRAPH graphA: { 
+     *     ?s a <http://example/Foo> .
+     *     ?s ?p ?v . } }
+     * </pre>
+     * 
+     * The result should be that the combination of tempGraph and graphA should
+     * have the exact same number of triples that we started with. But now
+     * notice that graphA has 0 triples:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * However, tempGraph has only 2 triples:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH tempGraph: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * so one triple is missing:
+     * 
+     * <pre>
+     * <http://example/s> <http://example/p> 2 .
+     * </pre>
+     * 
+     * @throws QueryEvaluationException
+     */
+    public void testTicket571() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException,
+            QueryEvaluationException {
+
+        final URI graphA = f.createURI("http://example.org/graphA");
+        final URI tempGraph = f.createURI("http://example.org/tmp");
+        final URI s = f.createURI("http://example/s>");
+        final URI p = f.createURI("http://example/p>");
+        final URI x = f.createURI("http://example/x>");
+        final URI foo = f.createURI("http://example/Foo>");
+        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
+        final Literal two = f.createLiteral("2", XSD.INTEGER);
+
+        // replace the standard dataset with one specific to this case.
+        con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
+
+        /**
+         * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
+         * ticket).
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
 //         * PREFIX tempGraph:  <http://example/temp>
 //         * DROP SILENT GRAPH tempGraph: ;
 //         * DROP SILENT GRAPH graphA: ;
-//         * LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
-//         * </pre>
-//         */
-//        con.prepareUpdate(//
-//                QueryLanguage.SPARQL,//
-//                "PREFIX graphA:  <http://example/graphA> \n" + //
+         * LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL,//
+                "PREFIX graphA:  <http://example/graphA> \n" + //
 //                "PREFIX tempGraph:  <http://example/temp> \n"+//
 //                "DROP SILENT GRAPH tempGraph: ;\n"+//
 //                "DROP SILENT GRAPH graphA: ;\n"+//
-//                "INSERT DATA { \n"+//
-//                " GRAPH graphA: { \n" +//
-//                "  <http://example/x> <http://example/p> 2 . \n"+//
-//                "   <http://example/x> a <http://example/Foo> . \n"+//
-//                "   <http://example/s> <http://example/p> 2 . \n"+//
-//                "}}\n"//
-////                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
-//        ).execute();
-//        
-//        /**
-//         * Now delete some triples from graphA while inserting the deleted
-//         * triples into tempGraph:
-//         * 
-//         * <pre>
-//         * PREFIX graphA:  <http://example/graphA>
-//         * PREFIX tempGraph:  <http://example/temp>
-//         * DROP SILENT GRAPH tempGraph: ;  ### Note: redundant
-//         * DELETE { GRAPH graphA:    { ?s ?p ?v . } } 
-//         * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
-//         * WHERE { GRAPH graphA: { 
-//         *     ?s a <http://example/Foo> .
-//         *     ?s ?p ?v . } }
-//         * </pre>
-//         */
-//        con.prepareUpdate(//
-//                QueryLanguage.SPARQL, //
-//                "PREFIX graphA:  <http://example/graphA> \n" + //
-//                "PREFIX tempGraph:  <http://example/temp> \n" +//
+                "INSERT DATA { \n"+//
+                " GRAPH graphA: { \n" +//
+                "   _:bnode <http://example/p> 2 . \n"+//
+                "   _:bnode a <http://example/Foo> . \n"+//
+                "   <http://example/s> <http://example/p> 2 . \n"+//
+                "}}\n"//
+//                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
+        ).execute();
+        
+        /**
+         * Verify that all three triples are in graphA:
+         * 
+         * <pre>
+         * SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 3L, countSolutions(query));
+            
+        }
+        
+        /**
+         * Now delete some triples from graphA while inserting the deleted
+         * triples into tempGraph:
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
+         * PREFIX tempGraph:  <http://example/temp>
+         * DROP SILENT GRAPH tempGraph: ;  ### Note: redundant
+         * DELETE { GRAPH graphA:    { ?s ?p ?v . } } 
+         * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+         * WHERE { GRAPH graphA: { 
+         *     ?s a <http://example/Foo> .
+         *     ?s ?p ?v . } }
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL, //
+                "PREFIX graphA:  <http://example/graphA> \n" + //
+                "PREFIX tempGraph:  <http://example/temp> \n" +//
 //                "DROP SILENT GRAPH tempGraph: ;\n"+//
-//                "DELETE { GRAPH graphA:    { ?s ?p ?v . } } \n"+//
-//                "INSERT { GRAPH tempGraph: { ?s ?p ?v . } } \n"+//
-//                "WHERE { GRAPH graphA: { \n"+//
-//                "    ?s a <http://example/Foo> . \n"+//
-//                "    ?s ?p ?v . } }\n"//
-//        ).execute();
-//
-//        /**
-//         * Verify that all three triples are in graphA:
-//         * 
-//         * <pre>
-//         * PREFIX graphA:  <http://example/graphA>
-//         * PREFIX tempGraph:  <http://example/temp>
-//         * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
-//         * </pre>
-//         */
-//        {
-////            String msg = "Nothing in graph <one>";
-////            " <http://example/x> <http://example/p> 2. \n"+//
-////            " <http://example/x> a <http://example/Foo>. \n"+//
-////            " <http://example/s> <http://example/p> 2. \n"+//
-//            // _:bnode <http://example/p> 2 .
-//            // _:bnode a <http://example/Foo> .
-//            // <http://example/s> <http://example/p> 2 .
-////            assertTrue(msg, con.hasStatement(x, p, two, true, graphA));
-////            assertTrue(msg, con.hasStatement(x, rdfType, foo, true, graphA));
-////            assertTrue(msg, con.hasStatement(s, p, two, true, graphA));
-//            /*
-//             * FIXME There is an uncertainty about the correct behavior
-//             * for this ticket.  If the bnode should be treated as a 
-//             * variable, then the current implementation is correct and
-//             * the ticket should be closed. If the bnode should be treated
-//             * as data, then I am not sure what needs to be done here. I
-//             * think that it should be treated as a variable.
-//             */
-//            fail("Finish test");
-//        }
-//        
-////        final StringBuilder update = new StringBuilder();
-////        update.append("INSERT DATA {\n");
-////        update.append(" GRAPH <http://example.org/one> {\n");
-////        update.append("   <http://example.org/a> <http://example.org/b> <http://example.org/c> .\n");
-////        update.append("   <http://example.org/d> <http://example.org/e> <http://example.org/f> .\n");
-////        update.append("}};\n");
-////        update.append("ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;\n");
-////        update.append("DROP SILENT GRAPH <http://example.org/one>  ;\n");
-////        
-////        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-////
-////        operation.execute();
-////
-////        final URI one = f.createURI("http://example.org/one");
-////        final URI two = f.createURI("http://example.org/two");
-////
-////        String msg = "Nothing in graph <one>";
-////        assertFalse(msg, con.hasStatement(null, null, null, true, one));
-////
-////        msg = "statements are in graph <two>";
-////        assertTrue(msg, con.hasStatement(null, null, null, true, two));
-//        
-//    }
+                "DELETE { GRAPH graphA:    { ?s ?p ?v . } } \n"+//
+                "INSERT { GRAPH tempGraph: { ?s ?p ?v . } } \n"+//
+                "WHERE { GRAPH graphA: { \n"+//
+                "    ?s a <http://example/Foo> . \n"+//
+                "    ?s ?p ?v . } }\n"//
+        ).execute();
+
+        /**
+         * graphA should have one triple remaining:
+         * 
+         * <pre>
+         * <http://example/s> <http://example/p> 2 .
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 1L, countSolutions(query));
+            
+        }
+
+        /**
+         * The other 2 triples should have been moved into tempGraph.
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/temp> { ?s ?p ?v . } }";
+
+            assertEquals("tempGraph", 2L, countSolutions(query));
+            
+        }
+
+    }
     
 	//@Test
 	public void testLoad()
@@ -1461,6 +1786,35 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		logger.debug("dataset loaded.");
 	}
 
+    /**
+     * Count solutions for a TupleQuery.
+     * 
+     * @param query
+     *            The SPARQL query.
+     * @return The #of solutions.
+     * @throws QueryEvaluationException
+     * @throws RepositoryException
+     * @throws MalformedQueryException
+     */
+    protected long countSolutions(final String query)
+            throws QueryEvaluationException, RepositoryException,
+            MalformedQueryException {
+        TupleQueryResult result = con.prepareTupleQuery(QueryLanguage.SPARQL,
+                query).evaluate();
+        try {
+            long n = 0;
+            while (result.hasNext()) {
+                final BindingSet bset = result.next();
+                n++;
+                if (logger.isInfoEnabled())
+                    logger.info(bset.toString());
+            }
+            return n;
+        } finally {
+            result.close();
+        }
+    }
+	
 	/**
 	 * Get a set of useful namespace prefix declarations.
 	 * 
