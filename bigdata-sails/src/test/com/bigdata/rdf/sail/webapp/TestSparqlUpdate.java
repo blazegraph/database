@@ -977,7 +977,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         catch (Exception e) {
             // expected behavior
 //            con.rollback();
-            log.info("Exception: " + e, e);
+            if(log.isInfoEnabled()) log.info("Expected exception: " + e, e);
         }
     }
 
