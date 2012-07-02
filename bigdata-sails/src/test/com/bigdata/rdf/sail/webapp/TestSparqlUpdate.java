@@ -56,6 +56,7 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -90,6 +91,14 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 public class TestSparqlUpdate<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
 
+    /**
+     * When <code>true</code>, the unit tests of the BINDINGS clause are
+     * enabled.
+     * 
+     * FIXME BINDINGS does not work correctly for UPDATE.
+     */
+    private static boolean BINDINGS = false;
+    
     public TestSparqlUpdate() {
 
     }
@@ -208,11 +217,234 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
     }
     
-////    //@Test
+//    /**
+//     * TODO Requires BINDINGS support for {@link RemoteRepository}
+//     * 
+//     * @since openrdf 2.6.3
+//     */
+////      @Test
+//    public void testInsertWhereWithBinding()
+//        throws Exception
+//    {
+//        if (!BINDINGS)
+//            return;
+//        log.debug("executing test testInsertWhereWithBinding");
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
+//
+//        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL,update.toString());
+//        operation.setBinding("x", bob);
+//
+//        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+//        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+//
+//        operation.execute();
+//
+//        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+//        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+//    }
+//
+//    /**
+//     * TODO Requires BINDINGS support for {@link RemoteRepository}
+//     *
+//     * @since openrdf 2.6.6
+//     */
+//    public void testInsertWhereWithBindings2()
+//        throws Exception
+//    {
+//        if (!BINDINGS)
+//            return;
+//        log.debug("executing test testInsertWhereWithBindings2");
+//        StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT {?x rdfs:label ?z . } WHERE {?x foaf:name ?y }");
+//
+//        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//        operation.setBinding("z", f.createLiteral("Bobbie"));
+//        operation.setBinding("x", bob);
+//
+//        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bobbie"), true));
+//        assertFalse(con.hasStatement(alice, RDFS.LABEL, null, true));
+//
+//        operation.execute();
+//
+//        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bobbie"), true));
+//        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+//    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//      @Test
+    public void testInsertEmptyWhere()
+        throws Exception
+    {
+        log.debug("executing test testInsertEmptyWhere");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { <" + bob + "> rdfs:label \"Bob\" . } WHERE { }");
+
+        assertFalse(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+        assertTrue(hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+    }
+
+//    /**
+//     * TODO Requires BINDINGS support for {@link RemoteRepository}
+//     *
+//     * @since openrdf 2.6.3
+//     */
+////      @Test
+//    public void testInsertEmptyWhereWithBinding()
+//        throws Exception
+//    {
+//        if (!BINDINGS)
+//            return;
+//        log.debug("executing test testInsertEmptyWhereWithBinding");
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT {?x rdfs:label ?y . } WHERE { }");
+//
+//        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//        operation.setBinding("x", bob);
+//        operation.setBinding("y", f.createLiteral("Bob"));
+//
+//        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+//
+//        operation.execute();
+//
+//        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+//    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//      @Test
+    public void testInsertNonMatchingWhere()
+        throws Exception
+    {
+        log.debug("executing test testInsertNonMatchingWhere");
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT { ?x rdfs:label ?y . } WHERE { ?x rdfs:comment ?y }");
+
+        assertFalse(hasStatement(bob, RDFS.LABEL, null, true));
+
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+        assertFalse(hasStatement(bob, RDFS.LABEL, null, true));
+    }
+
+//    /**
+//  * TODO Requires BINDINGS support for {@link RemoteRepository}
+//  *
+//     * @since openrdf 2.6.3
+//     */
+////      @Test
+//    public void testInsertNonMatchingWhereWithBindings()
+//        throws Exception
+//    {
+//        if (!BINDINGS)
+//            return;
+//        log.debug("executing test testInsertNonMatchingWhereWithBindings");
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT { ?x rdfs:label ?y . } WHERE { ?x rdfs:comment ?y }");
+//
+//        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//        operation.setBinding("x", bob);
+//        operation.setBinding("y", f.createLiteral("Bob"));
+//
+//        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+//
+//        operation.execute();
+//
+//        assertFalse(con.hasStatement(bob, RDFS.LABEL, null, true));
+//    }
+
+//    /**
+//  * TODO Requires BINDINGS support for {@link RemoteRepository}
+//  *
+//     * @since openrdf 2.6.3
+//     */
+////      @Test
+//    public void testInsertWhereWithBindings()
+//        throws Exception
+//    {
+//        if (!BINDINGS)
+//            return;
+//        log.debug("executing test testInsertWhereWithBindings");
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT { ?x rdfs:comment ?z . } WHERE { ?x foaf:name ?y }");
+//
+//        final Literal comment = f.createLiteral("Bob has a comment");
+//
+//        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//        operation.setBinding("x", bob);
+//        operation.setBinding("z", comment);
+//
+//        assertFalse(con.hasStatement(null, RDFS.COMMENT, comment, true));
+//
+//        operation.execute();
+//
+//        assertTrue(con.hasStatement(bob, RDFS.COMMENT, comment, true));
+//        assertFalse(con.hasStatement(alice, RDFS.COMMENT, comment, true));
+//
+//    }
+
+    /**
+     * @since openrdf 2.6.3
+     */
+//      @Test
+    public void testInsertWhereWithOptional()
+        throws Exception
+    {
+        log.debug("executing testInsertWhereWithOptional");
+
+        final StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append(" INSERT { ?s ex:age ?incAge } ");
+        // update.append(" DELETE { ?s ex:age ?age } ");
+        update.append(" WHERE { ?s foaf:name ?name . ");
+        update.append(" OPTIONAL {?s ex:age ?age . BIND ((?age + 1) as ?incAge)  } ");
+        update.append(" } ");
+
+        final URI age = f.createURI(EX_NS, "age");
+
+        assertFalse(hasStatement(alice, age, null, true));
+        assertTrue(hasStatement(bob, age, null, true));
+
+        m_repo.prepareUpdate(update.toString()).evaluate();
+
+//        RepositoryResult<Statement> result = m_repo.getStatements(bob, age, null, true);
+//
+//        while (result.hasNext()) {
+//            final Statement stmt = result.next();
+//            if (log.isInfoEnabled())
+//                log.info(stmt.toString());
+//        }
+
+        assertTrue(hasStatement(bob, age, f.createLiteral("43", XMLSchema.INTEGER), true));
+
+//        result = m_repo.getStatements(alice, age, null, true);
+//
+//        while (result.hasNext()) {
+//            final Statement stmt = result.next();
+//            if (log.isInfoEnabled())
+//                log.info(stmt.toString());
+//        }
+        assertFalse(hasStatement(alice, age, null, true));
+    }
+
+    ////    //@Test
     public void testDeleteInsertWhere()
         throws Exception
     {
-//        logger.debug("executing test DeleteInsertWhere");
+//        log.debug("executing test DeleteInsertWhere");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
@@ -230,11 +462,68 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
     }
 
-    //@Test
+//    /** 
+//  * TODO Requires BINDINGS support for {@link RemoteRepository}
+//  *
+//       * @since OPENRDF 2.6.6. */
+////  @Test
+//  public void testDeleteInsertWhereWithBindings2()
+//      throws Exception
+//  {
+//      if (!BINDINGS)
+//          return;
+//      log.debug("executing test testDeleteInsertWhereWithBindings2");
+//      final StringBuilder update = new StringBuilder();
+//      update.append(getNamespaceDeclarations());
+//      update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?z . } WHERE {?x foaf:name ?y }");
+//
+//      final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//      operation.setBinding("z", f.createLiteral("person"));
+//      
+//      assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+//      assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+//
+//      operation.execute();
+//
+//      assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("person"), true));
+//      assertTrue(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("person"), true));
+//
+//      assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//      assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//  }
+  
+  /** @since openrdf 2.6.3 */
+  public void testDeleteInsertWhereLoopingBehavior() throws Exception {
+      log.debug("executing test testDeleteInsertWhereLoopingBehavior");
+      final StringBuilder update = new StringBuilder();
+      update.append(getNamespaceDeclarations());
+      update.append(" DELETE { ?x ex:age ?y } INSERT {?x ex:age ?z }");
+      update.append(" WHERE { ");
+      update.append("   ?x ex:age ?y .");
+      update.append("   BIND((?y + 1) as ?z) ");
+      update.append("   FILTER( ?y < 46 ) ");
+      update.append(" } ");
+
+      final URI age = f.createURI(EX_NS, "age");
+      final Literal originalAgeValue = f.createLiteral("42", XMLSchema.INTEGER);
+      final Literal correctAgeValue = f.createLiteral("43", XMLSchema.INTEGER);
+      final Literal inCorrectAgeValue = f.createLiteral("46", XMLSchema.INTEGER);
+
+      assertTrue(hasStatement(bob, age, originalAgeValue, true));
+
+      m_repo.prepareUpdate(update.toString()).evaluate();
+
+      assertFalse(hasStatement(bob, age, originalAgeValue, true));
+      assertTrue(hasStatement(bob, age, correctAgeValue, true));
+      assertFalse(hasStatement(bob, age, inCorrectAgeValue, true));
+  }
+
+  //@Test
     public void testInsertTransformedWhere()
         throws Exception
     {
-//        logger.debug("executing test InsertTransformedWhere");
+//        log.debug("executing test InsertTransformedWhere");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -268,7 +557,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testInsertWhereGraph()
         throws Exception
     {
-//        logger.debug("executing testInsertWhereGraph");
+//        log.debug("executing testInsertWhereGraph");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}");
@@ -291,7 +580,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         throws Exception
     {
 
-//        logger.debug("executing testInsertWhereUsing");
+//        log.debug("executing testInsertWhereUsing");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("INSERT {?x rdfs:label ?y . } USING ex:graph1 WHERE {?x foaf:name ?y }");
@@ -319,7 +608,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testInsertWhereWith()
         throws Exception
     {
-//        logger.debug("executing testInsertWhereWith");
+//        log.debug("executing testInsertWhereWith");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -342,7 +631,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDeleteWhereShortcut()
         throws Exception
     {
-//        logger.debug("executing testDeleteWhereShortcut");
+//        log.debug("executing testDeleteWhereShortcut");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -377,7 +666,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         throws Exception
     {
         
-//        logger.debug("executing testDeleteWhereShortcut2");
+//        log.debug("executing testDeleteWhereShortcut2");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -402,7 +691,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDeleteWhere()
         throws Exception
     {
-//        logger.debug("executing testDeleteWhere");
+//        log.debug("executing testDeleteWhere");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -422,39 +711,45 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
     }
 
-    //@Test
-    public void testDeleteTransformedWhere()
-        throws Exception
-    {
-//        logger.debug("executing testDeleteTransformedWhere");
-
-        final StringBuilder update = new StringBuilder();
-        update.append(getNamespaceDeclarations());
-        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }");
-
-//        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-//        operation.execute();
-        m_repo.prepareUpdate(update.toString()).evaluate();
-
-        String msg = "foaf:name properties should have been deleted";
-        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-        msg = "ex:containsPerson properties should not have been deleted";
-        assertTrue(msg, hasStatement(graph1, f.createURI(EX_NS, "containsPerson"), bob, true));
-        assertTrue(msg, hasStatement(graph2, f.createURI(EX_NS, "containsPerson"), alice, true));
-
-    }
+//    /**
+//     * Note: blank nodes are not permitted in the DELETE clause template.
+//     * 
+//     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+//     * DELETE/INSERT WHERE handling of blank nodes </a>
+//     */
+//    //@Test
+//    public void testDeleteTransformedWhere()
+//        throws Exception
+//    {
+////        log.debug("executing testDeleteTransformedWhere");
+//
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }");
+//
+////        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+////        operation.execute();
+//        m_repo.prepareUpdate(update.toString()).evaluate();
+//
+//        String msg = "foaf:name properties should have been deleted";
+//        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//        msg = "ex:containsPerson properties should not have been deleted";
+//        assertTrue(msg, hasStatement(graph1, f.createURI(EX_NS, "containsPerson"), bob, true));
+//        assertTrue(msg, hasStatement(graph2, f.createURI(EX_NS, "containsPerson"), alice, true));
+//
+//    }
 
     //@Test
     public void testInsertData()
         throws Exception
     {
-//        logger.debug("executing testInsertData");
+//        log.debug("executing testInsertData");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -479,7 +774,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testInsertDataMultiplePatterns()
         throws Exception
     {
-//        logger.debug("executing testInsertData");
+//        log.debug("executing testInsertData");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -507,7 +802,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testInsertDataInGraph()
         throws Exception
     {
-//        logger.debug("executing testInsertDataInGraph");
+//        log.debug("executing testInsertDataInGraph");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -528,11 +823,33 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertTrue(msg, hasStatement(book1, DC.CREATOR, f.createLiteral("Ringo"), true, graph1));
     }
 
+    /** @since OPENRDF 2.6.3 */
+//  @Test
+    public void testInsertDataInGraph2()
+      throws Exception
+    {
+      log.debug("executing testInsertDataInGraph2");
+
+      final StringBuilder update = new StringBuilder();
+      update.append(getNamespaceDeclarations());
+      update.append("INSERT DATA { GRAPH ex:graph1 { ex:Human rdfs:subClassOf ex:Mammal. ex:Mammal rdfs:subClassOf ex:Animal. ex:george a ex:Human. ex:ringo a ex:Human. } } ");
+
+      final URI human = f.createURI(EX_NS, "Human");
+      final URI mammal = f.createURI(EX_NS, "Mammal");
+      final URI george = f.createURI(EX_NS, "george");
+
+      m_repo.prepareUpdate(update.toString()).evaluate();
+
+      assertTrue(hasStatement(human, RDFS.SUBCLASSOF, mammal, true, graph1));
+      assertTrue(hasStatement(mammal, RDFS.SUBCLASSOF, null, true, graph1));
+      assertTrue(hasStatement(george, RDF.TYPE, human, true, graph1));
+    }
+
     //@Test
     public void testDeleteData()
         throws Exception
     {
-//        logger.debug("executing testDeleteData");
+//        log.debug("executing testDeleteData");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("DELETE DATA { ex:alice foaf:knows ex:bob. } ");
@@ -552,7 +869,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDeleteDataMultiplePatterns()
         throws Exception
     {
-//        logger.debug("executing testDeleteData");
+//        log.debug("executing testDeleteData");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("DELETE DATA { ex:alice foaf:knows ex:bob. ex:alice foaf:mbox \"alice@example.org\" .} ");
@@ -574,7 +891,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDeleteDataFromGraph()
         throws Exception
     {
-//        logger.debug("executing testDeleteDataFromGraph");
+//        log.debug("executing testDeleteDataFromGraph");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -595,7 +912,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDeleteDataFromWrongGraph()
         throws Exception
     {
-//        logger.debug("executing testDeleteDataFromWrongGraph");
+//        log.debug("executing testDeleteDataFromWrongGraph");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -619,7 +936,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCreateNewGraph()
         throws Exception
     {
-//        logger.debug("executing testCreateNewGraph");
+//        log.debug("executing testCreateNewGraph");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -643,7 +960,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCreateExistingGraph()
         throws Exception
     {
-//        logger.debug("executing testCreateExistingGraph");
+//        log.debug("executing testCreateExistingGraph");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -668,7 +985,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCopyToDefault()
         throws Exception
     {
-//        logger.debug("executing testCopyToDefault");
+//        log.debug("executing testCopyToDefault");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("COPY GRAPH <" + graph1.stringValue() + "> TO DEFAULT");
@@ -691,7 +1008,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCopyToExistingNamed()
         throws Exception
     {
-//        logger.debug("executing testCopyToExistingNamed");
+//        log.debug("executing testCopyToExistingNamed");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -711,7 +1028,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCopyToNewNamed()
         throws Exception
     {
-//        logger.debug("executing testCopyToNewNamed");
+//        log.debug("executing testCopyToNewNamed");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -731,7 +1048,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCopyFromDefault()
         throws Exception
     {
-//        logger.debug("executing testCopyFromDefault");
+//        log.debug("executing testCopyFromDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -756,7 +1073,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testCopyFromDefaultToDefault()
         throws Exception
     {
-//        logger.debug("executing testCopyFromDefaultToDefault");
+//        log.debug("executing testCopyFromDefaultToDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -778,7 +1095,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testAddToDefault()
         throws Exception
     {
-//        logger.debug("executing testAddToDefault");
+//        log.debug("executing testAddToDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -802,7 +1119,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testAddToExistingNamed()
         throws Exception
     {
-//        logger.debug("executing testAddToExistingNamed");
+//        log.debug("executing testAddToExistingNamed");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -822,7 +1139,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testAddToNewNamed()
         throws Exception
     {
-//        logger.debug("executing testAddToNewNamed");
+//        log.debug("executing testAddToNewNamed");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -842,7 +1159,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testAddFromDefault()
         throws Exception
     {
-//        logger.debug("executing testAddFromDefault");
+//        log.debug("executing testAddFromDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -867,7 +1184,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testAddFromDefaultToDefault()
         throws Exception
     {
-//        logger.debug("executing testAddFromDefaultToDefault");
+//        log.debug("executing testAddFromDefaultToDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -889,7 +1206,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testMoveToDefault()
         throws Exception
     {
-//        logger.debug("executing testMoveToDefault");
+//        log.debug("executing testMoveToDefault");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -913,7 +1230,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testMoveToNewNamed()
         throws Exception
     {
-//        logger.debug("executing testMoveToNewNamed");
+//        log.debug("executing testMoveToNewNamed");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("MOVE GRAPH ex:graph1 TO ex:graph3");
@@ -932,7 +1249,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testMoveFromDefault()
         throws Exception
     {
-//        logger.debug("executing testMoveFromDefault");
+//        log.debug("executing testMoveFromDefault");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("MOVE DEFAULT TO ex:graph3");
@@ -956,7 +1273,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testMoveFromDefaultToDefault()
         throws Exception
     {
-//        logger.debug("executing testMoveFromDefaultToDefault");
+//        log.debug("executing testMoveFromDefaultToDefault");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("MOVE DEFAULT TO DEFAULT");
@@ -977,7 +1294,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testClearAll()
         throws Exception
     {
-//        logger.debug("executing testClearAll");
+//        log.debug("executing testClearAll");
         String update = "CLEAR ALL";
 
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
@@ -994,7 +1311,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testClearGraph()
         throws Exception
     {
-//        logger.debug("executing testClearGraph");
+//        log.debug("executing testClearGraph");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("CLEAR GRAPH <" + graph1.stringValue() + "> ");
@@ -1014,7 +1331,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testClearNamed()
         throws Exception
     {
-//        logger.debug("executing testClearNamed");
+//        log.debug("executing testClearNamed");
         String update = "CLEAR NAMED";
 
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
@@ -1033,7 +1350,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testClearDefault()
         throws Exception
     {
-//        logger.debug("executing testClearDefault");
+//        log.debug("executing testClearDefault");
 
         String update = "CLEAR DEFAULT";
 
@@ -1062,7 +1379,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDropAll()
         throws Exception
     {
-//        logger.debug("executing testDropAll");
+//        log.debug("executing testDropAll");
         String update = "DROP ALL";
 
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
@@ -1079,7 +1396,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDropGraph()
         throws Exception
     {
-//        logger.debug("executing testDropGraph");
+//        log.debug("executing testDropGraph");
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
         update.append("DROP GRAPH <" + graph1.stringValue() + "> ");
@@ -1099,7 +1416,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDropNamed()
         throws Exception
     {
-//        logger.debug("executing testDropNamed");
+//        log.debug("executing testDropNamed");
 
         String update = "DROP NAMED";
 
@@ -1118,7 +1435,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testDropDefault()
         throws Exception
     {
-//        logger.debug("executing testDropDefault");
+//        log.debug("executing testDropDefault");
 
         String update = "DROP DEFAULT";
 
@@ -1141,70 +1458,82 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
     }
 
-    //@Test
-    public void testUpdateSequenceDeleteInsert()
-        throws Exception
-    {
-//        logger.debug("executing testUpdateSequenceDeleteInsert");
+//  /**
+//  * Note: blank nodes are not permitted in the DELETE clause template.
+//  * 
+//  * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+//  * DELETE/INSERT WHERE handling of blank nodes </a>
+//  */
+//    //@Test
+//    public void testUpdateSequenceDeleteInsert()
+//        throws Exception
+//    {
+////        log.debug("executing testUpdateSequenceDeleteInsert");
+//
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }; ");
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x} ");
+//
+////        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+////        operation.execute();
+//
+//        m_repo.prepareUpdate(update.toString()).evaluate();
+//        
+//        String msg = "foaf:name properties should have been deleted";
+//        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//        msg = "foaf:name properties with value 'foo' should have been added";
+//        assertTrue(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+//        assertTrue(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+//    }
 
-        final StringBuilder update = new StringBuilder();
-        update.append(getNamespaceDeclarations());
-        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y }; ");
-        update.append(getNamespaceDeclarations());
-        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x} ");
-
-//        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-//        operation.execute();
-
-        m_repo.prepareUpdate(update.toString()).evaluate();
-        
-        String msg = "foaf:name properties should have been deleted";
-        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-        msg = "foaf:name properties with value 'foo' should have been added";
-        assertTrue(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
-        assertTrue(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
-    }
-
-    //@Test
-    public void testUpdateSequenceInsertDelete()
-        throws Exception
-    {
-//        logger.debug("executing testUpdateSequenceInsertDelete");
-
-        final StringBuilder update = new StringBuilder();
-        update.append(getNamespaceDeclarations());
-        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x}; ");
-        update.append(getNamespaceDeclarations());
-        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y } ");
-
-//        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
-
-        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-//        operation.execute();
-        m_repo.prepareUpdate(update.toString()).evaluate();
-
-        String msg = "foaf:name properties should have been deleted";
-        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
-        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
-
-        msg = "foaf:name properties with value 'foo' should not have been added";
-        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
-        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
-    }
+//  /**
+//  * Note: blank nodes are not permitted in the DELETE clause template.
+//  * 
+//  * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+//  * DELETE/INSERT WHERE handling of blank nodes </a>
+//  */
+//    //@Test
+//    public void testUpdateSequenceInsertDelete()
+//        throws Exception
+//    {
+////        log.debug("executing testUpdateSequenceInsertDelete");
+//
+//        final StringBuilder update = new StringBuilder();
+//        update.append(getNamespaceDeclarations());
+//        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x}; ");
+//        update.append(getNamespaceDeclarations());
+//        update.append("DELETE {?y foaf:name [] } WHERE {?x ex:containsPerson ?y } ");
+//
+////        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+//
+//        assertTrue(hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertTrue(hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+////        operation.execute();
+//        m_repo.prepareUpdate(update.toString()).evaluate();
+//
+//        String msg = "foaf:name properties should have been deleted";
+//        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+//        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+//
+//        msg = "foaf:name properties with value 'foo' should not have been added";
+//        assertFalse(msg, hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+//        assertFalse(msg, hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+//    }
 
     //@Test
     public void testUpdateSequenceInsertDelete2()
         throws Exception
     {
-//        logger.debug("executing testUpdateSequenceInsertDelete2");
+//        log.debug("executing testUpdateSequenceInsertDelete2");
 
         final StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());
@@ -1232,7 +1561,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testUpdateSequenceInsertDeleteExample9()
         throws Exception
     {
-//        logger.debug("executing testUpdateSequenceInsertDeleteExample9");
+//        log.debug("executing testUpdateSequenceInsertDeleteExample9");
 
         // replace the standard dataset with one specific to this case.
         m_repo.prepareUpdate("DROP ALL").evaluate();
@@ -1390,7 +1719,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //    public void testUpdateSequenceInsertDeleteExample9()
 //        throws Exception
 //    {
-//        logger.debug("executing testUpdateSequenceInsertDeleteExample9");
+//        log.debug("executing testUpdateSequenceInsertDeleteExample9");
 //
 //        // replace the standard dataset with one specific to this case.
 //        con.clear();

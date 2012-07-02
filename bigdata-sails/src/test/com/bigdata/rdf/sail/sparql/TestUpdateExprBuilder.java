@@ -2533,6 +2533,74 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+    * DELETE/INSERT with blank node in the DELETE template.
+     * <p>
+     * Note: blank nodes are not allowed in the DELETE clause template (nor in
+     * DELETE DATA). This is because the blank nodes in the DELETE clause are
+     * distinct for each solution plugged into that template. Thus they can not
+     * match anything in the database.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     *      DELETE/INSERT WHERE handling of blank nodes </a>
+     */
+    public void test_delete_insert_blankNodes01() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { [] foaf:givenName 'Bill' }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+
+        try {
+            parseUpdate(sparql, baseURI);
+            fail("Expecting exception: blank nodes not allowed in DELETE template");
+        } catch (MalformedQueryException ex) {
+            // Ignore expected exception.
+//            ex.printStackTrace();
+        }
+
+    }
+
+    /**
+     * DELETE/INSERT with blank node in the DELETE template.
+     * <p>
+     * Note: blank nodes are not allowed in the DELETE clause template (nor in
+     * DELETE DATA). This is because the blank nodes in the DELETE clause are
+     * distinct for each solution plugged into that template. Thus they can not
+     * match anything in the database.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     *      DELETE/INSERT WHERE handling of blank nodes </a>
+     */
+    public void test_delete_insert_blankNodes02()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
+                + "DELETE { ?person foaf:givenName [] }\n"//
+                + "INSERT { ?person foaf:givenName 'William' }\n"//
+                + "WHERE {\n"//
+                + "  ?person foaf:givenName 'Bill'. \n"//
+                + "  GRAPH <http://example/addresses> {\n"//
+                + "    ?person foaf:givenName 'Bill'\n"//
+                + "    }\n"//
+                + "}";
+
+        try {
+            parseUpdate(sparql, baseURI);
+            fail("Expecting exception: blank nodes not allowed in DELETE template");
+        } catch (MalformedQueryException ex) {
+            // Ignore expected exception.
+//            ex.printStackTrace();
+        }
+
+    }
+
+    /**
      * A unit test for the DELETE WHERE form without the shortcut, but
      * there the template and the where clause are the same.
      * <pre>

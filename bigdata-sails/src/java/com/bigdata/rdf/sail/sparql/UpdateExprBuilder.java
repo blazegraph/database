@@ -662,22 +662,21 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
 		return op;
 		
-	}
+    }
 
-	@Override
-	public QuadData visit(final ASTDeleteClause node, final Object data)
-		throws VisitorException
-	{
+    @Override
+    public QuadData visit(final ASTDeleteClause node, final Object data)
+            throws VisitorException {
 
-	    return doQuadsPatternClause(node, data);
-	    
+        return doQuadsPatternClause(node, data, false/* allowBlankNodes */);
+
     }
 
     @Override
     public QuadData visit(final ASTInsertClause node, final Object data)
             throws VisitorException {
 
-        return doQuadsPatternClause(node, data);
+        return doQuadsPatternClause(node, data, true/* allowBlankNodes */);
 
     }
 
@@ -845,9 +844,12 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * @return The {@link QuadData} (aka template). The {@link QuadData} as
      *         returned by this method is not flattened, but the context has
      *         been applied within any GRAPH section.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/571">
+     *      DELETE/INSERT WHERE handling of blank nodes </a>
      */
-    private QuadData doQuadsPatternClause(final Node node, final Object data)
-            throws VisitorException {
+    private QuadData doQuadsPatternClause(final Node node, final Object data,
+            final boolean allowBlankNodes) throws VisitorException {
 
         // Collect construct triples
         final GroupGraphPattern parentGP = graphPattern;
@@ -866,6 +868,27 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         final QuadData quadData = graphPattern.buildGroup(new QuadData());
 
+        if (!allowBlankNodes) {
+
+            /*
+             * Blank nodes are not allowed in the DELETE clause template.
+             */
+            
+            final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                    quadData, StatementPatternNode.class);
+
+            while (itr.hasNext()) {
+
+                final StatementPatternNode sp = itr.next();
+
+                assertNotAnonymousVariable(sp.s());
+
+                assertNotAnonymousVariable(sp.o());
+
+            }
+
+        }
+        
         graphPattern = parentGP;
 
         return quadData;
