@@ -30,7 +30,9 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 
 /**
@@ -51,6 +53,18 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
 
         /**
          * The {@link BigdataStatement}[] data.
+         * 
+         * TODO The strong typing as a {@link BigdataStatement}[] was introduced
+         * to support of the ticket below (573). This forces us to work with
+         * materialized RDF Values. That makes it more difficult to optimize
+         * SPARQL UPDATE by not materializing {@link IV}s as
+         * {@link BigdataValue}s (ticket 522).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/573">
+         *      NullPointerException when attempting to INSERT DATA containing a
+         *      blank node </a>
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/522">
+         *      SPARQL UPDATE should not materialize RDF Values</a>
          */
         String DATA = "data";
 
