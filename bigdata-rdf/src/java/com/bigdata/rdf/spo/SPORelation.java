@@ -1032,6 +1032,44 @@ public class SPORelation extends AbstractRelation<ISPO> {
     public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
             final IV o, final IV c, IElementFilter<ISPO> filter,
             final RangeBOp range) {
+
+    	final IPredicate<ISPO> pred = getPredicate(s, p, o, c, filter, range);
+    	
+        return getAccessPath(pred);
+
+    }
+
+    /**
+     * Return the predicate for a triple or quad pattern with an optional
+     * filter (core implementation). All arguments are optional. Any bound
+     * argument will restrict the returned access path. For a triple pattern,
+     * <i>c</i> WILL BE IGNORED as there is no index over the statement
+     * identifiers, even when they are enabled. For a quad pattern, any argument
+     * MAY be bound.
+     * 
+     * @param s
+     *            The subject position (optional).
+     * @param p
+     *            The predicate position (optional).
+     * @param o
+     *            The object position (optional).
+     * @param c
+     *            The context position (optional and ignored for a triple
+     *            store).
+     * @param filter
+     *            The filter (optional).
+     * @param range
+     *            The range (optional).
+     *            
+     * @return The predicate for that triple or quad pattern.
+     * 
+     * @throws UnsupportedOperationException
+     *             for a triple store without statement identifiers if the
+     *             <i>c</i> is non-{@link #NULL}.
+     */
+    public IPredicate<ISPO> getPredicate(final IV s, final IV p,
+            final IV o, final IV c, IElementFilter<ISPO> filter,
+            final RangeBOp range) {
         
         final IVariableOrConstant<IV> S = (s == null ? Var.var("s")
                 : new Constant<IV>(s));
@@ -1083,7 +1121,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             pred = pred.addIndexLocalFilter(ElementFilter.newInstance(filter));
         }
 
-        return getAccessPath(pred);
+        return pred;
 
     }
 

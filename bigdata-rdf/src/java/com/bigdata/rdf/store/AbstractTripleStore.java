@@ -2774,6 +2774,126 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    public IPredicate<ISPO> getPredicate(final Resource s, final URI p,
+            final Value o) {
+
+        return getPredicate(s, p, o, null/*c*/, null/* filter */, null/* range */);
+
+    }
+
+    /**
+     * Convert a Sesame Value based triple pattern into a bigdata Predicate.
+     * Will return null if any of the Sesame Values are not present in the
+     * database.
+     */
+    final public IPredicate<ISPO> getPredicate(final Resource s, final URI p,
+            final Value o, final Resource c, final IElementFilter<ISPO> filter,
+            final RangeBOp range) {
+
+        /*
+         * Convert other Value object types to our object types.
+         * 
+         * Note: the value factory is not requested unless we need to translate
+         * some value. This hack allows temporary stores without a lexicon to
+         * use the same entry points as those with one. Without this methods
+         * such as getStatementCount(c,exact) would throw exceptions when the
+         * lexicon was not associated with the store.
+         */
+
+        final BigdataValueFactory valueFactory = (s != null || p != null || o != null
+                | c != null) ? getValueFactory() : null;
+        
+        final BigdataResource _s = valueFactory == null ? null : valueFactory
+                .asValue(s);
+
+        final BigdataURI _p = valueFactory == null ? null : valueFactory
+                .asValue(p);
+
+        final BigdataValue _o = valueFactory == null ? null : valueFactory
+                .asValue(o);
+
+        // Note: _c is null unless quads.
+        final BigdataValue _c = quads ? valueFactory == null ? null
+                : valueFactory.asValue(c) : null;
+
+        /*
+         * Batch resolve all non-null values to get their term identifiers.
+         */
+        int nnonNull = 0;
+        final BigdataValue[] values = new BigdataValue[spoKeyArity];
+        {
+
+            if (s != null)
+                values[nnonNull++] = _s;
+
+            if (p != null)
+                values[nnonNull++] = _p;
+
+            if (o != null)
+                values[nnonNull++] = _o;
+
+            if (c != null && quads)
+                values[nnonNull++] = _c;
+
+            if (nnonNull > 0)
+                getLexiconRelation()
+                        .addTerms(values, nnonNull, true/* readOnly */);
+
+        }
+
+        /*
+         * If any value was given but is not known to the lexicon then use an
+         * empty access path since no statements can exist for the given
+         * statement pattern.
+         */
+
+        if (s != null && _s.getIV() == null)
+            return null; // new EmptyAccessPath<ISPO>();
+
+        if (p != null && _p.getIV() == null)
+        	return null; // new EmptyAccessPath<ISPO>();
+
+        if (o != null && _o.getIV() == null)
+        	return null; // new EmptyAccessPath<ISPO>();
+
+        if (quads && c != null && _c.getIV() == null)
+        	return null; // new EmptyAccessPath<ISPO>();
+
+//        /*
+//         * Convert our object types to internal identifiers.
+//         * 
+//         * Note: If a value was specified and it is not in the terms index then
+//         * the statement can not exist in the KB.
+//         */
+//        final long _s = getTermId(s);
+//
+//        if (_s == NULL && s != null)
+//            return new EmptyAccessPath<ISPO>();
+//
+//        final long _p = getTermId(p);
+//
+//        if (_p == NULL && p != null)
+//            return new EmptyAccessPath<ISPO>();
+//
+//        final long _o = getTermId(o);
+//
+//        if (_o == NULL && o != null)
+//            return new EmptyAccessPath<ISPO>();
+
+        /*
+         * Return the access path.
+         */
+
+        return getSPORelation().getPredicate(//
+                s == null ? null : _s.getIV(), //
+                p == null ? null : _p.getIV(),//
+                o == null ? null : _o.getIV(),//
+                (c == null || !quads) ? null : _c.getIV(),//
+                filter, range//
+        );
+
+    }
+
     final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
             final IV o) {
 
