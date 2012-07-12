@@ -302,6 +302,27 @@ public interface BD {
 
     final boolean DEFAULT_MATCH_EXACT = false;
     
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
+     * select ?s
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:matchRegex &quot;regex to apply to ?s bindings&quot; .
+     * }
+     * 
+     * </pre>
+     * <p>
+     * This operation will be rather expensive as it will require materializing
+     * all the hits to check their values.
+     */
+    final URI MATCH_REGEX = new URIImpl(SEARCH_NAMESPACE+"matchRegex");
+
+    final String DEFAULT_MATCH_REGEX = null;
+    
     final boolean DEFAULT_PREFIX_MATCH = false;
     
     /**

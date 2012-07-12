@@ -97,6 +97,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
         final boolean matchAllTerms = false;
         final long timeout = Long.MAX_VALUE;
         final TimeUnit unit = TimeUnit.MILLISECONDS;
+        final String regex = null;
 
         final Properties properties = getProperties();
         
@@ -144,7 +145,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
 //                        );
                 ndx.search(text,
                         languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
                 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
@@ -177,7 +178,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
                 final Hiterator<?> itr = // ndx.search(text, languageCode);
                     ndx.search(text,
                             languageCode, prefixMatch, minCosine, maxCosine,
-                            minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                            minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 

@@ -114,6 +114,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         final boolean matchAllTerms = false;
         final long timeout = Long.MAX_VALUE;
         final TimeUnit unit = TimeUnit.MILLISECONDS;
+        final String regex = null;
 
         final Properties properties = getProperties();
         
@@ -154,7 +155,7 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<Hit<Long>> itr = ndx.search(query,
                         languageCode, prefixMatch, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 //                                query, languageCode, 0d/* minCosine */,
 //                                Integer.MAX_VALUE/* maxRank */);
                 

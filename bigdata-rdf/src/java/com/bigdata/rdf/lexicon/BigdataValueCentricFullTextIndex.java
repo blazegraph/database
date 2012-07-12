@@ -33,6 +33,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -426,6 +428,75 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 	    		final BigdataValue term = e.getValue();
 	    		
 	    		if (term.stringValue().contains(query)) {
+	    			
+	    			tmp[k++] = iv2Hit.get(iv);
+	    			
+	    		}
+	    		
+	    	}
+	    	
+    	}
+    	
+    	if (k < hits.length) {
+    		
+    		final Hit[] a = new Hit[k];
+    		System.arraycopy(tmp, 0, a, 0, k);
+    		return a;
+    		
+    	} else {
+    	
+    		return hits;
+    		
+    	}
+    	
+    }
+    
+    @Override
+    protected Hit[] applyRegex(final Hit[] hits, final Pattern regex) {
+
+//    	/*
+//    	 * Too big to do efficient exact matching.
+//    	 */
+//    	if (hits.length > 10000) {
+//    		
+//    		return hits;
+//    		
+//    	}
+    	
+    	final int chunkSize = 1000;
+    	
+    	final Hit[] tmp = new Hit[hits.length];
+    	
+    	final Map<IV<?,?>, Hit> iv2Hit = new HashMap<IV<?,?>, Hit>(chunkSize);
+    	
+    	final LexiconRelation lex = getLexiconRelation();
+    	
+    	int i = 0, k = 0;
+    	while (i < hits.length) {
+    	
+    		iv2Hit.clear();
+    		
+	    	for (int j = 0; j < chunkSize && i < hits.length; j++) {
+
+	    		final Hit h = hits[i++];
+	    		
+	    		iv2Hit.put((IV<?,?>) h.getDocId(), h);
+	    		
+	    	}
+	    	
+	    	final Map<IV<?,?>, BigdataValue> terms = lex.getTerms(iv2Hit.keySet());
+
+	    	for (Map.Entry<IV<?,?>, BigdataValue> e : terms.entrySet()) {
+	    		
+	    		final IV<?,?> iv = e.getKey();
+	    		
+	    		final BigdataValue term = e.getValue();
+	    		
+	    		final String s = term.stringValue();
+	    		
+                final Matcher matcher = regex.matcher(s);
+                
+                if (matcher.find()) {
 	    			
 	    			tmp[k++] = iv2Hit.get(iv);
 	    			

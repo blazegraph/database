@@ -139,7 +139,8 @@ public class TestSubjectCentricFullTextIndex extends AbstractTripleStoreTestCase
                         false/* matchAllTerms */,
                         false, // matchExact
                         Long.MAX_VALUE,//2L/* timeout */,
-                        TimeUnit.MILLISECONDS// TimeUnit.SECONDS
+                        TimeUnit.MILLISECONDS,// TimeUnit.SECONDS
+                        null//regex
                         );
 
         // assertEquals("#hits", (long) expected.length, itr.size());
