@@ -71,6 +71,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
         final boolean matchAllTerms = false;
         final long timeout = Long.MAX_VALUE;
         final TimeUnit unit = TimeUnit.MILLISECONDS;
+        final String regex = null;
 
         final Properties properties = getProperties();
         
@@ -113,7 +114,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 final Hiterator<?> itr = ndx.search("The quick brown dog",
                         languageCode, false/* prefixMatch */
                         , minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
                 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -143,7 +144,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx.search("The qui bro do",
                         languageCode, true/*prefixMatch*/, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
                 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
                 
@@ -172,14 +173,14 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("brown", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(2, ndx
                         .count("brown", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit));
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
 
             }
 
@@ -190,13 +191,13 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("brown", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, ndx
                         .count("brown", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit));
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
 
             }
 
@@ -207,13 +208,13 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("bro", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, ndx
                         .count("bro", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit));
+                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
 
             }
 
@@ -224,7 +225,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("bro", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -240,7 +241,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("qui", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -256,7 +257,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("qui", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -272,7 +273,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 final Hiterator<?> itr = ndx
                         .search("quick", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit);
+                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);

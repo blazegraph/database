@@ -295,6 +295,11 @@ public class SearchServiceFactory implements ServiceFactory {
                 
                 assertObjectIsLiteral(sp);
                 
+            } else if(uri.equals(BD.MATCH_REGEX)) {
+                
+            	// a variable for the object is equivalent to regex = null
+//                assertObjectIsLiteral(sp);
+                
             } else {
 
                 throw new AssertionError("Unverified search predicate: " + sp);
@@ -355,6 +360,7 @@ public class SearchServiceFactory implements ServiceFactory {
         private final boolean matchExact;
         private final boolean subjectSearch;
         private final Literal searchTimeout;
+        private final Literal matchRegex;
         
         public SearchCall(
                 final AbstractTripleStore store,
@@ -401,6 +407,7 @@ public class SearchServiceFactory implements ServiceFactory {
             boolean matchExact = false;
             boolean subjectSearch = false;
             Literal searchTimeout = null;
+            Literal matchRegex = null;
 
             for (StatementPatternNode meta : statementPatterns.values()) {
 
@@ -432,6 +439,8 @@ public class SearchServiceFactory implements ServiceFactory {
                     subjectSearch = ((Literal) oVal).booleanValue();
                 } else if (BD.SEARCH_TIMEOUT.equals(p)) {
                     searchTimeout = (Literal) oVal;
+                } else if (BD.MATCH_REGEX.equals(p)) {
+                    matchRegex = (Literal) oVal;
                 }
             }
 
@@ -449,6 +458,7 @@ public class SearchServiceFactory implements ServiceFactory {
             this.matchExact = matchExact;
             this.subjectSearch = subjectSearch;
             this.searchTimeout = searchTimeout;
+            this.matchRegex = matchRegex;
 
         }
 
@@ -485,7 +495,8 @@ public class SearchServiceFactory implements ServiceFactory {
                 matchAllTerms,
                 matchExact,
                 searchTimeout == null ? BD.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
-                TimeUnit.MILLISECONDS);
+                TimeUnit.MILLISECONDS,
+                matchRegex == null ? null : matchRegex.stringValue());
         
         }
 

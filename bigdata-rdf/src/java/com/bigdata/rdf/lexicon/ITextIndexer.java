@@ -117,6 +117,8 @@ public interface ITextIndexer<A extends IHit> {
 	 *            to using {@link Long#MAX_VALUE}).
 	 * @param unit
 	 *            The unit in which the timeout is expressed.
+	 * @param regex
+	 * 			  A regex filter to apply to the search.            
 	 * 
 	 * @return The result set.
 	 */
@@ -125,7 +127,7 @@ public interface ITextIndexer<A extends IHit> {
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
             final boolean matchAllTerms, final boolean matchExact, 
-            long timeout, final TimeUnit unit);
+            long timeout, final TimeUnit unit, final String regex);
 
 	/**
 	 * Count free text search results.
@@ -164,6 +166,8 @@ public interface ITextIndexer<A extends IHit> {
 	 *            to using {@link Long#MAX_VALUE}).
 	 * @param unit
 	 *            The unit in which the timeout is expressed.
+	 * @param regex
+	 * 			  A regex filter to apply to the search.            
 	 * 
 	 * @return The result count.
 	 */
@@ -172,6 +176,6 @@ public interface ITextIndexer<A extends IHit> {
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
             final boolean matchAllTerms, final boolean matchExact, 
-            long timeout, final TimeUnit unit);
+            long timeout, final TimeUnit unit, final String regex);
 
 }

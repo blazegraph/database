@@ -801,7 +801,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -869,7 +870,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -940,7 +942,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1015,7 +1018,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1092,7 +1096,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1167,7 +1172,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1238,7 +1244,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1308,7 +1315,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1348,7 +1356,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 if (log.isInfoEnabled()) {
@@ -1488,7 +1497,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1554,7 +1564,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1626,7 +1637,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1703,7 +1715,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1781,7 +1794,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1857,7 +1871,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -1929,7 +1944,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             true, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -2001,7 +2017,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -2041,7 +2058,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 if (log.isInfoEnabled()) {
@@ -2187,7 +2205,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {
@@ -2569,7 +2588,8 @@ LIMIT 10 OFFSET 0
                             BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             true, // matchExact
                             BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS // unit
+                            TimeUnit.MILLISECONDS, // unit
+                            null // regex
                             );
                 
                 while (hits.hasNext()) {

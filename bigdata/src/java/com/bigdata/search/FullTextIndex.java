@@ -42,9 +42,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
@@ -951,10 +951,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
             final boolean matchAllTerms, final boolean matchExact,
-            long timeout, final TimeUnit unit) {
+            long timeout, final TimeUnit unit, final String regex) {
         
 		final Hit<V>[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit);
+				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit, regex);
     	
         return new Hiterator<Hit<V>>(//
                 Arrays.asList(a)// 
@@ -972,7 +972,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	
     	return count(query, languageCode, prefixMatch, 0.0d, 1.0d, 1, 10000, 
     			false, false, this.timeout,//
-                TimeUnit.MILLISECONDS);
+                TimeUnit.MILLISECONDS, null);
     	
     }
    
@@ -982,10 +982,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
             final boolean matchAllTerms, final boolean matchExact,
-            long timeout, final TimeUnit unit) {
+            long timeout, final TimeUnit unit, final String regex) {
     	
 		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit);
+				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit, regex);
 		
 		return a.length;
 		
@@ -997,7 +997,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             final double minCosine, final double maxCosine,
             final int minRank, final int maxRank, 
             final boolean matchAllTerms, final boolean matchExact, 
-            long timeout, final TimeUnit unit) {
+            long timeout, final TimeUnit unit, final String regex) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1039,7 +1039,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         }
         
         final FullTextSearchQuery cacheKey = new FullTextSearchQuery(
-        		query, matchAllTerms, matchExact, prefixMatch, timeout, unit
+        		query, matchAllTerms, matchExact, prefixMatch, timeout, unit, regex
         		);
         
         Hit<V>[] a;
@@ -1243,6 +1243,28 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	            return a; 
 	            
 	        }
+	        
+	        /*
+	         * Do regex matching.
+	         */
+	        if (regex != null) {
+	        	
+	        	final Pattern pattern = Pattern.compile(regex);
+	        	
+	        	a = applyRegex(a, pattern);
+	        	
+	        }
+	        
+	        if (a.length == 0) {
+	        	
+	            log.warn("No hits after regex pruning: languageCode=[" + languageCode + "], query=["
+	                    + query + "], regex=[" + regex + "]");
+	            
+	            cache.put(cacheKey, a);
+	            
+	            return a; 
+	            
+	        }
 	
 	        /*
 	         * Rank order the hits by relevance.
@@ -1419,6 +1441,19 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	throw new UnsupportedOperationException();
     	
     }
+
+	/**
+	 * Subclasses can override this method to do regex post-processing. This
+	 * involves materializing the hits into their original text values and
+	 * checking against the regex string in the materialized value. Not possible
+	 * from the base class. The value-centric RDF version can use the lexicon to
+	 * materialize the hits and check them against the regex.
+	 */
+    protected Hit<V>[] applyRegex(final Hit<V>[] hits, final Pattern regex) {
+    	
+    	throw new UnsupportedOperationException();
+    	
+    }
     
     /*
      * @todo implement the relevant methods.
@@ -1468,6 +1503,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	private final boolean prefixMatch;
     	private final long timeout;
     	private final TimeUnit unit;
+    	private final String regex;
     	
     	public FullTextSearchQuery(
     	    	final String search,
@@ -1475,7 +1511,8 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     	    	final boolean matchExact,
     	    	final boolean prefixMatch,
     	    	final long timeout,
-    	    	final TimeUnit unit) {
+    	    	final TimeUnit unit,
+    	    	final String regex) {
     		
     		this.search = search;
     		this.matchAllTerms = matchAllTerms;
@@ -1483,12 +1520,13 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     		this.prefixMatch = prefixMatch;
     		this.timeout = timeout;
     		this.unit = unit;
+    		this.regex = regex;
     		
     	}
     	
-		/**
-		 * Generated by Eclipse.
-		 */
+    	/**
+    	 * Generated by Eclipse.
+    	 */
 		@Override
 		public int hashCode() {
 			final int prime = 31;
@@ -1496,6 +1534,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 			result = prime * result + (matchAllTerms ? 1231 : 1237);
 			result = prime * result + (matchExact ? 1231 : 1237);
 			result = prime * result + (prefixMatch ? 1231 : 1237);
+			result = prime * result + ((regex == null) ? 0 : regex.hashCode());
 			result = prime * result
 					+ ((search == null) ? 0 : search.hashCode());
 			result = prime * result + (int) (timeout ^ (timeout >>> 32));
@@ -1503,9 +1542,9 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 			return result;
 		}
 
-		/**
-		 * Generated by Eclipse.
-		 */
+    	/**
+    	 * Generated by Eclipse.
+    	 */
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -1521,6 +1560,11 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 				return false;
 			if (prefixMatch != other.prefixMatch)
 				return false;
+			if (regex == null) {
+				if (other.regex != null)
+					return false;
+			} else if (!regex.equals(other.regex))
+				return false;
 			if (search == null) {
 				if (other.search != null)
 					return false;
@@ -1532,6 +1576,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 				return false;
 			return true;
 		}
+
     	
     }
     
