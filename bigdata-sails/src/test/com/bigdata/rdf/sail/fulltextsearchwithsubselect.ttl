@@ -1,0 +1,9 @@
+@prefix  rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+<http://example/1>     rdfs:label                       "music makes me feel relaxed" .
+<http://example/1>     rdf:type                         rdfs:Resource .
+<http://example/2>     rdfs:label                       "the music store" .
+<http://example/2>     rdf:type                         rdfs:Resource .
+<http://example/3>     rdfs:label                       "i love music" .
+<http://example/3>     rdf:type                         rdfs:Resource .
