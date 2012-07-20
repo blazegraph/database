@@ -95,7 +95,13 @@ public class ASTConstructOptimizer implements IASTOptimizer {
             projection.addProjectionVar(new VarNode(itr.next().getName()));
 
         }
-        
+
+        if (context.nativeDistinctSPO) {
+
+            constructNode.setNativeDistinct(true);
+
+        }
+
         return queryRoot;
 
     }

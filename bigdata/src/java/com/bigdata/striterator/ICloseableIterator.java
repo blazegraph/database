@@ -38,7 +38,7 @@ import java.util.Iterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ICloseableIterator<E> extends Iterator<E> {
+public interface ICloseableIterator<E> extends Iterator<E>, ICloseable {
 
     /**
      * Closes the iterator, releasing any associated resources. This method MAY

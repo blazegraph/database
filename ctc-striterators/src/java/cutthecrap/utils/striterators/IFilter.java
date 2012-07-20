@@ -29,8 +29,17 @@ package cutthecrap.utils.striterators;
 import java.util.Iterator;
 import java.io.Serializable;
 
+import com.bigdata.striterator.ICloseableIterator;
+
 /**
  * Provides the hook interface that allows use by Striterators
+ * 
+ * TODO The {@link Striterator} protocol does not support a close() method for
+ * {@link Filter}s. That method should be invoked by an
+ * {@link ICloseableIterator}.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/582">
+ *      IStriterator does not support close() protocol for Ifilter </a>
  */
 public interface IFilter extends Serializable, IPropertySet {
 	/**

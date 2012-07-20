@@ -44,6 +44,12 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.impl.EmptyBindingSet;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.filter.DistinctFilter;
+import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
@@ -53,7 +59,13 @@ import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.striterator.ICloseable;
+
+import cutthecrap.utils.striterators.IFilterTest;
 
 /**
  * Iterator consumes the solutions from a query and interprets them according to
@@ -98,6 +110,24 @@ public class ASTConstructIterator implements
      */
     private final List<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
 
+    /**
+     * A filter which restricts the emitted statements to the distinct
+     * {@link ISPO}. The {@link DistinctFilter} is based on the Java heap. The
+     * {@link NativeDistinctFilter} is based on persistence capable data
+     * structures and can scale to high cardinality outputs. Unfortunately, a
+     * complex CONSTRUCT template can make it impossible to predict the
+     * <p>
+     * Note: It is possible to disable this filter (in the code) by setting it
+     * to <code>null</code>.
+     * 
+     * @see DistinctFilter
+     * @see NativeDistinctFilter
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    private final IFilterTest filter;
+    
 //    /**
 //     * Return <code>true</code>iff {@link LexiconRelation#isStoreBlankNodes()}
 //     * is <code>true</code>.
@@ -176,6 +206,57 @@ public class ASTConstructIterator implements
 
         this.src = src;
 
+        /*
+         * Setup the DISTINCT SPO filter.
+         */
+        
+        final boolean nativeDistinct = construct.isNativeDistinct();
+        if (nativeDistinct) {
+            
+            /*
+             * Construct a predicate for the first triple template. We will use
+             * that as the bias for the scalable DISTINCT SPO filter.
+             */
+            final IPredicate pred;
+            {
+
+                final StatementPatternNode sp = templates.get(0/* index */);
+
+                final IVariableOrConstant<IV> s = sp.s().getValueExpression();
+                final IVariableOrConstant<IV> p = sp.p().getValueExpression();
+                final IVariableOrConstant<IV> o = sp.o().getValueExpression();
+
+//                // The graph term/variable iff specified by the query.
+//                final TermNode cvar = sp.c();
+//                final IVariableOrConstant<IV> c = cvar == null ? null : cvar
+//                        .getValueExpression();
+
+                final BOp[] vars = new BOp[] { s, p, o /*, c*/ };
+
+                pred = new SPOPredicate(vars, BOp.NOANNS);
+
+            }
+            
+            /*
+             * The index that will be used to read on the B+Tree access path.
+             */
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
+                    (IPredicate) pred, 3/* keyArity */);
+            
+            construct.setProperty(NativeDistinctFilter.Annotations.KEY_ORDER,
+                    indexKeyOrder);
+
+            // Native memory based DISTINCT filter.
+            filter = new NativeDistinctFilter.DistinctFilterImpl(construct);
+
+        } else {
+            
+            // JVM Based DISTINCT filter.
+            filter = new DistinctFilter.DistinctFilterImpl(construct);
+            
+        }
+        
     }
     
     public boolean hasNext() throws QueryEvaluationException {
@@ -243,6 +324,21 @@ public class ASTConstructIterator implements
             
             src.close();
             
+            if (filter instanceof ICloseable) {
+
+                /*
+                 * Ensure that we release the backing MemoryManager in a timely
+                 * fashion.
+                 * 
+                 * @see <a
+                 * href="https://sourceforge.net/apps/trac/bigdata/ticket/582">
+                 * IStriterator does not support close() protocol for IFilter
+                 * </a>
+                 */
+                ((ICloseable) filter).close();
+
+            }
+
         }
 
     }
@@ -316,7 +412,28 @@ public class ASTConstructIterator implements
         if(log.isDebugEnabled())
             log.debug(stmt.toString());
         
-        buffer.add(stmt);
+        if(filter != null) {
+
+            /*
+             * Impose a DISTINCT SPO filter on the generated statements in the
+             * constructed graph.
+             * 
+             * @see <a
+             * href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+             * CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+             */
+            
+            if(filter.isValid(stmt)) {
+                
+                buffer.add(stmt);
+                
+            }
+            
+        } else {
+
+            buffer.add(stmt);
+
+        }
         
     }
     

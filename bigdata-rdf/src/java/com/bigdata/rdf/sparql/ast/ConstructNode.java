@@ -30,6 +30,8 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.spo.ISPO;
 
 /**
  * A template for the construction of one or more graphs based on the solutions
@@ -47,10 +49,47 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
      */
     private static final long serialVersionUID = 1L;
 
-    public ConstructNode() {
-        super();
+    public interface Annotations extends AbstractStatementContainer.Annotations {
+
+        /**
+         * Boolean property (default {@value #DEFAULT_ALL_GRAPHS}) which is
+         * <code>true</code> iff a native DISTINCT {@link ISPO} filter should be
+         * applied (large cardinality is expected for the constructed graph).
+         * When <code>false</code>, a JVM based DISTINCT {@link ISPO} filter
+         * will be applied.
+         * <p>
+         * Note: This can be set using either {@link QueryHints#ANALYTIC} or
+         * {@link QueryHints#NATIVE_DISTINCT_SPO}.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+         *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+         */
+        String NATIVE_DISTINCT = "nativeDistinct";
+
+        boolean DEFAULT_NATIVE_DISTINCT = false;
+
     }
 
+    public ConstructNode() {
+
+        super();
+        
+    }
+
+    public ConstructNode(final AST2BOpContext ctx) {
+
+        super();
+        
+        if (ctx.nativeDistinctSPO) {
+         
+            // Native DISTINCT SPO FILTER is requested.
+            
+            setNativeDistinct(true);
+            
+        }
+
+    }
+    
     /**
      * Required deep copy constructor.
      */
@@ -80,6 +119,29 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
         
         return this;
     }
+
+    /**
+     * When <code>true</code>, a native DISTINCT {@link ISPO} filter will be
+     * applied to the constructed graph, otherwise a Java Heap based DISTINCT
+     * {@link ISPO} filter will be applied.
+     * 
+     * @see Annotations#NATIVE_DISTINCT
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public boolean isNativeDistinct() {
+
+        return getProperty(Annotations.NATIVE_DISTINCT,
+                Annotations.DEFAULT_NATIVE_DISTINCT);
+
+    }
+
+    public void setNativeDistinct(final boolean nativeDistinct) {
+        
+        setProperty(Annotations.NATIVE_DISTINCT, nativeDistinct);
+        
+    }
     
     @Override
     public String toString(final int indent) {
@@ -97,7 +159,10 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
         }
 
         sb.append("\n").append(s).append("}");
-        
+
+        if (isNativeDistinct())
+            sb.append(" [nativeDistinct]");
+
         return sb.toString();
 
     }

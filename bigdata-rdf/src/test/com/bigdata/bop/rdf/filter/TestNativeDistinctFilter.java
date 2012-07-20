@@ -175,7 +175,7 @@ public class TestNativeDistinctFilter extends TestCase2 {
     /**
      * Unit test for {@link NativeDistinctFilter#getFilterKeyOrder(SPOKeyOrder)}
      */
-    public void test_filterKeyOrder() {
+    public void test_filterKeyOrder_quads() {
 
         assertEquals(new int[] {0,1,2},
                 NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.SPOC));
@@ -194,6 +194,22 @@ public class TestNativeDistinctFilter extends TestCase2 {
 
         assertEquals(new int[] {0,1,2},
                 NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.SOPC));
+
+    }
+    
+    /**
+     * Unit test for {@link NativeDistinctFilter#getFilterKeyOrder(SPOKeyOrder)}
+     */
+    public void test_filterKeyOrder_triples() {
+
+        assertEquals(new int[] { 0, 1, 2 },
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.SPO));
+
+        assertEquals(new int[] { 1, 2, 0 },
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.POS));
+
+        assertEquals(new int[] { 2, 0, 1 },
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.OSP));
 
     }
     

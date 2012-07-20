@@ -721,7 +721,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							 */
 							
 							final ConstructNode template = op.getDeleteClause()
-									.getQuadData().flatten(new ConstructNode());
+									.getQuadData().flatten(new ConstructNode(context));
 
 							final ASTConstructIterator itr = new ASTConstructIterator(
 									context.conn.getTripleStore(), template,
@@ -789,7 +789,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							 */
 							
 							final ConstructNode template = op.getInsertClause()
-									.getQuadData().flatten(new ConstructNode());
+									.getQuadData().flatten(new ConstructNode(context));
 
 							final ASTConstructIterator itr = new ASTConstructIterator(
 									context.conn.getTripleStore(), template,
@@ -898,7 +898,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     // Flatten the original WHERE clause into a CONSTRUCT
                     // template.
                     final ConstructNode template = quadData
-                            .flatten(new ConstructNode());
+                            .flatten(new ConstructNode(context));
 
                     // Set the CONSTRUCT template (quads patterns).
                     queryRoot.setConstruct(template);
