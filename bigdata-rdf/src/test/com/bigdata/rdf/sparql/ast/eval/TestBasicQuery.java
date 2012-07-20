@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ConstructNode;
+
 /**
  * Data driven test suite.
  * 
@@ -93,12 +96,89 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_construct_1() throws Exception {
 
-        new TestHelper(
+        final ASTContainer ast = new TestHelper(
                 "construct-1", // testURI,
                 "construct-1.rq",// queryFileURL
                 "construct-1.trig",// dataFileURL
                 "construct-1-result.trig"// resultFileURL
                 ).runTest();
+        
+        final ConstructNode construct = ast.getOptimizedAST().getConstruct();
+
+        assertNotNull(construct);
+
+        assertFalse(construct.isNativeDistinct());
+
+    }
+
+    /**
+     * A simple CONSTRUCT query using a native DISTINCT filter.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * CONSTRUCT {
+     *   <http://www.bigdata.com/DC> rdfs:label "DC" .
+     *   ?x rdf:type foaf:Person . 
+     * } where {
+     *   # Enable the native DISTINCT SPO filter.
+     *   hint:Query hint:nativeDistinctSPO true .
+     *   ?x rdf:type foaf:Person 
+     * }
+     * </pre>
+     */
+    public void test_construct_1a() throws Exception {
+
+        final ASTContainer ast = new TestHelper(
+                "construct-1", // testURI,
+                "construct-1a.rq",// queryFileURL
+                "construct-1.trig",// dataFileURL
+                "construct-1-result.trig"// resultFileURL
+                ).runTest();
+
+        final ConstructNode construct = ast.getOptimizedAST().getConstruct();
+
+        assertNotNull(construct);
+
+        assertTrue(construct.isNativeDistinct());
+        
+    }
+
+    /**
+     * A simple CONSTRUCT query using a native DISTINCT filter (enabled
+     * via the "analytic" query hint).
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * CONSTRUCT {
+     *   <http://www.bigdata.com/DC> rdfs:label "DC" .
+     *   ?x rdf:type foaf:Person . 
+     * } where {
+     *   # Enable the native DISTINCT SPO filter.
+     *   hint:Query hint:analytic true .
+     *   ?x rdf:type foaf:Person 
+     * }
+     * </pre>
+     */
+    public void test_construct_1b() throws Exception {
+
+        final ASTContainer ast = new TestHelper(
+                "construct-1", // testURI,
+                "construct-1b.rq",// queryFileURL
+                "construct-1.trig",// dataFileURL
+                "construct-1-result.trig"// resultFileURL
+                ).runTest();
+
+        final ConstructNode construct = ast.getOptimizedAST().getConstruct();
+
+        assertNotNull(construct);
+
+        assertTrue(construct.isNativeDistinct());
         
     }
 

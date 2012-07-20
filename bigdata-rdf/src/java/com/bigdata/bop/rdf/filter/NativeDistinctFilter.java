@@ -7,12 +7,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BTreeAnnotations;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
+import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
@@ -30,14 +32,17 @@ import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.striterator.ICloseable;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Filterator;
+import cutthecrap.utils.striterators.IPropertySet;
 
 /**
  * A scalable DISTINCT operator based for {@link SPO}s.
@@ -144,18 +149,18 @@ public class NativeDistinctFilter extends BOpFilterBase {
     @Override
     final protected Iterator filterOnce(Iterator src, final Object context) {
         
-        return new Filterator(src, context, new DistinctFilterImpl());
+        return new Filterator(src, context, new DistinctFilterImpl(this));
         
     }
 
     /**
      * Return the 3-component key order which has the best locality given that
-     * the SPOs will be ariving in the natural order of the
+     * the SPOs will be arriving in the natural order of the
      * <i>indexKeyOrder</i>. This is the keyOrder that we will use for the
      * filter. This gives the filter index structure the best possible locality
      * in terms of the order in which the SPOs are arriving.
      * <p>
-     * The return valuer is an <code>int[3]</code>. The index is the orderinal
+     * The return valuer is an <code>int[3]</code>. The index is the ordinal
      * position of the triples mode key component for the filter keys. The value
      * at that index is the position in the {@link SPOKeyOrder} of the quads
      * mode index whose natural order determines the order of arrival of the
@@ -183,19 +188,36 @@ public class NativeDistinctFilter extends BOpFilterBase {
      * 
      * which models the <code>PSO</code> key order for the purposes of this
      * class.
+     * <p>
+     * Note: This method now accepts triples in support of the
+     * {@link ASTConstructIterator}
      * 
      * @see Annotations#INDEX_KEY_ORDER
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
      */
-    public static int[] getFilterKeyOrder(SPOKeyOrder indexKeyOrder) {
+    public static int[] getFilterKeyOrder(final SPOKeyOrder indexKeyOrder) {
 
         if (indexKeyOrder == null)
             throw new IllegalArgumentException();
 
-        if (indexKeyOrder.getKeyArity() != 4)
-            throw new IllegalArgumentException();
+//        if (indexKeyOrder.getKeyArity() != 4)
+//            throw new IllegalArgumentException();
 
         final int[] filterKeyOrder;
         switch (indexKeyOrder.index()) {
+        // TRIPLES
+        case SPOKeyOrder._SPO:
+            filterKeyOrder = new int[] { 0, 1, 2 };
+            break;
+        case SPOKeyOrder._POS:
+            filterKeyOrder = new int[] { 1, 2, 0 };
+            break;
+        case SPOKeyOrder._OSP:
+            filterKeyOrder = new int[] { 2, 0, 1 };
+            break;
+        // QUADS
         case SPOKeyOrder._SPOC:
             filterKeyOrder = new int[] { 0, 1, 2 };
             break;
@@ -220,7 +242,15 @@ public class NativeDistinctFilter extends BOpFilterBase {
         return filterKeyOrder;
     }
     
-    private class DistinctFilterImpl extends Filter {
+    /**
+     * A {@link Filter} which passes only the DISTINCT {@link ISPO}s and is
+     * backed by a scalable data structure (BTree or HTree).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static public class DistinctFilterImpl extends Filter implements
+            ICloseable {
 
         private static final long serialVersionUID = 1L;
 
@@ -232,7 +262,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
         /**
          * The fast JVM based cache. This is always allocated.
          */
-        private final LinkedHashMap<SPO, byte[]> lru;
+        private final LinkedHashMap<ISPO, byte[]> lru;
 
         /**
          * The metadata used to create the index.
@@ -262,10 +292,15 @@ public class NativeDistinctFilter extends BOpFilterBase {
         private volatile ICheckpointProtocol index;
         
         /**
+         * <code>true</code> until {@link #close() closed}.
+         */
+        private final AtomicBoolean open = new AtomicBoolean(true);
+        
+        /**
          * When <code>true</code>, the {@link BTree} will be used. When
          * <code>false</code> the {@link HTree}.
          * <p>
-         * Note: Hisorical testing indicated that the {@link BTree} was faster
+         * Note: Historical testing indicated that the {@link BTree} was faster
          * for this application.
          * 
          * TODO Edit HTree/BTree here.
@@ -279,28 +314,85 @@ public class NativeDistinctFilter extends BOpFilterBase {
         
         @Override
         protected void finalize() throws Throwable {
+            close();
             super.finalize();
-            if (index != null) {
-                index.close();
-                index = null;
-            }
-            if (store != null) {
-                store.close();
-                store = null;
+        }
+
+        /**
+         * Release resources associated with the filter.
+         * <p>
+         * Note: This is done automatically by {@link #finalize()}, but it
+         * should be done pro-actively whenever possible.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/582">
+         *      IStriterator does not support close() protocol for Ifilter </a>
+         */
+        @Override
+        public void close() {
+            if (open.compareAndSet(true/* expect */, false/* update */)) {
+                /*
+                 * Close when first invoked.
+                 */
+                if (index != null) {
+                    index.close();
+                    index = null;
+                }
+                if (store != null) {
+                    store.close();
+                    store = null;
+                }
             }
         }
+
+        @SuppressWarnings("unchecked")
+        static private <T> T getRequiredProperty(final IPropertySet pset,
+                final String name) {
+
+            final Object val = pset.getProperty(name);
+
+            if (val == null)
+
+                if (val == null)
+                    throw new IllegalStateException("Required property: "
+                            + name + " : " + NativeDistinctFilter.class);
+
+            return (T) val;
+
+        }
+
+        @SuppressWarnings("unchecked")
+        static private <T> T getProperty(final IPropertySet pset,
+                final String name, final T defaultValue) {
+
+            final Object val = pset.getProperty(name);
+
+            if (val != null)
+                return (T) val;
+
+            return defaultValue;
+
+        }
         
-        public DistinctFilterImpl() {
+        /**
+         * DISTINCT {@link ISPO} filter based on persistence capable data
+         * structures.
+         * 
+         * @param properties
+         *            Used to configure the DISTINCT filter.
+         * 
+         * @see DistinctFilter.Annotations
+         */
+        public DistinctFilterImpl(final IPropertySet properties) {
             
-            final int initialCapacity = NativeDistinctFilter.this.getProperty(
+            final int initialCapacity = getProperty(properties,
                     Annotations.INITIAL_CAPACITY,
                     Annotations.DEFAULT_INITIAL_CAPACITY);
 
-            final float loadFactor = NativeDistinctFilter.this.getProperty(
+            final float loadFactor = getProperty(properties,
                     Annotations.LOAD_FACTOR,
                     Annotations.DEFAULT_LOAD_FACTOR);
                     
-            lru = new LinkedHashMap<SPO, byte[]>(initialCapacity, loadFactor);
+            lru = new LinkedHashMap<ISPO, byte[]>(initialCapacity, loadFactor);
 
             this.nominalCapacity = initialCapacity;
 
@@ -312,8 +404,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
              */
             {
 
-                final SPOKeyOrder indexKeyOrder = (SPOKeyOrder) NativeDistinctFilter.this
-                        .getRequiredProperty(Annotations.KEY_ORDER);
+                final SPOKeyOrder indexKeyOrder = (SPOKeyOrder) getRequiredProperty(
+                        properties, Annotations.KEY_ORDER);
 
                 filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
 
@@ -322,20 +414,19 @@ public class NativeDistinctFilter extends BOpFilterBase {
                         : new HTreeIndexMetadata(UUID.randomUUID());
 
                 // IFF BTree
-                metadata.setBranchingFactor(NativeDistinctFilter.this.getProperty(
+                metadata.setBranchingFactor(getProperty(properties,
                         BTreeAnnotations.BRANCHING_FACTOR,
                         256));// TODO Overridden here. BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
 
                 // IFF HTree
                 if (metadata instanceof HTreeIndexMetadata) {
                     ((HTreeIndexMetadata) metadata)
-                            .setAddressBits(NativeDistinctFilter.this
-                                    .getProperty(
+                            .setAddressBits(getProperty(properties,
                                             HTreeAnnotations.ADDRESS_BITS,
                                             HTreeAnnotations.DEFAULT_ADDRESS_BITS));
                 }
 
-                metadata.setRawRecords(NativeDistinctFilter.this.getProperty(
+                metadata.setRawRecords(getProperty(properties,
                         Annotations.RAW_RECORDS,
                         Annotations.DEFAULT_RAW_RECORDS));
 
@@ -344,10 +435,9 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
                 metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
 
-                metadata.setWriteRetentionQueueCapacity(NativeDistinctFilter.this
-                        .getProperty(
-                                Annotations.WRITE_RETENTION_QUEUE_CAPACITY,
-                                Annotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
+                metadata.setWriteRetentionQueueCapacity(getProperty(properties,
+                        Annotations.WRITE_RETENTION_QUEUE_CAPACITY,
+                        Annotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
 
                 final int ratio = 32; // TODO Config/tune front-coding ratio.
 
@@ -378,8 +468,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
             final int n = lru.size();
             final byte[][] a = new byte[n][];
             {
-                // Evict everthing into an array.
-                final Iterator<Map.Entry<SPO, byte[]>> itr = lru.entrySet()
+                // Evict everything into an array.
+                final Iterator<Map.Entry<ISPO, byte[]>> itr = lru.entrySet()
                         .iterator();
                 int i = 0;
                 while (itr.hasNext()) {
@@ -409,6 +499,11 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
             if (index != null)
                 throw new IllegalStateException();
+
+            if (!open.get()) {
+                // Explicitly closed.
+                throw new IllegalStateException();
+            }
             
             /*
              * This wraps an efficient raw store interface around a child memory
@@ -435,7 +530,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
         @Override
         public boolean isValid(final Object obj) {
 
-            final SPO spo = (SPO) obj;
+            final ISPO spo = (ISPO) obj;
 
             return add(spo);
             
@@ -457,7 +552,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * 
          * @return <code>true</code> if the collection was modified.
          */
-        private boolean add(final SPO spo) {
+        private boolean add(final ISPO spo) {
 
             if(lru.containsKey(spo)) {
                 // already in the LRU

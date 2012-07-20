@@ -118,7 +118,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 		
 		where.addChild(union); // append UNION to WHERE clause.
 
-        final ConstructNode construct = new ConstructNode();
+        final ConstructNode construct = new ConstructNode(context);
 
 		final ProjectionNode projection = queryRoot.getProjection();
 		
