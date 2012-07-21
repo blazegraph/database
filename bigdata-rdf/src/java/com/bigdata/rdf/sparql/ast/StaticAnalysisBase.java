@@ -450,4 +450,33 @@ public class StaticAnalysisBase {
 
     }
 
+    /**
+     * Return any variables appearing in the Subject, Predicate, or Object
+     * position (the Context position is ignored).
+     * 
+     * @param sp
+     *            The statement pattern.
+     * 
+     * @return The SPO variables in that statement pattern.
+     */
+    public static Set<IVariable<?>> getSPOVariables(
+            final StatementPatternNode sp) {
+
+        final LinkedHashSet<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
+
+        for (int i = 0; i < 3; i++) {
+
+            final TermNode tmp = (TermNode) sp.get(0);
+
+            if (tmp.isVariable()) {
+
+                set.add((IVariable<?>) tmp.getValueExpression());
+
+            }
+        }
+
+        return set;
+
+    }
+
 }

@@ -1415,5 +1415,5 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
         }
         
     }
-
+    
 }

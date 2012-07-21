@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -42,10 +43,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.EmptyBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
@@ -56,7 +59,9 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
@@ -148,13 +153,22 @@ public class ASTConstructIterator implements
      * clause succeeded before we can output the ground triples.
      */
     private boolean haveFirstSolution = false; 
-    
+
     /**
      * 
+     * @param store
+     * @param construct
+     *            The {@link ConstructNode}
+     * @param whereClause
+     *            The WHERE clause (used to identify construct templates which
+     *            obviously produce DISTINCT triples).
+     * @param src
+     *            The solutions that will be used to construct the triples.
      */
     public ASTConstructIterator(//
             final AbstractTripleStore store,//
             final ConstructNode construct,//
+            final GraphPatternGroup<?> whereClause,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
         this.f = store.getValueFactory();
@@ -208,57 +222,226 @@ public class ASTConstructIterator implements
 
         /*
          * Setup the DISTINCT SPO filter.
+         * 
+         * Note: CONSTRUCT is sometimes used to materialize all triples for some
+         * triple pattern. For that use case, the triples are (of necessity)
+         * already DISTINCT. Therefore, when there is a single triple pattern in
+         * the WHERE clause and a single template in the CONSTRUCT, we DO NOT
+         * impose a DISTINCT filter. This saves resources when the CONSTRUCTed
+         * graph is large.
          */
+
+        final boolean isObviouslyDistinct = isObviouslyDistinct(
+                store.isQuads(), templates, whereClause);
         
-        final boolean nativeDistinct = construct.isNativeDistinct();
-        if (nativeDistinct) {
+        if (isObviouslyDistinct) {
+
+            // Do not impose a DISTINCT filter.
             
-            /*
-             * Construct a predicate for the first triple template. We will use
-             * that as the bias for the scalable DISTINCT SPO filter.
-             */
-            final IPredicate pred;
-            {
-
-                final StatementPatternNode sp = templates.get(0/* index */);
-
-                final IVariableOrConstant<IV> s = sp.s().getValueExpression();
-                final IVariableOrConstant<IV> p = sp.p().getValueExpression();
-                final IVariableOrConstant<IV> o = sp.o().getValueExpression();
-
-//                // The graph term/variable iff specified by the query.
-//                final TermNode cvar = sp.c();
-//                final IVariableOrConstant<IV> c = cvar == null ? null : cvar
-//                        .getValueExpression();
-
-                final BOp[] vars = new BOp[] { s, p, o /*, c*/ };
-
-                pred = new SPOPredicate(vars, BOp.NOANNS);
-
-            }
+            filter = null;
             
-            /*
-             * The index that will be used to read on the B+Tree access path.
-             */
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
-                    (IPredicate) pred, 3/* keyArity */);
-            
-            construct.setProperty(NativeDistinctFilter.Annotations.KEY_ORDER,
-                    indexKeyOrder);
-
-            // Native memory based DISTINCT filter.
-            filter = new NativeDistinctFilter.DistinctFilterImpl(construct);
-
         } else {
             
-            // JVM Based DISTINCT filter.
-            filter = new DistinctFilter.DistinctFilterImpl(construct);
+            final boolean nativeDistinct = construct.isNativeDistinct();
             
+            if (nativeDistinct) {
+
+                /*
+                 * Construct a predicate for the first triple template. We will
+                 * use that as the bias for the scalable DISTINCT SPO filter.
+                 */
+                final IPredicate pred;
+                {
+
+                    final StatementPatternNode sp = templates.get(0/* index */);
+
+                    final IVariableOrConstant<IV> s = sp.s()
+                            .getValueExpression();
+                    final IVariableOrConstant<IV> p = sp.p()
+                            .getValueExpression();
+                    final IVariableOrConstant<IV> o = sp.o()
+                            .getValueExpression();
+
+                    // // The graph term/variable iff specified by the query.
+                    // final TermNode cvar = sp.c();
+                    // final IVariableOrConstant<IV> c = cvar == null ? null :
+                    // cvar
+                    // .getValueExpression();
+
+                    final BOp[] vars = new BOp[] { s, p, o /* , c */};
+
+                    pred = new SPOPredicate(vars, BOp.NOANNS);
+
+                }
+
+                /*
+                 * The index that will be used to read on the B+Tree access
+                 * path.
+                 */
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
+                        (IPredicate) pred, 3/* keyArity */);
+
+                construct.setProperty(
+                        NativeDistinctFilter.Annotations.KEY_ORDER,
+                        indexKeyOrder);
+
+                // Native memory based DISTINCT filter.
+                filter = new NativeDistinctFilter.DistinctFilterImpl(construct);
+
+            } else {
+
+                // JVM Based DISTINCT filter.
+                filter = new DistinctFilter.DistinctFilterImpl(construct);
+
+            }
         }
         
     }
     
+    /**
+     * Return <code>true</code> iff this CONSTRUCT template will obviously
+     * produce distinct triples.
+     * <p>
+     * Note: CONSTRUCT is sometimes used to materialize all triples for some
+     * triple pattern. For that use case, the triples are (of necessity) already
+     * DISTINCT. Therefore, when there is a single triple pattern in the WHERE
+     * clause and a single template in the CONSTRUCT, we DO NOT impose a
+     * DISTINCT filter. This saves resources when the CONSTRUCTed graph is
+     * large.
+     * <p>
+     * Note: The specifics of the triple pattern in the where clause and the
+     * template do not matter as long as the triple pattern in the WHERE clause
+     * can not introduce a cardinality which is higher than the cardinality of
+     * the triples constructed by the template. This condition is satisfied if
+     * all variables used in the triple pattern in the WHERE clause are also
+     * used in the triple pattern in the template.
+     * <p>
+     * Note: The ground triples in the construct template are ignored for these
+     * purposes. We are only concerned with disabling the DISTINCT filter when
+     * the #of duplicate triples must be zero or near zero, not with providing a
+     * 100% guarantee that there are no duplicate triples in the CONSTRUCT
+     * output.
+     * 
+     * @param quads
+     *            <code>true</code> iff the database is in quads mode.
+     * @param templates
+     *            The non-ground triple templates.
+     * @param whereClause
+     *            The WHERE clause for the query.
+     * 
+     * @return <code>true</code> iff the construct will obviously produce a
+     *         graph containing distinct triples.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    static boolean isObviouslyDistinct(//
+            final boolean quads,//
+            final List<StatementPatternNode> templates,//
+            final GraphPatternGroup<?> whereClause//
+    ) {
+        
+        if (templates.isEmpty()) {
+        
+            /*
+             * The CONSTRUCT does not involve any parameterized (non-ground)
+             * triple templates.
+             */
+            
+            return true;
+            
+        }
+ 
+        if (templates.size() != 1 || whereClause.size() != 1) {
+
+            /*
+             * Either the templates and/or the where clause is complex. In this
+             * case we can not easily predict whether there will be duplicate
+             * triples constructed.
+             */
+            
+            return false;
+            
+        }
+        
+        if (!(whereClause.get(0) instanceof StatementPatternNode)) {
+            
+            /*
+             * The WHERE clause is not a single statement pattern.
+             */
+
+            return false;
+            
+        }
+
+        /*
+         * Both the templates and the where clause are a single statement
+         * pattern.  If they are the *same* statement pattern, then the
+         * CONSTRUCT will not produce any duplicate triples using that
+         * template.  
+         */
+        
+        final StatementPatternNode sp1 = templates.get(0);
+
+        final StatementPatternNode sp2 = (StatementPatternNode) whereClause
+                .get(0);
+
+        /*
+         * Make sure that all variables used in the WHERE clause triple pattern
+         * also appear in the CONSTRUCT template triple pattern.
+         */
+
+        final Set<IVariable<?>> vars1 = StaticAnalysis.getSPOVariables(sp1);
+        
+        final Set<IVariable<?>> vars2 = StaticAnalysis.getSPOVariables(sp2);
+
+        if (!vars1.equals(vars2)) {
+
+            /*
+             * Some variable(s) do not appear in both places.
+             */
+            
+            return false;
+            
+        }
+        
+//        if (!sp1.s().equals(sp2.s()))
+//            return false;
+//
+//        if (!sp1.p().equals(sp2.p()))
+//            return false;
+//        
+//        if (!sp1.o().equals(sp2.o()))
+//            return false;
+
+        /*
+         * CONSTRUCT always produces triples, but the access path for the
+         * statement pattern in the WHERE clause may visit multiple named
+         * graphs. If it does, then duplicate triples can result unless the
+         * access path is the RDF MERGE (default graph access path).
+         */
+
+        if (quads && sp2.c() == null && sp2.getScope() == Scope.NAMED_CONTEXTS) {
+
+            /*
+             * Multiple named graphs could be visited, so the statement pattern
+             * in the CONSTRUCT could produce duplicate triples.
+             */
+            
+            return false;
+
+        }
+
+        /*
+         * The construct should produce distinct triples without our having to
+         * add a DISTINCT filter.
+         */
+
+        return true;
+        
+    }
+
     public boolean hasNext() throws QueryEvaluationException {
 
         while (true) {
