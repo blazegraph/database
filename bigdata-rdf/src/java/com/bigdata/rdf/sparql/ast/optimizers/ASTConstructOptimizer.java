@@ -34,8 +34,13 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -80,26 +85,92 @@ public class ASTConstructOptimizer implements IASTOptimizer {
         }
 
         final ProjectionNode projection = new ProjectionNode();
+        {
 
-        queryRoot.setProjection(projection); // set on the query.
-        
-        projection.setReduced(true);
+            queryRoot.setProjection(projection); // set on the query.
 
-        // Visit the distinct variables in the CONSTRUCT clause.
-        final Iterator<IVariable<?>> itr = BOpUtility
-                .getSpannedVariables(constructNode);
+            projection.setReduced(true);
 
-        while(itr.hasNext()) {
+            // Visit the distinct variables in the CONSTRUCT clause.
+            final Iterator<IVariable<?>> itr = BOpUtility
+                    .getSpannedVariables(constructNode);
+
+            while (itr.hasNext()) {
+
+                // Add each variable to the projection.
+                projection.addProjectionVar(new VarNode(itr.next().getName()));
+
+            }
             
-            // Add each variable to the projection.
-            projection.addProjectionVar(new VarNode(itr.next().getName()));
-
         }
 
         if (context.nativeDistinctSPO) {
 
+            /**
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+             *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+             */
+            
             constructNode.setNativeDistinct(true);
 
+        }
+
+        final SliceNode slice = queryRoot.getSlice();
+        final OrderByNode orderBy = queryRoot.getOrderBy();
+
+        if (slice == null) {
+
+            if (orderBy != null) {
+                
+                /**
+                 * Clear the ORDER BY clause if unless a SLICE is also given.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/577"
+                 *      > DESCRIBE with OFFSET/LIMIT must use sub-SELECT </a>
+                 */
+
+                queryRoot.setOrderBy(null);
+                
+            }
+
+        } else if (slice != null) {
+
+            /**
+             * Push the WHERE clause into a sub-SELECT. The SLICE and the ORDER
+             * BY (if present) are moved to the sub-SELECT. The sub-SELECT has
+             * the same projection as the top-level query.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/577"
+             *      > DESCRIBE with OFFSET/LIMIT must use sub-SELECT </a>
+             */
+         
+            final SubqueryRoot subqueryRoot = new SubqueryRoot(QueryType.SELECT);
+            
+            // Make a copy of the top-level projection.
+            subqueryRoot.setProjection((ProjectionNode) projection.clone());
+
+            // Steal the WHERE clause from the top-level query.
+            subqueryRoot.setWhereClause(queryRoot.getWhereClause());
+            
+            // Setup the new WHERE clause for the top-level query.
+            queryRoot.setWhereClause(new JoinGroupNode(subqueryRoot));
+            
+            // Move the OFFSET/LIMIT onto the sub-SELECT.
+            subqueryRoot.setSlice(slice);
+            queryRoot.setSlice(null);
+
+            if (orderBy != null) {
+
+                // Move the ORDER BY clause (if present) onto the sub-SELECT.
+                subqueryRoot.setOrderBy(orderBy);
+                queryRoot.setOrderBy(null);
+                
+            }
+            
         }
 
         return queryRoot;
