@@ -411,6 +411,7 @@ public class ASTEvalHelper {
                 optimizedQuery.getPrefixDecls(), //
                 new ASTConstructIterator(store, //
                         optimizedQuery.getConstruct(), //
+                        optimizedQuery.getWhereClause(),//
                         ASTEvalHelper.evaluateQuery(
                                 astContainer,
                                 context,

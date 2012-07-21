@@ -723,9 +723,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							final ConstructNode template = op.getDeleteClause()
 									.getQuadData().flatten(new ConstructNode(context));
 
-							final ASTConstructIterator itr = new ASTConstructIterator(
-									context.conn.getTripleStore(), template,
-									result);
+                            final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context.conn.getTripleStore(), template,
+                                    op.getWhereClause(), result);
 
 							while (itr.hasNext()) {
 
@@ -791,9 +791,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							final ConstructNode template = op.getInsertClause()
 									.getQuadData().flatten(new ConstructNode(context));
 
-							final ASTConstructIterator itr = new ASTConstructIterator(
-									context.conn.getTripleStore(), template,
-									result);
+                            final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context.conn.getTripleStore(), template,
+                                    op.getWhereClause(), result);
 
 							while (itr.hasNext()) {
 

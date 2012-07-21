@@ -27,8 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 
 /**
  * Data driven test suite.
@@ -273,6 +278,226 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
                 "construct-5-result.trig"// resultFileURL
                 ).runTest();
         
+    }
+
+    /**
+     * Return the non-ground triple pattern templates from the CONSTRUCT node of
+     * the query.
+     * 
+     * @param queryRoot
+     *            The query.
+     *            
+     * @return The non-ground triple patterns in the CONSTRUCT template.
+     */
+    private static List<StatementPatternNode> getConstructTemplates(
+            final QueryRoot queryRoot) {
+
+        final List<StatementPatternNode> templates = new LinkedList<StatementPatternNode>();
+
+        final ConstructNode construct = queryRoot.getConstruct();
+
+        for (StatementPatternNode pat : construct) {
+
+            if (!pat.isGround()) {
+
+                /*
+                 * A statement pattern that we will process for each solution.
+                 */
+
+                templates.add(pat);
+
+            }
+
+        }
+    
+        return templates;
+
+    }
+    
+    /**
+     * Unit test for method identifying whether a CONSTRUCT template and WHERE
+     * clause will obviously result in distinct triples without the application
+     * of a DISTINCT SPO filter.
+     * 
+     * <pre>
+     * CONSTRUCT {
+     *   ?x rdf:type foaf:Person . 
+     * } where {
+     *   ?x rdf:type foaf:Person 
+     * }
+     * </pre>
+     * 
+     * For this query against a QUADS mode database, the access path for the
+     * sole triple pattern in the WHERE clause will be a DEFAULT GRAPH access
+     * path (the RDF MERGE of the triples across all named graphs that are
+     * visible). That results in an obviously distinct construct.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public void test_isObviouslyDistinct_01() throws Exception {
+     
+        final ASTContainer ast = new TestHelper(
+                "construct-isObviouslyDistinct-01", // testURI,
+                "construct-isObviouslyDistinct-01.rq",// queryFileURL
+                "construct-isObviouslyDistinct-01.trig",// dataFileURL
+                "construct-isObviouslyDistinct-01-result.trig"// resultFileURL
+                ).runTest();
+
+        final QueryRoot optimizedQuery = ast.getOptimizedAST();
+
+        assertTrue(ASTConstructIterator.isObviouslyDistinct(store.isQuads(),
+                getConstructTemplates(optimizedQuery),
+                optimizedQuery.getWhereClause()));
+
+    }
+    
+    /**
+     * Unit test for method identifying whether a CONSTRUCT template and WHERE
+     * clause will obviously result in distinct triples without the application
+     * of a DISTINCT SPO filter.
+     * 
+     * <pre>
+     * CONSTRUCT WHERE {?s ?p ?o}
+     * </pre>
+     * 
+     * For this query against a QUADS mode database, the access path for the
+     * sole triple pattern in the WHERE clause will be a DEFAULT GRAPH access
+     * path (the RDF MERGE of the triples across all named graphs that are
+     * visible). That results in an obviously distinct construct.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public void test_isObviouslyDistinct_02() throws Exception {
+     
+        final ASTContainer ast = new TestHelper(
+                "construct-isObviouslyDistinct-02", // testURI,
+                "construct-isObviouslyDistinct-02.rq",// queryFileURL
+                "construct-isObviouslyDistinct-02.trig",// dataFileURL
+                "construct-isObviouslyDistinct-02-result.trig"// resultFileURL
+                ).runTest();
+
+        final QueryRoot optimizedQuery = ast.getOptimizedAST();
+
+        assertTrue(ASTConstructIterator.isObviouslyDistinct(store.isQuads(),
+                getConstructTemplates(optimizedQuery),
+                optimizedQuery.getWhereClause()));
+
+    }
+    
+    /**
+     * Unit test for method identifying whether a CONSTRUCT template and WHERE
+     * clause will obviously result in distinct triples without the application
+     * of a DISTINCT SPO filter.
+     * 
+     * <pre>
+     * CONSTRUCT {
+     *   ?x rdf:type foaf:Person . 
+     * } where {
+     *   ?x rdf:type foaf:Person . 
+     *   ?x rdfs:label ?y 
+     * }
+     * </pre>
+     * 
+     * For this query, the <em>possibility</em> of multiple bindings on
+     * <code>y</code> for a given binding on <code>x</code> means that the
+     * CONSTRUCT is NOT obviously distinct.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public void test_isObviouslyDistinct_03() throws Exception {
+     
+        final ASTContainer ast = new TestHelper(
+                "construct-isObviouslyDistinct-03", // testURI,
+                "construct-isObviouslyDistinct-03.rq",// queryFileURL
+                "construct-isObviouslyDistinct-03.trig",// dataFileURL
+                "construct-isObviouslyDistinct-03-result.trig"// resultFileURL
+                ).runTest();
+
+        final QueryRoot optimizedQuery = ast.getOptimizedAST();
+
+        assertFalse(ASTConstructIterator.isObviouslyDistinct(store.isQuads(),
+                getConstructTemplates(optimizedQuery),
+                optimizedQuery.getWhereClause()));
+
+    }
+    
+    
+    /**
+     * Unit test for method identifying whether a CONSTRUCT template and WHERE
+     * clause will obviously result in distinct triples without the application
+     * of a DISTINCT SPO filter.
+     * 
+     * <pre>
+     * CONSTRUCT {
+     *   ?x foaf:accountName ?y . 
+     * } where {
+     *   ?x rdf:label ?y
+     * }
+     * </pre>
+     * 
+     * For this query, both the template and the WHERE clause are a single
+     * triple pattern and all variables are used in both places.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public void test_isObviouslyDistinct_04() throws Exception {
+     
+        final ASTContainer ast = new TestHelper(
+                "construct-isObviouslyDistinct-04", // testURI,
+                "construct-isObviouslyDistinct-04.rq",// queryFileURL
+                "construct-isObviouslyDistinct-04.trig",// dataFileURL
+                "construct-isObviouslyDistinct-04-result.trig"// resultFileURL
+                ).runTest();
+
+        final QueryRoot optimizedQuery = ast.getOptimizedAST();
+
+        assertTrue(ASTConstructIterator.isObviouslyDistinct(store.isQuads(),
+                getConstructTemplates(optimizedQuery),
+                optimizedQuery.getWhereClause()));
+
+    }
+
+    /**
+     * Unit test for method identifying whether a CONSTRUCT template and WHERE
+     * clause will obviously result in distinct triples without the application
+     * of a DISTINCT SPO filter.
+     * 
+     * <pre>
+     * CONSTRUCT {
+     *   ?s ?p ?o
+     * }
+     * WHERE {
+     *   GRAPH <http://www.bigdata.com/foo> {
+     *     ?s ?p ?o
+     *   }
+     * }
+     * </pre>
+     * 
+     * For this query, both the template and the WHERE clause are a single
+     * triple pattern and all variables are used in both places.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+     *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+     */
+    public void test_isObviouslyDistinct_05() throws Exception {
+
+        final ASTContainer ast = new TestHelper(
+                "construct-isObviouslyDistinct-05", // testURI,
+                "construct-isObviouslyDistinct-05.rq",// queryFileURL
+                "construct-isObviouslyDistinct-05.trig",// dataFileURL
+                "construct-isObviouslyDistinct-05-result.trig"// resultFileURL
+        ).runTest();
+
+        final QueryRoot optimizedQuery = ast.getOptimizedAST();
+
+        assertTrue(ASTConstructIterator.isObviouslyDistinct(store.isQuads(),
+                getConstructTemplates(optimizedQuery),
+                optimizedQuery.getWhereClause()));
+
     }
 
     /**
