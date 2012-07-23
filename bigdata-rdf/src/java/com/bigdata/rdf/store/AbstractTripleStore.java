@@ -3165,70 +3165,73 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public StringBuilder predicateUsage() {
-
-        return predicateUsage(this);
-
-    }
-
-    /**
-     * Dumps the #of statements using each predicate in the kb (tab delimited,
-     * unordered).
-     * 
-     * @param resolveTerms
-     *            Used to resolve term identifiers to terms (you can use this to
-     *            dump a {@link TempTripleStore} that is using the term
-     *            dictionary of the main database).
-     */
-    final public StringBuilder predicateUsage(
-            final AbstractTripleStore resolveTerms) {
-
-        if (getSPORelation().oneAccessPath) {
-
-            // The necessary index (POS or POCS) does not exist.
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        // visit distinct term identifiers for the predicate position.
-        final IChunkedIterator<IV> itr = getSPORelation().distinctTermScan(
-                quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
-
-        // resolve term identifiers to terms efficiently during iteration.
-        final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
-                resolveTerms, itr);
-        
-        try {
-        
-            final StringBuilder sb = new StringBuilder();
-
-            while (itr2.hasNext()) {
-
-                final BigdataValue term = itr2.next();
-
-                final IV p = term.getIV();
-                
-                final long n = getSPORelation().getAccessPath(null, p, null,
-                        null).rangeCount(false/* exact */);
-
-                /*
-                 * FIXME do efficient term resolution for scale-out. This will
-                 * require an expander pattern where we feed one iterator into
-                 * another and both are chunked.
-                 */
-                sb.append(n + "\t" + resolveTerms.toString(p) + "\n");
-
-            }
-        
-            return sb;
-        
-        } finally {
-
-            itr2.close();
-            
-        }
-
-    }
+//    final public StringBuilder predicateUsage() {
+//
+//        return predicateUsage(this);
+//
+//    }
+//
+//    /**
+//     * Dumps the #of statements using each predicate in the kb (tab delimited,
+//     * unordered).
+//     * 
+//     * @param resolveTerms
+//     *            Used to resolve term identifiers to terms (you can use this to
+//     *            dump a {@link TempTripleStore} that is using the term
+//     *            dictionary of the main database).
+//     * 
+//     * @see SD, which can now compute and report both the predicate partition
+//     *      usage and the class partition usage.
+//     */
+//    final public StringBuilder predicateUsage(
+//            final AbstractTripleStore resolveTerms) {
+//
+//        if (getSPORelation().oneAccessPath) {
+//
+//            // The necessary index (POS or POCS) does not exist.
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//        // visit distinct term identifiers for the predicate position.
+//        final IChunkedIterator<IV> itr = getSPORelation().distinctTermScan(
+//                quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
+//
+//        // resolve term identifiers to terms efficiently during iteration.
+//        final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
+//                resolveTerms, itr);
+//        
+//        try {
+//        
+//            final StringBuilder sb = new StringBuilder();
+//
+//            while (itr2.hasNext()) {
+//
+//                final BigdataValue term = itr2.next();
+//
+//                final IV p = term.getIV();
+//                
+//                final long n = getSPORelation().getAccessPath(null, p, null,
+//                        null).rangeCount(false/* exact */);
+//
+//                /*
+//                 * FIXME do efficient term resolution for scale-out. This will
+//                 * require an expander pattern where we feed one iterator into
+//                 * another and both are chunked.
+//                 */
+//                sb.append(n + "\t" + resolveTerms.toString(p) + "\n");
+//
+//            }
+//        
+//            return sb;
+//        
+//        } finally {
+//
+//            itr2.close();
+//            
+//        }
+//
+//    }
 
     /**
      * Utility method dumps the statements in the store using the SPO index

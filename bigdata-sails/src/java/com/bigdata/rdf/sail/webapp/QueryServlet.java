@@ -175,31 +175,26 @@ public class QueryServlet extends BigdataRDFServlet {
             buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
             return;
         }
-
-        final Graph g = SD.describeService(tripleStore);
-
+        
         /*
-         * Add the service end point.
-         * 
-         * TODO Report alternative end points?
+         * Figure out the service end point.
          */
+        final String serviceURI;
         {
             final StringBuffer sb = req.getRequestURL();
 
             final int indexOf = sb.indexOf("?");
 
-            final String serviceURI;
             if (indexOf == -1) {
                 serviceURI = sb.toString();
             } else {
                 serviceURI = sb.substring(0, indexOf);
             }
 
-            g.add(SD.Service, SD.endpoint,
-                    g.getValueFactory().createURI(serviceURI));
-
         }
         
+        final Graph g = SD.describeService(tripleStore, serviceURI);
+
         /*
          * CONNEG for the MIME type.
          * 

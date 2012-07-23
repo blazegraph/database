@@ -1733,7 +1733,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
             
         });
 
-        return new ChunkedWrappedIterator<IV>(itr);
+        return new ChunkedWrappedIterator<IV>(itr,//
+                ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE,// chunkSize
+                IV.class// elementClass
+        );
 
     }
 
