@@ -641,7 +641,7 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
             if (log.isInfoEnabled()) {
                 log.info("computing predicate usage...");
-                log.info("\n" + store.predicateUsage());
+//                log.info("\n" + store.predicateUsage());
             }
 
             /*

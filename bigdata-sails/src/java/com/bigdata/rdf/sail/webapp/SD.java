@@ -27,16 +27,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+
+import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.axioms.RdfsAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataValueIterator;
+import com.bigdata.rdf.store.BigdataValueIteratorImpl;
+import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
+import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * SPARQL 1.1 Service Description vocabulary class.
@@ -321,20 +339,35 @@ public class SD {
     /**
      * Collect various information, building up a service description graph.
      * 
-     * TODO I am disinclined to enumerate all named and default graphs when
-     * there is a GET against the SPARQL end point. That can be WAY too much
-     * information.
+     * @param tripleStore
+     *            The KB instance to be described.
+     * @param serviceURIs
+     *            One or more service end points for that KB instance.
      */
-    public static Graph describeService(final AbstractTripleStore tripleStore) {
+    public static Graph describeService(final AbstractTripleStore tripleStore,
+            final String serviceURI) {
 
         final Graph g = new GraphImpl();
+
+        final ValueFactory f = g.getValueFactory();
+
+        final BNode service = f.createBNode("service");
+
+        final BNode defaultDataset = f.createBNode("defaultDataset");
+        
+        final BNode defaultGraph = f.createBNode("defaultGraph");
+
+        g.add(service, RDF.TYPE, SD.Service);
+
+        // Service end point.
+        g.add(service, SD.endpoint, g.getValueFactory().createURI(serviceURI));
 
         /*
          * Supported Query Languages
          */
-        g.add(SD.Service, SD.supportedLanguage, SD.SPARQL10Query);
-        g.add(SD.Service, SD.supportedLanguage, SD.SPARQL11Query);
-        g.add(SD.Service, SD.supportedLanguage, SD.SPARQL11Update);
+        g.add(service, SD.supportedLanguage, SD.SPARQL10Query);
+        g.add(service, SD.supportedLanguage, SD.SPARQL11Query);
+        g.add(service, SD.supportedLanguage, SD.SPARQL11Update);
 
         /*
          * RDF and SPARQL Formats.
@@ -342,46 +375,46 @@ public class SD {
          * @see http://www.openrdf.org/issues/browse/RIO-79 (Request for unique
          * URIs)
          * 
-         * TODO Add an explict declation for SIDS mode data interchange?
+         * TODO Add an explicit declaration for SIDS mode data interchange?
          */
 
         // InputFormats
         {
-            g.add(SD.Service, SD.inputFormat, SD.RDFXML);
-            g.add(SD.Service, SD.inputFormat, SD.NTRIPLES);
-            g.add(SD.Service, SD.inputFormat, SD.TURTLE);
-            g.add(SD.Service, SD.inputFormat, SD.N3);
-            // g.add(SD.Service, SD.inputFormat, SD.TRIX); // TODO TRIX
-            g.add(SD.Service, SD.inputFormat, SD.TRIG);
-            // g.add(SD.Service, SD.inputFormat, SD.BINARY); // TODO BINARY
-            g.add(SD.Service, SD.inputFormat, SD.NQUADS);
+            g.add(service, SD.inputFormat, SD.RDFXML);
+            g.add(service, SD.inputFormat, SD.NTRIPLES);
+            g.add(service, SD.inputFormat, SD.TURTLE);
+            g.add(service, SD.inputFormat, SD.N3);
+            // g.add(service, SD.inputFormat, SD.TRIX); // TODO TRIX
+            g.add(service, SD.inputFormat, SD.TRIG);
+            // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
+            g.add(service, SD.inputFormat, SD.NQUADS);
 
-            g.add(SD.Service, SD.inputFormat, SD.SPARQL_RESULTS_XML);
-            g.add(SD.Service, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
-            g.add(SD.Service, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
-            g.add(SD.Service, SD.inputFormat, SD.SPARQL_RESULTS_TSV);
-            // g.add(SD.Service, SD.inputFormat,
+            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_XML);
+            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
+            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
+            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_TSV);
+            // g.add(service, SD.inputFormat,
             // SD.SPARQL_RESULTS_OPENRDF_BINARY);
 
         }
 
         // ResultFormats
         {
-            g.add(SD.Service, SD.resultFormat, SD.RDFXML);
-            g.add(SD.Service, SD.resultFormat, SD.NTRIPLES);
-            g.add(SD.Service, SD.resultFormat, SD.TURTLE);
-            g.add(SD.Service, SD.resultFormat, SD.N3);
-            // g.add(SD.Service, SD.resultFormat, SD.TRIX); // TODO TRIX
-            g.add(SD.Service, SD.resultFormat, SD.TRIG);
-            // g.add(SD.Service, SD.resultFormat, SD.BINARY); // TODO BINARY
-            // g.add(SD.Service, SD.resultFormat, SD.NQUADS); // TODO NQuads
+            g.add(service, SD.resultFormat, SD.RDFXML);
+            g.add(service, SD.resultFormat, SD.NTRIPLES);
+            g.add(service, SD.resultFormat, SD.TURTLE);
+            g.add(service, SD.resultFormat, SD.N3);
+            // g.add(service, SD.resultFormat, SD.TRIX); // TODO TRIX
+            g.add(service, SD.resultFormat, SD.TRIG);
+            // g.add(service, SD.resultFormat, SD.BINARY); // TODO BINARY
+            // g.add(service, SD.resultFormat, SD.NQUADS); // TODO NQuads
             // writer
 
-            g.add(SD.Service, SD.resultFormat, SD.SPARQL_RESULTS_XML);
-            g.add(SD.Service, SD.resultFormat, SD.SPARQL_RESULTS_JSON);
-            g.add(SD.Service, SD.resultFormat, SD.SPARQL_RESULTS_CSV);
-            g.add(SD.Service, SD.resultFormat, SD.SPARQL_RESULTS_TSV);
-            // g.add(SD.Service, SD.resultFormat,
+            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_XML);
+            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_JSON);
+            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_CSV);
+            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_TSV);
+            // g.add(service, SD.resultFormat,
             // SD.SPARQL_RESULTS_OPENRDF_BINARY);
         }
 
@@ -397,7 +430,7 @@ public class SD {
 
         if (tripleStore.isQuads()) {
 
-            g.add(SD.Service, SD.feature, SD.UnionDefaultGraph);
+            g.add(service, SD.feature, SD.UnionDefaultGraph);
 
         } else {
 
@@ -418,13 +451,421 @@ public class SD {
                 entailmentRegime = null;
             }
             if (entailmentRegime != null)
-                g.add(SD.Service, SD.entailmentRegime, entailmentRegime);
+                g.add(service, SD.entailmentRegime, entailmentRegime);
 
         }
 
-        g.add(SD.Service, SD.feature, SD.BasicFederatedQuery);
+        // Other features.
+        g.add(service, SD.feature, SD.BasicFederatedQuery);
+
+        /*
+         * Information about the defaultGraph.
+         * 
+         * TODO This could all be generalized and then run for each known named
+         * graph as well.
+         */
+        {
+            
+            // Default data set
+            g.add(service, SD.defaultDataset, defaultDataset);
+
+            g.add(defaultDataset, RDF.TYPE, SD.Dataset);
+
+            // any URI is considered to be an entity.
+            g.add(defaultDataset, VoidVocabularyDecl.uriRegexPattern,
+                    f.createLiteral("^.*"));
+
+            // Default graph in the default data set.
+            g.add(defaultDataset, SD.defaultGraph, defaultGraph);
+
+            // defautGraph description.
+            {
+
+                // #of triples in the default graph
+                g.add(defaultGraph, VoidVocabularyDecl.triples,
+                        f.createLiteral(tripleStore.getStatementCount()));
+
+                // #of entities in the default graph.
+                g.add(defaultGraph, VoidVocabularyDecl.entities,
+                        f.createLiteral(tripleStore.getURICount()));
+
+                // The distinct vocabularies in use.
+                final Set<String> namespaces = new LinkedHashSet<String>();
+
+                /*
+                 * property partition statistics & used vocabularies.
+                 * 
+                 * Note: A temporary graph is used to hold these data so we can
+                 * first output the vocabulary summary. This gives the output a
+                 * neater (and more human consumable) appearance.
+                 */
+                final Graph propertyPartitions = new GraphImpl();
+
+                // Frequency count of the predicates in the default graph.
+                final IVCount[] predicatePartitionCounts = predicateUsage(tripleStore);
+
+                // Frequency count of the classes in the default graph.
+                final IVCount[] classPartitionCounts = classUsage(tripleStore);
+
+                {
+
+                    // property partitions.
+                    for (IVCount tmp : predicatePartitionCounts) {
+
+                        final BNode propertyPartition = f.createBNode();
+
+                        final URI p = (URI) tmp.getValue();
+
+                        propertyPartitions.add(defaultGraph,
+                                VoidVocabularyDecl.propertyPartition,
+                                propertyPartition);
+
+                        propertyPartitions.add(propertyPartition,
+                                VoidVocabularyDecl.property, p);
+
+                        propertyPartitions.add(propertyPartition,
+                                VoidVocabularyDecl.triples,
+                                f.createLiteral(tmp.count));
+
+                        String namespace = p.getNamespace();
+
+                        if (namespace.endsWith("#")) {
+
+                            // Strip trailing '#' per VoID specification.
+                            namespace = namespace.substring(0,
+                                    namespace.length() - 1);
+
+                        }
+
+                        namespaces.add(namespace);
+
+                    }
+
+                }
+
+                // emit the in use vocabularies.
+                for (String namespace : namespaces) {
+
+                    g.add(defaultDataset, VoidVocabularyDecl.vocabulary,
+                            f.createURI(namespace));
+
+                }
+
+                // #of distinct predicates in the default graph.
+                g.add(defaultGraph, VoidVocabularyDecl.properties,
+                        f.createLiteral(predicatePartitionCounts.length));
+
+                // #of distinct classes in the default graph.
+                g.add(defaultGraph, VoidVocabularyDecl.classes,
+                        f.createLiteral(classPartitionCounts.length));
+
+                // now emit the property partition statistics.
+                g.addAll(propertyPartitions);
+                
+                // class partition statistics.
+                {
+
+                    // per class partition statistics.
+                    for (IVCount tmp : classPartitionCounts) {
+
+                        final BNode classPartition = f.createBNode();
+
+                        final BigdataValue cls = tmp.getValue();
+
+                        g.add(defaultGraph, VoidVocabularyDecl.classPartition,
+                                classPartition);
+
+                        g.add(classPartition, VoidVocabularyDecl.class_, cls);
+
+                        g.add(classPartition, VoidVocabularyDecl.triples,
+                                f.createLiteral(tmp.count));
+
+                    }
+
+                } // end class partition statistics.
+
+            } // end defaultGraph
+            
+//            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
+//
+//            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
+//
+//            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
+//
+//            /*
+//             * Note: The blank node count is only available when using the told
+//             * bnodes mode.
+//             */
+//            sb
+//                    .append("bnodeCount\t = "
+//                            + (tripleStore.getLexiconRelation()
+//                                    .isStoreBlankNodes() ? ""
+//                                    + tripleStore.getBNodeCount() : "N/A")
+//                            + "\n");
+
+        }
 
         return g;
+    
+    }
+
+    /**
+     * An {@link IV} and a counter for that {@link IV}.
+     */
+    private static class IVCount implements Comparable<IVCount> {
+
+        public final IV<?,?> iv;
+        
+        public final long count;
+
+        private BigdataValue val;
+        
+        /**
+         * Return the associated {@link BigdataValue}.
+         * <p>
+         * Note: A resolution set is necessary if you want to attach the
+         * {@link BigdataValue} to the {@link IV}.
+         * 
+         * @throws NotMaterializedException
+         */
+        public BigdataValue getValue() {
+
+            if(val == null)
+                throw new NotMaterializedException(iv.toString());
+            
+            return val;
+            
+        }
+        
+        public void setValue(final BigdataValue val) {
+
+            if (val == null)
+                throw new IllegalArgumentException();
+            
+            if (this.val != null && !this.val.equals(val))
+                throw new IllegalArgumentException();
+            
+            this.val = val;
+
+        }
+        
+        public IVCount(final IV<?,?> iv, final long count) {
+
+            if (iv == null)
+                throw new IllegalArgumentException();
+            
+            this.iv = iv;
+            
+            this.count = count;
+            
+        }
+
+        /**
+         * Place into order by descending count.
+         */
+        @Override
+        public int compareTo(IVCount arg0) {
+
+            if (count < arg0.count)
+                return 1;
+
+            if (count > arg0.count)
+                return -1;
+
+            return 0;
+            
+        }
+        
+    }
+    
+    /**
+     * Return an array of the distinct predicates in the KB ordered by their
+     * descending frequency of use. The {@link IV}s in the returned array will
+     * have been resolved to the corresponding {@link BigdataURI}s which can be
+     * accessed using {@link IV#getValue()}.
+     */
+    private static IVCount[] predicateUsage(final AbstractTripleStore kb) {
+
+        if (kb.getSPORelation().oneAccessPath) {
+
+            // The necessary index (POS or POCS) does not exist.
+            throw new UnsupportedOperationException();
+
+        }
+
+        final boolean quads = kb.isQuads();
+
+        // visit distinct term identifiers for the predicate position.
+        @SuppressWarnings("rawtypes")
+        final IChunkedIterator<IV> itr = kb.getSPORelation().distinctTermScan(
+                quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
+
+        // resolve term identifiers to terms efficiently during iteration.
+        final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
+                kb/* resolveTerms */, itr);
+
+        try {
+
+            final Set<IV<?,?>> ivs = new LinkedHashSet<IV<?,?>>();
+
+            final Map<IV<?, ?>, IVCount> counts = new LinkedHashMap<IV<?, ?>, IVCount>();
+
+            while (itr2.hasNext()) {
+
+                final BigdataValue term = itr2.next();
+
+                final IV<?,?> iv = term.getIV();
+
+                final long n = kb.getSPORelation()
+                        .getAccessPath(null, iv, null, null)
+                        .rangeCount(false/* exact */);
+
+                ivs.add(iv);
+                
+                counts.put(iv, new IVCount(iv, n));
+
+            }
+
+            // Batch resolve IVs to Values
+            final Map<IV<?, ?>, BigdataValue> x = kb.getLexiconRelation()
+                    .getTerms(ivs);
+
+            for (Map.Entry<IV<?, ?>, BigdataValue> e : x.entrySet()) {
+
+                final IVCount count = counts.get(e.getKey());
+
+                count.setValue(e.getValue());
+
+            }
+
+            final IVCount[] a = counts.values().toArray(
+                    new IVCount[counts.size()]);
+
+            // Order by descending count.
+            Arrays.sort(a);
+
+            return a;
+
+        } finally {
+
+            itr2.close();
+
+        }
+
+    }
+
+    /**
+     * Return an efficient statistical summary for the class partitions. The
+     * SPARQL query for this is
+     * 
+     * <pre>
+     * SELECT  ?class (COUNT(?s) AS ?count ) { ?s a ?class } GROUP BY ?class ORDER BY ?count
+     * </pre>
+     * 
+     * However, it is much efficient to scan POS for
+     * 
+     * <pre>
+     * rdf:type ?o ?s
+     * </pre>
+     * 
+     * and report the range count of
+     * 
+     * <pre>
+     * rdf:type ?o ?s
+     * </pre>
+     * 
+     * for each distinct value of <code>?o</code>.
+     * 
+     * @param kb
+     *            The KB instance.
+     *            
+     * @return The class usage statistics.
+     */
+    private static IVCount[] classUsage(final AbstractTripleStore kb) {
+
+        if (kb.getSPORelation().oneAccessPath) {
+
+            // The necessary index (POS or POCS) does not exist.
+            throw new UnsupportedOperationException();
+
+        }
+
+        final boolean quads = kb.isQuads();
+
+        final SPOKeyOrder keyOrder = quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS;
+
+        // Resolve IV for rdf:type
+        final BigdataURI rdfType = kb.getValueFactory().asValue(RDF.TYPE);
+
+        kb.getLexiconRelation().addTerms(new BigdataValue[] { rdfType },
+                1/* numTerms */, true/* readOnly */);
+
+        if (rdfType.getIV() == null) {
+
+            // No rdf:type assertions since rdf:type is unknown term.
+            return new IVCount[0];
+
+        }
+        
+        // visit distinct term identifiers for the rdf:type predicate.
+        @SuppressWarnings("rawtypes")
+        final IChunkedIterator<IV> itr = kb
+                .getSPORelation()
+                .distinctMultiTermScan(keyOrder, new IV[] { rdfType.getIV() }/* knownTerms */);
+
+        // resolve term identifiers to terms efficiently during iteration.
+        final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
+                kb/* resolveTerms */, itr);
+
+        try {
+
+            final Set<IV<?,?>> ivs = new LinkedHashSet<IV<?,?>>();
+
+            final Map<IV<?, ?>, IVCount> counts = new LinkedHashMap<IV<?, ?>, IVCount>();
+
+            while (itr2.hasNext()) {
+
+                final BigdataValue term = itr2.next();
+
+                final IV<?,?> iv = term.getIV();
+
+                final long n = kb
+                        .getSPORelation()
+                        .getAccessPath(null, rdfType.getIV()/* p */, iv/* o */,
+                                null).rangeCount(false/* exact */);
+
+                ivs.add(iv);
+                
+                counts.put(iv, new IVCount(iv, n));
+
+            }
+
+            // Batch resolve IVs to Values
+            final Map<IV<?, ?>, BigdataValue> x = kb.getLexiconRelation()
+                    .getTerms(ivs);
+
+            for (Map.Entry<IV<?, ?>, BigdataValue> e : x.entrySet()) {
+
+                final IVCount count = counts.get(e.getKey());
+
+                count.setValue(e.getValue());
+
+            }
+
+            final IVCount[] a = counts.values().toArray(
+                    new IVCount[counts.size()]);
+
+            // Order by descending count.
+            Arrays.sort(a);
+
+            return a;
+
+        } finally {
+
+            itr2.close();
+
+        }
+
     }
 
 }
