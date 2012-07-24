@@ -286,8 +286,23 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        final boolean describeEachNamedGraph;
+        {
+
+            final String s = context
+                    .getInitParameter(ConfigParams.DESCRIBE_EACH_NAMED_GRAPH);
+
+            describeEachNamedGraph = s == null ? ConfigParams.DEFAULT_DESCRIBE_EACH_NAMED_GRAPH
+                    : Boolean.valueOf(s);
+            
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.DESCRIBE_EACH_NAMED_GRAPH + "="
+                        + describeEachNamedGraph);
+
+        }
+
         final SparqlEndpointConfig config = new SparqlEndpointConfig(namespace,
-                timestamp, queryThreadPoolSize);
+                timestamp, queryThreadPoolSize, describeEachNamedGraph);
 
         rdfContext = new BigdataRDFContext(config, indexManager);
 

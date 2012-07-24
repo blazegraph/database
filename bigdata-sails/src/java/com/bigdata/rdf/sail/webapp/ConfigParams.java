@@ -80,4 +80,15 @@ public interface ConfigParams {
      */
     String READ_LOCK = "read-lock";
     
+    /**
+     * When <code>true</code> and the KB instance is in the <code>quads</code>
+     * mode, each named graph will also be described in in the same level of
+     * detail as the default graph (default
+     * {@value #DEFAULT_DESCRIBE_EACH_NAMED_GRAPH}). Otherwise only the default
+     * graph will be described.
+     */
+    String DESCRIBE_EACH_NAMED_GRAPH = "describe-each-named-graph";
+    
+    boolean DEFAULT_DESCRIBE_EACH_NAMED_GRAPH = true;
+    
 }

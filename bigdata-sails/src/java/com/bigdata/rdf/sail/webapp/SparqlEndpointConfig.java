@@ -50,8 +50,16 @@ public class SparqlEndpointConfig {
      */
     final public int queryThreadPoolSize;
     
+    /**
+     * When <code>true</code> and the KB instance is in the <code>quads</code>
+     * mode, each named graph will also be described in in the same level of
+     * detail as the default graph. Otherwise only the default graph will be
+     * described.
+     */
+    final public boolean describeEachNamedGraph;
+    
     public SparqlEndpointConfig(final String namespace, final long timestamp,
-            final int queryThreadPoolSize) {
+            final int queryThreadPoolSize, final boolean describeEachNamedGraph) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -61,6 +69,8 @@ public class SparqlEndpointConfig {
         this.timestamp = timestamp;
 
         this.queryThreadPoolSize = queryThreadPoolSize;
+        
+        this.describeEachNamedGraph = describeEachNamedGraph;
 
     }
 

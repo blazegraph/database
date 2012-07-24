@@ -28,7 +28,6 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -48,6 +47,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -175,25 +175,22 @@ public class QueryServlet extends BigdataRDFServlet {
             buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
             return;
         }
+
+        // Figure out the service end point.
+        final String serviceURI = getServiceURI(req);
         
         /*
-         * Figure out the service end point.
+         * TODO Resolve the SD class name and ctor via a configuration property
+         * for extensible descriptions.
          */
-        final String serviceURI;
+        final Graph g = new GraphImpl();
         {
-            final StringBuffer sb = req.getRequestURL();
 
-            final int indexOf = sb.indexOf("?");
+            final SD sd = new SD(g, tripleStore, serviceURI);
 
-            if (indexOf == -1) {
-                serviceURI = sb.toString();
-            } else {
-                serviceURI = sb.substring(0, indexOf);
-            }
+            sd.describeService(getBigdataRDFContext().getConfig().describeEachNamedGraph);
 
         }
-        
-        final Graph g = SD.describeService(tripleStore, serviceURI);
 
         /*
          * CONNEG for the MIME type.
