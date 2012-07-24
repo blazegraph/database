@@ -890,7 +890,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
     
     /**
-     * <code>true</code> iff the full text index is enabled.
+     * <code>true</code> iff the (value centric) full text index is enabled.
      * 
      * @see AbstractTripleStore.Options#TEXT_INDEX
      */

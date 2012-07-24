@@ -32,6 +32,7 @@ import java.io.Writer;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
@@ -246,6 +247,27 @@ abstract public class BigdataServlet extends HttpServlet {
 
         return new ByteArrayInputStream(outstr.toByteArray());
         
+    }
+
+    /**
+     * Figure out and return the service end point.
+     */
+    protected String getServiceURI(final HttpServletRequest req) {
+
+        final String serviceURI;
+
+        final StringBuffer sb = req.getRequestURL();
+
+        final int indexOf = sb.indexOf("?");
+
+        if (indexOf == -1) {
+            serviceURI = sb.toString();
+        } else {
+            serviceURI = sb.substring(0, indexOf);
+        }
+
+        return serviceURI;
+
     }
 
 }

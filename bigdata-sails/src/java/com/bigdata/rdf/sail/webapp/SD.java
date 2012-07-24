@@ -30,14 +30,17 @@ package com.bigdata.rdf.sail.webapp;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
+import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
@@ -47,10 +50,14 @@ import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.axioms.RdfsAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
@@ -137,6 +144,36 @@ public class SD {
     static public final URI RequiresDataset = new URIImpl(NS + "RequiresDataset");
     static public final URI EmptyGraphs = new URIImpl(NS + "EmptyGraphs");
     static public final URI BasicFederatedQuery = new URIImpl(NS + "BasicFederatedQuery");
+    
+    /**
+     * The namespace for the bigdata specific features.
+     */
+    static public final String BDFNS = BD.NAMESPACE+"/features/";
+
+    /*
+     * KB modes.
+     */
+    static public final URI ModeTriples = new URIImpl(BDFNS + "KB/Mode/Triples");
+    static public final URI ModeQuads = new URIImpl(BDFNS + "KB/Mode/Quads");
+    static public final URI ModeSids = new URIImpl(BDFNS + "KB/Mode/Sids");
+
+    /*
+     * Text Index modes.
+     */
+    static public final URI TextIndexValueCentric = new URIImpl(BDFNS
+            + "KB/TextIndex/ValueCentric");
+    
+    static public final URI TextIndexSubjectCentric = new URIImpl(BDFNS
+            + "KB/TextIndex/SubjectCentric");
+
+    /*
+     * Misc KB features.
+     */
+    static public final URI TruthMaintenance = new URIImpl(BDFNS
+            + "KB/TruthMaintenance");
+    
+    static public final URI IsolatableIndices = new URIImpl(BDFNS
+            + "KB/IsolatableIndices");
     
     /**
      * <pre>
@@ -337,285 +374,548 @@ public class SD {
 //            "http://www.w3.org/ns/formats/SPARQL_Results_TSV");
 
     /**
-     * Collect various information, building up a service description graph.
+     * The graph in which the service description is accumulated (from the
+     * constructor).
+     */
+    protected final Graph g;
+    
+    /**
+     * The KB instance that is being described (from the constructor).
+     */
+    protected final AbstractTripleStore tripleStore;
+    
+    /**
+     * The service end point (from the constructor).
+     */
+    protected final String serviceURI;
+
+    /**
+     * The value factory used to create values for the service description graph
+     * {@link #g}.
+     */
+    protected final ValueFactory f;
+    
+    /**
+     * The resource which models the service.
+     */
+    protected final BNode aService;
+
+    /**
+     * The resource which models the default data set for the service.
+     */
+    protected final BNode aDefaultDataset;
+    
+    /**
+     * The resource which models the default graph in the default data set for
+     * the service.
+     */
+    protected final BNode aDefaultGraph;
+
+    /**
      * 
+     * @param g
+     *            Where to assemble the description.
      * @param tripleStore
      *            The KB instance to be described.
      * @param serviceURIs
      *            One or more service end points for that KB instance.
+     * 
+     * @see #describeService()
      */
-    public static Graph describeService(final AbstractTripleStore tripleStore,
+    public SD(final Graph g, final AbstractTripleStore tripleStore,
             final String serviceURI) {
 
-        final Graph g = new GraphImpl();
+        if (g == null)
+            throw new IllegalArgumentException();
 
-        final ValueFactory f = g.getValueFactory();
-
-        final BNode service = f.createBNode("service");
-
-        final BNode defaultDataset = f.createBNode("defaultDataset");
+        if (tripleStore == null)
+            throw new IllegalArgumentException();
         
-        final BNode defaultGraph = f.createBNode("defaultGraph");
+        if (serviceURI == null)
+            throw new IllegalArgumentException();
 
-        g.add(service, RDF.TYPE, SD.Service);
+        this.g = g;
+        
+        this.tripleStore = tripleStore;
+        
+        this.serviceURI = serviceURI;
+        
+        this.f = g.getValueFactory();
+        
+        aService = f.createBNode("service");
+
+        aDefaultDataset = f.createBNode("defaultDataset");
+        
+        aDefaultGraph = f.createBNode("defaultGraph");
+        
+    }
+    
+    /**
+     * Collect various information, building up a service description graph.
+     * 
+     * @param describeNamedGraphs
+     *            When <code>true</code> and the KB instance is in the
+     *            <code>quads</code> mode, each named graph will also be
+     *            described in in the same level of detail as the default graph.
+     *            Otherwise only the default graph will be described.
+     */
+    public void describeService(final boolean describeNamedGraphs) {
+
+        g.add(aService, RDF.TYPE, SD.Service);
 
         // Service end point.
-        g.add(service, SD.endpoint, g.getValueFactory().createURI(serviceURI));
+        describeServiceEndpoints();
 
-        /*
-         * Supported Query Languages
-         */
-        g.add(service, SD.supportedLanguage, SD.SPARQL10Query);
-        g.add(service, SD.supportedLanguage, SD.SPARQL11Query);
-        g.add(service, SD.supportedLanguage, SD.SPARQL11Update);
+        // Describe the supported languages (SPARQL Query, Update, etc).
+        describeLanguages();
 
-        /*
-         * RDF and SPARQL Formats.
-         * 
-         * @see http://www.openrdf.org/issues/browse/RIO-79 (Request for unique
-         * URIs)
-         * 
-         * TODO Add an explicit declaration for SIDS mode data interchange?
-         */
+        // Describe other supported features.
+        describeOtherFeatures();
+        
+        // Describe the supported data formats.
+        describeInputFormats();
+        describeResultFormats();
 
-        // InputFormats
-        {
-            g.add(service, SD.inputFormat, SD.RDFXML);
-            g.add(service, SD.inputFormat, SD.NTRIPLES);
-            g.add(service, SD.inputFormat, SD.TURTLE);
-            g.add(service, SD.inputFormat, SD.N3);
-            // g.add(service, SD.inputFormat, SD.TRIX); // TODO TRIX
-            g.add(service, SD.inputFormat, SD.TRIG);
-            // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
-            g.add(service, SD.inputFormat, SD.NQUADS);
+        // Describe the entailment regime (if any).
+        describeEntailmentRegime();
+        
+        // Describe the default graph of the default data set.
+        describeDefaultDataSet(describeNamedGraphs);
 
-            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_XML);
-            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
-            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
-            g.add(service, SD.inputFormat, SD.SPARQL_RESULTS_TSV);
-            // g.add(service, SD.inputFormat,
-            // SD.SPARQL_RESULTS_OPENRDF_BINARY);
+    }
 
-        }
+    /**
+     * Describe the service end point(s).
+     * 
+     * @see #endpoint
+     */
+    protected void describeServiceEndpoints() {
 
-        // ResultFormats
-        {
-            g.add(service, SD.resultFormat, SD.RDFXML);
-            g.add(service, SD.resultFormat, SD.NTRIPLES);
-            g.add(service, SD.resultFormat, SD.TURTLE);
-            g.add(service, SD.resultFormat, SD.N3);
-            // g.add(service, SD.resultFormat, SD.TRIX); // TODO TRIX
-            g.add(service, SD.resultFormat, SD.TRIG);
-            // g.add(service, SD.resultFormat, SD.BINARY); // TODO BINARY
-            // g.add(service, SD.resultFormat, SD.NQUADS); // TODO NQuads
-            // writer
+        g.add(aService, SD.endpoint, g.getValueFactory().createURI(serviceURI));
 
-            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_XML);
-            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_JSON);
-            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_CSV);
-            g.add(service, SD.resultFormat, SD.SPARQL_RESULTS_TSV);
-            // g.add(service, SD.resultFormat,
-            // SD.SPARQL_RESULTS_OPENRDF_BINARY);
-        }
+    }
+    
+    /**
+     * Describe the supported Query Languages
+     */
+    protected void describeLanguages() {
 
-        /*
-         * TODO Report out the database mode {triples, provenance, or quads} and
-         * the entailment regieme for that mode (only for triples or quads at
-         * this point). Report out when truth maintenance is enabled and whether
-         * or not the full text index is enabled.
-         * 
-         * TODO sd:languageExtension or sd:feature could be used for query
-         * hints, NAMED SUBQUERY, etc.
-         */
+        g.add(aService, SD.supportedLanguage, SD.SPARQL10Query);
+        
+        g.add(aService, SD.supportedLanguage, SD.SPARQL11Query);
+
+        g.add(aService, SD.supportedLanguage, SD.SPARQL11Update);
+
+    }
+
+    /**
+     * Describe the supported input formats.
+     * 
+     * @see http://www.openrdf.org/issues/browse/RIO-79 (Request for unique
+     *      URIs)
+     * 
+     * @see #inputFormat
+     * 
+     *      TODO Add an explicit declaration for SIDS mode data interchange?
+     */
+    protected void describeInputFormats() {
+        
+        g.add(aService, SD.inputFormat, SD.RDFXML);
+        g.add(aService, SD.inputFormat, SD.NTRIPLES);
+        g.add(aService, SD.inputFormat, SD.TURTLE);
+        g.add(aService, SD.inputFormat, SD.N3);
+        // g.add(service, SD.inputFormat, SD.TRIX); // TODO TRIX
+        g.add(aService, SD.inputFormat, SD.TRIG);
+        // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
+        g.add(aService, SD.inputFormat, SD.NQUADS);
+
+        g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_XML);
+        g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
+        g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
+        g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_TSV);
+        // g.add(service,SD.inputFormat,SD.SPARQL_RESULTS_OPENRDF_BINARY);
+
+    }
+
+    /**
+     * Describe the supported result formats.
+     * 
+     * @see #resultFormat
+     */
+    protected void describeResultFormats() {
+
+        g.add(aService, SD.resultFormat, SD.RDFXML);
+        g.add(aService, SD.resultFormat, SD.NTRIPLES);
+        g.add(aService, SD.resultFormat, SD.TURTLE);
+        g.add(aService, SD.resultFormat, SD.N3);
+        // g.add(service, SD.resultFormat, SD.TRIX); // TODO TRIX
+        g.add(aService, SD.resultFormat, SD.TRIG);
+        // g.add(service, SD.resultFormat, SD.BINARY); // TODO BINARY
+        // g.add(service, SD.resultFormat, SD.NQUADS); // TODO NQuads
+        // writer
+
+        g.add(aService, SD.resultFormat, SD.SPARQL_RESULTS_XML);
+        g.add(aService, SD.resultFormat, SD.SPARQL_RESULTS_JSON);
+        g.add(aService, SD.resultFormat, SD.SPARQL_RESULTS_CSV);
+        g.add(aService, SD.resultFormat, SD.SPARQL_RESULTS_TSV);
+        // g.add(service, SD.resultFormat,
+        // SD.SPARQL_RESULTS_OPENRDF_BINARY);
+
+    }
+    
+    /**
+     * Describe non-language features.
+     * 
+     * TODO sd:languageExtension or sd:feature could be used for query hints,
+     * NAMED SUBQUERY, the NSS REST API features, etc.
+     * 
+     * TODO Report the backing store type (Journal, TemporaryStore, Federation)
+     * and the journal buffer mode.
+     */
+    protected void describeOtherFeatures() {
+
+        g.add(aService, SD.feature, SD.BasicFederatedQuery);
 
         if (tripleStore.isQuads()) {
 
-            g.add(service, SD.feature, SD.UnionDefaultGraph);
+            g.add(aService, SD.feature, SD.UnionDefaultGraph);
 
+            g.add(aService, SD.feature, ModeQuads);
+
+        } else if(tripleStore.isStatementIdentifiers()) {
+        
+            g.add(aService, SD.feature, ModeSids);
+            
         } else {
 
-            /*
-             * TODO The Axioms interface could self-report this.
-             */
-            final URI entailmentRegime;
-            final Axioms axioms = tripleStore.getAxioms();
-            if (axioms == null || axioms instanceof NoAxioms) {
-                entailmentRegime = SD.simpleEntailment;
-            } else if (axioms instanceof OwlAxioms) {
-                // TODO This is really the RDFS+ entailment regime.
-                entailmentRegime = SD.rdfsEntailment;
-            } else if (axioms instanceof RdfsAxioms) {
-                entailmentRegime = SD.rdfsEntailment;
-            } else {
-                // Unknown.
-                entailmentRegime = null;
-            }
-            if (entailmentRegime != null)
-                g.add(service, SD.entailmentRegime, entailmentRegime);
+            g.add(aService, SD.feature, ModeTriples);
 
         }
 
-        // Other features.
-        g.add(service, SD.feature, SD.BasicFederatedQuery);
+        if (tripleStore.getLexiconRelation().isTextIndex()) {
 
+            g.add(aService, SD.feature, TextIndexValueCentric);
+
+        }
+
+        if (tripleStore.getLexiconRelation().isSubjectCentricTextIndex()) {
+
+            g.add(aService, SD.feature, TextIndexSubjectCentric);
+
+        }
+
+        // TODO Report when justification chains are being tracked?
+//        if(tripleStore.isJustify())
+
+        final Properties properties = tripleStore.getProperties();
+
+        if (Boolean.valueOf(properties.getProperty(
+                BigdataSail.Options.TRUTH_MAINTENANCE,
+                BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE))) {
+
+            g.add(aService, SD.feature, TruthMaintenance);
+
+        }
+        
+        if (Boolean.valueOf(properties.getProperty(
+                BigdataSail.Options.ISOLATABLE_INDICES,
+                BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
+
+            g.add(aService, SD.feature, IsolatableIndices);
+
+        }
+        
         /*
-         * Information about the defaultGraph.
+         * TODO Report properties from the BigdataSail
          * 
-         * TODO This could all be generalized and then run for each known named
-         * graph as well.
+         * NAMESPACE?
          */
+        
+    }
+    
+    /**
+     * Describe the entailment regime.
+     * 
+     * TODO The Axioms interface could self-report this.
+     */
+    protected void describeEntailmentRegime() {
+
+        if (!tripleStore.isQuads())
+            return;
+
+        final URI entailmentRegime;
+        final Axioms axioms = tripleStore.getAxioms();
+        if (axioms == null || axioms instanceof NoAxioms) {
+            entailmentRegime = SD.simpleEntailment;
+        } else if (axioms instanceof OwlAxioms) {
+            // TODO This is really the RDFS+ entailment regime.
+            entailmentRegime = SD.rdfsEntailment;
+        } else if (axioms instanceof RdfsAxioms) {
+            entailmentRegime = SD.rdfsEntailment;
+        } else {
+            // Unknown.
+            entailmentRegime = null;
+        }
+        if (entailmentRegime != null)
+            g.add(aService, SD.entailmentRegime, entailmentRegime);
+
+    }
+    
+    /**
+     * Describe the default data set.
+     * 
+     * @param describeNamedGraph
+     *            When <code>true</code>, each named graph will also be
+     *            described in in the same level of detail as the default graph.
+     *            Otherwise only the default graph will be described.
+     */
+    protected void describeDefaultDataSet(final boolean describeNamedGraph) {
+
+        // Default data set
+        g.add(aService, SD.defaultDataset, aDefaultDataset);
+
+        g.add(aDefaultDataset, RDF.TYPE, SD.Dataset);
+
+        // any URI is considered to be an entity.
+        g.add(aDefaultDataset, VoidVocabularyDecl.uriRegexPattern,
+                f.createLiteral("^.*"));
+
+        // Frequency count of the predicates in the default graph.
+        final IVCount[] predicatePartitionCounts = predicateUsage(
+                tripleStore);
+
+        // Frequency count of the classes in the default graph.
+        final IVCount[] classPartitionCounts = classUsage(tripleStore);
+
+        // Describe vocabularies based on the predicate partitions.
+        describeVocabularies(predicatePartitionCounts);
+        
+        // defaultGraph description.
         {
-            
-            // Default data set
-            g.add(service, SD.defaultDataset, defaultDataset);
-
-            g.add(defaultDataset, RDF.TYPE, SD.Dataset);
-
-            // any URI is considered to be an entity.
-            g.add(defaultDataset, VoidVocabularyDecl.uriRegexPattern,
-                    f.createLiteral("^.*"));
 
             // Default graph in the default data set.
-            g.add(defaultDataset, SD.defaultGraph, defaultGraph);
-
-            // defautGraph description.
-            {
-
-                // #of triples in the default graph
-                g.add(defaultGraph, VoidVocabularyDecl.triples,
-                        f.createLiteral(tripleStore.getStatementCount()));
-
-                // #of entities in the default graph.
-                g.add(defaultGraph, VoidVocabularyDecl.entities,
-                        f.createLiteral(tripleStore.getURICount()));
-
-                // The distinct vocabularies in use.
-                final Set<String> namespaces = new LinkedHashSet<String>();
-
-                /*
-                 * property partition statistics & used vocabularies.
-                 * 
-                 * Note: A temporary graph is used to hold these data so we can
-                 * first output the vocabulary summary. This gives the output a
-                 * neater (and more human consumable) appearance.
-                 */
-                final Graph propertyPartitions = new GraphImpl();
-
-                // Frequency count of the predicates in the default graph.
-                final IVCount[] predicatePartitionCounts = predicateUsage(tripleStore);
-
-                // Frequency count of the classes in the default graph.
-                final IVCount[] classPartitionCounts = classUsage(tripleStore);
-
-                {
-
-                    // property partitions.
-                    for (IVCount tmp : predicatePartitionCounts) {
-
-                        final BNode propertyPartition = f.createBNode();
-
-                        final URI p = (URI) tmp.getValue();
-
-                        propertyPartitions.add(defaultGraph,
-                                VoidVocabularyDecl.propertyPartition,
-                                propertyPartition);
-
-                        propertyPartitions.add(propertyPartition,
-                                VoidVocabularyDecl.property, p);
-
-                        propertyPartitions.add(propertyPartition,
-                                VoidVocabularyDecl.triples,
-                                f.createLiteral(tmp.count));
-
-                        String namespace = p.getNamespace();
-
-                        if (namespace.endsWith("#")) {
-
-                            // Strip trailing '#' per VoID specification.
-                            namespace = namespace.substring(0,
-                                    namespace.length() - 1);
-
-                        }
-
-                        namespaces.add(namespace);
-
-                    }
-
-                }
-
-                // emit the in use vocabularies.
-                for (String namespace : namespaces) {
-
-                    g.add(defaultDataset, VoidVocabularyDecl.vocabulary,
-                            f.createURI(namespace));
-
-                }
-
-                // #of distinct predicates in the default graph.
-                g.add(defaultGraph, VoidVocabularyDecl.properties,
-                        f.createLiteral(predicatePartitionCounts.length));
-
-                // #of distinct classes in the default graph.
-                g.add(defaultGraph, VoidVocabularyDecl.classes,
-                        f.createLiteral(classPartitionCounts.length));
-
-                // now emit the property partition statistics.
-                g.addAll(propertyPartitions);
-                
-                // class partition statistics.
-                {
-
-                    // per class partition statistics.
-                    for (IVCount tmp : classPartitionCounts) {
-
-                        final BNode classPartition = f.createBNode();
-
-                        final BigdataValue cls = tmp.getValue();
-
-                        g.add(defaultGraph, VoidVocabularyDecl.classPartition,
-                                classPartition);
-
-                        g.add(classPartition, VoidVocabularyDecl.class_, cls);
-
-                        g.add(classPartition, VoidVocabularyDecl.triples,
-                                f.createLiteral(tmp.count));
-
-                    }
-
-                } // end class partition statistics.
-
-            } // end defaultGraph
+            g.add(aDefaultDataset, SD.defaultGraph, aDefaultGraph);
             
-//            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
-//
-//            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
-//
-//            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
-//
-//            /*
-//             * Note: The blank node count is only available when using the told
-//             * bnodes mode.
-//             */
-//            sb
-//                    .append("bnodeCount\t = "
-//                            + (tripleStore.getLexiconRelation()
-//                                    .isStoreBlankNodes() ? ""
-//                                    + tripleStore.getBNodeCount() : "N/A")
-//                            + "\n");
+            // Describe the default graph using statistics.
+            describeGraph(aDefaultGraph, predicatePartitionCounts,
+                    classPartitionCounts);
+
+        } // end defaultGraph
+
+        // sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
+        //
+        // sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
+        //
+        // sb.append("literalCount\t = " + tripleStore.getLiteralCount() +
+        // "\n");
+        //
+        // /*
+        // * Note: The blank node count is only available when using the told
+        // * bnodes mode.
+        // */
+        // sb
+        // .append("bnodeCount\t = "
+        // + (tripleStore.getLexiconRelation()
+        // .isStoreBlankNodes() ? ""
+        // + tripleStore.getBNodeCount() : "N/A")
+        // + "\n");
+
+        /*
+         * Report for each named graph.
+         */
+        if (describeNamedGraph && tripleStore.isQuads()) {
+
+            final SPORelation r = tripleStore.getSPORelation();
+
+            // the index to use for distinct term scan.
+            final SPOKeyOrder keyOrder = SPOKeyOrder.CSPO;
+
+            // visit distinct IVs for context position on that index.
+            @SuppressWarnings("rawtypes")
+            final IChunkedIterator<IV> itr = r.distinctTermScan(keyOrder);
+
+            // resolve IVs to terms efficiently during iteration.
+            final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
+                    tripleStore/* resolveTerms */, itr);
+
+            try {
+
+                while (itr2.hasNext()) {
+
+                    /*
+                     * Describe this named graph.
+                     * 
+                     * Note: This is using the predicate and class partition
+                     * statistics from the default graph (RDF merge) to identify
+                     * the set of all possible predicates and classes within
+                     * each named graph. It then tests each predicate and class
+                     * partition against the named graph and ignores those which
+                     * are not present in a given named graph. This is being
+                     * done because we do not have a CPxx index.
+                     */
+
+                    final BigdataResource graph = (BigdataResource) itr2.next();
+
+                    final IVCount[] predicatePartitionCounts2 = predicateUsage(
+                            tripleStore, graph.getIV(),
+                            predicatePartitionCounts);
+
+                    final IVCount[] classPartitionCounts2 = classUsage(
+                            tripleStore, graph.getIV(), classPartitionCounts);
+
+                    final BNode aNamedGraph = f.createBNode();
+
+                    // Named graph in the default data set.
+                    g.add(aDefaultDataset, SD.namedGraph, aNamedGraph);
+
+                    // The name of that named graph.
+                    g.add(aNamedGraph, SD.name, graph);
+
+                    // Describe the named graph.
+                    describeGraph(aNamedGraph, predicatePartitionCounts2,
+                            classPartitionCounts2);
+
+                }
+                
+            } finally {
+
+                itr2.close();
+
+            }
 
         }
 
-        return g;
+    }
+
+    /**
+     * Describe the vocabularies which are in use in the KB based on the
+     * predicate partition statistics.
+     * 
+     * @param predicateParitionCounts
+     *            The predicate partition statistics.
+     */
+    protected void describeVocabularies(final IVCount[] predicatePartitionCounts) {
+
+        // Find the distinct vocabularies in use.
+        final Set<String> namespaces = new LinkedHashSet<String>();
+        {
+
+            // property partitions.
+            for (IVCount tmp : predicatePartitionCounts) {
+
+                final URI p = (URI) tmp.getValue();
+
+                String namespace = p.getNamespace();
+
+                if (namespace.endsWith("#")) {
+
+                    // Strip trailing '#' per VoID specification.
+                    namespace = namespace.substring(0,
+                            namespace.length() - 1);
+
+                }
+
+                namespaces.add(namespace);
+
+            }
+
+        }
+
+        // Sort into dictionary order.
+        final String[] a = namespaces.toArray(new String[namespaces.size()]);
+        
+        Arrays.sort(a);
+
+        for (String namespace : a) {
+
+            g.add(aDefaultDataset, VoidVocabularyDecl.vocabulary,
+                    f.createURI(namespace));
+
+        }
+
+    }
     
+    /**
+     * Describe a named or default graph.
+     * 
+     * @param graph
+     *            The named graph.
+     * @param predicatePartitionCounts
+     *            The predicate partition statistics for that graph.
+     * @param classPartitionCounts
+     *            The class partition statistics for that graph.
+     */
+    protected void describeGraph(final Resource graph,
+            final IVCount[] predicatePartitionCounts,
+            final IVCount[] classPartitionCounts) {
+
+        // The graph is a Graph.
+        g.add(graph, RDF.TYPE, SD.Graph);
+
+        // #of triples in the default graph
+        g.add(graph, VoidVocabularyDecl.triples,
+                f.createLiteral(tripleStore.getStatementCount()));
+
+        // #of entities in the default graph.
+        g.add(graph, VoidVocabularyDecl.entities,
+                f.createLiteral(tripleStore.getURICount()));
+
+        // #of distinct predicates in the default graph.
+        g.add(graph, VoidVocabularyDecl.properties,
+                f.createLiteral(predicatePartitionCounts.length));
+
+        // #of distinct classes in the default graph.
+        g.add(graph, VoidVocabularyDecl.classes,
+                f.createLiteral(classPartitionCounts.length));
+
+        // property partition statistics.
+        for (IVCount tmp : predicatePartitionCounts) {
+
+            final BNode propertyPartition = f.createBNode();
+
+            final URI p = (URI) tmp.getValue();
+
+            g.add(graph, VoidVocabularyDecl.propertyPartition,
+                    propertyPartition);
+
+            g.add(propertyPartition, VoidVocabularyDecl.property, p);
+
+            g.add(propertyPartition, VoidVocabularyDecl.triples,
+                    f.createLiteral(tmp.count));
+
+        }
+
+        // class partition statistics.
+        {
+
+            // per class partition statistics.
+            for (IVCount tmp : classPartitionCounts) {
+
+                final BNode classPartition = f.createBNode();
+
+                final BigdataValue cls = tmp.getValue();
+
+                g.add(graph, VoidVocabularyDecl.classPartition,
+                        classPartition);
+
+                g.add(classPartition, VoidVocabularyDecl.class_, cls);
+
+                g.add(classPartition, VoidVocabularyDecl.triples,
+                        f.createLiteral(tmp.count));
+
+            }
+
+        } // end class partition statistics.
+
     }
 
     /**
      * An {@link IV} and a counter for that {@link IV}.
      */
-    private static class IVCount implements Comparable<IVCount> {
+    protected static class IVCount implements Comparable<IVCount> {
 
-        public final IV<?,?> iv;
-        
+        public final IV<?, ?> iv;
+
         public final long count;
 
         private BigdataValue val;
@@ -677,16 +977,21 @@ public class SD {
         }
         
     }
-    
+
     /**
      * Return an array of the distinct predicates in the KB ordered by their
      * descending frequency of use. The {@link IV}s in the returned array will
      * have been resolved to the corresponding {@link BigdataURI}s which can be
      * accessed using {@link IV#getValue()}.
+     * 
+     * @param kb
+     *            The KB instance.
      */
-    private static IVCount[] predicateUsage(final AbstractTripleStore kb) {
+    protected static IVCount[] predicateUsage(final AbstractTripleStore kb) {
 
-        if (kb.getSPORelation().oneAccessPath) {
+        final SPORelation r = kb.getSPORelation();
+        
+        if (r.oneAccessPath) {
 
             // The necessary index (POS or POCS) does not exist.
             throw new UnsupportedOperationException();
@@ -695,10 +1000,12 @@ public class SD {
 
         final boolean quads = kb.isQuads();
 
-        // visit distinct term identifiers for the predicate position.
+        // the index to use for distinct predicate scan.
+        final SPOKeyOrder keyOrder = quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS;
+
+        // visit distinct term identifiers for predicate position on that index.
         @SuppressWarnings("rawtypes")
-        final IChunkedIterator<IV> itr = kb.getSPORelation().distinctTermScan(
-                quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
+        final IChunkedIterator<IV> itr = r.distinctTermScan(keyOrder);
 
         // resolve term identifiers to terms efficiently during iteration.
         final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
@@ -716,8 +1023,7 @@ public class SD {
 
                 final IV<?,?> iv = term.getIV();
 
-                final long n = kb.getSPORelation()
-                        .getAccessPath(null, iv, null, null)
+                final long n = r.getAccessPath(null, iv, null, null)
                         .rangeCount(false/* exact */);
 
                 ivs.add(iv);
@@ -755,6 +1061,61 @@ public class SD {
     }
 
     /**
+     * Return the predicate partition statistics for the named graph.
+     * 
+     * @param kb
+     *            The KB instance.
+     * @param civ
+     *            The {@link IV} of a named graph (required).
+     * 
+     * @return The predicate partition statistics for that named graph. Only
+     *         predicate partitions which are non-empty are returned.
+     */
+    protected static IVCount[] predicateUsage(final AbstractTripleStore kb,
+            final IV<?, ?> civ, final IVCount[] predicatePartitionCounts) {
+        
+        final SPORelation r = kb.getSPORelation();
+
+        final boolean quads = kb.isQuads();
+        
+        if (!quads) {
+            
+            // Named graph only valid in quads mode.
+            throw new IllegalArgumentException();
+        
+        }
+
+        // The non-zero counts.
+        final List<IVCount> counts = new LinkedList<IVCount>();
+
+        // Check the known non-empty predicate partitions.
+        for(IVCount in : predicatePartitionCounts){
+
+            final long n = r.getAccessPath(null, in.iv, null, civ).rangeCount(
+                    false/* exact */);
+
+            if (n == 0)
+                continue;
+
+            final IVCount out = new IVCount(in.iv, n);
+
+            out.setValue(in.getValue());
+            
+            counts.add(out);
+
+        }
+        
+
+        final IVCount[] a = counts.toArray(new IVCount[counts.size()]);
+
+        // Order by descending count.
+        Arrays.sort(a);
+
+        return a;
+
+    }
+    
+    /**
      * Return an efficient statistical summary for the class partitions. The
      * SPARQL query for this is
      * 
@@ -781,9 +1142,11 @@ public class SD {
      *            
      * @return The class usage statistics.
      */
-    private static IVCount[] classUsage(final AbstractTripleStore kb) {
+    protected static IVCount[] classUsage(final AbstractTripleStore kb) {
 
-        if (kb.getSPORelation().oneAccessPath) {
+        final SPORelation r = kb.getSPORelation();
+
+        if (r.oneAccessPath) {
 
             // The necessary index (POS or POCS) does not exist.
             throw new UnsupportedOperationException();
@@ -809,9 +1172,8 @@ public class SD {
         
         // visit distinct term identifiers for the rdf:type predicate.
         @SuppressWarnings("rawtypes")
-        final IChunkedIterator<IV> itr = kb
-                .getSPORelation()
-                .distinctMultiTermScan(keyOrder, new IV[] { rdfType.getIV() }/* knownTerms */);
+        final IChunkedIterator<IV> itr = r.distinctMultiTermScan(keyOrder,
+                new IV[] { rdfType.getIV() }/* knownTerms */);
 
         // resolve term identifiers to terms efficiently during iteration.
         final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
@@ -829,10 +1191,8 @@ public class SD {
 
                 final IV<?,?> iv = term.getIV();
 
-                final long n = kb
-                        .getSPORelation()
-                        .getAccessPath(null, rdfType.getIV()/* p */, iv/* o */,
-                                null).rangeCount(false/* exact */);
+                final long n = r.getAccessPath(null, rdfType.getIV()/* p */,
+                        iv/* o */, null).rangeCount(false/* exact */);
 
                 ivs.add(iv);
                 
@@ -865,6 +1225,73 @@ public class SD {
             itr2.close();
 
         }
+
+    }
+
+    /**
+     * Return the class partition statistics for the named graph.
+     * 
+     * @param kb
+     *            The KB instance.
+     * @param civ
+     *            The {@link IV} of a named graph (required).
+     * 
+     * @return The class partition statistics for that named graph. Only class
+     *         partitions which are non-empty are returned.
+     */
+    protected static IVCount[] classUsage(final AbstractTripleStore kb,
+            final IV<?, ?> civ, final IVCount[] classPartitionCounts) {
+
+        final SPORelation r = kb.getSPORelation();
+
+        final boolean quads = kb.isQuads();
+
+        if (!quads) {
+
+            // Named graph only valid in quads mode.
+            throw new IllegalArgumentException();
+
+        }
+
+        // Resolve IV for rdf:type
+        final BigdataURI rdfType = kb.getValueFactory().asValue(RDF.TYPE);
+
+        kb.getLexiconRelation().addTerms(new BigdataValue[] { rdfType },
+                1/* numTerms */, true/* readOnly */);
+
+        if (rdfType.getIV() == null) {
+
+            // No rdf:type assertions since rdf:type is unknown term.
+            return new IVCount[0];
+
+        }
+
+        // The non-zero counts.
+        final List<IVCount> counts = new LinkedList<IVCount>();
+
+        // Check the known non-empty predicate partitions.
+        for (IVCount in : classPartitionCounts) {
+
+            final long n = r.getAccessPath(null, rdfType.getIV()/* p */,
+                    in.iv/* o */, civ).rangeCount(false/* exact */);
+
+            if (n == 0)
+                continue;
+            
+            final IVCount out = new IVCount(in.iv, n);
+
+            out.setValue(in.getValue());
+
+            counts.add(out);
+
+        }
+
+        final IVCount[] a = counts.toArray(new IVCount[counts.size()]);
+
+        // Order by descending count.
+        Arrays.sort(a);
+
+        return a;
 
     }
 
