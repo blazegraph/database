@@ -3,20 +3,23 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 
-import org.openrdf.http.server.repository.GraphQueryResultView;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
@@ -64,24 +67,56 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         final ValueFactory f = g.getValueFactory();
 
         // Verify the end point is disclosed.
-        assertTrue(g.contains(f.createStatement(SD.Service, SD.endpoint,
-                f.createURI(m_serviceURL))));
+        assertEquals(
+                1,
+                countMatches(g, null/* service*/, SD.endpoint,
+                        f.createURI(m_serviceURL)));
 
         // Verify description includes supported query and update languages.
-        assertTrue(g.contains(f.createStatement(SD.Service,
-                SD.supportedLanguage, SD.SPARQL10Query)));
-        assertTrue(g.contains(f.createStatement(SD.Service,
-                SD.supportedLanguage, SD.SPARQL11Query)));
-        assertTrue(g.contains(f.createStatement(SD.Service,
-                SD.supportedLanguage, SD.SPARQL11Update)));
+        assertEquals(
+                1,
+                countMatches(g, null/* service */, SD.supportedLanguage,
+                        SD.SPARQL10Query));
+        assertEquals(
+                1,
+                countMatches(g, null/* service */, SD.supportedLanguage,
+                        SD.SPARQL11Query));
+        assertEquals(
+                1,
+                countMatches(g, null/* service */, SD.supportedLanguage,
+                        SD.SPARQL11Update));
 
         // Verify support for Basic Federated Query is disclosed.
-        assertTrue(g.contains(f.createStatement(SD.Service, SD.feature,
-                SD.BasicFederatedQuery)));
+        assertEquals(
+                1,
+                countMatches(g, null/* service */, SD.feature,
+                        SD.BasicFederatedQuery));
 
     }
 
-	/**
+    /**
+     * Count matches of the triple pattern.
+     */
+    private int countMatches(final Graph g, final Resource s, final URI p,
+            final Value o) {
+
+        int n = 0;
+
+        final Iterator<Statement> itr = g.match(s, p, o);
+
+        while (itr.hasNext()) {
+
+            itr.next();
+            
+            n++;
+
+        }
+
+        return n;
+
+    }
+
+    /**
      * "ASK" query with an empty KB.
      */
     public void test_ASK() throws Exception {
