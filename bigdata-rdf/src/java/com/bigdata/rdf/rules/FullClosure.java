@@ -147,6 +147,13 @@ public class FullClosure extends BaseClosure {
 
             }
 
+            if (enableOwlFunctionalAndInverseFunctionalProperty) {
+                
+            	program.addStep(new RuleOwlFunctionalProperty(db, vocab));
+            	program.addStep(new RuleOwlInverseFunctionalProperty(db, vocab));
+
+            }
+            
             // add the custom rules
             final List<Rule> custom = getCustomRules(db);
             for (Rule r : custom) {
