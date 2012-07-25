@@ -264,6 +264,19 @@ public class InferenceEngine {
 
         String DEFAULT_FORWARD_CHAIN_OWL_SYMMETRIC_PROPERTY = "true";
 
+        /**
+		 * When <code>true</code> (default
+		 * {@value #DEFAULT_ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY}
+		 * ) the data is tested for violations of owl:FunctionalProperty and
+		 * owl:InverseFunctionalProperty. When this is enabled, closure will
+		 * fail if violations are found in the data.
+		 */
+        String ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY = InferenceEngine.class
+                .getName()
+                + ".enableOwlFunctionalAndInverseFunctionalProperty";
+
+        String DEFAULT_ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY = "false";
+
     }
 
     /**
@@ -306,6 +319,7 @@ public class InferenceEngine {
             this.forwardChainOwlTransitiveProperty = false;
             this.forwardChainOwlHasValue = false;
             this.forwardChainOwlSymmetricProperty = false;
+            this.enableOwlFunctionalAndInverseFunctionalProperty = false;
             
         } else {
             
@@ -387,6 +401,15 @@ public class InferenceEngine {
 		    if(INFO)
 		    log.info(Options.FORWARD_CHAIN_OWL_SYMMETRIC_PROPERTY + "="
 		            + forwardChainOwlSymmetricProperty);
+
+            this.enableOwlFunctionalAndInverseFunctionalProperty = Boolean
+		            .parseBoolean(properties.getProperty(
+		                    Options.ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY,
+		                    Options.DEFAULT_ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY));
+		    
+		    if(INFO)
+		    log.info(Options.ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY + "="
+		            + enableOwlFunctionalAndInverseFunctionalProperty);
 
         }
         
@@ -478,6 +501,13 @@ public class InferenceEngine {
      * When <code>false</code>, those entailments will NOT be available.
      */
     final protected boolean forwardChainOwlSymmetricProperty;
+    
+    /**
+     * Set based on {@link Options#ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY}. When
+     * <code>true</code>, we will test for violations of owl:FunctionalProperty and
+     * owl:InverseFunctionalProperty.
+     */
+    final protected boolean enableOwlFunctionalAndInverseFunctionalProperty;
     
     /**
      * Compute the forward closure of a focusStore against the database using

@@ -316,6 +316,13 @@ public class FastClosure extends BaseClosure {
                 }
 
             }
+            
+            if (enableOwlFunctionalAndInverseFunctionalProperty) {
+                
+            	program.addStep(new RuleOwlFunctionalProperty(db, vocab));
+            	program.addStep(new RuleOwlInverseFunctionalProperty(db, vocab));
+
+            }
 
         }
         
