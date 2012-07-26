@@ -76,7 +76,15 @@ public interface IResourceLocator<T extends ILocatableResource> {
      * will be returned from the cache and buffered writes on the indices for
      * those relations (if they are local index objects) will still be visible,
      * thus defeating the abort semantics.
+     * 
+     * @param instance
+     *            The instance whose cached references should be discarded.
+     * @param destroyed
+     *            <code>true</code> iff the resource was destroyed, in which
+     *            case the read-committed and unisolated views must also be
+     *            discarded even if they do not correspond to the
+     *            <i>instance</i>.
      */
-    public void discard(final ILocatableResource<T> instance);
+    public void discard(final ILocatableResource<T> instance,boolean destroyed);
     
 }
