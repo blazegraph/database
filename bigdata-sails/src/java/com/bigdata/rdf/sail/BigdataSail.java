@@ -724,7 +724,7 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
-    private static void checkProperties(Properties properties) 
+    private static void checkProperties(final Properties properties) 
             throws UnsupportedOperationException {
     
         final boolean quads = Boolean.parseBoolean(properties.getProperty(
