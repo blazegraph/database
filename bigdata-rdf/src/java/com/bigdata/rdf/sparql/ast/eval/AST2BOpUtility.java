@@ -677,7 +677,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * getting N empty solutions out when we run N named subqueries with
              * no dependencies. This is demonstrated by TestSubQuery in the
              * "named-subquery-scope" test case. While that test was written to
-             * test something else, it happens to trigger this bug as well.
+             * test something else, it happens to trigger this bug as well. This
+             * could be fixed by a count down latch operator which also gets the
+             * original inputs, waits until N named subqueries have completed,
+             * and then sends the original inputs to the next operator in the
+             * pipeline. This is the signal that the main query (or the next
+             * named subquery) can now execute.
              */
             if (dependsOn.length == 0 && false)
                 runFirst.add(subqueryRoot);
@@ -2651,7 +2656,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                      * variables. However, we need to model the MERGE JOIN in
                      * the AST in order to do that since, by this time, we have
                      * already generated the physical query plan for the named
-                     * subquery and the join vars are backed into that plan.
+                     * subquery and the join vars are baked into that plan.
                      */
                     break;
                 }
