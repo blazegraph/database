@@ -1,0 +1,2 @@
+com.bigdata.rdf.properties.xml.PropertiesXMLParserFactory
+com.bigdata.rdf.properties.text.PropertiesTextParserFactory

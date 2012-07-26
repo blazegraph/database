@@ -56,17 +56,21 @@ public class PropertyUtil
 {
 
     /**
-     * Return a flatten copy of the specified {@link Properties}.  The
-     * returned object does not share any structure with the source
-     * object, but it does share key and value references.  Since keys
-     * and values are {@link String}s for a {@link Properties} instance
-     * this SHOULD NOT be a problem. The behavior is equivilent to:
+     * Return a flatten copy of the specified {@link Properties}. The returned
+     * object does not share any structure with the source object, but it does
+     * share key and value references. Since keys and values are {@link String}s
+     * for a {@link Properties} instance this SHOULD NOT be a problem. The
+     * behavior is equivalent to:
+     * 
      * <pre>
      * Properties tmp = new Properties();
-     * tmp.putAll( flatten( props ) );
+     * tmp.putAll(flatten(props));
      * </pre>
      * 
-     * @param props The properties to be flattened and copied.
+     * except that it handles <code>null</code> values.
+     * 
+     * @param props
+     *            The properties to be flattened and copied.
      * 
      * @return A flat copy.
      */
@@ -76,8 +80,29 @@ public class PropertyUtil
         
         final Properties tmp = new Properties();
 
-        tmp.putAll( flatten( props ) );
+//        tmp.putAll( flatten( props ) );
 
+        final Map<String, Object> map = flatten(props);
+
+        for(Map.Entry<String,Object> e : map.entrySet()) {
+            
+            final String name = e.getKey();
+            
+            final Object val = e.getValue();
+
+//            if (val == null || !(val instanceof String)) {
+//                System.err.println("name=" + name + ", val=" + val);
+//            }
+
+            if (val != null) {
+
+                // Note: Hashtable does not allow nulls.
+                tmp.put(name, val);
+
+            }
+
+        }
+        
         return tmp;
         
     }

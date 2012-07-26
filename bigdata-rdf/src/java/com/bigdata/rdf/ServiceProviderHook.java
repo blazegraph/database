@@ -124,6 +124,24 @@ public class ServiceProviderHook {
             r.add(new BigdataRDFXMLWriterFactory());
 
         }
+
+//        {
+//            final PropertiesParserRegistry r = PropertiesParserRegistry.getInstance();
+//            
+//            r.add(new PropertiesXMLParserFactory());
+//            
+//            r.add(new PropertiesTextParserFactory());
+//            
+//        }
+//        
+//        {
+//            final PropertiesWriterRegistry r = PropertiesWriterRegistry.getInstance();
+//            
+//            r.add(new PropertiesXMLWriterFactory());
+//            
+//            r.add(new PropertiesTextWriterFactory());
+//            
+//        }
         
         loaded = true;
         
