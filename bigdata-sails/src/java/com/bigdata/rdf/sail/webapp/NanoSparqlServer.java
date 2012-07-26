@@ -30,10 +30,12 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.webapp.WebAppContext;
 import org.openrdf.rio.RDFParser;
 
 import com.bigdata.Banner;
@@ -275,11 +277,23 @@ public class NanoSparqlServer {
                     Long.toString(readLock));
         }
 
+        // Create the service.
         final Server server = NanoSparqlServer.newInstance(port, propertyFile,
                 initParams);
 
+        // Start the service.
         server.start();
 
+        /*
+         * Report the effective URL of this service.
+         * 
+         * TODO This is only the effective local URL (and only one of them, and
+         * even then only one for the first connector). It does not reflect any
+         * knowledge about the desired external deployment URL for the service
+         * end point. That should probably be directly configured so it can be
+         * exposed correctly for VoID and ServiceDescription responses.
+         */
+        final String serviceURL;
         {
 
             final int actualPort = server.getConnectors()[0].getLocalPort();
@@ -293,13 +307,14 @@ public class NanoSparqlServer {
 
             }
 
-            final String serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
+            serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
                     .toExternalForm();
 
             System.out.println("serviceURL: " + serviceURL);
 
         }
         
+        // Wait for the service to terminate.
         server.join();
 
     }
@@ -317,6 +332,9 @@ public class NanoSparqlServer {
      *            by {@link ConfigParams}.
      * 
      * @return The server instance.
+     * 
+     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+     *      Embedding Jetty </a>
      */
     static public Server newInstance(final int port,
             final IIndexManager indexManager,
@@ -363,23 +381,50 @@ public class NanoSparqlServer {
      *            by {@link ConfigParams}.
      * 
      * @return The server instance.
+     * 
+     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+     *      Embedding Jetty </a>
      */
     static public Server newInstance(final int port, final String propertyFile,
             final Map<String, String> initParams) {
 
         final Server server = new Server(port);
 
-        final ServletContextHandler context = getContextHandler(server,initParams);
-        
+        final ServletContextHandler context = getContextHandler(server,
+                initParams);
+
         final HandlerList handlers = new HandlerList();
 
+        /* TODO The webappHandler should be able to handle this also if
+         * we put the JSP pages into the top-level directory.
+         */
         final ResourceHandler resourceHandler = new ResourceHandler();
         
         setupStaticResources(server, resourceHandler);
-        
+
+        /**
+         * FIXME The WebAppContext is resulting in a
+         * "JSP Support not Configured" message (500 status code). Try this
+         * using the JSPServlet instead and/or in addition.
+         * 
+         * FIXME Also support this in the alternative newInstance() method
+         * above.
+         * 
+         * @see <a
+         *      href="http://thinking.awirtz.com/2011/11/03/embedded-jetty-servlets-and-jsp/">
+         *      embedded jetty servlets and jsp </a>
+         */
+////        final URL warUrl = this.class.getClassLoader().getResource(WEBAPPDIR);
+////        final String warUrlString = warUrl.toExternalForm();
+////        final WebAppContext webappHandler = new WebAppContext(warUrlString, CONTEXTPATH);
+//        final URL warUrl = getStaticResourceURL(server, "jsp"/* path */);
+//        final WebAppContext webappHandler = new WebAppContext(
+//                warUrl.toExternalForm(), "/jsp");
+
         handlers.setHandlers(new Handler[] {
                 context,//
                 resourceHandler,//
+//                webappHandler,
 //                new DefaultHandler()//
                 });
 
@@ -391,6 +436,9 @@ public class NanoSparqlServer {
 
     /**
      * Construct a {@link ServletContextHandler}.
+     * <p>
+     * Note: The {@link ContextHandler} uses the longest prefix of the request
+     * URI (the contextPath) to select a specific {@link Handler}.
      * 
      * @param initParams
      *            The init parameters, per the web.xml definition.
@@ -404,7 +452,8 @@ public class NanoSparqlServer {
         
         final ServletContextHandler context = new ServletContextHandler(
                 ServletContextHandler.NO_SECURITY
-                        | ServletContextHandler.NO_SESSIONS);
+//                        | ServletContextHandler.NO_SESSIONS
+                        );
 
 //        /*
 //         * Setup resolution for the static web app resources (index.html).
@@ -436,6 +485,24 @@ public class NanoSparqlServer {
         // Core RDF REST API, including SPARQL query and update.
         context.addServlet(new ServletHolder(new RESTServlet()), "/sparql/*");
 
+        // Multi-Tenancy API.
+        context.addServlet(new ServletHolder(new MultiTenancyServlet()),
+                "/namespace/*");
+        
+        /**
+         * Note: JSP pages for the servlet 2.5 specification add the following
+         * dependencies:
+         * 
+         * <pre>
+         *     ant-1.6.5.jar
+         *     core-3.1.1.jar
+         *     jsp-2.1.jar
+         *     jsp-api-2.1.jar
+         * </pre>
+         * 
+         * @see http://docs.codehaus.org/display/JETTY/Embedding+Jetty
+         */
+
 //        context.setResourceBase("bigdata-war/src/html");
 //        
 //        context.setWelcomeFiles(new String[]{"index.html"});
@@ -455,7 +522,7 @@ public class NanoSparqlServer {
     private static void setupStaticResources(final Server server,
             final ServletContextHandler context) {
 
-        final URL url = getStaticResourceURL(server);
+        final URL url = getStaticResourceURL(server, "html");
 
         if(url != null) {
 
@@ -482,7 +549,7 @@ public class NanoSparqlServer {
 
         context.setDirectoriesListed(false); // Nope!
 
-        final URL url = getStaticResourceURL(server);
+        final URL url = getStaticResourceURL(server, "html");
 
         if(url != null) {
             
@@ -520,32 +587,33 @@ public class NanoSparqlServer {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
      */
-    private static URL getStaticResourceURL(final Server server) {
+    private static URL getStaticResourceURL(final Server server, final String path) {
         
         /*
          * This is the resource path in the JAR.
          */
-        final String WEB_DIR_JAR = "bigdata-war/src/html";
+        final String WEB_DIR_JAR = "bigdata-war/src"
+                + (path == null ? "" : "/" + path);
 
         /*
          * This is the resource path in the IDE when NOT using the JAR.
          * 
          * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
          */
-        final String WEB_DIR_IDE = "html";
+        final String WEB_DIR_IDE = path; // "html";
 
         URL url = server.getClass().getClassLoader().getResource(WEB_DIR_JAR);
 
-        if (url == null) {
+        if (url == null && path != null) {
 
-            url = server.getClass().getClassLoader().getResource("html");
+            url = server.getClass().getClassLoader().getResource(path);// "html");
 
         }
 
         if (url == null) {
 
-            log.error("Could not locate: " + WEB_DIR_JAR + " -or- "
-                    + WEB_DIR_IDE);
+            log.error("Could not locate: " + WEB_DIR_JAR + ", " + WEB_DIR_IDE
+                    + ", -or- " + path);
         }
 
         return url;

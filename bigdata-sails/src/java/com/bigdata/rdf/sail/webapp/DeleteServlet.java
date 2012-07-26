@@ -132,7 +132,12 @@ public class DeleteServlet extends BigdataRDFServlet {
                 final AbstractQueryTask queryTask = getBigdataRDFContext()
                         .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
                                 format.getDefaultMIMEType(),
-                                req, os, false/*update*/);
+                                req, resp, os, false/*update*/);
+
+                if(queryTask == null) {
+                    // KB not found. Response already committed.
+                    return;
+                }
 
                 switch (queryTask.queryType) {
                 case DESCRIBE:

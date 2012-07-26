@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -1100,9 +1101,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @param update
      *            <code>true</code> iff this is a SPARQL UPDATE request.
      * 
-     * @return The task.
-     * 
-     * @throws MalformedQueryException
+     * @return The task -or- <code>null</code> if the named data set was not
+     *         found. When <code>null</code> is returned, the
+     *         {@link HttpServletResponse} will also have been committed.
+     * @throws IOException 
      */
     public AbstractQueryTask getQueryTask(//
             final String namespace,//
@@ -1110,14 +1112,27 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String queryStr,//
             final String acceptOverride,//
             final HttpServletRequest req,//
+            final HttpServletResponse resp,//
             final OutputStream os,//
             final boolean update//
-            ) throws MalformedQueryException {
+            ) throws MalformedQueryException, IOException {
 
         /*
          * Setup the baseURI for this request. It will be set to the requestURI.
          */
         final String baseURI = req.getRequestURL().toString();
+
+        final AbstractTripleStore tripleStore = getTripleStore(namespace,
+                timestamp);
+
+        if (tripleStore == null) {
+            /*
+             * There is no such triple/quad store instance.
+             */
+            BigdataServlet.buildResponse(resp, BigdataServlet.HTTP_NOTFOUND,
+                    BigdataServlet.MIME_TEXT_PLAIN);
+            return null;
+        }
 
         if (update) {
 
@@ -1129,8 +1144,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * the query parser.
              */
             final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                    getTripleStore(namespace, timestamp)).parseUpdate2(
-                    queryStr, baseURI);
+                    tripleStore).parseUpdate2(queryStr, baseURI);
 
             if (log.isDebugEnabled())
                 log.debug(astContainer.toString());
@@ -1148,8 +1162,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * the query parser.
          */
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                getTripleStore(namespace, timestamp)).parseQuery2(queryStr,
-                baseURI);
+                tripleStore).parseQuery2(queryStr, baseURI);
 
         if (log.isDebugEnabled())
             log.debug(astContainer.toString());
@@ -1280,6 +1293,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
         final AbstractTripleStore tripleStore = getTripleStore(namespace,
                 timestamp);
         
+        if (tripleStore == null) {
+
+            throw new DatasetNotFoundException("Not found: namespace="
+                    + namespace + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
+
+        }
+        
         // Wrap with SAIL.
         final BigdataSail sail = new BigdataSail(tripleStore);
 
@@ -1313,7 +1334,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @param timestamp
      *            The timestamp.
      * 
-     * @throws RepositoryException
+     * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
+     *         found for that namespace and timestamp.
      * 
      * @todo enforce historical query by making sure timestamps conform (we do
      *       not want to allow read/write tx queries unless update semantics are
@@ -1324,20 +1346,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     public AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
-        
+
 //        if (timestamp == ITx.UNISOLATED)
 //            throw new IllegalArgumentException("UNISOLATED reads disallowed.");
 
         // resolve the default namespace.
         final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
                 .getResourceLocator().locate(namespace, timestamp);
-
-        if (tripleStore == null) {
-
-            throw new RuntimeException("Not found: namespace=" + namespace
-                    + ", timestamp=" + TimestampUtility.toString(timestamp));
-
-        }
 
         return tripleStore;
         

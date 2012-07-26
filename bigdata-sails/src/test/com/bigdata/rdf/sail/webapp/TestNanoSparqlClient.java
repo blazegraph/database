@@ -3,17 +3,12 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 
-import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -29,6 +24,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.store.BD;
@@ -61,16 +57,17 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
      * Request the SPARQL SERVICE DESCRIPTION for the end point.
      */
     public void test_SERVICE_DESCRIPTION() throws Exception {
-        
-        final Graph g = m_repo.getServiceDescription();
+
+        final Graph g = RemoteRepository
+                .asGraph(m_repo.getServiceDescription());
 
         final ValueFactory f = g.getValueFactory();
 
         // Verify the end point is disclosed.
         assertEquals(
                 1,
-                countMatches(g, null/* service*/, SD.endpoint,
-                        f.createURI(m_serviceURL)));
+                countMatches(g, null/* service */, SD.endpoint,
+                        f.createURI(m_serviceURL + "/sparql")));
 
         // Verify description includes supported query and update languages.
         assertEquals(
@@ -91,28 +88,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
                 1,
                 countMatches(g, null/* service */, SD.feature,
                         SD.BasicFederatedQuery));
-
-    }
-
-    /**
-     * Count matches of the triple pattern.
-     */
-    private int countMatches(final Graph g, final Resource s, final URI p,
-            final Value o) {
-
-        int n = 0;
-
-        final Iterator<Statement> itr = g.match(s, p, o);
-
-        while (itr.hasNext()) {
-
-            itr.next();
-            
-            n++;
-
-        }
-
-        return n;
 
     }
 

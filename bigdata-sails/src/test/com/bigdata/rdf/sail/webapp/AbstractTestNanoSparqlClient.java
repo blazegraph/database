@@ -82,6 +82,7 @@ import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -124,7 +125,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     /**
      * The client-API wrapper to the NSS.
      */
-    protected RemoteRepository m_repo;
+    protected RemoteRepositoryManager m_repo;
 
     /**
 	 * The effective {@link NanoSparqlServer} http end point.
@@ -273,8 +274,10 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, "/sparql"/* file */)
-                .toExternalForm();
+        m_serviceURL = new URL("http", hostAddr, port, //
+                "" // file
+//              "/sparql/"// file
+        ).toExternalForm();
 
         if (log.isInfoEnabled())
             log.info("Setup done: name=" + getName() + ", namespace="
@@ -287,7 +290,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         m_cm = DefaultClientConnectionManagerFactory.getInstance()
                 .newInstance();
 
-        m_repo = new RemoteRepository(m_serviceURL,
+        m_repo = new RemoteRepositoryManager(m_serviceURL,
                 new DefaultHttpClient(m_cm),
                 m_indexManager.getExecutorService());
 

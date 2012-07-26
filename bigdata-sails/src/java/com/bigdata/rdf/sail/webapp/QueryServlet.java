@@ -44,15 +44,10 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFWriter;
-import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -176,9 +171,30 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
 
-        // Figure out the service end point.
-        final String serviceURI = getServiceURI(req);
+        /*
+         * Figure out the service end point.
+         * 
+         * Note: This code to figure out the service end point is a hack. It
+         * tends to work for the special case of ServiceDescription because
+         * there is an identity between the request URL and the service end
+         * point in this special case.
+         */
         
+        final String serviceURI;
+        {
+            
+            final StringBuffer sb = req.getRequestURL();
+
+            final int indexOf = sb.indexOf("?");
+
+            if (indexOf == -1) {
+                serviceURI = sb.toString();
+            } else {
+                serviceURI = sb.substring(0, indexOf);
+            }
+
+        }
+
         /*
          * TODO Resolve the SD class name and ctor via a configuration property
          * for extensible descriptions.
@@ -188,80 +204,18 @@ public class QueryServlet extends BigdataRDFServlet {
 
             final SD sd = new SD(g, tripleStore, serviceURI);
 
-            sd.describeService(getBigdataRDFContext().getConfig().describeEachNamedGraph);
+            final SparqlEndpointConfig config = getBigdataRDFContext()
+                    .getConfig();
+
+            sd.describeService(true/* describeStatistics */,
+                    config.describeEachNamedGraph);
 
         }
 
-        /*
-         * CONNEG for the MIME type.
-         * 
-         * Note: An attempt to CONNEG for a MIME type which can not be used with
-         * a give type of query will result in a response using a default MIME
-         * Type for that query.
-         * 
-         * TODO We could also do RDFa embedded in XHTML.
-         */
-        {
+        sendGraph(req, resp, g);
 
-            final String acceptStr = req.getHeader("Accept");
-
-            final ConnegUtil util = new ConnegUtil(acceptStr);
-
-            // The best RDFFormat for that Accept header. 
-            RDFFormat format = util.getRDFFormat();
-            
-            if (format == null)
-                format = RDFFormat.RDFXML;
-
-            resp.setStatus(HTTP_OK);
-
-            resp.setContentType(format.getDefaultMIMEType());
-
-            final OutputStream os = resp.getOutputStream();
-            try {
-                final RDFWriter writer = RDFWriterRegistry.getInstance()
-                        .get(format).getWriter(os);
-                writer.startRDF();
-                final Iterator<Statement> itr = g.iterator();
-                while (itr.hasNext()) {
-                    final Statement stmt = itr.next();
-                    writer.handleStatement(stmt);
-                }
-                writer.endRDF();
-                os.flush();
-            } catch (RDFHandlerException e) {
-                log.error(e, e);
-                throw launderThrowable(e, resp, "");
-            } finally {
-                os.close();
-            }
-        }
     }
 
-    /**
-     * Return <code>true</code> if the <code>Content-disposition</code> header
-     * should be set to indicate that the response body should be handled as an
-     * attachment rather than presented inline. This is just a hint to the user
-     * agent. How the user agent handles this hint is up to it.
-     * 
-     * @param mimeType
-     *            The mime type.
-     *            
-     * @return <code>true</code> if it should be handled as an attachment.
-     */
-    private boolean isAttachment(final String mimeType) {
-        if(mimeType.equals(MIME_TEXT_PLAIN)) {
-            return false;
-        } else if(mimeType.equals(MIME_SPARQL_RESULTS_XML)) {
-            return false;
-        } else if(mimeType.equals(MIME_SPARQL_RESULTS_JSON)) {
-            return false;
-        } else if(mimeType.equals(MIME_APPLICATION_XML)) {
-            return false;
-        }
-        return true;
-    }
-    
     /**
      * Handles SPARQL UPDATE.
      * 
@@ -314,13 +268,21 @@ public class QueryServlet extends BigdataRDFServlet {
 
             final UpdateTask updateTask;
             try {
+
                 /*
                  * Attempt to construct a task which we can use to evaluate the
                  * query.
                  */
+                
                 updateTask = (UpdateTask) context.getQueryTask(namespace,
                         timestamp, updateStr, null/* acceptOverride */, req,
-                        os, true/* update */);
+                        resp, os, true/* update */);
+                
+                if(updateTask == null) {
+                    // KB not found. Response already committed.
+                    return;
+                }
+                
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the
@@ -464,13 +426,21 @@ public class QueryServlet extends BigdataRDFServlet {
 
             final AbstractQueryTask queryTask;
             try {
+                
                 /*
                  * Attempt to construct a task which we can use to evaluate the
                  * query.
                  */
-                queryTask = context
-                        .getQueryTask(namespace, timestamp, queryStr,
-                                null/* acceptOverride */, req, os, false/* update */);
+                
+                queryTask = context.getQueryTask(namespace, timestamp,
+                        queryStr, null/* acceptOverride */, req, resp, os,
+                        false/* update */);
+                
+                if(queryTask == null) {
+                    // KB not found. Response already committed.
+                    return;
+                }
+                
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the

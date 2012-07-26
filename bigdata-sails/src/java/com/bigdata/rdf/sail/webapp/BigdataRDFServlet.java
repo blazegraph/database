@@ -33,14 +33,25 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Iterator;
+import java.util.Properties;
 
 import javax.servlet.Servlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Graph;
+import org.openrdf.model.Statement;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.journal.IAtomicStore;
+import com.bigdata.rdf.properties.PropertiesFormat;
+import com.bigdata.rdf.properties.PropertiesWriter;
+import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 
 /**
  * Abstract base class for {@link Servlet}s which interact with the bigdata RDF
@@ -313,5 +324,120 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
+    
+    /**
+     * Send an RDF Graph as a response using content negotiation.
+     * 
+     * @param req
+     * @param resp
+     */
+    protected void sendGraph(final HttpServletRequest req,
+            final HttpServletResponse resp, final Graph g) throws IOException {
+        /*
+         * CONNEG for the MIME type.
+         */
+        {
 
+            final String acceptStr = req.getHeader("Accept");
+
+            final ConnegUtil util = new ConnegUtil(acceptStr);
+
+            // The best RDFFormat for that Accept header. 
+            RDFFormat format = util.getRDFFormat();
+            
+            if (format == null)
+                format = RDFFormat.RDFXML;
+
+            resp.setStatus(HTTP_OK);
+
+            resp.setContentType(format.getDefaultMIMEType());
+
+            final OutputStream os = resp.getOutputStream();
+            try {
+                final RDFWriter writer = RDFWriterRegistry.getInstance()
+                        .get(format).getWriter(os);
+                writer.startRDF();
+                final Iterator<Statement> itr = g.iterator();
+                while (itr.hasNext()) {
+                    final Statement stmt = itr.next();
+                    writer.handleStatement(stmt);
+                }
+                writer.endRDF();
+                os.flush();
+            } catch (RDFHandlerException e) {
+                log.error(e, e);
+                throw launderThrowable(e, resp, "");
+            } finally {
+                os.close();
+            }
+        }
+    }
+
+    /**
+     * Send a properties file as a response using content negotiation.
+     * 
+     * @param req
+     * @param resp
+     */
+    protected void sendProperties(final HttpServletRequest req,
+            final HttpServletResponse resp, final Properties properties)
+            throws IOException {
+        /*
+         * CONNEG for the MIME type.
+         */
+        {
+
+            final String acceptStr = req.getHeader("Accept");
+
+            final ConnegUtil util = new ConnegUtil(acceptStr);
+
+            // The best format for that Accept header. 
+            PropertiesFormat format = util.getPropertiesFormat();
+            
+            if (format == null)
+                format = PropertiesFormat.XML;
+
+            resp.setStatus(HTTP_OK);
+
+            resp.setContentType(format.getDefaultMIMEType());
+
+            final OutputStream os = resp.getOutputStream();
+            try {
+                final PropertiesWriter writer = PropertiesWriterRegistry.getInstance()
+                        .get(format).getWriter(os);
+                writer.write(properties);
+                os.flush();
+            } catch (IOException e) {
+                log.error(e, e);
+                throw launderThrowable(e, resp, "");
+            } finally {
+                os.close();
+            }
+        }
+    }
+
+    /**
+     * Return <code>true</code> if the <code>Content-disposition</code> header
+     * should be set to indicate that the response body should be handled as an
+     * attachment rather than presented inline. This is just a hint to the user
+     * agent. How the user agent handles this hint is up to it.
+     * 
+     * @param mimeType
+     *            The mime type.
+     *            
+     * @return <code>true</code> if it should be handled as an attachment.
+     */
+    protected static boolean isAttachment(final String mimeType) {
+        if(mimeType.equals(MIME_TEXT_PLAIN)) {
+            return false;
+        } else if(mimeType.equals(MIME_SPARQL_RESULTS_XML)) {
+            return false;
+        } else if(mimeType.equals(MIME_SPARQL_RESULTS_JSON)) {
+            return false;
+        } else if(mimeType.equals(MIME_APPLICATION_XML)) {
+            return false;
+        }
+        return true;
+    }
+    
 }

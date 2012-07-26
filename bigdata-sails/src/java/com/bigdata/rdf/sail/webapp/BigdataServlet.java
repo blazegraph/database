@@ -99,6 +99,9 @@ abstract public class BigdataServlet extends HttpServlet {
 		MIME_TEXT_PLAIN = "text/plain",
 		MIME_TEXT_HTML = "text/html",
 //		MIME_TEXT_XML = "text/xml",
+        /**
+         * General purpose binary <code>application/octet-stream</code>.
+         */
 		MIME_DEFAULT_BINARY = "application/octet-stream",
         MIME_APPLICATION_XML = "application/xml",
         MIME_TEXT_JAVASCRIPT = "text/javascript",
@@ -138,7 +141,7 @@ abstract public class BigdataServlet extends HttpServlet {
 //        
 //    }
     
-    static protected void buildResponse(final HttpServletResponse resp,
+    static public void buildResponse(final HttpServletResponse resp,
             final int status, final String mimeType) throws IOException {
 
         resp.setStatus(status);
@@ -147,7 +150,7 @@ abstract public class BigdataServlet extends HttpServlet {
 
     }
 
-    static protected void buildResponse(final HttpServletResponse resp, final int status,
+    static public void buildResponse(final HttpServletResponse resp, final int status,
             final String mimeType, final String content) throws IOException {
 
         buildResponse(resp, status, mimeType);
@@ -247,27 +250,6 @@ abstract public class BigdataServlet extends HttpServlet {
 
         return new ByteArrayInputStream(outstr.toByteArray());
         
-    }
-
-    /**
-     * Figure out and return the service end point.
-     */
-    protected String getServiceURI(final HttpServletRequest req) {
-
-        final String serviceURI;
-
-        final StringBuffer sb = req.getRequestURL();
-
-        final int indexOf = sb.indexOf("?");
-
-        if (indexOf == -1) {
-            serviceURI = sb.toString();
-        } else {
-            serviceURI = sb.substring(0, indexOf);
-        }
-
-        return serviceURI;
-
     }
 
 }

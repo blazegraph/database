@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
+
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,6 +37,8 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
+
+import com.bigdata.rdf.properties.PropertiesFormat;
 
 
 /**
@@ -54,10 +57,6 @@ public class ConnegUtil {
     }
 
     private final ConnegScore<?>[] scores;
-
-    // private final RDFFormat rdfFormat;
-    //
-    // private final TupleQueryResultFormat tupleQueryResultFormat;
 
     /**
      * 
@@ -122,6 +121,21 @@ public class ConnegUtil {
 
                 }
 
+                // PropertiesFormat
+                {
+
+                    final PropertiesFormat format = PropertiesFormat
+                            .forMIMEType(t.getMimeType());
+
+                    if (format != null) {
+
+                        scores.add(new ConnegScore<PropertiesFormat>(t.q,
+                                format));
+
+                    }
+
+                }
+                
             }
 
         }
@@ -250,6 +264,46 @@ public class ConnegUtil {
             if (s.format instanceof BooleanQueryResultFormat) {
 
                 return (BooleanQueryResultFormat) s.format;
+
+            }
+
+        }
+
+        return fallback;
+
+    }
+
+    /**
+     * Return the best {@link PropertiesFormat} from the <code>Accept</code>
+     * header, where "best" is measured by the <code>q</code> parameter.
+     * 
+     * @return The best {@link PropertiesFormat} -or- <code>null</code> if no
+     *         {@link PropertiesFormat} was requested.
+     */
+    public PropertiesFormat getPropertiesFormat() {
+
+        return getPropertiesFormat(null/* fallback */);
+
+    }
+
+    /**
+     * Return the best {@link PropertiesFormat} from the <code>Accept</code>
+     * header, where "best" is measured by the <code>q</code> parameter.
+     * 
+     * @param fallback
+     *            The caller's default, which is returned if no match was
+     *            specified.
+     * 
+     * @return The best {@link PropertiesFormat} -or- <i>fallback</i> if no
+     *         {@link PropertiesFormat} was requested.
+     */
+    public PropertiesFormat getPropertiesFormat(final PropertiesFormat fallback) {
+
+        for (ConnegScore<?> s : scores) {
+
+            if (s.format instanceof PropertiesFormat) {
+
+                return (PropertiesFormat) s.format;
 
             }
 
