@@ -49,6 +49,14 @@
   	<load-on-startup>0</load-on-startup>
   </servlet>
   <servlet>
+   <servlet-name>Multi-Tenancy API</servlet-name>
+   <display-name>Multi-Tenancy API</display-name>
+   <description>The REST API for managing multiple KBs in a single Journal
+   or Fedetation.
+   </description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.MultiTenancyServlet</servlet-class>
+  </servlet>
+  <servlet>
   	<servlet-name>Status</servlet-name>
   	<display-name>Status</display-name>
   	<description>A status page.</description>
@@ -65,10 +73,19 @@
   <servlet-name>REST API</servlet-name>
   <url-pattern>/sparql</url-pattern>
   </servlet-mapping>
-  <!-- Mapping for access to non-default KB namespaces. -->
+  <!-- Mapping for access to non-default KB namespaces.
   <servlet-mapping>
   <servlet-name>REST API</servlet-name>
-  <url-pattern>/sparql/*</url-pattern>
+  <url-pattern>/sparql/*</url-pattern> 
+  </servlet-mapping> -->
+  <!-- Mappings for the multi-tenancy API. -->
+  <servlet-mapping>
+  <servlet-name>Multi-Tenancy API</servlet-name>
+  <url-pattern>/namespace</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+  <servlet-name>Multi-Tenancy API</servlet-name>
+  <url-pattern>/namespace/*</url-pattern>
   </servlet-mapping>
   <!-- Mapping for the status page. -->
   <servlet-mapping>

@@ -126,9 +126,9 @@ public class RemoteRepository {
     static protected final String UTF8 = "UTF-8";
 
     /**
-     * The service end point.
+     * The service end point for the default data set.
      */
-    protected final String serviceURL;
+    protected final String sparqlEndpointURL;
 
     /**
      * The client used for http connections.
@@ -138,7 +138,7 @@ public class RemoteRepository {
     /**
      * Thread pool for processing HTTP responses in background.
      */
-	private final Executor executor;
+	protected final Executor executor;
     
 //    /**
 //     * Create a connection to a remote repository using a shared
@@ -189,8 +189,8 @@ public class RemoteRepository {
      * life cycle of that {@link Executor} needs to be properly managed. Again,
      * see below for some hooks.
      * 
-     * @param serviceURL
-     *            The SPARQL http end point.
+     * @param sparqlEndpointURL
+     *            The SPARQL http end point for the data set.
      * @param httpClient
      *            The {@link HttpClient}.
      * @param executor
@@ -200,10 +200,10 @@ public class RemoteRepository {
      * @see QueryEngine#getClientConnectionManager()
      * @see IIndexManager#getExecutorService()
      */
-    public RemoteRepository(final String serviceURL,
+    public RemoteRepository(final String sparqlEndpointURL,
             final HttpClient httpClient, final Executor executor) {
     	
-        if (serviceURL == null)
+        if (sparqlEndpointURL == null)
             throw new IllegalArgumentException();
 
         if (httpClient == null)
@@ -212,7 +212,7 @@ public class RemoteRepository {
         if (executor == null)
             throw new IllegalArgumentException();
 
-        this.serviceURL = serviceURL;
+        this.sparqlEndpointURL = sparqlEndpointURL;
 
         this.httpClient = httpClient;
         
@@ -220,37 +220,41 @@ public class RemoteRepository {
 
     }
 
-    /**
-     * Return the SPARQL 1.1 Service Description for the end point.
-     */
-    public Graph getServiceDescription() throws Exception {
-        
-        final ConnectOptions opts = newConnectOptions();
-        
-        opts.method = "GET";
-        
-        HttpResponse response = null;
-        try {
-            
-            opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
-            
-            checkResponseCode(response = doConnect(opts));
+    @Override
+    public String toString() {
 
-            return asGraph(graphResults(response));
-            
-        } finally {
-            
-            try {
-                
-                if (response != null)
-                    EntityUtils.consume(response.getEntity());
-                
-            } catch (Exception ex) { }
-            
-        }
+        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL + "}";
+
+    }
+
+    /**
+     * Return the SPARQL end point.
+     */
+    public String getSparqlEndPoint() {
+        
+        return sparqlEndpointURL;
         
     }
     
+    /**
+     * Return the SPARQL 1.1 Service Description for the end point.
+     */
+    public GraphQueryResult getServiceDescription() throws Exception {
+
+        final ConnectOptions opts = newConnectOptions();
+
+        opts.method = "GET";
+
+        HttpResponse response = null;
+
+        opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
+
+        checkResponseCode(response = doConnect(opts));
+
+        return graphResults(response);
+
+    }
+
     /**
      * Prepare a tuple (select) query.
      * 
@@ -712,7 +716,7 @@ public class RemoteRepository {
 	 * <p>
 	 * Right now, the only metadata is the query ID.
 	 */
-    private abstract class Query implements IPreparedOperation {
+    protected abstract class Query implements IPreparedOperation {
 		
         protected final ConnectOptions opts;
         
@@ -840,44 +844,26 @@ public class RemoteRepository {
 
         public GraphQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
-            
+
             super(opts, id, query);
-            
+
         }
-		
-		@Override
+
+        @Override
         public GraphQueryResult evaluate() throws Exception {
 
-	        HttpResponse response = null;
-//	        try {
-	        	
-//	            final ConnectOptions opts = getConnectOpts();
+            HttpResponse response = null;
 
-                if (opts.acceptHeader == null)
-                    opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
+            if (opts.acceptHeader == null)
+                opts.acceptHeader = ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER;
 
-	        	checkResponseCode(response = doConnect(opts));
-	        	
-	        	return graphResults(response);
-	        	
-//	        } finally {
-//	        	
-//	        	try {
-//	            	
-//	        		if (response != null)
-//	        			EntityUtils.consume(response.getEntity());
-//	        		
-//	        	} catch (Exception ex) { 
-//	        	    
-//	                  log.warn(ex);
-//
-//	        	}
-//	        	
-//	        }
-			
-		}
-		
-	}
+            checkResponseCode(response = doConnect(opts));
+
+            return graphResults(response);
+
+        }
+
+    }
 
     private final class BooleanQuery extends Query implements
             IPreparedBooleanQuery {
@@ -1105,7 +1091,7 @@ public class RemoteRepository {
 
         if (log.isDebugEnabled()) {
             log.debug("*** Request ***");
-            log.debug(serviceURL);
+            log.debug(sparqlEndpointURL);
             log.debug(opts.method);
             log.debug("query=" + opts.getRequestParam("query"));
         }
@@ -1192,7 +1178,7 @@ public class RemoteRepository {
             } catch (Throwable t2) {
                 // ignored.
             }
-            throw new RuntimeException(serviceURL + " : " + t, t);
+            throw new RuntimeException(sparqlEndpointURL + " : " + t, t);
         }
 
     }
@@ -1229,7 +1215,7 @@ public class RemoteRepository {
         
         if (rc < 200 || rc >= 300) {
         
-            throw new IOException("Status Code=" + rc + ", Status Line="
+            throw new HttpException(rc, "Status Code=" + rc + ", Status Line="
                     + response.getStatusLine() + ", Response="
                     + getResponseBody(response));
 
@@ -1328,7 +1314,7 @@ public class RemoteRepository {
 	        if (format == null)
 	            throw new IOException(
 	                    "Could not identify format for service response: serviceURI="
-	                            + serviceURL + ", contentType=" + contentType
+	                            + sparqlEndpointURL + ", contentType=" + contentType
 	                            + " : response=" + getResponseBody(response));
 
             final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
@@ -1337,7 +1323,7 @@ public class RemoteRepository {
             if (parserFactory == null)
                 throw new IOException(
                         "No parser for format for service response: serviceURI="
-                                + serviceURL + ", contentType=" + contentType
+                                + sparqlEndpointURL + ", contentType=" + contentType
                                 + ", format=" + format + " : response="
                                 + getResponseBody(response));
 
@@ -1395,13 +1381,13 @@ public class RemoteRepository {
      */
 	public GraphQueryResult graphResults(final HttpResponse response) throws Exception {
 
-    	HttpEntity entity = null;
-    	BackgroundGraphResult result = null;
-		try {
+        HttpEntity entity = null;
+        BackgroundGraphResult result = null;
+        try {
 
-    		entity = response.getEntity();
-    		
-			final String baseURI = "";
+            entity = response.getEntity();
+
+            final String baseURI = "";
 
 	        final String contentType = entity.getContentType().getValue();
 
@@ -1416,7 +1402,7 @@ public class RemoteRepository {
             if (format == null)
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
-                                + serviceURL + ", contentType=" + contentType
+                                + sparqlEndpointURL + ", contentType=" + contentType
                                 + " : response=" + getResponseBody(response));
 
 			final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
@@ -1508,7 +1494,7 @@ public class RemoteRepository {
             if (format == null)
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
-                                + serviceURL + ", contentType=" + contentType
+                                + sparqlEndpointURL + ", contentType=" + contentType
                                 + " : response=" + getResponseBody(response));
 
             final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
@@ -1563,7 +1549,7 @@ public class RemoteRepository {
             if (format == null)
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
-                                + serviceURL + ", contentType=" + contentType
+                                + sparqlEndpointURL + ", contentType=" + contentType
                                 + " : response=" + getResponseBody(response));
 
             final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
@@ -1769,9 +1755,23 @@ public class RemoteRepository {
 	}
 
     /**
-     * Return the {@link ConnectOptions} which will be used by default.
+     * Return the {@link ConnectOptions} which will be used by default for the
+     * SPARQL end point.
      */
-    protected ConnectOptions newConnectOptions() {
+    final protected ConnectOptions newConnectOptions() {
+    
+        return newConnectOptions(sparqlEndpointURL);
+        
+    }
+    
+    /**
+     * Return the {@link ConnectOptions} which will be used by default for the
+     * specified service URL.
+     * 
+     * @param serviceURL
+     *            The URL of the service for the request.
+     */
+    protected ConnectOptions newConnectOptions(final String serviceURL) {
 
         final ConnectOptions opts = new ConnectOptions(serviceURL);
 
@@ -1779,18 +1779,28 @@ public class RemoteRepository {
 
     }
 
-    protected Graph asGraph(final GraphQueryResult result) throws Exception {
-    	
-    	final Graph g = new GraphImpl();
-    	
-    	while (result.hasNext()) {
-    	
-    		g.add(result.next());
-    		
-    	}
-    	
-    	return g;
-    	
+    /**
+     * Utility method to turn a {@link GraphQueryResult} into a {@link Graph}.
+     * 
+     * @param result
+     *            The {@link GraphQueryResult}.
+     * 
+     * @return The {@link Graph}.
+     * 
+     * @throws Exception
+     */
+    static public Graph asGraph(final GraphQueryResult result) throws Exception {
+
+        final Graph g = new GraphImpl();
+
+        while (result.hasNext()) {
+
+            g.add(result.next());
+
+        }
+
+        return g;
+
     }
-    
+
 }

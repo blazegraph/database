@@ -186,7 +186,12 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final AbstractQueryTask queryTask = getBigdataRDFContext()
                         .getQueryTask(namespace, ITx.READ_COMMITTED, queryStr,
                                 deleteQueryFormat.getDefaultMIMEType(), req,
-                                os, false/* update */);
+                                resp, os, false/* update */);
+
+                if(queryTask == null) {
+                    // KB not found. Response already committed.
+                    return;
+                }
 
                 switch (queryTask.queryType) {
                 case DESCRIBE:
@@ -342,7 +347,8 @@ public class UpdateServlet extends BigdataRDFServlet {
         
         try {
         
-        	List<FileItem> items = upload.parseRequest(req);
+        	@SuppressWarnings("unchecked")
+            List<FileItem> items = upload.parseRequest(req);
         	
         	for (FileItem item : items) {
         	

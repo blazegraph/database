@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.http.HttpEntity;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
@@ -42,7 +43,7 @@ import com.bigdata.rdf.ServiceProviderHook;
  */
 public class ConnectOptions {
 
-    /** The URL of the SPARQL end point. */
+    /** The URL of the remote REST service. */
     public final String serviceURL;
 
     /** The HTTP method (GET, POST, etc). */
@@ -72,6 +73,11 @@ public class ConnectOptions {
      * Used for NSS mutation operation responses.
      */
     public static final String MIME_APPLICATION_XML = "application/xml";
+
+    /**
+     * Used to interchange {@link Properties} objects.
+     */
+    public static final String MIME_PROPERTIES_XML = "application/xml";
 
     static {
 

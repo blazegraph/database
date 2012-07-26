@@ -301,6 +301,12 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        /*
+         * FIXME We should figure out a default serviceURI here but prefer one
+         * configured in web.xml. That will be the "official" URI reported out
+         * for ServiceDescription and VoID.
+         */
+        
         final SparqlEndpointConfig config = new SparqlEndpointConfig(namespace,
                 timestamp, queryThreadPoolSize, describeEachNamedGraph);
 

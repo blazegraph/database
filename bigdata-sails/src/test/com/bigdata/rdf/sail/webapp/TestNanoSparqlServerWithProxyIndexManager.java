@@ -220,8 +220,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          * Proxied test suites.
          */
         
-//         Basic NSS REST API (old version before RemoteRepository).
-//        suite.addTestSuite(TestNanoSparqlServer2.class);
+        // Multi-tenancy API.
+        suite.addTestSuite(TestMultiTenancyAPI.class);
 
         // RemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestNanoSparqlClient.class);
