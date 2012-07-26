@@ -694,7 +694,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
                 namespace);
         
         // Clear the entry from the resource locator cache.
-        indexManager.getResourceLocator().discard(this);
+        indexManager.getResourceLocator().discard(this, true/* destroyed */);
 
     }
 

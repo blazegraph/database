@@ -48,6 +48,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
@@ -959,18 +960,20 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         
     }
 
-    public void discard(final ILocatableResource<T> instance) {
-        
+    public void discard(final ILocatableResource<T> instance,
+            final boolean destroyed) {
+
         if (instance == null)
             throw new IllegalArgumentException();
 
         final String namespace = instance.getNamespace();
-        
+
         final long timestamp = instance.getTimestamp();
-        
+
         if (log.isInfoEnabled()) {
 
-            log.info("namespace=" + namespace + ", timestamp=" + timestamp);
+            log.info("namespace=" + namespace + ", timestamp=" + timestamp
+                    + ", destroyed=" + destroyed);
 
         }
 
@@ -992,7 +995,17 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
                 log.info("instance=" + instance + ", found=" + found);
                 
             }
-            
+
+            if (destroyed) {
+
+                // Also discard the unisolated view.
+                resourceCache.remove(new NT(namespace, ITx.UNISOLATED));
+
+                // Also discard the read-committed view.
+                resourceCache.remove(new NT(namespace, ITx.READ_COMMITTED));
+
+            }
+
         } finally {
             
             lock.unlock();

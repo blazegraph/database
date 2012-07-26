@@ -2014,7 +2014,7 @@ abstract public class AbstractTripleStore extends
 
         if (lexiconRelation != null) {
 
-            locator.discard(lexiconRelation);
+            locator.discard(lexiconRelation, false/*destroyed*/);
 
             lexiconRelation = null;
 
@@ -2022,7 +2022,7 @@ abstract public class AbstractTripleStore extends
 
         if (spoRelation != null) {
 
-            locator.discard(spoRelation);
+            locator.discard(spoRelation, false/*destroyed*/);
 
             spoRelation = null;
 
