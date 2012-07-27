@@ -66,6 +66,20 @@ public class InnerCause {
         
         {
             Class x = t.getClass();
+
+            // Check for Iterable<Throwable>
+            if(Iterable.class.isAssignableFrom(x)) {
+                for (Object o : (Iterable) t) {
+                    if (!(o instanceof Throwable)) {
+                        continue;
+                    }
+                    final Throwable tx = getInnerCause((Throwable) o, cls);
+                    if (tx != null)
+                        return tx;
+                }
+            }
+            
+            // Check the class hierarchy.
             while(x != null){
                 if( x == cls) 
                     return t;
@@ -73,7 +87,8 @@ public class InnerCause {
             }
             
         }
-         
+        
+        // Check the nested cause.
         t = t.getCause();
 
         if (t == null)
