@@ -50,7 +50,7 @@ import com.bigdata.service.IService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          FIXME The SPARQL layer needs to be separated from the core bigdata
+ *          TODO The SPARQL layer needs to be separated from the core bigdata
  *          layer, with the BigdataContext moving into a servlet package in the
  *          bigdata module and the CountersServlet moving into a servlet package
  *          in the com.bigdata.counters package namespace.

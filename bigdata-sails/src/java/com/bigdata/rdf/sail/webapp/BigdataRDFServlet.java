@@ -52,6 +52,8 @@ import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.util.InnerCause;
 
 /**
  * Abstract base class for {@link Servlet}s which interact with the bigdata RDF
@@ -149,10 +151,21 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         } finally {
             // ignore any problems here.
         }
-    	if (resp != null) {
+        if (resp != null) {
             if (!resp.isCommitted()) {
-                resp.setStatus(HTTP_INTERNALERROR);
-                resp.setContentType(MIME_TEXT_PLAIN);
+                if (InnerCause.isInnerCause(t,
+                        ConstraintViolationException.class)) {
+                    /*
+                     * A constraint violation is a bad request (the data
+                     * violates the rules) not a server error.
+                     */
+                    resp.setStatus(HTTP_BADREQUEST);
+                    resp.setContentType(MIME_TEXT_PLAIN);
+                } else {
+                    // Internal server error.
+                    resp.setStatus(HTTP_INTERNALERROR);
+                    resp.setContentType(MIME_TEXT_PLAIN);
+                }
             }
     	    OutputStream os = null;
     		try {

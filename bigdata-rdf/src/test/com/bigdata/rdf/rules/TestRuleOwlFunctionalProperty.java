@@ -121,15 +121,20 @@ public class TestRuleOwlFunctionalProperty extends AbstractRuleTestCase {
 	            
             } catch (Exception ex) {
             	
-            	final ExecutionExceptions ex2 = (ExecutionExceptions)
-            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
-            	
-            	Throwable t = ex2.causes().get(0);
-            	while (t.getCause() != null)
-            		t = t.getCause();
-            	
-            	if (!(t instanceof ConstraintViolationException))
-            		fail("inner cause should be a ConstraintViolationException");
+                if (!InnerCause.isInnerCause(ex,
+                        ConstraintViolationException.class)) {
+                    fail("Expected: " + ConstraintViolationException.class);
+                }
+                
+//            	final ExecutionExceptions ex2 = (ExecutionExceptions)
+//            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+//            	
+//            	Throwable t = ex2.causes().get(0);
+//            	while (t.getCause() != null)
+//            		t = t.getCause();
+//            	
+//            	if (!(t instanceof ConstraintViolationException))
+//            		fail("inner cause should be a ConstraintViolationException");
             	
             }
 
@@ -197,15 +202,19 @@ public class TestRuleOwlFunctionalProperty extends AbstractRuleTestCase {
 	            
             } catch (Exception ex) {
             	
-            	final ExecutionExceptions ex2 = (ExecutionExceptions)
-            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
-            	
-            	Throwable t = ex2.causes().get(0);
-            	while (t.getCause() != null)
-            		t = t.getCause();
-            	
-            	if (!(t instanceof ConstraintViolationException))
-            		fail("inner cause should be a ConstraintViolationException");
+                if (!InnerCause.isInnerCause(ex,
+                        ConstraintViolationException.class)) {
+                    fail("Expected: " + ConstraintViolationException.class);
+                }
+//            	final ExecutionExceptions ex2 = (ExecutionExceptions)
+//            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+//            	
+//            	Throwable t = ex2.causes().get(0);
+//            	while (t.getCause() != null)
+//            		t = t.getCause();
+//            	
+//            	if (!(t instanceof ConstraintViolationException))
+//            		fail("inner cause should be a ConstraintViolationException");
             	
             }
 
