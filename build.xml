@@ -511,9 +511,6 @@ public class BuildInfo {
 		  	<!-- jetty / servlet / jsp jars not required for the WAR. --> 
 	  		<exclude name="jetty*.jar"/>
 	  		<exclude name="servlet-api*.jar"/>
-         <exclude name="core-*.jar"/>
-         <exclude name="ant-*.jar"/>
-         <exclude name="jsp-api-*.jar"/>
 		  	<!-- zookeeper only used in scale-out. -->
 	  		<exclude name="apache/zookeeper*.jar"/>
 	  		<!-- jini only used in scale-out. -->
