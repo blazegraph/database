@@ -353,7 +353,7 @@ public class BuildInfo {
 		<bndwrap jars="${build.dir}/lib/high-scale-lib-v1.1.2.jar" output="${build.dir}/bundles/high-scale-lib-v1.1.2.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/openrdf-sesame-${sesame.version}-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-${sesame.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/apache/zookeeper-${zookeeper.version}.jar" output="${build.dir}/bundles/zookeeper-${zookeeper.version}.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/nxparser-6-22-2010.jar" output="${build.dir}/bundles/nxparser-2010.6.22.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/nxparser-${nxparser.version}.jar" output="${build.dir}/bundles/nxparser-2010.6.22.jar" definitions="${basedir}/osgi/" />
 	</target>
 
 
@@ -923,7 +923,7 @@ ${postInstallMessage}</echo>
 	        tofile="${dist.lib}/servlet-api.jar" />
 
       <!-- NxParser (RDF NQuads support) -->
-      <copy file="${bigdata-rdf.lib}/nxparser-6-22-2010.jar"
+      <copy file="${bigdata-rdf.lib}/nxparser-${nxparser.version}.jar"
             tofile="${dist.lib}/nxparser.jar" />
 
       <!-- apache http components (SPARQL connections). -->
