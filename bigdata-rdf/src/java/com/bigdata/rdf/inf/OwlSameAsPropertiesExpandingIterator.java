@@ -409,22 +409,27 @@ public class OwlSameAsPropertiesExpandingIterator implements
             }
         }
 
+        @Override
         public IIndex getIndex() {
             return accessPath.getIndex();
         }
 
+        @Override
         public IKeyOrder<ISPO> getKeyOrder() {
             return accessPath.getKeyOrder();
         }
 
+        @Override
         public IPredicate<ISPO> getPredicate() {
             return accessPath.getPredicate();
         }
 
+        @Override
         public boolean isEmpty() {
             return false;
         }
 
+        @Override
         public IChunkedOrderedIterator<ISPO> iterator() {
             final IChunkedOrderedIterator<ISPO> appender = getAppender();
             final IChunkedOrderedIterator<ISPO> delegate =
@@ -476,22 +481,26 @@ public class OwlSameAsPropertiesExpandingIterator implements
             };
         }
 
-        public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
-            throw new UnsupportedOperationException();
-        }
+//        public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
+//            throw new UnsupportedOperationException();
+//        }
 
+        @Override
         public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit, int capacity) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public long rangeCount(boolean exact) {
             return accessPath.rangeCount(exact) + 1;
         }
 
-        public ITupleIterator<ISPO> rangeIterator() {
-            throw new UnsupportedOperationException();
-        }
+//        @Override
+//        public ITupleIterator<ISPO> rangeIterator() {
+//            throw new UnsupportedOperationException();
+//        }
 
+        @Override
         public long removeAll() {
             throw new UnsupportedOperationException();
         }

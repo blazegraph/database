@@ -144,24 +144,28 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
         }
 
+        @Override
         public IIndex getIndex() {
 
             return sourceAccessPath.getIndex();
 
         }
 
+        @Override
         public IKeyOrder<ISPO> getKeyOrder() {
 
             return sourceAccessPath.getKeyOrder();
 
         }
 
+        @Override
         public IPredicate<ISPO> getPredicate() {
 
             return sourceAccessPath.getPredicate();
 
         }
 
+        @Override
         public boolean isEmpty() {
 
 //            System.err.println("Testing isEmpty(): "+getPredicate());
@@ -181,11 +185,12 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
         }
 
-        public ITupleIterator<ISPO> rangeIterator() {
-
-            return sourceAccessPath.rangeIterator();
-
-        }
+//        @Override
+//        public ITupleIterator<ISPO> rangeIterator() {
+//
+//            return sourceAccessPath.rangeIterator();
+//
+//        }
 
         /**
          * Unsupported operation.
@@ -194,24 +199,26 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
          * the context of SPARQL which lacks SELECT ... INSERT or SELECT ...
          * DELETE constructions, at least at this time.
          */
+        @Override
         public long removeAll() {
 
             throw new UnsupportedOperationException();
 
         }
 
+        @Override
         public IChunkedOrderedIterator<ISPO> iterator() {
 
             return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
 
         }
 
-        public IChunkedOrderedIterator<ISPO> iterator(final int limit,
-                final int capacity) {
-
-            return iterator(0L/* offset */, limit, capacity);
-
-        }
+//        public IChunkedOrderedIterator<ISPO> iterator(final int limit,
+//                final int capacity) {
+//
+//            return iterator(0L/* offset */, limit, capacity);
+//
+//        }
 
         /**
          * This is the common entry point for all iterator implementations.
@@ -231,6 +238,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
          *       closed world assumption to filter duplicates after the merge
          *       sort.)
          */
+        @Override
         public IChunkedOrderedIterator<ISPO> iterator(final long offset,
                 final long limit, final int capacity) {
 
@@ -599,6 +607,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
         /**
          * Return the estimated range count.
          */
+        @Override
         public long rangeCount(final boolean exactIsIgnored) {
 
             return estimatedRangeCount;

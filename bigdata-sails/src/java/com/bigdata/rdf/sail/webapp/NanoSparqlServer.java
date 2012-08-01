@@ -35,7 +35,6 @@ import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.webapp.WebAppContext;
 import org.openrdf.rio.RDFParser;
 
 import com.bigdata.Banner;
@@ -395,38 +394,51 @@ public class NanoSparqlServer {
 
         final HandlerList handlers = new HandlerList();
 
-        /* TODO The webappHandler should be able to handle this also if
-         * we put the JSP pages into the top-level directory.
-         */
         final ResourceHandler resourceHandler = new ResourceHandler();
         
         setupStaticResources(server, resourceHandler);
 
         /**
-         * FIXME The WebAppContext is resulting in a
-         * "JSP Support not Configured" message (500 status code). Try this
-         * using the JSPServlet instead and/or in addition.
+         * Note: There appear to be plenty of ways to setup JSP support for
+         * embedded jetty, and plenty of ways to get it wrong. I wound up adding
+         * to the classpath the following jars for jetty 7.2.2 to get this
+         * running:
          * 
-         * FIXME Also support this in the alternative newInstance() method
-         * above.
+         * <pre>
+         * com.sun.el_1.0.0.v201004190952.jar
+         * ecj-3.6.jar
+         * javax.el_2.1.0.v201004190952.jar
+         * javax.servlet.jsp.jstl_1.2.0.v201004190952.jar
+         * javax.servlet.jsp_2.1.0.v201004190952.jar
+         * jetty-jsp-2.1-7.2.2.v20101205.jar
+         * org.apache.jasper.glassfish_2.1.0.v201007080150.jar
+         * org.apache.taglibs.standard.glassfish_1.2.0.v201004190952.jar
+         * </pre>
          * 
-         * @see <a
-         *      href="http://thinking.awirtz.com/2011/11/03/embedded-jetty-servlets-and-jsp/">
-         *      embedded jetty servlets and jsp </a>
+         * With those jars on the class path, the following code will run
+         * JSP pages.
+         * 
+         * Note: In order for this to work, it must also be supported in the
+         * alternative newInstance() method above.
          */
-////        final URL warUrl = this.class.getClassLoader().getResource(WEBAPPDIR);
-////        final String warUrlString = warUrl.toExternalForm();
-////        final WebAppContext webappHandler = new WebAppContext(warUrlString, CONTEXTPATH);
-//        final URL warUrl = getStaticResourceURL(server, "jsp"/* path */);
-//        final WebAppContext webappHandler = new WebAppContext(
-//                warUrl.toExternalForm(), "/jsp");
-
-        handlers.setHandlers(new Handler[] {
-                context,//
-                resourceHandler,//
+//        if (false/* jsp */) {
+//            final URL warUrl = getStaticResourceURL(server, "jsp"/* path */);
+//            final WebAppContext webappHandler = new WebAppContext(
+//                    warUrl.toExternalForm(), "/jsp");
+//            handlers.setHandlers(new Handler[] {
+//                context,//
+//                resourceHandler,//
 //                webappHandler,
-//                new DefaultHandler()//
-                });
+////                new DefaultHandler()//
+//                });
+//      } else {
+            handlers.setHandlers(new Handler[] {
+                    context,//
+                    resourceHandler,//
+//                    webappHandler,
+//                    new DefaultHandler()//
+                    });
+//        }
 
         server.setHandler(handlers);
 

@@ -1172,7 +1172,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * <p>
      * The most common reason to close an iterator early are that you want to
      * only visit a limited #of elements. However, if you use either
-     * {@link IAccessPath#iterator(int, int)} or {@link IRule} with an
+     * {@link IAccessPath#iterator(long,long, int)} or {@link IRule} with an
      * {@link IQueryOptions} to impose that limit, then most processes that
      * produce {@link IAsynchronousIterator}s will automatically terminate when
      * they reach the desired limit, thereby avoiding issuing interrupts. Those

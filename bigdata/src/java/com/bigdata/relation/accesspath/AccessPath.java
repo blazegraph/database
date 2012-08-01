@@ -40,7 +40,6 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.bop.cost.BTreeCostModel;
 import com.bigdata.bop.cost.DiskCostModel;
@@ -693,7 +692,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
             
         }
         
-        final IChunkedIterator<R> itr = iterator(1,1);
+        final IChunkedIterator<R> itr = iterator(0L/* offset */, 1L/* limit */,
+                1/* capacity */);
         
         try {
             
@@ -744,8 +744,9 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 //        final IVariable<?>[] vars = BOpUtility
 //                .getDistinctArgumentVariables(predicate);
 
-		return BOpContext.solutions(iterator(0, limit, 0/* (int) limit */),
-				predicate, /* vars, */stats);
+        return BOpContext.solutions(
+                iterator(0L/* offset */, limit, 0/* capacity */), predicate,
+                stats);
 
     }
     
@@ -755,12 +756,12 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
     }
 
-    final public IChunkedOrderedIterator<R> iterator(final int limit,
-            final int capacity) {
-
-        return iterator(0L/* offset */, limit, capacity);
-
-    }
+//    final public IChunkedOrderedIterator<R> iterator(final int limit,
+//            final int capacity) {
+//
+//        return iterator(0L/* offset */, limit, capacity);
+//
+//    }
 
     /**
      * @throws RejectedExecutionException
@@ -1381,11 +1382,12 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     }
     
-    final public ITupleIterator<R> rangeIterator() {
-
-        return rangeIterator(0/* capacity */, flags, indexLocalFilter);
-
-    }
+//    @Override
+//    final public ITupleIterator<R> rangeIterator() {
+//
+//        return rangeIterator(0/* capacity */, flags, indexLocalFilter);
+//
+//    }
 
     @SuppressWarnings( { "unchecked" })
     protected ITupleIterator<R> rangeIterator(final int capacity,
@@ -1442,25 +1444,6 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         }
 
         return n;
-
-    }
-
-    /**
-     * Return the constant bound on the {@link #getPredicate() predicate} for
-     * this access path at the specified index -or- {@link #NULL} iff the
-     * predicate is not bound at that position.
-     * 
-     * @param index
-     *            The index.
-     * 
-     * @return Either the bound value -or- {@link #NULL} iff the index is
-     *         unbound for the predicate for this access path.
-     */
-    public Object get(final int index) {
-
-        final IVariableOrConstant<?> t = predicate.get(index);
-
-        return t == null || t.isVar() ? null : t.get();
 
     }
 

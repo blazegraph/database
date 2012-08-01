@@ -42,15 +42,19 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * FIXME Provide {@link ISolutionSet} implementations derived from {@link HTree}
- * and {@link BTree}.
- * <p>
- * Reconcile the {@link HTree} version with the hash join code and
- * {@link NamedSolutionSetRef}.
- * <p>
- * Add an {@link IAccessPath} for HTree and {@link Stream} backed solution sets
- * so they can be played out through a simple iterator model. The
- * {@link AccessPath} can be used for the {@link BTree} backed solution sets.
+ *         FIXME Provide {@link ISolutionSet} implementations derived from
+ *         {@link HTree} and {@link BTree}.
+ *         <P>
+ *         I am not sure that we will require this. We can probably use the
+ *         Stream for named solution sets for quite a while without supporting
+ *         declaration of named solution sets with specific join variables.
+ *         However, if we do add support for this, then we need to reconcile the
+ *         {@link HTree} version with the hash join code and
+ *         {@link NamedSolutionSetRef} and also add an {@link IAccessPath} for
+ *         {@link HTree} and {@link Stream} backed solution sets so they can be
+ *         played out through a simple iterator model. The {@link AccessPath} is
+ *         relation specific, but it could be relayered to provide support for
+ *         the {@link BTree} backed solution sets.
  */
 public interface ISolutionSet extends ICheckpointProtocol {
 
@@ -91,18 +95,18 @@ public interface ISolutionSet extends ICheckpointProtocol {
      */
     public void put(final ICloseableIterator<IBindingSet[]> src);
 
-    /**
-     * The {@link IVariable[]} specifying the join variables (required). The
-     * order of the entries is used when forming the as-bound keys for the hash
-     * table. Duplicate elements and null elements are not permitted.
-     * 
-     * TODO We will also need a method to report the JOIN_VARS if the backing
-     * data structure is an HTree or BTree. [Really, what we need is a method to
-     * describe how the index key will be generated, or just a method to
-     * generate the key. Also, it is possible that
-     * {@link ISolutionSetStats#getAlwaysBound} will report variables which are
-     * always bound but which are not part of the key for the index.
-     */
+//    /**
+//     * The {@link IVariable[]} specifying the join variables (required). The
+//     * order of the entries is used when forming the as-bound keys for the hash
+//     * table. Duplicate elements and null elements are not permitted.
+//     * 
+//     * TODO We will also need a method to report the JOIN_VARS if the backing
+//     * data structure is an HTree or BTree. [Really, what we need is a method to
+//     * describe how the index key will be generated, or just a method to
+//     * generate the key. Also, it is possible that
+//     * {@link ISolutionSetStats#getAlwaysBound} will report variables which are
+//     * always bound but which are not part of the key for the index.
+//     */
 //    public String[] getJoinVars();
 
 }

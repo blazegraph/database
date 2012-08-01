@@ -219,24 +219,37 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
          * @todo for scale-out, pass the filter to the data service.
          */
         
-        ITupleIterator itr = accessPath.rangeIterator();
+//        ITupleIterator itr = accessPath.rangeIterator();
+//
+//        int i = 0;
+//
+//        while (itr.hasNext() && i < n) {
+//
+//            final ISPO spo = (SPO) itr.next().getObject();
+//            
+//            if (filter != null && !filter.isValid(spo)) {
+//
+//                continue;
+//                
+//            }
+//            
+//            stmts[i++] = spo;
+//
+//        }
 
+        final IChunkedOrderedIterator<ISPO> itr = accessPath.iterator(0L,
+                (long) n, 0/* chunkSize */);
+        
         int i = 0;
-
-        while (itr.hasNext() && i < n) {
-
-            final ISPO spo = (SPO) itr.next().getObject();
-            
-            if (filter != null && !filter.isValid(spo)) {
-
-                continue;
-                
-            }
+        
+        while (itr.hasNext()) {
+        
+            final ISPO spo = itr.next();
             
             stmts[i++] = spo;
 
         }
-
+        
         this.numStmts = i;
         
     }

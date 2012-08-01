@@ -34,7 +34,6 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
@@ -50,9 +49,6 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-
-import cutthecrap.utils.striterators.IFilter;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A read-only {@link IAccessPath} that backchains certain inferences.
@@ -160,30 +156,32 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
     }
     
-    /**
-     * The {@link IIndex} for the source {@link IAccessPath}.
-     */
+    @Override
     final public IIndex getIndex() {
 
         return accessPath.getIndex();
         
     }
 
+    @Override
     final public IKeyOrder<ISPO> getKeyOrder() {
         
         return accessPath.getKeyOrder();
         
     }
 
+    @Override
     final public IPredicate<ISPO> getPredicate() {
         
         return accessPath.getPredicate();
         
     }
 
+    @Override
     public boolean isEmpty() {
         
-        final IChunkedIterator<ISPO> itr = iterator(1,1);
+        final IChunkedIterator<ISPO> itr = iterator(0L/* offset */,
+                1L/* limit */, 1/* capacity */);
         
         try {
             
@@ -198,20 +196,36 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Visits elements in the source {@link IAccessPath} plus all entailments
      * licensed by the {@link InferenceEngine}.
      */
+    @Override
     public IChunkedOrderedIterator<ISPO> iterator() {
         
         return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
         
     }
 
+//    /**
+//     * Visits elements in the source {@link IAccessPath} plus all entailments
+//     * licensed by the {@link InferenceEngine} as configured.
+//     */
+//    public IChunkedOrderedIterator<ISPO> iterator(final int limit,
+//            final int capacity) {
+//     
+//        return iterator(0L/*offset*/,limit,capacity);
+//        
+//    }
+
     /**
+     * {@inheritDoc}
      * @todo handle non-zero offset and larger limits?
      */
-    public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit,
-            int capacity) {
+    @Override
+    public IChunkedOrderedIterator<ISPO> iterator(final long offset,
+            long limit, int capacity) {
 
         if (offset > 0L)
             throw new UnsupportedOperationException();
@@ -222,16 +236,16 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         if (limit > Integer.MAX_VALUE)
             throw new UnsupportedOperationException();
 
-        return iterator((int) limit, capacity);
-
-    }
-    
-    /**
-     * Visits elements in the source {@link IAccessPath} plus all entailments
-     * licensed by the {@link InferenceEngine} as configured.
-     */
-    public IChunkedOrderedIterator<ISPO> iterator(final int limit,
-            final int capacity) {
+//        return iterator((int) limit, capacity);
+//
+//    }
+//    
+//    /**
+//     * Visits elements in the source {@link IAccessPath} plus all entailments
+//     * licensed by the {@link InferenceEngine} as configured.
+//     */
+//    public IChunkedOrderedIterator<ISPO> iterator(final int limit,
+//            final int capacity) {
 
         if (INFO) {
 
@@ -345,7 +359,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 //            tmp.addFilter(accessPathFilter);
         
         IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr == null//
-                ? accessPath.iterator(limit, capacity) //
+                ? accessPath.iterator(offset, limit, capacity) //
                 : new ChunkedWrappedIterator<ISPO>(owlSameAsItr,
                         capacity == 0 ? inf.database.getChunkCapacity()
                                 : capacity, null/* keyOrder */, filter)//
@@ -477,12 +491,15 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
     
     /**
+     * {@inheritDoc}
+     * <p>
      * When <code>exact == false</code> this does not count the backchained
      * entailments. When <code>exact == true</code> traverses the
      * {@link #iterator()} so as to produce an exact count of the #of elements
      * that would in fact be visited, which combines those from the database
      * with those generated dynamically (NOT efficient).
      */
+    @Override
     public long rangeCount(boolean exact) {
 
         if (!exact)
@@ -514,19 +531,18 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
         
     }
 
-    /**
-     * Delegated to the source {@link IAccessPath} (does not visit any
-     * entailments).
-     */
-    public ITupleIterator<ISPO> rangeIterator() {
-        
-        return accessPath.rangeIterator();
-        
-    }
+//    /**
+//     * Delegated to the source {@link IAccessPath} (does not visit any
+//     * entailments).
+//     */
+//    @Override
+//    public ITupleIterator<ISPO> rangeIterator() {
+//        
+//        return accessPath.rangeIterator();
+//        
+//    }
 
-    /**
-     * Delegated to the source {@link IAccessPath}.
-     */
+    @Override
     public long removeAll() {
 
         return accessPath.removeAll();

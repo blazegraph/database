@@ -25,7 +25,6 @@ package com.bigdata.rdf.spo;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -94,18 +93,18 @@ public class SPOAccessPath extends AccessPath<ISPO> {
 
     }
 
-    /**
-     * Strengthened return type.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    @SuppressWarnings("rawtypes")
-    public IV get(final int index) {
-
-        return (IV) super.get(index);
-
-    }
+//    /**
+//     * Strengthened return type.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    @SuppressWarnings("rawtypes")
+//    public IV get(final int index) {
+//
+//        return (IV) super.get(index);
+//
+//    }
 
     /**
      * Overridden to delegate to

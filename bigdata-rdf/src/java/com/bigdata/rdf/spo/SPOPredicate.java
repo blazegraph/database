@@ -378,4 +378,17 @@ public class SPOPredicate extends Predicate<ISPO> {
 
 	}
 
+//    /**
+//     * Strengthened return type.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    @SuppressWarnings("rawtypes")
+//    public IV getValue(final int index) {
+//
+//        return (IV) super.get(index);
+//
+//    }
+    
 }

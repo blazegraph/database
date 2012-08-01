@@ -1001,6 +1001,19 @@ public class TruthMaintenance {
 
             /*
              * Suck everything in the focusStore into an SPO[].
+             * 
+             * TODO There are some scalability and "old code" issues with this.
+             * It is reading everything into an SPO[], which is a scalability
+             * problem. This is also the only code which uses the
+             * SPOArrayIterator and the IAccessPath#rangeIterator(). If we
+             * change this, we can get rid of both of those things.
+             * 
+             * There are other alternatives to pulling it all into an ISPO[]. We
+             * are doing this so we can remove all these ISPOs later (see
+             * below). The backing temp store does not support multiple commit
+             * points, but we could write the new data onto a different temp
+             * triple store and then read from the old temp triple store when
+             * deleting the data.
              */
             
             final SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore

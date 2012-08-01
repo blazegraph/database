@@ -156,7 +156,7 @@ public interface IJoinNexus {
      * {@link IAccessPath} will use an {@link IAsynchronousIterator} instead.
      * This value should on the order of {@link #getChunkCapacity()}.
      * 
-     * @see IAccessPath#iterator(int, int)
+     * @see IAccessPath#iterator(long,long, int)
      * @see AbstractResource.Options#FULLY_BUFFERED_READ_THRESHOLD
      * @deprecated by bop annotations.
      */
