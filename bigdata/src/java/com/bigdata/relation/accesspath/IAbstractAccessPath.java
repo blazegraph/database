@@ -78,4 +78,12 @@ public interface IAbstractAccessPath<R> {
      */
     long rangeCount(boolean exact);
 
+    /**
+     * Remove all elements selected by the {@link IPredicate} (optional
+     * operation).
+     * 
+     * @return The #of elements that were removed.
+     */
+    public long removeAll();
+
 }

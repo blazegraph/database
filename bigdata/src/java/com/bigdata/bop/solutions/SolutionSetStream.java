@@ -37,24 +37,25 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.btree.BTree;
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamDecoder;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.relation.accesspath.AccessPath;
-import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.ChunkConsumerIterator;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.stream.Stream;
 import com.bigdata.striterator.Chunkerator;
+import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.ArrayIterator;
@@ -428,5 +429,146 @@ public final class SolutionSetStream extends Stream implements
         }
 
     }
-    
+
+    /**
+     * Return an access path that can be used to scan the solutions.
+     * 
+     * @param pred
+     *            ignored.
+     * 
+     * @return The access path.
+     * 
+     *         TODO FILTERS: (A) Any filter attached to the predicate must be
+     *         applied by the AP to remove solutions which do not satisfy the
+     *         filter;
+     *         <p>
+     *         (B) When the AP has a filter, then an exact range count must scan
+     *         the solutions to decide how many will match.
+     */
+    public IBindingSetAccessPath<IBindingSet> getAccessPath(
+            final IPredicate<IBindingSet> pred) {
+
+        return new SolutionSetAP(this, pred);
+
+    }
+
+    /**
+     * Class provides basic access path suitable for full scans.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class SolutionSetAP implements
+            IBindingSetAccessPath<IBindingSet> {
+
+        private final SolutionSetStream stream;
+        private final IPredicate<IBindingSet> predicate;
+
+        public SolutionSetAP(final SolutionSetStream stream,
+                final IPredicate<IBindingSet> pred) {
+
+            this.stream = stream;
+
+            this.predicate = pred;
+
+        }
+
+        @Override
+        public IPredicate<IBindingSet> getPredicate() {
+
+            return predicate;
+
+        }
+
+        @Override
+        public boolean isEmpty() {
+
+            /*
+             * Note: If we develop streams which can have non-exact range counts
+             * (due to deleted tuples) then this would have to be revisited.
+             */
+
+            return stream.entryCount == 0;
+
+        }
+
+        @Override
+        public long rangeCount(boolean exact) {
+
+            return stream.entryCount;
+
+        }
+
+        @Override
+        public ICloseableIterator<IBindingSet> solutions(final long limit,
+                final BaseJoinStats stats) {
+
+            if (limit != 0L && limit != Long.MAX_VALUE)
+                throw new UnsupportedOperationException();
+
+            final IChunkedIterator<IBindingSet> itr = new ChunkConsumerIterator<IBindingSet>(
+                    stream.get());
+
+            return BOpContext.solutions(itr, predicate, stats);
+
+        }
+
+        @Override
+        public long removeAll() {
+            
+            final long n = stream.rangeCount();
+            
+            stream.removeAll();
+            
+            return n;
+            
+        }
+
+    }
+
+//    /**
+//     * A predicate that can be used with an {@link ISolutionSet} without having
+//     * to resolve the {@link ISolutionSet} as an {@link IRelation}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     * @param <E>
+//     */
+//    public static class SolutionSetPredicate<E extends IBindingSet> extends
+//            Predicate<E> {
+//
+//        public SolutionSetPredicate(BOp[] args, Map<String, Object> annotations) {
+//            super(args, annotations);
+//        }
+//
+//        public SolutionSetPredicate(BOp[] args, NV... annotations) {
+//            super(args, annotations);
+//        }
+//
+//        public SolutionSetPredicate(IVariableOrConstant<?>[] values,
+//                String relationName, int partitionId, boolean optional,
+//                IElementFilter<E> constraint, IAccessPathExpander<E> expander,
+//                long timestamp) {
+//            super(values, relationName, partitionId, optional, constraint,
+//                    expander, timestamp);
+//        }
+//
+//        public SolutionSetPredicate(IVariableOrConstant<?>[] values,
+//                String relationName, long timestamp) {
+//            super(values, relationName, timestamp);
+//            // TODO Auto-generated constructor stub
+//        }
+//
+//        public SolutionSetPredicate(Predicate<E> op) {
+//            super(op);
+//            // TODO Auto-generated constructor stub
+//        }
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 1L;
+//
+//    }
+
 }

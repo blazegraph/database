@@ -26,7 +26,6 @@ import java.util.Collections;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -74,10 +73,13 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
     }
     
     /**
+     * {@inheritDoc}
+     * 
      * @throws UnsupportedOperationException
      *             unless the caller specified an {@link IPredicate} to the
      *             ctor.
      */
+    @Override
     public IPredicate<E> getPredicate() {
 
         if (predicate == null)
@@ -88,31 +90,40 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
     }
 
     /**
+     * {@inheritDoc}
+     * 
      * @throws UnsupportedOperationException
      *             unless the caller specified an {@link IKeyOrder} to the ctor.
      */
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         if (keyOrder == null)
             throw new UnsupportedOperationException();
 
         return keyOrder;
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @throws UnsupportedOperationException
+     *             since no index is associated with this array
+     */
+    @Override
+    public IIndex getIndex() {
+
+        throw new UnsupportedOperationException();
         
     }
 
     /**
-     * @throws UnsupportedOperationException
-     *             since no index is associated with this array
-     */
-    public IIndex getIndex() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
+     * {@inheritDoc}
+     * <p>
      * Returns <code>true</code> when the array of elements is empty.
      */
+    @Override
     public boolean isEmpty() {
 
         return e.length == 0;
@@ -120,47 +131,57 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Returns the size of the array of elements.
      */
+    @Override
     public long rangeCount(boolean exact) {
 
         return e.length;
 
     }
 
-    /**
-     * @throws UnsupportedOperationException
-     *             since no index is associated with this array
-     */
-    public ITupleIterator<E> rangeIterator() {
+//    /**
+//     * @throws UnsupportedOperationException
+//     *             since no index is associated with this array
+//     */
+//    @Override
+//    public ITupleIterator<E> rangeIterator() {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
-        throw new UnsupportedOperationException();
-        
-    }
-
     /**
+     * {@inheritDoc}
+     * <p>
      * Visits the entire array of elements.
      */
+    @Override
 	public IChunkedOrderedIterator<E> iterator() {
 
-		return iterator(0/* limit */, 0/* capacity */);
+        return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
 
     }
 
-    /**
-     * Visits the array of elements up to the specified limit.
-     */
-    public IChunkedOrderedIterator<E> iterator(final int limit, 
-    		final int capacity) {
+//    /**
+//     * Visits the array of elements up to the specified limit.
+//     */
+//    public IChunkedOrderedIterator<E> iterator(final int limit, 
+//    		final int capacity) {
+//
+//        return iterator(0L/* offset */, limit, capacity);
+//        
+//    }
 
-        return iterator(0L/* offset */, limit, capacity);
-        
-    }
-
     /**
-     * Visits the array of elements from the specified offset up to the 
+     * {@inheritDoc}
+     * <p>
+     * Visits the array of elements from the specified offset up to the
      * specified limit.
      */
+    @Override
     @SuppressWarnings("unchecked")
     public IChunkedOrderedIterator<E> iterator(final long offset, 
     		long limit, final int capacity) {
@@ -232,8 +253,11 @@ public class ArrayAccessPath<E> implements IAccessPath<E> {
 	}
 
     /**
+     * {@inheritDoc}
+     * <P>
      * Does nothing and always returns ZERO(0).
      */
+    @Override
     public long removeAll() {
 
         return 0L;

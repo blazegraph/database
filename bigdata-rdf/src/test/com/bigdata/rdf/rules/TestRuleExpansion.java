@@ -232,18 +232,23 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                             spo = null;
                         }
                         return new IAccessPath<ISPO>() {
+                            @Override
                             public IIndex getIndex() {
                                 return accessPath.getIndex();
                             }
+                            @Override
                             public IKeyOrder<ISPO> getKeyOrder() {
                                 return accessPath.getKeyOrder();
                             }
+                            @Override
                             public IPredicate<ISPO> getPredicate() {
                                 return accessPath.getPredicate();
                             }
+                            @Override
                             public boolean isEmpty() {
                                 return false;
                             }
+                            @Override
                             public IChunkedOrderedIterator<ISPO> iterator() {
                                 final IChunkedOrderedIterator<ISPO> delegate = accessPath.iterator();
                                 if (spo == null) {
@@ -288,18 +293,22 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                                     }
                                 };
                             }
-                            public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
-                                throw new UnsupportedOperationException();
-                            }
+//                            public IChunkedOrderedIterator<ISPO> iterator(int limit, int capacity) {
+//                                throw new UnsupportedOperationException();
+//                            }
+                            @Override
                             public IChunkedOrderedIterator<ISPO> iterator(long offset, long limit, int capacity) {
                                 throw new UnsupportedOperationException();
                             }
+                            @Override
                             public long rangeCount(boolean exact) {
                                 return accessPath.rangeCount(exact)+1;
                             }
-                            public ITupleIterator<ISPO> rangeIterator() {
-                                throw new UnsupportedOperationException();
-                            }
+//                            @Override
+//                            public ITupleIterator<ISPO> rangeIterator() {
+//                                throw new UnsupportedOperationException();
+//                            }
+                            @Override
                             public long removeAll() {
                                 return accessPath.removeAll();
                             }

@@ -50,7 +50,15 @@ public interface IBindingSetAccessPath<R> extends IAbstractAccessPath<R> {
      * Return an iterator which will visit the solutions drawn from the access
      * path with a limit on the number of solutions drawn.
      * 
-     * TODO Should this be visiting IBindingSet[]s?
+     * @param limit
+     *            The maximum #of solutions to visit.
+     * @param stats
+     *            Some statistics are updated as solutions are visited.
+     * 
+     * @return The iterator.
+     * 
+     *         TODO Should this be visiting IBindingSet[]s or be an
+     *         IChunkedIterator<IBindingSet>?
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
      *      should visit solutions for high level query).

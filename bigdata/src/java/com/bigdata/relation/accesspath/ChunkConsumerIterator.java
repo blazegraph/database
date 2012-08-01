@@ -10,12 +10,16 @@ import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
- * A class that aligns a buffer of <code>E[]</code>s (a buffer of chunks)
- * with an {@link IChunkedOrderedIterator}.
+ * A class that aligns a buffer of <code>E[]</code>s (a buffer of chunks) with
+ * an {@link IChunkedOrderedIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ChunkConsumerIterator.java 6130 2012-03-15 10:31:25Z
+ *          thompsonbry $
  * @param <E>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/483">
+ *      Eliminate unnecessary dechunking and rechunking </a>
  */
 public class ChunkConsumerIterator<E> implements IChunkedOrderedIterator<E> {
 

@@ -226,7 +226,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         return new Constant(((IElement) e).get(index));
 
     }
-
+    
     final public boolean isOptional() {
 
         return (Boolean) getProperty(Annotations.OPTIONAL,Annotations.DEFAULT_OPTIONAL);

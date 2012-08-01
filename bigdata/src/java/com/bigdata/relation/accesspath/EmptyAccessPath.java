@@ -4,8 +4,6 @@ import java.util.Collections;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -56,10 +54,12 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     }
     
     /**
+     * {@inheritDoc}
      * @throws UnsupportedOperationException
      *             unless the caller specified an {@link IPredicate} to the
      *             ctor.
      */
+    @Override
     public IPredicate<E> getPredicate() {
 
         if (predicate == null)
@@ -70,9 +70,11 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     }
 
     /**
+     * {@inheritDoc}
      * @throws UnsupportedOperationException
      *             unless the caller specified an {@link IKeyOrder} to the ctor.
      */
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         if (keyOrder == null)
@@ -83,9 +85,11 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     }
 
     /**
+     * {@inheritDoc}
      * @throws UnsupportedOperationException
      *             since no index was selected.
      */
+    @Override
     public IIndex getIndex() {
         
         throw new UnsupportedOperationException();
@@ -93,8 +97,10 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     }
     
     /**
+     * {@inheritDoc}<p>
      * Always returns <code>true</code>.
      */
+    @Override
     public boolean isEmpty() {
 
         return true;
@@ -102,48 +108,52 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     }
 
     /**
-     * Always returns ZERO(0).
+     * {@inheritDoc}<p>Always returns ZERO(0).
      */
+    @Override
     public long rangeCount(boolean exact) {
 
         return 0;
 
     }
 
+//    /**
+//     * Visits nothing.
+//     */
+//    @SuppressWarnings("unchecked")
+//    @Override
+//    public ITupleIterator<E> rangeIterator() {
+//
+//        return EmptyTupleIterator.INSTANCE;
+//        
+//    }
+
     /**
      * Visits nothing.
      */
-    @SuppressWarnings("unchecked")
-    public ITupleIterator<E> rangeIterator() {
-
-        return EmptyTupleIterator.INSTANCE;
-        
-    }
-
-    /**
-     * Visits nothing.
-     */
+    @Override
     public IChunkedOrderedIterator<E> iterator() {
         
         return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
         
     }
 
+//    /**
+//     * Visits nothing.
+//     */
+//    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+//
+//        return iterator(0L/* offset */, limit, capacity);
+//        
+//    }
+
     /**
      * Visits nothing.
      */
-    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
-
-        return iterator(0L/* offset */, limit, capacity);
-        
-    }
-
-    /**
-     * Visits nothing.
-     */
+    @Override
     @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<E> iterator(long offset, long limit,
-            int capacity) {
+    public IChunkedOrderedIterator<E> iterator(final long offset,
+            final long limit, final int capacity) {
 
         return new ChunkedWrappedIterator<E>(Collections.EMPTY_LIST.iterator());
 
@@ -152,6 +162,7 @@ public class EmptyAccessPath<E> implements IAccessPath<E> {
     /**
      * Does nothing and always returns ZERO(0).
      */
+    @Override
     public long removeAll() {
 
         return 0L;

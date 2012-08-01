@@ -112,12 +112,14 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     }
 
+    @Override
     public IPredicate<E> getPredicate() {
 
         return path1.getPredicate();
 
     }
 
+    @Override
     public boolean isEmpty() {
 
         return path1.isEmpty() && path2.isEmpty();
@@ -125,6 +127,8 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     }
 
     /**
+     * {@inheritDoc}
+     * <P>
      * Note: You can not get an exact range count for a view.
      * 
      * @throws UnsupportedOperationException
@@ -135,6 +139,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
      *       sync so that duplicates could be detected. This means a full key
      *       range scan for both source access paths.
      */
+    @Override
     public long rangeCount(boolean exact) {
 
         if (exact) {
@@ -152,23 +157,27 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     // final private int flags;
 
     /**
+     * {@inheritDoc}
+     * 
      * @throws UnsupportedOperationException
      *             always.
      * 
      * @todo this could be implemented with a variant (or relaxed form) of
      *       {@link FusedView}.
      */
+    @Override
     public IIndex getIndex() {
 
         throw new UnsupportedOperationException();
 
     }
 
-    public ITupleIterator<E> rangeIterator() {
-
-        return rangeIterator(0/* capacity */);
-
-    }
+//    @Override
+//    public ITupleIterator<E> rangeIterator() {
+//
+//        return rangeIterator(0/* capacity */);
+//
+//    }
 
     private ITupleIterator<E> rangeIterator(final int capacity) {
 
@@ -188,17 +197,18 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     }
 
+    @Override
     public IChunkedOrderedIterator<E> iterator() {
 
         return iterator(0L/* offset */, 0L/* limit */, 0/* capacity */);
 
     }
 
-    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
-        
-        return iterator(0L/* offset */, limit, capacity);
-        
-    }
+//    public IChunkedOrderedIterator<E> iterator(int limit, int capacity) {
+//        
+//        return iterator(0L/* offset */, limit, capacity);
+//        
+//    }
     
     /**
      * FIXME write tests for optimizations for point tests and small limits. See
@@ -206,7 +216,9 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
      * 
      * FIXME handle non-zero offset.
      */
-    public IChunkedOrderedIterator<E> iterator(long offset, long limit, int capacity) {
+    @Override
+    public IChunkedOrderedIterator<E> iterator(final long offset, long limit,
+            int capacity) {
 
         if (offset > 0L)
             throw new UnsupportedOperationException();
@@ -283,12 +295,14 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     }
 
+    @Override
     public long removeAll() {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         return path1.getKeyOrder();

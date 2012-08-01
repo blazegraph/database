@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
  * Base class for test suites for inference engine and the magic sets
@@ -51,4 +55,26 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
         super(name);
     }
     
+    /**
+     * Return the constant bound on the {@link Predicate} associated with the
+     * {@link IAccessPath} at the specified slot index -or- {@link #NULL} iff
+     * the predicate is not bound at that slot index.
+     * 
+     * @param ap
+     *            The {@link IAccessPath}.
+     * @param index
+     *            The slot index on the {@link Predicate}.
+     * 
+     * @return Either the bound value -or- {@link #NULL} iff the index is
+     *         unbound for the predicate for this access path.
+     */
+    @SuppressWarnings("rawtypes")
+    protected static IV getValue(final IAccessPath<?> ap, final int index) {
+
+        final IVariableOrConstant<?> t = ap.getPredicate().get(index);
+
+        return (IV) (t == null || t.isVar() ? null : t.get());
+
+    }
+
 }

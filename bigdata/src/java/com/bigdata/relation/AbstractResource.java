@@ -138,9 +138,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
     /**
      * If the estimated range count for an
-     * {@link IAccessPath#iterator(int, int)} is LTE this threshold then do a
-     * fully buffered (synchronous) read. Otherwise we will do an asynchronous
-     * read.
+     * {@link IAccessPath#iterator(long,long, int)} is LTE this threshold then
+     * do a fully buffered (synchronous) read. Otherwise we will do an
+     * asynchronous read.
      * 
      * @see Options#FULLY_BUFFERED_READ_THRESHOLD
      * 

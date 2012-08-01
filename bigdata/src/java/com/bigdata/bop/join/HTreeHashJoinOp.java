@@ -369,15 +369,26 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
         }
 
         /**
+         * Return the access path that to be scanned. Solutions read from this
+         * access path will be used to probe the hash index to identify
+         * solutions that can join.
+         */
+        private IBindingSetAccessPath<?> getAccessPath() {
+
+            return (IBindingSetAccessPath<?>) context.getAccessPath(relation,
+                    pred);
+
+        }
+        
+        /**
          * Do a hash join of the buffered solutions with the access path.
          */
         private void doHashJoin() {
 
             if (state.isEmpty())
                 return;
-            
-            final IAccessPath<?> accessPath = context.getAccessPath(relation,
-                    pred);
+
+            final IBindingSetAccessPath<?> accessPath = getAccessPath();
 
             if (log.isInfoEnabled())
                 log.info("accessPath=" + accessPath);
@@ -395,7 +406,7 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
 					IPredicate.Annotations.DEFAULT_CUTOFF_LIMIT);
 
 			// Obtain the iterator for the current join dimension.
-			final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
+			final ICloseableIterator<IBindingSet> itr = accessPath
 					.solutions(cutoffLimit, stats);
 
             state.hashJoin(

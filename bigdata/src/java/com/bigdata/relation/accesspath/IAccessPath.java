@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
@@ -68,15 +68,15 @@ public interface IAccessPath<R> extends IAbstractAccessPath<R> { //extends Itera
      */
     public IIndex getIndex();
     
-    /**
-     * The raw iterator for traversing the selected index within the key range
-     * implied by {@link IPredicate}.
-     * <p>
-     * Note: The access path may incorporate additional constraints from the
-     * specified {@link IPredicate} that are not present on the raw
-     * {@link ITupleIterator} returned by this method.
-     */
-    public ITupleIterator<R> rangeIterator();
+//    /**
+//     * The raw iterator for traversing the selected index within the key range
+//     * implied by {@link IPredicate}.
+//     * <p>
+//     * Note: The access path may incorporate additional constraints from the
+//     * specified {@link IPredicate} that are not present on the raw
+//     * {@link ITupleIterator} returned by this method.
+//     */
+//    public ITupleIterator<R> rangeIterator();
 
     /**
      * An iterator visiting elements using the natural order of the index
@@ -102,25 +102,25 @@ public interface IAccessPath<R> extends IAbstractAccessPath<R> { //extends Itera
      */
     public IChunkedOrderedIterator<R> iterator();
 
-    /**
-     * An iterator visiting elements using the natural order of the index
-     * selected for the {@link IPredicate}.
-     * 
-     * @param limit
-     *            The maximum #of elements that will be visited -or- ZERO (0) if
-     *            there is no limit.
-     * 
-     * @param capacity
-     *            The maximum capacity for the buffer used by the iterator. When
-     *            ZERO(0), a default capacity will be used. When a <i>limit</i>
-     *            is specified, the capacity will never exceed the <i>limit</i>.
-     * 
-     * @return The iterator.
-     * 
-     * @deprecated by {@link #iterator(long, long, int)}. Also, [limit] should
-     *             have been a long, not an int.
-     */
-    public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
+//    /**
+//     * An iterator visiting elements using the natural order of the index
+//     * selected for the {@link IPredicate}.
+//     * 
+//     * @param limit
+//     *            The maximum #of elements that will be visited -or- ZERO (0) if
+//     *            there is no limit.
+//     * 
+//     * @param capacity
+//     *            The maximum capacity for the buffer used by the iterator. When
+//     *            ZERO(0), a default capacity will be used. When a <i>limit</i>
+//     *            is specified, the capacity will never exceed the <i>limit</i>.
+//     * 
+//     * @return The iterator.
+//     * 
+//     * @deprecated by {@link #iterator(long, long, int)}. Also, [limit] should
+//     *             have been a long, not an int.
+//     */
+//    public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
 
     /**
      * An iterator visiting elements using the natural order of the index
@@ -166,12 +166,12 @@ public interface IAccessPath<R> extends IAbstractAccessPath<R> { //extends Itera
     public IChunkedOrderedIterator<R> iterator(long offset, long limit,
             int capacity);
 
-    /**
-     * Remove all elements selected by the {@link IPredicate} (optional
-     * operation).
-     * 
-     * @return The #of elements that were removed.
-     */
-    public long removeAll();
+//    /**
+//     * Remove all elements selected by the {@link IPredicate} (optional
+//     * operation).
+//     * 
+//     * @return The #of elements that were removed.
+//     */
+//    public long removeAll();
     
 }
