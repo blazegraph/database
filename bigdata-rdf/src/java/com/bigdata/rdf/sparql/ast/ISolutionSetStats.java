@@ -66,7 +66,7 @@ public interface ISolutionSetStats {
 	 * Return the subset of the variables which are materialized in all
 	 * solutions in which they appear (the variables do not have to be bound in
 	 * every solution, but if they are bound then their {@link IVCache}
-	 * association is set.
+	 * association is always set).
 	 */
     Set<IVariable<?>> getMaterialized();
     
