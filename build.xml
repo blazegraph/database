@@ -322,6 +322,15 @@ public class BuildInfo {
 			</manifest>
 		</jar>
 	</target>
+	
+	<!-- Deploy the JAR to the maven repository. -->
+   <target name="maven-deploy" depends="jar" 
+   	   description="Deploy the jar to the maven repository.">
+     	<exec command="mvn">
+    		<arg value="clean"/>
+    		<arg value="deploy"/>
+     	</exec>
+   	</target>
 
 	<!-- This generates an osgi bundle jar, but does not bundle the dependencies.
 		 See 'bundleJar'. -->

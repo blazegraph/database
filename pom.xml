@@ -48,7 +48,7 @@ commands first!
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.2.1</version>
+   <version>1.2.2-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>
@@ -156,6 +156,12 @@ commands first!
             <name>bigdata(R) releases</name>
             <url>scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/releases</url>
         </repository>
+        <snapshotRepository>
+            <id>bigdata.snapshots</id>
+            <name>bigdata(R) snapshots</name>
+            <url>scpexe://shell.speakeasy.net/home/t/thompsonbry/systap.com/maven/snapshots</url>
+            <uniqueVersion>true</uniqueVersion>
+        </snapshotRepository>
     </distributionManagement>
     
    <repositories>
