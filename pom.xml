@@ -33,6 +33,13 @@ To install the dependencies into your local maven repository, do:
 
         mvn clean install
         
+If you change any of the dependencies that are published by the bigdata
+project (whether because we maintain them or because they are not readily
+available) then you need to publish the updated dependencies to the maven
+repository.  There are commands in comment blocks in this POM that will
+deploy those dependencies.  Be sure to update the version numbers in the
+commands first!
+        
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" 
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -348,6 +355,7 @@ mvn deploy:deploy-file \
            <groupId>com.bigdata</groupId>
            <artifactId>bigdata-ganglia</artifactId>
            <version>1.0.1</version>
+           <optional>true</optional>
        </dependency>
        <!-- 
 mvn deploy:deploy-file \
