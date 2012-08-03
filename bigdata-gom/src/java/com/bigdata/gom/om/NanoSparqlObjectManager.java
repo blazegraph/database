@@ -2,6 +2,7 @@ package com.bigdata.gom.om;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.UUID;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -40,8 +41,8 @@ import com.bigdata.striterator.ICloseableIterator;
 public class NanoSparqlObjectManager extends ObjectMgrModel {
 	final RemoteRepository m_repo;
 	
-	public NanoSparqlObjectManager(final RemoteRepository repo, final String namespace) {
-		super(BigdataValueFactoryImpl.getInstance(namespace));
+	public NanoSparqlObjectManager(final UUID uuid, final RemoteRepository repo, final String namespace) {
+		super(uuid, BigdataValueFactoryImpl.getInstance(namespace));
 		
 		m_repo = repo;
 	}
@@ -118,12 +119,19 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		
 		// At present the DESCRIBE query will simply return a set of
 		//	statements equivalent to a TupleQuery <id, ?, ?>
-		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
-		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
-
-		while (stmts.hasNext()) {
-			final Statement stmt = stmts.next();
-			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
+//		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+//		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
+//
+//		while (stmts.hasNext()) {
+//			final Statement stmt = stmts.next();
+//			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
+//		}
+		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
+		final ICloseableIterator<BindingSet> res = evaluate(query);
+		
+		while (res.hasNext()) {
+			final BindingSet bs = res.next();
+			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
 		}
 	}
 
@@ -204,7 +212,6 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		} catch (QueryEvaluationException e) {
 			e.printStackTrace();
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		

@@ -98,6 +98,8 @@ public interface ILinkSet extends Set<IGPO> {
      */
     <C> Iterator<C> iterator(Class<C> theClassOrInterface);
 
+    <C> Iterator<C> statements();
+
 //    /**
 //     * Adds the generic object to the link set by appending it to the end of the
 //     * link set. Does nothing if the generic object is already a member of the
