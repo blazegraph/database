@@ -1,11 +1,13 @@
 package com.bigdata.gom.gpo;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +26,7 @@ import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -77,7 +80,7 @@ public class GPO implements IGPO {
 
 	private static final Logger log = Logger.getLogger(GPO.class);
 	
-	final IObjectManager m_om;
+	final ObjectMgrModel m_om;
 	final Resource m_id;
 	
 	boolean m_materialized = false;
@@ -260,6 +263,11 @@ public class GPO implements IGPO {
 			
 			return true;
 		}
+
+
+		public boolean hasValues() {
+			return m_values != null || m_addedValues != null;
+		}
 	}
 	GPOEntry m_headEntry = null;
 	GPOEntry m_tailEntry = null;
@@ -306,8 +314,8 @@ public class GPO implements IGPO {
 	}
 	
 	public GPO(IObjectManager om, Resource id) {
-		m_om = om;
-		m_id = id;
+		m_om = (ObjectMgrModel) om;
+		m_id = om.internKey((URI) id);
 	}
 	
 	@Override
@@ -330,7 +338,6 @@ public class GPO implements IGPO {
 		// Does not require full materialization!
 
 		final String query = "SELECT ?x WHERE {?x ?p <" + getId().toString() + ">}";
-		System.out.println("Query: " + query);
 		final ICloseableIterator<BindingSet> res = m_om.evaluate(query);
 		
 		final HashSet<IGPO> ret = new HashSet<IGPO>();
@@ -385,8 +392,20 @@ public class GPO implements IGPO {
 	public Map<URI, Long> getReverseLinkProperties() {
 		materialize();
 		
-		// TODO Auto-generated method stub
-		return null;
+		final Map<URI, Long> ret = new HashMap<URI, Long>();
+
+		final String query = "SELECT ?p (COUNT(?o) AS ?count) WHERE { ?o ?p <" + getId().toString() + "> } GROUP BY ?p";
+		
+		final ICloseableIterator<BindingSet> res = m_om.evaluate(query);
+		
+		while (res.hasNext()) {
+			final BindingSet bs = res.next();
+			final URI pred = (URI) bs.getBinding("p").getValue();
+			final Long count = ((BigdataLiteralImpl) bs.getBinding("count").getValue()).longValue();
+			ret.put(pred, count);
+		}
+
+		return ret;
 	}
 
 	@Override
@@ -647,5 +666,47 @@ public class GPO implements IGPO {
 		m_skins.add(ret);
 		
 		return ret;
+	}
+
+	public Iterator<URI> getPropertyURIs() {
+		materialize();
+		
+		return new Iterator<URI>() {
+			GPOEntry m_entry = next(m_headEntry);
+			
+			@Override
+			public boolean hasNext() {
+				return m_entry != null;
+			}
+
+			private GPOEntry next(final GPOEntry entry) {
+				if (entry == null)
+					return null;
+				
+				if (entry.hasValues()) {
+					return entry;
+				} else {
+					return next(entry.m_next);
+				}
+			}
+
+			@Override
+			public URI next() {
+				if (m_entry == null) {
+					throw new NoSuchElementException();
+				}
+				
+				final URI ret = m_entry.m_key;
+				m_entry = next(m_entry.m_next);
+				
+				return ret;
+			}
+
+			@Override
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+			
+		};
 	}
 }

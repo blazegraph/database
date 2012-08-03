@@ -2,6 +2,7 @@ package com.bigdata.gom.om;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -38,9 +39,16 @@ public class ObjectManager extends ObjectMgrModel {
 	
 	final BigdataSailRepositoryConnection m_cxn;
 	
-	public ObjectManager(final BigdataSailRepositoryConnection cxn) {
-		super(cxn.getTripleStore().getValueFactory());
+	public ObjectManager(final UUID uuid, final BigdataSailRepositoryConnection cxn) {
+		super(uuid, cxn.getValueFactory());
 		m_cxn = cxn;
+	}
+	
+	/**
+	 * @return direct repository connection
+	 */
+	public BigdataSailRepositoryConnection getRawConnection() {
+		return m_cxn;
 	}
 	
 	@Override
@@ -58,7 +66,7 @@ public class ObjectManager extends ObjectMgrModel {
 		try {
 			final TupleQuery q = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 			final TupleQueryResult res = q.evaluate();
-			return  new CloseableIteratorWrapper<BindingSet>(new Iterator<BindingSet>() {
+			return new CloseableIteratorWrapper<BindingSet>(new Iterator<BindingSet>() {
 
 				@Override
 				public boolean hasNext() {
@@ -146,9 +154,8 @@ public class ObjectManager extends ObjectMgrModel {
 		return true; //
 	}
 
-	@Override
-	public void materialize(IGPO gpo) {
-		if (false && log.isTraceEnabled())
+	public void materializeWithDescribe(IGPO gpo) {
+		if (log.isTraceEnabled())
 			log.trace("Materializing: " + gpo.getId());
 		
 		((GPO) gpo).reset();
@@ -158,15 +165,44 @@ public class ObjectManager extends ObjectMgrModel {
 		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
 		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
 
+		int statements = 0;
 		while (stmts.hasNext()) {
 			final Statement stmt = stmts.next();
-			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
+			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());	
+			statements++;
+		}
+		
+		if (log.isTraceEnabled())
+			log.trace("Materializing: " + gpo.getId() + " with " + statements + " statements");
+	}
+
+	@Override
+	public void materialize(IGPO gpo) {
+		if (false) {
+			materializeWithDescribe(gpo);
+			return;
+		}
+		
+		if (log.isTraceEnabled())
+			log.trace("Materializing: " + gpo.getId());
+		
+		((GPO) gpo).reset();
+		
+		// At present the DESCRIBE query will simply return a set of
+		//	statements equivalent to a TupleQuery <id, ?, ?>
+		// final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
+		final ICloseableIterator<BindingSet> res = evaluate(query);
+		
+		while (res.hasNext()) {
+			final BindingSet bs = res.next();
+			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
 		}
 	}
 
 	@Override
 	public void insert(Resource id, URI key, Value val) throws RepositoryException {
-		if (false && log.isTraceEnabled())
+		if (log.isTraceEnabled())
 			log.trace("Inserting statement: " + id.stringValue() + " " + key.stringValue() + " " + val.stringValue());
 		
 		// experiment with adding using batch syntax

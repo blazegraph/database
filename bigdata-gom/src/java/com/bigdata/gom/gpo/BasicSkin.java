@@ -3,6 +3,7 @@ package com.bigdata.gom.gpo;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
@@ -14,12 +15,16 @@ import org.openrdf.model.ValueFactory;
  */
 public class BasicSkin implements IGenericSkin {
 	
-	final IGPO m_gpo;
-	final ValueFactory m_vf;
+	final protected IGPO m_gpo;
+	final protected ValueFactory m_vf;
 	
 	public BasicSkin(final IGPO gpo) {
 		m_gpo = gpo;
 		m_vf = gpo.getObjectManager().getValueFactory();
+	}
+	
+	public void rollback() {
+		((GPO) m_gpo).setMaterialized(false); // forces reload
 	}
 	
 	public void setValue(final URI property, final Value value) {
@@ -102,6 +107,16 @@ public class BasicSkin implements IGenericSkin {
 		
 		if (v instanceof Literal) {
 			return ((Literal) v).stringValue();
+		} else {	
+			return null;
+		}
+	}
+
+	public IGPO getGPOValue(final URI key) {
+		final Value v = m_gpo.getValue(key);
+		
+		if (v instanceof Resource) {
+			return m_gpo.getObjectManager().getGPO((Resource) v);
 		} else {	
 			return null;
 		}

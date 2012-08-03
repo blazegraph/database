@@ -105,7 +105,6 @@ public class LinkSet implements ILinkSet {
 			final IObjectManager om = m_owner.getObjectManager();
 			
 			final String query = "SELECT ?x WHERE {?x <" + m_linkProperty.toString() + "> <" + m_owner.getId().toString() + ">}";
-			System.out.println("Query: " + query);
 			final ICloseableIterator<BindingSet> res = om.evaluate(query);
 			
 			return new Iterator<IGPO>() {
@@ -222,6 +221,12 @@ public class LinkSet implements ILinkSet {
 
 	@Override
 	public <T> T[] toArray(T[] arg0) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public <C> Iterator<C> statements() {
 		// TODO Auto-generated method stub
 		return null;
 	}

@@ -28,26 +28,32 @@
 
   <owl:Class rdf:about="&ns_transport;LandTransport">
     <rdfs:subClassOf rdf:resource="&ns_transport;Transport"/>
-    <rdfs:label>Land Transport.</rdfs:label>
+    <rdfs:label>Land Transport</rdfs:label>
     <rdfs:comment>Middle-level land transport class.</rdfs:comment>
   </owl:Class>
 
   <owl:Class rdf:about="&ns_transport;AirTransport">
     <rdfs:subClassOf rdf:resource="&ns_transport;Transport"/>
-    <rdfs:label>Air Transport.</rdfs:label>
+    <rdfs:label>Air Transport</rdfs:label>
     <rdfs:comment>Middle-level air transport class.</rdfs:comment>
   </owl:Class>
 
   <owl:Class rdf:about="&ns_transport;Bus">
     <rdfs:subClassOf rdf:resource="&ns_transport;LandTransport"/>
-    <rdfs:label>Bus.</rdfs:label>
+    <rdfs:label>Bus</rdfs:label>
     <rdfs:comment>Bottom-level bus class.</rdfs:comment>
   </owl:Class>
 
   <owl:Class rdf:about="&ns_transport;Car">
     <rdfs:subClassOf rdf:resource="&ns_transport;LandTransport"/>
-    <rdfs:label>Car.</rdfs:label>
+    <rdfs:label>Car</rdfs:label>
     <rdfs:comment>Bottom-level car class.</rdfs:comment>
+  </owl:Class>
+
+  <owl:Class rdf:about="&ns_transport;Plane">
+    <rdfs:subClassOf rdf:resource="&ns_transport;AirTransport"/>
+    <rdfs:label>Plane</rdfs:label>
+    <rdfs:comment>Bottom-level plane class.</rdfs:comment>
   </owl:Class>
 
 

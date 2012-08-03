@@ -2,6 +2,7 @@ package com.bigdata.gom.om;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,6 +24,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.spo.SPO;
 
 public abstract class ObjectMgrModel implements IObjectManager {
@@ -35,27 +37,72 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	
 	final ValueFactory m_valueFactory;
 	
+	final UUID m_uuid;
+	
 	// new terms cache to enable batch term registration on update/flush
 	final ArrayList<BigdataValue> m_terms = new ArrayList<BigdataValue>();
 	final ArrayList<Statement> m_inserts = new ArrayList<Statement>();
 	final ArrayList<Statement> m_removes = new ArrayList<Statement>();
 
-	// Object Creation and ID Management patterns
-	final URI s_idMgr;
-	final URI s_idMgrNextId;
 	final URI s_nmeMgr;
+
+	// Object Creation and ID Management patterns for default idGenerator
+	IIDGenerator m_idGenerator = null;
 
 	int m_transactionCounter = 0;
 	
-	ObjectMgrModel(final ValueFactory valueFactory) {
+	ObjectMgrModel(final UUID uuid, final ValueFactory valueFactory) {
 		m_valueFactory = valueFactory;
-		s_idMgr = m_valueFactory.createURI("gpo:idMgr");
-		s_idMgrNextId = m_valueFactory.createURI("gpo:idMgr#nextId");
-		s_nmeMgr = m_valueFactory.createURI("gpo:nmeMgr");
+		m_uuid = uuid;
 		
-		addNewTerm((BigdataValue) s_idMgr);
-		addNewTerm((BigdataValue) s_idMgrNextId );
-		addNewTerm((BigdataValue) s_nmeMgr);
+		s_nmeMgr = m_valueFactory.createURI("gpo:nmeMgr/"+m_uuid);
+		addNewTerm((BigdataValue) s_nmeMgr);			
+	}
+	
+	public IGPO getDefaultNameMgr() {
+		return getGPO(s_nmeMgr);
+	}
+	
+	public void setIDGenerator(final IIDGenerator idgenerator) {
+		m_idGenerator = idgenerator;
+	}
+	
+	public UUID getID() {
+		return m_uuid;
+	}
+	
+	class DefaultIDGenerator implements IIDGenerator {
+		final URI s_idMgr;
+		final URI s_idMgrNextId;
+		BasicSkin m_idMgr;
+		
+		DefaultIDGenerator() {
+			s_idMgr = m_valueFactory.createURI("gpo:idMgr/"+m_uuid);
+			s_idMgrNextId = m_valueFactory.createURI("gpo:idMgr/"+m_uuid + "#nextId");
+			
+			m_idMgr = new BasicSkin(getGPO(s_idMgr));
+
+			addNewTerm((BigdataValue) s_idMgr);
+			addNewTerm((BigdataValue) s_idMgrNextId );
+		}
+		
+		/**
+		 * Default IIDGenerator implementation for ObjectManagers.
+		 */
+		public URI genId() {
+			if (m_idMgr == null) {
+				m_idMgr = new BasicSkin(getGPO(s_idMgr));
+			}
+			
+			int nxtId = m_idMgr.getIntValue(s_idMgrNextId)+1;
+			m_idMgr.setValue(s_idMgrNextId, nxtId);
+			
+			return getValueFactory().createURI("gpo:" + m_uuid + "/" + nxtId);
+		}
+
+		public void rollback() {
+			m_idMgr = null; // force reload to committed state on next access
+		}
 	}
 	
 	@Override
@@ -139,7 +186,6 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		
 		if (ret == null) {
 			ret = new GPO(this, id);
-			// materialize(ret); // JFDI?
 			m_dict.put(id, ret);
 		}
 		
@@ -180,7 +226,9 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		m_dict.clear();
 		m_dirtyGPOs.clear();
 		m_transactionCounter = 0;	
-		m_idMgr = null;
+		if (m_idGenerator != null) {
+			m_idGenerator.rollback();
+		}
 		
 		doRollback();
 	}
@@ -189,12 +237,11 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
 	@Override
 	public IGPO createGPO() {
-		BasicSkin idMgr = getIdMgr();
+		if (m_idGenerator == null) {			
+			m_idGenerator = new DefaultIDGenerator();
+		}
 		
-		int nxtId = idMgr.getIntValue(s_idMgrNextId)+1;
-		idMgr.setValue(s_idMgrNextId, nxtId);
-		
-		final Resource uri = getValueFactory().createURI("gpo:#" + nxtId);
+		final Resource uri = m_idGenerator.genId();
 		addNewTerm((BigdataValue) uri);
 		final GPO ret = (GPO) getGPO(uri);
 		
@@ -207,22 +254,10 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		if (uri.isRealIV())
 			throw new IllegalArgumentException("IV already available: " + uri.stringValue());
 		
+		System.out.println("Adding term: " + uri);
 		m_terms.add(uri);
 	}
 
-	BasicSkin m_idMgr = null;
-	protected BasicSkin getIdMgr() {
-		if (m_idMgr == null) {
-			if (log.isTraceEnabled())
-				log.trace("retrieving ID Manager");
-			
-			IGPO idMgr = getGPO(s_idMgr);
-			
-			m_idMgr = new BasicSkin(idMgr);
-		}
-		
-		return m_idMgr;
-	}
 
 	/**
 	 * Simple save/recall interface that the ObjectManager provides to simplify
@@ -250,6 +285,16 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		}
 	}
 
+	/**
+	 * Return the list of names that have been used to save references. These
+	 * are the properties of the internal NameManager.
+	 */
+	public Iterator<URI> getNames() {
+		final GPO nmgr = (GPO) getGPO(s_nmeMgr);
+		
+		return nmgr.getPropertyURIs();
+	}
+
 	public void checkValue(Value newValue) {
 		final BigdataValue v = (BigdataValue) newValue;
 		if (!v.isRealIV()) {
@@ -262,7 +307,11 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		m_dirtyGPOs.clear();
 	}
 
-	public void insertBatch(final Resource m_id, final URI bigdataURI, final Value v) {
+	abstract public void insert(final Resource id, final URI key, final Value val) throws RepositoryException;
+
+	abstract public void retract(final Resource id, final URI key, final Value val) throws RepositoryException;
+
+		public void insertBatch(final Resource m_id, final URI bigdataURI, final Value v) {
 		m_inserts.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
 	}
 

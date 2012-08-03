@@ -4,12 +4,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -20,6 +23,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
@@ -46,6 +50,7 @@ import com.bigdata.rdf.sail.webapp.client.IRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.config.NicUtil;
+import com.bigdata.util.httpd.MIMEType;
 
 import junit.framework.TestCase;
 
@@ -74,7 +79,7 @@ public class TestRemoteGOM extends TestCase {
 	private BigdataSailRepositoryConnection m_cxn;
 
 	public void testSimpleDirectData() throws Exception {
-		final IObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final IObjectManager om = new NanoSparqlObjectManager(UUID.randomUUID(), m_repo, m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 					
 		final URL n3 = TestGOM.class.getResource("testgom.n3");
@@ -110,7 +115,7 @@ public class TestRemoteGOM extends TestCase {
 	}
 
 	public void testSimpleCreate() throws RepositoryException, IOException {
-		final IObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final IObjectManager om = new NanoSparqlObjectManager(UUID.randomUUID(), m_repo, m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -139,7 +144,7 @@ public class TestRemoteGOM extends TestCase {
 
 	public void testIncrementalUpdates() throws RepositoryException, IOException {
 		
-		final IObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final IObjectManager om = new NanoSparqlObjectManager(UUID.randomUUID(), m_repo, m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 
 		final int transCounter = om.beginNativeTransaction();
@@ -184,6 +189,60 @@ public class TestRemoteGOM extends TestCase {
 			throw new RuntimeException(t);
 		}
 		
+	}
+
+	public void testSimpleJSON() throws RepositoryException, IOException {
+		final IObjectManager om = new NanoSparqlObjectManager(UUID.randomUUID(), m_repo, m_namespace);
+		final ValueFactory vf = om.getValueFactory();
+		
+		final URI keyname = vf.createURI("attr:/test#name");
+		final Resource id = vf.createURI("gpo:test#1");
+		om.checkValue(id);
+		final int transCounter = om.beginNativeTransaction();
+		try {
+			IGPO gpo = om.getGPO(id);
+			
+			gpo.setValue(keyname, vf.createLiteral("Martyn"));			
+			
+			om.commitNativeTransaction(transCounter);
+		} catch (Throwable t) {
+			om.rollbackNativeTransaction();
+			
+			throw new RuntimeException(t);
+		}
+		
+		// Now let's read the data as JSON by connecting directly with the serviceurl
+		URL url = new URL(m_serviceURL);
+		URLConnection server = url.openConnection();
+		try {			
+			// server.setRequestProperty("Accept", TupleQueryResultFormat.JSON.toString());
+			server.setDoOutput(true);
+			server.connect();
+			PrintWriter out = new PrintWriter(server.getOutputStream());
+			out.print("query=SELECT ?p ?v WHERE {<" + id.stringValue() + "> ?p ?v}");
+			out.close();
+			InputStream inst = server.getInputStream();
+			byte[] buf = new byte[2048];
+			int curs = 0;
+			while (true) {
+				int len = inst.read(buf, curs, buf.length - curs);
+				if (len == -1) {
+					break;
+				}
+				curs += len;
+			}
+			System.out.println("Read in " + curs + " - " + new String(buf, 0, curs));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+		// clear cached data
+		((ObjectMgrModel) om).clearCache();
+		
+		IGPO gpo = om.getGPO(id); // reads from backing journal
+		
+		assertTrue("Martyn".equals(gpo.getValue(keyname).stringValue()));
 	}
 
 	public void setUp() throws Exception {

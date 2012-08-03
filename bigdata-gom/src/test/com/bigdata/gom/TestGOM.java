@@ -8,8 +8,10 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
@@ -23,6 +25,7 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.gom.gpo.BasicSkin;
@@ -55,6 +58,7 @@ import junit.framework.TestCase;
 public class TestGOM extends TestCase {
 	protected static final Logger log = Logger.getLogger(IObjectManager.class);
 	BigdataSailRepositoryConnection m_cxn = null;
+	private BigdataSail m_sail;
 
 	/**
 	 * Simple test loads data from a file and navigates around
@@ -66,7 +70,7 @@ public class TestGOM extends TestCase {
 		print(n3);
 		load(n3);
 		
-		final ObjectManager om = new ObjectManager(m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI s = vf.createURI("gpo:#root");
@@ -104,7 +108,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testSimpleCreate() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -133,6 +137,111 @@ public class TestGOM extends TestCase {
 	}
 	
 	/**
+	 * Checks getPropertyURIs of committed  GPO
+	 */
+	public void testSimpleProperties() throws RepositoryException, IOException {
+		
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ValueFactory vf = om.getValueFactory();
+		
+		final URI keyname = vf.createURI("attr:/test#name");
+		final URI keyage = vf.createURI("attr:/test#age");
+		final URI keyfriend = vf.createURI("attr:/test#friend");
+		final Resource id = vf.createURI("gpo:test#1");
+		final Resource id2 = vf.createURI("gpo:test#2");
+		om.checkValue(id); // ensure is imported!
+		om.checkValue(id2); // ensure is imported!
+		
+		final int transCounter = om.beginNativeTransaction();
+		try {
+			final IGPO gpo = om.getGPO(id);
+			
+			gpo.setValue(keyname, vf.createLiteral("Martyn"));			
+			gpo.setValue(keyage, vf.createLiteral(53));			
+			
+			Iterator<URI> uris = ((GPO) gpo).getPropertyURIs();
+			// should be two
+			uris.next();
+			uris.next();
+			// .. and no more
+			assertFalse(uris.hasNext());
+			
+			// add simple reverse link
+			om.getGPO(id2).setValue(keyfriend, id);
+
+			om.commitNativeTransaction(transCounter);
+			
+			uris = ((GPO) gpo).getPropertyURIs();
+			// should be two
+			uris.next();
+			uris.next();
+			// .. and no more
+			assertFalse(uris.hasNext());
+		} catch (Throwable t) {
+			om.rollbackNativeTransaction();
+			
+			throw new RuntimeException(t);
+		}
+		
+		// clear cached data
+		om.clearCache();
+		
+		IGPO gpo = om.getGPO(vf.createURI("gpo:test#1")); // reads from backing journal
+		
+		Iterator<URI> uris = ((GPO) gpo).getPropertyURIs();
+		// should be two
+		uris.next();
+		uris.next();
+		// .. and no more
+		assertFalse(uris.hasNext());
+	}
+	
+	public void testSimpleReverseLinkProperties() throws RepositoryException, IOException {
+		
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ValueFactory vf = om.getValueFactory();
+		
+		final URI keyname = vf.createURI("attr:/test#name");
+		final URI keyage = vf.createURI("attr:/test#age");
+		final URI parent = vf.createURI("attr:/test#parent");
+		final URI parent2 = vf.createURI("attr:/test#parent2");
+		final URI nme = vf.createURI("gpo:ROOT");
+		
+		final int transCounter = om.beginNativeTransaction();
+		try {
+			IGPO gpo = om.createGPO();
+			
+			gpo.setValue(keyname, vf.createLiteral("Martyn"));			
+			gpo.setValue(keyage, vf.createLiteral(53));		
+			
+			om.save(nme, gpo.getId());
+			
+			om.createGPO().setValue(parent, gpo.getId());
+			om.createGPO().setValue(parent, gpo.getId());
+			om.createGPO().setValue(parent, gpo.getId());
+			om.createGPO().setValue(parent2, gpo.getId());
+			om.createGPO().setValue(parent2, gpo.getId());
+			om.createGPO().setValue(parent2, gpo.getId());
+			
+			om.commitNativeTransaction(transCounter);
+		} catch (Throwable t) {
+			om.rollbackNativeTransaction();
+			
+			throw new RuntimeException(t);
+		}
+		
+		// clear cached data
+		om.clearCache();
+		
+		IGPO gpo = om.getGPO((Resource) om.recall(nme)); // reads from backing journal
+		
+		Map<URI, Long> map = gpo.getReverseLinkProperties();
+		
+		// there should be 3 - the two parent properties plus the name manager
+		assertTrue(map.size() == 3);
+	}
+	
+	/**
 	 * SimpleClassObjects tests navigation around a constructed network of GPOs.
 	 * First some class objects are created, with superclass and metaclass data.
 	 * Then instances of the classes are written.
@@ -146,7 +255,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testSimpleClassObjects() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
 		final ValueFactory vf = om.getValueFactory();
 
 		// This is the only required root!
@@ -212,7 +321,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testBasicSkin() {
 		GenericSkinRegistry.registerClass(BasicSkin.class);
-		final IObjectManager om = new ObjectManager(m_cxn);
+		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
 		
 		GPO gpo = (GPO) om.createGPO();
 		
@@ -226,7 +335,7 @@ public class TestGOM extends TestCase {
 
 	public void testIncrementalUpdates() throws RepositoryException, IOException {
 		
-		final IObjectManager om = new ObjectManager(m_cxn);
+		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
 		final ValueFactory vf = om.getValueFactory();
 
 		final int transCounter = om.beginNativeTransaction();
@@ -317,12 +426,27 @@ public class TestGOM extends TestCase {
         properties.setProperty("com.bigdata.namespace.kb.lex.ID2TERM.com.bigdata.btree.BTree.branchingFactor", "200");
 
 		// instantiate a sail and a Sesame repository
-		BigdataSail sail = new BigdataSail(properties);
-		BigdataSailRepository repo = new BigdataSailRepository(sail);
+		m_sail = new BigdataSail(properties);
+		BigdataSailRepository repo = new BigdataSailRepository(m_sail);
 		repo.initialize();		
 		
 		m_cxn = repo.getConnection();
 		m_cxn.setAutoCommit(false);
+		
+	}
+	
+	public void tearDown() {
+		try {
+			final long start = System.currentTimeMillis();
+			m_cxn.close();
+			m_sail.shutDown();
+			final long dur = System.currentTimeMillis()-start;
+			System.out.println("Sail shutdown: " + dur + "ms");
+		} catch (SailException e) {
+			e.printStackTrace();
+		} catch (RepositoryException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	void print(final URL n3) throws IOException {

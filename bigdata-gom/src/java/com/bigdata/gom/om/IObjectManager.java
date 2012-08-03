@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.gom.om;
 
+import java.util.Iterator;
+import java.util.UUID;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -42,6 +45,11 @@ import com.bigdata.striterator.ICloseableIterator;
  * The object manager is the abstraction for a connection the back end.
  */
 public interface IObjectManager extends INativeTransaction {
+	
+	/**
+	 * @return the UUID that identifies this ObjectManager
+	 */
+	UUID getID();
 
     /**
      * Return a canonical {@link IGPO} for the {@link Resource} (canonical
@@ -99,10 +107,6 @@ public interface IObjectManager extends INativeTransaction {
 
 	URI internKey(URI key);
 
-	void retract(Resource id, URI key, Value value) throws RepositoryException;
-
-	void insert(Resource id, URI key, Value value) throws RepositoryException;
-
 	/**
 	 * The ObjectManager is able to assign automatic ids for a new object.  These
 	 * will be of the form "gpo:#[genid]"
@@ -124,6 +128,12 @@ public interface IObjectManager extends INativeTransaction {
 	Value recall(URI key);
 	
 	IGPO recallAsGPO(URI key);
+	
+	/**
+	 * Return the list of names that have been used to save references. These
+	 * are the properties of the internal NameManager.
+	 */
+	Iterator<URI> getNames();
 
 	void remove(IGPO gpo);
 
