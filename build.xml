@@ -346,16 +346,15 @@ public class BuildInfo {
 		</jar>
 		<bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
 
-		<bndwrap jars="${build.dir}/lib/colt-1.2.0.jar" output="${build.dir}/bundles/colt-1.2.0.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/fastutil-5.1.5.jar" output="${build.dir}/bundles/fastutil-5.1.5.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" output="${build.dir}/bundles/dsi-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar" output="${build.dir}/bundles/lgpl-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/high-scale-lib-v1.1.2.jar" output="${build.dir}/bundles/high-scale-lib-v1.1.2.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/colt-${colt.version}.jar" output="${build.dir}/bundles/colt-${colt.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/fastutil-${fastutil.version}.jar" output="${build.dir}/bundles/fastutil-${fastutil.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/dsi-utils.${dsiutils.version}.jar" output="${build.dir}/bundles/dsi-utils.${dsiutils.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/lgpl-utils.${lgplutils.version}.jar" output="${build.dir}/bundles/lgpl-utils.${lgplutils.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/high-scale-lib-v${highscalelib.version}.jar" output="${build.dir}/bundles/high-scale-lib-v${highscalelib.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/openrdf-sesame-${sesame.version}-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-${sesame.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/apache/zookeeper-${zookeeper.version}.jar" output="${build.dir}/bundles/zookeeper-${zookeeper.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/nxparser-${nxparser.version}.jar" output="${build.dir}/bundles/nxparser-2010.6.22.jar" definitions="${basedir}/osgi/" />
 	</target>
-
 
 	<!-- Note: the javadoc requires a LOT of RAM, but runs quickly on a
 		 server	class machine. 
@@ -865,15 +864,15 @@ ${postInstallMessage}</echo>
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
 
       <!-- Utility libraries -->
-      <copy file="${bigdata.lib}/unimi/colt-1.2.0.jar"
+      <copy file="${bigdata.lib}/unimi/colt-${colt.version}.jar"
             tofile="${dist.lib}/colt.jar" />
-      <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar"
+      <copy file="${bigdata.lib}/high-scale-lib-v${highscalelib.version}.jar"
             tofile="${dist.lib}/highscalelib.jar" />
-      <copy file="${bigdata.lib}/dsi-utils-1.0.6-020610.jar"
+      <copy file="${bigdata.lib}/dsi-utils.${dsiutils.version}.jar"
             tofile="${dist.lib}/dsiutils.jar" />
-      <copy file="${bigdata.lib}/lgpl-utils-1.0.6-020610.jar"
+      <copy file="${bigdata.lib}/lgpl-utils.${lgplutils.version}.jar"
             tofile="${dist.lib}/lgplutils.jar" />
-      <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
+      <copy file="${bigdata.lib}/unimi/fastutil-${fastutil.version}.jar"
             tofile="${dist.lib}/fastutil.jar" />
       <copy file="${bigdata.lib}/bigdata-ganglia-1.0.1.jar"
             tofile="${dist.lib}/bigdata-ganglia.jar" />
@@ -881,7 +880,7 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/icu4j.jar" />
       <copy file="${bigdata.lib}/icu/icu4j-charset-${icu.version}.jar"
             tofile="${dist.lib}/icu4j-charset.jar" />
-      <copy file="${bigdata.lib}/apache/log4j-1.2.15.jar"
+      <copy file="${bigdata.lib}/apache/log4j-${log4j.version}.jar"
             tofile="${dist.lib}/log4j.jar" />
       <copy file="${bigdata.lib}/lucene/lucene-analyzers-${lucene.version}.jar"
             tofile="${dist.lib}/lucene-analyzer.jar" />
