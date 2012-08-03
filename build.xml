@@ -348,8 +348,8 @@ public class BuildInfo {
 
 		<bndwrap jars="${build.dir}/lib/colt-${colt.version}.jar" output="${build.dir}/bundles/colt-${colt.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/fastutil-${fastutil.version}.jar" output="${build.dir}/bundles/fastutil-${fastutil.version}.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/dsi-utils.${dsiutils.version}.jar" output="${build.dir}/bundles/dsi-utils.${dsiutils.version}.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/lgpl-utils.${lgplutils.version}.jar" output="${build.dir}/bundles/lgpl-utils.${lgplutils.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/dsi-utils-${dsiutils.version}.jar" output="${build.dir}/bundles/dsi-utils-${dsiutils.version}.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/lgpl-utils-${lgplutils.version}.jar" output="${build.dir}/bundles/lgpl-utils-${lgplutils.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/high-scale-lib-v${highscalelib.version}.jar" output="${build.dir}/bundles/high-scale-lib-v${highscalelib.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/openrdf-sesame-${sesame.version}-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-${sesame.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/apache/zookeeper-${zookeeper.version}.jar" output="${build.dir}/bundles/zookeeper-${zookeeper.version}.jar" definitions="${basedir}/osgi/" />
@@ -868,9 +868,9 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/colt.jar" />
       <copy file="${bigdata.lib}/high-scale-lib-v${highscalelib.version}.jar"
             tofile="${dist.lib}/highscalelib.jar" />
-      <copy file="${bigdata.lib}/dsi-utils.${dsiutils.version}.jar"
+      <copy file="${bigdata.lib}/dsi-utils-${dsiutils.version}.jar"
             tofile="${dist.lib}/dsiutils.jar" />
-      <copy file="${bigdata.lib}/lgpl-utils.${lgplutils.version}.jar"
+      <copy file="${bigdata.lib}/lgpl-utils-${lgplutils.version}.jar"
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-${fastutil.version}.jar"
             tofile="${dist.lib}/fastutil.jar" />
