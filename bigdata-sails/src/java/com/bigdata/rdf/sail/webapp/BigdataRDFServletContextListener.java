@@ -90,6 +90,12 @@ public class BigdataRDFServletContextListener implements
      * which case it will close it at the appropriate life cycle event.
      */
     private boolean closeIndexManager;
+
+    protected BigdataRDFContext getBigdataRDFContext() {
+
+        return rdfContext;
+        
+    }
     
     public void contextInitialized(final ServletContextEvent e) {
 
