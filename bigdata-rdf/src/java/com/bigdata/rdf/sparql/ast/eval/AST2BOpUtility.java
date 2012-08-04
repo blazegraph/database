@@ -1653,7 +1653,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
@@ -1668,7 +1668,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
@@ -1705,7 +1705,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
@@ -1721,7 +1721,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
@@ -3296,7 +3296,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
@@ -3310,7 +3310,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
