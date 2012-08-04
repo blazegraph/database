@@ -1638,18 +1638,22 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
         // lastPass is required except for normal joins.
-        final boolean lastPass = false;//optional; 
+        final boolean lastPass = false; 
 
         // true if we will release the HTree as soon as the join is done.
         // Note: also requires lastPass.
         final boolean release = lastPass;
 
+        // join can be pipelined unless last pass evaluation is required.
+        final int maxParallel = lastPass ? 1
+                : PipelineOp.Annotations.DEFAULT_MAX_PARALLEL;
+              
         if(ctx.nativeHashJoins) {
             left = new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
@@ -1664,7 +1668,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
@@ -3319,20 +3323,24 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final PipelineOp subqueryPlan = convertJoinGroupOrUnion(op/* left */,
                 subgroup, doneSet, ctx);
 
-        // lastPass is required if the join is optional.
-        final boolean lastPass = !joinType.isNormal(); // unless this is a simple required join.
-
+        // lastPass unless this is a normal join.
+        final boolean lastPass = !joinType.isNormal();
+        
         // true if we will release the HTree as soon as the join is done.
         // Note: also requires lastPass.
         final boolean release = lastPass && true;
-        
+
+        // join can be pipelined unless last pass evaluation is required.
+        final int maxParallel = lastPass ? 1
+                : PipelineOp.Annotations.DEFAULT_MAX_PARALLEL;
+                
         if(ctx.nativeHashJoins) {
             left = new HTreeSolutionSetHashJoinOp(
                 new BOp[] { subqueryPlan },//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
@@ -3348,7 +3356,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
