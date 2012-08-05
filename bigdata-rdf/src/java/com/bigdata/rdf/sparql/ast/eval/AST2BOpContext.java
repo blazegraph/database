@@ -8,8 +8,11 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IdFactory;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
+import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
@@ -130,8 +133,39 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * When <code>true</code>, a merge-join pattern will be recognized if it
      * appears in a join group. When <code>false</code>, this can still be
      * selectively enabled using a query hint.
+     * 
+     * @see QueryHints#MERGE_JOIN
      */
     public boolean mergeJoin = QueryHints.DEFAULT_MERGE_JOIN;
+    
+    /**
+     * The maximum parallelism for a solution set hash join when the join is
+     * used in a context that does permit parallelism, such as sub-group and
+     * sub-query evaluation (default {@value #maxParallelForSolutionSetHashJoin}
+     * ). The historical value for bigdata releases through 1.2.1 was ONE (1).
+     * While this join can be evaluated concurrently for multiple input chunks,
+     * assessment done with r6411 on BSBM (explore) and govtrack failed to
+     * demonstrate any performance advantage when using maxParallel = 5 (the
+     * default maximum parallelism as specified by
+     * {@link PipelineOp.Annotations#DEFAULT_MAX_PARALLEL}. This parameter makes
+     * it easier to re-test the effect of parallelism in these joins in the
+     * future.
+     * 
+     * @see AST2BOpUtility
+     * @see PipelineOp.Annotations#MAX_PARALLEL
+     * @see HTreeSolutionSetHashJoinOp
+     * @see JVMSolutionSetHashJoinOp
+     */
+    public int maxParallelForSolutionSetHashJoin = 1;
+    
+    /**
+     * When <code>true</code>, named subquery solution sets are written onto
+     * streams. When <code>false</code> they are written onto hash indices. This
+     * choice has some subtle implications for the query plan.
+     * 
+     * @see QueryHints#USE_STREAMS
+     */
+    public boolean useStreams = QueryHints.DEFAULT_USE_STREAMS;
     
     /**
      * When <code>true</code>, the projection of the query will be materialized
