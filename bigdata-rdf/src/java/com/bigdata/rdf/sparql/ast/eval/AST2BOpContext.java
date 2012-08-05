@@ -158,14 +158,14 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      */
     public int maxParallelForSolutionSetHashJoin = 1;
     
-    /**
-     * When <code>true</code>, named subquery solution sets are written onto
-     * streams. When <code>false</code> they are written onto hash indices. This
-     * choice has some subtle implications for the query plan.
-     * 
-     * @see QueryHints#USE_STREAMS
-     */
-    public boolean useStreams = QueryHints.DEFAULT_USE_STREAMS;
+//    /**
+//     * When <code>true</code>, named subquery solution sets are written onto
+//     * streams. When <code>false</code> they are written onto hash indices. This
+//     * choice has some subtle implications for the query plan.
+//     * 
+//     * @see QueryHints#USE_STREAMS
+//     */
+//    public boolean useStreams = QueryHints.DEFAULT_USE_STREAMS;
     
     /**
      * When <code>true</code>, the projection of the query will be materialized
