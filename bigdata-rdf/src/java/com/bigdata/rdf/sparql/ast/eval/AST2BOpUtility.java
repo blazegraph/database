@@ -1645,10 +1645,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final boolean release = lastPass;
 
         // join can be pipelined unless last pass evaluation is required
-        // BUT at-once evaluation is MUCH faster on BSBM (CPU bound otherwise).
-        final int maxParallel = 1;
-//        lastPass ? 1 : PipelineOp.Annotations.DEFAULT_MAX_PARALLEL;
-              
+        final int maxParallel = lastPass ? 1
+                : ctx.maxParallelForSolutionSetHashJoin;
+
         if(ctx.nativeHashJoins) {
             left = new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -3332,10 +3331,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final boolean release = lastPass && true;
 
         // join can be pipelined unless last pass evaluation is required
-        // BUT at-once evaluation is MUCH faster on BSBM (CPU bound otherwise).
-        final int maxParallel = 1;
-//        lastPass ? 1 : PipelineOp.Annotations.DEFAULT_MAX_PARALLEL;
-                
+        final int maxParallel = lastPass ? 1
+                : ctx.maxParallelForSolutionSetHashJoin;
+
         if(ctx.nativeHashJoins) {
             left = new HTreeSolutionSetHashJoinOp(
                 new BOp[] { subqueryPlan },//
