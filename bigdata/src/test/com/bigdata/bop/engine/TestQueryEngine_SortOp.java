@@ -243,8 +243,8 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery q = queryEngine.eval(queryId, query,
-                new LocalChunkMessage(queryEngine, queryId, startId,
-                        -1/* partitionId */, chunks));
+                null/* attributes */, new LocalChunkMessage(queryEngine,
+                        queryId, startId, -1/* partitionId */, chunks));
 
 		/*
 		 * Consume solutions, verifying the #of solutions and their order.

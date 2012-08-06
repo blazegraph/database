@@ -182,12 +182,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
          */
         private final IQueryAttributes attrs;
         
-//        /**
-//         * The join variables.
-//         */
-//        @SuppressWarnings("rawtypes")
-//        private final IVariable[] joinVars;
-        
         /**
          * <code>true</code> iff this is the first time the task is being
          * invoked, in which case we will evaluate the subquery and save its
@@ -329,7 +323,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
             private final BOpContext<IBindingSet> parentContext;
 
             /**
-             * The source binding sets
+             * The source binding sets.
              */
             private final IBindingSet[] bindingSets;
 
@@ -376,9 +370,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 						// Buffer the solutions on the hash index.
                         final long ncopied = state.acceptSolutions(
                                 subquerySolutionItr, stats);
-//                        final long ncopied = JVMHashJoinUtility.acceptSolutions(
-//                                subquerySolutionItr, joinVars, stats,
-//                                solutions, false/* optional */);
 
 						// Wait for the subquery to halt / test for errors.
 						runningSubquery.get();

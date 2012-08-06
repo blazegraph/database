@@ -213,7 +213,8 @@ public class BOpContextBase {
 // }
 
     /**
-     * Obtain an access path reading from relation for the specified predicate.
+     * Obtain an access path reading from the identified {@link IRelation} using
+     * the specified {@link IPredicate}.
      * <p>
      * Note: Passing in the {@link IRelation} is important since it otherwise
      * must be discovered using the {@link IResourceLocator}. By requiring the
@@ -249,9 +250,6 @@ public class BOpContextBase {
      * 
      * @todo Support mutable relation views (no - just fix truth maintenance).
      */
-//  * <h2>Non-Relation Access Paths</h2>
-//  * <p>
-//  * 
     public <E> IAccessPath<E> getAccessPath(final IRelation<E> relation,
             final IPredicate<E> predicate) {
 

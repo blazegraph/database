@@ -37,11 +37,15 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
@@ -50,6 +54,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamDecoder;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.ChunkConsumerIterator;
 import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.rwstore.IPSOutputStream;
@@ -445,8 +450,7 @@ public final class SolutionSetStream extends Stream implements
      *         (B) When the AP has a filter, then an exact range count must scan
      *         the solutions to decide how many will match.
      */
-    public IBindingSetAccessPath<IBindingSet> getAccessPath(
-            final IPredicate<IBindingSet> pred) {
+    public SolutionSetAP getAccessPath(final IPredicate<IBindingSet> pred) {
 
         return new SolutionSetAP(this, pred);
 
@@ -458,7 +462,7 @@ public final class SolutionSetStream extends Stream implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private static class SolutionSetAP implements
+    public static class SolutionSetAP implements
             IBindingSetAccessPath<IBindingSet> {
 
         private final SolutionSetStream stream;
@@ -473,6 +477,12 @@ public final class SolutionSetStream extends Stream implements
 
         }
 
+        public SolutionSetStream getStream() {
+            
+            return stream;
+            
+        }
+        
         @Override
         public IPredicate<IBindingSet> getPredicate() {
 
@@ -526,49 +536,58 @@ public final class SolutionSetStream extends Stream implements
 
     }
 
-//    /**
-//     * A predicate that can be used with an {@link ISolutionSet} without having
-//     * to resolve the {@link ISolutionSet} as an {@link IRelation}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     * @param <E>
-//     */
-//    public static class SolutionSetPredicate<E extends IBindingSet> extends
-//            Predicate<E> {
-//
-//        public SolutionSetPredicate(BOp[] args, Map<String, Object> annotations) {
-//            super(args, annotations);
-//        }
-//
-//        public SolutionSetPredicate(BOp[] args, NV... annotations) {
-//            super(args, annotations);
-//        }
-//
-//        public SolutionSetPredicate(IVariableOrConstant<?>[] values,
-//                String relationName, int partitionId, boolean optional,
-//                IElementFilter<E> constraint, IAccessPathExpander<E> expander,
-//                long timestamp) {
-//            super(values, relationName, partitionId, optional, constraint,
-//                    expander, timestamp);
-//        }
-//
-//        public SolutionSetPredicate(IVariableOrConstant<?>[] values,
-//                String relationName, long timestamp) {
-//            super(values, relationName, timestamp);
-//            // TODO Auto-generated constructor stub
-//        }
-//
-//        public SolutionSetPredicate(Predicate<E> op) {
-//            super(op);
-//            // TODO Auto-generated constructor stub
-//        }
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = 1L;
-//
-//    }
+    /**
+     * A predicate that can be used with an {@link ISolutionSet} without having
+     * to resolve the {@link ISolutionSet} as an {@link IRelation}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @param <E>
+     */
+    public static class SolutionSetStreamPredicate<E extends IBindingSet> extends
+            Predicate<E> {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+
+        public SolutionSetStreamPredicate(BOp[] args, Map<String, Object> annotations) {
+            super(args, annotations);
+        }
+
+        public SolutionSetStreamPredicate(BOp[] args, NV... annotations) {
+            super(args, annotations);
+        }
+
+        /** Deep copy constructor. */
+        public SolutionSetStreamPredicate(final SolutionSetStreamPredicate<E> op) {
+            super(op);
+        }
+
+        /**
+         * 
+         * @param attributeName
+         *            The name of the query attribute that will be used to
+         *            resolve this solution set.
+         * @param timestamp
+         *            The timestamp associated with the view.
+         */
+        public SolutionSetStreamPredicate(/*IVariableOrConstant<?>[] values,*/
+                final String attributeName,/* int partitionId, boolean optional, */
+                /*
+                 * IElementFilter<E> constraint, IAccessPathExpander<E>
+                 * expander,
+                 */
+                final long timestamp) {
+
+            super(EMPTY, attributeName/* relationName */, -1/* partitionId */,
+                    false/* optional */, null/* constraint */,
+                    null/* expander */, timestamp);
+
+        }
+
+    }
+
+    private static transient final IVariableOrConstant<?>[] EMPTY = new IVariableOrConstant[0];
 }

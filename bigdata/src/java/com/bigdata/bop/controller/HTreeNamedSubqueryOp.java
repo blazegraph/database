@@ -302,7 +302,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                         null, // mergeSolution (aka parent's source solution).
                         null, // selectVars (aka projection).
                         null, // constraints
-                        null  // stats updated above.
+                        null  // stats were updated above.
                         //context.getStats()//
                         );
 

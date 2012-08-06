@@ -912,6 +912,19 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation is a NOP since the underlying Java collection class
+     * is thread-safe for concurrent readers.
+     */
+    @Override
+    public void saveSolutionSet() {
+        
+        // NOP
+        
+    }
+    
+    /**
      * Output a solution.
      * 
      * @param outputBuffer
