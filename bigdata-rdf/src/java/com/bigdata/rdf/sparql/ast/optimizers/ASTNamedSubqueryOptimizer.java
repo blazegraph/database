@@ -365,25 +365,32 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
                 if (anInclude.getJoinVars() == null) {
 
-                    /*
-					 * Since no query hint was used, then figure out the join
-					 * variables using a static analysis of the query.
-					 * 
-					 * Note: Since the named subqueries run with only the
-					 * exogenous bindings as input, anything which is
-					 * exogenously bound plus anything which is known bound can
-					 * serve as a join variable. [TODO There is a StaticAnalysis
-					 * bug - it fails to consider the exogenous bindings when
-					 * computing the definitely bound variables. See
-					 * https://sourceforge.net/apps/trac/bigdata/ticket/412
-					 * (getDefinatelyBound() ignores exogenous variables).]
-					 * 
-					 * Note: If there are no exogenous bindings, then the sole
-					 * source solution for the named subquery is an empty
-					 * solution set. [TODO This case needs to be optimized. See
-					 * http://sourceforge.net/apps/trac/bigdata/ticket/535
-					 * (Optimize JOIN VARS for Sub-Selects).]
-					 */
+                    /**
+                     * Since no query hint was used, then figure out the join
+                     * variables using a static analysis of the query.
+                     * 
+                     * Note: Since the named subqueries run with only the
+                     * exogenous bindings as input, anything which is
+                     * exogenously bound plus anything which is known bound can
+                     * serve as a join variable.
+                     * 
+                     * TODO There is a StaticAnalysis bug - it fails to consider
+                     * the exogenous bindings when computing the definitely
+                     * bound variables.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/412">
+                     *      getDefinatelyBound() ignores exogenous variables
+                     *      </a>
+                     * 
+                     *      TODO Optimize case where there are no exogenous
+                     *      bindings such that the sole source solution for the
+                     *      named subquery is an empty solution set.
+                     * 
+                     * @see <a
+                     *      href="http://sourceforge.net/apps/trac/bigdata/ticket/535">
+                     *      Optimize JOIN VARS for Sub-Selects </a>
+                     */
 
                     final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
                     
