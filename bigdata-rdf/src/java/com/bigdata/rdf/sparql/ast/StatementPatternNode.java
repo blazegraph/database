@@ -9,6 +9,7 @@ import java.util.Set;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.htree.HTree;
@@ -481,24 +482,55 @@ public class StatementPatternNode extends
         final TermNode o = o();
         final TermNode c = c();
 
-        if (s instanceof VarNode) {
-            producedBindings.add(((VarNode) s).getValueExpression());
-        }
+//        if (s instanceof VarNode) {
+//            producedBindings.add(((VarNode) s).getValueExpression());
+//        }
+//
+//        if (p instanceof VarNode) {
+//            producedBindings.add(((VarNode) p).getValueExpression());
+//        }
+//
+//        if (o instanceof VarNode) {
+//            producedBindings.add(((VarNode) o).getValueExpression());
+//        }
+//
+//        if (c != null && c instanceof VarNode) {
+//            producedBindings.add(((VarNode) c).getValueExpression());
+//        }
 
-        if (p instanceof VarNode) {
-            producedBindings.add(((VarNode) p).getValueExpression());
-        }
-
-        if (o instanceof VarNode) {
-            producedBindings.add(((VarNode) o).getValueExpression());
-        }
-
-        if (c != null && c instanceof VarNode) {
-            producedBindings.add(((VarNode) c).getValueExpression());
-        }
-
+        addProducedBindings(s, producedBindings);
+        addProducedBindings(p, producedBindings);
+        addProducedBindings(o, producedBindings);
+        addProducedBindings(c, producedBindings);
+        
         return producedBindings;
 
+    }
+    
+    /**
+     * This handles the special case where we've wrapped a Var with a Constant
+     * because we know it's bound, perhaps by the exogenous bindings.  If we
+     * don't handle this case then we get the join vars wrong.
+     * 
+     * @see StaticAnalysis._getJoinVars
+     */
+    private void addProducedBindings(final TermNode t, final Set<IVariable<?>> producedBindings) {
+    	
+    	if (t instanceof VarNode) {
+    		
+            producedBindings.add(((VarNode) t).getValueExpression());
+            
+    	} else if (t instanceof ConstantNode) {
+    		
+    		final ConstantNode cNode = (ConstantNode) t;
+    		final Constant<?> c = (Constant<?>) cNode.getValueExpression();
+    		final IVariable<?> var = c.getVar();
+    		if (var != null) {
+    			producedBindings.add(var);
+    		}
+    		
+    	}
+    	
     }
 
 	public String toString(final int indent) {
