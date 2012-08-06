@@ -34,6 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstant;
@@ -198,7 +200,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  */
 public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
-//    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
+    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
 
     /**
      * 
@@ -594,6 +596,18 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     public Set<IVariable<?>> getDefinitelyIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
     
+    	/*
+    	 * Start by adding the exogenous variables.
+    	 */
+    	if (evaluationContext != null) {
+    		
+    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+    		
+    		// only add the vars that are always bound
+    		vars.addAll(stats.getAlwaysBound());
+    		
+    	}
+    	
         final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
         
         /*
@@ -694,6 +708,21 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     public Set<IVariable<?>> getMaybeIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
     
+    	/*
+    	 * Start by adding the exogenous variables.
+    	 */
+    	if (evaluationContext != null) {
+    		
+    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+    		
+    		// add the vars that are always bound
+    		vars.addAll(stats.getAlwaysBound());
+    		
+    		// also add the vars that might be bound
+    		vars.addAll(stats.getNotAlwaysBound());
+    		
+    	}
+    	
         final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
         
         /*
@@ -1314,6 +1343,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         if (whereClause != null) {
 
             getDefinitelyProducedBindings(whereClause, definitelyBound, true/* recursive */);
+            
+            if (log.isInfoEnabled()) {
+            	log.info(whereClause);
+            	log.info(definitelyBound);
+            }
 
         }
 
@@ -1960,12 +1994,20 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          */
         final Set<IVariable<?>> boundBySubquery = getDefinitelyProducedBindings(aSubquery);
 
+        if (log.isInfoEnabled()) {
+        	log.info(boundBySubquery);
+        }
+        
         /*
          * The variables which are definitely bound on entry to the join group
          * in which the subquery appears.
          */
         final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
                 theNode, new LinkedHashSet<IVariable<?>>());
+        
+        if (log.isInfoEnabled()) {
+        	log.info(incomingBindings);
+        }
         
         /*
          * This is only those variables which are bound on entry into the group
@@ -1974,8 +2016,16 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          */
         boundBySubquery.retainAll(incomingBindings);
             
+        if (log.isInfoEnabled()) {
+        	log.info(boundBySubquery);
+        }
+        
         vars.addAll(boundBySubquery);
 
+        if (log.isInfoEnabled()) {
+        	log.info(vars);
+        }
+        
         return vars;
 
     }
