@@ -35,6 +35,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
@@ -45,18 +46,18 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
-import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
+import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
@@ -83,8 +84,8 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class SearchServiceFactory implements ServiceFactory {
 
-//    private static final Logger log = Logger
-//            .getLogger(SearchServiceFactory.class);
+    private static final Logger log = Logger
+            .getLogger(SearchServiceFactory.class);
 
     /*
      * Note: This could extend the base class to allow for search service
@@ -351,6 +352,7 @@ public class SearchServiceFactory implements ServiceFactory {
         private final AbstractTripleStore store;
         private final IServiceOptions serviceOptions;
         private final Literal query;
+        private final IVariable<IV> search;
         private final IVariable<?>[] vars;
         private final Literal minRank;
         private final Literal maxRank;
@@ -392,6 +394,16 @@ public class SearchServiceFactory implements ServiceFactory {
             final StatementPatternNode sp = statementPatterns.get(BD.SEARCH);
 
             query = (Literal) sp.o().getValue();
+            
+            final TermNode searchQuery = sp.o();
+            if (searchQuery instanceof ConstantNode) {
+            	final ConstantNode cNode = (ConstantNode) searchQuery;
+            	final IConstant<IV> c = cNode.getValueExpression();
+            	this.search = (IVariable<IV>)
+            			c.getProperty(Constant.Annotations.VAR);
+            } else {
+            	this.search = null;
+            }
 
             /*
              * Unpack the search service request parameters.
@@ -444,11 +456,20 @@ public class SearchServiceFactory implements ServiceFactory {
                 }
             }
 
-            this.vars = new IVariable[] {//
-                    searchVar,//
-                    relVar == null ? Var.var() : relVar,// must be non-null.
-                    rankVar == null ? Var.var() : rankVar // must be non-null.
-            };
+            if (search == null) {
+	            this.vars = new IVariable[] {//
+	                    searchVar,//
+	                    relVar == null ? Var.var() : relVar,// must be non-null.
+	                    rankVar == null ? Var.var() : rankVar // must be non-null.
+	            };
+            } else {
+	            this.vars = new IVariable[] {//
+	                    searchVar,//
+	                    relVar == null ? Var.var() : relVar,// must be non-null.
+	                    rankVar == null ? Var.var() : rankVar, // must be non-null.
+	                    search
+	            };
+            }
 
             this.minRank = minRank;
             this.maxRank = maxRank;
@@ -588,13 +609,27 @@ public class SearchServiceFactory implements ServiceFactory {
             private IBindingSet newBindingSet(final IHit<?> hit) {
                 
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                final IConstant<?>[] vals = new IConstant[] {
+                final IConstant<?>[] vals = 
+                search == null ?
+                new IConstant[] {
                     new Constant(hit.getDocId()), // searchVar
                     new Constant(new XSDNumericIV(hit.getCosine())), // cosine
                     new Constant(new XSDNumericIV(hit.getRank())) // rank
+                } :
+                new IConstant[] {
+                    new Constant(hit.getDocId()), // searchVar
+                    new Constant(new XSDNumericIV(hit.getCosine())), // cosine
+                    new Constant(new XSDNumericIV(hit.getRank())), // rank
+                    new Constant(query)
                 };
             
-                return new ListBindingSet(vars, vals);
+                final ListBindingSet bs = new ListBindingSet(vars, vals);
+                
+                if (log.isInfoEnabled()) {
+                	log.info(bs);
+                }
+                
+                return bs;
                 
             }
 
