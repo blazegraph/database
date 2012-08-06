@@ -30,14 +30,25 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.UUID;
 
 import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.join.HTreeHashIndexOp;
+import com.bigdata.bop.join.HTreeHashJoinOp;
+import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.JVMHashIndexOp;
+import com.bigdata.bop.join.JVMHashJoinOp;
+import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
+import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
@@ -398,7 +409,51 @@ public interface QueryHints {
     String SOLUTION_SET_CACHE = "solutionSetCache";
 
     boolean DEFAULT_SOLUTION_SET_CACHE = false;
-    
+
+//    /**
+//     * When <code>true</code>, the output of a named subquery will be written
+//     * onto a {@link SolutionSetStream} (analytic mode) and onto a simple
+//     * ordered {@link IBindingSet} collection (otherwise). The solutions will be
+//     * joined into the parent query by first building a hash index on the
+//     * solution in the parent query and then using a {@link HTreeHashJoinOp}
+//     * (analytic mode) or {@link JVMHashJoinOp} (otherwise). Regardless, the
+//     * join variables will be identified based on the intersection of those
+//     * variables known to be bound in the pipeline (based on a static analysis
+//     * of the query) and those variables known to be bound in the solution set
+//     * (as reported by {@link ISolutionSetStats}).
+//     * <p>
+//     * When <code>false</code>, the solution set will be stored on a
+//     * {@link HTree} (if using the analytic query mode) and otherwise onto a
+//     * Java hash collection. Regardless, there will be join variables associated
+//     * with the hash index. The solution set will be joined into the parent
+//     * query using {@link HTreeSolutionSetHashJoinOp} (analytic mode) and
+//     * {@link JVMSolutionSetHashJoinOp} (otherwise).
+//     * <p>
+//     * Note: Using streams should make it easier for the query plan generator to
+//     * produce good join variables since it can make the decision about the join
+//     * variables at the time that it generated the hash index build + join to
+//     * "INCLUDE" the named solution set into the query at some specific point in
+//     * the plan. At that point we have perfect knowledge about the variables
+//     * that are always bound in the named solution set and we know the
+//     * evaluation order of the query plan (up to the point of the INCLUDE). It
+//     * is also faster to write solutions onto a stream than onto a hash index
+//     * and scanning the stream (during the join) is also very efficient.
+//     * <p>
+//     * There are some potential drawbacks to using streams in this manner, in
+//     * particular it turns the INCLUDE into an operation that can not run until
+//     * all previous operators in the query plan are done. This is because the
+//     * hash index must be built before we can do the join against the named
+//     * solution set.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
+//     *      SPARQL UPDATE for solution sets. </a>
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/535">
+//     *      Optimize join vars for sub-selects. </a>
+//     */
+//    String USE_STREAMS = "useStreams";
+//
+//    boolean DEFAULT_USE_STREAMS = false;
+
     /**
 	 * Option controls whether or not the proposed SPARQL extension for
 	 * reification done right is enabled.

@@ -43,6 +43,7 @@ import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
@@ -559,10 +560,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     }
     
     /**
-     * Checkpoint the {@link HTree} instance(s) used to buffer the source
-     * solutions ({@link #rightSolutions} and {@link #ivCache}) and then
-     * re-load the them in a read-only mode from their checkpoint(s). This
-     * exposes a view of the {@link HTree} which is safe for concurrent
+     * {@inheritDoc}
+     * <p>
+     * This implementation checkpoints the {@link HTree} instance(s) used to
+     * buffer the source solutions ({@link #rightSolutions} and {@link #ivCache}
+     * ) and then re-load the them in a read-only mode from their checkpoint(s).
+     * This exposes a view of the {@link HTree} which is safe for concurrent
      * readers.
      */
     public void saveSolutionSet() {
@@ -582,21 +585,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
-    /**
-     * Checkpoint the join set (used to buffer the optional solutions).
-     * <p>
-     * Note: Since we always output the solutions which did not join from a
-     * single thread as part of last pass evaluation there is no need to
-     * checkpoint the {@link #joinSet}.
-     */
-    public void checkpointJoinSet() {
-
-        if (!open.get())
-            throw new IllegalStateException();
-
-        checkpointHTree(joinSet);
-
-    }
+//    /**
+//     * Checkpoint the join set (used to buffer the optional solutions).
+//     * <p>
+//     * Note: Since we always output the solutions which did not join from a
+//     * single thread as part of last pass evaluation there is no need to
+//     * checkpoint the {@link #joinSet}.
+//     */
+//    public void checkpointJoinSet() {
+//
+//        if (!open.get())
+//            throw new IllegalStateException();
+//
+//        checkpointHTree(joinSet);
+//
+//    }
 
     private void checkpointHTree(final AtomicReference<HTree> ref) {
 

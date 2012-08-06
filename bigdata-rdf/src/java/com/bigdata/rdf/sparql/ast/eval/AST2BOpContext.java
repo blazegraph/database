@@ -1,14 +1,19 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
@@ -279,7 +284,45 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * used by {@link AST2BOpUtility}.
      */
     StaticAnalysis sa = null;
+
+    /**
+     * An optional map of key-value pairs that will be attached to the
+     * {@link IRunningQuery} on the query controller node.
+     */
+    final private AtomicReference<Map<Object, Object>> queryAttributes = new AtomicReference<Map<Object, Object>>();
+
+    public void addQueryAttribute(final Object key, final Object val) {
+
+        if (queryAttributes.get() == null) {
+
+            // Lazy initialization.
+            queryAttributes.compareAndSet(null/* expect */,
+                    new LinkedHashMap<Object, Object>()/* update */);
+
+        }
+
+        queryAttributes.get().put(key, val);
+
+    }
     
+    /**
+     * Return an optional (and immutable) map of key-value pairs that will be
+     * attached to the {@link IRunningQuery} on the query controller node.
+     * 
+     * @return The map -or- <code>null</code> if no query attributes have been
+     *         declared.
+     */
+    public Map<Object, Object> getQueryAttributes() {
+
+        final Map<Object, Object> tmp = queryAttributes.get();
+
+        if (tmp == null)
+            return null;
+
+        return Collections.unmodifiableMap(tmp);
+
+    }
+
     /**
      * 
      * @param queryRoot

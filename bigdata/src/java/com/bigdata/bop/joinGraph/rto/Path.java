@@ -836,9 +836,10 @@ public class Path {
 
         // run the cutoff sampling of the edge.
         final UUID queryId = UUID.randomUUID();
-        final IRunningQuery runningQuery = queryEngine.eval(
-                queryId,
-                queryOp,
+        final IRunningQuery runningQuery = queryEngine.eval(//
+                queryId,//
+                queryOp,//
+                null,// attributes
                 new LocalChunkMessage(queryEngine, queryId, joinOp
                         .getId()/* startId */, -1 /* partitionId */,
                         sourceSample.getSample()));

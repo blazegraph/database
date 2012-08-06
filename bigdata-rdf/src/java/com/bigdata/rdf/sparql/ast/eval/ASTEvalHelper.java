@@ -32,6 +32,7 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -463,8 +464,13 @@ public class ASTEvalHelper {
         IRunningQuery runningQuery = null;
         try {
 
+            // Optional attributes to be attached to the query.
+            final Map<Object, Object> queryAttributes = ctx
+                    .getQueryAttributes();
+
             // Submit query for evaluation.
-            runningQuery = ctx.queryEngine.eval(queryPlan, bindingSets);
+            runningQuery = ctx.queryEngine.eval(queryPlan, bindingSets,
+                    queryAttributes);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
@@ -644,8 +650,8 @@ public class ASTEvalHelper {
          * and Bigdata2SesameBindingSetIterator are IChunked(Ordered)Iterators.
          * That is, they implement #nextChunk(). A very simple class could be
          * used to align an IBindingSet[] returned by next() with nextChunk(). I
-         * would be suprised if this class did not already exist (in fact, the
-         * class is ChunkedArraysIterator).
+         * would be surprised if this class did not already exist (in fact, the
+         * class is ChunkedArraysIterator -or- ChunkConsumerIterator).
          * 
          * The other issue is that RunningQueryCloseableIterator would APPEAR to
          * be redundant with QueryResultIterator. However, correct termination

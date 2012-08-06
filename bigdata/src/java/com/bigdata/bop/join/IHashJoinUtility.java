@@ -261,6 +261,12 @@ public interface IHashJoinUtility {
     );
     
     /**
+     * Checkpoint the generated hash index such that it becomes safe for
+     * concurrent readers.
+     */
+    void saveSolutionSet();
+
+    /**
      * Identify and output the optional solutions. This is used with OPTIONAL
      * and NOT EXISTS.
      * <p>

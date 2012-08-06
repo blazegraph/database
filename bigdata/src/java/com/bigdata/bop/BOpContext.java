@@ -42,6 +42,10 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
+import com.bigdata.bop.solutions.SolutionSetStream;
+import com.bigdata.bop.solutions.SolutionSetStream.SolutionSetStreamPredicate;
+import com.bigdata.btree.BTree;
+import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -51,8 +55,10 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.stream.Stream;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
@@ -459,7 +465,82 @@ public class BOpContext<E> extends BOpContextBase {
         return getRunningQuery().getAttributes();
         
     }
-    
+
+    /**
+     * Return an access path for a predicate that identifies a data structure
+     * which can be resolved to a reference attached to as a query attribute.
+     * <p>
+     * This method is used for data structures (including {@link Stream}s,
+     * {@link HTree}s, and {@link BTree} indices as well as non-durable data
+     * structures, such as JVM collection classes. When the data structure is
+     * pre-existing (such as a named solution set whose life cycle is broader
+     * than the query), then the data structure MUST be resolved during query
+     * optimization and attached to the {@link IRunningQuery} before operators
+     * with a dependency on those data structures can execute.
+     * 
+     * @param predicate
+     *            The predicate.
+     * 
+     * @return The access path.
+     * 
+     * @throws RuntimeException
+     *             if the access path could not be resolved.
+     * 
+     * @see #getQueryAttributes()
+     */
+    public IBindingSetAccessPath<?> getAccessPath(final IPredicate predicate) {
+
+        if (predicate == null)
+            throw new IllegalArgumentException();
+
+        /*
+         * FIXME There are several cases here, one for each type of
+         * data structure we need to access and each means of identifying
+         * that data structure. The main case is Stream (for named solution sets).
+         * If we wind up always modeling a named solution set as a Stream, then
+         * that is the only case that we need to address.
+         */
+        if(predicate instanceof SolutionSetStream.SolutionSetStreamPredicate) {
+            
+            /*
+             * Resolve the name of the Stream against the query attributes for
+             * the running query, obtaining a reference to the Stream. Then
+             * request the access path from the Stream.
+             * 
+             * TODO We might need to also include the UUID of the top-level
+             * query since that is where any subquery will have to look to find
+             * the named solution set.
+             */
+            
+            @SuppressWarnings("unchecked")
+            final SolutionSetStreamPredicate<IBindingSet> p = (SolutionSetStreamPredicate<IBindingSet>) predicate;
+
+            final String attributeName = p.getOnlyRelationName();
+
+            final SolutionSetStream tmp = (SolutionSetStream) getQueryAttributes().get(
+                    attributeName);
+
+            if (tmp == null) {
+
+                /*
+                 * Likely causes include a failure to attach the solution set to
+                 * the query attributes when setting up the query or attaching
+                 * and/or resolving the solution set against the wrong running
+                 * query (especially when the queries are nested).
+                 */
+                throw new RuntimeException(
+                        "Could not resolve Stream: predicate=" + predicate);
+            
+            }
+            
+            return tmp.getAccessPath(predicate);
+
+        }
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
     /**
      * Return the {@link IMemoryManager} associated with the specified query.
      * 
