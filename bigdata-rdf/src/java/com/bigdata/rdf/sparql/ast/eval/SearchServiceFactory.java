@@ -50,6 +50,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -620,13 +621,16 @@ public class SearchServiceFactory implements ServiceFactory {
                     new Constant(hit.getDocId()), // searchVar
                     new Constant(new XSDNumericIV(hit.getCosine())), // cosine
                     new Constant(new XSDNumericIV(hit.getRank())), // rank
-                    new Constant(query)
+                    new Constant(((BigdataLiteral) query).getIV())
                 };
             
                 final ListBindingSet bs = new ListBindingSet(vars, vals);
                 
                 if (log.isInfoEnabled()) {
                 	log.info(bs);
+                	log.info(query.getClass());
+                	log.info(((BigdataLiteral) query).getIV());
+                	log.info(((BigdataLiteral) query).getIV().getClass());
                 }
                 
                 return bs;
