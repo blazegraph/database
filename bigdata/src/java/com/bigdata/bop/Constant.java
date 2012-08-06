@@ -265,5 +265,12 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         throw new UnsupportedOperationException();
         
     }
+    
+    @SuppressWarnings("unchecked")
+	final public IVariable<E> getVar() {
+    	
+    	return (IVariable<E>) getProperty(Annotations.VAR);
+    	
+    }
 
 }
