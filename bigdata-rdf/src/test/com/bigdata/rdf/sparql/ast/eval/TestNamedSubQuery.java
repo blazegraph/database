@@ -156,4 +156,32 @@ public class TestNamedSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
+    /**
+     * Unit test verifies that the named subquery is considering the
+     * exogenous variables when it's the first operator in the query and
+     * choosing the appropriate join variables to build the hash index.  You
+     * need to enable logging to verify that the JOIN_VARS are set correctly
+     * on the include (you should see VarNode(x)).
+     * 
+     * <pre>
+     * select ?x ?o
+     *   with {
+     *     select ?x where { ?x rdf:type foaf:Person }
+     *   } AS %namedSet1
+     * where {
+     *   INCLUDE %namedSet1 
+     *   ?x rdfs:label ?o
+     * }
+     * bindings ?x
+     * {
+     *   ( <http://www.bigdata.com/Mike> )
+     * }
+     * </pre>
+     */
+    public void test_named_subquery_bindings_2() throws Exception {
+
+        new TestHelper("named-subquery-bindings-2").runTest();
+
+    }
+    
 }
