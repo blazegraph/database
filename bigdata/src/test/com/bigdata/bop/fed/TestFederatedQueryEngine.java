@@ -355,7 +355,7 @@ public class TestFederatedQueryEngine extends
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                expected);
+                null/* queryAttributes */, expected);
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,

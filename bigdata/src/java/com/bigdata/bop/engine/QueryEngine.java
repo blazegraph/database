@@ -1140,6 +1140,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     }
 
+    /**
+     * Note: Used only by the test suite.
+     */
     public AbstractRunningQuery eval(final UUID queryId, final BOp op,
             final IBindingSet bset) throws Exception {
 
@@ -1148,18 +1151,26 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
     }
 
+    /**
+     * Note: Used only by the test suite.
+     */
     public AbstractRunningQuery eval(final UUID queryId, final BOp op,
-            final IBindingSet[] bset) throws Exception {
+            final Map<Object, Object> queryAttributes, final IBindingSet[] bset)
+            throws Exception {
 
-        return eval(queryId, (PipelineOp) op, null/* attributes */,
+        return eval(queryId, (PipelineOp) op, queryAttributes,
                 newLocalChunkMessage(queryId, op, bset));
 
     }
 
+    /**
+     * Note: Used only by the test suite.
+     */
     public AbstractRunningQuery eval(final UUID queryId, final BOp op,
+            final Map<Object, Object> queryAttributes,
             final IBindingSet[][] bset) throws Exception {
 
-        return eval(queryId, (PipelineOp) op, null/* attributes */,
+        return eval(queryId, (PipelineOp) op, queryAttributes,
                 newLocalChunkMessage(queryId, op, bset));
 
     }
@@ -1294,11 +1305,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     public AbstractRunningQuery eval(//
             final UUID queryId,//
             final PipelineOp query,//
-            final Map<Object,Object> attribs,//
+            final Map<Object,Object> queryAttributes,//
             final IChunkMessage<IBindingSet> msg//
             ) throws Exception {
 
-        return startEval(queryId, query, null/* attribs */, msg);
+        return startEval(queryId, query, queryAttributes, msg);
 
     }
     
@@ -1311,7 +1322,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      *            The unique identifier for the query.
      * @param query
      *            The query to evaluate.
-     * @param attribs
+     * @param queryAttributes
      *            Attributes to be attached to the query before it begins to
      *            execute (optional).
      * @param msg
@@ -1327,7 +1338,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     private AbstractRunningQuery startEval(//
             final UUID queryId,//
             final PipelineOp query,//
-            final Map<Object, Object> attribs,//
+            final Map<Object, Object> queryAttributes,//
             final IChunkMessage<IBindingSet> msg//
             ) throws Exception {
         
@@ -1352,7 +1363,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                 true/* controller */, getProxy()/* queryController */,
                 getServiceUUID(), query, msg/* realSource */);
 
-        if (attribs != null) {
+        if (queryAttributes != null) {
 
             /*
              * Propagate any initial attributes to the query.
@@ -1360,7 +1371,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             
             final IQueryAttributes tmp = runningQuery.getAttributes();
 
-            for (Map.Entry<Object, Object> e : attribs.entrySet()) {
+            for (Map.Entry<Object, Object> e : queryAttributes.entrySet()) {
 
                 tmp.put(e.getKey(), e.getValue());
 

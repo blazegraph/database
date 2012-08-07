@@ -27,8 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.join.IHashJoinUtility;
 
 /**
  * Attributes for named solution set processing.
@@ -42,7 +45,9 @@ public interface NamedSetAnnotations {
      * The name of {@link IQueryAttributes} attribute under which the
      * {@link NamedSolutionSetRef}. That {@link NamedSolutionSetRef} may be used
      * to locate the {@link IHashJoinUtility}, which includes metadata about the
-     * hash index and encapsulates the hash index state.
+     * hash index and encapsulates the hash index state. It may also be used to
+     * identify a named index that will be resolved against the SPARQL CACHE,
+     * the local index manager, or the federation index manager (on a cluster).
      * <p>
      * The attribute name includes the query UUID. The query UUID must be
      * extracted and used to lookup the {@link IRunningQuery} to which the
@@ -52,6 +57,8 @@ public interface NamedSetAnnotations {
      * {@link NamedSolutionSetRef}[].
      * 
      * @see NamedSolutionSetRef
+     * 
+     * @see BOpContext#getAlternateSource(PipelineOp, NamedSolutionSetRef)
      */
     final String NAMED_SET_REF = "namedSetRef";
 

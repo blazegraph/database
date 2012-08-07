@@ -65,8 +65,8 @@ public class BOpContextBase {
     
     /**
      * The <strong>local</strong> {@link IIndexManager}. Query evaluation occurs
-     * against the local indices. In scale-out, query evaluation proceeds shard
-     * wise and this {@link IIndexManager} MUST be able to read on the
+     * against the local indices. In scale-out, query evaluation proceeds
+     * shard-wise and this {@link IIndexManager} MUST be able to read on the
      * {@link ILocalBTreeView}.
      */
     final public IIndexManager getIndexManager() {

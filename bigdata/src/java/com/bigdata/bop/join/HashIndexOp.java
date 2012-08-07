@@ -35,6 +35,7 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
@@ -46,6 +47,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator builds a hash index from the source solutions. Once all source
@@ -85,6 +87,17 @@ abstract public class HashIndexOp extends PipelineOp {
 
     public interface Annotations extends HashJoinAnnotations, JoinAnnotations,
             NamedSetAnnotations {
+
+        /**
+         * An optional attribute specifying the <em>source</em> named solution
+         * set for the index build operation. Normally, the hash index is built
+         * from the solutions flowing through the pipeline. When this attribute
+         * is specified, the hash index is instead built from the solutions in
+         * the specified named solution set. Regardless, the solutions flowing
+         * through the pipeline are copied to the sink once the hash index has
+         * been built.
+         */
+        final String NAMED_SET_SOURCE_REF = "namedSetSourceRef";
 
     }
 
@@ -171,7 +184,7 @@ abstract public class HashIndexOp extends PipelineOp {
 
     }
 
-    public HashIndexOp(final BOp[] args, NV... annotations) {
+    public HashIndexOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -198,13 +211,15 @@ abstract public class HashIndexOp extends PipelineOp {
      * @param joinType
      *            The type of join.
      */
-    abstract protected IHashJoinUtility newState(
-            BOpContext<IBindingSet> context,
-            final NamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType);
+    abstract protected IHashJoinUtility newState(//
+            final BOpContext<IBindingSet> context,//
+            final NamedSolutionSetRef namedSetRef, //
+            final JoinTypeEnum joinType//
+            );
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new ControllerTask(this, context));
+        return new FutureTask<Void>(new ChunkTask(this, context));
         
     }
     
@@ -213,7 +228,7 @@ abstract public class HashIndexOp extends PipelineOp {
 	 * operator is interrupted, then the subqueries are cancelled. If a subquery
 	 * fails, then all subqueries are cancelled.
 	 */
-    private static class ControllerTask implements Callable<Void> {
+    private static class ChunkTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
 
@@ -223,7 +238,21 @@ abstract public class HashIndexOp extends PipelineOp {
         
         private final IHashJoinUtility state;
         
-        public ControllerTask(final HashIndexOp op,
+        /**
+         * <code>true</code> iff this is the first invocation of this operator.
+         */
+        private final boolean first;
+        
+        /**
+         * <code>true</code> iff the hash index will be generated from the
+         * intermediate solutions arriving from the pipeline. When
+         * <code>false</code>, the
+         * {@link HashIndexOp.Annotations#NAMED_SET_SOURCE_REF} identifies the
+         * source from which the index will be built.
+         */
+        private final boolean sourceIsPipeline;
+        
+        public ChunkTask(final HashIndexOp op,
                 final BOpContext<IBindingSet> context) {
 
             if (op == null)
@@ -241,7 +270,7 @@ abstract public class HashIndexOp extends PipelineOp {
             // Metadata to identify the named solution set.
             final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
-            
+
             {
 
                 /*
@@ -268,35 +297,69 @@ abstract public class HashIndexOp extends PipelineOp {
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
+                    
+                    first = true;
                                         
+                } else {
+                    
+                    first = false;
+
                 }
                 
                 this.state = state;
 
             }
             
+            // true iff we will build the index from the pipeline.
+            this.sourceIsPipeline = null == op
+                    .getProperty(Annotations.NAMED_SET_SOURCE_REF);
+
         }
         
         /**
          * Evaluate.
          */
         public Void call() throws Exception {
-            
+
             try {
 
-                // Buffer all source solutions.
-                acceptSolutions();
-                
-                if(context.isLastInvocation()) {
+                if (sourceIsPipeline) {
 
-                    // Checkpoint the solution set.
-                    checkpointSolutionSet();
+                    // Buffer all source solutions.
+                    acceptSolutions();
+
+                    if (context.isLastInvocation()) {
+
+                        // Checkpoint the solution set.
+                        checkpointSolutionSet();
+
+                        // Output the buffered solutions.
+                        outputSolutions();
+
+                    }
+
+                } else {
                     
-                    // Output the buffered solutions.
-                    outputSolutions();
+                    if(first) {
                     
+                        // Accept ALL solutions.
+                        acceptSolutions();
+                        
+                        // Checkpoint the generated solution set index.
+                        checkpointSolutionSet();
+                        
+                    }
+
+                    // Copy all solutions from the pipeline to the sink.
+                    BOpUtility.copy(context.getSource(), context.getSink(),
+                            null/* sink2 */, null/* mergeSolution */,
+                            null/* selectVars */, null/* constraints */, stats);
+
+                    // Flush solutions to the sink.
+                    context.getSink().flush();
+
                 }
-                
+
                 // Done.
                 return null;
 
@@ -311,11 +374,44 @@ abstract public class HashIndexOp extends PipelineOp {
         }
 
         /**
-         * Buffer intermediate resources.
+         * Add solutions to the hash index. The solutions to be indexed will be
+         * read either from the pipeline or from an "alternate" source
+         * identified by an annotation.
+         * 
+         * @see HashIndexOp.Annotations#NAMED_SET_SOURCE_REF
          */
         private void acceptSolutions() {
 
-            state.acceptSolutions(context.getSource(), stats);
+            final ICloseableIterator<IBindingSet[]> src;
+
+            if (sourceIsPipeline) {
+            
+                src = context.getSource();
+                
+            } else {
+                
+                /*
+                 * Metadata to identify the optional *source* solution set. When
+                 * <code>null</code>, the hash index is built from the solutions flowing
+                 * through the pipeline. When non-<code>null</code>, the hash index is
+                 * built from the solutions in the identifier solution set.
+                 */
+                final NamedSolutionSetRef namedSetSourceRef = (NamedSolutionSetRef) op
+                        .getRequiredProperty(Annotations.NAMED_SET_SOURCE_REF);
+
+                src = context.getAlternateSource(op, namedSetSourceRef);
+                
+            }
+
+            try {
+
+                state.acceptSolutions(src, stats);
+
+            } finally {
+
+                src.close();
+
+            }
 
         }
 

@@ -31,11 +31,12 @@ import com.bigdata.rdf.sparql.ast.eval.TestInclude;
 import junit.framework.TestCase2;
 
 /**
- * Test suite for low to no cardinality joins against a named solution set.
- * 
- * @see NamedSolutionSetScanOp
+ * Test suite the {@link NestedLoopJoinOp}
  * 
  * @author thompsonbry
+ * 
+ *         FIXME Test suite! It would be best to refactor the existing hash join
+ *         test suites, at least for the test setup.
  * 
  *         FIXME Verify that we are handling SELECT and CONSTRAINTS as well as
  *         the operator specific annotations (NAME, SPARQL_CACHE). Look at the
@@ -46,12 +47,12 @@ import junit.framework.TestCase2;
  *         preserving (that could be done in a data driven unit test at the
  *         SPARQL layer for INCLUDE).
  */
-public class TestNamedSolutionSetScanOp extends TestCase2 {
+public class TestNestedLoopJoinOp extends TestCase2 {
 
-	public TestNamedSolutionSetScanOp() {
+	public TestNestedLoopJoinOp() {
 	}
 
-	public TestNamedSolutionSetScanOp(String name) {
+	public TestNestedLoopJoinOp(String name) {
 		super(name);
 	}
 

@@ -45,7 +45,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.controller.ServiceCallJoin;
-import com.bigdata.bop.join.AbstractHashJoinOp;
+import com.bigdata.bop.join.HashJoinOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -439,13 +439,13 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
             {
             
                 @SuppressWarnings("rawtypes")
-                final Iterator<AbstractHashJoinOp> jitr = BOpUtility.visitAll(
-                        astContainer.getQueryPlan(), AbstractHashJoinOp.class);
+                final Iterator<HashJoinOp> jitr = BOpUtility.visitAll(
+                        astContainer.getQueryPlan(), HashJoinOp.class);
                 
                 assertTrue(jitr.hasNext());
                 
                 @SuppressWarnings("rawtypes")
-                final AbstractHashJoinOp join = jitr.next();
+                final HashJoinOp join = jitr.next();
                 
                 assertEquals(RDF.TYPE, ((IV<?,?>) join.getPredicate().get(1/* p */)
                         .get()).getValue());

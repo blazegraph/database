@@ -39,7 +39,6 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -159,7 +158,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements ICommitter,
+public class BTree extends AbstractBTree implements //ICommitter,
         ICheckpointProtocol {// ILocalBTreeView {
 
     final public int getHeight() {

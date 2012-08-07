@@ -55,6 +55,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
@@ -66,6 +67,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.keys.ICUVersionRecord;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
@@ -102,6 +104,8 @@ import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.NT;
 
@@ -397,6 +401,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      * @see Options#HISTORICAL_INDEX_CACHE_TIMEOUT
+     * 
+     *      TODO This should have {@link ICheckpointProtocol} values. We have to
+     *      update the
+     *      {@link IRWStrategy#registerExternalCache(ConcurrentWeakValueCache, int)}
+     *      method in order to make that change.
      */
 	// final private WeakValueCache<Long, ICommitter> historicalIndexCache;
 	final private ConcurrentWeakValueCache<Long, ICommitter> historicalIndexCache;
@@ -420,8 +429,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      */
-    final private ConcurrentWeakValueCacheWithTimeout<NT, BTree> indexCache;
-    
+    final private ConcurrentWeakValueCacheWithTimeout<NT, ICheckpointProtocol> indexCache;
+
 	/**
 	 * The "live" BTree mapping index names to the last metadata record
 	 * committed for the named index. The keys are index names (unicode
@@ -516,7 +525,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * allowing more than a single such distinct instance to exist for
 			 * the current name2Addr object.
 			 */
-			final BTree btree = getIndex(checkpointAddr);
+            final BTree btree = (BTree) getIndexWithCheckpointAddr(checkpointAddr);
 
 			/*
 			 * Wrap up in a read-only view since writes MUST NOT be allowed.
@@ -555,7 +564,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
 
-		return new ReadOnlyIndex(getIndex(checkpointAddr));
+        return new ReadOnlyIndex(
+                (IIndex) getIndexWithCheckpointAddr(checkpointAddr));
 
 	}
 
@@ -778,7 +788,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					TimeUnit.MILLISECONDS.toNanos(historicalIndexCacheTimeout));
 
 			// Cache by (name,commitTime). This cache is in front of the cache by addr.
-			indexCache = new ConcurrentWeakValueCacheWithTimeout<NT, BTree>(historicalIndexCacheCapacity,
+			indexCache = new ConcurrentWeakValueCacheWithTimeout<NT, ICheckpointProtocol>(historicalIndexCacheCapacity,
 	                    TimeUnit.MILLISECONDS.toNanos(historicalIndexCacheTimeout));
 
 			liveIndexCacheCapacity = getProperty(Options.LIVE_INDEX_CACHE_CAPACITY,
@@ -3564,8 +3574,45 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
+     * 
+     *      TODO Reconcile API tension with {@link IIndex} and
+     *      {@link ICheckpointProtocol}, however this method is overridden by
+     *      {@link Journal} and is also implemented by
+     *      {@link IBigdataFederation}. The central remaining tensions are
+     *      {@link FusedView} and the local/remote aspect. {@link FusedView}
+     *      could probably be "fixed" by extending {@link AbstractBTree} rather
+     *      than having an inner delegate for the mutable view. The local/remote
+     *      issue is more complex.
      */
 	public IIndex getIndex(final String name, final long commitTime) {
+
+        return (BTree) getIndexLocal(name, commitTime);
+
+    }
+
+	/**
+     * Core implementation for access to historical index views.
+     * <p>
+     * Note: Transactions should pass in the timestamp against which they are
+     * reading rather than the transaction identifier (aka startTime). By
+     * providing the timestamp of the commit point, the transaction will hit the
+     * {@link #indexCache}. If the transaction passes the startTime instead,
+     * then all startTimes will be different and the cache will be defeated.
+     * 
+     * @throws UnsupportedOperationException
+     *             If you pass in {@link ITx#UNISOLATED},
+     *             {@link ITx#READ_COMMITTED}, or a timestamp that corresponds
+     *             to a read-write transaction since those are not "commit
+     *             times".
+     * 
+     * @see #indexCache
+     * @see #getIndex(String, long)
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+	final public ICheckpointProtocol getIndexLocal(final String name,
+            final long commitTime) {
 
         if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
                 || TimestampUtility.isReadWriteTx(commitTime)) {
@@ -3574,7 +3621,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-        BTree ndx = null;
+        ICheckpointProtocol ndx = null;
         
         /*
          * Form the key for the cache.
@@ -3642,7 +3689,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			}
 
 			// Resolve the index against that commit record.
-            ndx = getIndex(name, commitRecord);
+            ndx = (BTree) getIndexWithCommitRecord(name, commitRecord);
 
             if (ndx == null) {
 
@@ -3652,7 +3699,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
             // Add the index to the cache.
-            final BTree ndx2 = indexCache.putIfAbsent(nt, ndx);
+            final ICheckpointProtocol ndx2 = indexCache.putIfAbsent(nt, ndx);
 
             if (ndx2 != null) {
 
@@ -3697,152 +3744,176 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	    
 	}
 	
-	/**
-	 * Returns a read-only named index loaded from a {@link ICommitRecord}. The
-	 * {@link BTree} will be marked as read-only, it will NOT permit writes, and
-	 * {@link BTree#getLastCommitTime(long)} will report the value associated
-	 * with {@link Entry#commitTime} for the historical {@link Name2Addr}
-	 * instance for that {@link ICommitRecord}.
-	 * 
-	 * @return The named index -or- <code>null</code> iff the named index did
-	 *         not exist as of that commit record.
-	 */
-	public BTree getIndex(final String name, final ICommitRecord commitRecord) {
-
-		final ReadLock lock = _fieldReadWriteLock.readLock();
-
-		lock.lock();
-
-		try {
-
-			assertOpen();
-
-			if (name == null)
-				throw new IllegalArgumentException();
-
-			if (commitRecord == null)
-				throw new IllegalArgumentException();
-
-			/*
-			 * The address of an historical Name2Addr mapping used to resolve
-			 * named indices for the historical state associated with this
-			 * commit record.
-			 */
-			final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
-
-			if (checkpointAddr == 0L) {
-
-				log.warn("No name2addr entry in this commit record: " + commitRecord);
-
-				return null;
-
-			}
-
-			/*
-			 * Resolve the address of the historical Name2Addr object using the
-			 * canonicalizing object cache. This prevents multiple historical
-			 * Name2Addr objects springing into existence for the same commit
-			 * record.
-			 */
-			final Name2Addr name2Addr = (Name2Addr) getIndex(checkpointAddr);
-
-			/*
-			 * The address at which the named index was written for that
-			 * historical state.
-			 */
-			final Name2Addr.Entry entry = name2Addr.getEntry(name);
-
-			if (entry == null) {
-
-				// No such index by name for that historical state.
-
-				return null;
-
-			}
-
-			/*
-			 * Resolve the named index using the object cache to impose a
-			 * canonicalizing mapping on the historical named indices based on
-			 * the address on which it was written in the store.
-			 */
-
-			final BTree btree = getIndex(entry.checkpointAddr);
-
-			assert entry.commitTime != 0L : "Entry=" + entry;
-
-			// Set the last commit time on the btree.
-			btree.setLastCommitTime(entry.commitTime);
-
-			return btree;
-
-		} finally {
-
-			lock.unlock();
-
-		}
-
-	}
-
-	/**
-	 * A canonicalizing mapping for <em>historical</em> {@link BTree}s.
-	 * <p>
-	 * Note: This method imposes a canonicalizing mapping and ensures that there
-	 * will be at most one instance of the historical index at a time. This
-	 * guarentee is used to facilitate buffer management. Writes on indices
-	 * returned by this method are NOT allowed.
-	 * <p>
-	 * Note: This method marks the {@link BTree} as read-only but does not set
-	 * {@link BTree#setLastCommitTime(long)} since it does not have access to
-	 * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
-	 * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
-	 * which does set {@link BTree#setLastCommitTime(long)}.
-	 * <p>
-	 * Note: The canonicalizing mapping for unisolated {@link BTree}s is
-	 * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
-	 * 
-	 * @param checkpointAddr
-	 *            The address of the {@link Checkpoint} record for the
-	 *            {@link BTree}.
-	 * 
-	 * @return The {@link BTree} loaded from that {@link Checkpoint}.
-	 * 
-	 * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
-	 */
-	final public BTree getIndex(final long checkpointAddr) {
-
-	    return (BTree) _getIndex(checkpointAddr);
-	}
-
+//	/**
+//     * Returns a read-only named index loaded from a {@link ICommitRecord}. The
+//     * {@link BTree} will be marked as read-only, it will NOT permit writes, and
+//     * {@link BTree#getLastCommitTime(long)} will report the value associated
+//     * with {@link Entry#commitTime} for the historical {@link Name2Addr}
+//     * instance for that {@link ICommitRecord}.
+//     * 
+//     * @return The named index -or- <code>null</code> iff the named index did
+//     *         not exist as of that commit record.
+//     * 
+//     * @deprecated by {@link #getIndexWithCommitRecord(String, ICommitRecord)}
+//     */
+//	public BTree getIndex(final String name, final ICommitRecord commitRecord) {
+//
+//        return (BTree) getIndexWithCommitRecord(name, commitRecord);
+//
+//	}
+	
     /**
-     * A canonicalizing mapping for <em>historical</em> {@link HTree}s.
-     * <p>
-     * Note: This method imposes a canonicalizing mapping and ensures that there
-     * will be at most one instance of the historical index at a time. This
-     * guarentee is used to facilitate buffer management. Writes on indices
-     * returned by this method are NOT allowed.
-     * <p>
-     * Note: This method marks the {@link BTree} as read-only but does not set
-     * {@link BTree#setLastCommitTime(long)} since it does not have access to
-     * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
-     * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
-     * which does set {@link BTree#setLastCommitTime(long)}.
-     * <p>
-     * Note: The canonicalizing mapping for unisolated {@link BTree}s is
-     * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
+     * Returns a read-only named index loaded from a {@link ICommitRecord}. The
+     * index will be marked as read-only, it will NOT permit writes, and
+     * {@link ICheckpointProtocol#getLastCommitTime(long)} will report the value
+     * associated with {@link Entry#commitTime} for the historical
+     * {@link Name2Addr} instance for that {@link ICommitRecord}.
      * 
-     * @param checkpointAddr
-     *            The address of the {@link Checkpoint} record for the
-     *            {@link HTree}.
-     * 
-     * @return The {@link HTree} loaded from that {@link Checkpoint}.
-     * 
-     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+     * @return The named index -or- <code>null</code> iff the named index did
+     *         not exist as of that commit record.
      */
-    final public HTree getHTree(final long checkpointAddr) {
+    public ICheckpointProtocol getIndexWithCommitRecord(final String name,
+            final ICommitRecord commitRecord) {
 
-        return (HTree) _getIndex(checkpointAddr);
-        
-    }
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
+
+        try {
+
+            assertOpen();
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            if (commitRecord == null)
+                throw new IllegalArgumentException();
+
+            /*
+             * The address of an historical Name2Addr mapping used to resolve
+             * named indices for the historical state associated with this
+             * commit record.
+             */
+            final long checkpointAddr = commitRecord
+                    .getRootAddr(ROOT_NAME2ADDR);
+
+            if (checkpointAddr == 0L) {
+
+                log.warn("No name2addr entry in this commit record: "
+                        + commitRecord);
+
+                return null;
+
+            }
+
+            /*
+             * Resolve the address of the historical Name2Addr object using the
+             * canonicalizing object cache. This prevents multiple historical
+             * Name2Addr objects springing into existence for the same commit
+             * record.
+             */
+            final Name2Addr name2Addr = (Name2Addr) getIndexWithCheckpointAddr(checkpointAddr);
+
+            /*
+             * The address at which the named index was written for that
+             * historical state.
+             */
+            final Name2Addr.Entry entry = name2Addr.getEntry(name);
+
+            if (entry == null) {
+
+                // No such index by name for that historical state.
+
+                return null;
+
+            }
+
+            /*
+             * Resolve the named index using the object cache to impose a
+             * canonicalizing mapping on the historical named indices based on
+             * the address on which it was written in the store.
+             */
+
+            final ICheckpointProtocol btree = getIndexWithCheckpointAddr(entry.checkpointAddr);
+
+            assert entry.commitTime != 0L : "Entry=" + entry;
+
+            // Set the last commit time on the btree.
+            btree.setLastCommitTime(entry.commitTime);
+
+            return btree;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+	}
+
+//	/**
+//	 * A canonicalizing mapping for <em>historical</em> {@link BTree}s.
+//	 * <p>
+//	 * Note: This method imposes a canonicalizing mapping and ensures that there
+//	 * will be at most one instance of the historical index at a time. This
+//	 * guarentee is used to facilitate buffer management. Writes on indices
+//	 * returned by this method are NOT allowed.
+//	 * <p>
+//	 * Note: This method marks the {@link BTree} as read-only but does not set
+//	 * {@link BTree#setLastCommitTime(long)} since it does not have access to
+//	 * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
+//	 * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
+//	 * which does set {@link BTree#setLastCommitTime(long)}.
+//	 * <p>
+//	 * Note: The canonicalizing mapping for unisolated {@link BTree}s is
+//	 * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
+//	 * 
+//	 * @param checkpointAddr
+//	 *            The address of the {@link Checkpoint} record for the
+//	 *            {@link BTree}.
+//	 * 
+//	 * @return The {@link BTree} loaded from that {@link Checkpoint}.
+//	 * 
+//	 * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+//	 * 
+//	 * @deprecated by {@link #getIndexWithCheckpointAddr(long)}
+//	 */
+//	final public BTree getIndex(final long checkpointAddr) {
+//
+//	    return (BTree) getIndexWithCheckpointAddr(checkpointAddr);
+//	    
+//	}
+
+//    /**
+//     * A canonicalizing mapping for <em>historical</em> {@link HTree}s.
+//     * <p>
+//     * Note: This method imposes a canonicalizing mapping and ensures that there
+//     * will be at most one instance of the historical index at a time. This
+//     * guarentee is used to facilitate buffer management. Writes on indices
+//     * returned by this method are NOT allowed.
+//     * <p>
+//     * Note: This method marks the {@link BTree} as read-only but does not set
+//     * {@link BTree#setLastCommitTime(long)} since it does not have access to
+//     * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
+//     * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
+//     * which does set {@link BTree#setLastCommitTime(long)}.
+//     * <p>
+//     * Note: The canonicalizing mapping for unisolated {@link BTree}s is
+//     * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
+//     * 
+//     * @param checkpointAddr
+//     *            The address of the {@link Checkpoint} record for the
+//     *            {@link HTree}.
+//     * 
+//     * @return The {@link HTree} loaded from that {@link Checkpoint}.
+//     * 
+//     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+//     */
+//    final public HTree getHTree(final long checkpointAddr) {
+//
+//        return (HTree) getIndexWithCheckpointAddr(checkpointAddr);
+//        
+//    }
 
     /**
      * A canonicalizing mapping for <em>historical</em> (read-only) views of
@@ -3865,8 +3936,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
-    private final ICommitter _getIndex(final long checkpointAddr) {
-        
+    public final ICheckpointProtocol getIndexWithCheckpointAddr(
+            final long checkpointAddr) {
+
         /*
          * Note: There are potentially three IO operations here. Reading the
          * Checkpoint record, reading the IndexMetadata record, then reading the
@@ -3888,7 +3960,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (ndx == null) {
 
             /*
-             * Load BTree from the store.
+             * Load index from the store.
              * 
              * Note: Does not set lastCommitTime.
              */
@@ -3910,7 +3982,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
         
-        return ndx;
+        return (ICheckpointProtocol) ndx;
 
     }
     
@@ -4055,7 +4127,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	public void dropIndex(final String name) {
 
-        final ICheckpointProtocol ndx = _getMutableView(name);
+        final ICheckpointProtocol ndx = getUnisolatedIndex(name);
 
         if (ndx == null)
             throw new NoSuchIndexException(name);
@@ -4111,11 +4183,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the index.
      * 
-     * @see #getIndex(String, long)
+     * @see #getLiveView(String, long)
      */
     final public BTree getIndex(final String name) {
 
-        return (BTree) _getMutableView(name);
+        return (BTree) getUnisolatedIndex(name);
         
     }
 
@@ -4128,11 +4200,28 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the index.
      * 
-     * @see #getIndex(String, long)
+     * @see #getLiveView(String, long)
      */
     final public HTree getHTree(final String name) {
         
-        return (HTree) _getMutableView(name);
+        return (HTree) getUnisolatedIndex(name);
+        
+    }
+
+    /**
+     * Return the mutable view of the named index (aka the "live" or
+     * {@link ITx#UNISOLATED} index). This object is NOT thread-safe. You MUST
+     * NOT write on this index unless you KNOW that you are the only writer. See
+     * {@link ConcurrencyManager}, which handles exclusive locks for
+     * {@link ITx#UNISOLATED} indices.
+     * 
+     * @return The mutable view of the index.
+     * 
+     * @see #getLiveView(String, long)
+     */
+    final public Stream getStream(final String name) {
+        
+        return (Stream) getUnisolatedIndex(name);
         
     }
 
@@ -4142,7 +4231,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @return The mutable view of the persistence capable data structure.
      */
-	final private ICheckpointProtocol _getMutableView(final String name) {
+    final public ICheckpointProtocol getUnisolatedIndex(final String name) {
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
 

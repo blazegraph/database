@@ -47,7 +47,6 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
@@ -1182,6 +1181,12 @@ public class BOpUtility {
 
     /**
      * Copy binding sets from the source to the sink(s).
+     * <p>
+     * Note: You MUST use {@link IBlockingBuffer#flush()} to flush the sink(s)
+     * in order for the last chunk in the sink(s) to be pushed to the downstream
+     * operator for that sink. However, do NOT use flush() if the operator
+     * evaluation fails since you do not want to push outputs from a failed
+     * operator to downstream operators.
      * 
      * @param source
      *            The source.

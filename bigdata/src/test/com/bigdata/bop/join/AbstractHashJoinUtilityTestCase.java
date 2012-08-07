@@ -592,6 +592,11 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
                 assertEquals(right.size(), stats.unitsIn.get());
 
+                // Verify all expected solutions are in the hash index.
+                assertSameSolutionsAnyOrder(
+                        right.toArray(new IBindingSet[right.size()]),
+                        state.indexScan());
+
             }
 
             /*

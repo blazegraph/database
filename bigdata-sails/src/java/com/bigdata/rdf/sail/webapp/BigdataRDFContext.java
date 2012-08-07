@@ -1467,7 +1467,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             // get the triple store's properties from the global row store.
             final Map<String, Object> properties = getIndexManager()
-                    .getGlobalRowStore().read(RelationSchema.INSTANCE,
+                    .getGlobalRowStore(timestamp).read(RelationSchema.INSTANCE,
                             namespace);
 
             // write them out,

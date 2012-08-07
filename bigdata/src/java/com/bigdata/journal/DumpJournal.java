@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DumpIndex;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.DumpIndex.PageStats;
@@ -403,8 +404,9 @@ public class DumpJournal {
             final BTree ndx;
             try {
                 
-                ndx = (BTree) journal.getIndex(entry.checkpointAddr);
-                
+                ndx = (BTree) journal
+                        .getIndexWithCheckpointAddr(entry.checkpointAddr);
+
             } catch (Throwable t) {
 
                 if (InnerCause.isInnerCause(t, ClassNotFoundException.class)) {
@@ -494,8 +496,28 @@ public class DumpJournal {
 				
 				final PageStats stats = e.getValue();
 
-				final BTree ndx = (BTree) journal.getIndex(name, commitRecord);
-				
+                final ICheckpointProtocol tmp = journal
+                        .getIndexWithCommitRecord(name, commitRecord);
+
+                if (!(tmp instanceof BTree)) {
+
+                    /*
+                     * FIXME Handle other type of named indices here in a more
+                     * graceful manner. They probably need to be grouped by type
+                     * since each type will require a different output format
+                     * for the metadata that we are writing out.
+                     */
+    
+                    System.out.println("name: " + name + ", class="
+                            + tmp.getClass() + ", checkpoint="
+                            + tmp.getCheckpoint());
+
+                    continue;
+                    
+                }
+
+                final BTree ndx = (BTree) tmp;
+
 				System.out.print(name);
 				System.out.print('\t');
 				System.out.print(ndx.getBranchingFactor());

@@ -41,20 +41,20 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
  * Test suite for {@link HTreeHashIndexOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestHTreeHashIndexOp.java 6010 2012-02-10 20:11:20Z thompsonbry $
  */
-public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
+public class TestJVMHashIndexOp extends HashIndexOpTestCase {
 
     /**
      * 
      */
-    public TestHTreeHashIndexOp() {
+    public TestJVMHashIndexOp() {
     }
 
     /**
      * @param name
      */
-    public TestHTreeHashIndexOp(String name) {
+    public TestJVMHashIndexOp(String name) {
         super(name);
     }
 
@@ -62,15 +62,7 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
     protected HashIndexOp newHashIndexOp(final String namespace,
             final BOp[] args, final NV... anns) {
 
-        // Note: RELATION_NAME is only required for the HTree variant.
-
-        final NV[] anns1 = anns;
-
-        final NV[] anns2 = concat(anns1, new NV[] { new NV(
-                HTreeHashIndexOp.Annotations.RELATION_NAME,
-                new String[] { namespace }) });
-
-        return new HTreeHashIndexOp(args, anns2);
+        return new JVMHashIndexOp(args, anns);
 
     }
     
@@ -78,7 +70,7 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
     protected SolutionSetHashJoinOp newSolutionSetHashJoinOp(final BOp[] args,
             final NV... anns) {
 
-       return new HTreeSolutionSetHashJoinOp(args, anns);
+        return new JVMSolutionSetHashJoinOp(args, anns);
 
     }
 

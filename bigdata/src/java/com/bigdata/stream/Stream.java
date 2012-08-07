@@ -59,6 +59,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.LongPacker;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.IRWStrategy;
@@ -181,8 +182,9 @@ abstract public class Stream implements ICheckpointProtocol {
         // save a reference to the immutable metadata record.
         this.metadata = (StreamIndexMetadata) metadata;
 
-        this.store = (IRWStrategy) store;
-        
+        this.store = (IRWStrategy) ((store instanceof AbstractJournal) ? ((AbstractJournal) store)
+                .getBufferStrategy() : store);
+
         this.readOnly = readOnly;
 
         setCheckpoint(checkpoint);
