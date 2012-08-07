@@ -75,14 +75,15 @@ public class TestAll extends TestCase {
         
         // Test suite for building a hash index from solutions and joining that
         // hash index back into the pipeline.
+        suite.addTestSuite(TestJVMHashIndexOp.class);
         suite.addTestSuite(TestHTreeHashIndexOp.class);
         suite.addTestSuite(TestHTreeSolutionSetHashJoin.class);
-        
-		/*
-		 * Test suite for join against a named solution set when the left
-		 * cardinality is low.
-		 */
-		suite.addTestSuite(TestNamedSolutionSetScanOp.class);
+
+        /*
+         * Test suite for a nested loop join using an index scan for each source
+         * solution read from the pipeline.
+         */
+		suite.addTestSuite(TestNestedLoopJoinOp.class);
 
         return suite;
         

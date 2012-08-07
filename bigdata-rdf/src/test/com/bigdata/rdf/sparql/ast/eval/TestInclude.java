@@ -40,7 +40,10 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.bop.join.NamedSolutionSetScanOp;
+import com.bigdata.bop.join.HashIndexOp;
+import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -177,7 +180,7 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp includeOp = (PipelineOp) queryPlan.get(0);
         
         // the INCLUDE should be evaluated using a solution set SCAN.
-        assertTrue(includeOp instanceof NamedSolutionSetScanOp);
+        assertTrue(includeOp instanceof NestedLoopJoinOp);
         
     }
     
@@ -292,22 +295,40 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         final PipelineOp includeOp = (PipelineOp) projectionOp.get(0);
         
         // the INCLUDE should be evaluated using a solution set SCAN.
-        assertTrue(includeOp instanceof NamedSolutionSetScanOp);
+        assertTrue(includeOp instanceof NestedLoopJoinOp);
         
     }
 
     /**
-	 * A unit test for an INCLUDE which is NOT the first JOIN in the WHERE
-	 * clause. This condition is enforced by turning off the join order
-	 * optimizer for this query.
-	 * <p>
-	 * Note: Since there is another JOIN in this query, there is no longer any
-	 * order guarantee for the resulting solutions.
-	 * 
-	 * <pre>
-	 * SELECT ?x ?z WHERE { INCLUDE %solutionSet1 }
-	 * </pre>
-	 */
+     * A unit test for an INCLUDE which is NOT the first JOIN in the WHERE
+     * clause. This condition is enforced by turning off the join order
+     * optimizer for this query.
+     * <p>
+     * Note: Since there is another JOIN in this query, there is no longer any
+     * order guarantee for the resulting solutions.
+     * 
+     * <pre>
+     * prefix : <http://www.bigdata.com/> 
+     * prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+     * prefix foaf: <http://xmlns.com/foaf/0.1/> 
+     * 
+     * SELECT ?x ?y WHERE { 
+     * 
+     *    # Turn off the join order optimizer.
+     *    hint:Query hint:optimizer "None" .
+     * 
+     *    # Run joins in the given order (INCLUDE is 2nd).
+     *    
+     *    # bind x => {Mike;Bryan}
+     *    ?x rdf:type foaf:Person .
+     *    
+     *    # join on (x) => {(x=Mike,y=2);(x=Bryan;y=4)} 
+     *    INCLUDE %solutionSet1 .
+     * 
+     * }
+     * </pre>
+     */
     public void test_include_03() throws Exception {
     	
         final TestHelper testHelper = new TestHelper(
@@ -392,21 +413,44 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 
         final ASTContainer astContainer = testHelper.runTest();
 
-//        final PipelineOp queryPlan = astContainer.getQueryPlan();
-//        
-//        // top level should be the SLICE operator.
-//        assertTrue(queryPlan instanceof SliceOp);
-//
-//        // sole argument should be the PROJECTION operator.
-//        final PipelineOp projectionOp = (PipelineOp) queryPlan.get(0);
-//
-//        assertTrue(projectionOp instanceof ProjectionOp);
-//
-//        // sole argument should be the INCLUDE operator.
-//        final PipelineOp includeOp = (PipelineOp) projectionOp.get(0);
-//        
-//        // the INCLUDE should be evaluated using a solution set SCAN.
-//        assertTrue(includeOp instanceof NamedSolutionSetScanOp);
+        /**
+         * The plan should be:
+         * 
+         * 1. A PipelineJoin for the initial triple pattern
+         * 
+         * 2. A HashIndexOp to generate an appropriate index for the join with
+         * the solution set. (The main point of this test is to verify that we
+         * build an appropriate hash index to do the join rather than using a
+         * NestedLoopJoinOp.)
+         * 
+         * 3. A SolutionSetHashJoin
+         * 
+         * 4. A ProjectionOp.
+         */
+//        com.bigdata.bop.solutions.ProjectionOp[6](JVMSolutionSetHashJoinOp[5])[ com.bigdata.bop.BOp.bopId=6, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, com.bigdata.bop.join.JoinAnnotations.select=[x, y], com.bigdata.bop.engine.QueryEngine.queryId=562dbadb-afcc-4a2c-bf70-2486f1061dc3]
+//                com.bigdata.bop.join.JVMSolutionSetHashJoinOp[5](JVMHashIndexOp[4])[ com.bigdata.bop.BOp.bopId=5, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.sharedState=true, namedSetRef=NamedSolutionSetRef{queryId=562dbadb-afcc-4a2c-bf70-2486f1061dc3,namedSet=%solutionSet1,joinVars=[x]}, com.bigdata.bop.join.JoinAnnotations.constraints=null, class com.bigdata.bop.join.SolutionSetHashJoinOp.release=false]
+//                  com.bigdata.bop.join.JVMHashIndexOp[4](PipelineJoin[3])[ com.bigdata.bop.BOp.bopId=4, com.bigdata.bop.BOp.evaluationContext=CONTROLLER, com.bigdata.bop.PipelineOp.maxParallel=1, com.bigdata.bop.PipelineOp.lastPass=true, com.bigdata.bop.PipelineOp.sharedState=true, com.bigdata.bop.join.JoinAnnotations.joinType=Normal, com.bigdata.bop.join.HashJoinAnnotations.joinVars=[x], com.bigdata.bop.join.JoinAnnotations.select=null, namedSetSourceRef=NamedSolutionSetRef{queryId=562dbadb-afcc-4a2c-bf70-2486f1061dc3,namedSet=%solutionSet1,joinVars=[]}, namedSetRef=NamedSolutionSetRef{queryId=562dbadb-afcc-4a2c-bf70-2486f1061dc3,namedSet=%solutionSet1,joinVars=[x]}]
+//                    com.bigdata.bop.join.PipelineJoin[3]()[ com.bigdata.bop.BOp.bopId=3, com.bigdata.bop.join.JoinAnnotations.constraints=null, com.bigdata.bop.BOp.evaluationContext=ANY, com.bigdata.bop.join.AccessPathJoinAnnotations.predicate=SPOPredicate[1]]
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+        
+        // top level should be the PROJECTION operator.
+        assertTrue(queryPlan instanceof ProjectionOp);
+
+        // sole argument should be the SOLUTION SET HASH JOIN operator.
+        final PipelineOp solutionSetHashJoinOp = (PipelineOp) queryPlan.get(0);
+
+        assertTrue(solutionSetHashJoinOp instanceof SolutionSetHashJoinOp);
+
+        // sole argument should be the HASH INDEX BUILD operator.
+        final PipelineOp hashIndexOp = (PipelineOp) solutionSetHashJoinOp.get(0);
+        
+        assertTrue(hashIndexOp instanceof HashIndexOp);
+
+        // sole argument should be the PIPELINE JOIN (triple pattern).
+        final PipelineOp pipelineJoinOp = (PipelineOp) hashIndexOp.get(0);
+
+        assertTrue(pipelineJoinOp instanceof PipelineJoin);
 
     }
     

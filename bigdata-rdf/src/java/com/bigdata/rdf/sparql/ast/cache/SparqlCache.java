@@ -491,7 +491,39 @@ public class SparqlCache implements ISparqlCache {
         return null;
         
     }
-    
+
+//    /**
+//     * Return the underlying index object for the named solution set.
+//     * 
+//     * TODO There is a scalability problem with returning the
+//     * {@link ISimpleIndexAccess} rather than an {@link ICloseableIterator}. If
+//     * the cache is remote or distributed, then we will not be able to return an
+//     * {@link ISimpleIndexAccess} interface. However, we can not return the
+//     * iterator here since we need to attach the returned object to the
+//     * {@link IQueryAttributes} for resolution at evaluation time by an
+//     * operator. We probably need to return something that can be used to obtain
+//     * appropriate access to the solutions during the evaluation of an operator
+//     * - that is, we need one more level of indirection here.
+//     * <p>
+//     * The same mechanism for access to a remote solution stream could be used
+//     * on a cluster when some solutions are on some node, or even distributed
+//     * across some set of nodes. Maybe we even have some code already that will
+//     * work for this, such as the chunk message stuff.
+//     */
+//    public ISimpleIndexAccess getSolutionSet(final String solutionSet) {
+//
+//        if (solutionSet == null)
+//            throw new IllegalArgumentException();
+//
+//        final SolutionSetStream sset = cacheMap.get(solutionSet);
+//
+//        if (sset == null)
+//            throw new IllegalStateException("Not found: " + solutionSet);
+//
+//        return sset;
+//
+//    }
+
 	public ICloseableIterator<IBindingSet[]> getSolutions(
 			final String solutionSet) {
 

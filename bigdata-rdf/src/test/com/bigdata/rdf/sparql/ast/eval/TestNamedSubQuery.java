@@ -148,6 +148,10 @@ public class TestNamedSubQuery extends AbstractDataDrivenSPARQLTestCase {
      *   ?x rdfs:label ?o
      *   INCLUDE %namedSet1 
      * }
+     * bindings ?x
+     * {
+     *   ( <http://www.bigdata.com/Mike> )
+     * }
      * </pre>
      */
     public void test_named_subquery_bindings() throws Exception {

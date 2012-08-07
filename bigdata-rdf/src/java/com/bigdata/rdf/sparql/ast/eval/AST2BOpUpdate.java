@@ -43,7 +43,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -587,34 +586,34 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 						if (isSolutionSet) {
 
-							/*
-							 * Target is solution set.
-							 * 
-							 * @see
-							 * https://sourceforge.net/apps/trac/bigdata/ticket
-							 * /524 (SPARQL Cache)
-							 * 
-							 * FIXME The DELETE+INSERT code path is failing
-							 * because it is based on the DELETE FROM SELECT
-							 * code path below and attempts to rewrite the query
-							 * to use a MINUS operator. However, the setup is
-							 * different in this case since we have already run
-							 * the original WHERE clause into a rewindable tuple
-							 * result set.
-							 * 
-							 * The best way to fix this would be to stay within
-							 * the native IBindingSet[] model and write the
-							 * solutions from the WHERE clause onto a chained
-							 * list of blocks, just as we do when writing on a
-							 * named solution set (or an htree with appropriate
-							 * join variables). That could then be joined into
-							 * the query with an INCLUDE. Since we do not want
-							 * this "temporary" solution set to be visible, we
-							 * could prefix it with a UUID and make sure that it
-							 * is written onto a memory manager, and also make
-							 * sure that we eventually delete the named solution
-							 * set since it should be temporary.
-							 */
+                            /*
+                             * Target is solution set.
+                             * 
+                             * @see
+                             * https://sourceforge.net/apps/trac/bigdata/ticket
+                             * /524 (SPARQL Cache)
+                             * 
+                             * FIXME [Is this fixed now?] The DELETE+INSERT code
+                             * path is failing because it is based on the DELETE
+                             * FROM SELECT code path below and attempts to
+                             * rewrite the query to use a MINUS operator.
+                             * However, the setup is different in this case
+                             * since we have already run the original WHERE
+                             * clause into a rewindable tuple result set.
+                             * 
+                             * The best way to fix this would be to stay within
+                             * the native IBindingSet[] model and write the
+                             * solutions from the WHERE clause onto a chained
+                             * list of blocks, just as we do when writing on a
+                             * named solution set (or an htree with appropriate
+                             * join variables). That could then be joined into
+                             * the query with an INCLUDE. Since we do not want
+                             * this "temporary" solution set to be visible, we
+                             * could prefix it with a UUID and make sure that it
+                             * is written onto a memory manager, and also make
+                             * sure that we eventually delete the named solution
+                             * set since it should be temporary.
+                             */
 
 							// The named solution set on which we will write.
 							final String solutionSet = deleteClause.getName();
@@ -638,11 +637,6 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 								 * removed.
 								 * 
 								 * WHERE := { INCLUDE %namedSet MINUS {INCLUDE %temp} }
-								 * 
-								 * FIXME This is failing (I think) because
-								 * the named solution set is not visible. 
-								 * It looks like it might be only visible
-								 * when using a SCAN?!?
 								 */
 //								final JoinGroupNode oldWhereClause = (JoinGroupNode) queryRoot
 //										.getWhereClause();

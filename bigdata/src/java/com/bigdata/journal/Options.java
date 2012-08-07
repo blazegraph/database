@@ -121,7 +121,7 @@ public interface Options {
      * @see #LIVE_INDEX_CACHE_CAPACITY, which governs the retention of clean
      *      "live" indices.
      * 
-     * @see AbstractJournal#getIndex(long)
+     * @see AbstractJournal#getIndexWithCheckpointAddr(long)
      */
     String HISTORICAL_INDEX_CACHE_CAPACITY = AbstractJournal.class.getName()
             + ".historicalIndexCacheCapacity";
@@ -135,7 +135,7 @@ public interface Options {
      * remain in the historical index cache regardless as long as it is strongly
      * reachable.
      * 
-     * @see AbstractJournal#getIndex(long)
+     * @see AbstractJournal#getIndexWithCheckpointAddr(long)
      */
     String HISTORICAL_INDEX_CACHE_TIMEOUT = AbstractJournal.class.getName()
             + ".historicalIndexCacheTimeout";

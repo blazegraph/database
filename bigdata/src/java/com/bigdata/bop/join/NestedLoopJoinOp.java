@@ -39,17 +39,17 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * This operator performs a nested loop join for solutions read from a named
- * solution set <em>lacking an index</em> against solutions read from the
- * pipeline (left). The operator is useful when the cardinality of the source
+ * This operator performs a nested loop join for solutions. Intermediate
+ * solutions read from the pipeline are joined against a scan of some other
+ * solution set. This operator is useful when the cardinality of the source
  * solutions in the pipeline is low (typically one empty source solution which
  * is exogenous to the query, but it is also cost efficient when there is a
  * small set of source solutions to be tested for each solution drained from the
@@ -60,30 +60,36 @@ import com.bigdata.striterator.ICloseableIterator;
  * Note: This operator MUST NOT reorder the solutions which are being scanned
  * from the named solution set. The query planner relies on that behavior to
  * optimize a SLICE from a pre-computed named solution set.
+ * <p>
  * 
  * @see <a
  *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
  *      SPARQL Update </a>
- *      
+ * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531"> SPARQL
  *      UPDATE for SOLUTION SETS </a>
- *      
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: CopyOp.java 6010 2012-02-10 20:11:20Z thompsonbry $
+ * 
+ *          TODO This join does not implement optional semantics. If a use case
+ *          for a nested loop join with optional semantics is identified at some
+ *          point, then we will have to add support for optional here (and in
+ *          the test suite).
  */
-public class NamedSolutionSetScanOp extends PipelineOp {
+public class NestedLoopJoinOp extends PipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends JoinAnnotations {
+    public interface Annotations extends JoinAnnotations, NamedSetAnnotations {
 
-        /**
-		 * The name of the pre-existing named solution set to be scanned.
-		 */
-		String NAME = NamedSolutionSetScanOp.class.getName() + ".name";
+//        /**
+//		 * The name of the pre-existing named solution set to be scanned.
+//		 */
+//		String NAME = NestedLoopJoinOp.class.getName() + ".name";
 
     }
 
@@ -92,7 +98,7 @@ public class NamedSolutionSetScanOp extends PipelineOp {
 	 * 
 	 * @param op
 	 */
-	public NamedSolutionSetScanOp(final NamedSolutionSetScanOp op) {
+	public NestedLoopJoinOp(final NestedLoopJoinOp op) {
 		
 		super(op);
 		
@@ -104,30 +110,30 @@ public class NamedSolutionSetScanOp extends PipelineOp {
 	 * @param args
 	 * @param annotations
 	 */
-	public NamedSolutionSetScanOp(final BOp[] args,
+	public NestedLoopJoinOp(final BOp[] args,
 			final Map<String, Object> annotations) {
 
 		super(args, annotations);
 
 		// MUST be given.
-		getRequiredProperty(Annotations.NAME);
+		getRequiredProperty(Annotations.NAMED_SET_REF);
 
 	}
 
-	public NamedSolutionSetScanOp(final BOp[] args, final NV... annotations) {
+	public NestedLoopJoinOp(final BOp[] args, final NV... annotations) {
 
 		this(args, NV.asMap(annotations));
 
 	}
 
-	/**
-	 * @see Annotations#NAME
-	 */
-	protected String getName() {
-		
-		return (String) getRequiredProperty(Annotations.NAME);
-		
-	}
+//	/**
+//	 * @see Annotations#NAME
+//	 */
+//	protected String getName() {
+//		
+//		return (String) getRequiredProperty(Annotations.NAME);
+//		
+//	}
 	
     /**
      * @see Annotations#SELECT
@@ -158,60 +164,39 @@ public class NamedSolutionSetScanOp extends PipelineOp {
      */
     static private class ChunkTask implements Callable<Void> {
 
-        private final NamedSolutionSetScanOp op;
+        private final NestedLoopJoinOp op;
 
         private final BOpContext<IBindingSet> context;
 
-        private final ISparqlCache sparqlCache;
-        
-        ChunkTask(final NamedSolutionSetScanOp op,
+        ChunkTask(final NestedLoopJoinOp op,
                 final BOpContext<IBindingSet> context) {
 
             this.op = op;
-            
+
             this.context = context;
 
-            // Resolve the object which will give us access to the named
-            // solution set.
-			this.sparqlCache = SparqlCacheFactory
-					.getExistingSparqlCache(context.getRunningQuery()
-							.getQueryEngine());
+        }
 
-			if (sparqlCache == null) {
+        public Void call() throws Exception {
 
-				/*
-				 * Not enabled?
-				 */
+            final BOpStats stats = context.getStats();
 
-				throw new UnsupportedOperationException();
+            // Convert source solutions to array (assumes low cardinality).
+            final IBindingSet[] leftSolutions = BOpUtility.toArray(
+                    context.getSource(), stats);
 
-			}
-
-		}
-
-		public Void call() throws Exception {
-
-			final BOpStats stats = context.getStats();
-
-			// Convert source solutions to array (low cardinality).
-			final IBindingSet[] leftSolutions = BOpUtility.toArray(
-					context.getSource(), stats);
-
-			// default sink
-			final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
+            // default sink
+            final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-			final String name = op.getName();
+            final IVariable<?>[] selectVars = op.getSelect();
 
-			final IVariable<?>[] selectVars = op.getSelect();
+            final IConstraint[] constraints = op.constraints();
 
-			final IConstraint[] constraints = op.constraints();
-
-			final ICloseableIterator<IBindingSet[]> ritr = sparqlCache
-					.getSolutions(name);
-
+            final ICloseableIterator<IBindingSet[]> ritr = getRightSolutions();
+			
 			try {
 
 	            while (ritr.hasNext()) {
@@ -265,6 +250,18 @@ public class NamedSolutionSetScanOp extends PipelineOp {
 
         }
 
-    } // class CopyTask
+        /**
+         * Return the right solutions.
+         */
+        protected ICloseableIterator<IBindingSet[]> getRightSolutions() {
+
+            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                    .getRequiredProperty(Annotations.NAMED_SET_REF);
+
+            return context.getAlternateSource(op, namedSetRef);
+
+        }
+
+    } // class ChunkTask
 
 }

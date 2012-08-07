@@ -46,7 +46,6 @@ import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;

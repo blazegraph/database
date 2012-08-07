@@ -386,8 +386,8 @@ public class CompactTask implements Callable<Journal> {
                     log.info("Start: name=" + entry.name);
                 
                 // source index.
-                final BTree oldBTree = oldJournal
-                        .getIndex(entry.checkpointAddr);
+                final BTree oldBTree = (BTree) oldJournal
+                        .getIndexWithCheckpointAddr(entry.checkpointAddr);
 
                 // #of index entries on the old index.
                 final long entryCount = oldBTree.rangeCount();

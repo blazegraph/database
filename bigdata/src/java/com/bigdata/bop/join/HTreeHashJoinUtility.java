@@ -43,7 +43,6 @@ import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
@@ -81,6 +80,8 @@ import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 import cutthecrap.utils.striterators.Visitor;
@@ -1469,42 +1470,135 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     } // outputOptionals.
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public ICloseableIterator<IBindingSet> indexScan() {
+
+        final HTree rightSolutions = getRightSolutions();
+
+        if (log.isInfoEnabled()) {
+            log.info("rightSolutions: #nnodes="
+                    + rightSolutions.getNodeCount() + ",#leaves="
+                    + rightSolutions.getLeafCount() + ",#entries="
+                    + rightSolutions.getEntryCount());
+        }
+
+        // source.
+        final ITupleIterator<?> solutionsIterator = rightSolutions
+                .rangeIterator();
+
+        IStriterator itr = new Striterator(solutionsIterator);
+
+        /**
+         * Add resolution step.
+         */
+        itr = itr.addFilter(new Resolver(){
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected Object resolve(Object obj) {
+                
+                final ITuple<?> t = ((ITuple<?>) obj);
+                
+                // Decode the solution.
+                IBindingSet bset = decodeSolution(t);
+
+//                if (selectVars != null) {
+//
+//                    // Drop variables which are not projected.
+//                    bset = bset.copy(selectVars);
+//
+//                }
+
+                // Resolve ivCache associations.
+                encoder.resolveCachedValues(bset);
+
+                return bset;
+                
+            }
+            
+        });
+        
+        return (ICloseableIterator<IBindingSet>) itr;
+        
+    }
+
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
         try {
 
-            final HTree rightSolutions = getRightSolutions();
+//            if (false) {
+//
+//                /*
+//                 * Striterator pattern.
+//                 */
+//
+//                final ICloseableIterator<IBindingSet> itr = indexScan();
+//                
+//                try {
+//                
+//                    while(itr.hasNext()) {
+//                    
+//                        IBindingSet bset = itr.next();
+//
+//                        if (selectVars != null) {
+//
+//                            // Drop variables which are not projected.
+//                            bset = bset.copy(selectVars);
+//
+//                        }
+//                        out.add(bset);
+//
+//                    }
+//                    
+//                } finally {
+//                    
+//                    itr.close();
+//                    
+//                }
+//                
+//                
+//            } else {
 
-            if (log.isInfoEnabled()) {
-                log.info("rightSolutions: #nnodes="
-                        + rightSolutions.getNodeCount() + ",#leaves="
-                        + rightSolutions.getLeafCount() + ",#entries="
-                        + rightSolutions.getEntryCount());
-            }
+                /*
+                 * Simple iterator pattern.
+                 */
+                
+                final HTree rightSolutions = getRightSolutions();
 
-            // source.
-            final ITupleIterator<?> solutionsIterator = rightSolutions
-                    .rangeIterator();
+                if (log.isInfoEnabled()) {
+                    log.info("rightSolutions: #nnodes="
+                            + rightSolutions.getNodeCount() + ",#leaves="
+                            + rightSolutions.getLeafCount() + ",#entries="
+                            + rightSolutions.getEntryCount());
+                }
 
-            while (solutionsIterator.hasNext()) {
+                // source.
+                final ITupleIterator<?> solutionsIterator = rightSolutions
+                        .rangeIterator();
 
-                final ITuple<?> t = solutionsIterator.next();
+                while (solutionsIterator.hasNext()) {
 
-                IBindingSet bset = decodeSolution(t);
+                    final ITuple<?> t = solutionsIterator.next();
 
-                if (selectVars != null) {
+                    IBindingSet bset = decodeSolution(t);
 
-                    // Drop variables which are not projected.
-                    bset = bset.copy(selectVars);
+                    if (selectVars != null) {
+
+                        // Drop variables which are not projected.
+                        bset = bset.copy(selectVars);
+
+                    }
+
+                    encoder.resolveCachedValues(bset);
+
+                    out.add(bset);
 
                 }
 
-                encoder.resolveCachedValues(bset);
-
-                out.add(bset);
-
-            }
+//            }
 
         } catch (Throwable t) {
 

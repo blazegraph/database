@@ -12,8 +12,10 @@
       	<uri>http://www.bigdata.com/Mike</uri>
       </binding>
       <binding name="y">
-      	<literal datatype="http://www.w3.org/2001/XMLSchema#int">3</literal>
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#int">2</literal>
       </binding>
+   </result>
+   <result>
       <binding name="x">
       	<uri>http://www.bigdata.com/Bryan</uri>
       </binding>

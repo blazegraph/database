@@ -50,7 +50,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.QueryResultUtil;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.impl.TupleQueryResultBuilder;
@@ -769,7 +768,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 			sb.append("  FILTER (?x = <http://www.bigdata.com/Bryan> ) .\n");
 			sb.append("}\n");
             
-            con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
+            con.prepareUpdate(QueryLanguage.SPARQL, sb.toString()).execute();
             
         }
 

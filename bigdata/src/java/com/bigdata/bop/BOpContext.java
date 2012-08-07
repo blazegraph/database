@@ -36,30 +36,30 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.http.conn.ClientConnectionManager;
 
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
-import com.bigdata.bop.solutions.SolutionSetStream;
-import com.bigdata.bop.solutions.SolutionSetStream.SolutionSetStreamPredicate;
-import com.bigdata.btree.BTree;
-import com.bigdata.htree.HTree;
+import com.bigdata.bop.join.IHashJoinUtility;
+import com.bigdata.btree.ISimpleIndexAccess;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
-import com.bigdata.stream.Stream;
 import com.bigdata.striterator.ChunkedFilter;
+import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -466,81 +466,199 @@ public class BOpContext<E> extends BOpContextBase {
         
     }
 
+//    /**
+//     * Return an access path for a predicate that identifies a data structure
+//     * which can be resolved to a reference attached to as a query attribute.
+//     * <p>
+//     * This method is used for data structures (including {@link Stream}s,
+//     * {@link HTree}s, and {@link BTree} indices as well as non-durable data
+//     * structures, such as JVM collection classes. When the data structure is
+//     * pre-existing (such as a named solution set whose life cycle is broader
+//     * than the query), then the data structure MUST be resolved during query
+//     * optimization and attached to the {@link IRunningQuery} before operators
+//     * with a dependency on those data structures can execute.
+//     * 
+//     * @param predicate
+//     *            The predicate.
+//     * 
+//     * @return The access path.
+//     * 
+//     * @throws RuntimeException
+//     *             if the access path could not be resolved.
+//     * 
+//     * @see #getQueryAttributes()
+//     */
+//    public IBindingSetAccessPath<?> getAccessPath(final IPredicate predicate) {
+//
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//
+//        /*
+//         * FIXME There are several cases here, one for each type of
+//         * data structure we need to access and each means of identifying
+//         * that data structure. The main case is Stream (for named solution sets).
+//         * If we wind up always modeling a named solution set as a Stream, then
+//         * that is the only case that we need to address.
+//         */
+//        if(predicate instanceof SolutionSetStream.SolutionSetStreamPredicate) {
+//            
+//            /*
+//             * Resolve the name of the Stream against the query attributes for
+//             * the running query, obtaining a reference to the Stream. Then
+//             * request the access path from the Stream.
+//             * 
+//             * TODO We might need to also include the UUID of the top-level
+//             * query since that is where any subquery will have to look to find
+//             * the named solution set.
+//             */
+//            
+//            @SuppressWarnings("unchecked")
+//            final SolutionSetStreamPredicate<IBindingSet> p = (SolutionSetStreamPredicate<IBindingSet>) predicate;
+//
+//            final String attributeName = p.getOnlyRelationName();
+//
+//            final SolutionSetStream tmp = (SolutionSetStream) getQueryAttributes().get(
+//                    attributeName);
+//
+//            if (tmp == null) {
+//
+//                /*
+//                 * Likely causes include a failure to attach the solution set to
+//                 * the query attributes when setting up the query or attaching
+//                 * and/or resolving the solution set against the wrong running
+//                 * query (especially when the queries are nested).
+//                 */
+//                throw new RuntimeException(
+//                        "Could not resolve Stream: predicate=" + predicate);
+//            
+//            }
+//            
+//            return tmp.getAccessPath(predicate);
+//
+//        }
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
+
     /**
-     * Return an access path for a predicate that identifies a data structure
-     * which can be resolved to a reference attached to as a query attribute.
-     * <p>
-     * This method is used for data structures (including {@link Stream}s,
-     * {@link HTree}s, and {@link BTree} indices as well as non-durable data
-     * structures, such as JVM collection classes. When the data structure is
-     * pre-existing (such as a named solution set whose life cycle is broader
-     * than the query), then the data structure MUST be resolved during query
-     * optimization and attached to the {@link IRunningQuery} before operators
-     * with a dependency on those data structures can execute.
+     * Return an {@link ICloseableIterator} that can be used to read the
+     * solutions to be indexed from a source other than the pipeline. The
+     * returned iterator is intentionally aligned with the type returned by
+     * {@link BOpContext#getSource()}.
      * 
-     * @param predicate
-     *            The predicate.
-     * 
-     * @return The access path.
+     * @return An iterator visiting the solutions to be indexed and never
+     *         <code>null</code>.
      * 
      * @throws RuntimeException
-     *             if the access path could not be resolved.
+     *             if the source can not be resolved.
      * 
-     * @see #getQueryAttributes()
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
+     *      SPARQL UPDATE for SOLUTION SETS </a>
      */
-    public IBindingSetAccessPath<?> getAccessPath(final IPredicate predicate) {
-
-        if (predicate == null)
-            throw new IllegalArgumentException();
+    @SuppressWarnings("unchecked")
+    public ICloseableIterator<IBindingSet[]> getAlternateSource(
+            final PipelineOp op, final NamedSolutionSetRef namedSetRef) {
 
         /*
-         * FIXME There are several cases here, one for each type of
-         * data structure we need to access and each means of identifying
-         * that data structure. The main case is Stream (for named solution sets).
-         * If we wind up always modeling a named solution set as a Stream, then
-         * that is the only case that we need to address.
+         * Lookup the attributes for the query that will be used to resolve the
+         * named solution set.
          */
-        if(predicate instanceof SolutionSetStream.SolutionSetStreamPredicate) {
-            
-            /*
-             * Resolve the name of the Stream against the query attributes for
-             * the running query, obtaining a reference to the Stream. Then
-             * request the access path from the Stream.
-             * 
-             * TODO We might need to also include the UUID of the top-level
-             * query since that is where any subquery will have to look to find
-             * the named solution set.
-             */
-            
-            @SuppressWarnings("unchecked")
-            final SolutionSetStreamPredicate<IBindingSet> p = (SolutionSetStreamPredicate<IBindingSet>) predicate;
+        final IQueryAttributes queryAttributes = getQueryAttributes(namedSetRef.queryId);
 
-            final String attributeName = p.getOnlyRelationName();
+        // Resolve the named solution set.
+        final Object tmp = queryAttributes.get(namedSetRef);
 
-            final SolutionSetStream tmp = (SolutionSetStream) getQueryAttributes().get(
-                    attributeName);
+        // Iterator visiting the solution set.
+        final ICloseableIterator<IBindingSet> src;
 
-            if (tmp == null) {
+        if (tmp != null) {
+
+            if (tmp instanceof IHashJoinUtility) {
 
                 /*
-                 * Likely causes include a failure to attach the solution set to
-                 * the query attributes when setting up the query or attaching
-                 * and/or resolving the solution set against the wrong running
-                 * query (especially when the queries are nested).
+                 * Reading solutions from an existing hash index.
                  */
-                throw new RuntimeException(
-                        "Could not resolve Stream: predicate=" + predicate);
-            
+
+                final IHashJoinUtility state = (IHashJoinUtility) tmp;
+
+                src = state.indexScan();
+
+            } else if (tmp instanceof ISimpleIndexAccess) {
+
+                /*
+                 * Reading solutions from a raw BTree, HTree, or Stream.
+                 */
+
+                src = (ICloseableIterator<IBindingSet>) ((ISimpleIndexAccess) tmp)
+                        .scan();
+
+            } else {
+
+                /*
+                 * We found something, but we do not know how to turn it into an
+                 * iterator visiting solutions.
+                 */
+
+                throw new UnsupportedOperationException("namedSetRef="
+                        + namedSetRef + ", class=" + tmp.getClass());
+
             }
+
+        } else {
+
+            /*
+             * There is no query attribute for that NamedSolutionSetRef.
+             * 
+             * The query attributes are the first level of resolution. Since
+             * nothing was found there, we will now look for an index (BTree,
+             * HTree, Stream, etc) having the specified name.
+             * 
+             * The search order is CACHE, local Journal, federation.
+             * 
+             * TODO The name of the desired solution set might need to be paired
+             * with the NamedSolutionSetRef or modeled by a different type of
+             * object for the NAMED_SET_REF annotation, otherwise we might not
+             * be able to clearly specify the name of a stream and the name of
+             * an index over that stream.
+             */
+
+            // The name of a solution set.
+            final String name = namedSetRef.namedSet;
+
+            // Resolve the object which will give us access to the named
+            // solution set.
+            final ISparqlCache sparqlCache = SparqlCacheFactory
+                    .getExistingSparqlCache(getRunningQuery().getQueryEngine());
+
+            if (sparqlCache != null && sparqlCache.existsSolutions(name)) {
+
+                return sparqlCache.getSolutions(name);
+
+            }
+
+            /*
+             * FIXME Provide local and perhaps federation-wide access to a
+             * durable named index, returning the index scan. [It appears that I
+             * am not finished yet with the abstraction for Journal to support
+             * non-BTree named indices.]
+             * 
+             * TODO Consider specifying the index using NT to specify both the
+             * name and the timestamp.
+             */
+
+            // getIndexManager().getIndex(name, timestamp)
+
+            throw new RuntimeException("Not found: name=" + name
+                    + ", namedSetRef=" + namedSetRef);
+
+        } 
             
-            return tmp.getAccessPath(predicate);
+        return new Chunkerator<IBindingSet>(src, op.getChunkCapacity(),
+                IBindingSet.class);
 
-        }
-        
-        throw new UnsupportedOperationException();
-        
     }
-
+    
     /**
      * Return the {@link IMemoryManager} associated with the specified query.
      * 

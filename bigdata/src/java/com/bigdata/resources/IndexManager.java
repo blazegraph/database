@@ -808,7 +808,8 @@ abstract public class IndexManager extends StoreManager {
             }
 
             // MAY be null.
-            btree = journal.getIndex(name, commitRecord);
+            btree = (BTree) journal
+                    .getIndexWithCommitRecord(name, commitRecord);
 
             if (btree != null) {
 
@@ -839,7 +840,8 @@ abstract public class IndexManager extends StoreManager {
             }
 
             // open index on that journal (MAY be null).
-            btree = (BTree) journal.getIndex(name, commitRecord);
+            btree = (BTree) journal
+                    .getIndexWithCommitRecord(name, commitRecord);
 
             if (btree == null)
                 log.warn("Index not found: name=" + name + ", timestamp="
@@ -1511,7 +1513,8 @@ abstract public class IndexManager extends StoreManager {
              * Open the mutable BTree only (not the full view since we don't
              * want to force the read of index segments from the disk).
              */
-            final BTree btree = journal.getIndex(entry.checkpointAddr);
+            final BTree btree = (BTree) journal
+                    .getIndexWithCheckpointAddr(entry.checkpointAddr);
 
             assert btree != null : entry.toString();
             

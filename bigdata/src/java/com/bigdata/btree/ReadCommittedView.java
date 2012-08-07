@@ -112,8 +112,9 @@ public class ReadCommittedView implements ILocalBTreeView {
             this.commitRecord = journal.getCommitRecord();
         
             // the read-only view of the index as of that commit point.
-            this.btree = journal.getIndex(name, commitRecord);
-            
+            this.btree = (BTree) journal.getIndexWithCommitRecord(name,
+                    commitRecord);
+
         }
         
     }

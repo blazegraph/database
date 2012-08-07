@@ -58,6 +58,8 @@ import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 import cutthecrap.utils.striterators.Visitor;
 
@@ -1006,46 +1008,166 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         }
         
     }
+    
+    @SuppressWarnings("unchecked")
+    @Override
+    public ICloseableIterator<IBindingSet> indexScan() {
 
+        try {
+
+//            /*
+//             * The selected variables -or- <code>null</code> if all variables
+//             * should be projected.
+//             */
+//            final IVariable<?>[] selected = getSelectVars();
+
+            final Map<Key, Bucket> rightSolutions = getRightSolutions();
+
+            if (log.isInfoEnabled())
+                log.info("rightSolutions: #buckets=" + rightSolutions.size());
+
+            // Visit the buckets.
+            IStriterator itr = new Striterator(rightSolutions.values()
+                    .iterator());
+            
+            itr = itr.addFilter(new Expander() {
+
+                private static final long serialVersionUID = 1L;
+
+                /**
+                 * Expand the bucket into the solutions in the bucket.
+                 */
+                @SuppressWarnings("rawtypes")
+                @Override
+                protected Iterator expand(Object obj) {
+
+                    final Bucket b = (Bucket) obj;
+
+                    return b.iterator();
+
+                }
+            });
+
+            /**
+             * Copy only the variables that are projected.
+             */
+            itr = itr.addFilter(new Resolver() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected Object resolve(Object obj) {
+
+                    final IBindingSet bs = ((SolutionHit) obj).solution;
+
+//                    if (selected != null) {
+//
+//                        // Drop variables which are not projected.
+//                        bs = bs.copy(selected);
+//
+//                    }
+
+                    return bs;
+
+                }
+            });
+            
+            return (ICloseableIterator<IBindingSet>) itr;
+
+        } catch (Throwable t) {
+
+            throw launderThrowable(t);
+
+        }
+
+    }
+    
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
         try {
 
-            final Map<Key, Bucket> rightSolutions = getRightSolutions();
+//            if (true) {
+//
+//          /*
+//          * Code works, uses Striterator pattern.
+//          *
+//                 * The selected variables -or- <code>null</code> if all
+//                 * variables should be projected.
+//                 */
+//                final IVariable<?>[] selected = getSelectVars();
+//                
+//                final ICloseableIterator<IBindingSet> itr = indexScan();
+//
+//                try {
+//
+//                    while (itr.hasNext()) {
+//
+//                        IBindingSet bs = itr.next();
+//
+//                        if (selected != null) {
+//
+//                            // Drop variables which are not projected.
+//                            bs = bs.copy(selected);
+//
+//                        }
+//                        
+//                        out.add(bs);
+//
+//                        if (log.isDebugEnabled())
+//                            log.debug("Output solution: " + bs);
+//
+//                    }
+//
+//                } finally {
+//
+//                    itr.close();
+//
+//                }
+//
+//            } else {
 
-            final IVariable<?>[] selected = getSelectVars();
+                /*
+                 * Code works, uses nested iterators pattern.
+                 */
+            
+                final Map<Key, Bucket> rightSolutions = getRightSolutions();
 
-            if (log.isInfoEnabled())
-                log.info("rightSolutions: #buckets=" + rightSolutions.size());
+                final IVariable<?>[] selected = getSelectVars();
 
-            // source.
-            final Iterator<Bucket> bucketIterator = rightSolutions.values()
-                    .iterator();
+                if (log.isInfoEnabled())
+                    log.info("rightSolutions: #buckets="
+                            + rightSolutions.size());
 
-            while (bucketIterator.hasNext()) {
+                // source.
+                final Iterator<Bucket> bucketIterator = rightSolutions.values()
+                        .iterator();
 
-                final Bucket bucket = bucketIterator.next();
+                while (bucketIterator.hasNext()) {
 
-                for (SolutionHit solutionHit : bucket) {
+                    final Bucket bucket = bucketIterator.next();
 
-                    IBindingSet bs = solutionHit.solution;
+                    for (SolutionHit solutionHit : bucket) {
 
-                    if (selected != null) {
+                        IBindingSet bs = solutionHit.solution;
 
-                        // Drop variables which are not projected.
-                        bs = bs.copy(selected);
+                        if (selected != null) {
+
+                            // Drop variables which are not projected.
+                            bs = bs.copy(selected);
+
+                        }
+
+                        out.add(bs);
+
+                        if (log.isDebugEnabled())
+                            log.debug("Output solution: " + bs);
 
                     }
 
-                    out.add(bs);
-
-                    if (log.isDebugEnabled())
-                        log.debug("Output solution: " + bs);
-
                 }
 
-            }
+//            }
 
         } catch (Throwable t) {
             

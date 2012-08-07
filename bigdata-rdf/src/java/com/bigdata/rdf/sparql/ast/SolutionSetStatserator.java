@@ -41,10 +41,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
-
-import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Class populates an {@link ISolutionSetStats} object from a stream of

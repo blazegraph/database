@@ -52,7 +52,7 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
-import com.bigdata.bop.join.AbstractHashJoinOp;
+import com.bigdata.bop.join.HashJoinOp;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
@@ -1016,7 +1016,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * of the hash join visible from the NanoSparqlServer. (Both
              * versions of the operator require this attribute.)
              */
-            map.put(AbstractHashJoinOp.Annotations.NAMED_SET_REF,
+            map.put(HashJoinOp.Annotations.NAMED_SET_REF,
                     new NamedSolutionSetRef(ctx.queryId, "--namedSet-"
                             + ctx.nextId(), joinVars));
 

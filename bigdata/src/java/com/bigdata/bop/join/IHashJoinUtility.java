@@ -34,6 +34,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
+import com.ibm.icu.util.BytesTrie.Iterator;
 
 /**
  * Interface for hash index build and hash join operations.
@@ -290,6 +291,20 @@ public interface IHashJoinUtility {
      */
     void outputSolutions(IBuffer<IBindingSet> out);
 
+    /**
+     * Return an {@link Iterator} that visits all solutions in the index (index
+     * scan). The visited solutions MAY contain variables that would not be
+     * projected out of the hash join.
+     * <p>
+     * Note: This is very nearly the same as {@link #outputSolutions(IBuffer)}
+     * except that the latter only outputs the projected variables and it writes
+     * onto an {@link IBuffer} rather than returning an
+     * {@link ICloseableIterator}.
+     * 
+     * @return The {@link Iterator}.
+     */
+    ICloseableIterator<IBindingSet> indexScan();
+    
     /**
      * Output the solutions which joined. This is used with EXISTS.
      * 

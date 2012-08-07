@@ -70,7 +70,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
@@ -561,12 +560,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                sources);
-//                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-//                        startId, -1 /* partitionId */,
-//                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
-
-//        runningQuery.get();
+                null/* queryAttributes */, sources);
         
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
@@ -710,10 +704,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         final PipelineOp query = delayOp; 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                sources);
-//                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-//                        startId, -1 /* partitionId */,
-//                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
+                null/* queryAttributes */, sources);
 
         assertFalse(runningQuery.isDone());
         
@@ -831,11 +822,8 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         final PipelineOp query = sliceOp; 
         final UUID queryId = UUID.randomUUID();
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
-                sources);
-//                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-//                        startId, -1 /* partitionId */,
-//                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
-
+                null/* queryAttributes */, sources);
+        
         //
         //
         //

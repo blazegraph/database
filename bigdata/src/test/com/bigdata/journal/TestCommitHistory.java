@@ -547,13 +547,13 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
              * returns a different instance than the "live" index.
              */
 
-            final BTree historicalIndex0 = (BTree) journal.getIndex(name,
+            final BTree historicalIndex0 = (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord0);
 
             assertTrue(liveIndex != historicalIndex0);
 
             // re-request is still the same object.
-            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+            assertTrue(historicalIndex0 == (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord0));
 
             /*
@@ -599,15 +599,15 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
              * commit record since the index state was not changed and it will
              * be reloaded from the same address.
              */
-            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+            assertTrue(historicalIndex0 == (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord1));
 
             // re-request is still the same object.
-            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+            assertTrue(historicalIndex0 == (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord0));
 
             // re-request is still the same object.
-            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+            assertTrue(historicalIndex0 == (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord1));
 
             /*
@@ -640,7 +640,7 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
             // must be a different index object.
 
-            BTree historicalIndex2 = (BTree) journal.getIndex(name,
+            BTree historicalIndex2 = (BTree) journal.getIndexWithCommitRecord(name,
                     commitRecord2);
 
             assertTrue(historicalIndex0 != historicalIndex2);
