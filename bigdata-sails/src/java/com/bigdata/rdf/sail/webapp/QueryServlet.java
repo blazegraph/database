@@ -129,6 +129,10 @@ public class QueryServlet extends BigdataRDFServlet {
             
             doQuery(req, resp);
             
+        } else if (req.getParameter("uuid") != null) {
+
+            doUUID(req, resp);
+            
         } else if (req.getParameter("ESTCARD") != null) {
             
             doEstCard(req, resp);
@@ -145,6 +149,20 @@ public class QueryServlet extends BigdataRDFServlet {
             
         }
         
+    }
+
+    /**
+     * Generate and send a UUID as a <code>text/plain</code> response entity.
+     * This is intended for use by JavaScript clients that want to generate new
+     * URLs locally. JavaScript does not provide an easy means to generate
+     * UUIDs, so we've added one to the server.
+     */
+    private void doUUID(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, UUID.randomUUID()
+                .toString());
+
     }
 
     /**

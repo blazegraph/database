@@ -499,26 +499,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             /*
              * Figure out the service end point.
              * 
-             * FIXME This needs to be an explicitly configured (or intelligently
-             * defaulted) URL in order for us to get the actual deployment URL
-             * correct in the generated VoID description. See NanoSparqlServer,
-             * web.xml, QueryServlet.doServiceDescription(), and
-             * BigdataRDFServletContext.
+             * Note: This is just the requestURL as reported. This makes is
+             * possible to support virtual hosting and similar http proxy
+             * patterns since the SPARQL end point is just the URL at which the
+             * service is responding.
              */
-            final String serviceURI;
-            {
-                
-                final StringBuffer sb = req.getRequestURL();
-
-                final int indexOf = sb.indexOf("?");
-
-                if (indexOf == -1) {
-                    serviceURI = sb.toString();
-                } else {
-                    serviceURI = sb.substring(0, indexOf);
-                }
-
-            }
+            final String serviceURI = req.getRequestURL().toString();
             
             final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
 

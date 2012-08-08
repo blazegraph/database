@@ -282,19 +282,20 @@ public class SparqlCache implements ISparqlCache {
         properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
                 BufferMode.MemStore.name());
 
+        // Start small, grow as required.
         properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""
-                + (10 * Bytes.megabyte));
+                + (1 * Bytes.megabyte));
 
-        properties.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE,
-                "true");
-
-//        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
-//                "false");
+//        properties.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE,
+//                "true");
 //
-//        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
-//                "false");
-//
-//        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+////        properties.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+////                "false");
+////
+////        properties.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+////                "false");
+////
+////        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
         this.cache = new CacheJournal(properties);
         

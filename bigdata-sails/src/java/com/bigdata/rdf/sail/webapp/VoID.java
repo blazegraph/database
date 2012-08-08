@@ -108,8 +108,8 @@ public class VoID {
      *            Where to assemble the description.
      * @param tripleStore
      *            The KB instance to be described.
-     * @param serviceURIs
-     *            One or more service end points for that KB instance.
+     * @param serviceURI
+     *            The SPARQL service end point.
      * @param aDefaultDataset
      *            The data set identifier that will be used on the description
      *            (the bigdata namespace of the dataset is obtained from the
@@ -172,26 +172,8 @@ public class VoID {
         // Also present the namespace in an unambiguous manner.
         g.add(aDataset, SD.KB_NAMESPACE, f.createLiteral(namespace));
 
-        /**
-         * Service end point for this.
-         * 
-         * 
-         * FIXME Provide the serviceURI for that namespace based on the
-         * top-level serviceURI plus the namespace. This is not getting the
-         * correct end point! It winds up as
-         * 
-         * <pre>
-         * <sparqlEndpoint rdf:resource="http://192.168.1.134:8080/namespace/kb/sparql"/>
-         * </pre>
-         * 
-         * which is Ok, but as
-         * 
-         * <pre>
-         * <sparqlEndpoint rdf:resource="http://192.168.1.134:8080/sparql/kb"/>
-         * </pre>
-         * 
-         * when using the ServiceDescription (which is totally wrong as the
-         * "namespace" component is not in the path).
+        /*
+         * Service end point for this namespace.
          */
         g.add(aDataset, VoidVocabularyDecl.sparqlEndpoint,
                 f.createURI(serviceURI + "/" + namespace + "/sparql"));
