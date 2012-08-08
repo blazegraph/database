@@ -45,6 +45,9 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.btree.ISimpleIndexAccess;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -58,6 +61,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -621,6 +625,15 @@ public class BOpContext<E> extends BOpContextBase {
              * object for the NAMED_SET_REF annotation, otherwise we might not
              * be able to clearly specify the name of a stream and the name of
              * an index over that stream.
+             * 
+             * TODO We might need/want to explicitly identify the conceptual
+             * location of the named solution set (cache, local index manager,
+             * federation) when the query is compiled so we only look in the
+             * right place at when the operator is executing. That could
+             * decrease latency for operators which execute multiple times,
+             * report errors early if something can not be resolved, and
+             * eliminate some overhead with testing remote services during
+             * operator evaluation (if the cache is non-local).
              */
 
             // The name of a solution set.
@@ -638,19 +651,53 @@ public class BOpContext<E> extends BOpContextBase {
             }
 
             /*
-             * FIXME Provide local and perhaps federation-wide access to a
-             * durable named index, returning the index scan. [It appears that I
-             * am not finished yet with the abstraction for Journal to support
-             * non-BTree named indices.]
-             * 
-             * TODO Consider specifying the index using NT to specify both the
-             * name and the timestamp.
+             * FIXME Consider specifying the index using NT to specify both the
+             * name and the timestamp. Or put the timestamp into the
+             * NamedSolutionSetRef.
              */
+            final long timestamp = ITx.READ_COMMITTED;
 
-            // getIndexManager().getIndex(name, timestamp)
+            final IIndexManager localIndexManager = getIndexManager();
 
-            throw new RuntimeException("Not found: name=" + name
-                    + ", namedSetRef=" + namedSetRef);
+            if (localIndexManager instanceof AbstractJournal) {
+
+                final ISimpleIndexAccess index = ((AbstractJournal) localIndexManager)
+                        .getIndexLocal(name, timestamp);
+
+                if (index != null) {
+
+                    src = (ICloseableIterator<IBindingSet>) index.scan();
+
+                } else {
+
+                    /*
+                     * TODO Provide federation-wide access to a durable named
+                     * index, returning the index scan.
+                     */
+
+                    final IBigdataFederation<?> fed = getFederation();
+
+                    // resolve remote index, obtaining "scan" of solutions.
+
+                    src = null;
+
+                }
+
+            } else {
+
+                /*
+                 * This is an odd code path. It is possible that we could hit it
+                 * if the local index manager were null (in unit tests) or some
+                 * wrapped object (such as an IJournal delegate).
+                 */
+
+                throw new AssertionError();
+                
+            }
+
+            if (src == null)
+                throw new RuntimeException("Not found: name=" + name
+                        + ", namedSetRef=" + namedSetRef);
 
         } 
             
