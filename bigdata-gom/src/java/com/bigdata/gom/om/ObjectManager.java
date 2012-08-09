@@ -28,6 +28,7 @@ import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -37,34 +38,48 @@ import com.bigdata.striterator.ICloseableIterator;
 public class ObjectManager extends ObjectMgrModel {
 	private static final Logger log = Logger.getLogger(IObjectManager.class);
 	
-	final BigdataSailRepositoryConnection m_cxn;
+	final BigdataSailRepository m_repo;
+	BigdataSailRepositoryConnection  m_cxn = null;
 	
-	public ObjectManager(final UUID uuid, final BigdataSailRepositoryConnection cxn) {
+	public ObjectManager(final UUID uuid, final BigdataSailRepository cxn) {
 		super(uuid, cxn.getValueFactory());
-		m_cxn = cxn;
+		m_repo = cxn;
 	}
 	
 	/**
 	 * @return direct repository connection
 	 */
-	public BigdataSailRepositoryConnection getRawConnection() {
-		return m_cxn;
+	public BigdataSailRepository getRepository() {
+		return m_repo;
 	}
 	
 	@Override
 	public void close() {
 		try {
-			m_cxn.close();
+			m_repo.shutDown();
 		} catch (RepositoryException e) {
 			log.warn("Problem with close", e);
 		}
 		m_dict.clear();
 	}
+	
+	public BigdataSailRepositoryConnection establishUnisolatedConnection() {
+		if (m_cxn == null) {
+			try {
+				m_cxn = m_repo.getUnisolatedConnection();
+				m_cxn.setAutoCommit(false);
+			} catch (RepositoryException e) {
+				throw new RuntimeException("Unable to establish unisolated connection", e);
+			}
+		}
+		
+		return m_cxn;
+	}
 
 	@Override
 	public ICloseableIterator<BindingSet> evaluate(final String query) {
 		try {
-			final TupleQuery q = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+			final TupleQuery q = establishUnisolatedConnection().prepareTupleQuery(QueryLanguage.SPARQL, query);
 			final TupleQueryResult res = q.evaluate();
 			return new CloseableIteratorWrapper<BindingSet>(new Iterator<BindingSet>() {
 
@@ -105,7 +120,7 @@ public class ObjectManager extends ObjectMgrModel {
 
 	public ICloseableIterator<Statement> evaluateGraph(final String query) {
 		try {
-			final GraphQuery q = m_cxn.prepareGraphQuery(QueryLanguage.SPARQL, query);
+			final GraphQuery q = establishUnisolatedConnection().prepareGraphQuery(QueryLanguage.SPARQL, query);
 			final GraphQueryResult res = q.evaluate();
 			return  new CloseableIteratorWrapper<Statement>(new Iterator<Statement>() {
 
@@ -208,13 +223,13 @@ public class ObjectManager extends ObjectMgrModel {
 		// experiment with adding using batch syntax
 		if (false) {
 			// m_cxn.getTripleStore().addStatement(id, key, val);
-			m_cxn.add(id, key, val);
+			establishUnisolatedConnection().add(id, key, val);
 		} else {
 			final ISPO spo = new BigdataStatementImpl((BigdataResource) id, 
 					(BigdataURI) key, 
 					(BigdataValue) val, null, StatementEnum.Explicit, false);
 			
-			m_cxn.getTripleStore().addStatements(new ISPO[] {spo}, 1);
+			establishUnisolatedConnection().getTripleStore().addStatements(new ISPO[] {spo}, 1);
 		}
 	}
 
@@ -222,12 +237,19 @@ public class ObjectManager extends ObjectMgrModel {
 	public void retract(Resource id, URI key, Value val) throws RepositoryException {
 		if (log.isTraceEnabled())
 			log.trace("Removing statement: " + id.stringValue() + " " + key.stringValue() + " " + val.stringValue());
-		m_cxn.remove(id, key, val);
+		establishUnisolatedConnection().remove(id, key, val);
 	}
 
 	@Override
 	void doCommit() {
-		m_cxn.getTripleStore().commit();
+		establishUnisolatedConnection().getTripleStore().commit();
+		try {
+			m_cxn.close();
+		} catch (RepositoryException e) {
+			throw new RuntimeException("Problem closing connection", e);
+		} finally {
+			m_cxn = null;
+		}
 	}
 
 	/**
@@ -236,15 +258,22 @@ public class ObjectManager extends ObjectMgrModel {
 	 */
 	@Override
 	void doRollback() {
-		m_cxn.getTripleStore().abort();
+		establishUnisolatedConnection().getTripleStore().abort();
+		try {
+			m_cxn.close();
+		} catch (RepositoryException e) {
+			throw new RuntimeException("Problem closing connection", e);
+		} finally {
+			m_cxn = null;
+		}
 	}
 
 	@Override
 	public void remove(IGPO gpo) {
 		try {
 			// Removes all references
-			m_cxn.remove(gpo.getId(), null, null);
-			m_cxn.remove((Resource) null, null, gpo.getId());
+			establishUnisolatedConnection().remove(gpo.getId(), null, null);
+			establishUnisolatedConnection().remove((Resource) null, null, gpo.getId());
 		} catch (RepositoryException e) {
 			throw new RuntimeException("Unable to remove object", e);
 		}
@@ -262,7 +291,7 @@ public class ObjectManager extends ObjectMgrModel {
 			m_terms.toArray(terms);
 			m_terms.clear();
 			final long start = System.currentTimeMillis();
-			m_cxn.getTripleStore().addTerms(terms);
+			establishUnisolatedConnection().getTripleStore().addTerms(terms);
 			if (log.isTraceEnabled())
 				log.trace("Added " + terms.length + " terms: " + (System.currentTimeMillis()-start) + "ms");
 		}
@@ -274,14 +303,14 @@ public class ObjectManager extends ObjectMgrModel {
 		if (m_removes.size() > 0) {
 			final ISPO[] spos = statementsToSPO(m_removes);
 			m_removes.clear();			
-			m_cxn.getTripleStore().removeStatements(spos, spos.length);
+			establishUnisolatedConnection().getTripleStore().removeStatements(spos, spos.length);
 		}
 		
 		// handle batch inserts
 		if (m_inserts.size() > 0) {
 			final ISPO[] spos = statementsToSPO(m_inserts);
 			m_inserts.clear();
-			m_cxn.getTripleStore().addStatements(spos, spos.length);
+			establishUnisolatedConnection().getTripleStore().addStatements(spos, spos.length);
 			
 		}
 	}
