@@ -1,7 +1,4 @@
-<!-- @todo add dependencies for GOM and add GOM to sources that are compiled, jared, etc. -->
-<!-- @todo trim fastutils using a tool to chase the actual class files that we use. -->
 <!-- @todo change the release target to put release notes into the root of the archives. -->
-<!-- @todo maven2 setup so we can run and publish unit tests results. -->
 <!-- $Id$ -->
 
 <!-- Deployment models.

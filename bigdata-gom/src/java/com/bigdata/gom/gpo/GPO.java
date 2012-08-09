@@ -7,17 +7,12 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.repository.RepositoryException;
@@ -25,15 +20,7 @@ import org.openrdf.repository.RepositoryException;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteralImpl;
-import com.bigdata.rdf.model.BigdataResource;
-import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -80,29 +67,45 @@ public class GPO implements IGPO {
 
 	private static final Logger log = Logger.getLogger(GPO.class);
 	
-	final ObjectMgrModel m_om;
-	final Resource m_id;
+	/**
+	 * The owning {@link IObjectManager}.
+	 */
+	private final ObjectMgrModel m_om;
 	
-	boolean m_materialized = false;
+	/**
+	 * The identifier for this {@link IGPO}.
+	 */
+	private final Resource m_id;
 	
-	boolean m_clean = true;
+	private boolean m_materialized = false;
 	
-	ArrayList<IGenericSkin> m_skins = null;
+	private boolean m_clean = true;
+	
+    private GPOEntry m_headEntry = null;
+    private GPOEntry m_tailEntry = null;
+
+    private ArrayList<IGenericSkin> m_skins = null;
 	
 	static class LinkValue {
-		final Value m_value;
-		LinkValue m_next;
+
+	    final Value m_value;
 		
-		LinkValue(Value value) {
-			m_value = value;
+	    LinkValue m_next;
+		
+		LinkValue(final Value value) {
+		
+		    m_value = value;
+		    
 		}
+		
 	}
-	/**
-	 * The GPOEntry retains the state necessary for providing delta updates to the underlying
-	 * triple data.  It supports multi-values against the same property and records values
-	 * removed and added.
-	 */
-	static class GPOEntry {
+
+    /**
+     * The GPOEntry retains the state necessary for providing delta updates to
+     * the underlying triple data. It supports multi-values against the same
+     * property and records values removed and added.
+     */
+    static class GPOEntry {
 		final URI m_key;
 		GPOEntry m_next;
 		
@@ -269,8 +272,6 @@ public class GPO implements IGPO {
 			return m_values != null || m_addedValues != null;
 		}
 	}
-	GPOEntry m_headEntry = null;
-	GPOEntry m_tailEntry = null;
 	
 	GPOEntry establishEntry(final URI key) {
 		final URI fkey = m_om.internKey(key);

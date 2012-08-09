@@ -317,7 +317,8 @@ public class BigdataRDFServletContextListener implements
                 indexManager);
 
         // Used by BigdataRDFBaseServlet
-        context.setAttribute(BigdataServlet.ATTRIBUTE_RDF_CONTEXT, rdfContext);
+        context.setAttribute(BigdataRDFServlet.ATTRIBUTE_RDF_CONTEXT,
+                rdfContext);
 
 //        // Initialize the SPARQL cache.
 //        context.setAttribute(BigdataServlet.ATTRIBUTE_SPARQL_CACHE,

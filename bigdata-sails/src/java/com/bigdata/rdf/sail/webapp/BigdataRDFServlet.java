@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -71,6 +72,13 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     static private final transient Logger log = Logger.getLogger(BigdataRDFServlet.class);
 
+    /**
+     * The name of the {@link ServletContext} attribute whose value is the
+     * {@link BigdataRDFContext}.
+     */
+    static public final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
+            .getName();
+    
     /**
      * The name of the <code>UTF-8</code> character encoding.
      */
