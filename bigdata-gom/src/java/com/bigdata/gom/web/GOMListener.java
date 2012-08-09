@@ -1,27 +1,18 @@
 package com.bigdata.gom.web;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Properties;
 import java.util.UUID;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
 
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.sail.SailException;
 
-import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext;
 import com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener;
-import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -44,6 +35,8 @@ public class GOMListener extends BigdataRDFServletContextListener {
         final ServletContext context = ev.getServletContext();
 
         final UUID uuid = UUID.fromString(context.getInitParameter("om-uuid"));
+        
+        final BigdataRDFContext rdfContext = getBigdataRDFContext();
         
         final String namespace = rdfContext.getConfig().namespace;
         try {
