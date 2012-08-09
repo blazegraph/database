@@ -14,6 +14,10 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -57,7 +61,7 @@ import junit.framework.TestCase;
  */
 public class TestGOM extends TestCase {
 	protected static final Logger log = Logger.getLogger(IObjectManager.class);
-	BigdataSailRepositoryConnection m_cxn = null;
+	BigdataSailRepository m_repo = null;
 	private BigdataSail m_sail;
 
 	/**
@@ -70,7 +74,7 @@ public class TestGOM extends TestCase {
 		print(n3);
 		load(n3);
 		
-		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI s = vf.createURI("gpo:#root");
@@ -108,7 +112,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testSimpleCreate() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -141,7 +145,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testSimpleProperties() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -198,7 +202,7 @@ public class TestGOM extends TestCase {
 	
 	public void testSimpleReverseLinkProperties() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -255,7 +259,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testSimpleClassObjects() throws RepositoryException, IOException {
 		
-		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final ObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 
 		// This is the only required root!
@@ -321,7 +325,7 @@ public class TestGOM extends TestCase {
 	 */
 	public void testBasicSkin() {
 		GenericSkinRegistry.registerClass(BasicSkin.class);
-		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		
 		GPO gpo = (GPO) om.createGPO();
 		
@@ -333,9 +337,21 @@ public class TestGOM extends TestCase {
 		
 	}
 
+	public void testJSLibrary() {
+		  ScriptEngineManager mgr = new ScriptEngineManager();
+		  ScriptEngine jsEngine = mgr.getEngineByName("JavaScript");
+		  ScriptEngine jsEngine2 = mgr.getEngineByName("JavaScript");
+		  System.out.println(jsEngine.get(ScriptEngine.LANGUAGE_VERSION));
+		  try {
+		    jsEngine.eval("print('Hello, world!'; var y = random()/0;)");
+		  } catch (ScriptException ex) {
+		      ex.printStackTrace();
+		  }    
+	}
+	
 	public void testIncrementalUpdates() throws RepositoryException, IOException {
 		
-		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		final IObjectManager om = new ObjectManager(UUID.randomUUID(), m_repo);
 		final ValueFactory vf = om.getValueFactory();
 
 		final int transCounter = om.beginNativeTransaction();
@@ -389,7 +405,11 @@ public class TestGOM extends TestCase {
 		InputStream in = n3.openConnection().getInputStream();
 		Reader reader = new InputStreamReader(in);
 		
-		m_cxn.add(reader, "", RDFFormat.N3);
+		final BigdataSailRepositoryConnection cxn = m_repo.getUnisolatedConnection();
+		cxn.setAutoCommit(false);
+		cxn.add(reader, "", RDFFormat.N3);
+		cxn.commit();
+		cxn.close();
 	}
 
 	/**
@@ -427,24 +447,18 @@ public class TestGOM extends TestCase {
 
 		// instantiate a sail and a Sesame repository
 		m_sail = new BigdataSail(properties);
-		BigdataSailRepository repo = new BigdataSailRepository(m_sail);
-		repo.initialize();		
-		
-		m_cxn = repo.getConnection();
-		m_cxn.setAutoCommit(false);
-		
+		m_repo = new BigdataSailRepository(m_sail);
+		m_repo.initialize();		
 	}
 	
 	public void tearDown() {
 		try {
 			final long start = System.currentTimeMillis();
-			m_cxn.close();
+			// m_repo.close();
 			m_sail.shutDown();
 			final long dur = System.currentTimeMillis()-start;
 			System.out.println("Sail shutdown: " + dur + "ms");
 		} catch (SailException e) {
-			e.printStackTrace();
-		} catch (RepositoryException e) {
 			e.printStackTrace();
 		}
 	}

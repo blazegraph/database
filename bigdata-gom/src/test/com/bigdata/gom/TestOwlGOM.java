@@ -46,7 +46,7 @@ import junit.framework.TestCase;
  * 
  */
 public class TestOwlGOM extends TestCase {
-	BigdataSailRepositoryConnection m_cxn = null;
+	BigdataSailRepository m_repo = null;
 	ObjectManager m_om = null;
 	ValueFactory m_vf = null;
 
@@ -165,7 +165,7 @@ public class TestOwlGOM extends TestCase {
 		InputStream in = data.openConnection().getInputStream();
 		Reader reader = new InputStreamReader(in);
 
-		m_cxn.add(reader, "", format);
+		m_repo.getConnection().add(reader, "", format);
 	}
 
 	public void setUp() throws RepositoryException, IOException {
@@ -210,13 +210,10 @@ public class TestOwlGOM extends TestCase {
 
 		// instantiate a sail and a Sesame repository
 		BigdataSail sail = new BigdataSail(properties);
-		BigdataSailRepository repo = new BigdataSailRepository(sail);
-		repo.initialize();
+		m_repo = new BigdataSailRepository(sail);
+		m_repo.initialize();
 
-		m_cxn = repo.getConnection();
-		m_cxn.setAutoCommit(false);
-
-		m_om = new ObjectManager(UUID.randomUUID(), m_cxn);
+		m_om = new ObjectManager(UUID.randomUUID(), m_repo);
 		m_vf = m_om.getValueFactory();
 	}
 
