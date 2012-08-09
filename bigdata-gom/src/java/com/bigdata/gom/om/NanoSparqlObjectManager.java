@@ -1,54 +1,83 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 19, 2012
+ */
 package com.bigdata.gom.om;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.UUID;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.rdf.model.BigdataResource;
-import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.IRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
+/**
+ * Remote {@link IObjectManager} using the <a href=
+ * "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
+ * > NanoSparqlServer REST API </a> to communicate with the database.
+ * 
+ * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn Cutcher</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class NanoSparqlObjectManager extends ObjectMgrModel {
-	final RemoteRepository m_repo;
+
+    private static final Logger log = Logger
+            .getLogger(NanoSparqlObjectManager.class);
+
+    private final RemoteRepository m_repo;
 	
-	public NanoSparqlObjectManager(final UUID uuid, final RemoteRepository repo, final String namespace) {
-		super(uuid, BigdataValueFactoryImpl.getInstance(namespace));
+	public NanoSparqlObjectManager(final RemoteRepository repo, final String namespace) {
 		
+        super(repo.getSparqlEndPoint(), BigdataValueFactoryImpl
+                .getInstance(namespace));
+
 		m_repo = repo;
 	}
 
 	@Override
 	public void close() {
+	    super.close();
 		// m_repo.close();
 	}
 
@@ -163,14 +192,14 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 	}
 
 	@Override
-	void doCommit() {
+	protected void doCommit() {
 		// FIXME: The current NanoSparqlServer commits each update.  This
 		//	needs to change to associate with an IsolatedTransaction with
 		//	an additional commit/rollback protocol
 	}
 
 	@Override
-	void doRollback() {
+	protected void doRollback() {
 		// FIXME: see comment above for doCommit()
 	}
 

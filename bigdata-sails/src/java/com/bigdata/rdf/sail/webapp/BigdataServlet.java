@@ -32,7 +32,6 @@ import java.io.Writer;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
@@ -59,9 +58,6 @@ abstract public class BigdataServlet extends HttpServlet {
     /*package*/ static final transient String ATTRIBUTE_INDEX_MANAGER = 
         IIndexManager.class.getName();
 
-    static final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
-            .getName();
-    
 //    /**
 //     * The {@link ServletContext} attribute whose value is the
 //     * {@link SparqlCache}.

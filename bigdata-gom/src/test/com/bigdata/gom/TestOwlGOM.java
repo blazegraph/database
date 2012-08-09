@@ -1,19 +1,37 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 19, 2012
+ */
 package com.bigdata.gom;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Properties;
-import java.util.UUID;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -21,19 +39,7 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.gom.gpo.ILinkSet;
-import com.bigdata.gom.om.ObjectManager;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal.Options;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.store.AbstractTripleStore;
-
-import junit.framework.TestCase;
 
 /**
  * This tests a skin to help process an OWL specification.
@@ -45,10 +51,9 @@ import junit.framework.TestCase;
  * @author Martyn Cutcher
  * 
  */
-public class TestOwlGOM extends TestCase {
-	BigdataSailRepository m_repo = null;
-	ObjectManager m_om = null;
-	ValueFactory m_vf = null;
+public class TestOwlGOM extends LocalGOMTestCase {
+
+    private static final Logger log = Logger.getLogger(TestOwlGOM.class);
 
 	final static String OWL_NAMESPACE = "http://www.w3.org/2002/07/owl#";
 	final static String RDFS_NAMESPACE = "http://www.w3.org/2000/01/rdf-schema#";
@@ -68,153 +73,145 @@ public class TestOwlGOM extends TestCase {
 
 	public void testOwlLoad1() throws RDFParseException, RepositoryException,
 			IOException {
-		doLoad("testowl.xml");
+
+	    doLoad("testowl.xml");
+	    
 	}
 
-	public void testOwlLoad2() throws RDFParseException, RepositoryException,
-			IOException {
-		doLoad("testowl2.xml");
+    public void testOwlLoad2() throws RDFParseException, RepositoryException,
+            IOException {
+
+        doLoad("testowl2.xml");
+
+    }
+
+    private void doLoad(final String owlFile) throws RDFParseException,
+            RepositoryException, IOException {
+
+        load(TestGOM.class.getResource(owlFile), RDFFormat.RDFXML);
+
+        final IGPO owl = om.getGPO(OWL.ONTOLOGY);
+
+        if (log.isInfoEnabled())
+            log.info(owl.pp());
+
+        {
+            // Iterator<IGPO> ontos =
+            // owl.getLinksIn(rdfURI("type")).iterator();
+            final Iterator<IGPO> ontos = owl.getLinksIn().iterator();
+            while (ontos.hasNext()) {
+                final IGPO onto = ontos.next();
+
+                showOntology(onto);
+            }
+        }
+
+        final ArrayList<IGPO> rootClasses = new ArrayList<IGPO>();
+        final IGPO classClass = om.getGPO(OWL.CLASS);
+        if (log.isInfoEnabled()) {
+            log.info("ClassClass: " + classClass.pp());
+            log.info("RDFS.SUBCLASSOF: " + RDFS.SUBCLASSOF);
+        }
+
+        {
+            final Iterator<IGPO> owlClasses = classClass.getLinksIn(RDF.TYPE)
+                    .iterator();
+            while (owlClasses.hasNext()) {
+                final IGPO owlClass = owlClasses.next();
+                if (log.isInfoEnabled()) {
+                    log.info("OWL Class: " + owlClass.getId().stringValue());
+                }
+                if (owlClass.getValue(RDFS.SUBCLASSOF) == null) {
+                    rootClasses.add(owlClass);
+                }
+            }
+        }
+
+        showClassHierarchy(rootClasses.iterator(), 0);
+
+        // TODO This is not *testing* anything.
+        {
+            final Iterator<IGPO> supers = classClass.getLinksOut(
+                    RDFS.SUBCLASSOF).iterator();
+            while (supers.hasNext()) {
+                final IGPO tmp = supers.next();
+                if (log.isInfoEnabled())
+                    log.info("Superclass: " + tmp.pp());
+            }
+        }
+        {
+            final Iterator<IGPO> subs = classClass.getLinksIn(RDFS.SUBCLASSOF)
+                    .iterator();
+            while (subs.hasNext()) {
+                final IGPO tmp = subs.next();
+                if (log.isInfoEnabled())
+                    log.info("Subclass: " + tmp.pp());
+            }
+        }
+
+        // OWL.DATATYPEPROPERTY vs OWL.OBJECTPROPERTY
+
 	}
 
-	private void doLoad(final String owlFile) throws RDFParseException,
-			RepositoryException, IOException {
-		final URL xml = TestGOM.class.getResource(owlFile);
+//	/**
+//	 * Utility to load n3 statements from a resource
+//	 */
+//	private void load(final URL data, final RDFFormat format)
+//			throws IOException, RDFParseException, RepositoryException {
+//	    final InputStream in = data.openConnection().getInputStream();
+//	    final Reader reader = new InputStreamReader(in);
+//		m_repo.getConnection().setAutoCommit(false);
+//
+//		m_repo.getConnection().add(reader, "", format);
+//	}
 
-		load(xml, RDFFormat.RDFXML);
-
-		IGPO owl = m_om.getGPO(OWL.ONTOLOGY);
-
-		System.out.println(owl.pp());
-
-		// Iterator<IGPO> ontos = owl.getLinksIn(rdfURI("type")).iterator();
-		Iterator<IGPO> ontos = owl.getLinksIn().iterator();
-		while (ontos.hasNext()) {
-			IGPO onto = ontos.next();
-
-			showOntology(onto);
-		}
-
-		ArrayList<IGPO> rootClasses = new ArrayList<IGPO>();
-		IGPO classClass = m_om.getGPO(OWL.CLASS);
-		System.out.println("ClassClass: " + classClass.pp());
-		System.out.println("RDFS.SUBCLASSOF: " + RDFS.SUBCLASSOF);
-
-		Iterator<IGPO> owlClasses = classClass.getLinksIn(RDF.TYPE).iterator();
-		while (owlClasses.hasNext()) {
-			final IGPO owlClass = owlClasses.next();
-			System.out.println("OWL Class: " + owlClass.getId().stringValue());
-			if (owlClass.getValue(RDFS.SUBCLASSOF) == null) {
-				rootClasses.add(owlClass);
-			}
-		}
-
-		showClassHierarchy(rootClasses.iterator(), 0);
-
-		Iterator<IGPO> supers = classClass.getLinksOut(RDFS.SUBCLASSOF)
-				.iterator();
-		while (supers.hasNext()) {
-			System.out.println("Superclass: " + supers.next().pp());
-		}
-		Iterator<IGPO> subs = classClass.getLinksIn(RDFS.SUBCLASSOF).iterator();
-		while (subs.hasNext()) {
-			System.out.println("Subclass: " + subs.next().pp());
-		}
-
-		// OWL.DATATYPEPROPERTY vs OWL.OBJECTPROPERTY
-	}
-
-	private void showClassHierarchy(Iterator<IGPO> classes, int indent) {
-		StringBuilder out = new StringBuilder();
-		showClassHierarchy(out, classes, indent);
-		System.out.println("Hierarchy: " + out.toString());
-	}
-
-	private void showClassHierarchy(StringBuilder out, Iterator<IGPO> classes,
-			int indent) {
-		while (classes.hasNext()) {
-			final IGPO clss = classes.next();
-			out.append(indentOut(clss, indent + 1));
-			showClassHierarchy(out,
-					clss.getLinksIn(RDFS.SUBCLASSOF).iterator(), indent + 1);
-		}
-	}
-
-	String indents = "\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
-
-	private Object indentOut(IGPO clss, int indent) {
-		Value lbl = clss.getValue(RDFS.LABEL);
-		final String display = lbl == null ? clss.getId().stringValue() : lbl
-				.stringValue();
-		return indents.substring(0, indent) + display;
-	}
-
-	private void showOntology(IGPO onto) {
-		System.out.println("Ontology: " + onto.pp());
-		Iterator<IGPO> parts = onto.getLinksIn().iterator();
-		while (parts.hasNext()) {
-			IGPO part = parts.next();
-			System.out.println("Onto Part: " + part.pp());
-		}
-	}
-
-	/**
-	 * Utility to load n3 statements from a resource
-	 */
-	private void load(final URL data, final RDFFormat format)
-			throws IOException, RDFParseException, RepositoryException {
-		InputStream in = data.openConnection().getInputStream();
-		Reader reader = new InputStreamReader(in);
-
-		m_repo.getConnection().add(reader, "", format);
-	}
-
-	public void setUp() throws RepositoryException, IOException {
-		Properties properties = new Properties();
-
-		// create a backing file for the database
-		File journal = File.createTempFile("bigdata", ".jnl");
-		properties.setProperty(BigdataSail.Options.FILE, journal
-				.getAbsolutePath());
-		properties
-				.setProperty("com.bigdata.rdf.sail.truthMaintenance", "false");
-
-		properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW
-				.toString());
-		properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
-		properties.setProperty(
-				IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.spo.SPO.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.spo.POS.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.spo.OSP.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.spo.BLOBS.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.lex.TERM2ID.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-		properties
-				.setProperty(
-						"com.bigdata.namespace.kb.lex.ID2TERM.com.bigdata.btree.BTree.branchingFactor",
-						"200");
-
-		// instantiate a sail and a Sesame repository
-		BigdataSail sail = new BigdataSail(properties);
-		m_repo = new BigdataSailRepository(sail);
-		m_repo.initialize();
-
-		m_om = new ObjectManager(UUID.randomUUID(), m_repo);
-		m_vf = m_om.getValueFactory();
-	}
+//	public void setUp() throws RepositoryException, IOException {
+//		Properties properties = new Properties();
+//
+//		// create a backing file for the database
+//		File journal = File.createTempFile("bigdata", ".jnl");
+//		properties.setProperty(BigdataSail.Options.FILE, journal
+//				.getAbsolutePath());
+//		properties
+//				.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+//
+//		properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW
+//				.toString());
+//		properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
+//		properties.setProperty(
+//				IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.spo.SPO.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.spo.POS.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.spo.OSP.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.spo.BLOBS.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.lex.TERM2ID.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//		properties
+//				.setProperty(
+//						"com.bigdata.namespace.kb.lex.ID2TERM.com.bigdata.btree.BTree.branchingFactor",
+//						"200");
+//
+//		// instantiate a sail and a Sesame repository
+//		BigdataSail sail = new BigdataSail(properties);
+//		m_repo = new BigdataSailRepository(sail);
+//		m_repo.initialize();
+//
+//		m_om = new ObjectManager(m_repo);
+//		m_vf = m_om.getValueFactory();
+//	}
 
 }

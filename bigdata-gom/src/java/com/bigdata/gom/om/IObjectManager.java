@@ -36,7 +36,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
-import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.striterator.ICloseableIterator;
@@ -45,11 +44,14 @@ import com.bigdata.striterator.ICloseableIterator;
  * The object manager is the abstraction for a connection the back end.
  */
 public interface IObjectManager extends INativeTransaction {
-	
-	/**
-	 * @return the UUID that identifies this ObjectManager
-	 */
-	UUID getID();
+
+    /**
+     * @return the UUID that identifies this ObjectManager
+     * 
+     * @deprecated Why do we need this? It should be hidden in how we generate
+     *             URIs, not part of the public API.
+     */
+    UUID getID();
 
     /**
      * Return a canonical {@link IGPO} for the {@link Resource} (canonical
@@ -95,6 +97,8 @@ public interface IObjectManager extends INativeTransaction {
      */
     boolean isPersistent();
 
+    ValueFactory getValueFactory();
+    
     /**
      * 
      */
@@ -104,6 +108,8 @@ public interface IObjectManager extends INativeTransaction {
      * 
      */
     void execute(String updateStr);
+
+    ICloseableIterator<Statement> evaluateGraph(String query);
 
 	URI internKey(URI key);
 
@@ -119,12 +125,14 @@ public interface IObjectManager extends INativeTransaction {
 	 * Simple save/recall interface that the ObjectManager provides to simplify
 	 * other pattern implementations.  Internally it uses a NameManager GPO
 	 */
+    @Deprecated // Just use the URI directly...
 	void save(URI key, Value value);
 
 	/**
 	 * Simple save/recall interface that the ObjectManager provides to simplify
 	 * other pattern implementations.  Internally it uses a NameManager GPO
 	 */
+    @Deprecated // Just use the URI directly...
 	Value recall(URI key);
 	
 	IGPO recallAsGPO(URI key);
@@ -133,13 +141,12 @@ public interface IObjectManager extends INativeTransaction {
 	 * Return the list of names that have been used to save references. These
 	 * are the properties of the internal NameManager.
 	 */
+    @Deprecated // Just use URIs directly...
 	Iterator<URI> getNames();
 
+	/**
+	 * Remove all assertions involving the specified object.
+	 */
 	void remove(IGPO gpo);
 
-	ICloseableIterator<Statement> evaluateGraph(String query);
-
-	ValueFactory getValueFactory();
-
-	void checkValue(Value newValue);
 }

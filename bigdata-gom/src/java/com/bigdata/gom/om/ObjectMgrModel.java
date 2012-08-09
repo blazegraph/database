@@ -1,10 +1,39 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 19, 2012
+ */
 package com.bigdata.gom.om;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -12,98 +41,167 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.repository.RepositoryException;
 
-import com.bigdata.gom.gpo.BasicSkin;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.spo.SPO;
 
+/**
+ * Base class for {@link IObjectManager} implementations. This class handles
+ * {@link IObjectManager} protocol for maintaining an transaction edit list.
+ * Concrete implementations need to provide for communication with the database
+ * (either remote or embedded) and the DESCRIBE (aka Object) cache.
+ * 
+ * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn
+ *         Cutcher</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public abstract class ObjectMgrModel implements IObjectManager {
 
-    protected static final Logger log = Logger.getLogger(IObjectManager.class);
+    private static final Logger log = Logger.getLogger(ObjectMgrModel.class);
 
-    final WeakHashMap<Resource, IGPO> m_dict = new WeakHashMap<Resource, IGPO>();
+    /**
+     * The {@link UUID} for this object manager instance.
+     */
+    private final UUID m_uuid;
+    
+    // TODO Should this be a BigdataValueFactory?
+    protected final ValueFactory m_valueFactory;
+    
+    /** Object Creation and ID Management patterns. */
+    private final IIDGenerator m_idGenerator;
+
+    /**
+     * Local cache.
+     */
+    private final WeakHashMap<Resource, IGPO> m_dict = new WeakHashMap<Resource, IGPO>();
 	
-	final ConcurrentHashMap<URI, URI> m_internedKeys = new ConcurrentHashMap<URI, URI>();
-	
-	final ValueFactory m_valueFactory;
-	
-	final UUID m_uuid;
-	
+    /**
+     * TODO The {@link BigdataValueFactory} handles this with
+     * {@link BigdataValueFactory#asValue(Value)}. Use that instead?
+     */
+	private final ConcurrentHashMap<URI, URI> m_internedKeys = new ConcurrentHashMap<URI, URI>();
+
+    /*
+     * We need to maintain a dirty list in order to pin object references that
+     * are dirty. On commit, we need to send the retracts and the asserts in a
+     * single operation, which is why these things are tracked on separate
+     * lists.
+     * 
+     * FIXME The OM should not be tracking the terms. The StatementBuffer or
+     * Sail will handle this.
+     */
 	// new terms cache to enable batch term registration on update/flush
-	final ArrayList<BigdataValue> m_terms = new ArrayList<BigdataValue>();
-	final ArrayList<Statement> m_inserts = new ArrayList<Statement>();
-	final ArrayList<Statement> m_removes = new ArrayList<Statement>();
+    protected final List<BigdataValue> m_terms = new ArrayList<BigdataValue>();
+    protected final List<Statement> m_inserts = new ArrayList<Statement>();
+    protected final List<Statement> m_removes = new ArrayList<Statement>();
 
-	final URI s_nmeMgr;
+    private final ArrayList<GPO> m_dirtyGPOs = new ArrayList<GPO>();
+    
+    private final int m_maxDirtyListSize = 1000; // 5000; // FIXME: Init from property file   
 
-	// Object Creation and ID Management patterns for default idGenerator
-	IIDGenerator m_idGenerator = null;
+	private final URI s_nmeMgr;
 
-	int m_transactionCounter = 0;
+    /**
+     * A lock for things which need to be serialized, initially just the native
+     * transaction stuff. Avoid using "synchronized(this)" or the synchronized
+     * keyword as that forces everything to contend for the same lock. If you
+     * can use different locks for different types of things then you have
+     * better concurrency (but, of course, only as appropriate).
+     */
+    private final Lock lock = new ReentrantLock();
 	
-	ObjectMgrModel(final UUID uuid, final ValueFactory valueFactory) {
+    /**
+     * The native transaction counter.
+     */
+	private int m_transactionCounter = 0;
+	
+    /**
+     * 
+     * @param endpoint
+     *            The SPARQL endpoint that can be used to communicate with the
+     *            database.
+     * @param valueFactory
+     *            The value factory.
+     */
+    public ObjectMgrModel(
+            final String endpoint, 
+            final ValueFactory valueFactory) {
+
 		m_valueFactory = valueFactory;
-		m_uuid = uuid;
 		
+		m_uuid = UUID.randomUUID();
+
+		m_idGenerator = new IDGenerator(endpoint, m_uuid, m_valueFactory);
+        
+        /*
+         * FIXME UUIG COINING. Plus this needs to be global if we have a
+         * "name manager" object. Frankly, I do not see any reason to have
+         * "named roots" in RDF GOM. Any URI can be a named root - you just need
+         * to use the URI!
+         */
 		s_nmeMgr = m_valueFactory.createURI("gpo:nmeMgr/"+m_uuid);
-		addNewTerm((BigdataValue) s_nmeMgr);			
+		
+		addNewTerm((BigdataValue) s_nmeMgr);
+		
 	}
 	
 	public IGPO getDefaultNameMgr() {
-		return getGPO(s_nmeMgr);
-	}
-	
-	public void setIDGenerator(final IIDGenerator idgenerator) {
-		m_idGenerator = idgenerator;
+		
+	    return getGPO(s_nmeMgr);
+	    
 	}
 	
 	public UUID getID() {
-		return m_uuid;
+		
+	    return m_uuid;
+	    
 	}
 	
-	class DefaultIDGenerator implements IIDGenerator {
-		final URI s_idMgr;
-		final URI s_idMgrNextId;
-		BasicSkin m_idMgr;
-		
-		DefaultIDGenerator() {
-			s_idMgr = m_valueFactory.createURI("gpo:idMgr/"+m_uuid);
-			s_idMgrNextId = m_valueFactory.createURI("gpo:idMgr/"+m_uuid + "#nextId");
-			
-			m_idMgr = new BasicSkin(getGPO(s_idMgr));
+    @Override
+    final public ValueFactory getValueFactory() {
 
-			addNewTerm((BigdataValue) s_idMgr);
-			addNewTerm((BigdataValue) s_idMgrNextId );
-		}
-		
-		/**
-		 * Default IIDGenerator implementation for ObjectManagers.
-		 */
-		public URI genId() {
-			if (m_idMgr == null) {
-				m_idMgr = new BasicSkin(getGPO(s_idMgr));
-			}
-			
-			int nxtId = m_idMgr.getIntValue(s_idMgrNextId)+1;
-			m_idMgr.setValue(s_idMgrNextId, nxtId);
-			
-			return getValueFactory().createURI("gpo:" + m_uuid + "/" + nxtId);
-		}
+        return m_valueFactory;
 
-		public void rollback() {
-			m_idMgr = null; // force reload to committed state on next access
-		}
-	}
+    }
+
+//	class DefaultIDGenerator implements IIDGenerator {
+//		final URI s_idMgr;
+//		final URI s_idMgrNextId;
+//		BasicSkin m_idMgr;
+//		
+//		DefaultIDGenerator() {
+//			s_idMgr = m_valueFactory.createURI("gpo:idMgr/"+m_uuid);
+//			s_idMgrNextId = m_valueFactory.createURI("gpo:idMgr/"+m_uuid + "#nextId");
+//			
+//			m_idMgr = new BasicSkin(getGPO(s_idMgr));
+//
+//			addNewTerm((BigdataValue) s_idMgr);
+//			addNewTerm((BigdataValue) s_idMgrNextId );
+//		}
+//		
+//		/**
+//		 * Default IIDGenerator implementation for ObjectManagers.
+//		 */
+//		public URI genId() {
+//			if (m_idMgr == null) {
+//				m_idMgr = new BasicSkin(getGPO(s_idMgr));
+//			}
+//			
+//            final int nxtId = m_idMgr.getIntValue(s_idMgrNextId) + 1;
+//
+//            m_idMgr.setValue(s_idMgrNextId, nxtId);
+//			
+//			return getValueFactory().createURI("gpo:" + m_uuid + "/" + nxtId);
+//		}
+//
+//		public void rollback() {
+//			m_idMgr = null; // force reload to committed state on next access
+//		}
+//	}
 	
 	@Override
 	public URI internKey(final URI key) {
@@ -118,10 +216,6 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		return uri;
 	}
 
-	final ArrayList<GPO> m_dirtyGPOs = new ArrayList<GPO>();
-	
-	final int m_maxDirtyListSize = 1000; // 5000; // FIXME: Init from property file
-	
 	/**
 	 * GPOs are added to the dirty list when initially modified.
 	 * 
@@ -143,7 +237,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	
 	private void flushDirtyObjects() {
 		// prepare values
-		Iterator<GPO> newValues = m_dirtyGPOs.iterator();
+		final Iterator<GPO> newValues = m_dirtyGPOs.iterator();
 		while (newValues.hasNext()) {
 			final GPO gpo = newValues.next();
 			gpo.prepareBatchTerms();
@@ -156,7 +250,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		final long count = m_dirtyGPOs.size();
 
 		if (true) {
-			Iterator<GPO> updates = m_dirtyGPOs.iterator();
+		    final Iterator<GPO> updates = m_dirtyGPOs.iterator();
 			while (updates.hasNext()) {
 				updates.next().prepareBatchUpdate();
 			}
@@ -164,7 +258,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 			flushStatements();
 		} else {
 			// update dirty objects	- is it worth while batching SPO[]?
-			Iterator<GPO> updates = m_dirtyGPOs.iterator();
+		    final Iterator<GPO> updates = m_dirtyGPOs.iterator();
 			while (updates.hasNext()) {
 				try {
 					updates.next().update();
@@ -174,8 +268,9 @@ public abstract class ObjectMgrModel implements IObjectManager {
 			}
 		}
 		m_dirtyGPOs.clear();
-		if (log.isTraceEnabled())
-			log.trace("Flush took " + (System.currentTimeMillis()-start) + "ms for " + count + " objects");
+        if (log.isTraceEnabled())
+            log.trace("Flush took " + (System.currentTimeMillis() - start)
+                    + "ms for " + count + " objects");
 	}
 	
 	abstract void flushStatements();
@@ -193,53 +288,74 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	}
 
 	@Override
-	public synchronized int beginNativeTransaction() {
-		return m_transactionCounter++;
+	public int beginNativeTransaction() {
+        lock.lock();
+        try {
+            return m_transactionCounter++;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public int commitNativeTransaction(final int expectedCounter) {
+        lock.lock();
+        try {
+            final int ret = --m_transactionCounter;
+            if (ret != expectedCounter) {
+                throw new IllegalArgumentException(
+                        "Unexpected transaction counter");
+            }
+
+            if (ret == 0) {
+                flushDirtyObjects();
+            }
+
+            doCommit();
+
+            return ret;
+        } finally {
+            lock.unlock();
+        }
+	}
+
+    /**
+     * Hook for extended commit processing.
+     */
+	protected abstract void doCommit();
+
+    @Override
+    public int getNativeTransactionCounter() {
+        /*
+         * Note: You must obtain the lock for visibility of the current value
+         * unless the transaction counter is either volatile or an
+         * AtomicInteger.
+         */
+        lock.lock();
+        try {
+            return m_transactionCounter;
+        } finally {
+            lock.unlock();
+        }
 	}
 
 	@Override
-	public int commitNativeTransaction(final int expectedCounter) {
-		final int ret = --m_transactionCounter;
-		if (ret != expectedCounter) {
-			throw new IllegalArgumentException("Unexpected transaction counter");
-		}
-		
-		if (ret == 0) {
-			flushDirtyObjects();
-		}
-		
-		doCommit();
-		
-		return ret;
+    public void rollbackNativeTransaction() {
+        clearCache();
+        m_transactionCounter = 0;
+        if (m_idGenerator != null) {
+            m_idGenerator.rollback();
+        }
+        doRollback();
 	}
 
-	abstract void doCommit();
-
-	@Override
-	public int getNativeTransactionCounter() {
-		return m_transactionCounter;
-	}
-
-	@Override
-	public void rollbackNativeTransaction() {
-		// just clear the cache for now
-		m_dict.clear();
-		m_dirtyGPOs.clear();
-		m_transactionCounter = 0;	
-		if (m_idGenerator != null) {
-			m_idGenerator.rollback();
-		}
-		
-		doRollback();
-	}
-
-	abstract void doRollback();
+	/**
+	 * Hook for extended rollback processing.
+	 */
+	abstract protected void doRollback();
 
 	@Override
 	public IGPO createGPO() {
-		if (m_idGenerator == null) {			
-			m_idGenerator = new DefaultIDGenerator();
-		}
 		
 		final Resource uri = m_idGenerator.genId();
 		addNewTerm((BigdataValue) uri);
@@ -249,13 +365,19 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		
 		return ret;
 	}
-	
+
+	@Deprecated // Let the BigdataSail handle this.
 	protected void addNewTerm(final BigdataValue uri) {
-		if (uri.isRealIV())
-			throw new IllegalArgumentException("IV already available: " + uri.stringValue());
 		
-		System.out.println("Adding term: " + uri);
-		m_terms.add(uri);
+        if (uri.isRealIV())
+            throw new IllegalArgumentException("IV already available: "
+                    + uri.stringValue());
+
+        if (log.isDebugEnabled())
+            log.debug("Adding term: " + uri);
+
+        m_terms.add(uri);
+        
 	}
 
 
@@ -263,6 +385,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	 * Simple save/recall interface that the ObjectManager provides to simplify
 	 * other pattern implementations.  Internally it uses a NameManager GPO
 	 */
+    @Deprecated // no need for explicit save/recall.
 	public void save(final URI key, Value value) {
 		getGPO(s_nmeMgr).setValue(key, value);
 	}
@@ -271,12 +394,15 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	 * Simple save/recall interface that the ObjectManager provides to simplify
 	 * other pattern implementations.  Internally it uses a NameManager GPO
 	 */
+    @Deprecated // no need for explicit recall.
 	public Value recall(final URI key) {	
 		return getGPO(s_nmeMgr).getValue(key);
 	}
 	
+	@Deprecated // no need for explicit recall.
 	public IGPO recallAsGPO(final URI key) {
-		Value val = recall(key);
+		
+	    final Value val = recall(key);
 		
 		if (val instanceof Resource) {
 			return getGPO((Resource) val);
@@ -290,11 +416,13 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	 * are the properties of the internal NameManager.
 	 */
 	public Iterator<URI> getNames() {
-		final GPO nmgr = (GPO) getGPO(s_nmeMgr);
+
+	    final GPO nmgr = (GPO) getGPO(s_nmeMgr);
 		
 		return nmgr.getPropertyURIs();
 	}
 
+	@Deprecated // The OM should not be worrying about IVs like this.
 	public void checkValue(Value newValue) {
 		final BigdataValue v = (BigdataValue) newValue;
 		if (!v.isRealIV()) {
@@ -302,26 +430,32 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		}
 	}
 
+    @Override
+    public void close() {
+
+        clearCache();
+        
+    }
+    
 	public void clearCache() {
 		m_dict.clear();
 		m_dirtyGPOs.clear();
 	}
 
-	abstract public void insert(final Resource id, final URI key, final Value val) throws RepositoryException;
+    abstract public void insert(final Resource id, final URI key,
+            final Value val) throws RepositoryException;
 
-	abstract public void retract(final Resource id, final URI key, final Value val) throws RepositoryException;
+    abstract public void retract(final Resource id, final URI key,
+            final Value val) throws RepositoryException;
 
-		public void insertBatch(final Resource m_id, final URI bigdataURI, final Value v) {
-		m_inserts.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
-	}
+    public void insertBatch(final Resource m_id, final URI bigdataURI,
+            final Value v) {
+        m_inserts.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
+    }
 
-	public void removeBatch(final Resource m_id, final URI bigdataURI, final Value v) {
-		m_removes.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
-	}
-
-	@Override
-	public ValueFactory getValueFactory() {
-		return m_valueFactory;
-	}
+    public void removeBatch(final Resource m_id, final URI bigdataURI,
+            final Value v) {
+        m_removes.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
+    }
 
 }

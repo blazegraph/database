@@ -8,7 +8,6 @@ import java.util.NoSuchElementException;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.gom.om.IObjectManager;
