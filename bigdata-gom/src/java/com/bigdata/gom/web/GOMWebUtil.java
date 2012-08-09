@@ -28,9 +28,9 @@ public class GOMWebUtil {
     static private final String ATTRIBUTE_OM = ObjectManager.class.getName();
 
     /**
-     * Return an {@link ObjectManager} instance that is scoped to the
-     * <code>request</code>. The same {@link ObjectManager} instance will be
-     * returned each time this method is invoked for the same
+     * Return an {@link ITx#UNISOLATED} {@link ObjectManager} instance that is
+     * scoped to the <code>request</code>. The same {@link ObjectManager}
+     * instance will be returned each time this method is invoked for the same
      * <code>request</code>. A distinct {@link ObjectManager} instance is
      * returned for each distinct <code>request</code>.
      * 
@@ -48,7 +48,24 @@ public class GOMWebUtil {
 
 	}
 
-    private static ObjectManager newObjectManager(
+
+    /**
+     * Return an {@link ObjectManager} instance that is scoped to the
+     * <code>request</code>. The same {@link ObjectManager} instance will be
+     * returned each time this method is invoked for the same
+     * <code>request</code>. A distinct {@link ObjectManager} instance is
+     * returned for each distinct <code>request</code>.
+     * 
+     * @param request
+     *            The request.
+     * @param timestamp
+     *            The timestamp of the view.
+     *            
+     * @return The {@link ObjectManager}.
+     * 
+     * @throws Exception
+     */
+    public static ObjectManager newObjectManager(
             final HttpServletRequest request, final long timestamp)
             throws RepositoryException {
 
