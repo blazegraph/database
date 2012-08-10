@@ -11,16 +11,55 @@ import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.gom.om.IObjectManager;
+import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 
+/**
+ * A (forward or reverse) link set.
+ * 
+ * @author <a href="mailto:martyncutcher@users.sourceforge.net">Martyn
+ *         Cutcher</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         FIXME We should materialize the link set unless the cardinality is
+ *         excessive. This applies in both the forward and reverse direction. We
+ *         will need a means to obtain a "DESCRIBE" of a resource (complete set
+ *         of attributes, forward, and reverse links) and a "SKETCH" of a
+ *         resource (cardinality counts only when a forward or reverse link set
+ *         is large and otherwise they are inlined as well into the sketch).
+ */
 public class LinkSet implements ILinkSet {
-	final IGPO m_owner;
-	final URI m_linkProperty;
-	final boolean m_linksIn;
 	
-	public LinkSet(final IGPO owner, final URI linkProperty, final boolean linksIn) {
+    /**
+     * The {@link IGPO} that is the head of the link set.
+     */
+    private final IGPO m_owner;
+    /**
+     * The predicate that collects this link set.
+     */
+	private final URI m_linkProperty;
+	/**
+	 * <code>true</code> iff this is a reverse link set.
+	 */
+	private final boolean m_linksIn;
+
+    /**
+     * 
+     * @param owner
+     *            The {@link IGPO} that is the head of the link set.
+     * @param linkProperty
+     *            The predicate that collects this link set.
+     * @param linksIn
+     *            <code>true</code> iff this is a reverse link set.
+     */
+    public LinkSet(final IGPO owner, final URI linkProperty,
+            final boolean linksIn) {
+        if (owner == null)
+            throw new IllegalArgumentException();
+        if (linkProperty == null)
+            throw new IllegalArgumentException();
 		m_owner = owner;
 		m_linkProperty = linkProperty;
 		m_linksIn = linksIn;
@@ -98,12 +137,38 @@ public class LinkSet implements ILinkSet {
 		return false;
 	}
 
-	@Override
+    /**
+     * Encode a URL, Literal, or blank node for inclusion in a SPARQL query to
+     * be sent to the remote service.
+     * 
+     * @param v
+     *            The resource.
+     *            
+     * @return The encoded representation of the resource.
+     * 
+     * @see ObjectMgrModel#encode(Resource)
+     */
+    public String encode(final Resource v) {
+
+        return ((GPO) m_owner).encode(v);
+
+    }
+
+    @Override
 	public Iterator<IGPO> iterator() {
 		if (m_linksIn) {
+            /*
+             * Links in is not materialized.
+             * 
+             * TODO It should be fully materialized when the cardinality is not
+             * excessive.
+             */
 			final IObjectManager om = m_owner.getObjectManager();
 			
-			final String query = "SELECT ?x WHERE {?x <" + m_linkProperty.toString() + "> <" + m_owner.getId().toString() + ">}";
+            final String query = "SELECT ?x\n" //
+                    + "WHERE {\n"//
+                    + "  ?x <"+ encode(m_linkProperty) + "> <" + encode(m_owner.getId())+ ">\n"//
+                    +"}";//
 			final ICloseableIterator<BindingSet> res = om.evaluate(query);
 			
 			return new Iterator<IGPO>() {
@@ -127,13 +192,16 @@ public class LinkSet implements ILinkSet {
 				
 			};
 		} else {
+		    /*
+		     * Links out is fully materialized on the gpo.
+		     */
 			final GPO.GPOEntry entry = ((GPO) m_owner).getEntry(m_linkProperty);
 			if (entry == null) {
 				return new EmptyIterator<IGPO>();
 			}
 			
 			return new Iterator<IGPO>() {
-				Iterator<Value> m_values = entry.values();
+			    final Iterator<Value> m_values = entry.values();
 				IGPO nextGPO = nextGPO();
 				
 				private IGPO nextGPO() {

@@ -115,7 +115,7 @@ public class TestGOM extends LocalGOMTestCase {
 
         final URI keyname = vf.createURI("attr:/test#name");
         final Resource id = vf.createURI("gpo:test#1");
-        om.checkValue(id); // ensure is imported!
+//        om.checkValue(id); // ensure is imported!
 
         final int transCounter = om.beginNativeTransaction();
         try {
@@ -152,8 +152,8 @@ public class TestGOM extends LocalGOMTestCase {
         final URI keyfriend = vf.createURI("attr:/test#friend");
         final Resource id = vf.createURI("gpo:test#1");
         final Resource id2 = vf.createURI("gpo:test#2");
-        om.checkValue(id); // ensure is imported!
-        om.checkValue(id2); // ensure is imported!
+//        om.checkValue(id); // ensure is imported!
+//        om.checkValue(id2); // ensure is imported!
 
         final int transCounter = om.beginNativeTransaction();
         try {
@@ -249,7 +249,7 @@ public class TestGOM extends LocalGOMTestCase {
         assertTrue(map.size() == 3);
 
     }
-
+    
     /**
      * SimpleClassObjects tests navigation around a constructed network of GPOs.
      * First some class objects are created, with superclass and metaclass data.
@@ -348,10 +348,9 @@ public class TestGOM extends LocalGOMTestCase {
     }
 
     /**
-     * TODO What is this test doing?
+     * Throughput test for updates.
      */
-    public void testIncrementalUpdates() throws RepositoryException,
-            IOException {
+    public void testUpdateThroughput() throws RepositoryException, IOException {
 
         final ValueFactory vf = om.getValueFactory();
 
@@ -454,4 +453,30 @@ public class TestGOM extends LocalGOMTestCase {
 		
 	}
 
+	/*
+	 * API method tests.
+	 */
+	
+    public void test_addValue() {
+        fail("write test");
+    }
+
+    public void test_setValue() {
+        fail("write test");
+    }
+    
+    public void test_removeValue() {
+        fail("write test");
+    }
+
+    public void test_removeValues() {
+        fail("write test");
+    }
+
+    public void test_dirtyObjectsAreCleanAfterCommit() {
+        fail("write test");
+    }
+    
+    // TODO Test ALL of the API.
+    
 }

@@ -79,7 +79,8 @@ import com.bigdata.util.config.NicUtil;
  * 
  */
 public class TestRemoteGOM extends TestCase {
-	protected static final Logger log = Logger.getLogger(IObjectManager.class);
+
+    private static final Logger log = Logger.getLogger(TestRemoteGOM.class);
 
 	private Server m_server;
 
@@ -288,7 +289,7 @@ public class TestRemoteGOM extends TestCase {
 		
 		final URI keyname = vf.createURI("attr:/test#name");
 		final Resource id = vf.createURI("gpo:test#1");
-		om.checkValue(id);
+//		om.checkValue(id);
 		final int transCounter = om.beginNativeTransaction();
 		try {
 			IGPO gpo = om.getGPO(id);
@@ -310,7 +311,10 @@ public class TestRemoteGOM extends TestCase {
 		assertTrue("Martyn".equals(gpo.getValue(keyname).stringValue()));
 	}
 
-	public void testIncrementalUpdates() throws RepositoryException, IOException {
+    /**
+     * Throughput test for updates.
+     */
+    public void testUpdateThroughput() throws RepositoryException, IOException {
 		
 		final IObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
 		final ValueFactory vf = om.getValueFactory();
@@ -372,7 +376,7 @@ public class TestRemoteGOM extends TestCase {
 		
 		final URI keyname = vf.createURI("attr:/test#name");
 		final Resource id = vf.createURI("gpo:test#1");
-		om.checkValue(id);
+//		om.checkValue(id);
 		final int transCounter = om.beginNativeTransaction();
 		try {
 			IGPO gpo = om.getGPO(id);

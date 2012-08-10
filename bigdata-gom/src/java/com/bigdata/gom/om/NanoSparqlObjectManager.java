@@ -26,14 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.gom.om;
 
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.MalformedQueryException;
@@ -75,14 +73,14 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		m_repo = repo;
 	}
 
-	@Override
-	public void close() {
-	    super.close();
-		// m_repo.close();
-	}
+//	@Override
+//	public void close() {
+//	    super.close();
+//		// m_repo.close();
+//	}
 
 	@Override
-	public ICloseableIterator<BindingSet> evaluate(String query) {
+	public ICloseableIterator<BindingSet> evaluate(final String query) {
 		try {
 			final IPreparedTupleQuery q = m_repo.prepareTupleQuery(query);
 			final TupleQueryResult res = q.evaluate();
@@ -144,7 +142,7 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		if (log.isTraceEnabled())
 			log.trace("Materializing: " + gpo.getId());
 		
-		((GPO) gpo).reset();
+		((GPO) gpo).dematerialize();
 		
 		// At present the DESCRIBE query will simply return a set of
 		//	statements equivalent to a TupleQuery <id, ?, ?>
@@ -165,46 +163,7 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 	}
 
 	@Override
-	public void insert(final Resource id, final URI key, final Value val) {
-		if (log.isTraceEnabled())
-			log.trace("Inserting statement: " + id.stringValue() + " " + key.stringValue() + " " + val.stringValue());
-		
-			final Statement statement = m_valueFactory.createStatement(id, key, val);
-			final ArrayList<Statement> batch = new ArrayList<Statement>(1);
-			batch.add(statement);
-			try {
-				m_repo.add(new AddOp(batch));
-			} catch (Exception e) {
-				throw new RuntimeException("Unable to insert statement", e);
-			}
-	}
-
-	@Override
-	public void retract(final Resource id, final URI key, final Value val) {
-		if (false && log.isTraceEnabled())
-			log.trace("Removing statement: " + id.stringValue() + " " + key.stringValue() + " " + val.stringValue());
-		
-			try {
-				m_repo.remove(new RemoveOp((URI) id, key, val, null));
-			} catch (Exception e) {
-				throw new RuntimeException("Unable to remove statement", e);
-			}
-	}
-
-	@Override
-	protected void doCommit() {
-		// FIXME: The current NanoSparqlServer commits each update.  This
-		//	needs to change to associate with an IsolatedTransaction with
-		//	an additional commit/rollback protocol
-	}
-
-	@Override
-	protected void doRollback() {
-		// FIXME: see comment above for doCommit()
-	}
-
-	@Override
-	public ICloseableIterator<Statement> evaluateGraph(String query) {
+	public ICloseableIterator<Statement> evaluateGraph(final String query) {
 		try {
 			final IPreparedGraphQuery q = m_repo.prepareGraphQuery(query);
 			final GraphQueryResult res = q.evaluate();
@@ -248,37 +207,35 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 	}
 
 	@Override
-	public void remove(IGPO gpo) {
-		// TODO Auto-generated method stub
-		
-	}
+    protected void flushStatements(final List<Statement> m_inserts,
+            final List<Statement> m_removes) {
 
-	@Override
-	void flushTerms() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	void flushStatements() {
-		// handle batch removes
+	    // handle batch removes
 		try {
-			final RemoveOp rop = m_removes.size() > 0 ? new RemoveOp(m_removes) : null;
-			final AddOp iop = m_inserts.size() > 0 ? new AddOp(m_inserts) : null;
-			
-			if (rop != null && iop != null) {
-				m_repo.update(rop, iop);
-			} else if (iop != null) {
-				m_repo.add(iop);
-			} else if (rop != null) {
-				m_repo.remove(rop);
-			}
-			
-			m_inserts.clear();
-			m_removes.clear();
-		} catch (Exception e) {
-			throw new RuntimeException("Unable to flush statements", e);
-		}
-	}
+
+            final RemoveOp rop = m_removes.size() > 0 ? new RemoveOp(m_removes)
+                    : null;
+
+            final AddOp iop = m_inserts.size() > 0 ? new AddOp(m_inserts)
+                    : null;
+
+            if (rop != null && iop != null) {
+                // Execute update.
+                m_repo.update(rop, iop);
+            } else if (iop != null) {
+                // Execute add
+                m_repo.add(iop);
+            } else if (rop != null) {
+                // Execute remove.
+                m_repo.remove(rop);
+            }
+
+        } catch (Exception e) {
+
+            throw new RuntimeException("Unable to flush statements", e);
+
+        }
+
+    }
 
 }

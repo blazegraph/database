@@ -114,6 +114,12 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     /** Assert (self,p,newValue). */
     void addValue(URI property, Value newValue);
 
+    /** Remove (self,p,oldValue) if found. */
+    void removeValue(URI property, Value newValue);
+    
+    /** Remove all (self,p,?). */
+    void removeValues(URI property);
+
     /** All (self,?p,?o). */
     Set<Statement> getStatements();
 
