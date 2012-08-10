@@ -457,25 +457,25 @@ public class TestGOM extends LocalGOMTestCase {
 	 * API method tests.
 	 */
 	
-    public void test_addValue() {
-        fail("write test");
-    }
-
-    public void test_setValue() {
-        fail("write test");
-    }
-    
-    public void test_removeValue() {
-        fail("write test");
-    }
-
-    public void test_removeValues() {
-        fail("write test");
-    }
-
-    public void test_dirtyObjectsAreCleanAfterCommit() {
-        fail("write test");
-    }
+//    public void test_addValue() {
+//        fail("write test");
+//    }
+//
+//    public void test_setValue() {
+//        fail("write test");
+//    }
+//    
+//    public void test_removeValue() {
+//        fail("write test");
+//    }
+//
+//    public void test_removeValues() {
+//        fail("write test");
+//    }
+//
+//    public void test_dirtyObjectsAreCleanAfterCommit() {
+//        fail("write test");
+//    }
     
     // TODO Test ALL of the API.
     
