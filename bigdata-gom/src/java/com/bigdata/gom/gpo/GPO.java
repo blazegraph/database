@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -13,9 +14,9 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
-import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
@@ -76,27 +77,60 @@ public class GPO implements IGPO {
 	 * The identifier for this {@link IGPO}.
 	 */
 	private final Resource m_id;
-	
-	private boolean m_materialized = false;
+
+	/**
+	 * <code>true</code> iff the forward link set has been materialized.
+	 */
+	private volatile boolean m_materialized = false;
 	
 	private boolean m_clean = true;
-	
+
+    /**
+     * Head of the double-linked list of values for each predicate. There is one
+     * double-linked list of {@link GPOEntry}s and this is the head of that
+     * list. There is one {@link GPOEntry} for each predicate that either has
+     * (or had) a bound value. Each {@link GPOEntry} models all values for a
+     * given predicate for this subject and tracks the edit list for the values
+     * for that predicate.
+     */
     private GPOEntry m_headEntry = null;
+    /**
+     * Tail of the double-linked list of values for each predicate. There is one
+     * double-linked list of {@link GPOEntry}s and this is the head of that
+     * list. There is one {@link GPOEntry} for each predicate that either has
+     * (or had) a bound value. Each {@link GPOEntry} models all values for a
+     * given predicate for this subject and tracks the edit list for the values
+     * for that predicate.
+     */
     private GPOEntry m_tailEntry = null;
 
     private ArrayList<IGenericSkin> m_skins = null;
 	
-	static class LinkValue {
+    /**
+     * A {@link Value} on any of the {@link GPOEntry} links (values, removed,
+     * and added). The {@link LinkValue}s are organized as a single-linked list.
+     */
+    static class LinkValue {
 
-	    final Value m_value;
-		
-	    LinkValue m_next;
-		
-		LinkValue(final Value value) {
-		
-		    m_value = value;
-		    
-		}
+        /**
+         * The RDF {@link Value}.
+         */
+        final Value m_value;
+
+        /**
+         * The next {@link LinkValue} in the list -or- <code>null</code> if this
+         * is the last {@link LinkValue} in the list.
+         */
+        LinkValue m_next;
+
+        LinkValue(final Value value) {
+
+            if (value == null)
+                throw new IllegalArgumentException();
+
+            m_value = value;
+
+        }
 		
 	}
 
@@ -106,17 +140,41 @@ public class GPO implements IGPO {
      * property and records values removed and added.
      */
     static class GPOEntry {
-		final URI m_key;
-		GPOEntry m_next;
+        
+        /**
+         * This is the predicate.
+         */
+        private final URI m_key;
+		/**
+		 * This is the next entry for a different predicate.
+		 */
+        private GPOEntry m_next;
+        /**
+         * This is the collection of bound values at the time the owning
+         * {@link GPO} was materialized or last committed. The total set of
+         * current bindings is {@link #m_values} PLUS {@link #m_addedValues}.
+         * 
+         * TODO We need to improve the documentation here. Ideally, I would like
+         * to see the pre-/post-conditions for add(), and remove() as well as
+         * initValue() and commit().
+         */
+		private LinkValue m_values;
+        /**
+         * Values added to this predicate and subject since the last commit.
+         */
+		private LinkValue m_addedValues;
+        /**
+         * Values removed from this predicate and subject since the last commit.
+         */
+		private LinkValue m_removedValues;
 		
-		LinkValue m_values;
-		LinkValue m_addedValues;
-		LinkValue m_removedValues;
-		
-		GPOEntry(final URI key) {
-			assert key != null;
+        GPOEntry(final URI key) {
+            
+            if (key == null)
+                throw new IllegalArgumentException();
 			
 			m_key = key;
+			
 		}
 
 
@@ -125,20 +183,21 @@ public class GPO implements IGPO {
 		 * to its read state. Therefore the value is added to the m_values
 		 * list and not m_addedValues.
 		 */
-		public void initValue(Value value) {
+		public void initValue(final GPO owner, final Value value) {
 			final LinkValue newValue = new LinkValue(value);
 			newValue.m_next = m_values;
 			m_values = newValue;
 			
 		}
 		
-		public void set(final Value value) {
-			m_addedValues = new LinkValue(value);
+		public void set(final GPO owner, final Value value) {
+
+		    m_addedValues = new LinkValue(value);
 			
 			// move m_values to m_removedValues
 			LinkValue nxt = m_values;
 			while (nxt != null) {
-				LinkValue rem = nxt;
+			    final LinkValue rem = nxt;
 				nxt = nxt.m_next;
 				
 				rem.m_next = m_removedValues;
@@ -146,9 +205,40 @@ public class GPO implements IGPO {
 			}
 			// and clear any current values
 			m_values = null;
+
 		}
 
-		public Iterator<Value> values() {
+        /**
+         * Remove the statement for the predicate and value if found, returning
+         * true IFF the statement was removed.
+         * 
+         * @return <code>true</code> iff the statement was removed.
+         * 
+         *         FIXME Implement remove(Value)
+         */
+        public boolean remove(final GPO owner, final Value value) {
+
+            if(value == null)
+                throw new IllegalArgumentException();
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * Remove all statements for this predicate on the owning {@link IGPO}.
+         * 
+         * @return <code>true</code> iff any statements were removed.
+         * 
+         *         FIXME Implement removeAll()
+         */
+        public boolean removeAll(final GPO owner) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        public Iterator<Value> values() {
 			return new Iterator<Value>() {
 				LinkValue m_cur = m_values;
 				LinkValue m_added = m_addedValues;
@@ -231,28 +321,28 @@ public class GPO implements IGPO {
 		 * Committing the entry checks for any added values and
 		 * moves this to the values chain.
 		 */
-		public void commit() {
-			if (m_addedValues != null) {
-				if (m_values == null) {
-					m_values = m_addedValues;
-				} else {
-					LinkValue tail = m_values;
-					while (tail.m_next != null)
-						tail = tail.m_next;
-					tail.m_next = m_addedValues;
-				}
-				m_addedValues = null;
-			}
-			m_removedValues = null;		
-		}
+        public void commit() {
+            if (m_addedValues != null) {
+                if (m_values == null) {
+                    m_values = m_addedValues;
+                } else {
+                    LinkValue tail = m_values;
+                    while (tail.m_next != null)
+                        tail = tail.m_next;
+                    tail.m_next = m_addedValues;
+                }
+                m_addedValues = null;
+            }
+            m_removedValues = null;
+        }
 
-		/**
-		 * A new value is only added if it does not already exist, ensuring the GPO maintains
-		 * semantics with the underlying TripleStore.
-		 * 
-		 * @return true if value was added
-		 */
-		public boolean add(final Value value) {
+        /**
+         * A new value is only added if it does not already exist, ensuring the
+         * GPO maintains semantics with the underlying TripleStore.
+         * 
+         * @return true if value was added
+         */
+		public boolean add(final GPO owner, final Value value) {
 			final Iterator<Value> values = values();
 			while (values.hasNext()) {
 				if (values.next().equals(value)) {
@@ -263,7 +353,7 @@ public class GPO implements IGPO {
 			final LinkValue nv = new LinkValue(value);
 			nv.m_next = m_addedValues;
 			m_addedValues = nv;
-			
+
 			return true;
 		}
 
@@ -273,6 +363,14 @@ public class GPO implements IGPO {
 		}
 	}
 	
+    /**
+     * Make sure that there is a {@link GPOEntry} for that property. If one is
+     * found, return it. Otherwise create and return a new {@link GPOEntry}.
+     * 
+     * @param key
+     *            The property.
+     * @return The {@link GPOEntry} and never <code>null</code>.
+     */
 	GPOEntry establishEntry(final URI key) {
 		final URI fkey = m_om.internKey(key);
 		if (m_headEntry == null) {
@@ -310,14 +408,26 @@ public class GPO implements IGPO {
 		return null;
 	}
 	
-	public void reset() {
+	public void dematerialize() {
+	    // TODO Synchronization?
+	    m_materialized = false;
+	    m_clean = true;
 		m_headEntry = m_tailEntry = null;
 	}
 	
-	public GPO(IObjectManager om, Resource id) {
-		m_om = (ObjectMgrModel) om;
-		m_id = om.internKey((URI) id);
-	}
+    public GPO(final IObjectManager om, final Resource id) {
+
+        if (om == null)
+            throw new IllegalArgumentException();
+        
+        if (id == null)
+            throw new IllegalArgumentException();
+        
+        m_om = (ObjectMgrModel) om;
+        
+        m_id = om.internKey((URI) id);
+        
+    }
 	
 	@Override
 	public IGenericSkin asClass(Class theClassOrInterface) {
@@ -325,11 +435,33 @@ public class GPO implements IGPO {
 		return null;
 	}
 
+    @Override
+    public IObjectManager getObjectManager() {
+        return m_om;
+    }
+
 	@Override
 	public Resource getId() {
 		return m_id;
 	}
 
+    /**
+     * Encode a URL, Literal, or blank node for inclusion in a SPARQL query to
+     * be sent to the remote service.
+     * 
+     * @param v
+     *            The resource.
+     *            
+     * @return The encoded representation of the resource.
+     * 
+     * @see ObjectMgrModel#encode(Resource)
+     */
+	public String encode(final Resource v) {
+
+	    return m_om.encode(v);
+	    
+	}
+	
 	/**
 	 * getLinksIn simply filters the values for Resources and returns a
 	 * wrapper.
@@ -338,7 +470,7 @@ public class GPO implements IGPO {
 	public Set<IGPO> getLinksIn() {
 		// Does not require full materialization!
 
-		final String query = "SELECT ?x WHERE {?x ?p <" + getId().toString() + ">}";
+		final String query = "SELECT ?x WHERE {?x ?p <" + encode(getId()) + ">}";
 		final ICloseableIterator<BindingSet> res = m_om.evaluate(query);
 		
 		final HashSet<IGPO> ret = new HashSet<IGPO>();
@@ -352,8 +484,10 @@ public class GPO implements IGPO {
 	
     /** All ?y where (?y,p,self). */
 	@Override
-	public ILinkSet getLinksIn(URI property) {
-		return new LinkSet(this, property, true);
+	public ILinkSet getLinksIn(final URI property) {
+
+        return new LinkSet(this, property, true/* linksIn */);
+
 	}
 
 	/** All ?y where (self,?,?y). */
@@ -364,7 +498,7 @@ public class GPO implements IGPO {
 		final HashSet<IGPO> ret = new HashSet<IGPO>();
 		GPOEntry entry = m_headEntry;
 		while (entry != null) {
-			Iterator<Value> values = entry.values();
+		    final Iterator<Value> values = entry.values();
 			while (values.hasNext()) {
 				final Value value = values.next();
 				if (value instanceof Resource) {
@@ -377,17 +511,13 @@ public class GPO implements IGPO {
 		return ret;
 	}
 
+    /** All ?y where (self,p,?y). */
 	@Override
-	public ILinkSet getLinksOut(URI property) {		
-		materialize();
-		
-		return new LinkSet(this, property, false);
-	}
+    public ILinkSet getLinksOut(final URI property) {
+        materialize();
 
-	@Override
-	public IObjectManager getObjectManager() {
-		return m_om;
-	}
+        return new LinkSet(this, property, false/* linksOut */);
+    }
 
 	@Override
 	public Map<URI, Long> getReverseLinkProperties() {
@@ -395,8 +525,10 @@ public class GPO implements IGPO {
 		
 		final Map<URI, Long> ret = new HashMap<URI, Long>();
 
-		final String query = "SELECT ?p (COUNT(?o) AS ?count) WHERE { ?o ?p <" + getId().toString() + "> } GROUP BY ?p";
-		
+        final String query = "SELECT ?p (COUNT(?o) AS ?count)\n"
+                + "WHERE { ?o ?p <" + getId().toString() + "> }\n"
+                + "GROUP BY ?p";
+
 		final ICloseableIterator<BindingSet> res = m_om.evaluate(query);
 		
 		while (res.hasNext()) {
@@ -459,48 +591,135 @@ public class GPO implements IGPO {
 		return false;
 	}
 
+    /**
+     * FIXME This should run a query (unless it is fully materialized, including
+     * the reverse links and forward links) and build an edit list for the
+     * retracts. [There could be a separate operation to remove only those
+     * properties associated with a skin.]
+     */
 	@Override
 	public void remove() {
-		m_om.remove(this);
+
+	    throw new UnsupportedOperationException();
+	    
 	}
 
-	public void dematerialize() {
-		m_materialized = false;
-		m_clean = true;
-		m_headEntry = m_tailEntry = null;
-	}
+	public void initValue(final URI predicate, final Value object) {
 
-	public void initValue(URI predicate, Value object) {
-		assert !m_materialized;
+	    if (predicate == null)
+            throw new IllegalArgumentException();
+        
+	    if (object == null)
+            throw new IllegalArgumentException();
+		
+	    assert !m_materialized;
 		
 		final GPOEntry entry = establishEntry(predicate);
-		entry.initValue(object);
+		
+		entry.initValue(this, object);
+		
 	}
 	
 	@Override
 	public void setValue( final URI property, final Value newValue) {
-		materialize();
+
+	    if (property == null)
+            throw new IllegalArgumentException();
+        
+	    if (newValue == null)
+            throw new IllegalArgumentException();
+		
+	    materialize();
 		
 		final GPOEntry entry = establishEntry(property);
-		entry.set(newValue);
+
+		entry.set(this, newValue);
 		
-		if (false && newValue instanceof Resource) {
-			try {
-				update(entry);
-			} catch (RepositoryException e) {
-				throw new RuntimeException("Unable to update", e);
-			}
-		} else {
-			dirty();
-		}
+		dirty();
 	}
 
-	private void dirty() {
-		if (m_clean) {
-			m_clean = false;
-			((ObjectMgrModel) m_om).addToDirtyList(this);
-		}
-	}
+    @Override
+    public void addValue(final URI property, final Value value) {
+
+        if (property == null)
+            throw new IllegalArgumentException();
+
+        if (value == null)
+            throw new IllegalArgumentException();
+        
+        materialize();
+        
+        final GPOEntry entry = establishEntry(property);
+    
+        if (entry.add(this, value)) {
+        
+            dirty();
+            
+        }
+        
+    }
+
+    @Override
+    public void removeValue(final URI property, final Value value) {
+
+        if (property == null)
+            throw new IllegalArgumentException();
+
+        if (value == null)
+            throw new IllegalArgumentException();
+
+        materialize();
+
+        final GPOEntry entry = establishEntry(property);
+
+        if (entry.remove(this, value)) {
+
+            dirty();
+
+        }
+
+    }
+
+    @Override
+    public void removeValues(final URI property) {
+
+        if (property == null)
+            throw new IllegalArgumentException();
+
+        materialize();
+
+        final GPOEntry entry = establishEntry(property);
+
+        if (entry.removeAll(this)) {
+
+            dirty();
+            
+        }
+        
+    }
+    
+    /**
+     * If this {@link GPO} was clean, then mark the {@link GPO} as dirty and add
+     * it to the object manager's dirty list. This is a NOP if the {@link GPO}
+     * is already marked as dirty.
+     */
+    private void dirty() {
+
+        if (m_clean) {
+        
+            m_clean = false;
+            
+            ((ObjectMgrModel) m_om).addToDirtyList(this);
+            
+        }
+        
+    }
+    
+    public boolean isDirty() {
+        
+        return !m_clean;
+        
+    }
 
 	@Override
 	public IGPO asGeneric() {
@@ -537,42 +756,45 @@ public class GPO implements IGPO {
 		}
 	}
 
-	/**
-	 * Called by the ObjectManager when flushing dirty objects.  This can occur
-	 * incrementally or on ObjectManager commit.  
-	 * 
-	 * The object is marked as clean once written.
-	 * 
-	 * @throws RepositoryException
-	 */
-	public void update() throws RepositoryException {
-		assert m_materialized;
+    /**
+     * Called by the ObjectManager when flushing dirty objects. This can occur
+     * incrementally or on ObjectManager commit. The object is marked as clean
+     * once written.
+     */
+    public void doCommit() {
+
+        assert m_materialized;
+
+        GPOEntry entry = m_headEntry;
+
+        while (entry != null) {
+
+            entry.commit();
+
+            entry = entry.m_next;
+
+        }
+
+        m_clean = true;
 		
-		GPOEntry entry = m_headEntry;
-		while (entry != null) {
-			update(entry);
-			
-			entry = entry.m_next;
-		}
-		
-		m_clean = true;
 	}
 	
-	private void update(final GPOEntry entry) throws RepositoryException {
-		assert m_materialized;
-		
-		final Iterator<Value> removes = entry.removes();
-		while (removes.hasNext()) {
-			m_om.retract(m_id, entry.m_key, removes.next());
-		}
-		
-		final Iterator<Value> inserts = entry.additions();
-		while (inserts.hasNext()) {
-			m_om.insert(m_id, entry.m_key, inserts.next());
-		}
-		
-		entry.commit();
-	}
+//	private void update(final GPOEntry entry) {
+//
+//	    assert m_materialized;
+//		
+////		final Iterator<Value> removes = entry.removes();
+////		while (removes.hasNext()) {
+////			m_om.retract(m_id, entry.m_key, removes.next());
+////		}
+////		
+////		final Iterator<Value> inserts = entry.additions();
+////		while (inserts.hasNext()) {
+////			m_om.insert(m_id, entry.m_key, inserts.next());
+////		}
+//		
+//		entry.commit();
+//	}
 	
 	/**
 	 * Basis for lazy materialization, checks materialize state and if false
@@ -589,54 +811,53 @@ public class GPO implements IGPO {
 		}
 	}
 
-	@Override
-	public void addValue(final URI property, final Value value) {
-		materialize();
-		
-		final GPOEntry entry = establishEntry(property);
-		if (entry.add(value)) {
-			dirty();
-		}
-	}
-
-	public void setMaterialized(boolean b) {
+    public void setMaterialized(boolean b) {
 		m_materialized = true;
 	}
 
-	public void prepareBatchTerms() {
-		final ObjectMgrModel oom = (ObjectMgrModel) m_om;
-		GPOEntry entry = m_headEntry;
-		while (entry != null) {
-			final Iterator<Value> inserts = entry.additions();
-			while (inserts.hasNext()) {
-				final Value v = inserts.next();
-				oom.checkValue(v);
-			}
-			
-			entry = entry.m_next;
-		}
-	}
+//	public void prepareBatchTerms() {
+//		final ObjectMgrModel oom = (ObjectMgrModel) m_om;
+//		GPOEntry entry = m_headEntry;
+//		while (entry != null) {
+//			final Iterator<Value> inserts = entry.additions();
+//			while (inserts.hasNext()) {
+//				final Value v = inserts.next();
+//				oom.checkValue(v);
+//			}
+//			
+//			entry = entry.m_next;
+//		}
+//	}
 	
-	/**
-	 * adds statements for batch update
-	 */
-	public void prepareBatchUpdate() {
-		final ObjectMgrModel oom = (ObjectMgrModel) m_om;
-		GPOEntry entry = m_headEntry;
-		while (entry != null) {
-			final Iterator<Value> inserts = entry.additions();
-			while (inserts.hasNext()) {
-				final Value v = inserts.next();
-				oom.insertBatch(m_id, entry.m_key, v);
-			}
-			final Iterator<Value> removes = entry.removes();
-			while (removes.hasNext()) {
-				final Value v = removes.next();
-				oom.removeBatch(m_id, entry.m_key, v);
-			}
-			
-			entry = entry.m_next;
-		}
+    /**
+     * Adds statements to be inserted and removed to the appropriate lists based
+     * on the {@link GPO}s internal edit set.
+     * 
+     * @param insertList
+     *            The list of statements to be added.
+     * @param removeList
+     *            The list of statements to be removed.
+     */
+    public void prepareBatchUpdate(final List<Statement> insertList,
+            final List<Statement> removeList) {
+        final ObjectMgrModel oom = (ObjectMgrModel) m_om;
+        final ValueFactory f = oom.getValueFactory();
+        GPOEntry entry = m_headEntry;
+        while (entry != null) {
+            final Iterator<Value> inserts = entry.additions();
+            while (inserts.hasNext()) {
+                final Value v = inserts.next();
+                final Statement stmt = f.createStatement(m_id, entry.m_key, v);
+                insertList.add(stmt);
+            }
+            final Iterator<Value> removes = entry.removes();
+            while (removes.hasNext()) {
+                final Value v = removes.next();
+                final Statement stmt = f.createStatement(m_id, entry.m_key, v);
+                removeList.add(stmt);
+            }
+            entry = entry.m_next;
+        }
 	}
 
 	/**

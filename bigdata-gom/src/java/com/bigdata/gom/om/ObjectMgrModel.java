@@ -26,8 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.gom.om;
 
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.WeakHashMap;
@@ -41,12 +41,9 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
@@ -75,33 +72,36 @@ public abstract class ObjectMgrModel implements IObjectManager {
     private final IIDGenerator m_idGenerator;
 
     /**
-     * Local cache.
+     * The "running object table." Dirty objects are wired into this table by
+     * the existence.
+     * 
+     * TODO If people hold onto a reference to an object it will not come out of
+     * this table. We need to remove all dirty objects from this map on a
+     * rollback.
+     * 
+     * TODO This map is touched for every pointer traversal. I would prefer to
+     * use weak references on the GPO forward and backward links to avoid those
+     * hash table lookups.
+     * 
+     * TODO This collection is not thread-safe without synchronization.
      */
     private final WeakHashMap<Resource, IGPO> m_dict = new WeakHashMap<Resource, IGPO>();
 	
     /**
+     * This is only for the predicates.
+     * 
      * TODO The {@link BigdataValueFactory} handles this with
      * {@link BigdataValueFactory#asValue(Value)}. Use that instead?
      */
 	private final ConcurrentHashMap<URI, URI> m_internedKeys = new ConcurrentHashMap<URI, URI>();
 
-    /*
+    /**
      * We need to maintain a dirty list in order to pin object references that
      * are dirty. On commit, we need to send the retracts and the asserts in a
-     * single operation, which is why these things are tracked on separate
-     * lists.
-     * 
-     * FIXME The OM should not be tracking the terms. The StatementBuffer or
-     * Sail will handle this.
+     * single operation. The GPO.GPOEntry tracks those individual asserts and
+     * retracts.
      */
-	// new terms cache to enable batch term registration on update/flush
-    protected final List<BigdataValue> m_terms = new ArrayList<BigdataValue>();
-    protected final List<Statement> m_inserts = new ArrayList<Statement>();
-    protected final List<Statement> m_removes = new ArrayList<Statement>();
-
-    private final ArrayList<GPO> m_dirtyGPOs = new ArrayList<GPO>();
-    
-    private final int m_maxDirtyListSize = 1000; // 5000; // FIXME: Init from property file   
+    private final List<GPO> m_dirtyGPOs = new LinkedList<GPO>();
 
 	private final URI s_nmeMgr;
 
@@ -145,7 +145,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
          */
 		s_nmeMgr = m_valueFactory.createURI("gpo:nmeMgr/"+m_uuid);
 		
-		addNewTerm((BigdataValue) s_nmeMgr);
+//		addNewTerm((BigdataValue) s_nmeMgr);
 		
 	}
 	
@@ -205,86 +205,140 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	
 	@Override
 	public URI internKey(final URI key) {
-		final URI old = m_internedKeys.putIfAbsent(key, key);
 		
-		
-		final URI uri =  old != null ? old : key;
-		
-		if (old == null && (uri instanceof BigdataURI) && ((BigdataURI) uri).getIV() == null)
-			addNewTerm((BigdataURI) uri);
+        final URI old = m_internedKeys.putIfAbsent(key, key);
+
+        final URI uri = old != null ? old : key;
+
+//		if (old == null && (uri instanceof BigdataURI) && ((BigdataURI) uri).getIV() == null)
+//			addNewTerm((BigdataURI) uri);
 		
 		return uri;
 	}
 
-	/**
-	 * GPOs are added to the dirty list when initially modified.
-	 * 
-	 * <p>The list cannot be allowed to grow unbounded since it retains a
-	 * concrete reference to the GPO and OutOfMemory will occur.  The
-	 * solution is to incrementally flush the dirty list.</p>
-	 */
-	public void addToDirtyList(GPO gpo) {
-		m_dirtyGPOs.add(gpo);
-		if (m_dirtyGPOs.size() > m_maxDirtyListSize) {
-			if (log.isTraceEnabled())
-				log.trace("Incremental flush of dirty objects");
-			
-			flushDirtyObjects();
-		}
+    /**
+     * GPOs are added to the dirty list when initially modified. The dirty list
+     * is not bounded. Large updates should be done using the RDF and SPARQL
+     * layer which do not have this implicit scaling limit.
+     * 
+     * TODO We can not do incremental eviction unless we are holding open a
+     * connection to the database that will isolate those edits. This could be
+     * done in principle with either full read/write transactions or with the
+     * unisolated connection (if embedded) but we do not yet support remove
+     * create/run/commit for full read/write transactions in the NSS REST API.
+     */
+	public void addToDirtyList(final GPO gpo) {
+
+	    if(gpo == null)
+	        throw new IllegalArgumentException();
+
+        if (!gpo.isDirty())
+            throw new IllegalStateException();
+
+	    m_dirtyGPOs.add(gpo);
+	    
+//		if (m_dirtyGPOs.size() > m_maxDirtyListSize) {
+//			if (log.isTraceEnabled())
+//				log.trace("Incremental flush of dirty objects");
+//			
+//			flushDirtyObjects();
+//		}
+
 	}
 	
-	abstract void flushTerms();
-	
-	private void flushDirtyObjects() {
-		// prepare values
-		final Iterator<GPO> newValues = m_dirtyGPOs.iterator();
-		while (newValues.hasNext()) {
-			final GPO gpo = newValues.next();
-			gpo.prepareBatchTerms();
-		}
-		
-		// flush terms
-		flushTerms();
-		
-		final long start = System.currentTimeMillis();
-		final long count = m_dirtyGPOs.size();
+//	abstract void flushTerms();
 
-		if (true) {
-		    final Iterator<GPO> updates = m_dirtyGPOs.iterator();
-			while (updates.hasNext()) {
-				updates.next().prepareBatchUpdate();
-			}
-			
-			flushStatements();
-		} else {
-			// update dirty objects	- is it worth while batching SPO[]?
-		    final Iterator<GPO> updates = m_dirtyGPOs.iterator();
-			while (updates.hasNext()) {
-				try {
-					updates.next().update();
-				} catch (RepositoryException e) {
-					throw new RuntimeException("Unexpected update exception", e);
-				}
-			}
-		}
-		m_dirtyGPOs.clear();
+	/**
+	 * Commit.
+	 */
+	private void flushDirtyObjects() {
+
+//	    // prepare values
+//		final Iterator<GPO> newValues = m_dirtyGPOs.iterator();
+//		while (newValues.hasNext()) {
+//			final GPO gpo = newValues.next();
+//			gpo.prepareBatchTerms();
+//		}
+//		
+//		// flush terms
+//		flushTerms();
+
+        final long start = System.currentTimeMillis();
+        final long count = m_dirtyGPOs.size();
+
+        {
+
+            /*
+             * Gather up and apply the edit set (statements added and removed).
+             */
+            final List<Statement> inserts = new LinkedList<Statement>();
+            final List<Statement> removes = new LinkedList<Statement>();
+            
+            final Iterator<GPO> updates = m_dirtyGPOs.iterator();
+
+            while (updates.hasNext()) {
+
+                updates.next().prepareBatchUpdate(inserts, removes);
+
+            }
+            
+            // Atomic commit.
+            flushStatements(inserts, removes);
+            
+        }
+        
+        {
+
+            /*
+             * Tell the dirty objects that they have been committed and are now
+             * clean.
+             */
+
+            final Iterator<GPO> updates = m_dirtyGPOs.iterator();
+
+            while (updates.hasNext()) {
+
+                updates.next().doCommit();
+
+            }
+
+            // Clear the dirty object list.
+            m_dirtyGPOs.clear();
+
+        }
+        
         if (log.isTraceEnabled())
             log.trace("Flush took " + (System.currentTimeMillis() - start)
                     + "ms for " + count + " objects");
-	}
+
+    }
 	
-	abstract void flushStatements();
+    /**
+     * Flush statements to be inserted and removed to the backing store..
+     * 
+     * @param insertList
+     *            The list of statements to be added.
+     * @param removeList
+     *            The list of statements to be removed.
+     */
+    abstract protected void flushStatements(final List<Statement> insertList,
+            final List<Statement> removeList);
 
 	@Override
 	public IGPO getGPO(final Resource id) {
-		IGPO ret = m_dict.get(id);
+
+	    IGPO ret = m_dict.get(id);
 		
 		if (ret == null) {
-			ret = new GPO(this, id);
+		
+		    ret = new GPO(this, id);
+		    
 			m_dict.put(id, ret);
+			
 		}
 		
 		return ret;
+
 	}
 
 	@Override
@@ -301,28 +355,35 @@ public abstract class ObjectMgrModel implements IObjectManager {
     public int commitNativeTransaction(final int expectedCounter) {
         lock.lock();
         try {
+
             final int ret = --m_transactionCounter;
+            
             if (ret != expectedCounter) {
+
                 throw new IllegalArgumentException(
                         "Unexpected transaction counter");
+                
             }
 
             if (ret == 0) {
+
                 flushDirtyObjects();
+
+//                doCommit();
+                
             }
 
-            doCommit();
-
             return ret;
+            
         } finally {
             lock.unlock();
         }
 	}
 
-    /**
-     * Hook for extended commit processing.
-     */
-	protected abstract void doCommit();
+//    /**
+//     * Hook for extended commit processing.
+//     */
+//	protected abstract void doCommit();
 
     @Override
     public int getNativeTransactionCounter() {
@@ -341,24 +402,31 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
 	@Override
     public void rollbackNativeTransaction() {
-        clearCache();
-        m_transactionCounter = 0;
-        if (m_idGenerator != null) {
-            m_idGenerator.rollback();
+        lock.lock();
+        try {
+            clearCache();
+            m_transactionCounter = 0;
+            if (m_idGenerator != null) {
+                m_idGenerator.rollback();
+            }
+//            doRollback();
+        } finally {
+            lock.unlock();
         }
-        doRollback();
 	}
 
-	/**
-	 * Hook for extended rollback processing.
-	 */
-	abstract protected void doRollback();
+//	/**
+//	 * Hook for extended rollback processing.
+//	 */
+//	abstract protected void doRollback();
 
 	@Override
 	public IGPO createGPO() {
 		
 		final Resource uri = m_idGenerator.genId();
-		addNewTerm((BigdataValue) uri);
+		
+//		addNewTerm((BigdataValue) uri);
+
 		final GPO ret = (GPO) getGPO(uri);
 		
 		ret.setMaterialized(true);
@@ -366,28 +434,22 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		return ret;
 	}
 
-	@Deprecated // Let the BigdataSail handle this.
-	protected void addNewTerm(final BigdataValue uri) {
-		
-        if (uri.isRealIV())
-            throw new IllegalArgumentException("IV already available: "
-                    + uri.stringValue());
+    @Override
+    final public void remove(final IGPO gpo) {
 
-        if (log.isDebugEnabled())
-            log.debug("Adding term: " + uri);
-
-        m_terms.add(uri);
+        gpo.remove();
         
-	}
+    }
 
-
-	/**
+    /**
 	 * Simple save/recall interface that the ObjectManager provides to simplify
 	 * other pattern implementations.  Internally it uses a NameManager GPO
 	 */
     @Deprecated // no need for explicit save/recall.
 	public void save(final URI key, Value value) {
-		getGPO(s_nmeMgr).setValue(key, value);
+
+        getGPO(s_nmeMgr).setValue(key, value);
+        
 	}
 
 	/**
@@ -422,14 +484,6 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		return nmgr.getPropertyURIs();
 	}
 
-	@Deprecated // The OM should not be worrying about IVs like this.
-	public void checkValue(Value newValue) {
-		final BigdataValue v = (BigdataValue) newValue;
-		if (!v.isRealIV()) {
-			addNewTerm(v);
-		}
-	}
-
     @Override
     public void close() {
 
@@ -437,25 +491,29 @@ public abstract class ObjectMgrModel implements IObjectManager {
         
     }
     
-	public void clearCache() {
-		m_dict.clear();
-		m_dirtyGPOs.clear();
+	final public void clearCache() {
+
+	    m_dict.clear();
+        m_dirtyGPOs.clear();
+        
 	}
 
-    abstract public void insert(final Resource id, final URI key,
-            final Value val) throws RepositoryException;
-
-    abstract public void retract(final Resource id, final URI key,
-            final Value val) throws RepositoryException;
-
-    public void insertBatch(final Resource m_id, final URI bigdataURI,
-            final Value v) {
-        m_inserts.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
+    /**
+     * Encode a URL, Literal, or blank node for inclusion in a SPARQL query to
+     * be sent to the remote service.
+     * 
+     * @param v
+     *            The resource.
+     *            
+     * @return The encoded representation of the resource.
+     * 
+     *         TODO This must correctly encode a URL, Literal, or blank node for
+     *         inclusion in a SPARQL query to be sent to the remote service.
+     */
+    public String encode(final Resource v) {
+        
+        return v.stringValue();
+        
     }
-
-    public void removeBatch(final Resource m_id, final URI bigdataURI,
-            final Value v) {
-        m_removes.add(m_valueFactory.createStatement(m_id, bigdataURI, v));
-    }
-
+    
 }

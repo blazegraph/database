@@ -63,20 +63,17 @@ public interface INativeTransaction
      * @exception if the <i>expectedCounter</i> is not equal to the
      * internal counter <em>before</em> the latter is decremented.
      */
- 
-    public int commitNativeTransaction( int expectedCounter );
+    public int commitNativeTransaction(int expectedCounter);
 
     /**
      * Rollback all changes since the last time the native
      * transaction counter was zero.
      */
-
     public void rollbackNativeTransaction();
 
     /**
      * The current value of the native transaction counter.<p>
      */
-
     public int getNativeTransactionCounter();
 
 }

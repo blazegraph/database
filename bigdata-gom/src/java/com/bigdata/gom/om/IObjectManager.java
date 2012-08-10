@@ -84,7 +84,8 @@ public interface IObjectManager extends INativeTransaction {
     /**
      * Close the object manager, which terminates its connection with the
      * backing store. Any open concurrent or nested/native transactions are
-     * flushed to the store.
+     * flushed to the store. The object manager can not be used after it has
+     * been closed.
      * 
      * @exception IllegalStateException
      *                if the store is already closed.
