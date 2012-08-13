@@ -3996,7 +3996,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * Note: You MUST {@link #commit()} before the registered index will be
 	 * either restart-safe or visible to new transactions.
 	 */
-	public void registerIndex(final IndexMetadata metadata) {
+	final public void registerIndex(final IndexMetadata metadata) {
 
 		if (metadata == null)
 			throw new IllegalArgumentException();
@@ -4006,7 +4006,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		if (name == null)
 			throw new IllegalArgumentException();
 
-		registerIndex(name, metadata);
+		// Note: Old code path was B+Tree specific.
+//		registerIndex(name, metadata);
+		
+        validateIndexMetadata(name, metadata);
+
+        // Note: Generic index create code path.
+        final ICheckpointProtocol ndx = Checkpoint.create(this, metadata);
+
+        // Note: Generic index registration code path.
+        _register(name, ndx);
 
 	}
     
