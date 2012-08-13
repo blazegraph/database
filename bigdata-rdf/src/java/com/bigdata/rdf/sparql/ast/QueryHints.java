@@ -400,6 +400,16 @@ public interface QueryHints {
     boolean DEFAULT_SOLUTION_SET_CACHE = true;
 
     /**
+     * When <code>true</code> a DESCRIBE cache will be maintained.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+     *      DESCRIBE CACHE </a>
+     */
+    String DESCRIBE_CACHE = "describe-cache";
+    
+    boolean DEFAULT_DESCRIBE_CACHE = false;
+    
+   /**
 	 * Option controls whether or not the proposed SPARQL extension for
 	 * reification done right is enabled.
 	 * 
