@@ -929,15 +929,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class GraphQueryTask extends AbstractQueryTask {
 
         public GraphQueryTask(final String namespace, final long timestamp,
-                final String baseURI,
-                final ASTContainer astContainer, final QueryType queryType,
-                final RDFFormat format, final HttpServletRequest req,
-                final OutputStream os) {
+                final String baseURI, final ASTContainer astContainer,
+                final QueryType queryType, final RDFFormat format,
+                final HttpServletRequest req, final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer,
-                    queryType, format.getDefaultMIMEType(),
-                    format.getCharset(), format.getDefaultFileExtension(), req,
-                    os);
+            super(namespace, timestamp, baseURI, astContainer, queryType,
+                    format.getDefaultMIMEType(), format.getCharset(), format
+                            .getDefaultFileExtension(), req, os);
 
         }
 
@@ -1180,7 +1178,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * CONNEG for the MIME type.
          * 
          * Note: An attempt to CONNEG for a MIME type which can not be used with
-         * a give type of query will result in a response using a default MIME
+         * a given type of query will result in a response using a default MIME
          * Type for that query.
          */
         final String acceptStr = explain ? "text/html"
