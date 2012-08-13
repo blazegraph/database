@@ -405,7 +405,7 @@ public interface QueryHints {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
      *      DESCRIBE CACHE </a>
      */
-    String DESCRIBE_CACHE = "describe-cache";
+    String DESCRIBE_CACHE = "describeCache";
     
     boolean DEFAULT_DESCRIBE_CACHE = false;
     
