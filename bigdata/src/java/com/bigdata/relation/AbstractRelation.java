@@ -225,7 +225,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     }
 
     /**
-     * Factory for {@link IndexMetadata}.
+     * Default factory for {@link IndexMetadata}.
      * 
      * @param name
      *            The fully qualified index name.
