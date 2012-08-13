@@ -24,11 +24,15 @@ package com.bigdata.rdf.sail.webapp;
 
 /**
  * Configuration object.
+ * 
+ * @see ConfigParams
  */
 public class SparqlEndpointConfig {
 
     /**
      * The default namespace.
+     * 
+     * @see ConfigParams#NAMESPACE
      */
     final public String namespace;
 
@@ -41,12 +45,16 @@ public class SparqlEndpointConfig {
      * {@link #timestamp} will actually be a read-only transaction identifier
      * which is shared by default for each query against the
      * {@link NanoSparqlServer}.
+     * 
+     * @see ConfigParams#READ_LOCK
      */
     final public long timestamp;
 
     /**
      * The #of threads to use to handle SPARQL queries -or- ZERO (0) for an
      * unbounded pool.
+     * 
+     * @see ConfigParams#QUERY_THREAD_POOL_SIZE
      */
     final public int queryThreadPoolSize;
     
@@ -55,11 +63,14 @@ public class SparqlEndpointConfig {
      * mode, each named graph will also be described in in the same level of
      * detail as the default graph. Otherwise only the default graph will be
      * described.
+     * 
+     * @see ConfigParams#DESCRIBE_EACH_NAMED_GRAPH
      */
     final public boolean describeEachNamedGraph;
-    
+
     public SparqlEndpointConfig(final String namespace, final long timestamp,
-            final int queryThreadPoolSize, final boolean describeEachNamedGraph) {
+            final int queryThreadPoolSize,
+            final boolean describeEachNamedGraph) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -69,9 +80,9 @@ public class SparqlEndpointConfig {
         this.timestamp = timestamp;
 
         this.queryThreadPoolSize = queryThreadPoolSize;
-        
-        this.describeEachNamedGraph = describeEachNamedGraph;
 
+        this.describeEachNamedGraph = describeEachNamedGraph;
+        
     }
 
 }
