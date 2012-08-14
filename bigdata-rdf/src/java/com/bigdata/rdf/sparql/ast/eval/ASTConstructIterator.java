@@ -156,7 +156,7 @@ public class ASTConstructIterator implements
 
     /**
      * 
-     * @param store
+     * @param tripleStore
      * @param construct
      *            The {@link ConstructNode}
      * @param whereClause
@@ -166,12 +166,12 @@ public class ASTConstructIterator implements
      *            The solutions that will be used to construct the triples.
      */
     public ASTConstructIterator(//
-            final AbstractTripleStore store,//
+            final AbstractTripleStore tripleStore,//
             final ConstructNode construct,//
             final GraphPatternGroup<?> whereClause,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
-        this.f = store.getValueFactory();
+        this.f = tripleStore.getValueFactory();
         
 //        this.toldBNodes = store.getLexiconRelation().isStoreBlankNodes();
         
@@ -232,7 +232,7 @@ public class ASTConstructIterator implements
          */
 
         final boolean isObviouslyDistinct = isObviouslyDistinct(
-                store.isQuads(), templates, whereClause);
+                tripleStore.isQuads(), templates, whereClause);
         
         if (isObviouslyDistinct) {
 
@@ -250,15 +250,21 @@ public class ASTConstructIterator implements
                  * Construct a predicate for the first triple template. We will
                  * use that as the bias for the scalable DISTINCT SPO filter.
                  */
+                @SuppressWarnings("rawtypes")
                 final IPredicate pred;
                 {
 
                     final StatementPatternNode sp = templates.get(0/* index */);
 
+                    @SuppressWarnings("rawtypes")
                     final IVariableOrConstant<IV> s = sp.s()
                             .getValueExpression();
+
+                    @SuppressWarnings("rawtypes")
                     final IVariableOrConstant<IV> p = sp.p()
                             .getValueExpression();
+                    
+                    @SuppressWarnings("rawtypes")
                     final IVariableOrConstant<IV> o = sp.o()
                             .getValueExpression();
 
@@ -560,26 +566,26 @@ public class ASTConstructIterator implements
             }
             
         }
-        
+
         // Blank nodes (scoped to the solution).
-        final Map<String,BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
-        
-        for(StatementPatternNode pat : templates) {
+        final Map<String, BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
+
+        for (StatementPatternNode pat : templates) {
 
             /*
              * Attempt to build a statement from this statement pattern and
              * solution.
              */
-            
+
             final BigdataStatement stmt = makeStatement(pat, solution, bnodes);
 
-            if(stmt != null) {
-            
+            if (stmt != null) {
+
                 // If successful, then add to the buffer.
                 addStatementToBuffer(stmt);
-                
+
             }
-            
+
         }
 
     }
@@ -591,11 +597,11 @@ public class ASTConstructIterator implements
      *            The statement.
      */
     private void addStatementToBuffer(final BigdataStatement stmt) {
-        
-        if(log.isDebugEnabled())
+
+        if (log.isDebugEnabled())
             log.debug(stmt.toString());
-        
-        if(filter != null) {
+
+        if (filter != null) {
 
             /*
              * Impose a DISTINCT SPO filter on the generated statements in the
@@ -605,9 +611,9 @@ public class ASTConstructIterator implements
              * href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
              * CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
              */
-            
-            if(filter.isValid(stmt)) {
-                
+
+            if (filter.isValid(stmt)) {
+
                 buffer.add(stmt);
                 
             }
@@ -676,8 +682,11 @@ public class ASTConstructIterator implements
      * 
      * @return The as-bound value.
      */
-    private BigdataValue getValue(final TermNode term,
-            final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
+    private BigdataValue getValue(//
+            final TermNode term,//
+            final BindingSet solution,//
+            final Map<String, BigdataBNode> bnodes//
+            ) {
 
         if (term instanceof ConstantNode) {
 
@@ -711,10 +720,10 @@ public class ASTConstructIterator implements
 
             final String varname = v.getValueExpression().getName();
 
-            if(v.isAnonymous()) {
-                
-                return getBNode(varname, bnodes); 
-                
+            if (v.isAnonymous()) {
+
+                return getBNode(varname, bnodes);
+
             }
             
             final BigdataValue val = (BigdataValue) solution.getValue(varname);
