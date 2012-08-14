@@ -30,12 +30,15 @@ package com.bigdata.rdf.sparql.ast.eval;
 import info.aduna.iteration.CloseableIteration;
 
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
@@ -62,6 +65,7 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationIterator;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
@@ -73,8 +77,12 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.cache.DescribeBindingsCollector;
+import com.bigdata.rdf.sparql.ast.cache.DescribeCacheUpdater;
+import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -376,6 +384,8 @@ public class ASTEvalHelper {
 
     /**
      * Evaluate a CONSTRUCT/DESCRIBE query.
+     * <p>
+     * Note: For a DESCRIBE query, this also updates the DESCRIBE cache.
      * 
      * @param store
      *            The {@link AbstractTripleStore} having the data.
@@ -385,6 +395,9 @@ public class ASTEvalHelper {
      *            The initial solution to kick things off.
      * 
      * @throws QueryEvaluationException
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+     *      DESCRIBE CACHE </a>
      */
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
@@ -399,6 +412,34 @@ public class ASTEvalHelper {
         final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
                 batchResolveIVs(store, bs));
 
+        final IDescribeCache describeCache;
+        final Set<IVariable<?>> describeVars;
+        if (context.sparqlCache != null
+                && astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE) {
+            
+            /*
+             * The DESCRIBE cache is enabled.
+             */
+            
+            describeCache = context.getDescribeCache();
+
+            /*
+             * The set of variables that were in the original DESCRIBE
+             * projection. This can include both variables explicitly given in
+             * the query (DESCRIBE ?foo WHERE {...}) and variables bound to
+             * constants by an AssignmentNode (DESCRIBE uri).
+             */
+            describeVars = astContainer.getOriginalAST().getProjectedVars(
+                    new LinkedHashSet<IVariable<?>>());
+
+        } else {
+            
+            // DESCRIBE cache is not enabled.
+            describeCache = null;
+            describeVars = null;
+            
+        }
+        
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
 
@@ -408,22 +449,93 @@ public class ASTEvalHelper {
         final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
                 && !optimizedQuery.hasSlice();
 
-        return new GraphQueryResultImpl(//
-                optimizedQuery.getPrefixDecls(), //
+        // Solutions to the WHERE clause (as projected).
+        final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
+                .evaluateQuery(astContainer, context, bindingSets//
+                        , materializeProjectionInQuery//
+                        , optimizedQuery.getProjection().getProjectionVars()//
+                );
+
+        final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
+        final ConcurrentHashSet<BigdataValue> describedResources;
+        if (describeCache != null) {
+
+            /**
+             * If we are maintaining the DESCRIBE cache, then we need to know
+             * the distinct bindings that the projected variables in the
+             * original DESCRIBE query take on in the solutions. Those bound
+             * values identify the resources that were actually described by the
+             * query. This is necessary to handle cases such as
+             * <code>DESCRIBE ?foo WHERE {...}</code> or <code>DESCRIBE *</code>
+             * 
+             * Note: The [describedResources] is a ConcurrentHashSet in order to
+             * provide thread safety since new bindings for the DESCRIBE
+             * variable(s) may be discovered concurrent with new constructed
+             * statements being observed. We need to have the new bindings
+             * become immediately visible in order to avoid missing any
+             * statements involving a resource in the original projection. The
+             * [describedResources] were "described" and must be updated in the
+             * DESCRIBE cache.
+             */
+     
+            // Concurrency safe set.
+            describedResources = new ConcurrentHashSet<BigdataValue>();
+            
+            // Collect the bindings on those variables.
+            solutions2 = new DescribeBindingsCollector(//
+                    describeVars,// what to collect
+                    describedResources,// where to put the bindings.
+                    solutions// source solutions
+            );
+
+        } else {
+
+            // Pass through original iterator.
+            solutions2 = solutions;
+            describedResources = null;
+        
+        }
+
+        // Constructed Statements.
+        final CloseableIteration<BigdataStatement, QueryEvaluationException> src =
                 new ASTConstructIterator(store, //
                         optimizedQuery.getConstruct(), //
                         optimizedQuery.getWhereClause(),//
-                        ASTEvalHelper.evaluateQuery(
-                                astContainer,
-                                context,
-                                bindingSets//
-                                ,materializeProjectionInQuery//
-                                ,optimizedQuery.getProjection()
-                                        .getProjectionVars()//
-                                )));
+                        solutions2);
+
+        final CloseableIteration<BigdataStatement, QueryEvaluationException> src2;
+
+        if (describeCache != null) {
+
+            /*
+             * Wrap the Statement iteration with logic that will update the
+             * DESCRIBE cache.
+             * 
+             * Note: [describedResources] is the set of BigdataValues that were
+             * "described" by the query and will have an entry asserted in the
+             * cache.
+             * 
+             * TODO We do not need to update cache entries unless they have been
+             * invalidated (or are based on the open web and have become stale
+             * or invalidated by finding new assertions relevant to those
+             * resources during an open web query).
+             */
+
+            src2 = new DescribeCacheUpdater(describeCache, describedResources,
+                    src);
+
+        } else {
+
+            src2 = src;
+
+        }
+        
+        return new GraphQueryResultImpl(//
+                optimizedQuery.getPrefixDecls(), //
+                src2);
 
     }
-    
+
     /**
      * Evaluate a query plan (core method).
      * 

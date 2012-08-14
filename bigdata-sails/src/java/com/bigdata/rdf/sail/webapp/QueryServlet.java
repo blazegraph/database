@@ -91,6 +91,15 @@ public class QueryServlet extends BigdataRDFServlet {
     
     static private final transient Logger log = Logger.getLogger(QueryServlet.class); 
 
+    /**
+     * The name of the parameter/attribute that contains the SPARQL query.
+     * <p>
+     * Note: This can be either a URL query parameter or a servlet request
+     * attribute. The latter is used to support chaining of a linked data GET as
+     * a SPARQL DESCRIBE query.
+     */
+    static final transient String ATTR_QUERY = "query";
+    
 //    /**
 //     * The name of the request attribute for the {@link AbstractQueryTask}.
 //     */
@@ -405,15 +414,22 @@ public class QueryServlet extends BigdataRDFServlet {
     /**
      * Run a SPARQL query.
      */
-    private void doQuery(final HttpServletRequest req,
-                final HttpServletResponse resp) throws IOException {
+    void doQuery(final HttpServletRequest req, final HttpServletResponse resp)
+            throws IOException {
 
         final String namespace = getNamespace(req);
 
         final long timestamp = getTimestamp(req);
 
-        // The SPARQL query.
-        final String queryStr = req.getParameter("query");
+        /*
+         * The SPARQL query.
+         * 
+         * Note: This can be attached as a request attribute. That supports a
+         * linked data GET by turning it into a SPARQL DESCRIBE query.
+         */
+        final String queryStr = req.getParameter(ATTR_QUERY) != null ? req
+                .getParameter(ATTR_QUERY) : (String) req
+                .getAttribute(ATTR_QUERY);
 
         if (queryStr == null) {
 

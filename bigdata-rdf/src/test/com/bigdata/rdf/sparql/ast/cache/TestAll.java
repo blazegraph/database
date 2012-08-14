@@ -57,8 +57,18 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("SPARQL Cache");
 
-        // Basic query.
-        suite.addTestSuite(TestSparqlCache.class);
+        suite.addTestSuite(TestSparqlCacheFactory.class);
+        
+        /*
+         * Note: Data-driven unit tests are used for the SPARQL named solution
+         * set cache and the DESCRIBE cache.
+         */
+        
+//        // Basic query.
+//        suite.addTestSuite(TestSparqlCache.class);
+//
+//        // DESCRIBE cache.
+//        suite.addTestSuite(TestDescribeCache.class);
 
         return suite;
         

@@ -31,6 +31,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.spo.SPORelation;
@@ -118,4 +119,14 @@ public interface IEvaluationContext {
 	 * @see QueryHints#SOLUTION_SET_CACHE
 	 */
     ISparqlCache getSparqlCache();
+
+    /**
+     * Return the cache for described resources (experimental feature).
+     * 
+     * @return The cache -or- <code>null</code>.
+     * 
+     * @see QueryHints#DESCRIBE_CACHE
+     */
+    IDescribeCache getDescribeCache();
+
 }

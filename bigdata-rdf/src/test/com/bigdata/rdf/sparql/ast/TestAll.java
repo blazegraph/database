@@ -83,9 +83,15 @@ public class TestAll extends TestCase {
 //        // Test suite for building a SPARQL expressions from the AST.
 //        suite.addTestSuite(TestAST2SparqlGenerator.class);
 
-        // Test suite for SPARQL solution set caching.
+        /*
+         * Test suite for SPARQL solution set caching.
+         * 
+         * Note: Most of this stuff is tested using data-driven SPARQL
+         * evaluation tests (which are not incorporated into the sub-suite that
+         * is being included here).
+         */
         suite.addTest(com.bigdata.rdf.sparql.ast.cache.TestAll.suite());
-        
+      
         // Test suite for AST evaluation (SPARQL query).
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.TestAll.suite());
 

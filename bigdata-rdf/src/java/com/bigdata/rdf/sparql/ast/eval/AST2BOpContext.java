@@ -30,6 +30,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
 import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
 import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
@@ -383,10 +384,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
          * Cache for SPARQL named solution sets.
          * 
          * TODO Define a query hint for enabling or disabling the SPARQL cache
-         * for an operation.
+         * for an operation?
          */
         {
-            final boolean enable = queryHints == null ? QueryHints.DEFAULT_SOLUTION_SET_CACHE
+            final boolean enableSparqlCache = queryHints == null ? QueryHints.DEFAULT_SOLUTION_SET_CACHE
                     : Boolean
                             .valueOf(queryHints
                                     .getProperty(
@@ -394,12 +395,33 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
                                             QueryHints.DEFAULT_SOLUTION_SET_CACHE ? Boolean.TRUE
                                                     .toString() : Boolean.FALSE
                                                     .toString()));
-            if (enable) {
+
+//            final boolean enableDescribeCache = queryHints == null ? QueryHints.DEFAULT_DESCRIBE_CACHE
+//                    : Boolean.valueOf(queryHints.getProperty(
+//                            QueryHints.DESCRIBE_CACHE,
+//                            QueryHints.DEFAULT_DESCRIBE_CACHE ? Boolean.TRUE
+//                                    .toString() : Boolean.FALSE.toString()));
+
+            if (enableSparqlCache) {
+            
+                /*
+                 * Note: This will create the cache if it does not exist. At all
+                 * other places in the code we use getExistingSparqlCache() to
+                 * access the cache IFF it exists. Here is where we create it.
+                 */
+
                 this.sparqlCache = SparqlCacheFactory
                         .getSparqlCache(queryEngine);
+                
+//                ((SparqlCache) sparqlCache)
+//                        .setDescribeCache(enableDescribeCache);
+
             } else {
+                
                 this.sparqlCache = null;
+                
             }
+
         }
         
         this.context = new BOpContextBase(queryEngine);
@@ -509,5 +531,12 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     		return sparqlCache;
     	
     }
-    
+
+    public IDescribeCache getDescribeCache() {
+
+        return getSparqlCache().getDescribeCache(db.getNamespace(),
+                db.getTimestamp());
+
+    }
+
 }

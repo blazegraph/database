@@ -67,6 +67,12 @@ public class TestAll extends TestCase {
         // Basic query.
         suite.addTestSuite(TestBasicQuery.class);
 
+        // Test suite for CONSTRUCT queries.
+        suite.addTestSuite(TestConstruct.class);
+
+        // Test suite for DESCRIBE and the DESCRIBE cache.
+        suite.addTestSuite(TestDescribe.class);
+
         // Port of unit tests original written at the AST layer.
         suite.addTestSuite(TestAST.class);
 
