@@ -30,8 +30,10 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
@@ -43,6 +45,7 @@ import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.gom.gpo.LinkSet;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -244,7 +247,15 @@ public class ObjectManager extends ObjectMgrModel {
 		int statements = 0;
 		while (stmts.hasNext()) {
 			final Statement stmt = stmts.next();
-			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());	
+			final Resource subject = stmt.getSubject();
+			final URI predicate = stmt.getPredicate();
+			final Value value = stmt.getObject();
+						
+			if (subject.equals(gpo.getId())) { // property
+				((GPO) gpo).initValue(predicate, value);
+			} else { // links in - add to LinkSet
+				((GPO) gpo).initLinkValue(predicate, (URI) subject);
+			}
 			statements++;
 		}
 		
@@ -258,7 +269,7 @@ public class ObjectManager extends ObjectMgrModel {
         if (gpo == null)
             throw new IllegalArgumentException();
 
-		if (false) {
+		if (true) {
 			materializeWithDescribe(gpo);
 			return;
 		}
