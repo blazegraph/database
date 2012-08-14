@@ -103,6 +103,13 @@ public class GPO implements IGPO {
      * for that predicate.
      */
     private GPOEntry m_tailEntry = null;
+    
+    /**
+     * The DESCRIBE cache may eagerly load linksIn linkSets.  To support this
+     * {@link GPOEntry}s can be maintained for linksIn.
+     */
+    private GPOEntry m_headLinkEntry = null;
+    private GPOEntry m_tailLinkEntry = null;
 
     private ArrayList<IGenericSkin> m_skins = null;
 	
@@ -168,6 +175,11 @@ public class GPO implements IGPO {
          */
 		private LinkValue m_removedValues;
 		
+		/**
+		 * Keep track of entry size
+		 */
+		private int m_size = 0;
+		
         GPOEntry(final URI key) {
             
             if (key == null)
@@ -188,6 +200,7 @@ public class GPO implements IGPO {
 			newValue.m_next = m_values;
 			m_values = newValue;
 			
+			m_size++;
 		}
 		
 		public void set(final GPO owner, final Value value) {
@@ -205,7 +218,8 @@ public class GPO implements IGPO {
 			}
 			// and clear any current values
 			m_values = null;
-
+			
+			m_size = 1;
 		}
 
         /**
@@ -213,29 +227,82 @@ public class GPO implements IGPO {
          * true IFF the statement was removed.
          * 
          * @return <code>true</code> iff the statement was removed.
-         * 
-         *         FIXME Implement remove(Value)
          */
         public boolean remove(final GPO owner, final Value value) {
 
-            if(value == null)
+            if (value == null)
                 throw new IllegalArgumentException();
             
-            throw new UnsupportedOperationException();
+            // if on m_values then move to m_removed
+            LinkValue test = m_values;
+            LinkValue prev = null;
+            while (test != null) {
+            	if (value.equals(test.m_value)) {
+            		if (prev == null) {
+            			m_values = test.m_next;
+            		} else {
+            			prev.m_next = test.m_next;
+            		}
+            		// add to removed values
+        			test.m_next = m_removedValues;
+        			m_removedValues = test;
+        			
+        			m_size--;
+        			
+            		return true;
+            	}
+            	prev = test;
+            	test = test.m_next;
+            }
             
+            // if on m_added then just remove it
+            test = m_addedValues;
+            prev = null;
+            while (test != null) {
+            	if (value.equals(test.m_value)) {
+            		if (prev == null) {
+            			m_addedValues = test.m_next;
+            		} else {
+            			prev.m_next = test.m_next;
+            		}
+            		
+            		m_size--;
+            		
+            		return true;
+            	}
+            	prev = test;
+            	test = test.m_next;
+           }
+           
+            
+            return false;
         }
 
         /**
          * Remove all statements for this predicate on the owning {@link IGPO}.
          * 
          * @return <code>true</code> iff any statements were removed.
-         * 
-         *         FIXME Implement removeAll()
          */
         public boolean removeAll(final GPO owner) {
+        	if (m_size == 0) {
+        		return false;
+        	}
+        	
+        	// just move m_values to tail of m_removedValues
+            if (m_removedValues == null) {
+            	m_removedValues = m_values;
+            } else {
+            	LinkValue tail = m_removedValues;
+            	while (tail.m_next != null) tail = tail.m_next;
+            	tail.m_next = m_values;
+            }
             
-            throw new UnsupportedOperationException();
+            m_values = null; // clear values
+            m_addedValues = null; // remove any additions
             
+        	m_size = 0;
+        	
+        	return true;
         }
 
         public Iterator<Value> values() {
@@ -353,6 +420,8 @@ public class GPO implements IGPO {
 			final LinkValue nv = new LinkValue(value);
 			nv.m_next = m_addedValues;
 			m_addedValues = nv;
+			
+			m_size++;
 
 			return true;
 		}
@@ -360,6 +429,11 @@ public class GPO implements IGPO {
 
 		public boolean hasValues() {
 			return m_values != null || m_addedValues != null;
+		}
+
+
+		public int size() {
+			return m_size;
 		}
 	}
 	
@@ -389,6 +463,32 @@ public class GPO implements IGPO {
 		return m_tailEntry;
 	}
 	
+   /**
+     * Make sure that there is a {@link GPOEntry} for that link property. If one is
+     * found, return it. Otherwise create and return a new {@link GPOEntry}.
+     * 
+     * @param key
+     *            The link property.
+     * @return The {@link GPOEntry} and never <code>null</code>.
+     */
+	GPOEntry establishLinkEntry(final URI key) {
+		final URI fkey = m_om.internKey(key);
+		if (m_headLinkEntry == null) {
+			m_headLinkEntry = m_tailLinkEntry = new GPOEntry(fkey);
+		} else {
+			GPOEntry entry = m_headLinkEntry;
+			while (entry != null) {
+				if (entry.m_key == fkey) {
+					return entry;
+				}
+				entry = entry.m_next;
+			}
+			m_tailLinkEntry = m_tailLinkEntry.m_next = new GPOEntry(fkey);
+		}
+		
+		return m_tailLinkEntry;
+	}
+	
 	/**
 	 * The entry is interned to provide a unique Object and allow
 	 * '==' testing.
@@ -399,6 +499,25 @@ public class GPO implements IGPO {
 	GPOEntry getEntry(final URI key) {
 		final URI fkey = m_om.internKey(key);
 		GPOEntry entry = m_headEntry;
+		while (entry != null) {
+			if (entry.m_key == fkey) {
+				return entry;
+			}
+			entry = entry.m_next;
+		}
+		return null;
+	}
+	
+	/**
+	 * The entry is interned to provide a unique Object and allow
+	 * '==' testing.
+	 * 
+	 * @param key
+	 * @return the found link entry, if any
+	 */
+	GPOEntry getLinkEntry(final URI key) {
+		final URI fkey = m_om.internKey(key);
+		GPOEntry entry = m_headLinkEntry;
 		while (entry != null) {
 			if (entry.m_key == fkey) {
 				return entry;
@@ -485,8 +604,10 @@ public class GPO implements IGPO {
     /** All ?y where (?y,p,self). */
 	@Override
 	public ILinkSet getLinksIn(final URI property) {
+		// materialize fully load links in from Describe cache
+		materialize();
 
-        return new LinkSet(this, property, true/* linksIn */);
+		return new LinkSet(this, property, true/* linksIn */);
 
 	}
 
@@ -587,8 +708,8 @@ public class GPO implements IGPO {
 
 	@Override
 	public boolean isMemberOf(ILinkSet linkSet) {
-		// TODO Auto-generated method stub
-		return false;
+
+		return linkSet.contains(this);
 	}
 
     /**
@@ -615,6 +736,22 @@ public class GPO implements IGPO {
 	    assert !m_materialized;
 		
 		final GPOEntry entry = establishEntry(predicate);
+		
+		entry.initValue(this, object);
+		
+	}
+	
+	public void initLinkValue(final URI predicate, final URI object) {
+
+	    if (predicate == null)
+            throw new IllegalArgumentException();
+        
+	    if (object == null)
+            throw new IllegalArgumentException();
+		
+	    assert !m_materialized;
+		
+		final GPOEntry entry = establishLinkEntry(predicate);
 		
 		entry.initValue(this, object);
 		

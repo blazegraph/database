@@ -88,26 +88,44 @@ public class LinkSet implements ILinkSet {
 
 	@Override
 	public int size() {
-		// TODO Auto-generated method stub
-		return 0;
+		final GPO.GPOEntry entry;
+		if (m_linksIn) {
+			entry = ((GPO) m_owner).getLinkEntry(m_linkProperty);
+		} else {
+			entry = ((GPO) m_owner).getEntry(m_linkProperty);
+		}
+		return entry == null ? 0 : entry.size();
 	}
 
 	@Override
 	public long sizeLong() {
-		// TODO Auto-generated method stub
-		return 0;
+		return size();
 	}
 
 	@Override
-	public boolean add(IGPO arg0) {
-		// TODO Auto-generated method stub
-		return false;
+	public boolean add(IGPO arg) {
+		if (arg == null) {
+			throw new IllegalArgumentException();
+		}
+		
+		if (m_linksIn) {
+			arg.addValue(m_linkProperty, m_owner.getId());
+		} else {
+			m_owner.addValue(m_linkProperty, arg.getId());
+		}
+		
+		return true;
 	}
 
 	@Override
-	public boolean addAll(Collection<? extends IGPO> arg0) {
-		// TODO Auto-generated method stub
-		return false;
+	public boolean addAll(Collection<? extends IGPO> arg) {
+		if (arg == null) {
+			throw new IllegalArgumentException();
+		}
+		for (IGPO mem : arg)
+			add(mem);
+		
+		return true;
 	}
 
 	@Override
@@ -122,7 +140,14 @@ public class LinkSet implements ILinkSet {
 			throw new IllegalArgumentException("IGPO required");
 		}
 		IGPO gpo = (IGPO) arg;
-		return gpo.getValue(m_linkProperty) == m_owner;
+		
+		// since linkSet is fully materialized, just run through it
+		Iterator<IGPO> values = iterator();
+		while (values.hasNext()) {
+			if (values.next() == gpo)
+				return true;
+		}
+		return false;
 	}
 
 	@Override
@@ -156,7 +181,7 @@ public class LinkSet implements ILinkSet {
 
     @Override
 	public Iterator<IGPO> iterator() {
-		if (m_linksIn) {
+		if (false) {
             /*
              * Links in is not materialized.
              * 
@@ -193,9 +218,15 @@ public class LinkSet implements ILinkSet {
 			};
 		} else {
 		    /*
-		     * Links out is fully materialized on the gpo.
+		     * Both Links in AND Links out are fully materialized on the gpo with DESCRIBE.
 		     */
-			final GPO.GPOEntry entry = ((GPO) m_owner).getEntry(m_linkProperty);
+			final GPO.GPOEntry entry;
+			if (m_linksIn) {
+				entry = ((GPO) m_owner).getLinkEntry(m_linkProperty);
+			} else {
+				entry = ((GPO) m_owner).getEntry(m_linkProperty);
+			}
+			
 			if (entry == null) {
 				return new EmptyIterator<IGPO>();
 			}
