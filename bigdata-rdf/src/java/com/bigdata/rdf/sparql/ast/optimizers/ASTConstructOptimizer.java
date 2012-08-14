@@ -84,12 +84,31 @@ public class ASTConstructOptimizer implements IASTOptimizer {
             
         }
 
-        final ProjectionNode projection = new ProjectionNode();
-        {
+        final ProjectionNode projection;
+        if (queryRoot.getProjection() == null) {
 
-            queryRoot.setProjection(projection); // set on the query.
+            /*
+             * Set a new projection on the query.
+             * 
+             * Note: This handles both a CONSTRUCT query and a DESCRIBE query
+             * when we are NOT maintaining a DESCRIBE cache.
+             * 
+             * @see <a
+             * href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+             * DESCRIBE CACHE </a>
+             */
+            queryRoot.setProjection(projection = new ProjectionNode());
 
             projection.setReduced(true);
+
+        } else {
+            
+            projection = queryRoot.getProjection();
+            
+        }
+
+        // Add projected variables based on the CONSTRUCT template.
+        {
 
             // Visit the distinct variables in the CONSTRUCT clause.
             final Iterator<IVariable<?>> itr = BOpUtility
@@ -101,7 +120,7 @@ public class ASTConstructOptimizer implements IASTOptimizer {
                 projection.addProjectionVar(new VarNode(itr.next().getName()));
 
             }
-            
+
         }
 
         if (context.nativeDistinctSPO) {

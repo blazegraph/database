@@ -189,7 +189,6 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final ProjectionNode projection = new ProjectionNode();
             queryRoot.setProjection(projection);
 
-            // projection.addProjectionVar(new VarNode("s"));
             final VarNode anonvar = new VarNode("-iri-1");
             anonvar.setAnonymous(true);
             projection.addProjectionExpression(new AssignmentNode(anonvar,
@@ -201,7 +200,22 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
          * Setup the expected AST model.
          */
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        final ProjectionNode projection;
         {
+            
+            /*
+             * Setup the projection node.
+             * 
+             * Note: This is only present if the DESCRIBE cache is being
+             * maintained based on observed solutions to DESCRIBE queries.
+             */
+            projection = new ProjectionNode();
+            projection.setReduced(true);
+            final VarNode anonvar = new VarNode("-iri-1");
+            anonvar.setAnonymous(true);
+            projection.addProjectionExpression(new AssignmentNode(anonvar,
+                    new ConstantNode(mikeURI.getIV())));
+            
             /*
              * Setup the CONSTRUCT node.
              */
@@ -250,6 +264,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
+            if (context.getDescribeCache() != null) {
+
+                expected.setProjection(projection);
+                
+            }
+            
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
@@ -261,8 +281,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 
     /**
      * Unit test for the AST rewrite of a simple describe query involving an IRI
-     * and a variable bound by a WHERE clause. The IRI in this case was choosen
-     * such that it would not be selected by the WHERE clause.
+     * and a variable bound by a WHERE clause. The IRI in this case was chosen
+     * such that it would NOT be selected by the WHERE clause.
      * 
      * <pre>
      * describe <http://www.bigdata.com/DC> ?x 
@@ -400,7 +420,29 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
          * Setup the expected AST model.
          */
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        final ProjectionNode projection;
         {
+            
+            /*
+             * Setup the projection node.
+             * 
+             * Note: This is only present if the DESCRIBE cache is being
+             * maintained based on observed solutions to DESCRIBE queries.
+             */
+            {
+                projection = new ProjectionNode();
+                
+                projection.setReduced(true);
+                
+                final VarNode anonvar = new VarNode("-iri-1");
+                anonvar.setAnonymous(true);
+                projection.addProjectionExpression(new AssignmentNode(anonvar,
+                        new ConstantNode(dcURI.getIV())));
+
+                projection.addProjectionVar(new VarNode("x"));
+
+            }
+            
             /*
              * Setup the CONSTRUCT node.
              */
@@ -474,6 +516,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
+            if (context.getDescribeCache() != null) {
+
+                expected.setProjection(projection);
+                
+            }
+            
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
@@ -610,7 +658,23 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
          * Setup the expected AST model.
          */
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        final ProjectionNode projection;
         {
+
+            /*
+             * Setup the projection necessary for maintaining the DESCRIBE
+             * cache.
+             */
+            {
+
+                projection = new ProjectionNode();
+                
+                projection.setReduced(true);
+
+                projection.addProjectionVar(new VarNode("x"));
+
+            }
+            
             /*
              * Setup the CONSTRUCT node.
              */
@@ -669,6 +733,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             
             final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
+
+            if (context.getDescribeCache() != null) {
+
+                expected.setProjection(projection);
+                
+            }
 
             IQueryNode actual;
             

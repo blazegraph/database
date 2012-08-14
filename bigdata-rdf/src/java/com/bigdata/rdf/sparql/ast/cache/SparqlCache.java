@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.cache;
 
+
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,8 +45,10 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.SolutionSetStream;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
+import com.bigdata.htree.HTree;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.BufferMode;
@@ -55,11 +58,13 @@ import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -123,7 +128,7 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class SparqlCache implements ISparqlCache {
 
-    private static final Logger log = Logger.getLogger(SparqlCache.class);
+    static private transient final Logger log = Logger.getLogger(SparqlCache.class);
     
 //    public interface Options {
 //
@@ -164,16 +169,17 @@ public class SparqlCache implements ISparqlCache {
      * presumes a circular hash function such as is common in distributed row
      * stores, etc.
      */
-    private final CacheJournal cache;
+    private final CacheJournal cacheStore;
     
     /**
-     * FIXME Convert over to Name2Addr and layered resolution with appropriate
-     * concurrency control at each layer. The problem with layering the MemStore
-     * journal mode over the RWStore journal mode is that we wind up with two
-     * journals. There should be one journal with layered addressing (that is,
-     * with a solution set cache in front of the Journal). That might mean using
-     * a concurrent hash map for the resolution and named locks to provide
-     * concurrency control. We could name the solution sets within a scope:
+     * FIXME FIXME MVCC VIEWS: Convert over to Name2Addr and layered resolution
+     * with appropriate concurrency control at each layer. The problem with
+     * layering the MemStore journal mode over the RWStore journal mode is that
+     * we wind up with two journals. There should be one journal with layered
+     * addressing (that is, with a solution set cache in front of the Journal).
+     * That might mean using a concurrent hash map for the resolution and named
+     * locks to provide concurrency control. We could name the solution sets
+     * within a scope:
      * 
      * <pre>
      * (cache|query|database)[.queryUUID].namespace[.joinVars]
@@ -198,9 +204,42 @@ public class SparqlCache implements ISparqlCache {
      * <p>
      * 4. We need to have metadata about solution sets on hand for explicit
      * CREATEs (e.g., supporting declared join variables).
+     * 
+     * FIXME MVCC VIEWS: Does this permit bleeding between the solution set
+     * caches for distinct KB instances?!? (It is lacking the KB namespace).
      */
     private final ConcurrentHashMap<String/*name*/,SolutionSetStream> cacheMap;
 //    private final ConcurrentWeakValueCacheWithTimeout<String/* name */, IMemoryManager /* allocationContext */> cacheMap;
+
+    /**
+     * The {@link DescribeServiceFactory} tracks changes via an
+     * {@link IChangeLog} registered with each update connection and is
+     * responsible for cache invalidation.
+     */
+    private DescribeServiceFactory describeServiceFactory;
+
+//    /**
+//     * TODO Hack enables the DESCRIBE cache. Remove this method?
+//     */
+//    public void setDescribeCache(boolean enableDescribeCache) {
+//
+//        this.enableDescribeCache = enableDescribeCache;
+//
+//    }
+
+//    /**
+//     * Return <code>true</code> iff the DESCRIBE cache is enabled.
+//     */
+//    public boolean isDescribeCache() {
+//
+//        return enableDescribeCache;
+//
+//    }
+
+    /**
+     * TODO Hack enables the DESCRIBE cache.
+     */
+    private boolean enableDescribeCache = QueryHints.DEFAULT_DESCRIBE_CACHE;
     
 //    /**
 //     * The performance counters for the {@link IBufferStrategy} backing the
@@ -297,7 +336,7 @@ public class SparqlCache implements ISparqlCache {
 ////
 ////        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
-        this.cache = new CacheJournal(properties);
+        this.cacheStore = new CacheJournal(properties);
         
 //        /*
 //         * TODO The expire should be per cached object, not global. We would
@@ -313,7 +352,13 @@ public class SparqlCache implements ISparqlCache {
     
     @Override
     public void init() {
-        
+
+        if (enableDescribeCache) {
+
+            describeServiceFactory = new DescribeServiceFactory();
+
+        }
+
     }
     
     /**
@@ -336,7 +381,7 @@ public class SparqlCache implements ISparqlCache {
 
         cacheMap.clear();
         
-        cache.destroy();
+        cacheStore.destroy();
 
     }
 
@@ -347,7 +392,7 @@ public class SparqlCache implements ISparqlCache {
      */
     protected IRWStrategy getStore() {
         
-        return (IRWStrategy) cache.getBufferStrategy();
+        return (IRWStrategy) cacheStore.getBufferStrategy();
         
     }
     
@@ -466,14 +511,15 @@ public class SparqlCache implements ISparqlCache {
                 emptySolutionSet.iterator());
 
         // write the solutions.
-        writeSolutions(sset,src);
+        writeSolutions(sset, src);
 
     }
 
-    private void writeSolutions(final SolutionSetStream sset, final ICloseableIterator<IBindingSet[]> src) {
-        
+    private void writeSolutions(final SolutionSetStream sset,
+            final ICloseableIterator<IBindingSet[]> src) {
+
         sset.put(src);
-        
+
     }
     
 	public ISolutionSetStats getSolutionSetStats(final String solutionSet) {
@@ -568,116 +614,69 @@ public class SparqlCache implements ISparqlCache {
 
     }
     
-//    @Override
-//    public ICacheHit get(final AST2BOpContext ctx,
-//            final QueryBase queryOrSubquery) {
-//
-//        /*
-//         * FIXME Implement. Start with a simple DESCRIBE <uri> cache.
-//         */
-//
-//        return null;
-//        
-//    }
-//    
-//    /*
-//     * TODO When caching a solution set, make sure that we do so before we apply
-//     * the solution modifiers (ORDER BY, GROUP BY/HAVING, OFFSET/LIMIT) and
-//     * perhaps before we evaluate DISTINCT.
-//     * 
-//     * TODO It will be especially easy if the solution set has been pushed into
-//     * a hash index, which we can then just pour into the cache.
-//     * 
-//     * TODO We need a hash code to get started with query matching. However, it
-//     * can not be the hash code of the query string or we will not be able to
-//     * parameterize the solution modifiers. This suggests computing a hash 
-//     * function over the AST which knows to leave off the solution modifiers.
-//     */
-//    @Override
-//    public ICacheHit put(final AST2BOpContext ctx,
-//            final QueryBase queryOrSubquery,
-//            final ICloseableIterator<IBindingSet> src) {
-//        // TODO Auto-generated method stub
-//        return null;
-//    }
+    /**
+     * 
+     * @return The DESCRIBE cache for that view -or- <code>null</code> if the
+     *         DESCRIBE cache is not enabled.
+     * 
+     * @see QueryHints#DESCRIBE_CACHE
+     */
+    public IDescribeCache getDescribeCache(final String namespace,
+            final long timestamp) {
 
-//    /**
-//     * Cache invalidation / cache update protocol.
-//     * 
-//     * FIXME This listener needs to build up a "transaction" of change events
-//     * which will cause invalidation of cache entries. Those change events need
-//     * to be processed once we have committed the change set, but they MUST be
-//     * processed before another operation can read against the new commit point.
-//     * <P>
-//     * In order to close that gap, we can either invalidate the cache as we go
-//     * (this will cause the query engine to regenerate the cache before the
-//     * cached results are actually wrong) -or- we need to have a low level
-//     * callback from the {@link Journal} where we get notice of the
-//     * {@link IChangeLog} commit (including the timestamp) before the
-//     * {@link Journal} actually finishes the commit process, but probably after
-//     * it check points the various indices. E.g., hooked right into the middle
-//     * of the commit protocol. For a tightly integrated cache, this can be fast
-//     * enough.
-//     * <p>
-//     * Another possibility is to permit reads against the cache for any cached
-//     * solution for which we have not yet received an invalidation notice. Once
-//     * we get an invalidation notice, the cache will only respond for that
-//     * cached solution set up to the lastCommitTime before the
-//     * {@link IChangeRecord} event (so the cache needs to listen to commit
-//     * times, which is easy). This will allow read-only operations against
-//     * historical commit points to proceed but will not allow reads against the
-//     * cache for cached solution sets which MIGHT be invalidated.
-//     * <p>
-//     * Each cache entry needs to have the createTime (commit time against which
-//     * it was created, which needs to be the actually commit point if the reader
-//     * is isolated by a transaction). That is the first commit point for which
-//     * the cache entry is valid. It also needs to know the last commit time for
-//     * which the cache entry is valid, which is the point at which it was
-//     * expired. When a cache invalidation notice ({@link IChangeRecord}) has
-//     * been received, but we have not yet observed the commit for that change
-//     * record, we need to flag the cache entry as possibly invalid after the
-//     * then most current last commit time. Queries which hit that window must be
-//     * passed through to the database.
-//     * <p>
-//     * We need one {@link IChangeLog} listener per update connection. There can
-//     * be multiple such listeners concurrently when the database is using full
-//     * read/write transactions and/or when there are updates against different
-//     * triple/quad store instances.
-//     * 
-//     * TODO Each Change log event indicates an {@link ISPO} which was added to
-//     * (or removed from) the database. Cache entries which depend on statement
-//     * patterns which cover those {@link ISPO}s must be invalidated (or updated)
-//     * when the database update is committed. Obviously, the cache entries need
-//     * to be indexed for rapid discovery for invalidation purposes (in addition
-//     * to the discovery for cache hits).
-//     * 
-//     * TODO Cache entries need to be chained together so we can have hits for
-//     * the same query for different commit points. The backing solution set for
-//     * a given commit time needs to be expired no later than when we recycle
-//     * that commit point. This is yet another place where a low-level
-//     * integration with the {@link AbstractTransactionService} is required.
-//     */
-//    private class CacheChangeLogListener implements IChangeLog {
-//
-//        @Override
-//        public void changeEvent(IChangeRecord record) {
-//            // TODO Auto-generated method stub
-//
-//        }
-//
-//        @Override
-//        public void transactionCommited(final long commitTime) {
-//            // TODO Auto-generated method stub
-//
-//        }
-//
-//        @Override
-//        public void transactionAborted() {
-//            // TODO Auto-generated method stub
-//
-//        }
-//
-//    }
+        if (!enableDescribeCache) {
+
+            // Not enabled.
+            return null;
+
+        }
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        
+        /*
+         * Resolve the DESCRIBE cache for this KB namespace using ATOMIC pattern
+         * (locking).
+         */
+
+        HTree htree;
+        synchronized (this) {
+
+            final String name = namespace + ".describeCache";
+
+            htree = cacheStore.getHTree(name);
+
+            if (htree == null) {
+
+                if (TimestampUtility.isReadOnly(timestamp)) {
+
+                    // Cache is not pre-existing.
+                    return null;
+
+                }
+                
+                final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
+                        name, UUID.randomUUID());
+
+                metadata.setRawRecords(true/* rawRecords */);
+
+                metadata.setMaxRecLen(0/* maxRecLen */);
+                
+                cacheStore.registerIndex(metadata);
+
+            }
+            
+            htree = cacheStore.getHTree(name);
+
+        }
+        
+        return new DescribeCache(htree);
+        
+    }
+    
+    /*
+     * END OF DESCRIBE CACHE SUPPORT
+     */
 
     /**
      * The {@link CacheJournal} provides the backing store for transient named
@@ -775,6 +774,7 @@ public class SparqlCache implements ISparqlCache {
             
         }
         
+        @SuppressWarnings("rawtypes")
         public DefaultResourceLocator getResourceLocator() {
             
             return (DefaultResourceLocator) getLocalIndexManager()

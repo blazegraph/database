@@ -222,6 +222,17 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
         }
         
+        /**
+         * Read the query and load the data file(s) but do not run the query.
+         * 
+         * @param testURI
+         * @param queryFileURL
+         * @param dataFileURLs
+         * @param resultFileURL
+         * @param laxCardinality
+         * @param checkOrder
+         * @throws Exception
+         */
         public TestHelper(final String testURI, final String queryFileURL,
                 final String[] dataFileURLs, final String resultFileURL,
                 final boolean laxCardinality, final boolean checkOrder)
@@ -448,8 +459,16 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
         }
 
+        /**
+         * Set lazily by {@link #readExpectedGraphQueryResult()}.
+         */
+        public Set<Statement> expectedGraphQueryResult = null;
+
         public Set<Statement> readExpectedGraphQueryResult() throws Exception {
 
+            if (expectedGraphQueryResult != null)
+                return expectedGraphQueryResult;
+            
             final RDFFormat rdfFormat = Rio
                     .getParserFormatForFileName(resultFileURL);
 
@@ -475,6 +494,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
                     in.close();
                     
                 }
+                
+                expectedGraphQueryResult = result;
 
                 return result;
                 
@@ -499,7 +520,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
 		}
 
-		private void compareGraphs(final Set<Statement> queryResult,
+		public void compareGraphs(final Set<Statement> queryResult,
 				final Set<Statement> expectedResult) {
 
 			AbstractQueryEngineTestCase.compareGraphs(getName(), queryResult,

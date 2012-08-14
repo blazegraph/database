@@ -23,11 +23,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.util.Collections;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 
 /**
  * Default dispatch pattern for a core REST API.
@@ -51,7 +55,12 @@ public class RESTServlet extends BigdataRDFServlet {
     private InsertServlet m_insertServlet;
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
-
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+     *      DESCRIBE CACHE </a>
+     */
+    private DescribeCacheServlet m_describeServlet;
+    
     public RESTServlet() {
     }
 
@@ -68,12 +77,14 @@ public class RESTServlet extends BigdataRDFServlet {
         m_insertServlet = new InsertServlet();
         m_updateServlet = new UpdateServlet();
         m_deleteServlet = new DeleteServlet();
+        m_describeServlet = new DescribeCacheServlet();
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
         m_updateServlet.init(getServletConfig());
         m_deleteServlet.init(getServletConfig());
-
+        m_describeServlet.init(getServletConfig());
+        
     }
     
     /**
@@ -102,17 +113,65 @@ public class RESTServlet extends BigdataRDFServlet {
             m_deleteServlet = null;
         }
 
+        if (m_describeServlet != null) {
+            m_describeServlet.destroy();
+            m_describeServlet = null;
+        }
+
         super.destroy();
         
     }
 
-	/**
-	 * GET is only allowed with query requests, so delegate to the QueryServlet.
-	 */
     @Override
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        /*
+         * Look for linked data GET requests.
+         */
+
+        final String pathInfo = req.getPathInfo();
+
+        if (pathInfo != null) {
+
+            final URI uri = new URIImpl(req.getRequestURL().toString());
+
+            if (m_describeServlet != null) {
+
+                /*
+                 * Test the DESCRIBE cache. 
+                 */
+                
+                req.setAttribute(DescribeCacheServlet.ATTR_DESCRIBE_URIS,
+                        Collections.singleton(uri));
+
+                m_describeServlet.doGet(req, resp);
+
+                if (resp.isCommitted()) {
+                 
+                    // Cache hit.
+                    return;
+                    
+                }
+
+            }
+
+            // Set this up as a DESCRIBE query.
+            req.setAttribute(QueryServlet.ATTR_QUERY,
+                    "DESCRIBE <" + uri.stringValue() + ">");
+            
+            // Handle the linked data GET as a DESCRIBE query.
+            m_queryServlet.doQuery(req, resp);
+            
+            return;
+
+        }
+
+        /*
+         * Otherwise, GET against the SPARQL endpoint is only allowed with query
+         * requests, so delegate to the QueryServlet.
+         */
+        
         m_queryServlet.doGet(req, resp);
         
     }
