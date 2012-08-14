@@ -52,6 +52,7 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("GOM");
 
         // Embedded GOM test suite.
+        suite.addTestSuite(com.bigdata.gom.TestGPO.class);
         suite.addTestSuite(com.bigdata.gom.TestGOM.class);
 
         suite.addTestSuite(com.bigdata.gom.TestOwlGOM.class);

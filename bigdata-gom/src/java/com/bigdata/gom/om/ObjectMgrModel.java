@@ -44,6 +44,7 @@ import org.openrdf.model.ValueFactory;
 
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
@@ -65,8 +66,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
      */
     private final UUID m_uuid;
     
-    // TODO Should this be a BigdataValueFactory?
-    protected final ValueFactory m_valueFactory;
+    protected final BigdataValueFactory m_valueFactory;
     
     /** Object Creation and ID Management patterns. */
     private final IIDGenerator m_idGenerator;
@@ -88,12 +88,10 @@ public abstract class ObjectMgrModel implements IObjectManager {
     private final WeakHashMap<Resource, IGPO> m_dict = new WeakHashMap<Resource, IGPO>();
 	
     /**
-     * This is only for the predicates.
-     * 
-     * TODO The {@link BigdataValueFactory} handles this with
-     * {@link BigdataValueFactory#asValue(Value)}. Use that instead?
+     * This is only for the predicates and provides the guarantee that we can
+     * reference test on predicates within the scope of a given object manager.
      */
-	private final ConcurrentHashMap<URI, URI> m_internedKeys = new ConcurrentHashMap<URI, URI>();
+    private final ConcurrentHashMap<BigdataURI, BigdataURI> m_internedKeys = new ConcurrentHashMap<BigdataURI, BigdataURI>();
 
     /**
      * We need to maintain a dirty list in order to pin object references that
@@ -129,7 +127,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
      */
     public ObjectMgrModel(
             final String endpoint, 
-            final ValueFactory valueFactory) {
+            final BigdataValueFactory valueFactory) {
 
 		m_valueFactory = valueFactory;
 		
@@ -162,7 +160,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	}
 	
     @Override
-    final public ValueFactory getValueFactory() {
+    final public BigdataValueFactory getValueFactory() {
 
         return m_valueFactory;
 
@@ -202,19 +200,31 @@ public abstract class ObjectMgrModel implements IObjectManager {
 //			m_idMgr = null; // force reload to committed state on next access
 //		}
 //	}
-	
-	@Override
-	public URI internKey(final URI key) {
-		
-        final URI old = m_internedKeys.putIfAbsent(key, key);
 
-        final URI uri = old != null ? old : key;
+    /**
+     * Intern a predicate (internal API). This provides the guarantee that we
+     * can use reference tests (<code>==</code>) for URIs within the scope of a
+     * given object manager.
+     * 
+     * @param key
+     *            The predicate.
+     * 
+     * @return The interned version of the predicate.
+     */
+    public BigdataURI internKey(final URI aKey) {
 
-//		if (old == null && (uri instanceof BigdataURI) && ((BigdataURI) uri).getIV() == null)
-//			addNewTerm((BigdataURI) uri);
-		
+        // Ensure URI is for the namespace associated with this OM.
+        final BigdataURI key = m_valueFactory.asValue(aKey);
+        
+        // Internal the URI.
+        final BigdataURI old = m_internedKeys.putIfAbsent(key, key);
+
+        // Resolve data race.
+        final BigdataURI uri = old != null ? old : key;
+
 		return uri;
-	}
+
+    }
 
     /**
      * GPOs are added to the dirty list when initially modified. The dirty list
