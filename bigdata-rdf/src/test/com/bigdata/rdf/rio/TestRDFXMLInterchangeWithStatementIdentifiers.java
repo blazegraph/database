@@ -395,7 +395,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
                 final IAccessPath<ISPO> ap = store.getAccessPath(null, rdfType,
                         Software);
                 
-                log.info(store.dumpStatements(ap).toString());
+                if(log.isInfoEnabled()) log.info(store.dumpStatements(ap).toString());
                 
                 assertEquals("rangeCount", 3L, ap.rangeCount(true/* exact */));
                 

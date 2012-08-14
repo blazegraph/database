@@ -145,7 +145,8 @@ public class VoID {
     }
     
     /**
-     * Describe the default data set.
+     * Describe the default data set (the one identified by the namespace
+     * associated with the {@link AbstractTripleStore}.
      * 
      * @param describeStatistics
      *            When <code>true</code>, the VoID description will include the
@@ -157,7 +158,7 @@ public class VoID {
      *            described in in the same level of detail as the default graph.
      *            Otherwise only the default graph will be described.
      */
-    protected void describeDataSet(final boolean describeStatistics,
+    public void describeDataSet(final boolean describeStatistics,
             final boolean describeNamedGraphs) {
 
         final String namespace = tripleStore.getNamespace();
