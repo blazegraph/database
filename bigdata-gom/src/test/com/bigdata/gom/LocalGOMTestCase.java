@@ -43,6 +43,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal.Options;
@@ -198,6 +199,17 @@ abstract public class LocalGOMTestCase extends TestCase {
             IGPO part = parts.next();
             System.out.println("Onto Part: " + part.pp());
         }
+    }
+    
+    protected void checkLinkSet(final ILinkSet ls, int size) {
+    	assertTrue(ls.size() == size);
+    	Iterator<IGPO> values = ls.iterator();
+    	int count = 0;
+    	while (values.hasNext()) {
+    		count++;
+    		values.next();
+    	}
+    	assertTrue(count == size);
     }
 
 }
