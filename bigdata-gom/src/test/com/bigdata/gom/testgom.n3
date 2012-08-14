@@ -13,13 +13,22 @@
 <gpo:#123> <attr:/employee#dob> "28031959" .
 <gpo:#123> <attr:/employee#town> "Wokingham" .
 <gpo:#123> <attr:/employee#worksFor> <gpo:#456> .
+<gpo:#123> <attr:/employee#worksFor> <gpo:#567> .
 # Employee 124
 <gpo:#124> <attr:/type> <gpo:#100> .
 <gpo:#124> <attr:/employee#name> "Bryan" .
 <gpo:#124> <attr:/employee#town> "Washington" .
 <gpo:#124> <attr:/employee#worksFor> <gpo:#456> .
+# Employee 125
+<gpo:#124> <attr:/type> <gpo:#100> .
+<gpo:#124> <attr:/employee#name> "Mike" .
+<gpo:#124> <attr:/employee#town> "A Rock" .
+<gpo:#124> <attr:/employee#worksFor> <gpo:#456> .
 # Company 456
 <gpo:#456> <attr:/type> <gpo:#101> .
 <gpo:#456> <attr:/company#name> "Systap" .
+# Company 567
+<gpo:#567> <attr:/type> <gpo:#101> .
+<gpo:#567> <attr:/company#name> "Actionflux" .
 # Root
 <gpo:#root> <attr:/root> <gpo:#456> .
