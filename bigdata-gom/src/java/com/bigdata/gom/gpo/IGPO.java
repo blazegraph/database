@@ -34,6 +34,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.skin.GenericSkinRegistry;
+import com.bigdata.rdf.model.BigdataResource;
 
 /**
  * A generic object has identity and an extensible, loosely-typed property set.
@@ -73,7 +74,7 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     /**
      * Returns the persistent identity of the generic object.
      */
-    Resource getId();
+    BigdataResource getId();
 
     /**
      * Returns true iff <i>other</i> has the same identity as <i>this</i>

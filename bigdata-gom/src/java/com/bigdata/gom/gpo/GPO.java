@@ -22,6 +22,7 @@ import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
 import com.bigdata.rdf.model.BigdataLiteralImpl;
+import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -76,7 +77,7 @@ public class GPO implements IGPO {
 	/**
 	 * The identifier for this {@link IGPO}.
 	 */
-	private final Resource m_id;
+	private final BigdataResource m_id;
 
 	/**
 	 * <code>true</code> iff the forward link set has been materialized.
@@ -543,8 +544,8 @@ public class GPO implements IGPO {
             throw new IllegalArgumentException();
         
         m_om = (ObjectMgrModel) om;
-        
-        m_id = om.internKey((URI) id);
+
+        m_id = om.getValueFactory().asValue(id);
         
     }
 	
@@ -560,7 +561,7 @@ public class GPO implements IGPO {
     }
 
 	@Override
-	public Resource getId() {
+	public BigdataResource getId() {
 		return m_id;
 	}
 
@@ -741,7 +742,7 @@ public class GPO implements IGPO {
 		
 	}
 	
-	public void initLinkValue(final URI predicate, final URI object) {
+	public void initLinkValue(final URI predicate, final Resource object) {
 
 	    if (predicate == null)
             throw new IllegalArgumentException();

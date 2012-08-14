@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -43,11 +44,19 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.gom.gpo.LinkSet;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
+import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -63,7 +72,8 @@ public class ObjectManager extends ObjectMgrModel {
 	private static final Logger log = Logger.getLogger(ObjectManager.class);
 	
 	final private BigdataSailRepository m_repo;
-//	private BigdataSailRepositoryConnection  m_cxn;
+	final private boolean readOnly;
+	final private IDescribeCache m_describeCache;
 	
     /**
      * 
@@ -75,9 +85,29 @@ public class ObjectManager extends ObjectMgrModel {
      */
     public ObjectManager(final String endpoint, final BigdataSailRepository cxn) {
 
-        super(endpoint, cxn.getValueFactory());
+        super(endpoint, (BigdataValueFactory) cxn.getValueFactory());
 
         m_repo = cxn;
+
+        final AbstractTripleStore tripleStore = cxn.getDatabase();
+
+        this.readOnly = tripleStore.isReadOnly();
+        
+        final QueryEngine queryEngine = cxn.getSail().getQueryEngine();
+
+        final ISparqlCache sparqlCache = SparqlCacheFactory
+                .getExistingSparqlCache(queryEngine);
+
+        if (sparqlCache != null) {
+
+            m_describeCache = sparqlCache.getDescribeCache(
+                    tripleStore.getNamespace(), tripleStore.getTimestamp());
+
+        } else {
+
+            m_describeCache = null;
+
+        }
 
     }
 	
@@ -229,7 +259,7 @@ public class ObjectManager extends ObjectMgrModel {
 		return true; //
 	}
 
-	public void materializeWithDescribe(final IGPO gpo) {
+	private void materializeWithDescribe(final IGPO gpo) {
 
         if (gpo == null)
             throw new IllegalArgumentException();
@@ -239,31 +269,113 @@ public class ObjectManager extends ObjectMgrModel {
 		
 		((GPO) gpo).dematerialize();
 		
-		// At present the DESCRIBE query will simply return a set of
-		//	statements equivalent to a TupleQuery <id, ?, ?>
-		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
-		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
+        /*
+         * At present the DESCRIBE query will simply return a set of statements
+         * equivalent to a TupleQuery <id, ?, ?>.
+         */
+
+        if (m_describeCache != null) {
+
+            final IV<?, ?> iv = addResolveIV(gpo);
+
+            final Graph g = m_describeCache.lookup(iv);
+
+            if (g != null) {
+
+                initGPO((GPO) gpo, g.iterator());
+
+                return;
+
+            }
+
+        }
+
+        final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+
+        final ICloseableIterator<Statement> stmts = evaluateGraph(query);
+
+        initGPO((GPO) gpo, stmts);
+  
+	}
+	
+    /**
+     * Initialize a {@link IGPO} from a collection of statements.
+     * 
+     * @param gpo
+     *            The gpo.
+     * @param stmts
+     *            The statements.
+     */
+    private void initGPO(final GPO gpo, final Iterator<Statement> stmts) {
 
 		int statements = 0;
+
 		while (stmts.hasNext()) {
-			final Statement stmt = stmts.next();
+		
+		    final Statement stmt = stmts.next();
 			final Resource subject = stmt.getSubject();
 			final URI predicate = stmt.getPredicate();
 			final Value value = stmt.getObject();
 						
-			if (subject.equals(gpo.getId())) { // property
-				((GPO) gpo).initValue(predicate, value);
+			if (subject.equals(gpo.getId())) {
+
+			    // property
+                gpo.initValue(predicate, value);
+
 			} else { // links in - add to LinkSet
-				((GPO) gpo).initLinkValue(predicate, (URI) subject);
-			}
+			    
+                gpo.initLinkValue(predicate, subject);
+                
+            }
+			
 			statements++;
+
 		}
 		
 		if (log.isTraceEnabled())
-			log.trace("Materializing: " + gpo.getId() + " with " + statements + " statements");
+			log.trace("Materialized: " + gpo.getId() + " with " + statements + " statements");
+    }
+
+    /**
+     * Attempt to add/resolve the {@link IV} for the {@link IGPO}.
+     * 
+     * @param gpo
+     *            The {@link IGPO}.
+     *            
+     * @return The {@link IV} -or- <code>null</code> iff this is a read-only
+     *         connection and the {@link BigdataResource} associated with that
+     *         {@link IGPO} is not in the lexicon.
+     */
+    private IV<?, ?> addResolveIV(final IGPO gpo) {
+
+        final BigdataResource id = gpo.getId();
+
+        IV<?, ?> iv = id.getIV();
+
+        if (iv == null) {
+
+            /*
+             * Attempt to resolve the IV. If the connection allows updates then
+             * this will cause an IV to be assigned if the Resource was not
+             * already in the lexicon.
+             */
+            
+            final BigdataValue[] values = new BigdataValue[] { id };
+
+            m_repo.getDatabase().getLexiconRelation()
+                    .addTerms(values, values.length, readOnly);
+
+            // Note: MAY still be null!
+            iv = id.getIV();
+
+        }
+
+        // May be null.
+        return iv;
+
 	}
 
-	@Override
+    @Override
 	public void materialize(final IGPO gpo) {
 	    
         if (gpo == null)
@@ -289,14 +401,20 @@ public class ObjectManager extends ObjectMgrModel {
          * 
          * TODO URL encoding of the URI in the query?
          */
+		
 		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
+	
 		final ICloseableIterator<BindingSet> res = evaluate(query);
 		
 		while (res.hasNext()) {
-			final BindingSet bs = res.next();
-			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
+
+		    final BindingSet bs = res.next();
+		    
+            ((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));
+
 		}
-	}
+
+    }
 
     @Override
     protected void flushStatements(final List<Statement> m_inserts,

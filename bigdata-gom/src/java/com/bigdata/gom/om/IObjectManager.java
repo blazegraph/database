@@ -34,10 +34,10 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -98,7 +98,11 @@ public interface IObjectManager extends INativeTransaction {
      */
     boolean isPersistent();
 
-    ValueFactory getValueFactory();
+    /**
+     * The value factory for the KB instance associated with this object manager
+     * view.
+     */
+    BigdataValueFactory getValueFactory();
     
     /**
      * 
@@ -111,8 +115,6 @@ public interface IObjectManager extends INativeTransaction {
     void execute(String updateStr);
 
     ICloseableIterator<Statement> evaluateGraph(String query);
-
-	URI internKey(URI key);
 
 	/**
 	 * The ObjectManager is able to assign automatic ids for a new object.  These
