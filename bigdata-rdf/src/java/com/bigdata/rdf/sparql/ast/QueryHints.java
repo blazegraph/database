@@ -412,7 +412,7 @@ public interface QueryHints {
      */
     String DESCRIBE_CACHE = "describeCache";
     
-    boolean DEFAULT_DESCRIBE_CACHE = true;
+    boolean DEFAULT_DESCRIBE_CACHE = false;
     
    /**
 	 * Option controls whether or not the proposed SPARQL extension for
