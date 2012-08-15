@@ -33,7 +33,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 
 /**
  * Concrete implementation based on the {@link HTreeHashJoinUtility}.
@@ -134,10 +134,10 @@ public class HTreeHashIndexOp extends HashIndexOp {
     @Override
     protected HTreeHashJoinUtility newState(
             final BOpContext<IBindingSet> context,
-            final NamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
+            final INamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
 
         return new HTreeHashJoinUtility(
-                context.getMemoryManager(namedSetRef.queryId), this, joinType);
+                context.getMemoryManager(namedSetRef.getQueryId()), this, joinType);
 
     }
     

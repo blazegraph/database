@@ -21,10 +21,11 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -168,8 +169,8 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
         
         final IVariable[] selectVars = null;
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName, joinVars);
 
         final HashIndexOp op = newHashIndexOp(setup.namespace, BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
@@ -261,8 +262,8 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
         
         final IVariable[] selectVars = null;
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName, joinVars);
 
         final HashIndexOp op = newHashIndexOp(setup.namespace,BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
@@ -354,11 +355,11 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
         
         final IVariable[] selectVars = null;
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName, joinVars);
 
-        final NamedSolutionSetRef namedSolutionSetSource = new NamedSolutionSetRef(
-                queryId, solutionSetName + "source", joinVars);
+        final INamedSolutionSetRef namedSolutionSetSource = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName + "source", joinVars);
 
         // The Stream will be attached to the query attributes
         final Map<Object, Object> queryAttributes = new LinkedHashMap<Object, Object>();
@@ -565,11 +566,11 @@ abstract public class HashIndexOpTestCase extends TestCase2 {
                         .getRequiredProperty(Annotations.EXPECTED_SOLUTIONS);
                 
                 // Metadata to identify the generated solution set.
-                final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                         .getRequiredProperty(Annotations.NAMED_SET_REF);
 
                 // Metadata to identify the source solution set.
-                final NamedSolutionSetRef namedSetSourceRef = (NamedSolutionSetRef) op
+                final INamedSolutionSetRef namedSetSourceRef = (INamedSolutionSetRef) op
                         .getRequiredProperty(Annotations.NAMED_SET_SOURCE_REF);
 
                 // The actual query attributes from the query.

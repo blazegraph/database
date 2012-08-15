@@ -30,12 +30,15 @@ package com.bigdata.bop.fed;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
@@ -312,10 +315,12 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(fed, queryEngineStore/* indexManager */
-                ), -1/* partitionId */, statIsIgnored, sourceIsIgnored,
-                sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -368,10 +373,12 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(fed, queryEngineStore/* indexManager */
-                ), -1/* partitionId */, statIsIgnored, sourceIsIgnored,
-                sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -425,10 +432,12 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+        
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(fed, queryEngineStore/* indexManager */
-                ), -1/* partitionId */, statIsIgnored, sourceIsIgnored,
-                sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -472,6 +481,22 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
 
         return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
 
+    }
+
+    protected class MockPipelineOp extends PipelineOp {
+
+        public MockPipelineOp(final BOp[] args, final NV... anns) {
+
+            super(args, NV.asMap(anns));
+
+        };
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+            throw new UnsupportedOperationException();
+        }
     }
 
 }

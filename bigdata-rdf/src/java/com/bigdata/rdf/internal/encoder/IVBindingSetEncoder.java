@@ -139,8 +139,8 @@ public class IVBindingSetEncoder implements IBindingSetEncoder,
     }
 
     /**
-     * Build up the schema. This includes all observed variables, not just those
-     * declared in {@link #joinVars}
+     * Build up the schema based on variables that are actually bound in the
+     * observed bindings.
      * 
      * @param bset
      *            An observed binding set.

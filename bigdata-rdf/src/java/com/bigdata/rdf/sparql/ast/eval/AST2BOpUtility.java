@@ -30,6 +30,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
@@ -41,9 +42,9 @@ import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.Union;
@@ -773,8 +774,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IVariable<?>[] joinVars = ASTUtil.convert(subqueryRoot
                 .getJoinVars());
 
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                ctx.queryId, subqueryRoot.getName(), joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(ctx.queryId, subqueryRoot.getName(), joinVars);
 
         if(ctx.nativeHashJoins) {
             left = new HTreeNamedSubqueryOp(leftOrEmpty(left), //
@@ -1210,132 +1211,142 @@ public class AST2BOpUtility extends AST2BOpJoins {
 				 * hash index.
 				 */
 
-				final ISolutionSetStats stats = ctx.sa
-						.getSolutionSetStats(name);
+                final ISolutionSetStats stats = ctx.sa
+                        .getSolutionSetStats(name);
 
-				if (stats != null) {
+                /*
+                 * Note: This is all variables whose IVCache association is
+                 * always present when that variable is bound in a solution
+                 * (that is, all variables which we do not need to materialize
+                 * for the solution set).
+                 * 
+                 * TODO Should add all variables not in scope in the parent
+                 * which are materialized in the named solution set and retain
+                 * only the variables which are in scope in the parent which are
+                 * materialized in the named solution set. Or we should
+                 * materialize things which were materialized in the pipeline
+                 * solutions and no longer possess that property because they
+                 * were not materialized in the named solution set (especially
+                 * if they will need to be materialized later in the query; if
+                 * they will not need to be materialized later in the query then
+                 * we should just drop them from the doneSet since they are only
+                 * partly materialized).
+                 */
 
-					/*
-					 * Note: This is all variables whose IVCache association is
-					 * always present when that variable is bound in a solution
-					 * (that is, all variables which we do not need to
-					 * materialize for the solution set).
-					 * 
-					 * TODO Should add all variables not in scope in the parent
-					 * which are materialized in the named solution set and
-					 * retain only the variables which are in scope in the
-					 * parent which are materialized in the named solution set.
-					 * Or we should materialize things which were materialized
-					 * in the pipeline solutions and no longer possess that
-					 * property because they were not materialized in the named
-					 * solution set (especially if they will need to be
-					 * materialized later in the query; if they will not need to
-					 * be materialized later in the query then we should just
-					 * drop them from the doneSet since they are only partly
-					 * materialized).
-					 */
+                doneSet.addAll(stats.getMaterialized());
 
-					doneSet.addAll(stats.getMaterialized());
-
-					if (isNamedSolutionSetScan(ctx, nsi)) {
-
-						/*
-						 * Optimize with SCAN and nested loop join.
-						 * 
-						 * Note: This optimization also preserves the ORDER in
-						 * the named solution set.
-						 */
-
-						return convertNamedSolutionSetScan(left, nsi, doneSet,
-								ctx);
-					
-					}
-
-					/*
-					 * Find the join variables. This is the set of variables
-					 * which are both definitely bound on entry to the INCLUDE
-					 * and which are known to be bound by all solutions in the
-					 * named solution set.
-					 * 
-					 * TODO If we provide CREATE SOLUTIONS semantics to specify
-					 * the type of the data structure in which the named
-					 * solution set is stored *AND* it is a hash index (or a
-					 * BTree with a primary key which is either to our join
-					 * variables or a sub-set of those join variables) then
-					 * we can use that index without building a hash index on
-					 * the desired join variables.
-					 */
-					final Set<IVariable<?>> joinvars = ctx.sa.getJoinVars(nsi,
-							name/* solutionSet */,
-							new LinkedHashSet<IVariable<?>>());
-					
-					// flatten into IVariable[].
-					joinVars = joinvars.toArray(new IVariable[]{});
+                if (isNamedSolutionSetScan(ctx, nsi)) {
 
                     /*
-                     * Pass all variable bindings along.
+                     * Optimize with SCAN and nested loop join.
                      * 
-                     * Note: If we restrict the [select] annotation to only
-                     * those variables projected by the subquery, then we will
-                     * wind up pruning any variables used in the join group
-                     * which are NOT projected into the subquery. [We are not
-                     * building the index from the solutions flowing through the
-                     * pipeline. Is this comment true for an index build from a
-                     * source other than the pipeline?]
+                     * Note: This optimization also preserves the ORDER in the
+                     * named solution set.
                      */
-			        @SuppressWarnings("rawtypes")
-			        final IVariable[] selectVars = null;
 
-			        // The identifier for the source solution set.
-                    final NamedSolutionSetRef sourceSet = new NamedSolutionSetRef(
-                            ctx.queryId, name, IVariable.EMPTY/* joinVars */);
+                    return convertNamedSolutionSetScan(left, nsi, doneSet, ctx);
 
-                    // The identifier for the generated index.
-			        final NamedSolutionSetRef generatedSet = new NamedSolutionSetRef(
-			                ctx.queryId, name, joinVars);
-			        
-			        final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+                }
 
-			        if(ctx.nativeHashJoins) {
-			            left = new HTreeHashIndexOp(leftOrEmpty(left),//
-			                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-			                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-			                        BOpEvaluationContext.CONTROLLER),//
-			                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-			                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-			                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-			                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
-			                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
-			                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-			                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                            new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF, sourceSet),//
-                            new NV(HashIndexOp.Annotations.NAMED_SET_REF, generatedSet)//
-			        );
-			        } else {
-			            left = new JVMHashIndexOp(leftOrEmpty(left),//
-			                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-			                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-			                        BOpEvaluationContext.CONTROLLER),//
-			                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-			                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-			                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-			                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
-			                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-			                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                            new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF, sourceSet),//
-                            new NV(HashIndexOp.Annotations.NAMED_SET_REF, generatedSet)//
-			            ); 
-			        }
+                /*
+                 * Find the join variables. This is the set of variables which
+                 * are both definitely bound on entry to the INCLUDE and which
+                 * are known to be bound by all solutions in the named solution
+                 * set.
+                 * 
+                 * TODO If we provide CREATE SOLUTIONS semantics to specify the
+                 * type of the data structure in which the named solution set is
+                 * stored *AND* it is a hash index (or a BTree with a primary
+                 * key which is either to our join variables or a sub-set of
+                 * those join variables) then we can use that index without
+                 * building a hash index on the desired join variables.
+                 */
+                final Set<IVariable<?>> joinvars = ctx.sa.getJoinVars(nsi,
+                        name/* solutionSet */,
+                        new LinkedHashSet<IVariable<?>>());
 
-			        // true since we are building the hash index.
-					release = true;
+                // flatten into IVariable[].
+                joinVars = joinvars.toArray(new IVariable[] {});
 
-				} else {
+                /*
+                 * Pass all variable bindings along.
+                 * 
+                 * Note: If we restrict the [select] annotation to only those
+                 * variables projected by the subquery, then we will wind up
+                 * pruning any variables used in the join group which are NOT
+                 * projected into the subquery. [We are not building the index
+                 * from the solutions flowing through the pipeline. Is this
+                 * comment true for an index build from a source other than the
+                 * pipeline?]
+                 */
+                @SuppressWarnings("rawtypes")
+                final IVariable[] selectVars = null;
 
-					throw new RuntimeException("Unresolved solution set: "
-							+ name);
+                /*
+                 * The identifier for the source solution set.
+                 * 
+                 * Note: This is a pre-existing solution set. It is located
+                 * using the KB view (namespace and timestamp).
+                 */
+                final INamedSolutionSetRef sourceSet = NamedSolutionSetRefUtility
+                        .newInstance(ctx.getNamespace(), ctx.getTimestamp(),
+                                name, IVariable.EMPTY/* joinVars */);
 
-				}
+                /*
+                 * The identifier for the generated index.
+                 * 
+                 * Note: This is a dynamically generated index scoped to the
+                 * query. it is located using the queryId.
+                 */
+                final INamedSolutionSetRef generatedSet = NamedSolutionSetRefUtility
+                        .newInstance(ctx.queryId, name, joinVars);
+
+                final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+
+                if (ctx.nativeHashJoins) {
+                    left = new HTreeHashIndexOp(
+                            leftOrEmpty(left),//
+                            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                            new NV(PipelineOp.Annotations.SHARED_STATE, true),// live
+                                                                              // stats.
+                            new NV(HTreeHashIndexOp.Annotations.RELATION_NAME,
+                                    new String[] { ctx.getLexiconNamespace() }),//
+                            new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                            new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                            new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                            new NV(
+                                    HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
+                                    sourceSet),//
+                            new NV(HashIndexOp.Annotations.NAMED_SET_REF,
+                                    generatedSet)//
+                    );
+                } else {
+                    left = new JVMHashIndexOp(
+                            leftOrEmpty(left),//
+                            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                            new NV(PipelineOp.Annotations.SHARED_STATE, true),// live
+                                                                              // stats.
+                            new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                            new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                            new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                            new NV(
+                                    HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
+                                    sourceSet),//
+                            new NV(HashIndexOp.Annotations.NAMED_SET_REF,
+                                    generatedSet)//
+                    );
+                }
+
+                // true since we are building the hash index.
+                release = true;
 
             }
             
@@ -1365,8 +1376,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
 		 * by a named subquery or we have build a hash index from a pre-existing
 		 * named solution set. Now we can do the hash join.
 		 */
-        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
-                ctx.queryId, name, joinVars);
+        final INamedSolutionSetRef namedSolutionSetRef = NamedSolutionSetRefUtility
+                .newInstance(ctx.queryId, name, joinVars);
 
 		@SuppressWarnings("rawtypes")
 		final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -1521,8 +1532,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // The name of the named solution set.
         final String name = nsi.getName();
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                ctx.queryId, name, IVariable.EMPTY/* joinVars */);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(ctx.getNamespace(), ctx.getTimestamp(), name,
+                        IVariable.EMPTY/* joinVars */);
 
 //        ctx.addQueryAttribute(namedSolutionSet, name);
 
@@ -1623,7 +1635,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //                
 //            }
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         // Sub-Select is not optional.
@@ -1845,7 +1857,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         /*
@@ -2365,6 +2377,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * IN expression). That way we do not have to magically "subtract" the
          * known "IN" filters out of the join- and post- filters.
          * 
+         * This could be done now using a query local named solution set as an
+         * inline access path. However, named solution sets are not currently
+         * shipped around on a cluster, so that would not yet work on a cluster
+         * for default graphs joins unless those joins are marked as running on
+         * the query controller (I think that they might be).
+         * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
          * DataSetJoin with an "inline" access path.)
          * 
@@ -2775,9 +2793,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 .toArray(new IVariable[joinVars.size()]);
         
         // The hash index for the first source.
-        final NamedSolutionSetRef firstNamedSolutionSetRef = new NamedSolutionSetRef(
-                ctx.queryId, firstInclude.getName(), joinvars2);
-        
+        final INamedSolutionSetRef firstNamedSolutionSetRef = NamedSolutionSetRefUtility
+                .newInstance(ctx.queryId, firstInclude.getName(), joinvars2);
+
         if (!firstInclude.getJoinVarSet().equals(joinVars)) {
             
             /*
@@ -2823,22 +2841,22 @@ public class AST2BOpUtility extends AST2BOpJoins {
         /*
          * Setup the sources (one per INCLUDE).
          */
-        final NamedSolutionSetRef[] namedSolutionSetRefs;
+        final INamedSolutionSetRef[] namedSolutionSetRefs;
         {
             
-            final List<NamedSolutionSetRef> list = new LinkedList<NamedSolutionSetRef>();
+            final List<INamedSolutionSetRef> list = new LinkedList<INamedSolutionSetRef>();
 
             list.add(firstNamedSolutionSetRef);
 
             for (NamedSubqueryInclude nsi : includes) {
 
-                list.add(new NamedSolutionSetRef(
+                list.add(NamedSolutionSetRefUtility.newInstance(
                         ctx.queryId, nsi.getName(), joinvars2));
 
             }
             
             namedSolutionSetRefs = list
-                    .toArray(new NamedSolutionSetRef[list.size()]);
+                    .toArray(new INamedSolutionSetRef[list.size()]);
 
         }
 
@@ -3280,7 +3298,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         @SuppressWarnings("rawtypes")
         final IVariable[] selectVars = null;
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         final PipelineOp op;
@@ -3487,7 +3505,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                  */
                 throw new UnsupportedOperationException();
             }
-            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+            final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                     ctx.queryId, "--distinct-"+ctx.nextId(), vars);
             op = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.BOP_ID,

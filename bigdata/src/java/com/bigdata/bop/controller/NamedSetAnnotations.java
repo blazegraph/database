@@ -43,22 +43,23 @@ public interface NamedSetAnnotations {
 
     /**
      * The name of {@link IQueryAttributes} attribute under which the
-     * {@link NamedSolutionSetRef}. That {@link NamedSolutionSetRef} may be used
-     * to locate the {@link IHashJoinUtility}, which includes metadata about the
-     * hash index and encapsulates the hash index state. It may also be used to
-     * identify a named index that will be resolved against the SPARQL CACHE,
-     * the local index manager, or the federation index manager (on a cluster).
+     * {@link INamedSolutionSetRef} can be located. That
+     * {@link INamedSolutionSetRef} may be used to locate the
+     * {@link IHashJoinUtility}, which includes metadata about the hash index
+     * and encapsulates the hash index state. It may also be used to identify a
+     * named index that will be resolved against the SPARQL CACHE, the local
+     * index manager, or the federation index manager (on a cluster).
      * <p>
      * The attribute name includes the query UUID. The query UUID must be
      * extracted and used to lookup the {@link IRunningQuery} to which the
      * solution set was attached.
      * <p>
      * Note: For a MERGE JOIN, the value under this attribute is a
-     * {@link NamedSolutionSetRef}[].
+     * {@link INamedSolutionSetRef}[].
      * 
-     * @see NamedSolutionSetRef
+     * @see INamedSolutionSetRef
      * 
-     * @see BOpContext#getAlternateSource(PipelineOp, NamedSolutionSetRef)
+     * @see BOpContext#getAlternateSource(PipelineOp, INamedSolutionSetRef)
      */
     final String NAMED_SET_REF = "namedSetRef";
 

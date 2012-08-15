@@ -143,7 +143,7 @@ public class ResourceEvents {
      * @param name
      *            The index name.
      */
-    static public void openUnisolatedBTree(String name) {
+    static public void openUnisolatedIndex(final String name) {
 
         if (log.isInfoEnabled())
             log.info("name=" + name);
@@ -163,7 +163,7 @@ public class ResourceEvents {
      * 
      * @todo add reporting for {@link AbstractBTree#reopen()}.
      */
-    static public void closeUnisolatedBTree(String name) {
+    static public void closeUnisolatedIndex(final String name) {
 
         if (log.isInfoEnabled())
             log.info("name=" + name);
@@ -176,7 +176,7 @@ public class ResourceEvents {
      * @param name
      *            The index name.
      */
-    static public void dropUnisolatedBTree(String name) {
+    static public void dropUnisolatedIndex(final String name) {
 
         if (log.isInfoEnabled())
             log.info("name=" + name);

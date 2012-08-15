@@ -29,6 +29,7 @@ package com.bigdata.bop.ap;
 
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
@@ -40,6 +41,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate.Annotations;
 import com.bigdata.bop.ap.filter.BOpResolver;
@@ -283,10 +285,12 @@ public class TestPredicateAccessPath extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, statIsIgnored,
-                sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -358,10 +362,12 @@ public class TestPredicateAccessPath extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, statIsIgnored,
-                sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -458,10 +464,12 @@ public class TestPredicateAccessPath extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
                 1/* capacity */);
 
+        final PipelineOp mockQuery = new MockPipelineOp(BOp.NOARGS);
+
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, statIsIgnored,
-                sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
+                ), -1/* partitionId */, statIsIgnored, mockQuery/* op */,
+                false/* lastInvocation */, sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
 
         // lookup relation
         final R relation = (R) context.getRelation(pred);
@@ -505,4 +513,20 @@ public class TestPredicateAccessPath extends TestCase2 {
         
     }
 
+    protected class MockPipelineOp extends PipelineOp {
+
+        public MockPipelineOp(final BOp[] args, final NV... anns) {
+
+            super(args, NV.asMap(anns));
+
+        };
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+            throw new UnsupportedOperationException();
+        }
+    }
+    
 }

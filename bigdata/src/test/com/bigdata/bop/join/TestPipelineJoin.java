@@ -209,7 +209,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, stats,
+                ), -1/* partitionId */, stats,query/* op */,
+                false/* lastInvocation */, 
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -313,7 +314,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, stats,
+                ), -1/* partitionId */, stats,query/* op */,
+                false/* lastInvocation */, 
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -407,7 +409,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, stats,
+                ), -1/* partitionId */, stats,query/* op */,
+                false/* lastInvocation */, 
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -495,7 +498,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                ), -1/* partitionId */, stats,
+                ), -1/* partitionId */, stats,query/* op */,
+                false/* lastInvocation */, 
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -590,7 +594,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -695,7 +700,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -802,7 +808,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -915,7 +922,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                -1/* partitionId */, stats, source, sink, sink2);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, sink2);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -1047,7 +1055,8 @@ public class TestPipelineJoin extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);

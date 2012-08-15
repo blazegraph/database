@@ -185,7 +185,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         private final PipelineOp subquery;
         
         /** Metadata to identify the named solution set. */
-        private final NamedSolutionSetRef namedSetRef;
+        private final INamedSolutionSetRef namedSetRef;
 
         /**
          * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
@@ -218,7 +218,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
-            this.namedSetRef = (NamedSolutionSetRef) op
+            this.namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
             
             {
@@ -232,7 +232,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                 
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
-                attrs = context.getQueryAttributes(namedSetRef.queryId);
+                attrs = context.getQueryAttributes(namedSetRef.getQueryId());
 
                 HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
                         .get(namedSetRef);
@@ -243,8 +243,8 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                      * Note: This operator does not support optional semantics.
                      */
                     state = new HTreeHashJoinUtility(
-                            context.getMemoryManager(namedSetRef.queryId), op,
-                            JoinTypeEnum.Normal);
+                            context.getMemoryManager(namedSetRef.getQueryId()),
+                            op, JoinTypeEnum.Normal);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

@@ -45,18 +45,18 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.DistinctFilter;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
-import com.bigdata.bop.join.HashJoinOp;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.HashJoinOp;
 import com.bigdata.bop.join.JVMHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.PipelineJoin;
@@ -1017,8 +1017,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * versions of the operator require this attribute.)
              */
             map.put(HashJoinOp.Annotations.NAMED_SET_REF,
-                    new NamedSolutionSetRef(ctx.queryId, "--namedSet-"
-                            + ctx.nextId(), joinVars));
+                    NamedSolutionSetRefUtility.newInstance(ctx.queryId,
+                            "--namedSet-" + ctx.nextId(), joinVars));
 
             /*
              * Choose the evaluation context.

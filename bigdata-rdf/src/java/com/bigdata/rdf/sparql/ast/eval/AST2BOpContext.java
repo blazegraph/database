@@ -11,7 +11,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IdFactory;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -20,6 +22,7 @@ import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -30,10 +33,10 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -67,11 +70,18 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	 * The {@link QueryEngine}. 
 	 */
 	public final QueryEngine queryEngine;
-	
+
     /**
-     * The {@link SparqlCache}.
+     * The {@link ISolutionSetCache} -or- <code>null</code> iff that cache is not
+     * enabled.
      */
-    public final ISparqlCache sparqlCache;
+    public final ISolutionSetCache sparqlCache;
+
+    /**
+     * The {@link IDescribeCache} -or- <code>null</code> iff that cache is not
+     * enabled..
+     */
+    public final IDescribeCache describeCache;
 
 	/**
 	 * The query hints from the original {@link #query}.
@@ -381,49 +391,33 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         this.queryId = queryId;
         
         /*
-         * Cache for SPARQL named solution sets.
+         * Connect to the cache provider.
          * 
-         * TODO Define a query hint for enabling or disabling the SPARQL cache
-         * for an operation?
+         * Note: This will create the cache if it does not exist. At all other
+         * places in the code we use getExistingSparqlCache() to access the
+         * cache IFF it exists. Here is where we create it.
          */
-        {
-            final boolean enableSparqlCache = queryHints == null ? QueryHints.DEFAULT_SOLUTION_SET_CACHE
-                    : Boolean
-                            .valueOf(queryHints
-                                    .getProperty(
-                                            QueryHints.SOLUTION_SET_CACHE,
-                                            QueryHints.DEFAULT_SOLUTION_SET_CACHE ? Boolean.TRUE
-                                                    .toString() : Boolean.FALSE
-                                                    .toString()));
+        final ICacheConnection cacheConn = CacheConnectionFactory
+                .getCacheConnection(queryEngine);
 
-//            final boolean enableDescribeCache = queryHints == null ? QueryHints.DEFAULT_DESCRIBE_CACHE
-//                    : Boolean.valueOf(queryHints.getProperty(
-//                            QueryHints.DESCRIBE_CACHE,
-//                            QueryHints.DEFAULT_DESCRIBE_CACHE ? Boolean.TRUE
-//                                    .toString() : Boolean.FALSE.toString()));
+        if (cacheConn != null) {
 
-            if (enableSparqlCache) {
+            // SOLUTIONS cache (if enabled)
+            this.sparqlCache = cacheConn.getSparqlCache(db.getNamespace(),
+                    db.getTimestamp());
+
+            // DESCRIBE cache (if enabled)
+            this.describeCache = cacheConn.getDescribeCache(db.getNamespace(),
+                    db.getTimestamp());
+
+        } else {
             
-                /*
-                 * Note: This will create the cache if it does not exist. At all
-                 * other places in the code we use getExistingSparqlCache() to
-                 * access the cache IFF it exists. Here is where we create it.
-                 */
-
-                this.sparqlCache = SparqlCacheFactory
-                        .getSparqlCache(queryEngine);
-                
-//                ((SparqlCache) sparqlCache)
-//                        .setDescribeCache(enableDescribeCache);
-
-            } else {
-                
-                this.sparqlCache = null;
-                
-            }
-
+            this.sparqlCache = null;
+            
+            this.describeCache = null;
+            
         }
-        
+
         this.context = new BOpContextBase(queryEngine);
 
     }
@@ -526,7 +520,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
     }
 
-    public ISparqlCache getSparqlCache() {
+    public ISolutionSetCache getSparqlCache() {
     	
     		return sparqlCache;
     	
@@ -534,9 +528,41 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     public IDescribeCache getDescribeCache() {
 
-        return getSparqlCache().getDescribeCache(db.getNamespace(),
-                db.getTimestamp());
+        return describeCache;
 
     }
+
+    @Override
+    public ISolutionSetStats getSolutionSetStats(final String localName) {
+
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = IVariable.EMPTY;
+        
+        return NamedSolutionSetRefUtility.getSolutionSetStats(//
+                sparqlCache,//
+                (AbstractJournal) queryEngine.getIndexManager(),// localIndexManager
+                getNamespace(),//
+                getTimestamp(),//
+                localName,//
+                joinVars//
+                );
+
+    }
+
+//    @Override
+//    public ICloseableIterator<IBindingSet[]> getSolutionSet(
+//            final String localName) {
+//
+//        return NamedSolutionSetRefUtility.getSolutionSet(//
+//                sparqlCache,//
+//                (AbstractJournal) queryEngine.getIndexManager(),// localIndexManager
+//                getNamespace(),//
+//                getTimestamp(),//
+//                localName,//
+//                joinVars,//
+//                chunkCapacity//
+//                );
+//
+//    }
 
 }

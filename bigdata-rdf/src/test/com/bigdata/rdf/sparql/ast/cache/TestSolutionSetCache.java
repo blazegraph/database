@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 10, 2012
  */
 
-package com.bigdata.rdf.sparql.ast.eval.cache;
+package com.bigdata.rdf.sparql.ast.cache;
 
 import java.math.BigInteger;
 import java.util.Iterator;
@@ -44,6 +44,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
@@ -57,9 +58,10 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionImpl;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.Dechunkerator;
@@ -74,6 +76,10 @@ import com.bigdata.striterator.ICloseableIterator;
  *          TODO We should actually be verifying the order for those solution
  *          sets where the maintenance of the order is part of their CREATE
  *          declaration.
+ *          
+ *          FIXME Verfiy MVCC semantics.  Once written, a cached solution set
+ *          must become visible to readers.  This will require us to commit
+ *          the CacheJournal as well.
  */
 public class TestSolutionSetCache extends TestCase2 {
 
@@ -86,9 +92,9 @@ public class TestSolutionSetCache extends TestCase2 {
 
     protected Journal journal;
     protected QueryEngine queryEngine;
-    protected ISparqlCache cache;
+    protected ISolutionSetCache cache;
     
-    /** Note: Not used yet by the {@link SparqlCache}.
+    /** Note: Not used yet by the {@link CacheConnectionImpl}.
      */
     protected IEvaluationContext ctx = null;
 
@@ -154,7 +160,12 @@ public class TestSolutionSetCache extends TestCase2 {
         queryEngine = QueryEngineFactory.getQueryController(journal);
         
         // Setup the solution set cache.
-        cache = SparqlCacheFactory.getSparqlCache(queryEngine);
+        final ICacheConnection cacheConn = CacheConnectionFactory
+                .getCacheConnection(queryEngine);
+
+        // FIXME MVCC VIEWS: This is ONLY using the UNISOLATED VIEW.  Test MVCC semantics.
+        cache = cacheConn == null ? null : cacheConn.getSparqlCache(namespace,
+                ITx.UNISOLATED);
 
         /*
          * Declare some IVs.
@@ -247,8 +258,12 @@ public class TestSolutionSetCache extends TestCase2 {
                 log.info("Ignoring expected exception: " + ex);
         }
 
+        assertFalse(cache.existsSolutions(solutionSet));
+        
         cache.putSolutions(solutionSet,
                 new CloseableIteratorWrapper<IBindingSet[]>(in.iterator()));
+
+        assertTrue(cache.existsSolutions(solutionSet));
 
         final ICloseableIterator<IBindingSet[]> out = cache.getSolutions(
                 solutionSet);

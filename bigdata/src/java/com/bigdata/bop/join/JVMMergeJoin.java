@@ -37,8 +37,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
@@ -221,7 +221,7 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
             this.op = op;
 
             // The names of the attributes used to discover the solution sets.
-            final NamedSolutionSetRef[] namedSetRef = (NamedSolutionSetRef[]) op
+            final INamedSolutionSetRef[] namedSetRef = (INamedSolutionSetRef[]) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
             state = new JVMHashJoinUtility[namedSetRef.length];
@@ -236,7 +236,7 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
             for (int i = 0; i < state.length; i++) {
 
                 final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef[i].queryId);
+                        .getQueryAttributes(namedSetRef[i].getQueryId());
 
                 state[i] = (JVMHashJoinUtility) attrs.get(namedSetRef[i]);
                 

@@ -37,7 +37,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
@@ -71,7 +71,7 @@ public class StaticAnalysisBase {
      *            analysis.
      * @param evaluationContext
 	 *            The evaluation context provides access to the
-	 *            {@link ISolutionSetStats} and the {@link ISparqlCache} for
+	 *            {@link ISolutionSetStats} and the {@link ISolutionSetCache} for
 	 *            named solution sets.
      */
     protected StaticAnalysisBase(final QueryRoot queryRoot,
@@ -191,25 +191,16 @@ public class StaticAnalysisBase {
 //              addProjectedVariables(subquery, varSet);
             	
             } else {
-            	
-				final ISolutionSetStats stats = getSolutionSetStats(name);
 
-				if (stats != null) {
+                final ISolutionSetStats stats = getSolutionSetStats(name);
 
-					/*
-					 * Note: This is all variables which are bound in ANY
-					 * solution. It MAY include variables which are NOT bound in
-					 * some solutions.
-					 */
+                /*
+                 * Note: This is all variables which are bound in ANY solution.
+                 * It MAY include variables which are NOT bound in some
+                 * solutions.
+                 */
 
-					varSet.addAll(stats.getUsedVars());
-
-				} else {
-
-					throw new RuntimeException("Unresolved solution set: "
-							+ name);
-
-				}
+                varSet.addAll(stats.getUsedVars());
             	
             }
             
@@ -324,43 +315,31 @@ public class StaticAnalysisBase {
     }
 
     /**
-	 * Return the {@link ISolutionSetStats} for the named solution set.
-	 * <p>
-	 * Note: This does NOT report on {@link NamedSubqueryRoot}s for the query.
-	 * It only checks the {@link ISparqlCache}.
-	 * <p>
-	 * Note: Typically, callers MUST look for both a {@link NamedSubqueryRoot}
-	 * and an {@link ISolutionSetStats} and then handle these as appropriate. In
-	 * one case, that means static analysis of the {@link NamedSubqueryRoot}. In
-	 * the other, the relevant information are present in pre-computed metadata
-	 * on the {@link ISolutionSetStats}.
-	 * 
-	 * @param name
-	 *            The name of the solution set.
-	 * 
-	 * @return The {@link ISolutionSetStats} -or- <code>null</code> if there is
-	 *         no such pre-existing named solution set.
-	 * 
-	 * @see #getNamedSubqueryRoot(String)
-	 */
+     * Return the {@link ISolutionSetStats} for the named solution set.
+     * <p>
+     * Note: This does NOT report on {@link NamedSubqueryRoot}s for the query.
+     * It only checks the {@link ISolutionSetCache}.
+     * <p>
+     * Note: Typically, callers MUST look for both a {@link NamedSubqueryRoot}
+     * and an {@link ISolutionSetStats} and then handle these as appropriate. In
+     * one case, that means static analysis of the {@link NamedSubqueryRoot}. In
+     * the other, the relevant information are present in pre-computed metadata
+     * on the {@link ISolutionSetStats}.
+     * 
+     * @param name
+     *            The name of the solution set.
+     * 
+     * @return The {@link ISolutionSetStats} and never <code>null</code>.
+     * 
+     * @throws RuntimeException
+     *             if there is no such pre-existing named solution set.
+     * 
+     * @see #getNamedSubqueryRoot(String)
+     */
     public ISolutionSetStats getSolutionSetStats(final String name) {
-    	
-		final ISparqlCache sparqlCache = evaluationContext.getSparqlCache();
-		
-		if(sparqlCache != null) {
-			
-			final ISolutionSetStats stats = sparqlCache
-					.getSolutionSetStats(name);
 
-			if(stats != null) {
-				
-				return stats;
-				
-			}
-			
-		}
-		
-		return null;
+        return evaluationContext.getSolutionSetStats(name);
+        
     }
     
     /**

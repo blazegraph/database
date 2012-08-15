@@ -35,7 +35,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IAccessPath;
 
@@ -175,7 +175,7 @@ public class HTreeHashJoinOp<E> extends HashJoinOp<E> {
 
     @Override
     protected IHashJoinUtility newState(final BOpContext<IBindingSet> context,
-            final NamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
+            final INamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
 
         return new HTreeHashJoinUtility(context.getRunningQuery()
                 .getMemoryManager(), this, joinType);

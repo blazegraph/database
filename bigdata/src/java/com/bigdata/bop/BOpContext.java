@@ -31,29 +31,29 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.http.conn.ClientConnectionManager;
 
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.btree.ISimpleIndexAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -91,15 +91,12 @@ public class BOpContext<E> extends BOpContextBase {
 
     private final IBlockingBuffer<E[]> sink2;
 
-    private final AtomicBoolean lastInvocation = new AtomicBoolean(false);
-
-	/**
-	 * Set by the {@link QueryEngine} when the criteria specified by
-	 * {@link #isLastInvocation()} are satisfied.
-	 */
-    public void setLastInvocation() {
-    	lastInvocation.set(true);
-    }
+    /**
+     * The operator that is being executed.
+     */
+    private final PipelineOp op;
+    
+    private final boolean lastInvocation;
 
 	/**
 	 * <code>true</code> iff this is the last invocation of the operator. The
@@ -117,16 +114,11 @@ public class BOpContext<E> extends BOpContextBase {
 	 * parallel. This is why the evaluation context is locked to the query
 	 * controller. In addition, the operator must declare that it is NOT thread
 	 * safe in order for the query engine to serialize its evaluation tasks.
-	 * 
-	 * @todo This should be a ctor parameter.  We just have to update the test
-	 * suites for the changed method signature.
 	 */
-//    * <li>{@link BOp.Annotations#EVALUATION_CONTEXT} is
-//    * {@link BOpEvaluationContext#CONTROLLER}</li>
     public boolean isLastInvocation() {
-    	return lastInvocation.get();
+        return lastInvocation;
     }
-    
+
     /**
      * The interface for a running query.
      * <p>
@@ -138,7 +130,7 @@ public class BOpContext<E> extends BOpContextBase {
     public IRunningQuery getRunningQuery() {
         return runningQuery;
     }
- 
+
     /**
      * The index partition identifier -or- <code>-1</code> if the index is not
      * sharded.
@@ -156,30 +148,18 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
+     * Return the operator that is being executed.
+     */
+    public PipelineOp getOperator() {
+        return op;
+    }
+
+    /**
      * Where to read the data to be consumed by the operator.
      */
     public final ICloseableIterator<E[]> getSource() {
         return source;
     }
-
-//    /**
-//     * Attach another source. The decision to attach the source is mutex with
-//     * respect to the decision that the source reported by {@link #getSource()}
-//     * is exhausted.
-//     * 
-//     * @param source
-//     *            The source.
-//     *            
-//     * @return <code>true</code> iff the source was attached.
-//     */
-//    public boolean addSource(IAsynchronousIterator<E[]> source) {
-//
-//        if (source == null)
-//            throw new IllegalArgumentException();
-//        
-//        return this.source.add(source);
-//        
-//    }
 
     /**
      * Where to write the output of the operator.
@@ -202,54 +182,69 @@ public class BOpContext<E> extends BOpContextBase {
         return sink2;
     }
 
-	/**
-	 * 
-	 * @param runningQuery
-	 *            The {@link IRunningQuery}.
-	 * @param partitionId
-	 *            The index partition identifier -or- <code>-1</code> if the
-	 *            index is not sharded.
-	 * @param stats
-	 *            The object used to collect statistics about the evaluation of
-	 *            this operator.
-	 * @param source
-	 *            Where to read the data to be consumed by the operator.
-	 * @param sink
-	 *            Where to write the output of the operator.
-	 * @param sink2
-	 *            Alternative sink for the output of the operator (optional).
-	 *            This is used by things like SPARQL optional joins to route
-	 *            failed joins outside of the join group.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the <i>stats</i> is <code>null</code>
-	 * @throws IllegalArgumentException
-	 *             if the <i>source</i> is <code>null</code> (use an empty
-	 *             source if the source will be ignored).
-	 * @throws IllegalArgumentException
-	 *             if the <i>sink</i> is <code>null</code>
-	 * 
-	 * @todo Modify to accept {@link IChunkMessage} or an interface available
-	 *       from getChunk() on {@link IChunkMessage} which provides us with
-	 *       flexible mechanisms for accessing the chunk data.
-	 *       <p>
-	 *       When doing that, modify to automatically track the {@link BOpStats}
-	 *       as the <i>source</i> is consumed.
-	 *       <p>
-	 *       Note: The only call to this method outside of the test suite is 
-	 *       from ChunkedRunningQuery.  It always has a fully materialized
-	 *       chunk on hand and ready to be processed.
-	 */
+    /**
+     * 
+     * @param runningQuery
+     *            The {@link IRunningQuery}.
+     * @param partitionId
+     *            The index partition identifier -or- <code>-1</code> if the
+     *            index is not sharded.
+     * @param stats
+     *            The object used to collect statistics about the evaluation of
+     *            this operator.
+     * @param source
+     *            Where to read the data to be consumed by the operator.
+     * @param op
+     *            The operator that is being executed.
+     * @param lastInvocation
+     *            <code>true</code> iff this is the last invocation pass for
+     *            that operator.
+     * @param sink
+     *            Where to write the output of the operator.
+     * @param sink2
+     *            Alternative sink for the output of the operator (optional).
+     *            This is used by things like SPARQL optional joins to route
+     *            failed joins outside of the join group.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>stats</i> is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the <i>source</i> is <code>null</code> (use an empty
+     *             source if the source will be ignored).
+     * @throws IllegalArgumentException
+     *             if the <i>sink</i> is <code>null</code>
+     * 
+     * @todo Modify to accept {@link IChunkMessage} or an interface available
+     *       from getChunk() on {@link IChunkMessage} which provides us with
+     *       flexible mechanisms for accessing the chunk data.
+     *       <p>
+     *       When doing that, modify to automatically track the {@link BOpStats}
+     *       as the <i>source</i> is consumed.
+     *       <p>
+     *       Note: The only call to this method outside of the test suite is
+     *       from ChunkedRunningQuery. It always has a fully materialized chunk
+     *       on hand and ready to be processed.
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public BOpContext(final IRunningQuery runningQuery, final int partitionId,
-            final BOpStats stats, final ICloseableIterator<E[]> source,
-            final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
+    public BOpContext(//
+            final IRunningQuery runningQuery,//
+            final int partitionId,//
+            final BOpStats stats, //
+            final PipelineOp op,//
+            final boolean lastInvocation,//
+            final ICloseableIterator<E[]> source,//
+            final IBlockingBuffer<E[]> sink, //
+            final IBlockingBuffer<E[]> sink2//
+            ) {
         
         super(runningQuery.getFederation(), runningQuery.getLocalIndexManager());
         
         if (stats == null)
             throw new IllegalArgumentException();
-        
+
+        if (op == null)
+            throw new IllegalArgumentException();
+
         if (source == null)
             throw new IllegalArgumentException();
         
@@ -259,6 +254,8 @@ public class BOpContext<E> extends BOpContextBase {
         this.runningQuery = runningQuery;
         this.partitionId = partitionId;
         this.stats = stats;
+        this.op = op;
+        this.lastInvocation = lastInvocation;
         /*
          * Wrap each IBindingSet to provide access to the BOpContext.
          * 
@@ -498,7 +495,7 @@ public class BOpContext<E> extends BOpContextBase {
 //            throw new IllegalArgumentException();
 //
 //        /*
-//         * FIXME There are several cases here, one for each type of
+//         * TODO There are several cases here, one for each type of
 //         * data structure we need to access and each means of identifying
 //         * that data structure. The main case is Stream (for named solution sets).
 //         * If we wind up always modeling a named solution set as a Stream, then
@@ -562,21 +559,37 @@ public class BOpContext<E> extends BOpContextBase {
      */
     @SuppressWarnings("unchecked")
     public ICloseableIterator<IBindingSet[]> getAlternateSource(
-            final PipelineOp op, final NamedSolutionSetRef namedSetRef) {
-
-        /*
-         * Lookup the attributes for the query that will be used to resolve the
-         * named solution set.
-         */
-        final IQueryAttributes queryAttributes = getQueryAttributes(namedSetRef.queryId);
-
-        // Resolve the named solution set.
-        final Object tmp = queryAttributes.get(namedSetRef);
+            final INamedSolutionSetRef namedSetRef) {
 
         // Iterator visiting the solution set.
         final ICloseableIterator<IBindingSet> src;
 
-        if (tmp != null) {
+        // The local (application) name of the solution set.
+        final String localName = namedSetRef.getLocalName();
+
+        /*
+         * When non-null, this identifies the IRunningQuery that we need to look
+         * at to find the named solution set.
+         */
+        final UUID queryId = namedSetRef.getQueryId();
+        
+        if (queryId != null) {
+
+            /*
+             * Lookup the attributes for the query that will be used to resolve
+             * the named solution set.
+             */
+            final IQueryAttributes queryAttributes = getQueryAttributes(queryId);
+
+            // Resolve the named solution set.
+            final Object tmp = queryAttributes.get(namedSetRef);
+
+            if (tmp == null) {
+
+                throw new RuntimeException("Not found: name=" + localName
+                            + ", namedSetRef=" + namedSetRef);
+
+            }
 
             if (tmp instanceof IHashJoinUtility) {
 
@@ -600,8 +613,8 @@ public class BOpContext<E> extends BOpContextBase {
             } else {
 
                 /*
-                 * We found something, but we do not know how to turn it into an
-                 * iterator visiting solutions.
+                 * We found something, but we do not know how to turn it
+                 * into an iterator visiting solutions.
                  */
 
                 throw new UnsupportedOperationException("namedSetRef="
@@ -609,100 +622,38 @@ public class BOpContext<E> extends BOpContextBase {
 
             }
 
+            return new Chunkerator<IBindingSet>(src, op.getChunkCapacity(),
+                    IBindingSet.class);
+            
         } else {
-
-            /*
-             * There is no query attribute for that NamedSolutionSetRef.
-             * 
-             * The query attributes are the first level of resolution. Since
-             * nothing was found there, we will now look for an index (BTree,
-             * HTree, Stream, etc) having the specified name.
-             * 
-             * The search order is CACHE, local Journal, federation.
-             * 
-             * TODO The name of the desired solution set might need to be paired
-             * with the NamedSolutionSetRef or modeled by a different type of
-             * object for the NAMED_SET_REF annotation, otherwise we might not
-             * be able to clearly specify the name of a stream and the name of
-             * an index over that stream.
-             * 
-             * TODO We might need/want to explicitly identify the conceptual
-             * location of the named solution set (cache, local index manager,
-             * federation) when the query is compiled so we only look in the
-             * right place at when the operator is executing. That could
-             * decrease latency for operators which execute multiple times,
-             * report errors early if something can not be resolved, and
-             * eliminate some overhead with testing remote services during
-             * operator evaluation (if the cache is non-local).
-             */
-
-            // The name of a solution set.
-            final String name = namedSetRef.namedSet;
 
             // Resolve the object which will give us access to the named
             // solution set.
-            final ISparqlCache sparqlCache = SparqlCacheFactory
-                    .getExistingSparqlCache(getRunningQuery().getQueryEngine());
+            final ICacheConnection cacheConn = CacheConnectionFactory
+                    .getExistingCacheConnection(getRunningQuery()
+                            .getQueryEngine());
 
-            if (sparqlCache != null && sparqlCache.existsSolutions(name)) {
+            final String namespace = namedSetRef.getNamespace();
 
-                return sparqlCache.getSolutions(name);
+            final long timestamp = namedSetRef.getTimestamp();
 
-            }
+            final ISolutionSetCache sparqlCache = cacheConn == null ? null
+                    : cacheConn.getSparqlCache(namespace, timestamp);
 
-            /*
-             * FIXME Consider specifying the index using NT to specify both the
-             * name and the timestamp. Or put the timestamp into the
-             * NamedSolutionSetRef.
-             */
-            final long timestamp = ITx.READ_COMMITTED;
+            // TODO ClassCastException is possible?
+            final AbstractJournal localIndexManager = (AbstractJournal) getIndexManager();
 
-            final IIndexManager localIndexManager = getIndexManager();
+            return NamedSolutionSetRefUtility.getSolutionSet(//
+                    sparqlCache,//
+                    localIndexManager,// 
+                    namespace,//
+                    timestamp,//
+                    localName,//
+                    namedSetRef.getJoinVars(),//
+                    op.getChunkCapacity()//
+                    );
 
-            if (localIndexManager instanceof AbstractJournal) {
-
-                final ISimpleIndexAccess index = ((AbstractJournal) localIndexManager)
-                        .getIndexLocal(name, timestamp);
-
-                if (index != null) {
-
-                    src = (ICloseableIterator<IBindingSet>) index.scan();
-
-                } else {
-
-                    /*
-                     * TODO Provide federation-wide access to a durable named
-                     * index, returning the index scan.
-                     */
-
-                    final IBigdataFederation<?> fed = getFederation();
-
-                    // resolve remote index, obtaining "scan" of solutions.
-
-                    src = null;
-
-                }
-
-            } else {
-
-                /*
-                 * This is an odd code path. It is possible that we could hit it
-                 * if the local index manager were null (in unit tests) or some
-                 * wrapped object (such as an IJournal delegate).
-                 */
-
-                throw new AssertionError();
-                
-            }
-
-            if (src == null)
-                throw new RuntimeException("Not found: name=" + name
-                        + ", namedSetRef=" + namedSetRef);
-
-        } 
-            
-        return new Chunkerator<IBindingSet>(src, op.getChunkCapacity(),
-                IBindingSet.class);
+        }
 
     }
     

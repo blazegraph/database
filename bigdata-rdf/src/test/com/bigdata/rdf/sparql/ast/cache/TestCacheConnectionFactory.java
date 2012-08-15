@@ -39,25 +39,25 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Stress test for correct shutdown of the {@link SparqlCache} as allocated by
- * the {@link SparqlCacheFactory}.
+ * Stress test for correct shutdown of the {@link ICacheConnection} as allocated
+ * by the {@link CacheConnectionFactory}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestQueryEngineFactory.java 4585 2011-06-01 13:42:56Z
  *          thompsonbry $
  */
-public class TestSparqlCacheFactory extends TestCase2 {
+public class TestCacheConnectionFactory extends TestCase2 {
 
     /**
      * 
      */
-    public TestSparqlCacheFactory() {
+    public TestCacheConnectionFactory() {
     }
 
     /**
      * @param name
      */
-    public TestSparqlCacheFactory(String name) {
+    public TestCacheConnectionFactory(String name) {
         super(name);
     }
     
@@ -83,17 +83,17 @@ public class TestSparqlCacheFactory extends TestCase2 {
             assertNotNull(queryEngine);
             
             // does not exist yet.
-            assertNull(SparqlCacheFactory.getExistingSparqlCache(queryEngine));
+            assertNull(CacheConnectionFactory.getExistingCacheConnection(queryEngine));
 
             // was not created.
-            assertNull(SparqlCacheFactory.getExistingSparqlCache(queryEngine));
+            assertNull(CacheConnectionFactory.getExistingCacheConnection(queryEngine));
 
-            final ISparqlCache sparqlCache = SparqlCacheFactory
-                    .getSparqlCache(queryEngine);
+            final ICacheConnection cache = CacheConnectionFactory
+                    .getCacheConnection(queryEngine);
 
             // still exists and is the same reference.
-            assertTrue(sparqlCache == SparqlCacheFactory
-                    .getExistingSparqlCache(queryEngine));
+            assertTrue(cache == CacheConnectionFactory
+                    .getExistingCacheConnection(queryEngine));
 
         } finally {
 
@@ -110,7 +110,7 @@ public class TestSparqlCacheFactory extends TestCase2 {
     }
 
     /**
-     * Look for a memory leak in the {@link SparqlCacheFactory}.
+     * Look for a memory leak in the {@link CacheConnectionFactory}.
      * 
      * @throws InterruptedException
      */
@@ -156,19 +156,19 @@ public class TestSparqlCacheFactory extends TestCase2 {
                                     .getQueryController(jnl));
 
                     // does not exist yet.
-                    assertNull(SparqlCacheFactory
-                            .getExistingSparqlCache(queryEngine));
+                    assertNull(CacheConnectionFactory
+                            .getExistingCacheConnection(queryEngine));
 
                     // was not created.
-                    assertNull(SparqlCacheFactory
-                            .getExistingSparqlCache(queryEngine));
+                    assertNull(CacheConnectionFactory
+                            .getExistingCacheConnection(queryEngine));
 
-                    final ISparqlCache sparqlCache = SparqlCacheFactory
-                            .getSparqlCache(queryEngine);
+                    final ICacheConnection cache = CacheConnectionFactory
+                            .getCacheConnection(queryEngine);
 
                     // still exists and is the same reference.
-                    assertTrue(sparqlCache == SparqlCacheFactory
-                            .getExistingSparqlCache(queryEngine));
+                    assertTrue(cache == CacheConnectionFactory
+                            .getExistingCacheConnection(queryEngine));
 
                     ncreated++;
 
@@ -190,7 +190,7 @@ public class TestSparqlCacheFactory extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("Created " + ncreated + " instances.");
 
-            final int nalive = SparqlCacheFactory.getSparqlCacheCount();
+            final int nalive = CacheConnectionFactory.getCacheCount();
 
             if (log.isInfoEnabled())
                 log.info("There are " + nalive

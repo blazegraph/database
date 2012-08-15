@@ -39,8 +39,8 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -255,10 +255,10 @@ public class NestedLoopJoinOp extends PipelineOp {
          */
         protected ICloseableIterator<IBindingSet[]> getRightSolutions() {
 
-            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+            final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            return context.getAlternateSource(op, namedSetRef);
+            return context.getAlternateSource(namedSetRef);
 
         }
 

@@ -12,8 +12,8 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.JoinTypeEnum;
@@ -105,7 +105,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
 //					+ "=" + isSharedState());
 //		}
 
-        final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) getRequiredProperty(Annotations.NAMED_SET_REF);
+        final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) getRequiredProperty(Annotations.NAMED_SET_REF);
 
 		final IVariable<?>[] vars = (IVariable[]) getProperty(Annotations.VARIABLES);
 
@@ -145,7 +145,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
             this.context = context;
 
             /** Metadata to identify the named solution set. */
-            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+            final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
             /*
@@ -158,7 +158,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
             // Lookup the attributes for the query on which we will hang the
             // solution set.
             final IQueryAttributes attrs = context
-                    .getQueryAttributes(namedSetRef.queryId);
+                    .getQueryAttributes(namedSetRef.getQueryId());
 
             HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
                     .get(namedSetRef);
@@ -166,7 +166,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
             if (state == null) {
 
                 state = new HTreeHashJoinUtility(
-                        context.getMemoryManager(namedSetRef.queryId), op,
+                        context.getMemoryManager(namedSetRef.getQueryId()), op,
                         JoinTypeEnum.Filter);
 
                 if (attrs.putIfAbsent(namedSetRef, state) != null)

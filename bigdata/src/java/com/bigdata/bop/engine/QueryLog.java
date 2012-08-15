@@ -45,8 +45,9 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.RunState.RunStateEnum;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.PipelineJoin;
@@ -425,9 +426,9 @@ public class QueryLog {
              */
             final Object namedSetRef = bop
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
-            if (namedSetRef instanceof NamedSolutionSetRef) {
-                final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                final IRunningQuery t = getRunningQuery(q, ref.queryId);
+            if (namedSetRef instanceof INamedSolutionSetRef) {
+                final INamedSolutionSetRef ref = (INamedSolutionSetRef) namedSetRef;
+                final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
                 if (t != null) {
                     final IQueryAttributes attrs = t == null ? null : t
                             .getAttributes();
@@ -443,12 +444,12 @@ public class QueryLog {
                     // sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
                 }
             } else {
-                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
+                final INamedSolutionSetRef[] refs = (INamedSolutionSetRef[]) namedSetRef;
                 for (int i = 0; i < refs.length; i++) {
-                    final NamedSolutionSetRef ref = refs[i];
+                    final INamedSolutionSetRef ref = refs[i];
                     if (i > 0)
                         sb.append(",");
-                    final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                    final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
                     if (t != null) {
                         final IQueryAttributes attrs = t == null ? null : t
                                 .getAttributes();
@@ -458,7 +459,7 @@ public class QueryLog {
                             // Prefer the IHashUtilityState
                             sb.append(state.toString());
                             sb.append(cdata(",namedSet="));
-                            sb.append(cdata(ref.namedSet));
+                            sb.append(cdata(ref.getLocalName()));
                         } else {
                             // Otherwise the NamedSolutionSetRef
                             sb.append(ref.toString());
@@ -1021,9 +1022,9 @@ public class QueryLog {
              */
             final Object namedSetRef = bop
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
-            if (namedSetRef instanceof NamedSolutionSetRef) {
-                final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                final IRunningQuery t = getRunningQuery(q, ref.queryId);
+            if (namedSetRef instanceof INamedSolutionSetRef) {
+                final INamedSolutionSetRef ref = (INamedSolutionSetRef) namedSetRef;
+                final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
                 if (t != null) {
                     final IQueryAttributes attrs = t == null ? null : t
                             .getAttributes();
@@ -1033,7 +1034,7 @@ public class QueryLog {
                         // Prefer the IHashUtilityState
                         w.write(cdata(state.toString()));
                         w.write(cdata(",namedSet="));
-                        w.write(cdata(ref.namedSet));
+                        w.write(cdata(ref.getLocalName()));
                     } else {
                         // Otherwise the NamedSolutionSetRef
                         w.write(cdata(ref.toString()));
@@ -1042,12 +1043,12 @@ public class QueryLog {
                     // Arrays.toString(ref.joinVars)));
                 }
             } else {
-                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
+                final INamedSolutionSetRef[] refs = (INamedSolutionSetRef[]) namedSetRef;
                 for (int i = 0; i < refs.length; i++) {
-                    final NamedSolutionSetRef ref = refs[i];
+                    final INamedSolutionSetRef ref = refs[i];
                     if (i > 0)
                         w.write(cdata(","));
-                    final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                    final IRunningQuery t = getRunningQuery(q, ref.getQueryId());
                     if (t != null) {
                         final IQueryAttributes attrs = t == null ? null : t
                                 .getAttributes();

@@ -1194,10 +1194,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
             // context : @todo pass in IChunkMessage or IChunkAccessor
             context = new BOpContext<IBindingSet>(ChunkedRunningQuery.this,
-                    partitionId, stats, src, sink, altSink);
+                    partitionId, stats, op, isLastInvocation, src, sink,
+                    altSink);
 
-            if(isLastInvocation)
-                context.setLastInvocation();
+//            if(isLastInvocation)
+//                context.setLastInvocation();
             
             // FutureTask for operator execution (not running yet).
             if ((ft = op.eval(context)) == null)

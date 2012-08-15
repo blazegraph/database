@@ -37,11 +37,11 @@ import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -85,7 +85,9 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
 //                new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.PIPELINED, false),//
-                new NV(NamedSetAnnotations.NAMED_SET_REF,new NamedSolutionSetRef(queryId,getName(),joinVars))//
+                new NV(NamedSetAnnotations.NAMED_SET_REF,
+                        NamedSolutionSetRefUtility.newInstance(queryId,
+                                getName(), joinVars))//
                 );
 
         if (annotations != null) {
@@ -120,8 +122,9 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         final IVariable[] joinVars = new IVariable[]{x};
 
         final NV namedSet = new NV(NamedSetAnnotations.NAMED_SET_REF,
-                new NamedSolutionSetRef(queryId, getName(), joinVars));
-        
+                NamedSolutionSetRefUtility.newInstance(queryId, getName(),
+                        joinVars));
+
         final Predicate<IV> pred = new Predicate<IV>(new IVariableOrConstant[] {
                 new Constant<String>("Mary"), Var.var("x") }, NV
                 .asMap(new NV[] {//

@@ -33,9 +33,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 
 /**
  * Unit tests for {@link HTreeDistinctBindingSetsOp}.
@@ -76,7 +76,7 @@ public class TestHTreeDistinctBindingSets extends
                 NV.asMap(new NV[]{//
                     new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
-                            new NamedSolutionSetRef(queryId, getName(), vars)),//
+                            NamedSolutionSetRefUtility.newInstance(queryId, getName(), vars)),//
 //                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -95,7 +95,7 @@ public class TestHTreeDistinctBindingSets extends
                 NV.asMap(new NV[]{//
                     new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
-                            new NamedSolutionSetRef(queryId, getName(), vars)),//
+                            NamedSolutionSetRefUtility.newInstance(queryId, getName(), vars)),//
                     new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.ANY),//
@@ -114,7 +114,7 @@ public class TestHTreeDistinctBindingSets extends
                 NV.asMap(new NV[]{//
                     new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
-                            new NamedSolutionSetRef(queryId, getName(), vars)),//
+                            NamedSolutionSetRefUtility.newInstance(queryId, getName(), vars)),//
                     new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.SHARDED),//
@@ -154,7 +154,7 @@ public class TestHTreeDistinctBindingSets extends
                 NV.asMap(new NV[]{//
                     new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
-                            new NamedSolutionSetRef(queryId, getName(), vars)),//
+                            NamedSolutionSetRefUtility.newInstance(queryId, getName(), vars)),//
                     new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
