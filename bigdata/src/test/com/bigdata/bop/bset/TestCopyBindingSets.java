@@ -159,7 +159,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -208,7 +209,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */),
-                -1/* partitionId */, stats, source, sink, altSink);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, altSink);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -276,7 +278,8 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);

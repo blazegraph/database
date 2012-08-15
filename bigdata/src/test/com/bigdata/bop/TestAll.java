@@ -105,6 +105,9 @@ public class TestAll extends TestCase {
         // aggregation operators.
         suite.addTest(com.bigdata.bop.solutions.TestAll.suite());
 
+        // Unit tests for named solution set references.
+        suite.addTestSuite(TestNamedSolutionSetRef.class);
+        
         // query engine.
         suite.addTest(com.bigdata.bop.engine.TestAll.suite());
 

@@ -43,8 +43,8 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -184,7 +184,7 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
      */
     abstract protected IHashJoinUtility newState(//
             final BOpContext<IBindingSet> context,//
-            final NamedSolutionSetRef namedSetRef, //
+            final INamedSolutionSetRef namedSetRef, //
             final JoinTypeEnum joinType//
             );
 
@@ -257,13 +257,13 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
                  * entire operation will occur within a single evaluation pass.
                  */
 
-                final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                         .getRequiredProperty(Annotations.NAMED_SET_REF);
 
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
                 final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef.queryId);
+                        .getQueryAttributes(namedSetRef.getQueryId());
 
                 IHashJoinUtility state = (IHashJoinUtility) attrs
                         .get(namedSetRef);

@@ -42,6 +42,11 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.SparseRowStore;
 
+/**
+ * {@link IJournal} delegation pattern.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class JournalDelegate implements IJournal {
 	
 	private final AbstractJournal delegate;

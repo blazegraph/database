@@ -32,7 +32,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -118,7 +118,7 @@ public interface IEvaluationContext {
 	 * 
 	 * @see QueryHints#SOLUTION_SET_CACHE
 	 */
-    ISparqlCache getSparqlCache();
+    ISolutionSetCache getSparqlCache();
 
     /**
      * Return the cache for described resources (experimental feature).
@@ -129,4 +129,31 @@ public interface IEvaluationContext {
      */
     IDescribeCache getDescribeCache();
 
+    /**
+     * Resolve the pre-existing named solution set returning its
+     * {@link ISolutionSetStats}.
+     * 
+     * @param localName
+     *            The local name of the named solution set.
+     * 
+     * @return The {@link ISolutionSetStats}
+     * 
+     * @throws RuntimeException
+     *             if the named solution set can not be found.
+     */
+    ISolutionSetStats getSolutionSetStats(String name);
+ 
+//    /**
+//     * Resolve a pre-existing named solution set.
+//     * 
+//     * @param localName
+//     *            The local name of the named solution set.
+//     *            
+//     * @return The {@link ISolutionSet}
+//     * 
+//     * @throws RuntimeException
+//     *             if the named solution set can not be found.
+//     */
+//    ICloseableIterator<IBindingSet[]> getSolutionSet(String name);
+    
 }

@@ -34,27 +34,27 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.QueryEngine;
 
 /**
- * A factory pattern for the {@link SparqlCache}.
+ * A factory pattern for the {@link ICacheConnection}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SparqlCacheFactory {
+public class CacheConnectionFactory {
 
     private static final Logger log = Logger
-            .getLogger(SparqlCacheFactory.class);
+            .getLogger(CacheConnectionFactory.class);
 
     /**
      * Weak key cache to enforce the singleton pattern.
      * <p>
-     * Note: We do not want to keep any {@link SparqlCache} objects wired into
-     * the cache unless the application is holding a hard reference to the
+     * Note: We do not want to keep any {@link ICacheConnection} objects wired
+     * into the memory unless the application is holding a hard reference to the
      * {@link QueryEngine}.
      */
-    private static WeakHashMap<QueryEngine, SparqlCache> instanceCache = new WeakHashMap<QueryEngine, SparqlCache>();
+    private static WeakHashMap<QueryEngine, ICacheConnection> instanceCache = new WeakHashMap<QueryEngine, ICacheConnection>();
 
     /**
-     * Singleton factory test (does not create the sparql cache).
+     * Singleton factory test (does not create the cache).
      * 
      * @param queryEngine
      *            The {@link QueryEngine}.
@@ -62,7 +62,7 @@ public class SparqlCacheFactory {
      * @return The query controller iff one has been obtained from the factory
      *         and its weak reference has not been cleared.
      */
-    static public ISparqlCache getExistingSparqlCache(
+    static public ICacheConnection getExistingCacheConnection(
             final QueryEngine queryEngine) {
 
         return instanceCache.get(queryEngine);
@@ -75,24 +75,25 @@ public class SparqlCacheFactory {
      * @param queryEngine
      *            The {@link QueryEngine}.
      *            
-     * @return The {@link SparqlCache}.
+     * @return The {@link ICacheConnection}.
      */
-    static public ISparqlCache getSparqlCache(final QueryEngine queryEngine) {
+    static public ICacheConnection getCacheConnection(
+            final QueryEngine queryEngine) {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
 
-        SparqlCache sparqlCache = instanceCache.get(queryEngine);
+        ICacheConnection cache = instanceCache.get(queryEngine);
 
-        if (sparqlCache == null) {
+        if (cache == null) {
 
             synchronized (instanceCache) {
 
-                if ((sparqlCache = instanceCache.get(queryEngine)) == null) {
+                if ((cache = instanceCache.get(queryEngine)) == null) {
 
-                    sparqlCache = newSparqlCache(queryEngine);
+                    cache = newCacheConnection(queryEngine);
                     
-                    instanceCache.put(queryEngine, sparqlCache);
+                    instanceCache.put(queryEngine, cache);
                     
                 }
 
@@ -100,36 +101,37 @@ public class SparqlCacheFactory {
 
         }
 
-        return sparqlCache;
+        return cache;
 
     }
 
     /**
-     * Initialize a new {@link SparqlCache} instance (or a connection to a
-     * SPARQL cache fabric).
+     * Initialize a new {@link ICacheConnection} instance (or a connection to a
+     * cache fabric).
      * 
      * @param queryEngine
      *            The query controller.
      * 
-     * @return The new {@link SparqlCache}.
+     * @return The new {@link ICacheConnection}.
      */
-    private static SparqlCache newSparqlCache(final QueryEngine queryEngine) {
+    private static ICacheConnection newCacheConnection(
+            final QueryEngine queryEngine) {
 
         if (log.isInfoEnabled())
             log.info("Initiallizing: " + queryEngine);
 
-        final SparqlCache sparqlCache = new SparqlCache(queryEngine);
+        final ICacheConnection cache = new CacheConnectionImpl(queryEngine);
 
-        sparqlCache.init();
+        cache.init();
 
-        return sparqlCache;
+        return cache;
 
     }
     
     /**
-     * Return the #of live query controllers.
+     * Return the #of live {@link ICacheConnection} instances.
      */
-    public static int getSparqlCacheCount() {
+    public static int getCacheCount() {
 
         return instanceCache.size();
 

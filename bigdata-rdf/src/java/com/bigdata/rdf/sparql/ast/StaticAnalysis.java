@@ -48,8 +48,8 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
+import com.bigdata.rdf.sparql.ast.cache.ISolutionSetCache;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionImpl;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
@@ -212,7 +212,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * @deprecated By the other form of this constructor. The constructor should
      *             have access to the {@link ISolutionSetStats}, which are on the
      *             {@link AST2BOpContext}. It also needs access to the
-     *             {@link SparqlCache} for named solution sets.
+     *             {@link CacheConnectionImpl} for named solution sets.
      */
     // Note: Only exposed to the same package for unit tests.
     StaticAnalysis(final QueryRoot queryRoot) {
@@ -229,7 +229,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 	 *            analysis.
 	 * @param evaluationContext
 	 *            The evaluation context provides access to the
-	 *            {@link ISolutionSetStats} and the {@link ISparqlCache} for
+	 *            {@link ISolutionSetStats} and the {@link ISolutionSetCache} for
 	 *            named solution sets.
 	 * 
 	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
@@ -865,23 +865,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 			} else {
 
-				final ISolutionSetStats stats = getSolutionSetStats(name);
+                final ISolutionSetStats stats = getSolutionSetStats(name);
 
-				if (stats != null) {
+                /*
+                 * Note: This is all variables which are bound in ALL solutions.
+                 */
 
-					/*
-					 * Note: This is all variables which are bound in ALL
-					 * solutions.
-					 */
-
-					vars.addAll(stats.getAlwaysBound());
-
-				} else {
-
-					throw new RuntimeException("Unresolved solution set: "
-							+ name);
-
-				}
+                vars.addAll(stats.getAlwaysBound());
 
 			}
 
@@ -1025,23 +1015,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 				
 			} else {
 				
-				final ISolutionSetStats stats = getSolutionSetStats(name);
+                final ISolutionSetStats stats = getSolutionSetStats(name);
 
-				if (stats != null) {
+                /*
+                 * Note: This is all variables bound in ANY solution. It MAY
+                 * include variables which are NOT bound in some solutions.
+                 */
 
-					/*
-					 * Note: This is all variables bound in ANY solution. It MAY
-					 * include variables which are NOT bound in some solutions.
-					 */
-
-					vars.addAll(stats.getUsedVars());
-
-				} else {
-
-					throw new RuntimeException("Unresolved solution set: "
-							+ name);
-
-				}
+                vars.addAll(stats.getUsedVars());
 
 			}
 
@@ -2090,9 +2071,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * collected for that solution set.
          */
 		final ISolutionSetStats stats = getSolutionSetStats(name);
-		
-		if(stats == null)
-			throw new RuntimeException("Not found: "+name);
 		
 		/*
 		 * All variables which are bound in each solution of this solution set.

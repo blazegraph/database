@@ -744,7 +744,7 @@ public class Name2Addr extends BTree {
         ndx.setDirtyListener( l );
         
         // report event (loaded btree).
-        ResourceManager.openUnisolatedBTree(name);
+        ResourceManager.openUnisolatedIndex(name);
 
         // return btree.
         return ndx;
@@ -837,7 +837,7 @@ public class Name2Addr extends BTree {
         putOnCommitList(name, btree, false/* needsCheckpoint */);
         
         // report event (the application has access to the named index).
-        ResourceManager.openUnisolatedBTree(name);
+        ResourceManager.openUnisolatedIndex(name);
         
     }
 
@@ -1010,7 +1010,7 @@ public class Name2Addr extends BTree {
         super.remove(key);
 
         // report event.
-        ResourceManager.dropUnisolatedBTree(name);
+        ResourceManager.dropUnisolatedIndex(name);
 
     }
     

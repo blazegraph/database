@@ -174,7 +174,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
         private final PipelineOp subquery;
         
         /** Metadata to identify the named solution set. */
-        private final NamedSolutionSetRef namedSetRef;
+        private final INamedSolutionSetRef namedSetRef;
 
         /**
          * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
@@ -207,7 +207,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
-            this.namedSetRef = (NamedSolutionSetRef) op
+            this.namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
             
             {
@@ -221,7 +221,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                 
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
-                attrs = context.getQueryAttributes(namedSetRef.queryId);
+                attrs = context.getQueryAttributes(namedSetRef.getQueryId());
 
                 JVMHashJoinUtility state = (JVMHashJoinUtility) attrs
                         .get(namedSetRef);

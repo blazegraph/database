@@ -41,8 +41,8 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -213,7 +213,7 @@ abstract public class HashIndexOp extends PipelineOp {
      */
     abstract protected IHashJoinUtility newState(//
             final BOpContext<IBindingSet> context,//
-            final NamedSolutionSetRef namedSetRef, //
+            final INamedSolutionSetRef namedSetRef, //
             final JoinTypeEnum joinType//
             );
 
@@ -268,7 +268,7 @@ abstract public class HashIndexOp extends PipelineOp {
             this.stats = ((NamedSolutionSetStats) context.getStats());
 
             // Metadata to identify the named solution set.
-            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+            final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
             {
@@ -283,7 +283,7 @@ abstract public class HashIndexOp extends PipelineOp {
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
                 final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef.queryId);
+                        .getQueryAttributes(namedSetRef.getQueryId());
 
                 IHashJoinUtility state = (IHashJoinUtility) attrs
                         .get(namedSetRef);
@@ -396,10 +396,10 @@ abstract public class HashIndexOp extends PipelineOp {
                  * through the pipeline. When non-<code>null</code>, the hash index is
                  * built from the solutions in the identifier solution set.
                  */
-                final NamedSolutionSetRef namedSetSourceRef = (NamedSolutionSetRef) op
+                final INamedSolutionSetRef namedSetSourceRef = (INamedSolutionSetRef) op
                         .getRequiredProperty(Annotations.NAMED_SET_SOURCE_REF);
 
-                src = context.getAlternateSource(op, namedSetSourceRef);
+                src = context.getAlternateSource(namedSetSourceRef);
                 
             }
 

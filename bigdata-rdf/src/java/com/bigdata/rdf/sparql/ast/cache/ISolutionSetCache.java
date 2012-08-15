@@ -39,26 +39,9 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME MVCC VIEWS: This is not MVCC aware. Just like the
- *          {@link IDescribeCache}, the instances of this interface need to know
- *          the namespace and timestamp with which they are associated. Also,
- *          {@link ISparqlCache} and {@link IDescribeCache} should probably
- *          extend a common (remote) interface rather than having the
- *          {@link #getDescribeCache(String, long)} method on this interface. An
- *          ISparqlCacheService abstraction should be a factory for an interface
- *          providing a view of a cache fabric as of for a specific namespace
- *          and timestamp. The remote service will need to have the life cycle
- *          of the cache associated with a given namespace linked to that
- *          namespace.
  */
-public interface ISparqlCache {
+public interface ISolutionSetCache {
 
-    /**
-     * Initialize the cache / cache connection.
-     */
-    void init();
-    
     /**
      * Close the cache / cache connection.
      */
@@ -94,14 +77,14 @@ public interface ISparqlCache {
     void createSolutions(String solutionSet, ISPO[] params);
 
     /**
-     * Save the solutions into a named solution set.
+     * Save the solutions into a named solution set. If there is an existing
+     * solution set having that name, then its solutions will be replaced by the
+     * new solutions (replace not append).
      * 
      * @param solutionSet
      *            The name of the solution set.
      * @param src
      *            The solutions.
-     * 
-     *            TODO Is this APPEND or REPLACE?
      */
 	void putSolutions(String solutionSet, ICloseableIterator<IBindingSet[]> src);
 
@@ -139,45 +122,4 @@ public interface ISparqlCache {
      */
     boolean existsSolutions(String solutionSet);
     
-    /**
-     * Return a view of a maintained DESCRIBE cache.
-     * 
-     * @param namespace
-     *            The KB namespace.
-     * @param timestamp
-     *            The timestamp of the view.
-     *            
-     * @return The view of the maintained DESCRIBE cache -or- <code>null</code>
-     *         if no cache is available for that KB.
-     */
-    IDescribeCache getDescribeCache(final String namespace, final long timestamp);
-
-//    /**
-//     * Return the result from the cache -or- <code>null</code> if there is a
-//     * cache miss.
-//     * 
-//     * @param ctx
-//     *            The {@link AST2BOpContext}.
-//     *            
-//     * @param queryOrSubquery
-//     *            The query.
-//     * 
-//     * @return The cache hit -or- <code>null</code>
-//     */
-//    ICacheHit get(final AST2BOpContext ctx, final QueryBase queryOrSubquery);
-//
-//    /**
-//     * Publish a solution set to the cache.
-//     * 
-//     * @param ctx
-//     *            The query context in which the solution set was generated.
-//     * @param queryOrSubquery
-//     *            The query or subquery used to generate the solution set.
-//     * @param src
-//     *            An iterator which can drain the solution set.
-//     * @return A reference to the cached solution set.
-//     */
-//    ICacheHit put(final AST2BOpContext ctx, final QueryBase queryOrSubquery,
-//            final ICloseableIterator<IBindingSet> src);
-
 }

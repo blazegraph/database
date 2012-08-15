@@ -35,7 +35,7 @@ import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
@@ -104,7 +104,7 @@ public class JVMHashJoinOp<E> extends HashJoinOp<E> {
 
     @Override
     protected IHashJoinUtility newState(final BOpContext<IBindingSet> context,
-            final NamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
+            final INamedSolutionSetRef namedSetRef, final JoinTypeEnum joinType) {
 
         return new JVMHashJoinUtility(this, joinType);
     

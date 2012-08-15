@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.solutions;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.htree.HTree;
@@ -42,15 +42,15 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- *         FIXME Provide {@link ISolutionSet} implementations derived from
+ *         TODO Provide {@link ISolutionSet} implementations derived from
  *         {@link HTree} and {@link BTree}.
  *         <P>
  *         I am not sure that we will require this. We can probably use the
- *         Stream for named solution sets for quite a while without supporting
- *         declaration of named solution sets with specific join variables.
- *         However, if we do add support for this, then we need to reconcile the
- *         {@link HTree} version with the hash join code and
- *         {@link NamedSolutionSetRef} and also add an {@link IAccessPath} for
+ *         {@link SolutionSetStream} for named solution sets for quite a while
+ *         without supporting declaration of named solution sets with specific
+ *         join variables. However, if we do add support for this, then we need
+ *         to reconcile the {@link HTree} version with the hash join code and
+ *         {@link INamedSolutionSetRef} and also add an {@link IAccessPath} for
  *         {@link HTree} and {@link Stream} backed solution sets so they can be
  *         played out through a simple iterator model. The {@link AccessPath} is
  *         relation specific, but it could be relayered to provide support for

@@ -242,12 +242,13 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */,
         queryContext
         );
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query, true/* lastInvocation */, source, sink, null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -341,12 +342,14 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */,
         queryContext
         );
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -506,12 +509,14 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         queryContext
         );
         
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -676,13 +681,15 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         queryContext
         );
 
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
         
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -849,13 +856,15 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         queryContext
         );
         
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
 
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1021,12 +1030,14 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         queryContext
         );
         
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1188,13 +1199,15 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         queryContext
         );
 
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
         
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1354,12 +1367,15 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */,
         queryContext
         );
+        
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1503,12 +1519,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1665,12 +1685,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -1842,12 +1866,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+        
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2003,12 +2031,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2182,12 +2214,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2370,12 +2406,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+        
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+        
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2564,12 +2604,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+        
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
             
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2745,12 +2789,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+        
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+        
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -2934,12 +2982,16 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         , null/* indexManager */
         , queryContext
         );
+
+        // Note: [lastInvocation:=true] forces the solutions to be emitted.
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
-        // Force the solutions to be emitted.
-        context.setLastInvocation();
+
+//        // Force the solutions to be emitted.
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.

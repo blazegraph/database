@@ -25,15 +25,16 @@ package com.bigdata.bop.join;
 
 import java.util.UUID;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
-
-import junit.framework.TestCase2;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 
 /**
  * Test suite for {@link HTreeSolutionSetHashJoinOp}.
@@ -67,8 +68,8 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
         
         final String solutionSetName = "set1";
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName, joinVars);
 
         // release requires lastPass
         // optional requires lastPass

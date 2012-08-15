@@ -331,18 +331,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, null/* sink2 */);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, null/* sink2 */);
+
+//            context.setLastInvocation();
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);
@@ -455,18 +457,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, null/* sink2 */);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, null/* sink2 */);
+
+//            context.setLastInvocation();
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);
@@ -573,18 +577,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, null/* sink2 */);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, null/* sink2 */);
+
+//            context.setLastInvocation();
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);
@@ -690,18 +696,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, null/* sink2 */);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, null/* sink2 */);
+
+//            context.setLastInvocation();
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);
@@ -838,18 +846,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, null/* sink2 */);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, null/* sink2 */);
+
+//            context.setLastInvocation();
             
             // get task.
             final FutureTask<Void> ft = query.eval(context);
@@ -1017,18 +1027,20 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBlockingBuffer<IBindingSet[]> sink2 = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
-            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
-                            queryContext), -1/* partitionId */, stats, source,
-                    sink, sink2);
-
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
              * run the hash join, this is signal is required in order to have
              * the operator produce output. Otherwise it will just buffer the
              * source solutions until it exceeds its memory budget.
              */
-            context.setLastInvocation();
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */,
+                            setup.jnl/* indexManager */, queryContext),
+                    -1/* partitionId */, stats, query/* op */,
+                    true/* lastInvocation */, source, sink, sink2);
+
+//            context.setLastInvocation();
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);

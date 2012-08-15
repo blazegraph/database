@@ -53,9 +53,9 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
@@ -95,12 +95,12 @@ public class ObjectManager extends ObjectMgrModel {
         
         final QueryEngine queryEngine = cxn.getSail().getQueryEngine();
 
-        final ISparqlCache sparqlCache = SparqlCacheFactory
-                .getExistingSparqlCache(queryEngine);
+        final ICacheConnection cacheConn = CacheConnectionFactory
+                .getExistingCacheConnection(queryEngine);
 
-        if (sparqlCache != null) {
+        if (cacheConn != null) {
 
-            m_describeCache = sparqlCache.getDescribeCache(
+            m_describeCache = cacheConn.getDescribeCache(
                     tripleStore.getNamespace(), tripleStore.getTimestamp());
 
         } else {

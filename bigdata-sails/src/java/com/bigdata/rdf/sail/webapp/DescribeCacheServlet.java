@@ -43,19 +43,14 @@ import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
-import com.bigdata.rdf.sparql.ast.cache.ISparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCache;
-import com.bigdata.rdf.sparql.ast.cache.SparqlCacheFactory;
-import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * A maintained cache for DESCRIBE of URIs.
@@ -67,19 +62,6 @@ import com.bigdata.rwstore.sector.MemStore;
  * The {@link DescribeCacheServlet} will recognize and perform the DESCRIBE of
  * cached resources where those resources are attached to a request attribute
  * 
- * TODO One or more resources DESCRIBEd per request?
- * 
- * TODO Maintenance of the DESCRIBE cache (via {@link CustomServiceFactory}).
- * 
- * TODO If the cache is durable, then it needs to use a durable backend. If it
- * is incrementally maintained, then it can use a {@link MemStore} or a
- * {@link BufferMode#MemStore} (delegating) {@link Journal} (pattern) similar to
- * the {@link SparqlCache}. Incremental maintenance means that a NOT_FOUND is
- * not authoritative. We must still check the database. If we populate and
- * maintain the cache on insert then it becomes authoritative (for this
- * endpoint) and NOT_FOUND means that there is nothing known about that
- * resource.
- * 
  * TODO Http cache control. Different strategies can make sense depending on the
  * scalability of the application and the tolerance for stale data. We can use
  * an expire for improved scalability with caching into the network, but
@@ -88,8 +70,7 @@ import com.bigdata.rwstore.sector.MemStore;
  * If we support faceting (by schema or source) then we need to provide E-Tags
  * for each schema/source so the client can inspect/require certain facets.
  * 
- * TODO VoID for forward/reverse link set summarization when the cardinality is
- * large. Otherwise directly represent the data.
+ * TODO VoID for forward/reverse link set and attribute sketch.
  * 
  * TODO Conneg for the actual representation, but internally use an efficient
  * representation that can provide summaries (a SKETCH) through a jump table
@@ -102,10 +83,6 @@ import com.bigdata.rwstore.sector.MemStore;
  * about the web resources that have been queried for a given URI. This should
  * include at least the URI itself and could include well known aggregators that
  * might have data for that URI.
- * 
- * TODO DESCRIBE => Service translation and invocation from the query engine
- * using a conditional pipeline. If NOT_FOUND, then do the describe (conditional
- * sub-query) and populate the cache.
  * 
  * TODO Take advantage of the known materialization performed by a DESCRIBE
  * query when running queries (materialized star-join). Also, store IVs in the
@@ -123,9 +100,7 @@ import com.bigdata.rwstore.sector.MemStore;
  * TODO Expose (and declare through VoID) a simple URI lookup service that is
  * powered by this cache and turns into a DESCRIBE query if there is a cache
  * miss (or turn it into a DESCRIBE query and let that route to the cache
- * first).
- * 
- * TODO Test suite.
+ * first).  VoID has the concept of this kind of "lookup" service.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584"> DESCRIBE
  *      CACHE </a>
@@ -200,16 +175,15 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
                 .getQueryController(context.getIndexManager());
 
         // Iff enabled.
-        final ISparqlCache sparqlCache = SparqlCacheFactory
-                .getExistingSparqlCache(queryEngine);
+        final ICacheConnection cacheConn = CacheConnectionFactory
+                .getExistingCacheConnection(queryEngine);
 
         final String namespace = getNamespace(req);
 
         final long timestamp = getTimestamp(req);
 
-        final IDescribeCache describeCache = sparqlCache == null ? null
-                : ((SparqlCache) sparqlCache).getDescribeCache(namespace,
-                        timestamp);
+        final IDescribeCache describeCache = cacheConn == null ? null
+                : cacheConn.getDescribeCache(namespace, timestamp);
 
         if (describeCache == null) {
 
@@ -398,7 +372,7 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
                 try {
                     throw BigdataRDFServlet.launderThrowable(e, resp,
                             "DESCRIBE"
-                    // queryStr // TODO Report as "DESCRIBE uri+".
+                    // queryStr // TODO Report as "DESCRIBE uri(s)".
                             );
                 } catch (Exception e1) {
                     throw new RuntimeException(e);

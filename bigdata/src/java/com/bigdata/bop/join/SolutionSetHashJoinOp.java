@@ -43,9 +43,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -220,13 +220,13 @@ abstract public class SolutionSetHashJoinOp extends PipelineOp {
             this.op = op;
 
             // The name of the attribute used to discover the solution set.
-            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+            final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
             // Lookup the attributes for the query on which we will hang the
             // solution set.
             final IQueryAttributes attrs = context
-                    .getQueryAttributes(namedSetRef.queryId);
+                    .getQueryAttributes(namedSetRef.getQueryId());
 
             state = (IHashJoinUtility) attrs.get(namedSetRef);
 

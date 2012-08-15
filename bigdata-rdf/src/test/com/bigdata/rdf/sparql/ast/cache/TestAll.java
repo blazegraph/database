@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.cache;
 
+
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -55,9 +58,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("SPARQL Cache");
+        final TestSuite suite = new TestSuite("Solution Set Cache");
 
-        suite.addTestSuite(TestSparqlCacheFactory.class);
+        suite.addTestSuite(TestCacheConnectionFactory.class);
+        
+        if (QueryHints.DEFAULT_SOLUTION_SET_CACHE) {
+
+            // Test get/put/clear/etc for named solution sets.
+            suite.addTestSuite(TestSolutionSetCache.class);
+
+        }
         
         /*
          * Note: Data-driven unit tests are used for the SPARQL named solution

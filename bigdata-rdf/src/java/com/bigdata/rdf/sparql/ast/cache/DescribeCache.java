@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
+import org.openrdf.query.GraphQueryResult;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.htree.HTree;
@@ -20,7 +21,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  *         FIXME MVCC VIEWS: The same integration issue also needs to be
- *         addressed for the {@link SparqlCache} for named solution sets.
+ *         addressed for the {@link CacheConnectionImpl} for named solution sets.
  * 
  *         TODO Support hash partitioned and remove DESCRIBE cache instances.
  *         These will need access to a service that resolves {@link BigdataURI}
@@ -30,7 +31,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class DescribeCache implements IDescribeCache {
 
     static private transient final Logger log = Logger
-            .getLogger(SparqlCache.class);
+            .getLogger(CacheConnectionImpl.class);
 
     // /**
     // * The KB instance for which the cache is being maintained.
@@ -101,12 +102,27 @@ public class DescribeCache implements IDescribeCache {
      * 
      * TODO Compute the sketch and use an efficient representation for the
      * describe graph. The insert should be vectored, scalable, and page
-     * oriented (blob stream API).
+     * oriented (blob stream API). The only scalable way to compute and store
+     * the sketch is to stream onto a buffer backed by temporary file, computing
+     * the sketch as we go and then replay the stream into a compact
+     * representation for the resource description. However, note that the API
+     * currently presumes that the {@link Graph} is transmitted as a unit. A
+     * {@link GraphQueryResult} provides an iterator oriented view of a graph
+     * more suitable to the transmission of large graphs and streaming graphs
+     * over a network.
+     * <p>
+     * The sketch can be used to compress the resource description. For example,
+     * it includes a frequency count of the predicates that can be used to
+     * assign Huffman codes. It would also be useful to be able to efficiently
+     * skip forward in the stream to the offset where specific edges are stored.
+     * Perhaps we could organize the edges using SPO (attributes and forward
+     * links) and POS (reverse links) projections.
      * 
      * TODO If we explicit manage the raw records then we need to change how the
      * metadata is declared. We would have a fixed length value (the addr on the
      * backing store - either 4 or 8 bytes). We would also have to manage the
-     * storage explicitly.
+     * storage explicitly, including explicitly deleting the backing raw record
+     * for each cache entry when that cache entry is invalidated.
      */
     public void insert(final IV<?, ?> iv, final Graph g) {
 
@@ -141,9 +157,6 @@ public class DescribeCache implements IDescribeCache {
 
     /**
      * {@inheritDoc}
-     * 
-     * TODO If we explicitly manage raw records (rather than transparently) then
-     * this MUST release the backing raw record for each cache entry.
      * 
      * TODO Invalidation should probably for lastCommitTime+1 (that is, anything
      * after the most current lastCommitTime). However, there is still a race

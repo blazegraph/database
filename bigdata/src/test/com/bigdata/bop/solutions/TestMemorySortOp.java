@@ -184,12 +184,13 @@ public class TestMemorySortOp extends TestCase2 {
 		, null/* indexManager */,queryContext
 		);
 
-		final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-				runningQuery, -1/* partitionId */
-				, stats, source, sink, null/* sink2 */
-		);
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
+        );
 		
-        context.setLastInvocation();
+//        context.setLastInvocation();
 
 		final FutureTask<Void> ft = query.eval(context);
 		// Run the query.
@@ -297,10 +298,11 @@ public class TestMemorySortOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
-        );
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
+      );
 
-        context.setLastInvocation();
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -412,10 +414,11 @@ public class TestMemorySortOp extends TestCase2 {
         
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 runningQuery, -1/* partitionId */
-                , stats, source, sink, null/* sink2 */
+                , stats, query/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
         );
 
-        context.setLastInvocation();
+//        context.setLastInvocation();
 
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
@@ -435,7 +438,7 @@ public class TestMemorySortOp extends TestCase2 {
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;
         assertEquals ( 7, stats.unitsOut.get () ) ;
-        assertEquals ( 1, stats.chunksOut.get () ) ;
+        assertEquals(1, stats.chunksOut.get());
     }
 
 }

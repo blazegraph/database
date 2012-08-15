@@ -33,9 +33,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 
 /**
  * Test suite for {@link HTreeHashIndexOp}.
@@ -101,8 +102,8 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
         
         final String solutionSetName = "set1";
         
-        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                queryId, solutionSetName, joinVars);
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
+                .newInstance(queryId, solutionSetName, joinVars);
 
         new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//

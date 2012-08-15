@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 31, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.bop;
 
 import java.util.Arrays;
 import java.util.UUID;
@@ -33,8 +33,11 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NamedSolutionSetRef;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
+import com.bigdata.journal.ITx;
 
 /**
  * Test suite for {@link NamedSolutionSetRef}.
@@ -70,12 +73,12 @@ public class TestNamedSolutionSetRef extends TestCase2 {
         final IVariable[] joinVars = new IVariable[] { x, y };
         
         {
-            final NamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
+            final INamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
                     namedSet, joinVars);
 
-            assertEquals("namedSet", namedSet, ref.namedSet);
-            assertTrue("queryId", queryId.equals(ref.queryId));
-            assertTrue("joinVars", Arrays.deepEquals(joinVars, ref.joinVars));
+            assertEquals("namedSet", namedSet, ref.getLocalName());
+            assertTrue("queryId", queryId.equals(ref.getQueryId()));
+            assertTrue("joinVars", Arrays.deepEquals(joinVars, ref.getJoinVars()));
         }
 
         try {
@@ -116,21 +119,61 @@ public class TestNamedSolutionSetRef extends TestCase2 {
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[] { x, y };
 
-        final NamedSolutionSetRef ref = new NamedSolutionSetRef(queryId,
-                namedSet, joinVars);
+        final String namespace = "kb";
+        
+        final long timestamp = ITx.UNISOLATED;
+        
+        /*
+         * First, test a reference for a named solution set attached to a query.
+         */
+        
+        final INamedSolutionSetRef ref = NamedSolutionSetRefUtility
+                .newInstance(queryId, namedSet, joinVars);
 
         final String s = ref.toString();
 
         if (log.isInfoEnabled())
             log.info(s);
 
-        final NamedSolutionSetRef ref2 = NamedSolutionSetRef.valueOf(s);
+        final INamedSolutionSetRef ref2 = NamedSolutionSetRefUtility.valueOf(s);
 
         if (log.isInfoEnabled())
             log.info(ref2.toString());
 
-        assertEquals(ref, ref2);
+        assertTrue(ref.equals(ref2));
+        assertTrue(ref2.equals(ref));
+        assertTrue(ref.equals(ref));
+        assertTrue(ref2.equals(ref2));
 
+        /*
+         * Now test a reference for a named solution set associated with a KB
+         * (either durable or cached).
+         */
+
+        final INamedSolutionSetRef refX = NamedSolutionSetRefUtility
+                .newInstance(namespace, timestamp, namedSet, joinVars);
+
+        final String sX = refX.toString();
+
+        if (log.isInfoEnabled())
+            log.info(sX);
+
+        final INamedSolutionSetRef refX2 = NamedSolutionSetRefUtility.valueOf(sX);
+
+        if (log.isInfoEnabled())
+            log.info(refX2.toString());
+
+        assertTrue(refX.equals(refX2));
+        assertTrue(refX2.equals(refX));
+        assertTrue(refX.equals(refX));
+        assertTrue(refX2.equals(refX2));
+
+        /*
+         * Verify that ref and refX are not equals!
+         */
+        assertFalse(ref.equals(refX));
+        assertFalse(refX.equals(ref));
+        
     }
     
 }

@@ -226,8 +226,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats,
-                source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -321,8 +321,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats,
-                source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -385,7 +385,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -480,7 +481,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -546,7 +548,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -603,7 +606,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         try {
@@ -644,7 +648,8 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, query/* op */,
+                false/* lastInvocation */, source, sink, null/* sink2 */);
 
         // get task.
         try {
@@ -737,7 +742,8 @@ public class TestSliceOp extends TestCase2 {
                         null/* indexManager */, sink);
 
                 final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                        q, -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                        q, -1/* partitionId */, stats, query/* op */,
+                        false/* lastInvocation */, source, sink, null/* sink2 */);
 
                 final FutureTask<Void> ft = query.eval(context);
 

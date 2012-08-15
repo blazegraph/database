@@ -33,6 +33,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import junit.framework.TestCase2;
+
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 
@@ -44,11 +46,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
@@ -62,8 +64,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-
-import junit.framework.TestCase2;
 
 /**
  * Abstract base class for DISTINCT SOLUTIONS test suites.
@@ -251,7 +251,7 @@ abstract public class AbstractDistinctSolutionsTestCase extends TestCase2 {
                     new NV(HTreeDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.VARIABLES,vars),//
                     new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
-                            new NamedSolutionSetRef(queryId, getName(), vars)),//
+                            NamedSolutionSetRefUtility.newInstance(queryId, getName(), vars)),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),//
@@ -288,8 +288,9 @@ abstract public class AbstractDistinctSolutionsTestCase extends TestCase2 {
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                     new MockRunningQuery(null/* fed */, null/* indexManager */,
-                            queryContext),
-                    -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                            queryContext), -1/* partitionId */, stats,
+                    query/* op */, false/* lastInvocation */, source, sink,
+                    null/* sink2 */);
 
             // get task.
             final FutureTask<Void> ft = query.eval(context);

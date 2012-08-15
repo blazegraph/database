@@ -64,19 +64,20 @@ public class DescribeServiceFactory implements CustomServiceFactory {
     @Override
     public void startConnection(final BigdataSailConnection conn) {
 
-        final ISparqlCache sparqlCache = SparqlCacheFactory
-                .getExistingSparqlCache(conn.getBigdataSail().getQueryEngine());
+        final ICacheConnection cacheConn = CacheConnectionFactory
+                .getExistingCacheConnection(conn.getBigdataSail()
+                        .getQueryEngine());
 
-        if (sparqlCache == null) {
+        if (cacheConn == null) {
 
-            // SPARQL cache is not enabled.
+            // Cache is not enabled.
             return;
 
         }
 
         final AbstractTripleStore tripleStore = conn.getTripleStore();
 
-        final IDescribeCache describeCache = sparqlCache.getDescribeCache(
+        final IDescribeCache describeCache = cacheConn.getDescribeCache(
                 tripleStore.getNamespace(), tripleStore.getTimestamp());
 
         if (describeCache == null) {
