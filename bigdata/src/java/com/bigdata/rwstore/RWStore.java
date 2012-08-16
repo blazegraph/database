@@ -2336,7 +2336,7 @@ public class RWStore implements IStore, IBufferedWriter {
 //              latestReleasableTime++;
 
             if (txLog.isInfoEnabled())
-                txLog.info("lastCommitTime=" + lastCommitTime
+                txLog.info("RECYCLER: lastCommitTime=" + lastCommitTime
                         + ", latestReleasableTime=" + latestReleasableTime
                         + ", lastDeferredReleaseTime="
                         + m_lastDeferredReleaseTime + ", activeTxCount="
@@ -3551,7 +3551,7 @@ public class RWStore implements IStore, IBufferedWriter {
         		fromKey, toKey);
 
         if (txLog.isInfoEnabled())
-            txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
+            txLog.info("RECYCLED: fromTime=" + fromTime + ", toTime=" + toTime
                     + ", totalFreed=" + totalFreed 
                     + ", commitPointsRecycled=" + commitPointsRecycled
                     + ", commitPointsRemoved=" + commitPointsRemoved
