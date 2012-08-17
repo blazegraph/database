@@ -193,6 +193,11 @@ abstract public class AbstractTripleStore extends
 
     final static private Logger log = Logger.getLogger(AbstractTripleStore.class);
 
+    /*
+     * TODO I have held back this change until I can test it on a cluster.  I am
+     * not sure what effect this would have.  You can always force registration
+     * of the embedded services using "ServiceRegistry.getInstance()".
+     */
 //    /**
 //     * Make sure that any services are registered.
 //     */
