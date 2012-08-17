@@ -379,7 +379,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	/**
 	 * Counts the #of results in a SPARQL result set.
 	 * 
-	 * @param conn
+	 * @param result
 	 *            The connection from which to read the results.
 	 * 
 	 * @return The #of results.
