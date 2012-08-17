@@ -43,7 +43,6 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -575,15 +574,29 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
 
             assertDescribedResource(dc, describeCache, h);
 
-//            }
+            // }
 
-            // Should cause the cache entry to be invalidated.
-            final BigdataSail sail= new BigdataSail(h.getTripleStore());
-            sail.initialize();
-            final BigdataSailConnection conn = sail.getConnection();
-            conn.addStatement(dc, rdfType, foafPerson,
-                    BD.NULL_GRAPH);
-            conn.commit();
+            /*
+             * Should cause the cache entry to be invalidated.
+             * 
+             * TODO The DescribeServiceFactory will only notice an update that
+             * goes through a BigdataSailConnection. This issue is documented at
+             * CustomServiceFactory. This should probably be fixed as part of a
+             * broader overhaul.
+             */
+            final BigdataSail sail = new BigdataSail(h.getTripleStore());
+            try {
+                sail.initialize();
+                final BigdataSailConnection conn = sail.getConnection();
+                try {
+                    conn.addStatement(dc, rdfType, foafPerson);
+                    conn.commit();
+                } finally {
+                    conn.close();
+                }
+            } finally {
+                sail.shutDown();
+            }
 
             // This cache entry should be gone.
             assertNull(describeCache.lookup(dc.getIV()));
