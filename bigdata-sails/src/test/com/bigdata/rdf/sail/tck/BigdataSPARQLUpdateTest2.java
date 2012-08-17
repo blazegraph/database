@@ -335,7 +335,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 //        
 //        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
 
-        props.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+        props.setProperty(Options.BUFFER_MODE, BufferMode.MemStore.toString());
         
         // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
         props.setProperty(Options.QUADS_MODE, "true");
