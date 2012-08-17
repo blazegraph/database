@@ -55,6 +55,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -125,6 +126,9 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         // turn on quads.
         properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
 
+        // TM not available with quads.
+        properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,"false");
+
 //        // override the default vocabulary.
 //        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
 //                NoVocabulary.class.getName());
@@ -136,7 +140,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         // no persistence.
         properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
                 BufferMode.Transient.toString());
-        
+
         return properties;
 
     }

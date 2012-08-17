@@ -1657,7 +1657,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         if (allSolutionSets && context.sparqlCache != null) {
             
             // Delete all solution sets.
-            context.sparqlCache.clearAllSolutions(context);
+            context.sparqlCache.clearAllSolutions();
             
         }
         

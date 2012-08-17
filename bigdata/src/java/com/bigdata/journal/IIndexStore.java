@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +57,19 @@ public interface IIndexStore {
      *         with that name for that timestamp.
      */
     public IIndex getIndex(String name, long timestamp);
+
+    /**
+     * Iterator visits the names of all indices spanned by the given prefix.
+     * 
+     * @param prefix
+     *            The prefix (optional).
+     * @param timestamp
+     *            A timestamp which represents either a possible commit time on
+     *            the store or a read-only transaction identifier.
+     * 
+     * @return An iterator visiting those index names.
+     */
+    public Iterator<String> indexNameScan(String prefix, long timestamp);
 
     /**
      * Return an unisolated view of the global {@link SparseRowStore} used to

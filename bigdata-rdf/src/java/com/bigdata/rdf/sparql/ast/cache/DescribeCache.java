@@ -33,45 +33,40 @@ public class DescribeCache implements IDescribeCache {
     static private transient final Logger log = Logger
             .getLogger(CacheConnectionImpl.class);
 
-    // /**
-    // * The KB instance for which the cache is being maintained.
-    // */
-    // private final AbstractTripleStore tripleStore;
-
     /**
      * The cache. The keys are {@link IV}s. The values are the {@link Graph} s
      * describing those {@link IV}s.
      */
-    private HTree cache;
+    private HTree map;
+    
+    public DescribeCache(final HTree map) {
 
-    public DescribeCache(// final AbstractTripleStore tripleStore,
-            final HTree cache) {
-
-        // if(tripleStore == null)
-        // throw new IllegalArgumentException();
-
-        if (cache == null)
+        if (map == null)
             throw new IllegalArgumentException();
 
-        // this.tripleStore = tripleStore;
-
-        this.cache = cache;
+        this.map = map;
 
     }
 
     public void close() {
 
-        this.cache.close();
+        this.map.close();
 
     }
 
+    public void destroy() {
+        
+        this.map.removeAll();
+        
+    }
+    
     /**
      * Return a thread-local instance.
      * 
      */
     private IKeyBuilder getKeyBuilder() {
 
-        return cache.getIndexMetadata().getKeyBuilder();
+        return map.getIndexMetadata().getKeyBuilder();
 
     }
 
@@ -130,11 +125,11 @@ public class DescribeCache implements IDescribeCache {
 
         final byte[] val = SerializerUtil.serialize(g);
 
-        synchronized (cache) {
+        synchronized (map) {
 
-            cache.remove(key);
+            map.remove(key);
 
-            cache.insert(key, val);
+            map.insert(key, val);
 
         }
 
@@ -144,7 +139,7 @@ public class DescribeCache implements IDescribeCache {
 
         final byte[] key = iv2key(getKeyBuilder(), iv);
 
-        final byte[] val = cache.lookupFirst(key);
+        final byte[] val = map.lookupFirst(key);
 
         if (val == null)
             return null;
@@ -184,13 +179,13 @@ public class DescribeCache implements IDescribeCache {
 
         final IKeyBuilder keyBuilder = getKeyBuilder();
 
-        synchronized (cache) {
+        synchronized (map) {
 
             for (IV<?, ?> iv : a) {
 
                 final byte[] key = iv2key(keyBuilder, iv);
 
-                cache.remove(key);
+                map.remove(key);
 
             }
 

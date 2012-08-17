@@ -93,9 +93,6 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  * 
  * @see DumpJournal
- * 
- * @todo debug logic to dump only within the namespace (its hacked in
- *       {@link ListIndicesTask}).
  */
 public class DumpFederation {
 

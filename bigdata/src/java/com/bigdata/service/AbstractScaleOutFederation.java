@@ -105,7 +105,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
      * 
      * {@inheritDoc}
      */
-    public ClientIndexView getIndex(String name, long timestamp) {
+    public ClientIndexView getIndex(final String name, final long timestamp) {
 
         return (ClientIndexView) super.getIndex(name, timestamp);
         

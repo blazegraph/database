@@ -70,9 +70,6 @@ public class TestAll extends TestCase {
         // test the root block api.
         suite.addTestSuite( TestRootBlockView.class );
 
-        // @todo tests of the index used map index names to indices.
-        suite.addTestSuite( TestName2Addr.class );
-
         // tests of the index used to access historical commit records
         suite.addTestSuite( TestCommitRecordIndex.class );
         

@@ -1131,8 +1131,11 @@ public class BigdataSail extends SailBase implements Sail {
     }
 
     /**
-     * Return a read-write {@link SailConnection}. There is only one writable
-     * connection and this method will block until the connection is available.
+     * Return a read-write {@link SailConnection}. This is used for both
+     * read-write transactions and the UNISOLATED connection.
+     * <p>
+     * Note: There is only one UNISOLATED connection and, when requested, this
+     * method will block until that connection is available.
      * 
      * @see #getReadOnlyConnection() for a non-blocking, read-only connection.
      * 
@@ -1157,6 +1160,8 @@ public class BigdataSail extends SailBase implements Sail {
                 conn = getUnisolatedConnection();
 
             }
+
+//log.error("START CONNECTION : "+conn); // FIXME LOGGING
 
             if (!conn.isReadOnly()) {
 
@@ -2705,9 +2710,11 @@ public class BigdataSail extends SailBase implements Sail {
              */
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
-            
+
             final long commitTime = database.commit();
             
+//log.error("COMMIT : changeLog="+(changeLog!=null)+", commitTime="+commitTime); // FIXME LOGGER
+
             if (changeLog != null) {
                 
                 changeLog.transactionCommited(commitTime);
@@ -3390,6 +3397,8 @@ public class BigdataSail extends SailBase implements Sail {
                 // Attach that transaction view to this SailConnection.
                 attach(txView);
 
+//log.error("NEW TX: "+this); // FIXME LOGGING
+
             } catch (Throwable t) {
 
                 try {
@@ -3441,6 +3450,8 @@ public class BigdataSail extends SailBase implements Sail {
             
                 final long commitTime = txService.commit(tx);
                 
+//log.error("COMMIT : changeLog="+(changeLog!=null)+", tx="+tx+", commitTime="+commitTime); // FIXME LOGGER
+
                 if (changeLog != null) {
                     
                     changeLog.transactionCommited(commitTime);

@@ -35,6 +35,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.stream.Stream;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
 
 /**
  * A checkpoint record is written each time the btree is flushed to the
@@ -861,6 +862,16 @@ public class Checkpoint implements Externalizable {
             break;
         case HTree:
             ndx = HTree.create(store, (HTreeIndexMetadata) metadata);
+            break;
+        case Stream:
+            /*
+             * FIXME GIST : This is not setting the SolutionSetStream class
+             * since Stream.create() is being invoked rather than
+             * SolutionSetStream.create()
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+             */
+            ndx = Stream.create(store, (StreamIndexMetadata) metadata);
             break;
         default:
             throw new AssertionError("Unknown: " + metadata.getIndexType());

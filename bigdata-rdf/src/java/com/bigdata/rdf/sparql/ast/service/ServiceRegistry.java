@@ -8,7 +8,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.http.conn.ClientConnectionManager;
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -65,11 +68,19 @@ public class ServiceRegistry {
         
         aliases = new ConcurrentHashMap<URI, URI>();
 
+        defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
+                new RemoteServiceFactoryImpl(true/* isSparql11 */));
+
         // Add the Bigdata search service.
         add(BD.SEARCH, new SearchServiceFactory());
 
-        defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
-                new RemoteServiceFactoryImpl(true/* isSparql11 */));
+        if (QueryHints.DEFAULT_DESCRIBE_CACHE) {
+
+            add(new URIImpl(BD.NAMESPACE + "describe"),
+                    new DescribeServiceFactory());
+
+        }
+        
     }
 
     /**

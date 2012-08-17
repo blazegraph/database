@@ -34,7 +34,9 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLEncoder;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Properties;
@@ -995,7 +997,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
 
-    public void dropIndex(String name) {
+    public void dropIndex(final String name) {
 
         if (log.isInfoEnabled())
             log.info("name=" + name);
@@ -1019,6 +1021,46 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This implementation fully buffers the namespace scan.
+     */
+    public Iterator<String> indexNameScan(final String prefix,
+            final long timestamp) {
+
+        if (log.isInfoEnabled())
+            log.info("prefix=" + prefix + " @ " + timestamp);
+
+        assertOpen();
+
+        try {
+
+            final String namespace = MetadataService.METADATA_INDEX_NAMESPACE
+                    + (prefix == null ? "" : prefix);
+
+            final IMetadataService mds = getMetadataService();
+
+            if (mds == null) {
+
+                throw new RuntimeException(
+                        "Could not discover the metadata service");
+
+            }
+
+            final String[] names = (String[]) mds.submit(
+                    new ListIndicesTask(timestamp, namespace)).get();
+
+            return Arrays.asList(names).iterator();
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+        
+    }
+    
     public SparseRowStore getGlobalRowStore() {
         
         return globalRowStoreHelper.getGlobalRowStore();

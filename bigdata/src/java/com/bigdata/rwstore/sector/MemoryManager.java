@@ -948,9 +948,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 						m_debugCurs = 0;
 					}
 				}
+
+				removeFromExternalCache(getPhysicalAddress(addr),
+                        sector.getPhysicalSize(offset));
+
 			} else {
 
-				// free of a blob.
+	            // free of a blob.
 				final ByteBuffer hdrbuf = getBlobHdr(addr);
 				final int spos = hdrbuf.position();
 				final int hdrsize = hdrbuf.limit() - spos;
@@ -981,7 +985,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				
 			}
 			
-			removeFromExternalCache(getPhysicalAddress(addr), 0);
+//			removeFromExternalCache(getPhysicalAddress(addr), 0);
 		} finally {
 			m_allocationLock.unlock();
 		}
@@ -1229,20 +1233,36 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	}
 
 	/**
-	 * immediateFree
-	 * @param clr
-	 * @param sze
+     * We need to remove entries from the historicalIndexCache for checkpoint
+     * records when the allocations associated with those checkpoint records are
+     * freed.
+     * 
+     * @param clr
+     *            The physical address that is being deleted.
+     * @param slotSize
+     *            The size of the allocator slot for that physical address.
 	 */
-	void removeFromExternalCache(final long clr, final int sze) {
-		assert m_allocationLock.isLocked();
-		if (m_externalCache != null && (sze == 0 || sze == m_cachedDatasize)) {
-			Object rem = m_externalCache.remove(clr);
-			
-			if (rem != null && log.isTraceEnabled()) {
-				log.trace("ExternalCache, removed: " + rem.getClass().getName() + " with addr: " + clr);
-			}
-		}
-	}
+	void removeFromExternalCache(final long clr, final int slotSize) {
+		
+	    assert m_allocationLock.isLocked();
+		
+	    if (m_externalCache == null)
+		    return;
+		
+        if (slotSize == 0 || slotSize == m_cachedDatasize) {
+
+            final Object rem = m_externalCache.remove(clr);
+
+            if (rem != null && log.isTraceEnabled()) {
+
+                log.trace("ExternalCache, removed: " + rem.getClass().getName()
+                        + " with addr: " + clr);
+            
+            }
+
+        }
+
+    }
 
 	private int getSlotSize(final int size) {
 		return SectorAllocator.getBlockForSize(size);

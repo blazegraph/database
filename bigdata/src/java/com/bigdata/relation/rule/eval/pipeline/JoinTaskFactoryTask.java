@@ -1,5 +1,6 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -418,100 +419,128 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
         /**
          * Delegates to the {@link IndexManager}.
          */
+        @Override
         public IIndex getIndex(final String name, final long timestamp) {
 
             return dataService.getResourceManager().getIndex(name, timestamp);
-            
+
         }
 
         /**
          * Not allowed.
          */
+        @Override
         public void dropIndex(final String name) {
-            
+
             throw new UnsupportedOperationException();
-            
+
         }
 
         /**
          * Not allowed.
          */
+        @Override
         public void registerIndex(IndexMetadata indexMetadata) {
 
             throw new UnsupportedOperationException();
-            
+
         }
 
+        @Override
         public void destroy() {
-            
+
             throw new UnsupportedOperationException();
-            
+
         }
 
+        @Override
         public ExecutorService getExecutorService() {
-            
+
             return dataService.getFederation().getExecutorService();
-            
+
         }
 
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
 
             return dataService.getFederation().getGlobalFileSystem();
-            
+
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore() {
 
             return dataService.getFederation().getGlobalRowStore();
-            
+
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
 
             return dataService.getFederation().getGlobalRowStore(timestamp);
-            
+
         }
 
+        @Override
         public long getLastCommitTime() {
 
             return dataService.getFederation().getLastCommitTime();
-            
+
         }
 
+        @Override
         public IResourceLocator getResourceLocator() {
 
             return dataService.getFederation().getResourceLocator();
-            
+
         }
 
+        @Override
         public IResourceLockService getResourceLockService() {
 
             return dataService.getFederation().getResourceLockService();
-            
+
         }
 
+        @Override
         public TemporaryStore getTempStore() {
 
             return dataService.getFederation().getTempStore();
 
         }
 
-    	public ScheduledFuture<?> addScheduledTask(Runnable task,
-    			long initialDelay, long delay, TimeUnit unit) {
-    		return dataService.getFederation().addScheduledTask(task, initialDelay, delay, unit);
-    	}
+        @Override
+        public ScheduledFuture<?> addScheduledTask(Runnable task,
+                long initialDelay, long delay, TimeUnit unit) {
+            return dataService.getFederation().addScheduledTask(task,
+                    initialDelay, delay, unit);
+        }
 
-    	public boolean getCollectPlatformStatistics() {
-    		return dataService.getFederation().getCollectPlatformStatistics();
-    	}
+        @Override
+        public boolean getCollectPlatformStatistics() {
+            return dataService.getFederation().getCollectPlatformStatistics();
+        }
 
-    	public boolean getCollectQueueStatistics() {
-    		return dataService.getFederation().getCollectQueueStatistics();
-    	}
+        @Override
+        public boolean getCollectQueueStatistics() {
+            return dataService.getFederation().getCollectQueueStatistics();
+        }
 
-    	public int getHttpdPort() {
-    		return dataService.getFederation().getHttpdPort();
-    	}
+        @Override
+        public int getHttpdPort() {
+            return dataService.getFederation().getHttpdPort();
+        }
+
+        /**
+         * {@inheritDoc}
+         * 
+         * TODO Implement. Probably delegate to the local DS n2a index so this
+         * does a DS local n2a scan.
+         */
+        @Override
+        public Iterator<String> indexNameScan(String prefix, long timestamp) {
+            throw new UnsupportedOperationException();
+        }
 
     }
 

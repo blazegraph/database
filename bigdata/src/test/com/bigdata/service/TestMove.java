@@ -253,9 +253,8 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
 
                 npartitions = getPartitionCount(name);
 
-//                if (log.isInfoEnabled())
-//                    log.info
-                System.err.println
+                if (log.isInfoEnabled())
+                    log.info
                     ("Populating the index: overflowCounter="
                         + overflowCounter + ", nrounds=" + nrounds
                         + ", nwritten=" + nwritten + ", nentries="
@@ -288,7 +287,8 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
          */
         {
 
-            System.err.println("Setting up LBS for move.");
+            if (log.isInfoEnabled())
+                log.info("Setting up LBS for move.");
 
             // explicitly set the log level for the load balancer.
             LoadBalancerService.log.setLevel(Level.INFO);
@@ -414,8 +414,9 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
                 final PartitionLocator locator = (PartitionLocator) SerializerUtil
                         .deserialize(itr.next().getValue());
 
-                System.err.println("locators["+n+"]="+locator);
-                
+                if (log.isInfoEnabled())
+                    log.info("locators[" + n + "]=" + locator);
+
                 if (locator.getDataServiceUUID().equals(dataService0
                         .getServiceUUID())) {
 
@@ -437,9 +438,11 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
 
             }
 
-            System.err.println("npartitions=" + getPartitionCount(name));
-            System.err.println("npartitions(ds0)=" + ndataService0);
-            System.err.println("npartitions(ds1)=" + ndataService1);
+            if (log.isInfoEnabled()) {
+                log.info("npartitions=" + getPartitionCount(name));
+                log.info("npartitions(ds0)=" + ndataService0);
+                log.info("npartitions(ds1)=" + ndataService1);
+            }
             assertEquals("#dataService0=" + ndataService0, 1, ndataService0);
             assertEquals("#dataService1=" + ndataService0, 1, ndataService1);
 

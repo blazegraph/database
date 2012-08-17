@@ -38,6 +38,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -526,12 +528,37 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * the current name2Addr object.
 			 */
             final BTree btree = (BTree) getIndexWithCheckpointAddr(checkpointAddr);
+            
+            // References must be distinct.
+            if (_name2Addr == btree)
+                throw new AssertionError();
 
-			/*
-			 * Wrap up in a read-only view since writes MUST NOT be allowed.
-			 */
-			return new ReadOnlyIndex(btree);
+//			/*
+//			 * Wrap up in a read-only view since writes MUST NOT be allowed.
+//			 */
+//			return new ReadOnlyIndex(btree);
 
+            /*
+             * Set the last commit time on the Name2Addr view.
+             * 
+             * TODO We can not reliably set the lastCommitTime on Name2Addr in
+             * this method. It will typically be the commitTime associated last
+             * commit point on the store, but it *is* possible to have a commit
+             * on the database where no named indices were dirty and hence no
+             * update was made to Name2Addr. In this (rare, but real) case, the
+             * factual Name2Addr lastCommitTime would be some commit time
+             * earlier than the lastCommitTime reported by the Journal.
+             */
+            final long lastCommitTime = getLastCommitTime();
+
+            if (lastCommitTime != 0L) {
+
+                btree.setLastCommitTime(lastCommitTime);
+
+            }
+
+            return btree;
+            
 		} finally {
 
 			lock.unlock();
@@ -564,10 +591,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
 
-        return new ReadOnlyIndex(
-                (IIndex) getIndexWithCheckpointAddr(checkpointAddr));
+        final Name2Addr n2a = 
+                (Name2Addr) getIndexWithCheckpointAddr(checkpointAddr);
 
-	}
+//        return new ReadOnlyIndex(n2a);
+
+        /*
+         * Set the last commit time on the Name2Addr index view.
+         * 
+         * TODO We can not reliably set the lastCommitTime on Name2Addr in this
+         * method. It will typically be the commitTime associated with the
+         * [commitRecord] that we resolved above, but it *is* possible to have a
+         * commit on the database where no named indices were dirty and hence no
+         * update was made to Name2Addr. In this (rare, but real) case, the
+         * factual Name2Addr lastCommitTime would be some commit time earlier
+         * than the commitTime reported by the [commitRecord].
+         */
+
+        final long commitTime2 = commitRecord.getTimestamp();
+        
+        n2a.setLastCommitTime(commitTime2);
+
+        return n2a;
+
+    }
 
 	/**
 	 * Return the root block view associated with the commitRecord for the
@@ -1154,9 +1201,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * allow the removal of cached data when it is available for recycling.
 			 */
 			if (_bufferStrategy instanceof IRWStrategy) {
-				((IRWStrategy) _bufferStrategy).registerExternalCache(historicalIndexCache,
-						getByteCount(_commitRecordIndex.getCheckpoint().getCheckpointAddr()));
-			}
+
+			    final int checkpointRecordSize = getByteCount(_commitRecordIndex
+                        .getCheckpoint().getCheckpointAddr());
+
+			    ((IRWStrategy) _bufferStrategy).registerExternalCache(
+                        historicalIndexCache, checkpointRecordSize);
+			    
+            }
 
             // new or re-load from the store.
 			this._icuVersionRecord = _getICUVersionRecord();
@@ -2115,10 +2167,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		for (int i = 0; i < _committers.length; i++) {
 
-			if (_committers[i] == null)
+		    final ICommitter committer = _committers[i];
+		    
+			if (committer == null)
 				continue;
 
-			final long addr = _committers[i].handleCommit(commitTime);
+			final long addr = committer.handleCommit(commitTime);
 
 			rootAddrs[i] = addr;
 
@@ -3617,7 +3671,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
                 || TimestampUtility.isReadWriteTx(commitTime)) {
 
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("name=" + name
+                    + ",commitTime=" + TimestampUtility.toString(commitTime));
 
         }
 
@@ -3768,12 +3823,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * {@link ICheckpointProtocol#getLastCommitTime(long)} will report the value
      * associated with {@link Entry#commitTime} for the historical
      * {@link Name2Addr} instance for that {@link ICommitRecord}.
+     * <p>
+     * Note: This method should be preferred to
+     * {@link #getIndexWithCheckpointAddr(long)} for read-historical indices
+     * since it will explicitly mark the index as read-only and specifies the
+     * <i>lastCommitTime</i> on the returned index based on
+     * {@link Name2Addr.Entry#commitTime}, which is the actual commit time for
+     * the last update to the index.
      * 
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
      */
-    public ICheckpointProtocol getIndexWithCommitRecord(final String name,
-            final ICommitRecord commitRecord) {
+    final public ICheckpointProtocol getIndexWithCommitRecord(
+            final String name, final ICommitRecord commitRecord) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (commitRecord == null)
+            throw new IllegalArgumentException();
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -3782,12 +3850,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         try {
 
             assertOpen();
-
-            if (name == null)
-                throw new IllegalArgumentException();
-
-            if (commitRecord == null)
-                throw new IllegalArgumentException();
 
             /*
              * The address of an historical Name2Addr mapping used to resolve
@@ -3834,14 +3896,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * the address on which it was written in the store.
              */
 
-            final ICheckpointProtocol btree = getIndexWithCheckpointAddr(entry.checkpointAddr);
+            final ICheckpointProtocol index = getIndexWithCheckpointAddr(entry.checkpointAddr);
 
             assert entry.commitTime != 0L : "Entry=" + entry;
 
             // Set the last commit time on the btree.
-            btree.setLastCommitTime(entry.commitTime);
+            index.setLastCommitTime(entry.commitTime);
 
-            return btree;
+            return index;
 
         } finally {
 
@@ -3931,8 +3993,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * @param checkpointAddr
      *            The address of the {@link Checkpoint} record.
      * 
-     * @return The persistence capable data structure associated with that
-     *         {@link Checkpoint}.
+     * @return The read-only persistence capable data structure associated with
+     *         that {@link Checkpoint}.
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
@@ -4039,6 +4101,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
+     * 
+     * @deprecated by {@link #register(String, IndexMetadata)}
      */
 	final public BTree registerIndex(final String name, final IndexMetadata metadata) {
 
@@ -4182,6 +4246,72 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
 	}
+
+    public Iterator<String> indexNameScan(final String prefix,
+            final long timestamp) {
+
+        if (timestamp == ITx.UNISOLATED) {
+
+            /*
+             * For the live Name2Addr index, we get the necessary locks to avoid
+             * concurrent modifications, fully materialize the iterator into a
+             * collection, and then return an iterator over that collection.
+             * This is safe, but not as scaleable.
+             */
+
+            final ReadLock lock = _fieldReadWriteLock.readLock();
+
+            lock.lock();
+
+            try {
+
+                final List<String> names = new LinkedList<String>();
+
+                synchronized (_name2Addr) {
+
+                    final Iterator<String> itr = Name2Addr.indexNameScan(
+                            prefix, _name2Addr);
+
+                    while (itr.hasNext()) {
+
+                        names.add(itr.next());
+
+                    }
+
+                }
+
+                return names.iterator();
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
+        }
+
+        final IIndex n2a;
+
+        if (timestamp == ITx.READ_COMMITTED) {
+
+            n2a = getName2Addr();
+
+        } else if (TimestampUtility.isReadWriteTx(timestamp)) {
+
+            final long readsOnCommitTime = getLocalTransactionManager().getTx(
+                    timestamp).getReadsOnCommitTime();
+
+            n2a = getName2Addr(readsOnCommitTime);
+
+        } else {
+
+            n2a = getName2Addr(timestamp);
+
+        }
+
+        return Name2Addr.indexNameScan(prefix, n2a);
+
+    }
 
     /**
      * Return the mutable view of the named index (aka the "live" or

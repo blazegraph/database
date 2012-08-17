@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.cache;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -61,7 +60,7 @@ public interface ISolutionSetCache {
     /**
      * Clear all named solution sets.
      */
-    void clearAllSolutions(IEvaluationContext ctx);
+    void clearAllSolutions();
 
     /**
      * Create a named solution set.

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.cache;
 
-
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -54,10 +53,10 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
+import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
@@ -111,24 +110,30 @@ public class CacheConnectionImpl implements ICacheConnection {
      * presumes a circular hash function such as is common in distributed row
      * stores, etc.
      */
-    private final InnerCacheJournal cacheStore;
+    private final AbstractJournal cacheStore;
     
     /**
-     * The {@link DescribeServiceFactory} tracks changes via an
-     * {@link IChangeLog} registered with each update connection and is
-     * responsible for cache invalidation.
      */
-    private DescribeServiceFactory describeServiceFactory;
+    private boolean enableDescribeCache;
 
     /**
-     * TODO Hack enables the DESCRIBE cache.
      */
-    private boolean enableDescribeCache = QueryHints.DEFAULT_DESCRIBE_CACHE;
-    
+    private boolean enableSolutionsCache;
+
     /**
-     * TODO Hack enables the SOLUTIONS cache.
+     * Boolean determines whether or not the main database is used for the
+     * cache. When the main database is used, the cache winds up being durable.
+     * A dedicated cache journal could also be durable, depending on how it was
+     * configured, as long is it is not destroyed by {@link #close()}.
+     * 
+     * FIXME This is using the local RWStore Journal rather than the
+     * InnerCacheJournal. I am trying to track down an issue with visibility of
+     * SPARQL UPDATEs that write on solution sets using full read/write
+     * transactions. One assumes that if everything is writing onto the SAME
+     * journal instance, then the commit protocol should be taking care of
+     * things for us.
      */
-    private boolean enableSolutionsCache = QueryHints.DEFAULT_SOLUTION_SET_CACHE;
+    private static final boolean useMainDatabaseForCache = false;
     
     private IIndexManager getLocalIndexManager() {
         
@@ -142,8 +147,8 @@ public class CacheConnectionImpl implements ICacheConnection {
          * Note: I have commented this out on the QueryEngine and
          * FederatedQueryEngine until after the 1.2.0 release.
          */
-//        return queryEngine.getConcurrencyManager();
-        throw new UnsupportedOperationException();
+        return queryEngine.getConcurrencyManager();
+//        throw new UnsupportedOperationException();
         
     }
     
@@ -196,18 +201,42 @@ public class CacheConnectionImpl implements ICacheConnection {
 ////
 ////        properties.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
 
-        this.cacheStore = new InnerCacheJournal(properties);
+        if (useMainDatabaseForCache) {
         
+            this.cacheStore = (AbstractJournal) queryEngine.getIndexManager();
+            
+        } else {
+            
+            this.cacheStore = new InnerCacheJournal(properties);
+            
+        }
+
+        /*
+         * TODO Hack enables the SOLUTIONS cache.
+         * 
+         * Note: The SolutionSetStream has a dependency on the IPSOutputStream
+         * so the solutions cache can not be enabled when that interface is not
+         * available.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
+         * Support PSOutputStream/InputStream at IRawStore </a>
+         */
+        this.enableSolutionsCache = QueryHints.DEFAULT_SOLUTION_SET_CACHE
+                && cacheStore.getBufferStrategy() instanceof IRWStrategy;
+
+        /*
+         * TODO Hack enables the DESCRIBE cache.
+         * 
+         * FIXME The describe cache can not be local on a federation (or if it
+         * is, it has to be local to the query controller).
+         */
+        this.enableDescribeCache = QueryHints.DEFAULT_DESCRIBE_CACHE
+                && queryEngine.getFederation() == null;
+
     }
     
     @Override
     public void init() {
-
-        if (enableDescribeCache) {
-
-            describeServiceFactory = new DescribeServiceFactory();
-
-        }
 
     }
     
@@ -215,11 +244,45 @@ public class CacheConnectionImpl implements ICacheConnection {
     public void close() {
 
 //        cacheMap.clear();
-        
-        cacheStore.destroy();
+
+        if (!useMainDatabaseForCache) {
+
+            /*
+             * Do not delete the main database if it is being used for the
+             * cache !!!
+             */
+            
+            cacheStore.destroy();
+            
+        }
 
     }
 
+    @Override
+    public void destroyCaches(final String namespace, final long timestamp) {
+
+        // SOLUTIONS cache (if enabled)
+        final ISolutionSetCache solutionsCache = getSparqlCache(namespace,
+                timestamp);
+
+        if (solutionsCache != null) {
+
+            solutionsCache.clearAllSolutions();
+
+        }
+
+        // DESCRIBE cache (if enabled)
+        final IDescribeCache describeCache = getDescribeCache(namespace,
+                timestamp);
+
+        if (describeCache != null) {
+
+            describeCache.destroy();
+
+        }
+
+    }
+    
     /**
      * {@link CacheConnectionImpl} is used with a singleton pattern managed by the
      * {@link CacheConnectionFactory}. It will be torn down automatically it is no
@@ -240,7 +303,8 @@ public class CacheConnectionImpl implements ICacheConnection {
      * 
      * @return The backing store.
      */
-    protected AbstractJournal getStore() {
+    // TODO Make package private / protected.
+    public AbstractJournal getStore() {
         
         return cacheStore;
         
@@ -318,10 +382,16 @@ public class CacheConnectionImpl implements ICacheConnection {
          * caller just needs to use appropriate synchronization when writing on
          * a mutable HTree. The DescribeCache implementation takes care of that.
          * 
-         * FIXME The DESCRIBE cache will never become materialized if you are
+         * TODO The DESCRIBE cache will never become materialized if you are
          * only running queries (versus mutations) against a given KB instance.
          * This is because the HTree is only created when we have a mutable
-         * view.
+         * view. There is one HTree per KB namespace, so we can not create this
+         * when the CacheConnection is first setup either. As a workaround, you
+         * can demand the DESCRIBE cache eagerly.
+         * 
+         * Perhaps the way to fix this is to move this code into
+         * AbstractTripleStore#create() and the code path where we materialize a
+         * KB from the GRS.
          */
 
         HTree htree;

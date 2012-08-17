@@ -2701,6 +2701,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 			return delegate.getHttpdPort();
 		}
 
+        @Override
+        public Iterator<String> indexNameScan(String prefix, long timestamp) {
+            throw new UnsupportedOperationException();
+        }
+
     } // class IsolatatedActionJournal
 
     /**
@@ -2752,9 +2757,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          */
         
         /**
+         * {@inheritDoc}
+         * <p>
          * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
          */
-        public IIndex getIndex(String name, long timestamp) {
+        public IIndex getIndex(final String name, final long timestamp) {
 
             if (timestamp == ITx.UNISOLATED)
                 throw new UnsupportedOperationException();
@@ -2777,6 +2784,23 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             // to the backing journal.
             return delegate.getIndex(name, timestamp);
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: Does not allow access to {@link ITx#UNISOLATED} indices.
+         */
+        @Override
+        public Iterator<String> indexNameScan(final String prefix,
+                final long timestamp) {
+
+            if (timestamp == ITx.UNISOLATED)
+                throw new UnsupportedOperationException();
+
+            // to the backing journal.
+            return delegate.indexNameScan(prefix, timestamp);
 
         }
 
@@ -3208,6 +3232,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 		public int getHttpdPort() {
 			return delegate.getHttpdPort();
 		}
+
+        @Override
+        public Iterator<String> indexNameScan(String prefix, long timestamp) {
+            throw new UnsupportedOperationException();
+        }
         
     }
     

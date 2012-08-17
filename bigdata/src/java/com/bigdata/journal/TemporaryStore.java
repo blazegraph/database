@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,6 +66,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME GIST This should support generalized indices (HTree, Stream, etc) not just
+ * BTree.
  */
 //* {@link #checkpoint()} may be used to checkpoint the indices and
 //* {@link #restoreLastCheckpoint()} may be used to revert to the last
@@ -325,6 +331,28 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
+    public Iterator<String> indexNameScan(final String prefix,
+            final long timestampIsIgnored) {
+
+        final List<String> names = new LinkedList<String>();
+
+        synchronized (name2Addr) {
+
+            final Iterator<String> itr = Name2Addr.indexNameScan(prefix,
+                    name2Addr);
+
+            while (itr.hasNext()) {
+
+                names.add(itr.next());
+
+            }
+
+        }
+
+        return names.iterator();
+
+    }
+    
     /**
      * Return an {@link ITx#UNISOLATED} view of the named index -or-
      * <code>null</code> if there is no registered index by that name.

@@ -75,5 +75,5 @@ public interface IIndexManager extends IIndexStore {
      *                if <i>name</i> does not identify a registered index.
      */
     public void dropIndex(String name);
-    
+
 }

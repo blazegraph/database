@@ -436,6 +436,14 @@ public class NamedSolutionSetRefUtility {
              */
             index = localJournal.getUnisolatedIndex(fqn);
 
+        } else if(TimestampUtility.isReadWriteTx(timestamp)) {
+            
+            final long readsOnCommitTime = localJournal
+                    .getLocalTransactionManager().getTx(timestamp)
+                    .getReadsOnCommitTime();
+
+            index = localJournal.getIndexLocal(fqn, readsOnCommitTime);
+
         } else if (TimestampUtility.isReadOnly(timestamp)) {
 
             index = localJournal.getIndexLocal(fqn, timestamp);

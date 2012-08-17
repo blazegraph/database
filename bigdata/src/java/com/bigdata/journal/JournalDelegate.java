@@ -264,4 +264,9 @@ public class JournalDelegate implements IJournal {
 	public int getHttpdPort() {
 		return delegate.getHttpdPort();
 	}
+
+    @Override
+    public Iterator<String> indexNameScan(String prefix, long timestamp) {
+        return delegate.indexNameScan(prefix, timestamp);
+    }
 }

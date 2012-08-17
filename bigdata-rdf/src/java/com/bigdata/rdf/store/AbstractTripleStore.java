@@ -123,6 +123,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -192,6 +193,15 @@ abstract public class AbstractTripleStore extends
 
     final static private Logger log = Logger.getLogger(AbstractTripleStore.class);
 
+//    /**
+//     * Make sure that any services are registered.
+//     */
+//    static {
+//        
+//        ServiceRegistry.getInstance();
+//        
+//    }
+    
     /**
      * This is used to conditionally enable the logic to retract justifications
      * when the corresponding statements is retracted.
