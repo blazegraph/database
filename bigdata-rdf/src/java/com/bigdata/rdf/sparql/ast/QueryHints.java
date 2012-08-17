@@ -38,6 +38,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
@@ -413,8 +414,17 @@ public interface QueryHints {
     String DESCRIBE_CACHE = "describeCache";
     
     boolean DEFAULT_DESCRIBE_CACHE = false;
+
+    /**
+     * FIXME Hack enables the cache feature if either the describe or the
+     * solution set caches is enabled.
+     * 
+     * @see CacheConnectionFactory#getCacheConnection(QueryEngine)
+     */
+    final boolean CACHE_ENABLED = DEFAULT_SOLUTION_SET_CACHE
+            || DEFAULT_DESCRIBE_CACHE;
     
-   /**
+    /**
 	 * Option controls whether or not the proposed SPARQL extension for
 	 * reification done right is enabled.
 	 * 

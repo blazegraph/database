@@ -120,7 +120,28 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             // register the scale-out index, creating a single index partition.
             fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
 
-            overflowCounter1 = dataService0.getAsynchronousOverflowCounter();
+            // wait until overflow processing is done.
+            overflowCounter1 = awaitAsynchronousOverflow(dataService0,
+                    overflowCounter0);
+            
+//            {
+//                long counter = 0;
+//
+//                for (int i = 0; i < 10 && counter == 0; i++) {
+//
+//                    counter = dataService0.getAsynchronousOverflowCounter();
+//
+//                    if (counter == 0) {
+//
+//                        Thread.sleep(500/* ms */);
+//
+//                    }
+//
+//                }
+//
+//                overflowCounter1 = counter;
+//
+//            }
 
             assertEquals(1, overflowCounter1);
 

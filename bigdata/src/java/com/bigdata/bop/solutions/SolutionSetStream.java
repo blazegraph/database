@@ -124,6 +124,9 @@ public final class SolutionSetStream extends Stream implements
      *      and reporting fields which are specific to derived classes, not just
      *      BTree, HTree, and Stream. Or we need to add a general concept of a
      *      "summary statistics object" for a persistent data structure.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
+     *      </a>
      */
     private MySolutionSetStats solutionSetStats;
     
@@ -160,6 +163,12 @@ public final class SolutionSetStream extends Stream implements
      * Create a stream for an ordered solution set.
      * <p>
      * {@inheritDoc}
+     * 
+     * FIXME This is not setting the SolutionSetStream class when invoked by
+     * {@link Checkpoint#create(IRawStore, IndexMetadata)} since Stream.create()
+     * is being invoked rather than SolutionSetStream.create().
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
      */
     public static SolutionSetStream create(final IRawStore store,
             final StreamIndexMetadata metadata) {

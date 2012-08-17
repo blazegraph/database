@@ -697,8 +697,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         try {
 
-            super.destroy();
-
             final IIndexManager indexManager = getIndexManager();
 
             indexManager.dropIndex(getFQN(LexiconKeyOrder.TERM2ID));
@@ -721,6 +719,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             valueFactory.remove(/*getNamespace()*/);
 
             termCache.clear();
+            
+            super.destroy();
 
         } finally {
 

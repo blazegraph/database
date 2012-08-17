@@ -394,21 +394,26 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
          * Connect to the cache provider.
          * 
          * Note: This will create the cache if it does not exist. At all other
-         * places in the code we use getExistingSparqlCache() to access the
+         * places in the code we use getExistingCacheConnection() to access the
          * cache IFF it exists. Here is where we create it.
+         * 
+         * TODO Actually, DescribeServiceFactory also does this....
          */
         final ICacheConnection cacheConn = CacheConnectionFactory
                 .getCacheConnection(queryEngine);
 
         if (cacheConn != null) {
 
+            final String namespace = db.getNamespace();
+
+            final long timestamp = db.getTimestamp();
+            
             // SOLUTIONS cache (if enabled)
-            this.sparqlCache = cacheConn.getSparqlCache(db.getNamespace(),
-                    db.getTimestamp());
+            this.sparqlCache = cacheConn.getSparqlCache(namespace, timestamp);
 
             // DESCRIBE cache (if enabled)
-            this.describeCache = cacheConn.getDescribeCache(db.getNamespace(),
-                    db.getTimestamp());
+            this.describeCache = cacheConn.getDescribeCache(namespace,
+                    timestamp);
 
         } else {
             

@@ -71,6 +71,9 @@ public class TestJournalBasics extends TestCase {
         // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite(TestNamedIndices.class);
 
+        // tests of Name2Addr semantics (isolation, prefix scans, etc).
+        suite.addTestSuite(TestName2Addr.class);
+
         // verify that an index is restart-safe iff the journal commits.
         suite.addTestSuite(TestRestartSafe.class);
 
@@ -101,7 +104,10 @@ public class TestJournalBasics extends TestCase {
 
         // test compacting merge of a Journal.
         suite.addTestSuite(TestCompactJournal.class);
-        
+
+        // test the DumpJournal utility.
+        suite.addTestSuite(TestDumpJournal.class);
+
         /*
          * tests of transaction support.
          */

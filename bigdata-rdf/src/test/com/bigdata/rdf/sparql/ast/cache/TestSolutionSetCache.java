@@ -92,6 +92,7 @@ public class TestSolutionSetCache extends TestCase2 {
 
     protected Journal journal;
     protected QueryEngine queryEngine;
+    protected ICacheConnection cacheConn;
     protected ISolutionSetCache cache;
     
     /** Note: Not used yet by the {@link CacheConnectionImpl}.
@@ -160,8 +161,7 @@ public class TestSolutionSetCache extends TestCase2 {
         queryEngine = QueryEngineFactory.getQueryController(journal);
         
         // Setup the solution set cache.
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getCacheConnection(queryEngine);
+        cacheConn = CacheConnectionFactory.getCacheConnection(queryEngine);
 
         // FIXME MVCC VIEWS: This is ONLY using the UNISOLATED VIEW.  Test MVCC semantics.
         cache = cacheConn == null ? null : cacheConn.getSparqlCache(namespace,
@@ -202,6 +202,11 @@ public class TestSolutionSetCache extends TestCase2 {
         if (cache != null) {
             cache.close();
             cache = null;
+        }
+        
+        if (cacheConn != null) {
+            cacheConn.close();
+            cacheConn = null;
         }
         
         if (queryEngine != null) {
@@ -624,16 +629,24 @@ public class TestSolutionSetCache extends TestCase2 {
                 cache.getSolutions(solutionSet2));
 
         // Clear all named solution set.
-        cache.clearAllSolutions(ctx);
+        cache.clearAllSolutions();
 
+//        ((CacheConnectionImpl)cacheConn).getStore().commit();
+        
         // Verify gone.
         try {
-            cache.getSolutions(solutionSet1);
+            final ICloseableIterator<IBindingSet[]> itr = cache.getSolutions(solutionSet1);
+            try {
+                assertFalse(itr.hasNext());
+            }finally {
+                itr.close();
+            }
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
+        assertFalse(cache.existsSolutions(solutionSet1));
 
         // Verify gone.
         try {
@@ -643,6 +656,7 @@ public class TestSolutionSetCache extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
+        assertFalse(cache.existsSolutions(solutionSet2));
 
     }
 

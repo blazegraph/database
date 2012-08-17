@@ -62,7 +62,9 @@ import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.resources.IndexManager;
@@ -444,15 +446,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
     }
 
-//    /**
-//     * Return the {@link ConcurrencyManager} for the {@link #getIndexManager()
-//     * local index manager}.
-//     */
-//    public ConcurrencyManager getConcurrencyManager() {
-//        
-//        return ((Journal) localIndexManager).getConcurrencyManager();
-//
-//    }
+    /**
+     * Return the {@link ConcurrencyManager} for the {@link #getIndexManager()
+     * local index manager}.
+     */
+    public ConcurrencyManager getConcurrencyManager() {
+        
+        return ((Journal) localIndexManager).getConcurrencyManager();
+
+    }
     
     /**
      * The RMI proxy for this {@link QueryEngine} when used as a query controller.

@@ -46,8 +46,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
@@ -61,7 +59,6 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
@@ -70,8 +67,6 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.Tx;
@@ -1495,28 +1490,41 @@ abstract public class IndexManager extends StoreManager {
         
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
-        // historical view of Name2Addr as of that timestamp.
-        final ITupleIterator<?> itr = journal.getName2Addr(timestamp)
-                .rangeIterator();
+//        // historical view of Name2Addr as of that timestamp.
+//        final ITupleIterator<?> itr = journal.getName2Addr(timestamp)
+//                .rangeIterator();
+//        
+//        while (itr.hasNext()) {
+//
+//            final ITuple<?> tuple = itr.next();
+//
+//            final Entry entry = EntrySerializer.INSTANCE
+//                    .deserialize(new DataInputBuffer(tuple.getValue()));
+//        
+//        // the name of an index to consider.
+//        final String name = entry.name;
+//
+//        /*
+//         * Open the mutable BTree only (not the full view since we don't
+//         * want to force the read of index segments from the disk).
+//         */
+//        final BTree btree = (BTree) journal
+//                .getIndexWithCheckpointAddr(entry.checkpointAddr);
         
-        while (itr.hasNext()) {
+        final Iterator<String> itr = journal.indexNameScan(null/* prefix */,
+                timestamp);
 
-            final ITuple<?> tuple = itr.next();
-
-            final Entry entry = EntrySerializer.INSTANCE
-                    .deserialize(new DataInputBuffer(tuple.getValue()));
-
-            // the name of an index to consider.
-            final String name = entry.name;
+        while(itr.hasNext()) {
+        
+            final String name = itr.next();
 
             /*
              * Open the mutable BTree only (not the full view since we don't
              * want to force the read of index segments from the disk).
              */
-            final BTree btree = (BTree) journal
-                    .getIndexWithCheckpointAddr(entry.checkpointAddr);
+            final BTree btree = (BTree) journal.getIndexLocal(name, timestamp);
 
-            assert btree != null : entry.toString();
+            assert btree != null : name;
             
             // index metadata for that index partition.
             final IndexMetadata indexMetadata = btree.getIndexMetadata();

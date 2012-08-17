@@ -32,6 +32,7 @@ import java.util.WeakHashMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * A factory pattern for the {@link ICacheConnection}.
@@ -83,6 +84,13 @@ public class CacheConnectionFactory {
         if (queryEngine == null)
             throw new IllegalArgumentException();
 
+        if(!QueryHints.CACHE_ENABLED) {
+            
+            // Feature is disabled.
+            return null;
+            
+        }
+        
         ICacheConnection cache = instanceCache.get(queryEngine);
 
         if (cache == null) {

@@ -17,12 +17,17 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 
 /**
  * This service tracks KB updates via an {@link IChangeLog} and is responsible
  * for DESCRIBE cache invalidation for resources for which an update has been
  * observed.
-* 
+ * 
+ * @see BD#DESCRIBE
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584"> DESCRIBE
+ *      cache </a>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class DescribeServiceFactory implements CustomServiceFactory {
@@ -64,9 +69,17 @@ public class DescribeServiceFactory implements CustomServiceFactory {
     @Override
     public void startConnection(final BigdataSailConnection conn) {
 
+        /**
+         * TODO This really should not be using getCacheConnection() but rather
+         * getExistingCacheConnection(). I need to figure out the pattern that
+         * brings the cache connection into existence and who is responsible for
+         * invoking it. The problem is that there are multiple entry points,
+         * including AST evaluation, the DescribeServlet, and the test suite.
+         * AST2BOpContext does this, but it is not always created before we need
+         * the cache connection.
+         */
         final ICacheConnection cacheConn = CacheConnectionFactory
-                .getExistingCacheConnection(conn.getBigdataSail()
-                        .getQueryEngine());
+                .getCacheConnection(conn.getBigdataSail().getQueryEngine());
 
         if (cacheConn == null) {
 

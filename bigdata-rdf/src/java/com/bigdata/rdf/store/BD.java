@@ -33,6 +33,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+
 
 /**
  * A vocabulary for bigdata specific extensions.
@@ -106,6 +108,15 @@ public interface BD {
      */
     URI STATEMENT_TYPE = new URIImpl(NAMESPACE+"statementType");
     
+    /**
+     * The URI for the "DESCRIBE" service.
+     * 
+     * @see DescribeServiceFactory
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+     *      Describe Cache </a>
+     */
+    URI DESCRIBE = new URIImpl(NAMESPACE + "describe");
+
     /**
      * The name of a magic predicate recognized by the {@link com.bigdata.rdf.sail.BigdataSail} when
      * it occurs in statement patterns such as:

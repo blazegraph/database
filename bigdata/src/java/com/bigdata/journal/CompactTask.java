@@ -24,9 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -39,14 +39,9 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IOverflowHandler;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.Journal.Options;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
@@ -104,6 +99,12 @@ public class CompactTask implements Callable<Journal> {
     /** The caller specified commit time. */
     final protected long commitTime;
 
+    /**
+     * The {@link ICommitRecord} corresponding to the caller specified commit
+     * time.
+     */
+    final protected ICommitRecord commitRecord;
+    
     // cause from first task to error.
     final protected AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
     
@@ -155,6 +156,8 @@ public class CompactTask implements Callable<Journal> {
         this.outFile = outFile;
         
         this.commitTime = commitTime;
+        
+        this.commitRecord = src.getCommitRecord(commitTime);
 
     }
 
@@ -259,13 +262,16 @@ public class CompactTask implements Callable<Journal> {
 
         final long begin = System.currentTimeMillis();
 
-        // using read-committed view of Name2Addr
+        // using snapshot isolation view of Name2Addr
         final int nindices = (int) oldJournal.getName2Addr(commitTime)
                 .rangeCount(null, null);
 
-        // using read-committed view of Name2Addr
-        final ITupleIterator itr = oldJournal.getName2Addr(commitTime)
-                .rangeIterator(null, null);
+        final Iterator<String> nitr = oldJournal.indexNameScan(
+                null/* prefix */, commitTime);
+
+//        // using read-committed view of Name2Addr
+//        final ITupleIterator itr = oldJournal.getName2Addr(commitTime)
+//                .rangeIterator(null, null);
 
         /*
          * This service will limit the #of indices that we process in parallel.
@@ -286,15 +292,17 @@ public class CompactTask implements Callable<Journal> {
         final ThreadPoolExecutor service = (ThreadPoolExecutor)Executors.newFixedThreadPool(
                 3/* maxParallel */, DaemonThreadFactory.defaultThreadFactory());
         
-        while (itr.hasNext()) {
+        while (nitr.hasNext()) {
 
-            final ITuple tuple = itr.next();
+//            final ITuple tuple = itr.next();
+//
+//            final Entry entry = EntrySerializer.INSTANCE
+//                    .deserialize(new DataInputBuffer(tuple.getValue()));
 
-            final Entry entry = EntrySerializer.INSTANCE
-                    .deserialize(new DataInputBuffer(tuple.getValue()));
-
+            final String name = nitr.next();
+            
             // Submit task to copy the index to the new journal.
-            service.submit(new CopyIndexTask(newJournal, entry));
+            service.submit(new CopyIndexTask(newJournal, name));
 
         }
 
@@ -345,29 +353,30 @@ public class CompactTask implements Callable<Journal> {
         /** The new journal. */
         protected final Journal newJournal;
 
-        /**
-         * An {@link Entry} from the {@link Name2Addr} index for an index
-         * defined on the {@link #oldJournal}.
-         */
-        protected final Entry entry;
+//        /**
+//         * An {@link Entry} from the {@link Name2Addr} index for an index
+//         * defined on the {@link #oldJournal}.
+//         */
+//        protected final Entry entry;
 
+        private final String name;
+        
         /**
          * @param newJournal
          *            The new journal.
-         * @param entry
-         *            An {@link Entry} from the {@link Name2Addr} index for an
-         *            index defined on the {@link #oldJournal}.
+         * @param name The name of an index to be copied.
          */
-        public CopyIndexTask(final Journal newJournal, final Entry entry) {
+        public CopyIndexTask(final Journal newJournal, final String name) {
 
             if (newJournal == null)
                 throw new IllegalArgumentException();
-            if (entry == null)
+            
+            if (name == null)
                 throw new IllegalArgumentException();
 
             this.newJournal = newJournal;
 
-            this.entry = entry;
+            this.name = name;
 
         }
 
@@ -383,12 +392,21 @@ public class CompactTask implements Callable<Journal> {
                 startCount.incrementAndGet();
 
                 if (INFO)
-                    log.info("Start: name=" + entry.name);
+                    log.info("Start: name=" + name);
                 
                 // source index.
-                final BTree oldBTree = (BTree) oldJournal
-                        .getIndexWithCheckpointAddr(entry.checkpointAddr);
+//                final BTree oldBTree = (BTree) oldJournal
+//                        .getIndexWithCheckpointAddr(entry.checkpointAddr);
 
+                /*
+                 * This only supports the BTree class.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/585
+                 * (GIST)
+                 */
+                final BTree oldBTree = (BTree) oldJournal
+                        .getIndexWithCommitRecord(name, commitRecord);
+                
                 // #of index entries on the old index.
                 final long entryCount = oldBTree.rangeCount();
 
@@ -414,7 +432,7 @@ public class CompactTask implements Callable<Journal> {
                 final long oldCounter = oldBTree.getCounter().get();
 
                 if (INFO)
-                    log.info("name=" + entry.name //
+                    log.info("name=" + name //
                             + ", entryCount=" + entryCount//
                             + ", checkpoint=" + oldBTree.getCheckpoint()//
                     );
@@ -452,7 +470,7 @@ public class CompactTask implements Callable<Journal> {
                  */
 
                 if (DEBUG)
-                    log.debug("Copying data to new journal: name=" + entry.name
+                    log.debug("Copying data to new journal: name=" + name
                             + ", entryCount=" + entryCount);
 
                 newBTree.rangeCopy(oldBTree, null, null, true/* overflow */);
@@ -460,10 +478,10 @@ public class CompactTask implements Callable<Journal> {
                 /*
                  * Register the new B+Tree on the new journal.
                  */
-                newJournal.registerIndex(entry.name, newBTree);
+                newJournal.registerIndex(name, newBTree);
 
                 if (DEBUG)
-                    log.debug("Done with index: name=" + entry.name);
+                    log.debug("Done with index: name=" + name);
 
                 doneCount.incrementAndGet();
 

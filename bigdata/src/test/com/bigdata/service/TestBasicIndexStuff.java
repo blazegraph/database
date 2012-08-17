@@ -31,15 +31,10 @@ package com.bigdata.service;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.proc.RangeCountProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.resources.ResourceManager;
-import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Test of basic index operations.

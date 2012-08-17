@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -647,6 +648,12 @@ public class AbstractResourceManagerTestCase extends
 		public int getHttpdPort() {
 			return 0;
 		}
+
+        @Override
+        public Iterator<String> indexNameScan(String prefix, long timestamp) {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

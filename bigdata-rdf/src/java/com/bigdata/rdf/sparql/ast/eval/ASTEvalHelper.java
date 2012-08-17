@@ -103,7 +103,7 @@ public class ASTEvalHelper {
      * evaluated.
      */
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
-    
+
     /**
      * Batch resolve {@link Value}s to {@link IV}s.
      * 

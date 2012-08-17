@@ -23,26 +23,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.cache;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
-import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
-import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -98,14 +98,8 @@ public class SolutionSetCache implements ISolutionSetCache {
     private final CacheConnectionImpl cache;
 
     /**
-     * FIXME MVCC VIEWS: Convert over to Name2Addr and layered resolution
-     * with appropriate concurrency control at each layer. The problem with
-     * layering the MemStore journal mode over the RWStore journal mode is that
-     * we wind up with two journals. There should be one journal with layered
-     * addressing (that is, with a solution set cache in front of the Journal).
-     * That might mean using a concurrent hash map for the resolution and named
-     * locks to provide concurrency control. We could name the solution sets
-     * within a scope:
+     * FIXME MVCC VIEWS: Convert over to Name2Addr and layered resolution with
+     * appropriate concurrency control at each layer.
      * 
      * <pre>
      * (cache|query|database)[.queryUUID].namespace[.joinVars]
@@ -127,24 +121,38 @@ public class SolutionSetCache implements ISolutionSetCache {
      * 3. If we allow updates against named solution sets, then the visibility
      * of those updates must again be consistent with the MVCC architecture for
      * the query and update operations.
-     * <p>
-     * 4. We need to have metadata about solution sets on hand for explicit
-     * CREATEs (e.g., supporting declared join variables).
      * 
-     * FIXME Explicit recycling.
+     * FIXME Appropriate synchronization, including for updates, and on the
+     * Stream class (unisolated index protection).
      * 
-     * FIXME Appropriate synchronization, including for updates.
+     * FIXME This probably needs to buffer {@link Name2Addr} changes in a manner
+     * similar to {@link AbstractTask} in order to handle tx isolation
+     * correctly. However, this is not even hooked into the commit protocol so
+     * it is difficult to set how the view can evolve. I am unsure how this will
+     * play out for SPARQL UPDATE request sequences for either the UNISOLATED
+     * case or the case where the changes are isolated by a read/write tx.
      * 
-     * FIXME Life cycle hook for the cache. Destroy with the KB instance.
-     * 
+     * FIXME The SolutionSetStream is not transaction aware at all. This makes
+     * it difficult to use named solution sets in SPARQL UPDATE in conjunction
+     * with full read-write transactions. There is no sense of a "FusedView" and
+     * the Stream is not being access through an AbstractTask running on the
+     * concurrency manager.
      */
-    private final ConcurrentHashMap<String/* name */, SolutionSetStream> cacheMap;
+//    @Deprecated // We need to use Name2Addr and Name2Addr prefix scans
+//    private final ConcurrentHashMap<String/* name */, SolutionSetStream> cacheMap;
 
     // private final ConcurrentWeakValueCacheWithTimeout<String/* name */,
     // IMemoryManager /* allocationContext */> cacheMap;
 
     private final String namespace;
     private final long timestamp;
+
+    public String toString() {
+
+        return super.toString() + "{namespace=" + namespace + ",timestamp="
+                + TimestampUtility.toString(timestamp) + "}";
+    
+    }
     
     SolutionSetCache(final CacheConnectionImpl cache, final String namespace,
             final long timestamp) {
@@ -170,19 +178,12 @@ public class SolutionSetCache implements ISolutionSetCache {
         // this.cacheMap = new ConcurrentWeakValueCacheWithTimeout<String,
         // IMemoryManager>(
         // 0/* queueCapacity */, timeoutNanos);
-        this.cacheMap = new ConcurrentHashMap<String, SolutionSetStream>();
+//        this.cacheMap = new ConcurrentHashMap<String, SolutionSetStream>();
 
     }
 
     /**
      * Return the backing store.
-     * 
-     * FIXME There is a reliance on the {@link IRWStrategy} right now because
-     * the {@link IPSOutputStream} API has not yet been lifted onto the
-     * {@link IRawStore} or a similar API.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-     *      Support PSOutputStream/InputStream at IRawStore </a>
      */
     private IRWStrategy getRWStrategy() {
 
@@ -196,19 +197,41 @@ public class SolutionSetCache implements ISolutionSetCache {
 //    }
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Explicit close is not safe. We want to destroy to cached solution
+     * sets if the AbstractTripleStore is destroyed. The hook is currently in
+     * {@link AbstractResource#destroy()}.
+     */
+    @Override
+    public void close() {
+
+//        cacheMap.clear();
+
+    }
+
+    /**
      * Return the fully qualified name of the named solution set.
      * 
      * @param localName
      *            The local (aka application) name.
-     *            
+     * 
      * @return The fully qualified name.
      * 
-     *         FIXME This does not support different index orders and will only
-     *         when work for a {@link SolutionSetStream} (no components in the
-     *         key). In order to support index orders we will need to modify the
-     *         {@link ISolutionSetCache} API to accept the
-     *         {@link INamedSolutionSetRef} rather than just the application
-     *         name of the named solution set.
+     *         TODO Support different index orders. We can do a prefix scan on
+     *         Name2Addr to find the existing index orders (but this is not
+     *         currently efficient due to a bug in Name2Addr).
+     *         <p>
+     *         When reading out the {@link ISolutionSetStats} or the solutions
+     *         themselves, all we need is the first such index that we find for
+     *         a given namespace and localName.
+     *         <p>
+     *         When writing, we need to write on ALL such indices.
+     *         <p>
+     *         Either way, the scan should give us what we need.
+     *         <p>
+     *         For CREATE, the desired index order(s) should be declared in the
+     *         create metadata.
      */
     private String getFQN(final String localName) {
         
@@ -216,48 +239,110 @@ public class SolutionSetCache implements ISolutionSetCache {
                 IVariable.EMPTY/* joinVars */);
 
     }
+
+    private void assertNotReadOnly() {
+
+        if (TimestampUtility.isReadOnly(timestamp)) {
+
+            throw new UnsupportedOperationException("Read Only");
+
+        }
+
+    }
     
-    /*
-     * FIXME Explicit close is probably not safe. We want to destroy to cached
-     * solution sets if the AbstractTripleStore is destroyed, so that would be a
-     * hook in AbstractResource#destroy() (or something near there).
-     * 
-     * FIXME The [cacheMap] MUST have a life cycle beyond the SparqlCacheImpl
-     * view or we will discard the cached solutions as soon as this object goes
-     * out of scope (simply by loosing the reference to the [cacheMap] - the
-     * allocations would still be there on the backing InnerCacheJournal).
-     */
     @Override
-    public void close() {
+    public void clearAllSolutions() {
 
-        cacheMap.clear();
+        assertNotReadOnly();
+        
+        final String prefix = NamedSolutionSetRefUtility.getPrefix(namespace)
+                .toString();
 
-        // cacheStore.destroy();
+        if (log.isInfoEnabled())
+            log.info("Scanning: prefix=" + prefix);
+        
+        final Iterator<String> itr = cache.getStore().indexNameScan(prefix,
+                timestamp);
+
+        while(itr.hasNext()) {
+            
+            final String name = itr.next();
+            
+            cache.getStore().dropIndex(name);
+
+            if (log.isInfoEnabled())
+                log.info("Dropping: " + name);
+            
+        }
+        
+//        final Iterator<Map.Entry<String, SolutionSetStream>> itr = cacheMap
+//                .entrySet().iterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<String, SolutionSetStream> e = itr.next();
+//
+//            final String solutionSet = e.getKey();
+//
+//            final SolutionSetStream sset = e.getValue();
+//
+//            if (log.isInfoEnabled())
+//                log.info("solutionSet: " + solutionSet);
+//
+//            sset.clear();
+//
+//            itr.remove();
+//
+//        }
 
     }
 
-    @Override
-    public void clearAllSolutions(final IEvaluationContext ctx) {
+    /**
+     * Return the named solution set.
+     * 
+     * @param fqn
+     *            The fully qualified name.
+     *            
+     * @return The named solution set -or- <code>null</code> if it was not
+     *         found.
+     */
+    private SolutionSetStream getSolutionSet(final String fqn) {
 
-        final Iterator<Map.Entry<String, SolutionSetStream>> itr = cacheMap
-                .entrySet().iterator();
+        if (timestamp == ITx.READ_COMMITTED) {
 
-        while (itr.hasNext()) {
+            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
+                    cache.getStore().getLastCommitTime());
 
-            final Map.Entry<String, SolutionSetStream> e = itr.next();
+        } else if (timestamp == ITx.UNISOLATED) {
 
-            final String solutionSet = e.getKey();
+            return (SolutionSetStream) cache.getStore().getUnisolatedIndex(fqn);
 
-            final SolutionSetStream sset = e.getValue();
+        } else if(TimestampUtility.isReadWriteTx(timestamp)){
 
-            if (log.isInfoEnabled())
-                log.info("solutionSet: " + solutionSet);
+            final long readsOnCommitTime = cache.getStore()
+                    .getLocalTransactionManager().getTx(timestamp)
+                    .getReadsOnCommitTime();
 
-            sset.clear();
-
-            itr.remove();
+            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
+                    readsOnCommitTime);
+            
+        } else {
+            
+            return (SolutionSetStream) cache.getStore().getIndexLocal(fqn,
+                    timestamp);
 
         }
+   
+    }
+    
+    public boolean existsSolutions(final String solutionSet) {
+
+        if (solutionSet == null)
+            throw new IllegalArgumentException();
+
+        final SolutionSetStream sset = getSolutionSet(getFQN(solutionSet));
+
+        return sset != null;
 
     }
 
@@ -267,16 +352,24 @@ public class SolutionSetCache implements ISolutionSetCache {
         if (log.isInfoEnabled())
             log.info("solutionSet: " + solutionSet);
 
-        final String fqn = getFQN(solutionSet);
+        if (existsSolutions(solutionSet)) {
+
+            final String fqn = getFQN(solutionSet);
+
+            cache.getStore().dropIndex(fqn);
         
-        final SolutionSetStream sset = cacheMap.remove(fqn);
-
-        if (sset != null) {
-            sset.clear();
-
             return true;
-
+            
         }
+        
+//        final SolutionSetStream sset = cacheMap.remove(fqn);
+//
+//        if (sset != null) {
+//            sset.clear();
+//
+//            return true;
+//
+//        }
 
         return false;
 
@@ -290,7 +383,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
         final String fqn = getFQN(solutionSet);
 
-        SolutionSetStream sset = cacheMap.get(fqn);
+        SolutionSetStream sset = getSolutionSet(fqn);
 
         if (sset == null) {
 
@@ -319,20 +412,35 @@ public class SolutionSetCache implements ISolutionSetCache {
     private SolutionSetStream _create(final String fqn,
             final ISPO[] params) {
         
-        SolutionSetStream sset = cacheMap.get(fqn);
+        SolutionSetStream sset = getSolutionSet(fqn);
 
         if (sset != null)
             throw new RuntimeException("Exists: " + fqn);
 
+        if (log.isInfoEnabled())
+            log.info("Create: fqn=" + fqn + ", params="
+                    + Arrays.toString(params));
+        
         final StreamIndexMetadata md = new StreamIndexMetadata(fqn,
                 UUID.randomUUID());
+        
+        /*
+         * TODO GIST : We should not have to do this here. See
+         * Checkpoint.create() and SolutionSetStream.create() for why this is
+         * necessary.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+         */
+        md.setStreamClassName(SolutionSetStream.class.getName());
+        
+        sset = (SolutionSetStream) cache.getStore().register(fqn, md);
 
-        sset = SolutionSetStream.create(getRWStrategy(), md);
+//        sset = SolutionSetStream.create(getRWStrategy(), md);
 
         // sset = new SolutionSetMetadata(getStore(),
         // params == null ? getDefaultMetadata() : params, false/* readOnly */);
 
-        cacheMap.put(fqn, sset);
+//        cacheMap.put(fqn, sset);
 
         return sset;
     }
@@ -367,7 +475,7 @@ public class SolutionSetCache implements ISolutionSetCache {
 
         final String fqn = getFQN(solutionSet);
 
-        final SolutionSetStream sset = cacheMap.get(fqn);
+        final SolutionSetStream sset = getSolutionSet(fqn);
 
         if (sset != null) {
 
@@ -379,66 +487,18 @@ public class SolutionSetCache implements ISolutionSetCache {
 
     }
 
-    // /**
-    // * Return the underlying index object for the named solution set.
-    // *
-    // * TODO There is a scalability problem with returning the
-    // * {@link ISimpleIndexAccess} rather than an {@link ICloseableIterator}.
-    // If
-    // * the cache is remote or distributed, then we will not be able to return
-    // an
-    // * {@link ISimpleIndexAccess} interface. However, we can not return the
-    // * iterator here since we need to attach the returned object to the
-    // * {@link IQueryAttributes} for resolution at evaluation time by an
-    // * operator. We probably need to return something that can be used to
-    // obtain
-    // * appropriate access to the solutions during the evaluation of an
-    // operator
-    // * - that is, we need one more level of indirection here.
-    // * <p>
-    // * The same mechanism for access to a remote solution stream could be used
-    // * on a cluster when some solutions are on some node, or even distributed
-    // * across some set of nodes. Maybe we even have some code already that
-    // will
-    // * work for this, such as the chunk message stuff.
-    // */
-    // public ISimpleIndexAccess getSolutionSet(final String solutionSet) {
-    //
-    // if (solutionSet == null)
-    // throw new IllegalArgumentException();
-    //
-    // final SolutionSetStream sset = cacheMap.get(solutionSet);
-    //
-    // if (sset == null)
-    // throw new IllegalStateException("Not found: " + solutionSet);
-    //
-    // return sset;
-    //
-    // }
-
     public ICloseableIterator<IBindingSet[]> getSolutions(
             final String solutionSet) {
 
         final String fqn = getFQN(solutionSet);
 
-        final SolutionSetStream sset = cacheMap.get(fqn);
+        final SolutionSetStream sset = getSolutionSet(fqn);
 
         if (sset == null)
             throw new IllegalStateException("Not found: " + solutionSet);
 
         // Return iterator over the decoded solutions.
         return sset.get();
-
-    }
-
-    public boolean existsSolutions(final String solutionSet) {
-
-        if (solutionSet == null)
-            throw new IllegalArgumentException();
-
-        final SolutionSetStream sset = cacheMap.get(getFQN(solutionSet));
-
-        return sset != null;
 
     }
 

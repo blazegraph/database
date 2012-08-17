@@ -30,6 +30,7 @@ package com.bigdata.relation;
 
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -40,17 +41,22 @@ import java.util.concurrent.SynchronousQueue;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.rdf.rules.FastClosure;
 import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.RuleFastClosure5;
 import com.bigdata.rdf.rules.RuleFastClosure6;
+import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -689,6 +695,67 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         if (log.isInfoEnabled())
             log.info(toString());
 
+        /*
+         * Destroy all indices spanned by the namespace for this relation.
+         */
+        {
+
+            final Iterator<String> itr = indexManager.indexNameScan(namespace,
+                    timestamp);
+
+            while (itr.hasNext()) {
+
+                final String name = itr.next();
+
+                indexManager.dropIndex(name);
+
+            }
+
+        }
+
+        /*
+         * Destroy any caches associated with this relation.
+         */
+        {
+
+            if (indexManager instanceof IJournal
+                    || indexManager instanceof IBigdataFederation) {
+
+                /*
+                 * Note: No cache associated with a TemporaryStore (since no
+                 * QueryEngine is associated with a TemporaryStore).
+                 * 
+                 * Note: If the cache is remote, then we need to create the
+                 * QueryEngine instance on demand so we can access the cache.
+                 * Hence getQueryController() and not getExistingQueryEngine().
+                 * 
+                 * TODO This could wind up using the wrong index manager if the
+                 * destroy() is executed by an AbstractTask (neither the Journal
+                 * nor the JiniFederation).
+                 */
+                final QueryEngine queryEngine = QueryEngineFactory
+                        .getQueryController(indexManager);
+
+                /*
+                 * Connect to the cache provider.
+                 * 
+                 * Note: This will create the cache if it does not exist. At all
+                 * other places in the code we use getExistingSparqlCache() to
+                 * access the cache IFF it exists. Here is where we create it.
+                 */
+                final ICacheConnection cacheConn = CacheConnectionFactory
+                        .getCacheConnection(queryEngine);
+
+                if (cacheConn != null) {
+
+                    cacheConn.destroyCaches(namespace, timestamp);
+
+                }
+
+            }
+
+        }
+        
         // Delete the entry for this relation from the row store.
         indexManager.getGlobalRowStore().delete(RelationSchema.INSTANCE,
                 namespace);

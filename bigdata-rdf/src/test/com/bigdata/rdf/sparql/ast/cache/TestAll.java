@@ -60,7 +60,11 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("Solution Set Cache");
 
-        suite.addTestSuite(TestCacheConnectionFactory.class);
+        if (QueryHints.CACHE_ENABLED) {
+
+            suite.addTestSuite(TestCacheConnectionFactory.class);
+
+        }
         
         if (QueryHints.DEFAULT_SOLUTION_SET_CACHE) {
 

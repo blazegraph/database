@@ -40,7 +40,15 @@ public interface ICacheConnection {
      * Close the cache / cache connection.
      */
     void close();
-    
+
+    /**
+     * Destroy the cache(s) associated with that namespace.
+     * 
+     * @param namespace
+     *            The KB namespace.
+     */
+    void destroyCaches(final String namespace,final long timestamp);
+
     /**
      * Return a view of the named SOLUTIONS cache.
      * 
@@ -52,7 +60,8 @@ public interface ICacheConnection {
      * @return The view of the named solutions cache -or- <code>null</code> if
      *         no cache is available for that KB.
      */
-    ISolutionSetCache getSparqlCache(final String namespace, final long timestamp);
+    ISolutionSetCache getSparqlCache(final String namespace,
+            final long timestamp);
 
     /**
      * Return a view of a maintained DESCRIBE cache.

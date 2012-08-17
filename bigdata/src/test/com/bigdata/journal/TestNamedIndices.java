@@ -51,8 +51,8 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
     }
 
     /**
-     * Test the ability to register and use named index, including whether the
-     * named index is restart safe.
+     * Test the ability to register and use named {@link BTree}, including
+     * whether the named {@link BTree} is restart safe.
      */
     public void test_registerAndUseBTree() {
 
@@ -116,6 +116,10 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
     }
 
+    /**
+     * Test the ability to register and use named {@link HTree}, including
+     * whether the named {@link HTree} is restart safe.
+     */
 	public void test_registerAndUseHTree() {
 
 		Journal journal = new Journal(getProperties());
@@ -129,7 +133,7 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
             assertNull(journal.getHTree(name));
 
             final HTreeIndexMetadata metadata = new HTreeIndexMetadata(
-                        indexUUID);
+                        name, indexUUID);
             
             final HTree htree0 = HTree.create(journal, metadata);
 
@@ -174,5 +178,12 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 		}
 
     }
-    
+
+    /**
+     * FIXME Test for Stream as well, or maybe the concrete SolutionSetStream.
+     */
+    public void testRegisterAndUseStream() {
+        fail("write test");
+    }
+
 }

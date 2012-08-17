@@ -44,14 +44,22 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.LRUCache;
@@ -64,6 +72,12 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
+import com.ibm.icu.text.Collator;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * <p>
@@ -321,9 +335,23 @@ public class Name2Addr extends BTree {
         
         metadata.setBTreeClassName(Name2Addr.class.getName());
 
-        // @todo configure unicode sort key behavior explicitly?
+        /*
+         * TODO configure unicode sort key behavior explicitly?
+         * 
+         * Note: This only applies to new Name2Addr objects. However, historical
+         * Name2Addr objects were created using the default collator for the
+         * platform. When the ICU library is available, that is the default.
+         */
+
+        final Properties p = new Properties();
+
+//        p.setProperty(KeyBuilder.Options.COLLATOR, CollatorEnum.ASCII.name());
+
+        p.setProperty(KeyBuilder.Options.STRENGTH,
+                StrengthEnum.Identical.name());
+
         metadata.setTupleSerializer(new Name2AddrTupleSerializer(
-                new DefaultKeyBuilderFactory(new Properties())));
+                new DefaultKeyBuilderFactory(p)));
 
         return (Name2Addr) BTree.create(store, metadata);
         
@@ -641,8 +669,12 @@ public class Name2Addr extends BTree {
      */
     private byte[] getKey(final String name) {
 
-        return metadata.getTupleSerializer().serializeKey(name);
-        
+        final byte[] a = metadata.getTupleSerializer().serializeKey(name);
+
+//        log.error("name=" + name + ", key=" + BytesUtil.toString(a));
+
+        return a;
+
 //        return KeyBuilder.asSortKey(name);
 
     }
@@ -1092,8 +1124,20 @@ public class Name2Addr extends BTree {
     
     /**
      * An entry in the persistent index.
+     * <p>
+     * The {@link Entry} reports the {@link #name} of the index, its
+     * {@link #checkpointAddr}, and the {@link #commitTime} when it was last
+     * updated. If you want to know more about the index, then you need to open
+     * it.
+     * <p>
+     * Do NOT open the index directly from the {@link #checkpointAddr}. That
+     * will circumvent the canonical mapping imposed by the
+     * {@link IIndexManager} on the open indices for a given name and commit
+     * time. Instead, just ask the {@link IIndexManager} to open the index
+     * having the specified {@link #name} as of the desired commit time.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      */
     public static class Entry {
        
@@ -1248,10 +1292,16 @@ public class Name2Addr extends BTree {
         @Override
         public byte[] serializeKey(final Object obj) {
 
-            return getKeyBuilder().reset().append((String) obj).getKey();
+            final IKeyBuilder keyBuilder = getKeyBuilder();
+            
+            final byte[] a = keyBuilder.reset().append((String) obj).getKey();
 
+//            log.error("name=" + obj + ", key=" + BytesUtil.toString(a)+", keyBuilder="+keyBuilder);
+            
+            return a;
+            
         }
-
+        
         /**
          * Return the byte[] value an {@link Entry}.
          * 
@@ -1308,5 +1358,130 @@ public class Name2Addr extends BTree {
         }
 
     } // Name2AddrTupleSerializer
+
+    /**
+     * Prefix scan of a {@link Name2Addr} index. This scan assumes that the
+     * caller has provided for any possible thread-safety issues.
+     * 
+     * @param prefix
+     *            The prefix.
+     * @param n2a
+     *            The index.
+     * 
+     * @return The names of the indices spanned by that prefix in that index.
+     * 
+     *         FIXME There is a problem with the prefix scan. It appears that we
+     *         are not able to generate the key for a prefix correctly. This
+     *         problem is being worked around by scanning the entire
+     *         {@link Name2Addr} index and then filter for those entries that
+     *         start with the specified prefix. This is not very scalable.
+     *         <p>
+     *         If you change {@link Name2Addr} to use {@link CollatorEnum#ASCII}
+     *         then the prefix scan works correctly without that filter. The
+     *         problem is related to how the {@link Collator} is encoding the
+     *         keys. Neither the ICU nor the JDK collators work for this right
+     *         now. At least the ICU collator winds up with some additional
+     *         bytes after the "end" of the prefix that do not appear when you
+     *         encode the entire index name. For example, compare "kb" and
+     *         "kb.red". See TestName2Addr for more about this issue.
+     *         <p>
+     *         Fixing this problem MIGHT require a data migration. Or we might
+     *         be able to handle this entirely by using an appropriate
+     *         {@link Name2Addr#getKey(String)} and
+     *         {@link Name2AddrTupleSerializer#serializeKey(Object)}
+     *         implementation (depending on how the keys are being encoded).
+     */
+    public static final Iterator<String> indexNameScan(final String prefix,
+            final IIndex n2a) {
+
+        final byte[] fromKey;
+        final byte[] toKey;
+        final boolean hasPrefix = prefix != null && prefix.length() > 0;
+        final boolean restrictScan = false;
+
+        if (hasPrefix && restrictScan) {
+
+            /*
+             * When the namespace prefix was given, generate the toKey as the
+             * fixed length successor of the fromKey.
+             */
+
+            log.error("prefix=" + prefix);
+
+            final IKeyBuilder keyBuilder = n2a.getIndexMetadata()
+                    .getTupleSerializer().getKeyBuilder();
+
+            fromKey = keyBuilder.reset().append(prefix).getKey();
+
+            // toKey =
+            // keyBuilder.reset().append(prefix).appendNul().getKey();
+            toKey = SuccessorUtil.successor(fromKey.clone());
+
+            if (true || log.isDebugEnabled()) {
+
+                log.error("fromKey=" + BytesUtil.toString(fromKey));
+
+                log.error("toKey  =" + BytesUtil.toString(toKey));
+
+            }
+
+        } else {
+
+            // Do not restrict the scan.
+            fromKey = null;
+            toKey = null;
+
+        }
+
+        @SuppressWarnings("unchecked")
+        final ITupleIterator<Entry> itr = n2a.rangeIterator(fromKey, toKey);
+
+        IStriterator sitr = new Striterator(itr);
+
+        sitr = sitr.addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 1L;
+
+            @SuppressWarnings("unchecked")
+            @Override
+            protected Object resolve(Object obj) {
+
+                return ((ITuple<Entry>) obj).getObject().name;
+
+            }
+
+        });
+
+        if (hasPrefix && !restrictScan) {
+
+            /*
+             * Only report the names that match the prefix.
+             * 
+             * Note: For the moment, the filter is hacked by examining the
+             * de-serialized Entry objects and only reporting those that start
+             * with the [prefix].
+             */
+            
+            sitr = sitr.addFilter(new Filter() {
+
+                @Override
+                public boolean isValid(final Object obj) {
+                    
+                    final String name = (String) obj;
+
+                    if (name.startsWith(prefix)) {
+
+                        // acceptable.
+                        return true;
+                    }
+                    return false;
+                }
+            });
+
+        }
+
+        return sitr;
+
+    }
 
 }

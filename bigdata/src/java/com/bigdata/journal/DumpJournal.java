@@ -27,28 +27,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DumpIndex;
+import com.bigdata.btree.DumpIndex.PageStats;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.DumpIndex.PageStats;
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -66,7 +64,8 @@ import com.bigdata.util.InnerCause;
  * @todo add an option to copy off data from one or more indices as of a
  *       specified commit time?
  * 
- * @todo add an option to restrict the names of the indices to be dumped (-name=<regex>).
+ * @todo add an option to restrict the names of the indices to be dumped
+ *       (-name=<regex>).
  * 
  * @todo allow dump even on a journal that is open (e.g., only request a read
  *       lock or do not request a lock). An error is reported when you actually
@@ -75,6 +74,11 @@ import com.bigdata.util.InnerCause;
  *       root blocks must be consistent when they are read, a reader would have
  *       to have a lock at the moment that it read the root blocks...
  * 
+ *       TODO GIST : Support all types of indices.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
+ *      </a>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -82,9 +86,9 @@ public class DumpJournal {
 
     private static final Logger log = Logger.getLogger(DumpJournal.class);
     
-    public DumpJournal() {
-        
-    }
+//    public DumpJournal() {
+//        
+//    }
     
     /**
      * Dump one or more journal files.
@@ -170,8 +174,65 @@ public class DumpJournal {
 
             try {
 
-                dumpJournal(file,dumpHistory,dumpPages,dumpIndices,showTuples);
+                /*
+                 * Stat the file and report on its size, etc.
+                 */
+                {
+                    
+                  System.out.println("File: "+file);
+
+                  if(!file.exists()) {
+
+                      System.err.println("No such file");
+                      
+                      System.exit(1);
+                      
+                  }
+                  
+                  if(!file.isFile()) {
+                      
+                      System.err.println("Not a regular file");
+                      
+                      System.exit(1);
+                      
+                  }
+                  
+                  System.out.println("Length: "+file.length());
+
+                  System.out.println("Last Modified: "+new Date(file.lastModified()));
+                  
+                }
                 
+                final Properties properties = new Properties();
+
+                {
+                
+                    properties.setProperty(Options.FILE, file.toString());
+                
+                    properties.setProperty(Options.READ_ONLY, "" + true);
+
+                    properties.setProperty(Options.BUFFER_MODE,
+                            BufferMode.Disk.toString());
+
+                }
+
+                System.out.println("Opening (read-only): " + file);
+
+                final Journal journal = new Journal(properties);
+
+                try {
+
+                    final DumpJournal dumpJournal = new DumpJournal(journal);
+
+                    dumpJournal.dumpJournal(dumpHistory, dumpPages,
+                            dumpIndices, showTuples);
+
+                } finally {
+                    
+                    journal.close();
+                    
+                }
+
             } catch( RuntimeException ex) {
                 
                 ex.printStackTrace();
@@ -186,97 +247,120 @@ public class DumpJournal {
         
     }
     
-    public static void dumpJournal(File file,boolean dumpHistory,boolean dumpPages,boolean dumpIndices,boolean showTuples) {
-        
-        /*
-         * Stat the file and report on its size, etc.
-         */
-        {
-            
-          System.out.println("File: "+file);
-
-          if(!file.exists()) {
-
-              System.err.println("No such file");
-              
-              System.exit(1);
-              
-          }
-          
-          if(!file.isFile()) {
-              
-              System.err.println("Not a regular file");
-              
-              System.exit(1);
-              
-          }
-          
-          System.out.println("Length: "+file.length());
-
-          System.out.println("Last Modified: "+new Date(file.lastModified()));
-          
-        }
-        
-        final Properties properties = new Properties();
-
-        {
-        
-            properties.setProperty(Options.FILE, file.toString());
-        
-            properties.setProperty(Options.READ_ONLY, "" + true);
-            
-            properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
-        
-        }
-        
-        System.out.println("Opening (read-only): "+file);
-        
-        final Journal journal = new Journal(properties);
+    /**
+     * 
+     * @param dumpHistory
+     *            Dump metadata for indices in all commit records (default only
+     *            dumps the metadata for the indices as of the most current
+     *            committed state).
+     * @param dumpPages
+     *            Dump the pages of the indices and reports some information on
+     *            the page size.
+     * @param dumpIndices
+     *            Dump the indices (does not show the tuples by default).
+     * @param showTuples
+     *            Dump the records in the indices.
+     */
+    public void dumpJournal(final boolean dumpHistory, final boolean dumpPages,
+            final boolean dumpIndices, final boolean showTuples) {
 
         try {
             
             final FileMetadata fmd = journal.getFileMetadata();
 
-            // dump the MAGIC and VERSION.
-            System.out.println("magic="+Integer.toHexString(fmd.magic));
-            System.out.println("version="+Integer.toHexString(fmd.version));
-            
-            // dump the root blocks.
-            System.out.println(fmd.rootBlock0.toString());
-            System.out.println(fmd.rootBlock1.toString());
+            if (fmd != null) {
+                
+                /*
+                 * Note: The FileMetadata is only available on a re-open of an
+                 * existing Journal.
+                 */
 
-            // report on which root block is the current root block.
-            System.out.println("The current root block is #"
-                    + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
-            
-            /* 
-             * Report on:
-             * 
-             * - the length of the journal.
-             * - the #of bytes available for user data in the journal.
-             * - the offset at which the next record would be written.
-             * - the #of bytes remaining in the user extent.
-             */
+                // dump the MAGIC and VERSION.
+                System.out.println("magic=" + Integer.toHexString(fmd.magic));
+                System.out.println("version="
+                        + Integer.toHexString(fmd.version));
 
-            final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
-            
-            System.out.println("extent="+fmd.extent+"("+fmd.extent/Bytes.megabyte+"M)"+
-                    ", userExtent="+fmd.userExtent+"("+fmd.userExtent/Bytes.megabyte+"M)"+
-                    ", bytesAvailable="+bytesAvailable+"("+bytesAvailable/Bytes.megabyte+"M)"+
-                    ", nextOffset="+fmd.nextOffset);
+                /*
+                 * Report on:
+                 * 
+                 * - the length of the journal. - the #of bytes available for
+                 * user data in the journal. - the offset at which the next
+                 * record would be written. - the #of bytes remaining in the
+                 * user extent.
+                 */
+
+                final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
+
+                System.out.println("extent=" + fmd.extent + "(" + fmd.extent
+                        / Bytes.megabyte + "M)" + ", userExtent="
+                        + fmd.userExtent + "(" + fmd.userExtent
+                        / Bytes.megabyte + "M)" + ", bytesAvailable="
+                        + bytesAvailable + "(" + bytesAvailable
+                        / Bytes.megabyte + "M)" + ", nextOffset="
+                        + fmd.nextOffset);
+
+            }
+
+            {
+
+                /*
+                 * Dump the root blocks.
+                 * 
+                 * Note: This uses the IBufferStrategy to access the root
+                 * blocks. The code used to use the FileMetadata, but that was
+                 * only available for a re-opened journal. This approach works
+                 * for a new Journal as well.
+                 */
+                {
+
+                    final ByteBuffer rootBlock0 = journal.getBufferStrategy()
+                            .readRootBlock(true/* rootBlock0 */);
+                    
+                    if (rootBlock0 != null) {
+                    
+                        System.out.println(new RootBlockView(
+                                true/* rootBlock0 */, rootBlock0,
+                                new ChecksumUtility()).toString());
+                        
+                    }
+                    
+                }
+
+                {
+
+                    final ByteBuffer rootBlock1 = journal.getBufferStrategy()
+                            .readRootBlock(false/* rootBlock0 */);
+                    
+                    if (rootBlock1 != null) {
+                    
+                        System.out.println(new RootBlockView(
+                                false/* rootBlock0 */, rootBlock1,
+                                new ChecksumUtility()).toString());
+                        
+                    }
+                    
+                }
+                // System.out.println(fmd.rootBlock0.toString());
+                // System.out.println(fmd.rootBlock1.toString());
+
+                // report on which root block is the current root block.
+                System.out.println("The current root block is #"
+                        + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
+
+            }
 
             final IBufferStrategy strategy = journal.getBufferStrategy();
-            
+
             if (strategy instanceof RWStrategy) {
-                
+
                 final RWStore store = ((RWStrategy) strategy).getStore();
-                
+
                 final StringBuilder sb = new StringBuilder();
-                
+
                 store.showAllocators(sb);
-                
+
                 System.out.println(sb);
-                
+
             }
             
 			final CommitRecordIndex commitRecordIndex = journal
@@ -322,8 +406,9 @@ public class DumpJournal {
                     
                     System.out.println(commitRecord.toString());
 
-                    dumpNamedIndicesMetadata(journal,commitRecord,dumpPages,dumpIndices,showTuples);
-                    
+                    dumpNamedIndicesMetadata(commitRecord, dumpPages,
+                            dumpIndices, showTuples);
+
                 }
                 
             } else {
@@ -336,7 +421,8 @@ public class DumpJournal {
                 
                 System.out.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(journal,commitRecord,dumpPages,dumpIndices,showTuples);
+                dumpNamedIndicesMetadata(commitRecord, dumpPages, dumpIndices,
+                        showTuples);
                 
             }
 
@@ -347,32 +433,42 @@ public class DumpJournal {
         }
 
     }
+
+    private final Journal journal;
+
+    public DumpJournal(final Journal journal) {
+
+        if (journal == null)
+            throw new IllegalArgumentException();
+        
+        this.journal = journal;
+
+    }
     
-	/**
-	 * Get the {@link Checkpoint} record for a named index.
-	 * 
-	 * @param journal
-	 *            The journal.
-	 * @param name2Addr
-	 *            Some {@link Name2Addr} instance (might not implement
-	 *            {@link Name2Addr}).
-	 * @param name
-	 *            The index name.
-	 * @return The {@link Checkpoint} record.
-	 */
-	private static Checkpoint getCheckpoint(final Journal journal,
-			final IIndex name2Addr, final String name) {
-		final byte[] val = name2Addr.lookup(name2Addr.getIndexMetadata()
-				.getTupleSerializer().getKeyBuilder().reset().append(name)
-				.getKey());
-		assert val != null;
-		final Entry e = EntrySerializer.INSTANCE
-				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
-		assert e.name.equals(name);
-		final Checkpoint checkpoint = (Checkpoint) SerializerUtil
-				.deserialize(journal.read(e.checkpointAddr));
-		return checkpoint;
-	}
+//	/**
+//	 * Get the {@link Checkpoint} record for a named index.
+//	 * 
+//	 * @param journal
+//	 *            The journal.
+//	 * @param name2Addr
+//	 *            Some {@link Name2Addr} instance (might not implement
+//	 *            {@link Name2Addr}).
+//	 * @param name
+//	 *            The index name.
+//	 * @return The {@link Checkpoint} record.
+//	 */
+//    private Checkpoint getCheckpoint(final IIndex name2Addr, final String name) {
+//		final byte[] val = name2Addr.lookup(name2Addr.getIndexMetadata()
+//				.getTupleSerializer().getKeyBuilder().reset().append(name)
+//				.getKey());
+//		assert val != null;
+//		final Entry e = EntrySerializer.INSTANCE
+//				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
+//		assert e.name.equals(name);
+//		final Checkpoint checkpoint = (Checkpoint) SerializerUtil
+//				.deserialize(journal.read(e.checkpointAddr));
+//		return checkpoint;
+//	}
 
 	/**
      * Dump metadata about each named index as of the specified commit record.
@@ -380,32 +476,37 @@ public class DumpJournal {
      * @param journal
      * @param commitRecord
      */
-	private static void dumpNamedIndicesMetadata(AbstractJournal journal,
-			ICommitRecord commitRecord, boolean dumpPages, boolean dumpIndices, boolean showTuples) {
+    private void dumpNamedIndicesMetadata(final ICommitRecord commitRecord,
+            final boolean dumpPages, final boolean dumpIndices,
+            final boolean showTuples) {
 
         // view as of that commit record.
-        final IIndex name2Addr = journal.getName2Addr(commitRecord.getTimestamp());
+        final IIndex name2Addr = journal.getName2Addr(commitRecord
+                .getTimestamp());
 
-        final ITupleIterator itr = name2Addr.rangeIterator(null,null);
-        
-		final Map<String, PageStats> pageStats = dumpPages ? new TreeMap<String, PageStats>()
-				: null;
+        final Iterator<String> nitr = journal.indexNameScan(null/* prefix */,
+                commitRecord.getTimestamp());
+
+//        final ITupleIterator<?> itr = name2Addr.rangeIterator(null, null);
+
+        final Map<String, PageStats> pageStats = dumpPages ? new TreeMap<String, PageStats>()
+                : null;
 		
-        while (itr.hasNext()) {
+        while (nitr.hasNext()) {
 
-            // a registered index.
-            final Name2Addr.Entry entry = Name2Addr.EntrySerializer.INSTANCE
-                    .deserialize(itr.next().getValueStream());
+//            // a registered index.
+//            final Name2Addr.Entry entry = Name2Addr.EntrySerializer.INSTANCE
+            //                    .deserialize(itr.next().getValueStream());
 
-            System.out.println("name=" + entry.name + ", addr="
-                    + journal.toString(entry.checkpointAddr));
+            final String name = nitr.next();
+            
+            System.out.println("name=" + name);
 
-            // load B+Tree from its checkpoint record.
-            final BTree ndx;
+            // load index from its checkpoint record.
+            final ICheckpointProtocol ndx;
             try {
-                
-                ndx = (BTree) journal
-                        .getIndexWithCheckpointAddr(entry.checkpointAddr);
+
+                ndx = journal.getIndexWithCommitRecord(name, commitRecord);
 
             } catch (Throwable t) {
 
@@ -435,19 +536,23 @@ public class DumpJournal {
             // show metadata record.
             System.out.println("\t" + ndx.getIndexMetadata());
 
-			if (pageStats != null) {
-				
-				final PageStats stats = DumpIndex
-						.dumpPages(ndx, false/* dumpNodeState */);
+            if (ndx instanceof AbstractBTree) {
 
-				System.out.println("\t" + stats);
+                if (pageStats != null) {
 
-				pageStats.put(entry.name, stats);
+                    final PageStats stats = DumpIndex.dumpPages(
+                            (AbstractBTree) ndx, false/* dumpNodeState */);
 
-			}
+                    System.out.println("\t" + stats);
 
-            if (dumpIndices)
-                DumpIndex.dumpIndex(ndx, showTuples);
+                    pageStats.put(name, stats);
+
+                }
+
+                if (dumpIndices)
+                    DumpIndex.dumpIndex((AbstractBTree) ndx, showTuples);
+
+            }
 
         }
 
@@ -502,10 +607,13 @@ public class DumpJournal {
                 if (!(tmp instanceof BTree)) {
 
                     /*
-                     * FIXME Handle other type of named indices here in a more
-                     * graceful manner. They probably need to be grouped by type
-                     * since each type will require a different output format
-                     * for the metadata that we are writing out.
+                     * FIXME GIST : Handle other type of named indices here in a
+                     * more graceful manner. They probably need to be grouped by
+                     * type since each type will require a different output
+                     * format for the metadata that we are writing out.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/585
+                     * (GIST)
                      */
     
                     System.out.println("name: " + name + ", class="

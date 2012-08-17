@@ -19,6 +19,11 @@ import com.bigdata.rdf.internal.IV;
 public interface IDescribeCache {
     
     /**
+     * Destroy the cache.
+     */
+    void destroy();
+    
+    /**
      * Invalidate the identified cache entries.
      * 
      * @param ivs

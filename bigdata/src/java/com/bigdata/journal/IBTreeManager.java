@@ -44,7 +44,9 @@ import com.bigdata.service.ndx.IClientIndex;
  * @todo change registerIndex() methods to return void and have people use
  *       {@link #getIndex(String)} to obtain the view after they have registered
  *       the index. This will make it somewhat easier to handle things like the
- *       registration of an index partition reading from multiple resources.
+ *       registration of an index partition reading from multiple resources or
+ *       the registration of indices that are not {@link BTree}s (HTree, Stream,
+ *       etc).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

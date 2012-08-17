@@ -31,15 +31,20 @@ import java.util.Set;
 
 import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Data driven test suite for DESCRIBE queries, including the interaction with
@@ -500,6 +505,88 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
                 assertDescribedResource(v, describeCache, h);
                 
             }
+
+        }
+
+    }
+
+    /**
+     * A simple DESCRIBE query of a constant, but in this test we also verify
+     * that the cache entry is invalidated by an update involving that resource.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * DESCRIBE <http://www.bigdata.com/DC>
+     * </pre>
+     */
+    public void test_describe_1_invalidation() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-1", // testURI,
+                "describe-1.rq",// queryFileURL
+                "describe-1.trig",// dataFileURL
+                "describe-1-result.trig"// resultFileURL
+                );
+        
+        // The DESCRIBE cache that we are reading on.
+        final IDescribeCache describeCache = getDescribeCache(
+                h.getASTContainer(), h.getTripleStore());
+
+        final BigdataValueFactory f = h.getTripleStore().getValueFactory();
+
+        final BigdataURI dc = f.createURI("http://www.bigdata.com/DC");
+
+        final BigdataURI foafPerson = f.asValue(FOAFVocabularyDecl.Person);
+
+        final BigdataURI rdfType = f.asValue(RDF.TYPE);
+
+        final BigdataValue[] values = new BigdataValue[] { //
+                dc, foafPerson, rdfType 
+                };
+
+        h.getTripleStore().getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+
+        for (BigdataValue v : values) {
+
+            assertNotNull(v.toString(), v.getIV());
+
+        }
+
+        if (describeCache != null) {
+
+            // Not in the cache before we run the DESCRIBE query.
+            for (BigdataValue v : values) {
+
+                assertNull(describeCache.lookup(v.getIV()));
+
+            }
+
+        }
+
+        h.runTest();
+
+        if (describeCache != null) {
+
+//            for (BigdataValue v : values) {
+
+            assertDescribedResource(dc, describeCache, h);
+
+//            }
+
+            // Should cause the cache entry to be invalidated.
+            final BigdataSail sail= new BigdataSail(h.getTripleStore());
+            sail.initialize();
+            final BigdataSailConnection conn = sail.getConnection();
+            conn.addStatement(dc, rdfType, foafPerson,
+                    BD.NULL_GRAPH);
+            conn.commit();
+
+            // This cache entry should be gone.
+            assertNull(describeCache.lookup(dc.getIV()));
 
         }
 

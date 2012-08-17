@@ -740,6 +740,12 @@ public class TestEventReceiver extends TestCase2 {
 		public int getHttpdPort() {
 			return 0;
 		}
+
+        @Override
+        public Iterator<String> indexNameScan(String prefix, long timestamp) {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

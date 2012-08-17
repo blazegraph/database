@@ -1,5 +1,6 @@
 package com.bigdata.bop.fed;
 
+import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -8,13 +9,13 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
+import com.bigdata.relation.rule.eval.pipeline.JoinTaskFactoryTask;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.DataService;
@@ -43,6 +44,9 @@ import com.bigdata.sparse.SparseRowStore;
  *       and disallows {@link #dropIndex(String)} and
  *       {@link #registerIndex(IndexMetadata)} in an attempt to stay out of
  *       trouble. That may be enough reason to keep it private.
+ * 
+ *       TODO Is this an exact functional duplicate of the class by the same
+ *       name in the {@link JoinTaskFactoryTask}?
  */
 class DelegateIndexManager implements IIndexManager {
 
@@ -167,5 +171,16 @@ class DelegateIndexManager implements IIndexManager {
 				+ dataService.getServiceUUID() + "}";
     	
 	}
+
+    /**
+     * {@inheritDoc}
+     * 
+     * TODO Implement. Probably delegate to the local DS n2a index so this
+     * does a DS local n2a scan.
+     */
+    @Override
+    public Iterator<String> indexNameScan(String prefix, long timestamp) {
+        throw new UnsupportedOperationException();
+    }
 
 }

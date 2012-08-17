@@ -96,6 +96,24 @@ public interface ITx {
      */
     public long getStartTimestamp();
 
+    /**
+     * The timestamp of the commit point against which this transaction is
+     * reading.
+     * <p>
+     * Note: This is not currently available on a cluster. In that context, we
+     * wind up with the same timestamp for {@link #startTime} and
+     * {@link #readsOnCommitTime} which causes cache pollution for things which
+     * cache based on {@link #readsOnCommitTime}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
+     *      Refactor native long tx id to thin object</a>
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
+     *      cache for access to historical index views on the Journal by name
+     *      and commitTime. </a>
+     */
+    public long getReadsOnCommitTime();
+    
 //    /**
 //     * Return the timestamp assigned to this transaction by a centralized
 //     * transaction manager service during its prepare+commit protocol. This
