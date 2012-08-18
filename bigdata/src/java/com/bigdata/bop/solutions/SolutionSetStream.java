@@ -119,11 +119,12 @@ public final class SolutionSetStream extends Stream implements
      * @see #needsCheckpoint()
      * @see #flush()
      * 
-     *      FIXME This is hacked into the bloomFilterAddr. It should have its
-     *      own address. The Checkpoint class needs a protocol for populating
-     *      and reporting fields which are specific to derived classes, not just
-     *      BTree, HTree, and Stream. Or we need to add a general concept of a
-     *      "summary statistics object" for a persistent data structure.
+     *      FIXME GIST : This is hacked into the bloomFilterAddr. It should have
+     *      its own address. The Checkpoint class needs a protocol for
+     *      populating and reporting fields which are specific to derived
+     *      classes, not just BTree, HTree, and Stream. Or we need to add a
+     *      general concept of a "summary statistics object" for a persistent
+     *      data structure.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
      *      </a>
@@ -164,9 +165,9 @@ public final class SolutionSetStream extends Stream implements
      * <p>
      * {@inheritDoc}
      * 
-     * FIXME This is not setting the SolutionSetStream class when invoked by
-     * {@link Checkpoint#create(IRawStore, IndexMetadata)} since Stream.create()
-     * is being invoked rather than SolutionSetStream.create().
+     * FIXME GIST : This is not setting the SolutionSetStream class when invoked
+     * by {@link Checkpoint#create(IRawStore, IndexMetadata)} since
+     * Stream.create() is being invoked rather than SolutionSetStream.create().
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
      */

@@ -73,10 +73,16 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- *         TODO Write unit tests ({@link Stream} is abstract right now which
- *         makes that difficult). Focus on the checkpoint protocol as the
- *         underlying stream is implemented by the low level storage engine and
- *         tested separately.
+ *         FIXME GIST : The base Stream should handle byte[]s, much like the
+ *         basic BTree or HTree. That way it can be a concrete class and used
+ *         for a variety of things. It might also allow an append() method
+ *         (similar to insert) for non-iterator based incremental write
+ *         protocols. This would be really just a thin wrapper over the
+ *         {@link IPSOutputStream}, but integrated with the
+ *         {@link ICheckpointProtocol} and (ideally) the MVCC architecture.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
+ *      </a>
  */
 abstract public class Stream implements ICheckpointProtocol {
 
