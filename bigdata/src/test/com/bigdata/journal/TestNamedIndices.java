@@ -27,12 +27,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.DataOutputStream;
+import java.util.Arrays;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.htree.HTree;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.stream.Stream;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
+import com.bigdata.striterator.CloseableIteratorWrapper;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for api supporting registration, lookup, use, and atomic commit of
@@ -46,7 +56,7 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
     public TestNamedIndices() {
     }
 
-    public TestNamedIndices(String name) {
+    public TestNamedIndices(final String name) {
         super(name);
     }
 
@@ -179,11 +189,82 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
 
     }
 
-    /**
-     * FIXME Test for Stream as well, or maybe the concrete SolutionSetStream.
-     */
-    public void testRegisterAndUseStream() {
-        fail("write test");
-    }
-
+//    /**
+//     * FIXME GIST : Test for Stream as well. We should define a basic Stream
+//     * that handles byte[]s, much like the basic BTree or HTree. That way it can
+//     * be a concrete class and used for a variety of things.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
+//     *      </a>
+//     */
+//    public void testRegisterAndUseStream() {
+//
+//        Journal journal = new Journal(getProperties());
+//
+//        try {
+//
+//            final String name = "abc";
+//
+//            final UUID indexUUID = UUID.randomUUID();
+//
+//            assertNull(journal.getUnisolatedIndex(name));
+//
+//            final StreamIndexMetadata metadata = new StreamIndexMetadata(name,
+//                    indexUUID);
+//
+//            journal.register(name, metadata);
+//
+//            Stream stream = (Stream) journal.getUnisolatedIndex(name);
+//
+//            final byte[][] expected = new byte[][] {//
+//                    new byte[] { 0 },//
+//                    new byte[] { 1, 2, 3 },
+//            };
+//
+//            stream.write(new CloseableIteratorWrapper<byte[]>(Arrays.asList(
+//                    expected).iterator()));
+//
+//            /*
+//             * commit and close the journal
+//             */
+//            journal.commit();
+//
+//            if (journal.isStable()) {
+//
+//                /*
+//                 * re-open the journal and test restart safety.
+//                 */
+//                journal = reopenStore(journal);
+//
+//                stream = (Stream) journal.getUnisolatedIndex(name);
+//
+//                assertNotNull(stream);
+//
+//                assertEquals("indexUUID", indexUUID, stream.getIndexMetadata()
+//                        .getIndexUUID());
+//
+//                assertEquals("rangeCount", 1L, stream.rangeCount());
+//
+//                @SuppressWarnings("unchecked")
+//                final ICloseableIterator<byte[]> itr = (ICloseableIterator<byte[]>) stream
+//                        .scan();
+//
+//                for (byte[] ex : expected) {
+//
+//                    final byte[] ac = itr.next();
+//
+//                    assertTrue(BytesUtil.bytesEqual(ex, ac));
+//
+//                }
+//
+//            }
+//
+//        } finally {
+//
+//            journal.destroy();
+//
+//        }
+//
+//    }
+    
 }
