@@ -26,15 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.gom.om;
 
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
@@ -256,31 +252,11 @@ public class ObjectManager extends ObjectMgrModel {
 		return true; //
 	}
 
-	private void materializeWithDescribe(final IGPO gpo) {
+	@Override
+	protected void materializeWithDescribe(final IGPO gpo) {
 
         if (gpo == null)
             throw new IllegalArgumentException();
-	    
-	    if (log.isTraceEnabled())
-			log.trace("Materializing: " + gpo.getId());
-		
-		((GPO) gpo).dematerialize();
-		
-//		if (m_describeCache == null) {
-//				AbstractTripleStore store = m_repo.getDatabase();
-//		       final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) store.getIndexManager());
-//
-//		        final ICacheConnection cacheConn = CacheConnectionFactory
-//		                .getExistingCacheConnection(queryEngine);
-//
-//		        if (cacheConn != null) {
-//
-//		            m_describeCache = cacheConn.getDescribeCache(
-//		                    store.getNamespace(), store.getTimestamp());
-//
-//		        }
-//
-//		}
 		
         /*
          * At present the DESCRIBE query will simply return a set of statements
@@ -295,7 +271,8 @@ public class ObjectManager extends ObjectMgrModel {
 
             if (g != null) {
 
-                initGPO((GPO) gpo, g.iterator());
+                initGPO((GPO) gpo,
+                        new CloseableIteratorWrapper<Statement>(g.iterator()));
 
                 return;
 
@@ -303,51 +280,9 @@ public class ObjectManager extends ObjectMgrModel {
 
         }
 
-        final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+        super.materializeWithDescribe(gpo);
 
-        final ICloseableIterator<Statement> stmts = evaluateGraph(query);
-
-        initGPO((GPO) gpo, stmts);
-  
 	}
-	
-    /**
-     * Initialize a {@link IGPO} from a collection of statements.
-     * 
-     * @param gpo
-     *            The gpo.
-     * @param stmts
-     *            The statements.
-     */
-    private void initGPO(final GPO gpo, final Iterator<Statement> stmts) {
-
-		int statements = 0;
-
-		while (stmts.hasNext()) {
-		
-		    final Statement stmt = stmts.next();
-			final Resource subject = stmt.getSubject();
-			final URI predicate = stmt.getPredicate();
-			final Value value = stmt.getObject();
-						
-			if (subject.equals(gpo.getId())) {
-
-			    // property
-                gpo.initValue(predicate, value);
-
-			} else { // links in - add to LinkSet
-			    
-                gpo.initLinkValue(predicate, subject);
-                
-            }
-			
-			statements++;
-
-		}
-		
-		if (log.isTraceEnabled())
-			log.trace("Materialized: " + gpo.getId() + " with " + statements + " statements");
-    }
 
     /**
      * Attempt to add/resolve the {@link IV} for the {@link IGPO}.
@@ -387,47 +322,6 @@ public class ObjectManager extends ObjectMgrModel {
         return iv;
 
 	}
-
-    @Override
-	public void materialize(final IGPO gpo) {
-	    
-        if (gpo == null)
-            throw new IllegalArgumentException();
-
-		if (true) {
-			materializeWithDescribe(gpo);
-			return;
-		}
-		
-		if (log.isTraceEnabled())
-			log.trace("Materializing: " + gpo.getId());
-		
-		((GPO) gpo).dematerialize();
-
-        /**
-         * At present the DESCRIBE query will simply return a set of statements
-         * equivalent to a TupleQuery <id, ?, ?>
-         * 
-         * <pre>
-         * final String query = "DESCRIBE <"; + gpo.getId().toString() + ">";
-         * </pre>
-         * 
-         * TODO URL encoding of the URI in the query?
-         */
-		
-		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
-	
-		final ICloseableIterator<BindingSet> res = evaluate(query);
-		
-		while (res.hasNext()) {
-
-		    final BindingSet bs = res.next();
-		    
-            ((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));
-
-		}
-
-    }
 
     @Override
     protected void flushStatements(final List<Statement> m_inserts,

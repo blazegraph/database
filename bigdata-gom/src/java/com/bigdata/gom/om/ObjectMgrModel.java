@@ -26,11 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.gom.om;
 
+import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,12 +40,14 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
+import org.openrdf.query.BindingSet;
 
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Base class for {@link IObjectManager} implementations. This class handles
@@ -73,7 +75,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
     /**
      * The "running object table." Dirty objects are wired into this table by
-     * the existence.
+     * the existence of a hard reference in the {@link #m_dirtyGPOs} list.
      * 
      * TODO If people hold onto a reference to an object it will not come out of
      * this table. We need to remove all dirty objects from this map on a
@@ -82,10 +84,8 @@ public abstract class ObjectMgrModel implements IObjectManager {
      * TODO This map is touched for every pointer traversal. I would prefer to
      * use weak references on the GPO forward and backward links to avoid those
      * hash table lookups.
-     * 
-     * TODO This collection is not thread-safe without synchronization.
      */
-    private final WeakHashMap<Resource, IGPO> m_dict = new WeakHashMap<Resource, IGPO>();
+    private final ConcurrentWeakValueCache<Resource, IGPO> m_dict = new ConcurrentWeakValueCache<Resource, IGPO>();
 	
     /**
      * This is only for the predicates and provides the guarantee that we can
@@ -348,16 +348,168 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	    IGPO ret = m_dict.get(id);
 		
 		if (ret == null) {
-		
-		    ret = new GPO(this, id);
-		    
-			m_dict.put(id, ret);
-			
+
+            final IGPO tmp = m_dict.putIfAbsent(id, ret = new GPO(this, id));
+
+            if (tmp != null) {
+            
+                // Lost the data race.
+                ret = tmp;
+                
+            }
+
 		}
 		
 		return ret;
 
 	}
+
+	public Iterator<WeakReference<IGPO>> getGPOs() {
+	    
+	    return m_dict.iterator();
+	    
+	}
+	
+    @Override
+    public void materialize(final IGPO gpo) {
+        
+        if (gpo == null)
+            throw new IllegalArgumentException();
+
+        if (log.isTraceEnabled())
+            log.trace("Materializing: " + gpo.getId());
+        
+        ((GPO) gpo).dematerialize();
+
+        if (true) {
+            
+            materializeWithDescribe(gpo);
+            
+        } else {
+         
+            materializeWithSelect(gpo);
+            
+        }
+        
+    }
+
+    protected void materializeWithDescribe(final IGPO gpo) {
+
+        final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+
+        initGPO((GPO) gpo, evaluateGraph(query));
+
+    }
+
+    protected void materializeWithSelect(final IGPO gpo) {
+
+        final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString()
+                + "> ?p ?v}";
+
+        final ICloseableIterator<BindingSet> res = evaluate(query);
+
+        while (res.hasNext()) {
+
+            final BindingSet bs = res.next();
+
+            ((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));
+
+        }
+
+    }
+    
+    public void initGPOs(final ICloseableIterator<Statement> itr) {
+        
+        initGPO(null/* gpo */, itr);
+
+    }
+    
+    /**
+     * Initialize one or more {@link IGPO}s from a collection of statements.
+     * 
+     * @param gpo
+     *            The gpo (optional). When given, only the specified
+     *            {@link IGPO} will be initialized. When not provided, all
+     *            {@link Resource}s in the subject and object position of the
+     *            visited {@link Statement}s will be resolved to {@link IGPO}s
+     *            and the corresponding properties and/or links initialized from
+     *            the {@link Statement}s.
+     * @param stmts
+     *            The statements.
+     */
+    protected void initGPO(final GPO gpo,
+            final ICloseableIterator<Statement> stmts) {
+
+        try {
+
+            final Resource id = gpo == null ? null : gpo.getId();
+            
+            int statements = 0;
+
+            while (stmts.hasNext()) {
+
+                final Statement stmt = stmts.next();
+                final Resource subject = stmt.getSubject();
+                final URI predicate = stmt.getPredicate();
+                final Value value = stmt.getObject();
+
+                if (id != null) {
+
+                    /*
+                     * Initializing some specific gpo provided by the caller.
+                     */
+                    
+                    if (subject.equals(id)) {
+
+                        // property or link out.
+                        gpo.initValue(predicate, value);
+
+                    } else { // links in - add to LinkSet
+
+                        gpo.initLinkValue(predicate, subject);
+
+                    }
+
+                } else {
+                
+                    /*
+                     * Initial GPOs for all resources visited.
+                     */
+                    {
+
+                        final GPO tmp = (GPO) getGPO(subject);
+
+                        // property or link out.
+                        tmp.initValue(predicate, value);
+                        
+                    }
+
+                    if(value instanceof Resource) {
+                        
+                        final GPO tmp = (GPO) getGPO((Resource) value);
+
+                        // Link in.
+                        tmp.initLinkValue(predicate, subject);
+                        
+                    }
+                    
+                }
+                
+                statements++;
+
+            }
+
+            if (log.isTraceEnabled())
+                log.trace("Materialized: " + gpo.getId() + " with "
+                        + statements + " statements");
+
+        } finally {
+
+            stmts.close();
+
+        }
+
+    }
 
 	@Override
 	public int beginNativeTransaction() {

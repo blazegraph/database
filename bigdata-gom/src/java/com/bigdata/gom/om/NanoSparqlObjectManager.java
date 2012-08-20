@@ -26,32 +26,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.gom.om;
 
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
-import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 
-import com.bigdata.gom.gpo.GPO;
-import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -117,33 +107,33 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		return true;
 	}
 
-	@Override
-	public void materialize(IGPO gpo) {
-		if (gpo == null || gpo.getId() == null)
-			throw new IllegalArgumentException("Materialization requires an identity");
-		
-		if (log.isTraceEnabled())
-			log.trace("Materializing: " + gpo.getId());
-		
-		((GPO) gpo).dematerialize();
-		
-		// At present the DESCRIBE query will simply return a set of
-		//	statements equivalent to a TupleQuery <id, ?, ?>
-//		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
-//		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
-//
-//		while (stmts.hasNext()) {
-//			final Statement stmt = stmts.next();
-//			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
+//	@Override
+//	public void materialize(IGPO gpo) {
+//		if (gpo == null || gpo.getId() == null)
+//			throw new IllegalArgumentException("Materialization requires an identity");
+//		
+//		if (log.isTraceEnabled())
+//			log.trace("Materializing: " + gpo.getId());
+//		
+//		((GPO) gpo).dematerialize();
+//		
+//		// At present the DESCRIBE query will simply return a set of
+//		//	statements equivalent to a TupleQuery <id, ?, ?>
+////		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
+////		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
+////
+////		while (stmts.hasNext()) {
+////			final Statement stmt = stmts.next();
+////			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
+////		}
+//		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
+//		final ICloseableIterator<BindingSet> res = evaluate(query);
+//		
+//		while (res.hasNext()) {
+//			final BindingSet bs = res.next();
+//			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
 //		}
-		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
-		final ICloseableIterator<BindingSet> res = evaluate(query);
-		
-		while (res.hasNext()) {
-			final BindingSet bs = res.next();
-			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
-		}
-	}
+//	}
 
 	@Override
     public ICloseableIterator<Statement> evaluateGraph(final String query) {

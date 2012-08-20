@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.gom.om;
 
+import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.UUID;
 
@@ -75,6 +76,28 @@ public interface IObjectManager extends INativeTransaction {
     // Return canonical IGPO for Resource (including Statement) w/in OM scope and never null.
     IGPO getGPO(Resource id);
 
+    /**
+     * Partially materialize {@link IGPO}s from a stream of {@link Statement}s.
+     * 
+     * @param itr
+     *            The {@link Statement}s.
+     */
+    void initGPOs(final ICloseableIterator<Statement> itr);
+
+    /**
+     * An iterator that visits the weak reference values in the running object
+     * table. You must test each weak reference in order to determine whether
+     * its value has been cleared as of the moment that you request that value.
+     * The entries visited by the iterator are not "touched" so the use of the
+     * iterator will not cause them to be retained any longer than they
+     * otherwise would have been retained.
+     * 
+     * TODO We could do one-step look ahead and buffer a hard reference to the
+     * next {@link IGPO} to be visited. That would allow us to eliminate the
+     * {@link WeakReference} from this method signature.
+     */
+    Iterator<WeakReference<IGPO>> getGPOs();
+    
     /**
      * Ensure Statements are materialized for gpo's Resource:
      * <code>DESCRIBE ?s</code>.
