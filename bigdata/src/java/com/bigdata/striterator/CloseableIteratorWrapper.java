@@ -48,9 +48,16 @@ public class CloseableIteratorWrapper<E> implements ICloseableIterator<E> {
         this.src = src;
         
     }
-    
-    /** NOP. */
+
+    /** Delegate to the source iff the source implements {@link ICloseable}. */
     public void close() {
+
+        if (src instanceof ICloseable) {
+
+            ((ICloseable) src).close();
+
+        }
+
     }
 
     public boolean hasNext() {
