@@ -16,6 +16,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 
@@ -925,6 +926,27 @@ public class GPO implements IGPO {
 //		}
 	}
 
+    @Override
+    public IGPO getLink(final URI property, final IGPO target) {
+
+        if (getValue(property) != target.getId()) {
+
+            // Link does not exist.
+            return null;
+            
+        }
+        
+        return m_om.getGPO(new StatementImpl(m_id, property, target.getId()));
+
+    }
+
+//    @Override
+//    public void addLink(final URI property, final IGPO target) {
+//
+//        addValue(property, target.getId());
+//
+//    }
+	
 	@Override
 	public void addValue(final URI property, final Value value) {
 
