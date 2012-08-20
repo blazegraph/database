@@ -200,6 +200,13 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     IGenericSkin asClass(Class theClassOrInterface);
 
     /**
+     * Force the full materialization of the {@link IGPO}.
+     * 
+     * @return This {@link IGPO}.
+     */
+    IGPO materialize();
+    
+    /**
      * @return a pretty printed representation of the GPO
      */
 	String pp();

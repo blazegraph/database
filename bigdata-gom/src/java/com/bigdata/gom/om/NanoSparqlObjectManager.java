@@ -107,34 +107,6 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 		return true;
 	}
 
-//	@Override
-//	public void materialize(IGPO gpo) {
-//		if (gpo == null || gpo.getId() == null)
-//			throw new IllegalArgumentException("Materialization requires an identity");
-//		
-//		if (log.isTraceEnabled())
-//			log.trace("Materializing: " + gpo.getId());
-//		
-//		((GPO) gpo).dematerialize();
-//		
-//		// At present the DESCRIBE query will simply return a set of
-//		//	statements equivalent to a TupleQuery <id, ?, ?>
-////		final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
-////		final ICloseableIterator<Statement> stmts = evaluateGraph(query);
-////
-////		while (stmts.hasNext()) {
-////			final Statement stmt = stmts.next();
-////			((GPO) gpo).initValue(stmt.getPredicate(), stmt.getObject());				
-////		}
-//		final String query = "SELECT ?p ?v WHERE {<" + gpo.getId().toString() + "> ?p ?v}";
-//		final ICloseableIterator<BindingSet> res = evaluate(query);
-//		
-//		while (res.hasNext()) {
-//			final BindingSet bs = res.next();
-//			((GPO) gpo).initValue((URI) bs.getValue("p"), bs.getValue("v"));				
-//		}
-//	}
-
 	@Override
     public ICloseableIterator<Statement> evaluateGraph(final String query) {
 
