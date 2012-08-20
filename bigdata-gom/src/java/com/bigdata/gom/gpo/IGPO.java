@@ -115,6 +115,12 @@ public interface IGPO extends IGenericSkin // @todo , INativeTransaction?
     /** Assert (self,p,newValue). */
     void addValue(URI property, Value newValue);
 
+//    /** Assert (self,p,target). */
+//    void addLink(URI property,IGPO target);
+
+    /** Return the {@link IGPO} modeling the link iff it exists. */
+    IGPO getLink(URI property, IGPO target);
+
     /** Remove (self,p,oldValue) if found. */
     void removeValue(URI property, Value oldValue);
     
