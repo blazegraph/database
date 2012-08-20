@@ -11,7 +11,6 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.query.BindingSet;
 
@@ -125,7 +124,7 @@ public class Example2 implements Callable<Void> {
          * The namespace of the KB instance that you want to connect to on that
          * server. The default namespace is "kb".
          */
-        final String namespace = "kb";//emc.srm.topology.kb";
+        final String namespace = "kb";
         
         ClientConnectionManager ccm = null;
 
