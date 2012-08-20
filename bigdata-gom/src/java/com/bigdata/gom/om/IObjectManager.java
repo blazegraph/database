@@ -29,6 +29,7 @@ package com.bigdata.gom.om;
 
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
 
 import org.openrdf.model.Resource;
@@ -81,8 +82,12 @@ public interface IObjectManager extends INativeTransaction {
      * 
      * @param itr
      *            The {@link Statement}s.
+     *            
+     * @return A hard reference collection that will keep the any materialized
+     *         {@link IGPO}s from being finalized before the caller has a chance
+     *         to do something with them.
      */
-    void initGPOs(final ICloseableIterator<Statement> itr);
+    Map<Resource,IGPO> initGPOs(final ICloseableIterator<Statement> itr);
 
     /**
      * An iterator that visits the weak reference values in the running object

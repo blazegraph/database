@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.gom.om;
 
 import java.lang.ref.WeakReference;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -85,7 +88,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
      * use weak references on the GPO forward and backward links to avoid those
      * hash table lookups.
      */
-    private final ConcurrentWeakValueCache<Resource, IGPO> m_dict = new ConcurrentWeakValueCache<Resource, IGPO>();
+    private final ConcurrentWeakValueCache<Resource, IGPO> m_dict;
 	
     /**
      * This is only for the predicates and provides the guarantee that we can
@@ -142,9 +145,12 @@ public abstract class ObjectMgrModel implements IObjectManager {
          * to use the URI!
          */
 		s_nmeMgr = m_valueFactory.createURI("gpo:nmeMgr/"+m_uuid);
-		
-//		addNewTerm((BigdataValue) s_nmeMgr);
-		
+
+		/*
+		 * Note: This sets the hard reference queue capacity.
+		 */
+        m_dict = new ConcurrentWeakValueCache<Resource, IGPO>(1000/* queueCapacity */);
+
 	}
 	
 	public IGPO getDefaultNameMgr() {
@@ -418,9 +424,9 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
     }
     
-    public void initGPOs(final ICloseableIterator<Statement> itr) {
+    public Map<Resource, IGPO> initGPOs(final ICloseableIterator<Statement> itr) {
         
-        initGPO(null/* gpo */, itr);
+        return initGPO(null/* gpo */, itr);
 
     }
     
@@ -436,9 +442,25 @@ public abstract class ObjectMgrModel implements IObjectManager {
      *            the {@link Statement}s.
      * @param stmts
      *            The statements.
+     * 
+     * @return A hard reference collection that will keep the any materialized
+     *         {@link IGPO}s from being finalized before the caller has a chance
+     *         to do something with them.
      */
-    protected void initGPO(final GPO gpo,
+    protected Map<Resource, IGPO> initGPO(final GPO gpo,
             final ICloseableIterator<Statement> stmts) {
+
+        final Map<Resource, IGPO> map;
+
+        if (gpo != null) {
+
+            map = Collections.singletonMap((Resource) gpo.getId(), (IGPO) gpo);
+
+        } else {
+            
+            map = new HashMap<Resource, IGPO>();
+            
+        }
 
         try {
 
@@ -482,6 +504,8 @@ public abstract class ObjectMgrModel implements IObjectManager {
                         // property or link out.
                         tmp.initValue(predicate, value);
                         
+                        map.put(tmp.getId(), tmp);
+                        
                     }
 
                     if(value instanceof Resource) {
@@ -490,6 +514,8 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
                         // Link in.
                         tmp.initLinkValue(predicate, subject);
+                        
+                        map.put(tmp.getId(), tmp);
                         
                     }
                     
@@ -503,6 +529,8 @@ public abstract class ObjectMgrModel implements IObjectManager {
                 log.trace("Materialized: " + gpo.getId() + " with "
                         + statements + " statements");
 
+            return map;
+            
         } finally {
 
             stmts.close();
