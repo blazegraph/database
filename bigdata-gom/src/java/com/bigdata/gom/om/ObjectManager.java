@@ -55,6 +55,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
@@ -75,7 +76,7 @@ public class ObjectManager extends ObjectMgrModel {
 	
 	final private BigdataSailRepository m_repo;
 	final private boolean readOnly;
-	private IDescribeCache m_describeCache;
+	final private IDescribeCache m_describeCache;
 	
     /**
      * 
@@ -94,21 +95,34 @@ public class ObjectManager extends ObjectMgrModel {
         final AbstractTripleStore tripleStore = cxn.getDatabase();
 
         this.readOnly = tripleStore.isReadOnly();
-        
-        final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) m_repo.getDatabase().getIndexManager());
 
-        final ICacheConnection cacheConn = CacheConnectionFactory
-                .getExistingCacheConnection(queryEngine);
+        /*
+         * FIXME The DESCRIBE cache feature is not yet finished. This code will
+         * not obtain a connection to the DESCRIBE cache unless an unisolated
+         * query or update operation has already run against the query engine.
+         * This is a known bug and will be resolved as we work through the MVCC
+         * cache coherence for the DESCRIBE cache.
+         */
+        {
 
-        if (cacheConn != null) {
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getStandaloneQueryController((Journal) m_repo
+                            .getDatabase().getIndexManager());
 
-            m_describeCache = cacheConn.getDescribeCache(
-                    tripleStore.getNamespace(), 0 /*tripleStore.getTimestamp()*/);
+            final ICacheConnection cacheConn = CacheConnectionFactory
+                    .getExistingCacheConnection(queryEngine);
 
-        } else {
+            if (cacheConn != null) {
 
-            m_describeCache = null;
+                m_describeCache = cacheConn.getDescribeCache(
+                        tripleStore.getNamespace(), tripleStore.getTimestamp());
 
+            } else {
+
+                m_describeCache = null;
+
+            }
+            
         }
 
     }
@@ -133,119 +147,100 @@ public class ObjectManager extends ObjectMgrModel {
 	}
 	
 	@Override
-	public ICloseableIterator<BindingSet> evaluate(final String query) {
+    public ICloseableIterator<BindingSet> evaluate(final String query) {
 
-	    BigdataSailRepositoryConnection cxn = null;
-		
-	    try {
-
-		    cxn = getQueryConnection();
-        
-		    final TupleQuery q = cxn.prepareTupleQuery(QueryLanguage.SPARQL,
-                    query);
-            
-		    final TupleQueryResult res = q.evaluate();
-            
-		    return new CloseableIteratorWrapper<BindingSet>(
-                    new Iterator<BindingSet>() {
-
-				@Override
-				public boolean hasNext() {
-					try {
-						return res.hasNext();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
-
-				@Override
-				public BindingSet next() {
-					try {
-						return res.next();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
-
-				@Override
-				public void remove() {
-					throw new UnsupportedOperationException();
-				}
-				
-                    });
-
-	    } catch (Exception ex) {
-        
-	        throw new RuntimeException(ex);
-	        
-        } finally {
-            
-            if (cxn != null) {
-                try {
-                    cxn.close();
-                } catch (RepositoryException e) {
-                    log.error(e, e);
-                }
-            }
-            
+        final BigdataSailRepositoryConnection cxn;
+        try {
+            cxn = getQueryConnection();
+        } catch (RepositoryException e1) {
+            throw new RuntimeException(e1);
         }
-	    
+
+        try {
+
+            // Setup the query.
+            final TupleQuery q = cxn.prepareTupleQuery(QueryLanguage.SPARQL,
+                    query);
+
+            // Note: evaluate() runs asynchronously and must be closed().
+            final TupleQueryResult res = q.evaluate();
+
+            // Will close the TupleQueryResult.
+            return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+                    res) {
+                public void close() {
+                    // Close the TupleQueryResult.
+                    super.close();
+                    try {
+                        // Close the connection.
+                        cxn.close();
+                    } catch (RepositoryException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+
+        } catch (Throwable t) {
+
+            // Error preparing the query.
+            try {
+                // Close the connection
+                cxn.close();
+            } catch (RepositoryException e) {
+                log.error(e, e);
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
     }
 
 	public ICloseableIterator<Statement> evaluateGraph(final String query) {
 
-	    BigdataSailRepositoryConnection cxn = null;
-        
-	    try {
-        
-	        cxn = getQueryConnection();
-            
-	        final GraphQuery q = cxn.prepareGraphQuery(QueryLanguage.SPARQL,
+        final BigdataSailRepositoryConnection cxn;
+        try {
+            cxn = getQueryConnection();
+        } catch (RepositoryException e1) {
+            throw new RuntimeException(e1);
+        }
+
+        try {
+
+            // Setup the query.
+            final GraphQuery q = cxn.prepareGraphQuery(QueryLanguage.SPARQL,
                     query);
-            
-	        final GraphQueryResult res = q.evaluate();
-			
-	        return  new CloseableIteratorWrapper<Statement>(new Iterator<Statement>() {
 
-				@Override
-				public boolean hasNext() {
-					try {
-						return res.hasNext();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
+            // Note: evaluate() runs asynchronously and must be closed().
+            final GraphQueryResult res = q.evaluate();
 
-				@Override
-				public Statement next() {
-					try {
-						return res.next();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
-
-				@Override
-				public void remove() {
-					throw new UnsupportedOperationException();
-				}
-				
-			});
-
-	    } catch (Exception t) {
-        
-	        throw new RuntimeException(t);
-	        
-        } finally {
-            
-            if (cxn != null) {
-                try {
-                    cxn.close();
-                } catch (RepositoryException e) {
-                    log.error(e, e);
+            // Will close the TupleQueryResult.
+            return new Sesame2BigdataIterator<Statement, QueryEvaluationException>(
+                    res) {
+                public void close() {
+                    // Close the TupleQueryResult.
+                    super.close();
+                    try {
+                        // Close the connection.
+                        cxn.close();
+                    } catch (RepositoryException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
+            };
+
+        } catch (Throwable t) {
+
+            // Error preparing the query.
+            try {
+                // Close the connection
+                cxn.close();
+            } catch (RepositoryException e) {
+                log.error(e, e);
             }
-            
+
+            throw new RuntimeException(t);
+
         }
 
 	}
@@ -271,21 +266,21 @@ public class ObjectManager extends ObjectMgrModel {
 		
 		((GPO) gpo).dematerialize();
 		
-		if (m_describeCache == null) {
-				AbstractTripleStore store = m_repo.getDatabase();
-		       final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) store.getIndexManager());
-
-		        final ICacheConnection cacheConn = CacheConnectionFactory
-		                .getExistingCacheConnection(queryEngine);
-
-		        if (cacheConn != null) {
-
-		            m_describeCache = cacheConn.getDescribeCache(
-		                    store.getNamespace(), store.getTimestamp());
-
-		        }
-
-		}
+//		if (m_describeCache == null) {
+//				AbstractTripleStore store = m_repo.getDatabase();
+//		       final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) store.getIndexManager());
+//
+//		        final ICacheConnection cacheConn = CacheConnectionFactory
+//		                .getExistingCacheConnection(queryEngine);
+//
+//		        if (cacheConn != null) {
+//
+//		            m_describeCache = cacheConn.getDescribeCache(
+//		                    store.getNamespace(), store.getTimestamp());
+//
+//		        }
+//
+//		}
 		
         /*
          * At present the DESCRIBE query will simply return a set of statements

@@ -36,12 +36,16 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -79,48 +83,27 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 //		// m_repo.close();
 //	}
 
-	@Override
-	public ICloseableIterator<BindingSet> evaluate(final String query) {
-		try {
-			final IPreparedTupleQuery q = m_repo.prepareTupleQuery(query);
-			final TupleQueryResult res = q.evaluate();
-			return  new CloseableIteratorWrapper<BindingSet>(new Iterator<BindingSet>() {
+    @Override
+    public ICloseableIterator<BindingSet> evaluate(final String query) {
 
-				@Override
-				public boolean hasNext() {
-					try {
-						return res.hasNext();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
+        try {
 
-				@Override
-				public BindingSet next() {
-					try {
-						return res.next();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
+            // Setup the query.
+            final IPreparedTupleQuery q = m_repo.prepareTupleQuery(query);
 
-				@Override
-				public void remove() {
-					throw new UnsupportedOperationException();
-				}
-				
-			});
-		} catch (RepositoryException e1) {
-			e1.printStackTrace();
-		} catch (MalformedQueryException e1) {
-			e1.printStackTrace();
-		} catch (QueryEvaluationException e) {
-			e.printStackTrace();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		return null;
+            // Note: evaluate() runs asynchronously and must be closed().
+            final TupleQueryResult res = q.evaluate();
+
+            // Will close the TupleQueryResult.
+            return new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+                    res);
+            
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+	        
+	    }
+	    
 	}
 
 	@Override
@@ -163,47 +146,26 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 	}
 
 	@Override
-	public ICloseableIterator<Statement> evaluateGraph(final String query) {
-		try {
-			final IPreparedGraphQuery q = m_repo.prepareGraphQuery(query);
-			final GraphQueryResult res = q.evaluate();
-			return  new CloseableIteratorWrapper<Statement>(new Iterator<Statement>() {
+    public ICloseableIterator<Statement> evaluateGraph(final String query) {
 
-				@Override
-				public boolean hasNext() {
-					try {
-						return res.hasNext();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
+	    try {
 
-				@Override
-				public Statement next() {
-					try {
-						return res.next();
-					} catch (QueryEvaluationException e) {
-						throw new RuntimeException(e);
-					}
-				}
+            // Setup the query.
+            final IPreparedGraphQuery q = m_repo.prepareGraphQuery(query);
 
-				@Override
-				public void remove() {
-					throw new UnsupportedOperationException();
-				}
-				
-			});
-		} catch (RepositoryException e1) {
-			e1.printStackTrace();
-		} catch (MalformedQueryException e1) {
-			e1.printStackTrace();
-		} catch (QueryEvaluationException e) {
-			e.printStackTrace();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		return null;
+            // Note: evaluate() runs asynchronously and must be closed().
+            final GraphQueryResult res = q.evaluate();
+
+            // Will close the GraphQueryResult.
+            return new Sesame2BigdataIterator<Statement, QueryEvaluationException>(
+                    res);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
 	}
 
 	@Override
