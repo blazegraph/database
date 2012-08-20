@@ -42,10 +42,12 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -96,6 +98,7 @@ abstract public class LocalGOMTestCase extends TestCase {
         m_vf = m_sail.getValueFactory();
         // Note: This uses a mock endpoint URL.
         om = new ObjectManager("http://localhost/sparql", m_repo);
+        
     }
     
     protected void tearDown() throws Exception {

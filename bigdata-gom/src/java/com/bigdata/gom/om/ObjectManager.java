@@ -45,8 +45,10 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataValue;
@@ -73,7 +75,7 @@ public class ObjectManager extends ObjectMgrModel {
 	
 	final private BigdataSailRepository m_repo;
 	final private boolean readOnly;
-	final private IDescribeCache m_describeCache;
+	private IDescribeCache m_describeCache;
 	
     /**
      * 
@@ -93,7 +95,7 @@ public class ObjectManager extends ObjectMgrModel {
 
         this.readOnly = tripleStore.isReadOnly();
         
-        final QueryEngine queryEngine = cxn.getSail().getQueryEngine();
+        final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) m_repo.getDatabase().getIndexManager());
 
         final ICacheConnection cacheConn = CacheConnectionFactory
                 .getExistingCacheConnection(queryEngine);
@@ -101,7 +103,7 @@ public class ObjectManager extends ObjectMgrModel {
         if (cacheConn != null) {
 
             m_describeCache = cacheConn.getDescribeCache(
-                    tripleStore.getNamespace(), tripleStore.getTimestamp());
+                    tripleStore.getNamespace(), 0 /*tripleStore.getTimestamp()*/);
 
         } else {
 
@@ -268,6 +270,22 @@ public class ObjectManager extends ObjectMgrModel {
 			log.trace("Materializing: " + gpo.getId());
 		
 		((GPO) gpo).dematerialize();
+		
+		if (m_describeCache == null) {
+				AbstractTripleStore store = m_repo.getDatabase();
+		       final QueryEngine queryEngine = QueryEngineFactory.getStandaloneQueryController((Journal) store.getIndexManager());
+
+		        final ICacheConnection cacheConn = CacheConnectionFactory
+		                .getExistingCacheConnection(queryEngine);
+
+		        if (cacheConn != null) {
+
+		            m_describeCache = cacheConn.getDescribeCache(
+		                    store.getNamespace(), store.getTimestamp());
+
+		        }
+
+		}
 		
         /*
          * At present the DESCRIBE query will simply return a set of statements
