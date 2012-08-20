@@ -279,15 +279,12 @@ public class LinkSet implements ILinkSet {
 		
 		final boolean ret;
 		if (m_linksIn) {
-			ret = gpo.getValue(m_linkProperty) == m_owner;
-			if (ret) {
-				gpo.setValue(m_linkProperty, null);
-			}
-		} else { // FIXME: implement linksOut
-			throw new UnsupportedOperationException();
+			gpo.removeValue(m_linkProperty, m_owner.getId());
+		} else {
+			m_owner.removeValue(m_linkProperty, gpo.getId());
 		}
 		
-		return ret;
+		return true;
 	}
 
 	@Override

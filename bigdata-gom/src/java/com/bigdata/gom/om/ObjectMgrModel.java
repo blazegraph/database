@@ -256,6 +256,14 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
 	}
 	
+	/**
+	 * 
+	 * @return size of dirty list
+	 */
+	public int getDirtyObjectCount() {
+		return m_dirtyGPOs.size();
+	}
+	
 //	abstract void flushTerms();
 
 	/**
