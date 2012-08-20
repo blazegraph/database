@@ -77,6 +77,8 @@ public interface IObjectManager extends INativeTransaction {
     // Return canonical IGPO for Resource (including Statement) w/in OM scope and never null.
     IGPO getGPO(Resource id);
 
+    IGPO getGPO(Statement stmt);
+
     /**
      * Partially materialize {@link IGPO}s from a stream of {@link Statement}s.
      * 

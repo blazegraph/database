@@ -8,10 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -25,6 +24,7 @@ import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
 import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -88,6 +88,8 @@ public class GPO implements IGPO {
 	 */
 	private final BigdataResource m_id;
 
+	private final BigdataStatement m_stmt;
+	
 	/**
 	 * <code>true</code> iff the forward link set has been materialized.
 	 */
@@ -547,7 +549,7 @@ public class GPO implements IGPO {
     	return m_id.hashCode();
     }
 
-	public GPO(final IObjectManager om, final Resource id) {
+    public GPO(final IObjectManager om, final Resource id) {
 
 		if (om == null)
 			throw new IllegalArgumentException();
@@ -558,9 +560,33 @@ public class GPO implements IGPO {
 		m_om = (ObjectMgrModel) om;
 
 		m_id = om.getValueFactory().asValue(id);
+		
+		m_stmt = null;
 
 	}
 	
+    public GPO(final IObjectManager om, final BNode id, final Statement stmt) {
+
+        if (om == null)
+            throw new IllegalArgumentException();
+
+        if (id == null)
+            throw new IllegalArgumentException();
+
+        m_om = (ObjectMgrModel) om;
+
+        m_id = om.getValueFactory().asValue(id);
+        
+        final BigdataStatement stmt2 = om.getValueFactory().createStatement(
+                ((ObjectMgrModel)om).bestEffortIntern(stmt.getSubject()),//
+                ((ObjectMgrModel)om).internKey(stmt.getPredicate()), //
+                ((ObjectMgrModel)om).bestEffortIntern(stmt.getObject()) //
+                );
+
+        this.m_stmt = stmt2;
+        
+    }
+
 	private void checkLive() {
 		if (m_removed)
 			throw new IllegalStateException("This GPO has been removed");
@@ -586,6 +612,19 @@ public class GPO implements IGPO {
 		return m_id;
 	}
 
+    /**
+     * Iff this {@link IGPO} represents a statement (aka link), then return that
+     * {@link Statement}.
+     * 
+     * @return The {@link Statement} or <code>null</code> if the {@link IGPO}
+     *         does not represent a {@link Statement}.
+     */
+    public BigdataStatement getStatement() {
+	    
+	    return m_stmt;
+	    
+	}
+	
 	/**
 	 * Encode a URL, Literal, or blank node for inclusion in a SPARQL query to
 	 * be sent to the remote service.
@@ -1126,8 +1165,8 @@ public class GPO implements IGPO {
 		checkLive();
 
 		if (!m_materialized) {
-			synchronized (this) {
-				if (!m_materialized) {
+            synchronized (this) {
+                if (!m_materialized && m_stmt == null) {
 					m_om.materialize(this);
 					m_materialized = true;
 				}
