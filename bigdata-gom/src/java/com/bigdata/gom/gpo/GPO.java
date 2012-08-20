@@ -1045,7 +1045,7 @@ public class GPO implements IGPO {
 //		final Lock readLock = m_lock.readLock();
 //		readLock.lock();
 //		try {
-			materialize();
+//			materialize();
 
 			final StringBuilder out = new StringBuilder("ID: "
 					+ m_id.stringValue() + "\n");
@@ -1122,7 +1122,7 @@ public class GPO implements IGPO {
 	 * Basis for lazy materialization, checks materialize state and if false
 	 * requests matierialization from the ObjectManager
 	 */
-	public void materialize() {
+	public IGPO materialize() {
 		checkLive();
 
 		if (!m_materialized) {
@@ -1133,6 +1133,7 @@ public class GPO implements IGPO {
 				}
 			}
 		}
+		return this;
 	}
 
 	public void setMaterialized(boolean b) {
