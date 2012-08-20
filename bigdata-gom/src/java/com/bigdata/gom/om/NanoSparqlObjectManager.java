@@ -90,7 +90,7 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
             
         } catch (Exception ex) {
 
-            throw new RuntimeException(ex);
+            throw new RuntimeException("query=" + query, ex);
 	        
 	    }
 	    
@@ -124,7 +124,7 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
 
         } catch (Exception ex) {
 
-            throw new RuntimeException(ex);
+            throw new RuntimeException("query=" + query, ex);
 
         }
 

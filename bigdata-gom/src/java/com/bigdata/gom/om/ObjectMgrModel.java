@@ -48,6 +48,9 @@ import org.openrdf.query.BindingSet;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.striterator.ICloseableIterator;
@@ -78,17 +81,10 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
     /**
      * The "running object table." Dirty objects are wired into this table by
-     * the existence of a hard reference in the {@link #m_dirtyGPOs} list.
-     * 
-     * TODO If people hold onto a reference to an object it will not come out of
-     * this table. We need to remove all dirty objects from this map on a
-     * rollback.
-     * 
-     * TODO This map is touched for every pointer traversal. I would prefer to
-     * use weak references on the GPO forward and backward links to avoid those
-     * hash table lookups.
+     * the existence of a hard reference in the {@link #m_dirtyGPOs} list. The
+     * keys are either {@link Resource}s or {@link Statement}s.
      */
-    private final ConcurrentWeakValueCache<Resource, IGPO> m_dict;
+    private final ConcurrentWeakValueCache<Object, IGPO> m_dict;
 	
     /**
      * This is only for the predicates and provides the guarantee that we can
@@ -149,7 +145,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		/*
 		 * Note: This sets the hard reference queue capacity.
 		 */
-        m_dict = new ConcurrentWeakValueCache<Resource, IGPO>(1000/* queueCapacity */);
+        m_dict = new ConcurrentWeakValueCache<Object, IGPO>(1000/* queueCapacity */);
 
 	}
 	
@@ -171,41 +167,6 @@ public abstract class ObjectMgrModel implements IObjectManager {
         return m_valueFactory;
 
     }
-
-//	class DefaultIDGenerator implements IIDGenerator {
-//		final URI s_idMgr;
-//		final URI s_idMgrNextId;
-//		BasicSkin m_idMgr;
-//		
-//		DefaultIDGenerator() {
-//			s_idMgr = m_valueFactory.createURI("gpo:idMgr/"+m_uuid);
-//			s_idMgrNextId = m_valueFactory.createURI("gpo:idMgr/"+m_uuid + "#nextId");
-//			
-//			m_idMgr = new BasicSkin(getGPO(s_idMgr));
-//
-//			addNewTerm((BigdataValue) s_idMgr);
-//			addNewTerm((BigdataValue) s_idMgrNextId );
-//		}
-//		
-//		/**
-//		 * Default IIDGenerator implementation for ObjectManagers.
-//		 */
-//		public URI genId() {
-//			if (m_idMgr == null) {
-//				m_idMgr = new BasicSkin(getGPO(s_idMgr));
-//			}
-//			
-//            final int nxtId = m_idMgr.getIntValue(s_idMgrNextId) + 1;
-//
-//            m_idMgr.setValue(s_idMgrNextId, nxtId);
-//			
-//			return getValueFactory().createURI("gpo:" + m_uuid + "/" + nxtId);
-//		}
-//
-//		public void rollback() {
-//			m_idMgr = null; // force reload to committed state on next access
-//		}
-//	}
 
     /**
      * Intern a predicate (internal API). This provides the guarantee that we
@@ -230,6 +191,33 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
 		return uri;
 
+    }
+
+    /**
+     * Make a best effort attempt to use the {@link Resource} associated with an
+     * {@link IGPO} in the running object table
+     * 
+     * @param t
+     *            Some identifier.
+     *            
+     * @return Either the same reference or one that will be canonical as long
+     *         as that {@link IGPO} remains pinned in the running object table.
+     */
+    public <T> T bestEffortIntern(final T t) {
+
+        if (t instanceof Resource) {
+
+            final IGPO gpo = m_dict.get(t);
+
+            if (gpo == null)
+                return t;
+
+            return (T) gpo.getId();
+
+        }
+
+        return t;
+        
     }
 
     /**
@@ -369,6 +357,44 @@ public abstract class ObjectMgrModel implements IObjectManager {
 		return ret;
 
 	}
+
+    /**
+     * {@inheritDoc}
+     * 
+     * FIXME This is using the {@link String} representation of the
+     * {@link Statement} as the blank node ID. It needs to work with the stable
+     * {@link IV}s as assigned by the lexicon. However, we need to ensure that
+     * the {@link IV}s are being reported through to the object manager in the
+     * various interchange formats that it uses and work through how we will
+     * provide that information in the SELECT query as well as CONSTRUCT and
+     * DESCRIBE (basically, we need to conneg for a MIME Type that supports it).
+     */
+	public IGPO getGPO(final Statement stmt) {
+
+        final BigdataBNode id = m_valueFactory.createBNode(stmt.toString());
+
+        // Flag indicating that this GPO is a Statement.
+        id.setStatementIdentifier(true);
+        
+        IGPO ret = m_dict.get(id);
+        
+        if (ret == null) {
+
+            final IGPO tmp = m_dict.putIfAbsent(id, ret = new GPO(this, id,
+                    stmt));
+
+            if (tmp != null) {
+            
+                // Lost the data race.
+                ret = tmp;
+                
+            }
+
+        }
+        
+        return ret;
+
+    }
 
 	public Iterator<WeakReference<IGPO>> getGPOs() {
 	    

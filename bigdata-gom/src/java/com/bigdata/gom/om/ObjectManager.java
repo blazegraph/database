@@ -186,7 +186,7 @@ public class ObjectManager extends ObjectMgrModel {
                 log.error(e, e);
             }
 
-            throw new RuntimeException(t);
+            throw new RuntimeException("query=" + query, t);
 
         }
 
@@ -235,7 +235,7 @@ public class ObjectManager extends ObjectMgrModel {
                 log.error(e, e);
             }
 
-            throw new RuntimeException(t);
+            throw new RuntimeException("query=" + query, t);
 
         }
 
