@@ -41,6 +41,7 @@ import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
 import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLParserFactory;
 import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
+import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
 
 /**
  * This static class provides a hook which allows the replacement of services
@@ -114,6 +115,9 @@ public class ServiceProviderHook {
             r.get(NQuadsParser.nquads);
 
             r.add(new BigdataNTriplesParserFactory());
+            
+            // subclassed the turtle parser to allow for fully numeric bnode ids
+            r.add(new BigdataTurtleParserFactory());
             
         }
 
