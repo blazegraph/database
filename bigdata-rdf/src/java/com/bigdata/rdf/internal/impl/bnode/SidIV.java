@@ -197,7 +197,7 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 		final byte[] key = key();
 		final int signum = key.length > 0 ? 1 : 0;
 		final BigInteger bi = new BigInteger(signum, key);
-		return bi.toString();
+		return 's' + bi.toString();
 	}
 
 	/**

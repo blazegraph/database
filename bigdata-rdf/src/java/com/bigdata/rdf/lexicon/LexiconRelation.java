@@ -2684,7 +2684,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * identifier.
              */
 
-        	final String id = ((BNode) iv).getID();
+        	final String id = 't' + ((BNode) iv).getID();
         	
             final BigdataBNode bnode = valueFactory.createBNode(id);
 
