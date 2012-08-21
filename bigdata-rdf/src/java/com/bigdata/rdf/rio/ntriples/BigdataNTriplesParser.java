@@ -632,10 +632,11 @@ public class BigdataNTriplesParser extends RDFParserBase {
 		if (c == -1) {
 			throwEOFException();
 		}
-//		else if (!NTriplesUtil.isLetter(c)) {
-		else if (!/*NTriplesUtil.*/isLetter(c)) { 
-			reportError("Expected a letter, found: " + (char)c);
-		}
+//      modified to allow fully numeric bnode ids 
+////		else if (!NTriplesUtil.isLetter(c)) {
+//		else if (!/*NTriplesUtil.*/isLetter(c)) { 
+//			reportError("Expected a letter, found: " + (char)c);
+//		}
 		name.append((char)c);
 
 		// Read all following letter and numbers, they are part of the name
