@@ -64,6 +64,11 @@ public class ThickCloseableIterator<E> implements ICloseableIterator<E>,
     private final E[] a;
     
     /**
+     * The number of elements to be visited by the iterator.
+     */
+    private final int len;
+    
+    /**
      * Create a thick iterator.
      * 
      * @param a
@@ -79,6 +84,35 @@ public class ThickCloseableIterator<E> implements ICloseableIterator<E>,
             throw new IllegalArgumentException();
         
         this.a = a;
+        this.len = a.length;
+
+        lastIndex = -1;
+        
+    }
+
+    /**
+     * Create a thick iterator.
+     * 
+     * @param a
+     *            The array of elements to be visited by the iterator (may be
+     *            empty, but may not be <code>null</code>).
+     * @param len
+     *            The number of elements to be visited by the iterator. Must be
+     *            less than the length of the array.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>a</i> is <code>null</code>.
+     */
+    public ThickCloseableIterator(final E[] a, final int len) {
+
+        if (a == null)
+            throw new IllegalArgumentException();
+        
+        if (len > a.length)
+        	throw new IllegalArgumentException();
+        
+        this.a = a;
+        this.len = len;
 
         lastIndex = -1;
         
@@ -86,7 +120,7 @@ public class ThickCloseableIterator<E> implements ICloseableIterator<E>,
 
     public boolean hasNext() {
         
-        if(open && lastIndex + 1 < a.length)
+        if(open && lastIndex + 1 < len)
             return true;
         
         close();
