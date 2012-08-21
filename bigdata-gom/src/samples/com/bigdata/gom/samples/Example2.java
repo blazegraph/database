@@ -1,5 +1,6 @@
 package com.bigdata.gom.samples;
 
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -135,6 +136,8 @@ public class Example2 implements Callable<Void> {
     
     public Void call() throws Exception {
 
+        final long begin = System.currentTimeMillis();
+        
         /*
          * URI used to recommend possible connections.
          */
@@ -160,21 +163,28 @@ public class Example2 implements Callable<Void> {
                         "  OPTIONAL { ?x rdfs:label ?xname2 } .\n"+//
                         "  OPTIONAL { ?z rdfs:label ?zname2 } .\n"+//
                         "} \n" + //
-                        "GROUP BY ?x ?z "
+                        "GROUP BY ?x ?z \n"//
+                        /*
+                         * Optionally, only see friends of a friend with more
+                         * than one indirect connection.
+                         */
+//                        +"HAVING (?connectionCount > 1)\n"//
                 );
 
         /*
          * Convert solutions into a graph, collecting the vertices of interest
          * for that graph.
          */
+        // the [x] bindings.
         final Set<IGPO> roots = new LinkedHashSet<IGPO>();
+        final Set<IGPO> all = new LinkedHashSet<IGPO>();
         try {
 
             while (itr.hasNext()) {
 
                 final BindingSet bset = itr.next();
 
-                System.out.println(bset.toString());
+//                System.out.println(bset.toString());
                 
                 final IGPO x = om.getGPO((Resource) bset.getValue("x"));
 
@@ -206,7 +216,9 @@ public class Example2 implements Callable<Void> {
                 }
 
                 roots.add(x);
-                roots.add(z);
+                all.add(x);
+                all.add(z);
+                all.add(link);
 
             }
             
@@ -216,8 +228,11 @@ public class Example2 implements Callable<Void> {
             
         }
 
+        final long elapsed = System.currentTimeMillis() - begin;
+        
         System.out.println("Found " + roots.size()
-                + " friends having unconnected friends of friends");
+                + " friends having unconnected friends of friends in "
+                + elapsed + "ms");
 
         for (IGPO gpo : roots) {
 
@@ -236,7 +251,7 @@ public class Example2 implements Callable<Void> {
                     final Integer connectionCount = getLinkWeight(gpo,
                             connectTo, friendOfAFriend, weightProperty);
 
-                    System.out.println("friendOfAFriend: "
+                    System.out.println("   friendOfAFriend: "
                             + friendOfAFriend.getId() + " (name="
                             + getStr(friendOfAFriend, RDFS.LABEL)
                             + "), connectionCount=" + connectionCount);
@@ -248,6 +263,8 @@ public class Example2 implements Callable<Void> {
 //            System.out.println(gpo.pp());
 
         }
+
+        System.out.println("size(x)="+roots.size()+", size(all)="+all.size());
         
         return null;
         
