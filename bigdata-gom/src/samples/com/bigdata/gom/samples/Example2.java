@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -50,6 +51,9 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class Example2 implements Callable<Void> {
 
+    private static final transient Logger log = Logger
+            .getLogger(Example2.class);
+
     private final IObjectManager om;
     
     public Example2(final IObjectManager om) {
@@ -84,6 +88,51 @@ public class Example2 implements Callable<Void> {
 
     }
 
+    /**
+     * Return the link weight between two friends of friends.
+     * 
+     * @param gpo
+     *            The link source.
+     * @param connectTo
+     *            The link property.
+     * @param friendOfAFriend
+     *            The link target.
+     * @param weightProperty
+     *            The link weight property.
+     * 
+     * @return The link weight -or- <code>null</code> if the link either does
+     *         not exist or does not have the link weight property.
+     */
+    static private Integer getLinkWeight(final IGPO gpo, final URI connectTo,
+            final IGPO friendOfAFriend, final URI weightProperty) {
+
+        final IGPO link = gpo.getLink(connectTo, friendOfAFriend);
+
+        if (link == null) {
+
+            log.warn("No such link: source=" + gpo + ", linkType=" + connectTo
+                    + ", target=" + friendOfAFriend);
+
+            return null;
+
+        }
+
+        final Value linkWeight = link.getValue(weightProperty);
+
+        if (linkWeight == null) {
+
+            log.warn("No such link attribute: source=" + gpo + ", linkType="
+                    + connectTo + ", target=" + friendOfAFriend
+                    + ", linkAttribute=" + linkWeight);
+
+            return null;
+
+        }
+
+        return ((Literal) linkWeight).intValue();
+
+    }
+    
     public Void call() throws Exception {
 
         /*
@@ -107,7 +156,7 @@ public class Example2 implements Callable<Void> {
                         "  ?x foaf:knows ?y . \n" + //
                         "  ?y foaf:knows ?z . \n" + //
                         "  FILTER NOT EXISTS { ?x foaf:knows ?z } . \n" + //
-                        "  FILTER ( ?x != ?z ) . \n"+//
+                        "  FILTER ( !sameTerm(?x,?z)) . \n"+//
                         "  OPTIONAL { ?x rdfs:label ?xname2 } .\n"+//
                         "  OPTIONAL { ?z rdfs:label ?zname2 } .\n"+//
                         "} \n" + //
@@ -125,6 +174,8 @@ public class Example2 implements Callable<Void> {
 
                 final BindingSet bset = itr.next();
 
+                System.out.println(bset.toString());
+                
                 final IGPO x = om.getGPO((Resource) bset.getValue("x"));
 
                 final IGPO z = om.getGPO((Resource) bset.getValue("z"));
@@ -155,6 +206,7 @@ public class Example2 implements Callable<Void> {
                 }
 
                 roots.add(x);
+                roots.add(z);
 
             }
             
@@ -169,11 +221,11 @@ public class Example2 implements Callable<Void> {
 
         for (IGPO gpo : roots) {
 
-            System.out.println("---------");
-
             final ILinkSet friends = gpo.getLinksOut(connectTo);
 
             if (!friends.isEmpty()) {
+
+                System.out.println("---------");
 
                 System.out.println("person=" + gpo.getId() + " (name="
                         + getStr(gpo, RDFS.LABEL) + ") has " + friends.size()
@@ -181,9 +233,8 @@ public class Example2 implements Callable<Void> {
 
                 for (IGPO friendOfAFriend : friends) {
 
-                    final int connectionCount = ((Literal) gpo.getLink(
-                            connectTo, friendOfAFriend)
-                            .getValue(weightProperty)).intValue();
+                    final Integer connectionCount = getLinkWeight(gpo,
+                            connectTo, friendOfAFriend, weightProperty);
 
                     System.out.println("friendOfAFriend: "
                             + friendOfAFriend.getId() + " (name="
