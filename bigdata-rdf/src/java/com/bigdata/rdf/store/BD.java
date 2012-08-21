@@ -358,6 +358,12 @@ public interface BD {
     final boolean DEFAULT_SUBJECT_SEARCH = false;
     
     /**
+     * Magic predicate used for the "search in search" service.  Also serves
+     * as the identifier for the service itself.
+     */
+    final URI SEARCH_IN_SEARCH = new URIImpl(SEARCH_NAMESPACE+"searchInSearch");
+    
+    /**
      * Magic predicate used to query for free text search metadata.  Use 
      * in conjunction with {@link #SEARCH} as follows:
      * <p>

@@ -495,6 +495,12 @@ public class RemoteRepository {
         }
 
 	}
+	
+	public long size() throws Exception {
+		
+		return rangeCount(null, null, null, null);
+		
+	}
 
     /**
      * Adds RDF data to the remote repository.
