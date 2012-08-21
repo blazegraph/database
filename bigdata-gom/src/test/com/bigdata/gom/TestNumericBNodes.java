@@ -5,7 +5,6 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserRegistry;
 
-import com.bigdata.gom.samples.Example1;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.rio.turtle.BigdataTurtleParser;
