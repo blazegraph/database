@@ -65,6 +65,8 @@ public class TestAll extends TestCase {
         // JavaScript GOM test suite.
         suite.addTestSuite(com.bigdata.gom.TestJavaScriptGOM.class);
 
+        suite.addTestSuite(com.bigdata.gom.TestNumericBNodes.class);
+        
         return suite;
 
     }

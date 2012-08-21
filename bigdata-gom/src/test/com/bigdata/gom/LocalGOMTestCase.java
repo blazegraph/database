@@ -70,8 +70,8 @@ abstract public class LocalGOMTestCase extends TestCase {
         super(name);
     }
 
-    protected void setUp() throws Exception {
-        
+    protected Properties getProperties() throws Exception {
+    	
         final Properties properties = new Properties();
 
         // create a backing file for the database
@@ -91,8 +91,14 @@ abstract public class LocalGOMTestCase extends TestCase {
 //        properties.setProperty("com.bigdata.namespace.kb.lex.ID2TERM.com.bigdata.btree.BTree.branchingFactor", "200");
         properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
 
+        return properties;
+        
+    }
+    
+    protected void setUp() throws Exception {
+
         // instantiate a sail and a Sesame repository
-        m_sail = new BigdataSail(properties);
+        m_sail = new BigdataSail(getProperties());
         m_repo = new BigdataSailRepository(m_sail);
         m_repo.initialize();
         m_vf = m_sail.getValueFactory();
