@@ -156,10 +156,18 @@ public class LinkSet implements ILinkSet {
 		return false;
 	}
 
+	/*
+	 * @see #size()
+	 */
 	@Override
 	public boolean isEmpty() {
-		// TODO Auto-generated method stub
-		return false;
+        final GPO.GPOEntry entry;
+        if (m_linksIn) {
+            entry = ((GPO) m_owner).getLinkEntry(m_linkProperty);
+        } else {
+            entry = ((GPO) m_owner).getEntry(m_linkProperty);
+        }
+        return entry == null;
 	}
 
     /**
