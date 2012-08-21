@@ -926,15 +926,21 @@ public class GPO implements IGPO {
 //		}
 	}
 
+    /**
+     * {@inheritDoc}
+     * 
+     * FIXME This should be conditional, returning null if the link does not
+     * exist. However, that conditional test needs to be efficient.
+     */
     @Override
     public IGPO getLink(final URI property, final IGPO target) {
 
-        if (getValue(property) != target.getId()) {
-
-            // Link does not exist.
-            return null;
-            
-        }
+//        if (getValue(property) != target.getId()) {
+//
+//            // Link does not exist.
+//            return null;
+//            
+//        }
         
         return m_om.getGPO(new StatementImpl(m_id, property, target.getId()));
 
