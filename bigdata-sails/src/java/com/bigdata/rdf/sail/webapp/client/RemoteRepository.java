@@ -496,6 +496,20 @@ public class RemoteRepository {
 
 	}
 	
+    /**
+     * Perform a fast range count on the statement indices.
+     * 
+     * @param s
+     *            the subject (can be null)
+     * @param p
+     *            the predicate (can be null)
+     * @param o
+     *            the object (can be null)
+     * @param c
+     *            the context (can be null)
+     *            
+     * @return the range count (#of statements in the database).
+     */
 	public long size() throws Exception {
 		
 		return rangeCount(null, null, null, null);
