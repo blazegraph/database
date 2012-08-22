@@ -149,8 +149,18 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
         String uriString = r.toString();
 
+        /*
+         * Note: This hack makes it possible to load data where blank node
+         * IDs were mistakenly emitted as URIs <node...>.  This was true of
+         * one version of the tbl data sets at:
+         * 
+         * http://km.aifb.kit.edu/projects/btc-2012/
+         * 
+         * However, the data sets are being fixed.  You can hack the code
+         * here if you encounter this problem.
+         */
         final URI uri;
-        if (uriString.indexOf(':') == -1) {
+        if (false && uriString.indexOf(':') == -1) {
             uri = valueFactory.createURI(baseUri + "#" + uriString);
         } else {
             uri = valueFactory.createURI(uriString);
