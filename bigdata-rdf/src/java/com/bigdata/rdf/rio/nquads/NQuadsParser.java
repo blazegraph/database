@@ -143,6 +143,21 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
         
     }
 
+    private URI asURI(final Node node, final String baseUri) {
+
+        final org.semanticweb.yars.nx.Resource r = (org.semanticweb.yars.nx.Resource) node;
+
+        String uriString = r.toString();
+
+        final URI uri;
+        if (uriString.indexOf(':') == -1) {
+            uri = valueFactory.createURI(baseUri + "#" + uriString);
+        } else {
+            uri = valueFactory.createURI(uriString);
+        }
+        return uri;
+    }
+
     public void parse(final InputStream is, final String baseUriIsIgnored)
             throws IOException, RDFParseException, RDFHandlerException {
 
@@ -188,14 +203,14 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      *       allow/disallow long literals in the {@link ILexiconConfiguration}
      *       and store them appropriately.
      */
-    public void parse(final Reader r, final String baseUriIsIgnored)
+    public void parse(final Reader r, final String baseUri)
             throws IOException, RDFParseException, RDFHandlerException {
 
         if (r == null)
             throw new IllegalArgumentException();
 
         // I doubt that this will do any good.
-        setBaseURI(baseUriIsIgnored);
+        setBaseURI(baseUri);
 
         final RDFHandler handler = getRDFHandler();
 
@@ -238,22 +253,24 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
             // s
             if (nodes[0] instanceof org.semanticweb.yars.nx.Resource) {
-                s = f.createURI(nodes[0].toString());
+//                s = f.createURI(nodes[0].toString());
+                s = asURI(nodes[0],baseUri);
             } else if (nodes[0] instanceof org.semanticweb.yars.nx.BNode) {
                 s = f.createBNode(nodes[0].toString());
             } else
                 throw new RuntimeException();
 
             // p
-            p = f.createURI(nodes[1].toString());
+//            p = f.createURI(nodes[1].toString());
+            p = asURI(nodes[1],baseUri);
 
             // o
             if (nodes[2] instanceof org.semanticweb.yars.nx.Resource) {
-                o = f.createURI(nodes[2].toString());
+                o = asURI(nodes[2],baseUri);
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.BNode) {
                 o = f.createBNode(nodes[2].toString());
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.Literal) {
-                final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
+//                final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
 //                final int len = tmp.getData().length();
 //                if (len > (Bytes.kilobyte32 * 64)) {
 //                    log
@@ -274,7 +291,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
             // c
             if (nodes.length > 3) {
                 if (nodes[3] instanceof org.semanticweb.yars.nx.Resource) {
-                    c = f.createURI(nodes[3].toString());
+//                    c = f.createURI(nodes[3].toString());
+                    c = asURI(nodes[3],baseUri);
                 } else if (nodes[3] instanceof org.semanticweb.yars.nx.BNode) {
                     c = f.createBNode(nodes[3].toString());
                 } else
