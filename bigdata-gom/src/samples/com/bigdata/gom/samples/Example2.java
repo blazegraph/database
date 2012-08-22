@@ -186,9 +186,21 @@ public class Example2 implements Callable<Void> {
 
 //                System.out.println(bset.toString());
                 
-                final IGPO x = om.getGPO((Resource) bset.getValue("x"));
+                final Value xval = bset.getValue("x");
+                
+                final IGPO x = om.getGPO((Resource) xval);
 
-                final IGPO z = om.getGPO((Resource) bset.getValue("z"));
+                final Value zval = bset.getValue("z");
+                if (!(zval instanceof Resource)) {
+                    /*
+                     * Bad FOAF data. The target should be a Resource, not a
+                     * Literal.
+                     */
+                    log.warn("target of foaf:knows is not a Resource: source="
+                            + xval + ", target=" + zval);
+                    continue;
+                }
+                final IGPO z = om.getGPO((Resource) zval);
 
                 final Literal connectionCount = (Literal) bset
                         .getValue("connectionCount");
