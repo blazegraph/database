@@ -161,13 +161,8 @@ public class LinkSet implements ILinkSet {
 	 */
 	@Override
 	public boolean isEmpty() {
-        final GPO.GPOEntry entry;
-        if (m_linksIn) {
-            entry = ((GPO) m_owner).getLinkEntry(m_linkProperty);
-        } else {
-            entry = ((GPO) m_owner).getEntry(m_linkProperty);
-        }
-        return entry == null;
+        // Not sufficient to check for null GPOEntry - items could have been removed
+        return size() == 0;
 	}
 
     /**
