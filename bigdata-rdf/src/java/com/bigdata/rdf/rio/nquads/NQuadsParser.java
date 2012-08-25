@@ -200,7 +200,13 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
         final org.semanticweb.yars.nx.Literal lit = (org.semanticweb.yars.nx.Literal) node;
 
-        final String label = lit.getData();
+        /*
+         * Note: Literal.getData() does not translate embedded escape sequences.
+         * You need to use getUnescapedData() to replace escape codes with the
+         * corresponding character sequences.
+         */
+        
+        final String label = lit.getUnescapedData();
 
         final String languageTag = lit.getLanguageTag();
 

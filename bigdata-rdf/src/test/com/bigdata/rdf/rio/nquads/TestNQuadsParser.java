@@ -120,6 +120,39 @@ public class TestNQuadsParser extends TestCase2 {
 
     }
 
+    public void test_plainLiteralWithEscapes() throws RDFParseException,
+            RDFHandlerException, IOException {
+
+        final String baseUri = "http://www.w3.org/People/Berners-Lee/card.rdf";
+
+        final StringBuilder data = new StringBuilder();
+
+        data.append("<http://www.w3.org/People/Berners-Lee/card#i> "
+                + "<http://xmlns.com/foaf/0.1/name> "
+                + "\"Timothy Berners-\\'Lee\" .\n");
+
+        final Graph g = new GraphImpl();
+
+        parser.setRDFHandler(new RDFHandlerBase() {
+            public void handleStatement(Statement st)
+                    throws RDFHandlerException {
+                g.add(st);
+            }
+        });
+
+        parser.parse(new StringReader(data.toString()), baseUri);
+
+        assertEquals(1, g.size());
+
+        final ValueFactory f = new ValueFactoryImpl();
+
+        assertTrue(g.contains(new StatementImpl(//
+                f.createURI("http://www.w3.org/People/Berners-Lee/card#i"), f
+                        .createURI("http://xmlns.com/foaf/0.1/name"), f
+                        .createLiteral("Timothy Berners-'Lee"))));
+
+    }
+
     public void test_datatypeLiteral() throws RDFParseException,
             RDFHandlerException, IOException {
 
