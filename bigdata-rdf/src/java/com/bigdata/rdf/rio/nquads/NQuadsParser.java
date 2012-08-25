@@ -35,6 +35,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -160,7 +161,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
          * here if you encounter this problem.
          */
         final URI uri;
-        if (false && uriString.indexOf(':') == -1) {
+        if (true && uriString.indexOf(':') == -1) {
             uri = valueFactory.createURI(baseUri + "#" + uriString);
         } else {
             uri = valueFactory.createURI(uriString);
@@ -168,6 +169,64 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
         return uri;
     }
 
+    /**
+     * Convert a yars literal to an openrdf Literal.
+     * 
+     * @param node
+     *            The literal.
+     * @param baseUri
+     * 
+     * @return The literal.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/590">
+     *      nxparser fails with uppercase language tag </a>
+     */
+    private Literal asLiteral(final Node node,final String baseUri) {
+
+//      final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
+//      final int len = tmp.getData().length();
+//      if (len > (Bytes.kilobyte32 * 64)) {
+//          log
+//                  .warn("Dropping statement with long literal: length="
+//                          + len
+//                          + (tmp.getDatatype() != null ? ",datatype="
+//                                  + tmp.getDatatype() : "")
+//                          + ", begins="
+//                          + tmp
+//                                  .getData()
+//                                  .substring(0/* beginIndex */, 100/* endIndex */));
+//          continue;
+//      }
+
+        final org.semanticweb.yars.nx.Literal lit = (org.semanticweb.yars.nx.Literal) node;
+
+        final String label = lit.getData();
+
+        final String languageTag = lit.getLanguageTag();
+
+        final org.semanticweb.yars.nx.Resource datatypeUri = lit.getDatatype();
+
+        final Literal newLit;
+
+        if (languageTag != null) {
+
+            newLit = valueFactory.createLiteral(label, languageTag);
+
+        } else if (datatypeUri != null) {
+
+            newLit = valueFactory.createLiteral(label,
+                    asURI(datatypeUri, baseUri));
+
+        } else {
+
+            newLit = valueFactory.createLiteral(label);
+
+        }
+
+        return newLit;
+
+    }
+    
     public void parse(final InputStream is, final String baseUriIsIgnored)
             throws IOException, RDFParseException, RDFHandlerException {
 
@@ -280,21 +339,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.BNode) {
                 o = f.createBNode(nodes[2].toString());
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.Literal) {
-//                final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
-//                final int len = tmp.getData().length();
-//                if (len > (Bytes.kilobyte32 * 64)) {
-//                    log
-//                            .warn("Dropping statement with long literal: length="
-//                                    + len
-//                                    + (tmp.getDatatype() != null ? ",datatype="
-//                                            + tmp.getDatatype() : "")
-//                                    + ", begins="
-//                                    + tmp
-//                                            .getData()
-//                                            .substring(0/* beginIndex */, 100/* endIndex */));
-//                    continue;
-//                }
-                o = f.createLiteral(nodes[2].toString());
+                o = asLiteral(nodes[2], baseUri);
             } else
                 throw new RuntimeException();
             
