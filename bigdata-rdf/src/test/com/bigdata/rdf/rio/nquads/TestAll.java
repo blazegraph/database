@@ -58,6 +58,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestNQuadsParserFactory.class);
 
+        suite.addTestSuite(TestNQuadsParser.class);
+
         return suite;
         
     }
