@@ -1770,6 +1770,40 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	}
 
+    /**
+     * Verify ability to load data from a gzip resource.
+     */
+    public void testLoadGZip()
+            throws Exception
+        {
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.gz>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        con.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+        assertTrue(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
+
+//    /**
+//     * Verify ability to load data from a zip resource.
+//     */
+//    public void testLoadZip()
+//            throws Exception
+//        {
+//        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.zip>";
+//        
+//        final String ns = "http://bigdata.com/test/data#";
+//        
+//        con.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+//
+//        assertTrue(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+//                f.createLiteral("Michael Personick"), true));
+//
+//    }
+
 	/* protected methods */
 
 	protected void loadDataset(final String datasetFile)

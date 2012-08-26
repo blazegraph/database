@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 import info.aduna.iteration.CloseableIteration;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -1356,15 +1358,40 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final String contentType = hconn.getContentType();
 
+            // The baseURL (passed to the parser).
+            final String baseURL = sourceURL.toExternalForm();
+            
+            // The file path.
+            final String n = sourceURL.getFile();
+
+            // Attempt to obtain the format from the Content-Type.
             RDFFormat format = RDFFormat.forMIMEType(contentType);
 
             if (format == null) {
-                // Try to get the RDFFormat from the URL's file path.
-                format = RDFFormat.forFileName(sourceURL.getFile(),
-                        RDFFormat.RDFXML// fallback
-                        );
+
+                /*
+                 * Try to get the RDFFormat from the URL's file path.
+                 */
+
+                RDFFormat fmt = RDFFormat.forFileName(n);
+
+                if (fmt == null && n.endsWith(".zip")) {
+                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
+                }
+
+                if (fmt == null && n.endsWith(".gz")) {
+                    fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
+                }
+
+                if (fmt == null) {
+                    // Default format.
+                    fmt = RDFFormat.RDFXML;
+                }
+
+                format = fmt;
+
             }
-            
+
             if (format == null)
                 throw new UnknownContentTypeException(contentType);
 
@@ -1391,12 +1418,52 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     defactoContext));
 
             /*
+             * Setup the input stream.
+             */
+            InputStream is = hconn.getInputStream();
+
+            try {
+
+                /*
+                 * Setup decompression.
+                 */
+                
+                if (n.endsWith(".gz")) {
+
+                    is = new GZIPInputStream(is);
+
+//                } else if (n.endsWith(".zip")) {
+//
+//                    /*
+//                     * TODO This will not process all entries in a zip input
+//                     * stream, just the first.
+//                     */
+//                    is = new ZipInputStream(is);
+
+                }
+
+            } catch (Throwable t) {
+
+                if (is != null) {
+
+                    try {
+                        is.close();
+                    } catch (Throwable t2) {
+                        log.warn(t2, t2);
+                    }
+
+                    throw new RuntimeException(t);
+
+                }
+                
+            }
+            
+            /*
              * Run the parser, which will cause statements to be
              * inserted.
              */
 
-            rdfParser.parse(hconn.getInputStream(), sourceURL
-                    .toExternalForm()/* baseURL */);
+            rdfParser.parse(is, baseURL);
 
         } finally {
 
