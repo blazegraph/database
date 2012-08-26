@@ -1715,6 +1715,40 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
     }
 
+    /**
+     * Verify ability to load data from a gzip resource.
+     */
+    public void testLoadGZip()
+            throws Exception
+        {
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.gz>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        m_repo.prepareUpdate(update).evaluate();
+        
+        assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
+
+//    /**
+//     * Verify ability to load data from a gzip resource.
+//     */
+//    public void testLoadZip()
+//            throws Exception
+//        {
+//        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.zip>";
+//        
+//        final String ns = "http://bigdata.com/test/data#";
+//        
+//        m_repo.prepareUpdate(update).evaluate();
+//        
+//        assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+//                f.createLiteral("Michael Personick"), true));
+//
+//    }
+
 //    //@Test
 //    public void testUpdateSequenceInsertDeleteExample9()
 //        throws Exception
