@@ -30,8 +30,12 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import org.openrdf.model.URI;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.helpers.RDFParserBase;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.rio.IRDFParserOptions;
+import com.bigdata.rdf.rio.RDFParserOptions;
 
 /**
  * The LOAD operation reads an RDF document from a IRI and inserts its triples
@@ -52,6 +56,22 @@ public class LoadGraph extends GraphUpdate {
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Adds options to control the behavior of the {@link RDFParser}.
+     * 
+     * @see RDFParserOptions
+     * @see RDFParserBase
+     * @see RDFParser
+     */
+    public interface Annotations extends GraphUpdate.Annotations{
+
+        /**
+         * {@link RDFParserOptions} (optional).
+         */
+        String OPTIONS = "options";
+        
+    }
+    
     public LoadGraph() {
         
         super(UpdateType.Load);
@@ -131,6 +151,30 @@ public class LoadGraph extends GraphUpdate {
 
     }
 
+    /**
+     * Return the {@link RDFParserOptions}.
+     * 
+     * @return The {@link RDFParserOptions} -or- <code>null</code> if the
+     *         options were not configured.
+     */
+    public IRDFParserOptions getRDFParserOptions() {
+
+        return (IRDFParserOptions) getProperty(Annotations.OPTIONS);
+
+    }
+
+    /**
+     * Set the {@link RDFParserOptions}.
+     * 
+     * @param options
+     *            The options (may be <code>null</code>).
+     */
+    public void setRDFParserOptions(final IRDFParserOptions options) {
+
+        setProperty(Annotations.OPTIONS, options);
+
+    }
+    
 //    LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
     public String toString(final int indent) {
 
@@ -140,13 +184,21 @@ public class LoadGraph extends GraphUpdate {
         
         sb.append(getUpdateType());
 
-        if (isSilent())
-            sb.append(" SILENT");
-
+        final boolean silent = isSilent();
+        
         final ConstantNode sourceGraph = getSourceGraph();
         
         final ConstantNode targetGraph = getTargetGraph();        
 
+        final IRDFParserOptions rdfParserOptions = getRDFParserOptions();        
+
+        if(silent)
+            sb.append(" SILENT");
+
+        if (rdfParserOptions != null) {
+            sb.append(" OPTIONS=" + rdfParserOptions);
+        }
+        
         if (sourceGraph != null) {
             sb.append("\n");
             sb.append(indent(indent + 1));
@@ -158,7 +210,7 @@ public class LoadGraph extends GraphUpdate {
             sb.append(indent(indent + 1));
             sb.append("target=" + targetGraph);
         }
-
+        
         sb.append("\n");
 
         return sb.toString();

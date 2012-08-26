@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.bigdata.rdf.internal.IV;
@@ -42,6 +43,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.AddGraph;
@@ -105,6 +107,10 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
             
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
+
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -138,6 +144,10 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             op.setSilent(true);
             
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
+
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
            
@@ -171,6 +181,10 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             op.setSilent(true);
             
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
+
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
 
@@ -203,6 +217,10 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
+
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data"))));
 
@@ -212,6 +230,10 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final LoadGraph op = new LoadGraph();
 
             expected.addChild(op);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
 
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data1"))));
@@ -223,8 +245,396 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             expected.addChild(op);
 
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            op.setRDFParserOptions(options);
+
             op.setSourceGraph(new ConstantNode(makeIV(valueFactory
                     .createURI("http://www.bigdata.com/data2"))));
+
+        }
+
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * 
+     * <pre>
+     * load verifyData=true <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_verifyData_true() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load verifyData=true <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setVerifyData(true);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * 
+     * <pre>
+     * load verifyData=false <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_verifyData_false() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load verifyData=false <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setVerifyData(false);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load stopAtFirstError=true <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_stopAtFirstError_true() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load stopAtFirstError=true <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setStopAtFirstError(true);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load stopAtFirstError=false <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_stopAtFirstError_false() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load stopAtFirstError=false <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setStopAtFirstError(false);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load preserveBNodeIDs=true <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_preserveBNodeIDs_true() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load preserveBNodeIDs=true <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setPreserveBNodeIDs(true);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load preserveBNodeIDs=false <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_preserveBNodeIDs_false() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load preserveBNodeIDs=false <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setPreserveBNodeIDs(false);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load datatypeHandling=IGNORE <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_datatypeHandling_ignore() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load datatypeHandling=ignore <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setDatatypeHandling(DatatypeHandling.IGNORE);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load datatypeHandling=VERIFY <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_datatypeHandling_verify() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load datatypeHandling=verify <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setDatatypeHandling(DatatypeHandling.VERIFY);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load datatypeHandling=NORMALIZE <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_datatypeHandling_normalize() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        //LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load datatypeHandling=normalize <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+//            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+            
+            options.setDatatypeHandling(DatatypeHandling.VERIFY);
+            
+            op.setRDFParserOptions(options);
+            
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
+           
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple LOAD operation with the non-standard extension
+     * <pre>
+     * load verifyData=true silent datatypeHandling=NORMALIZE <http://www.bigdata.com/data>
+     * </pre>
+     */
+    public void test_load_nonStandard_multipleOptions()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        // LOAD ( SILENT )? IRIref_from ( INTO GRAPH IRIref_to )?
+        final String sparql = "load verifyData=true silent datatypeHandling=normalize <http://www.bigdata.com/data>";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final LoadGraph op = new LoadGraph();
+
+            expected.addChild(op);
+
+            op.setSilent(true);
+
+            final RDFParserOptions options = new RDFParserOptions();
+
+            options.setVerifyData(true);
+            
+            options.setDatatypeHandling(DatatypeHandling.VERIFY);
+
+            op.setRDFParserOptions(options);
+
+            op.setSourceGraph(new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com/data"))));
 
         }
 

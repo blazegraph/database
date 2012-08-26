@@ -1787,6 +1787,27 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
     }
 
+    // TODO test for stopAtFirstError
+    // TODO test for verifyData
+    // TODO test for preserveBNodeIDs
+    // TODO test for datatypeHandling
+    // And apply those tests to the other UPDATE test suite as well (NSS)
+//    public void testLoad_stopAtFirstError_false()
+//            throws Exception
+//        {
+//            final String update = "LOAD stopAtFirstError=false <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithError.rdf>";
+//            
+//            final String ns = "http://bigdata.com/test/data#";
+//            
+//            final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
+//
+//            operation.execute();
+//
+//            assertFalse(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+//                    f.createLiteral("Michael Personick"), true));
+//
+//        }
+
 //    /**
 //     * Verify ability to load data from a zip resource.
 //     */

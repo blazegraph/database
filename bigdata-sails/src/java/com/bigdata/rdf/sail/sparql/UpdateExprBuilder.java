@@ -44,6 +44,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.sail.sparql.ast.ASTAdd;
 import com.bigdata.rdf.sail.sparql.ast.ASTClear;
 import com.bigdata.rdf.sail.sparql.ast.ASTCopy;
@@ -255,6 +256,35 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         if (node.isSilent())
             op.setSilent(true);
 
+        final RDFParserOptions options = new RDFParserOptions(
+                context.tripleStore.getProperties());
+
+        if (node.verifyData != null) {
+
+            options.setVerifyData(node.verifyData);
+
+        }
+
+        if (node.stopAtFirstError != null) {
+
+            options.setStopAtFirstError(node.stopAtFirstError);
+
+        }
+
+        if (node.preserveBNodeIDs != null) {
+
+            options.setPreserveBNodeIDs(node.preserveBNodeIDs);
+
+        }
+
+        if (node.datatypeHandling != null) {
+
+            options.setDatatypeHandling(node.datatypeHandling);
+
+        }
+
+        op.setRDFParserOptions(options);
+        
         if (node.jjtGetNumChildren() > 1) {
 
             final ConstantNode targetGraph = (ConstantNode) node.jjtGetChild(1)

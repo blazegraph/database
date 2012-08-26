@@ -71,6 +71,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -340,7 +341,7 @@ public class ParseOp extends PipelineOp {
          * TODO Javadoc for annotations (which need to be defined) and
          * interaction with the triple store properties.
          */
-        private final RDFParserOptions parserOptions;
+        private final IRDFParserOptions parserOptions;
 
         /**
          * The {@link AbstractTripleStore} on which the statements will

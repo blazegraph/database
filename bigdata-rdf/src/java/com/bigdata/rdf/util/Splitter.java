@@ -81,6 +81,7 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.rio.BasicRioLoader;
+import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -298,7 +299,7 @@ public class Splitter {
                 /*
                  * The defaults here are intended to facilitate splitting.
                  */
-                final RDFParserOptions defaultParserOptions = new RDFParserOptions();
+                final IRDFParserOptions defaultParserOptions = new RDFParserOptions();
                 
                 // Blank node IDs should be preserved.
                 defaultParserOptions.setPreserveBNodeIDs(true);

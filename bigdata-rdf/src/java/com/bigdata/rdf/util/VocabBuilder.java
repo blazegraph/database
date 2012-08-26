@@ -52,6 +52,7 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
 import com.bigdata.rdf.ServiceProviderHook;
+import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.vocab.VocabularyDecl;
 
@@ -69,7 +70,7 @@ public class VocabBuilder {
 
 	private static final Logger log = Logger.getLogger(VocabBuilder.class);
 	
-    private final RDFParserOptions parserOptions;
+    private final IRDFParserOptions parserOptions;
 	
 	private final Map<URI, P> preds = new LinkedHashMap<URI, P>();
 

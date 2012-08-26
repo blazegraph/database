@@ -32,6 +32,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.MathExpr.MathOp;
+import org.openrdf.rio.RDFParser.DatatypeHandling;
 
 public class SyntaxTreeBuilder/*@bgen(jjtree)*/implements SyntaxTreeBuilderTreeConstants/*@egen*/ {/*@bgen(jjtree)*/
   protected JJTSyntaxTreeBuilderState jjtree = new JJTSyntaxTreeBuilderState();
@@ -252,6 +253,14 @@ TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 |   <SOLUTIONS: "solutions">
 |   <TREF_OPEN: "<<">
 |   <TREF_CLOSE: ">>">
+// RDFParserOptions (for LOAD)
+|   <VERIFY_DATA: "verifyData">
+|   <PRESERVE_BNODE_IDS: "preserveBNodeIDs">
+|   <STOP_AT_FIRST_ERROR: "stopAtFirstError">
+|   <DATATYPE_HANDLING: "datatypeHandling">
+|   <VERIFY: "VERIFY">
+|   <IGNORE: "IGNORE">
+|   <NORMALIZE: "NORMALIZE">
 }
 
 TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
@@ -5433,14 +5442,23 @@ void Update()       :
 
 void Load() :
 {/*@bgen(jjtree) Load */
-  ASTLoad jjtn000 = new ASTLoad(JJTLOAD);
-  boolean jjtc000 = true;
-  jjtree.openNodeScope(jjtn000);
-/*@egen*/}
+ ASTLoad jjtn000 = new ASTLoad(JJTLOAD);
+ boolean jjtc000 = true;
+ jjtree.openNodeScope(jjtn000);
+/*@egen*/Token t = null;}
 {/*@bgen(jjtree) Load */
     try {
 /*@egen*/
-    <LOAD> [<SILENT> {jjtn000.setSilent(true);} ] IRIref() [<INTO> GraphRef() ]/*@bgen(jjtree)*/
+//    <LOAD> [<SILENT> {jjtThis.setSilent(true);} ] IRIref() [<INTO> GraphRef() ]
+    <LOAD> 
+    ( <SILENT> {jjtn000.setSilent(true);}
+    | <VERIFY_DATA>         <EQ> (t=<TRUE>|t=<FALSE>) {jjtn000.verifyData=Boolean.valueOf(t.image);}
+    | <PRESERVE_BNODE_IDS>  <EQ> (t=<TRUE>|t=<FALSE>) {jjtn000.preserveBNodeIDs=Boolean.valueOf(t.image);}
+    | <STOP_AT_FIRST_ERROR> <EQ> (t=<TRUE>|t=<FALSE>) {jjtn000.stopAtFirstError=Boolean.valueOf(t.image);}
+    | <DATATYPE_HANDLING>   <EQ> (t=<IGNORE>|t=<VERIFY>|t=<NORMALIZE>) {jjtn000.datatypeHandling=DatatypeHandling.valueOf(t.image.toUpperCase());}
+    )*
+    IRIref()
+    [ <INTO> GraphRef() ]/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
         jjtree.clearNodeScope(jjtn000);

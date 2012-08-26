@@ -46,7 +46,7 @@ import org.openrdf.rio.helpers.RDFParserBase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RDFParserOptions implements Serializable {
+public class RDFParserOptions implements Serializable, IRDFParserOptions {
 
     private static final Logger log = Logger.getLogger(RDFParserOptions.class);
     
@@ -59,7 +59,7 @@ public class RDFParserOptions implements Serializable {
         
         /**
          * Optional boolean property may be used to turn on data verification in
-         * the RIO parser (default is {@value #DEFAULT_PARSER_VERIFY_DATA}).
+         * the RIO parser (default is {@value #DEFAULT_VERIFY_DATA}).
          */
         String VERIFY_DATA = RDFParserOptions.class.getName() + ".verifyData";
 
@@ -100,24 +100,40 @@ public class RDFParserOptions implements Serializable {
 
     private DatatypeHandling datatypeHandling = DatatypeHandling.VERIFY;
 
-    private boolean preserveBNodeIDs = false;
+    private boolean preserveBNodeIDs = Boolean.valueOf(Options.DEFAULT_PRESERVE_BNODE_IDS);
 
-    private boolean stopAtFirstError = true;
+    private boolean stopAtFirstError = Boolean.valueOf(Options.DEFAULT_STOP_AT_FIRST_ERROR);
 
-    private boolean verifyData = true;
+    private boolean verifyData = Boolean.valueOf(Options.DEFAULT_VERIFY_DATA);
 
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#getVerifyData()
+     */
+    @Override
     synchronized public boolean getVerifyData() {
         return verifyData;
     }
     
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#getStopAtFirstError()
+     */
+    @Override
     synchronized public boolean getStopAtFirstError() {
         return stopAtFirstError;
     }
     
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#getPreserveBNodeIDs()
+     */
+    @Override
     synchronized public boolean getPreserveBNodeIDs() {
         return preserveBNodeIDs;
     }
 
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#getDatatypeHandling()
+     */
+    @Override
     synchronized public DatatypeHandling getDatatypeHandling() {
         return datatypeHandling;
     }
@@ -182,16 +198,16 @@ public class RDFParserOptions implements Serializable {
     public synchronized String toString() {
         return super.toString() + //
                 "{verifyData=" + verifyData + //
-                ",preserveBNodeIDS=" + preserveBNodeIDs + //
+                ",preserveBNodeIDs=" + preserveBNodeIDs + //
                 ",stopAtFirstError=" + stopAtFirstError + //
                 ",datatypeHandling=" + datatypeHandling + //
                 "}";
     }
 
-    /**
-     * Sets the datatype handling mode (default is
-     * {@link DatatypeHandling#VERIFY}).
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#setDatatypeHandling(org.openrdf.rio.RDFParser.DatatypeHandling)
      */
+    @Override
     synchronized public void setDatatypeHandling(
             final DatatypeHandling datatypeHandling) {
         
@@ -202,26 +218,26 @@ public class RDFParserOptions implements Serializable {
         
     }
 
-    /**
-     * Set whether the parser should preserve bnode identifiers specified in the
-     * source (default is <code>false</code>).
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#setPreserveBNodeIDs(boolean)
      */
+    @Override
     synchronized public void setPreserveBNodeIDs(final boolean preserveBNodeIDs) {
         this.preserveBNodeIDs = preserveBNodeIDs;
     }
 
-    /**
-     * Sets whether the parser should stop immediately if it finds an error in
-     * the data (default value is <code>true</code>).
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#setStopAtFirstError(boolean)
      */
+    @Override
     synchronized public void setStopAtFirstError(final boolean stopAtFirstError) {
         this.stopAtFirstError = stopAtFirstError;
     }
 
-    /**
-     * Sets whether the parser should verify the data it parses (default value
-     * is <code>true</code>).
+    /* (non-Javadoc)
+     * @see com.bigdata.rdf.rio.IRDFParserOptions#setVerifyData(boolean)
      */
+    @Override
     synchronized public void setVerifyData(final boolean verifyData) {
         this.verifyData = verifyData;
     }
@@ -239,4 +255,30 @@ public class RDFParserOptions implements Serializable {
         p.setVerifyData(verifyData);
     }
 
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof IRDFParserOptions))
+            return false;
+
+        final IRDFParserOptions t = (IRDFParserOptions) o;
+
+        if (verifyData != t.getVerifyData())
+            return false;
+
+        if (preserveBNodeIDs != t.getPreserveBNodeIDs())
+            return false;
+
+        if (stopAtFirstError != t.getStopAtFirstError())
+            return false;
+
+        if (!datatypeHandling.equals(getDatatypeHandling()))
+            return false;
+
+        return true;
+
+    }
+    
 }
