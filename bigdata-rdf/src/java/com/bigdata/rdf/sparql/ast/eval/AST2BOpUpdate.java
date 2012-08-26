@@ -91,6 +91,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
@@ -1233,7 +1234,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                             + defaultContext);
                 
                 doLoad(context.conn.getSailConnection(), sourceURL,
-                        defaultContext, nmodified);
+                        defaultContext, op.getRDFParserOptions(), nmodified);
 
             } catch (Throwable t) {
 
@@ -1333,6 +1334,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      */
     private static void doLoad(final BigdataSailConnection conn,
             final URL sourceURL, final URI defaultContext,
+            final IRDFParserOptions parserOptions,
             final AtomicLong nmodified) throws IOException, RDFParseException,
             RDFHandlerException {
 
@@ -1404,15 +1406,19 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             final RDFParser rdfParser = rdfParserFactory
                     .getParser();
 
-            rdfParser.setValueFactory(conn.getTripleStore()
-                    .getValueFactory());
+            rdfParser.setValueFactory(conn.getTripleStore().getValueFactory());
 
-            rdfParser.setVerifyData(true);
+            /*
+             * Apply the RDF parser options.
+             */
 
-            rdfParser.setStopAtFirstError(true);
+            rdfParser.setVerifyData(parserOptions.getVerifyData());
 
-            rdfParser
-                    .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+            rdfParser.setPreserveBNodeIDs(parserOptions.getPreserveBNodeIDs());
+
+            rdfParser.setStopAtFirstError(parserOptions.getStopAtFirstError());
+
+            rdfParser.setDatatypeHandling(parserOptions.getDatatypeHandling());
 
             rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified,
                     defactoContext));

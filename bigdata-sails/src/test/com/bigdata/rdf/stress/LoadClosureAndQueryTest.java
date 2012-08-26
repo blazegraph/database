@@ -72,6 +72,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -843,7 +844,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * 
          * @todo configure via Properties.
          */
-        final RDFParserOptions parserOptions = new RDFParserOptions();
+        final IRDFParserOptions parserOptions = new RDFParserOptions();
         parserOptions.setVerifyData(false);
 
         /*
