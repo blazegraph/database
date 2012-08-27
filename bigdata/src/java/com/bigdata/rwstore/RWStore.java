@@ -262,11 +262,23 @@ public class RWStore implements IStore, IBufferedWriter {
         String ALLOCATION_SIZES = RWStore.class.getName() + ".allocationSizes";
 
         /**
+         * Note: The default allocation sizes SHOULD NOT provide for allocation
+         * slots larger than an 8k page. This can lead to large allocation slots
+         * when a B+Tree index is sparsely populated (less efficient prefix
+         * compression) followed by a gradual reduction in the average page size
+         * with the net effect that large allocators become unused and turn into
+         * wasted and unrecoverable space on the backing file. Keeping to an 8k
+         * maximum allocation slot size means that we have to do a few more IOs
+         * if the page exceeds the 8k boundary, but we never wind up with those
+         * large and (mostly) unused allocators. The B+Tree branching factors
+         * should be tuned to target perhaps 80% of an 8k page in order to have
+         * only a small number of pages that spill over into blobs.
+         * 
          * @see #ALLOCATION_SIZES
          */
-        //String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128";
+        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128";
         // String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520";
-        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512";
+//        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512";
         // private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
         // private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
