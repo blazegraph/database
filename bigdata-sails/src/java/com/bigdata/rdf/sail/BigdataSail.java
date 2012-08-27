@@ -267,6 +267,8 @@ public class BigdataSail extends SailBase implements Sail {
     
         /**
          * The capacity of the statement buffer used to absorb writes.
+         * If this capacity is exceeded, then an incremental flush will
+         * push assertions and/or retractions to the statement indices.
          * 
          * @see #DEFAULT_BUFFER_CAPACITY
          */
