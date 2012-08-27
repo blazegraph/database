@@ -275,7 +275,7 @@ public class InferenceEngine {
                 .getName()
                 + ".enableOwlFunctionalAndInverseFunctionalProperty";
 
-        String DEFAULT_ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY = "false";
+        String DEFAULT_ENABLE_OWL_FUNCTIONAL_AND_INVERSE_FUNCTIONAL_PROPERTY = "true";
 
     }
 
