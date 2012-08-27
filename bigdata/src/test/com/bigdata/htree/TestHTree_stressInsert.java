@@ -5,6 +5,7 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.PageStats;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.IRawStore;
@@ -153,7 +154,8 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
             // Verify the iterator visits all of the tuples.
             assertSameIteratorAnyOrder(keys, htree.values());
             
-        	if(log.isInfoEnabled()) log.info(htree.getPageInfo());
+            if (log.isInfoEnabled())
+                log.info(htree.getPageInfo());
 
             } catch (Throwable t) {
             	try {

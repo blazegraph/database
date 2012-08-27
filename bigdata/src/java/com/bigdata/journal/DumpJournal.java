@@ -38,12 +38,11 @@ import java.util.TreeMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.DumpIndex;
-import com.bigdata.btree.DumpIndex.PageStats;
 import com.bigdata.btree.ICheckpointProtocol;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.PageStats;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumUtility;
@@ -53,28 +52,12 @@ import com.bigdata.util.InnerCause;
  * A utility class that opens the journal in a read-only mode and dumps the root
  * blocks and metadata about the indices on a journal file.
  * 
- * @todo add an option to collect histograms over index records so that "fat" in
- *       the indices may be targetted. We can always report histograms for the
- *       raw key and value data. However, with either an extensible serializer
- *       or with some application aware logic we are also able to report type
- *       specific histograms.
+ * TODO add an option to dump only as of a specified commitTime?
  * 
- * @todo add an option to dump only as of a specified commitTime?
+ * TODO add an option to restrict the names of the indices to be dumped
+ * (-name=<regex>).
  * 
- * @todo add an option to copy off data from one or more indices as of a
- *       specified commit time?
- * 
- * @todo add an option to restrict the names of the indices to be dumped
- *       (-name=<regex>).
- * 
- * @todo allow dump even on a journal that is open (e.g., only request a read
- *       lock or do not request a lock). An error is reported when you actually
- *       begin to read from the file once it is opened in a read-only mode if
- *       there is another process with an exclusive lock. In fact, since the
- *       root blocks must be consistent when they are read, a reader would have
- *       to have a lock at the moment that it read the root blocks...
- * 
- *       TODO GIST : Support all types of indices.
+ * TODO GIST : Support all types of indices.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
  *      </a>
@@ -264,115 +247,113 @@ public class DumpJournal {
     public void dumpJournal(final boolean dumpHistory, final boolean dumpPages,
             final boolean dumpIndices, final boolean showTuples) {
 
-        try {
+        final FileMetadata fmd = journal.getFileMetadata();
+
+        if (fmd != null) {
             
-            final FileMetadata fmd = journal.getFileMetadata();
+            /*
+             * Note: The FileMetadata is only available on a re-open of an
+             * existing Journal.
+             */
 
-            if (fmd != null) {
+            // dump the MAGIC and VERSION.
+            System.out.println("magic=" + Integer.toHexString(fmd.magic));
+            System.out.println("version="
+                    + Integer.toHexString(fmd.version));
+
+            /*
+             * Report on:
+             * 
+             * - the length of the journal. - the #of bytes available for
+             * user data in the journal. - the offset at which the next
+             * record would be written. - the #of bytes remaining in the
+             * user extent.
+             */
+
+            final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
+
+            System.out.println("extent=" + fmd.extent + "(" + fmd.extent
+                    / Bytes.megabyte + "M)" + ", userExtent="
+                    + fmd.userExtent + "(" + fmd.userExtent
+                    / Bytes.megabyte + "M)" + ", bytesAvailable="
+                    + bytesAvailable + "(" + bytesAvailable
+                    / Bytes.megabyte + "M)" + ", nextOffset="
+                    + fmd.nextOffset);
+
+        }
+
+        {
+
+            /*
+             * Dump the root blocks.
+             * 
+             * Note: This uses the IBufferStrategy to access the root
+             * blocks. The code used to use the FileMetadata, but that was
+             * only available for a re-opened journal. This approach works
+             * for a new Journal as well.
+             */
+            {
+
+                final ByteBuffer rootBlock0 = journal.getBufferStrategy()
+                        .readRootBlock(true/* rootBlock0 */);
                 
-                /*
-                 * Note: The FileMetadata is only available on a re-open of an
-                 * existing Journal.
-                 */
-
-                // dump the MAGIC and VERSION.
-                System.out.println("magic=" + Integer.toHexString(fmd.magic));
-                System.out.println("version="
-                        + Integer.toHexString(fmd.version));
-
-                /*
-                 * Report on:
-                 * 
-                 * - the length of the journal. - the #of bytes available for
-                 * user data in the journal. - the offset at which the next
-                 * record would be written. - the #of bytes remaining in the
-                 * user extent.
-                 */
-
-                final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
-
-                System.out.println("extent=" + fmd.extent + "(" + fmd.extent
-                        / Bytes.megabyte + "M)" + ", userExtent="
-                        + fmd.userExtent + "(" + fmd.userExtent
-                        / Bytes.megabyte + "M)" + ", bytesAvailable="
-                        + bytesAvailable + "(" + bytesAvailable
-                        / Bytes.megabyte + "M)" + ", nextOffset="
-                        + fmd.nextOffset);
-
+                if (rootBlock0 != null) {
+                
+                    System.out.println(new RootBlockView(
+                            true/* rootBlock0 */, rootBlock0,
+                            new ChecksumUtility()).toString());
+                    
+                }
+                
             }
 
             {
 
-                /*
-                 * Dump the root blocks.
-                 * 
-                 * Note: This uses the IBufferStrategy to access the root
-                 * blocks. The code used to use the FileMetadata, but that was
-                 * only available for a re-opened journal. This approach works
-                 * for a new Journal as well.
-                 */
-                {
-
-                    final ByteBuffer rootBlock0 = journal.getBufferStrategy()
-                            .readRootBlock(true/* rootBlock0 */);
-                    
-                    if (rootBlock0 != null) {
-                    
-                        System.out.println(new RootBlockView(
-                                true/* rootBlock0 */, rootBlock0,
-                                new ChecksumUtility()).toString());
-                        
-                    }
-                    
-                }
-
-                {
-
-                    final ByteBuffer rootBlock1 = journal.getBufferStrategy()
-                            .readRootBlock(false/* rootBlock0 */);
-                    
-                    if (rootBlock1 != null) {
-                    
-                        System.out.println(new RootBlockView(
-                                false/* rootBlock0 */, rootBlock1,
-                                new ChecksumUtility()).toString());
-                        
-                    }
-                    
-                }
-                // System.out.println(fmd.rootBlock0.toString());
-                // System.out.println(fmd.rootBlock1.toString());
-
-                // report on which root block is the current root block.
-                System.out.println("The current root block is #"
-                        + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
-
-            }
-
-            final IBufferStrategy strategy = journal.getBufferStrategy();
-
-            if (strategy instanceof RWStrategy) {
-
-                final RWStore store = ((RWStrategy) strategy).getStore();
-
-                final StringBuilder sb = new StringBuilder();
-
-                store.showAllocators(sb);
-
-                System.out.println(sb);
-
-            }
-            
-			final CommitRecordIndex commitRecordIndex = journal
-					.getCommitRecordIndex();
-
-			System.out.println("There are " + commitRecordIndex.getEntryCount()
-					+ " commit points.");
-
-			if (dumpHistory) {
-
-                System.out.println("Historical commit points follow in temporal sequence (first to last):");
+                final ByteBuffer rootBlock1 = journal.getBufferStrategy()
+                        .readRootBlock(false/* rootBlock0 */);
                 
+                if (rootBlock1 != null) {
+                
+                    System.out.println(new RootBlockView(
+                            false/* rootBlock0 */, rootBlock1,
+                            new ChecksumUtility()).toString());
+                    
+                }
+                
+            }
+            // System.out.println(fmd.rootBlock0.toString());
+            // System.out.println(fmd.rootBlock1.toString());
+
+            // report on which root block is the current root block.
+            System.out.println("The current root block is #"
+                    + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
+
+        }
+
+        final IBufferStrategy strategy = journal.getBufferStrategy();
+
+        if (strategy instanceof RWStrategy) {
+
+            final RWStore store = ((RWStrategy) strategy).getStore();
+
+            final StringBuilder sb = new StringBuilder();
+
+            store.showAllocators(sb);
+
+            System.out.println(sb);
+
+        }
+        
+		final CommitRecordIndex commitRecordIndex = journal
+				.getCommitRecordIndex();
+
+		System.out.println("There are " + commitRecordIndex.getEntryCount()
+				+ " commit points.");
+
+		if (dumpHistory) {
+
+            System.out.println("Historical commit points follow in temporal sequence (first to last):");
+            
 //                final IKeyBuilder keyBuilder = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
 //
 //				final long targetTime = 1303505388420L;
@@ -390,46 +371,41 @@ public class DumpJournal {
 //                		keyBuilder.reset().append(toTime+1).getKey()
 //                		);
 
-                final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<CommitRecordIndex.Entry> itr = commitRecordIndex.rangeIterator();
+            
+            while(itr.hasNext()) {
                 
-                while(itr.hasNext()) {
-                    
-                    System.out.println("----");
+                System.out.println("----");
 
-                    final CommitRecordIndex.Entry entry = itr.next().getObject();
-                    
-                    System.out.print("Commit Record: " + entry.commitTime
-                            + ", addr=" + journal.toString(entry.addr)+", ");
-                    
-                    final ICommitRecord commitRecord = journal
-                            .getCommitRecord(entry.commitTime);
-                    
-                    System.out.println(commitRecord.toString());
-
-                    dumpNamedIndicesMetadata(commitRecord, dumpPages,
-                            dumpIndices, showTuples);
-
-                }
+                final CommitRecordIndex.Entry entry = itr.next().getObject();
                 
-            } else {
-
-                /*
-                 * Dump the current commit record.
-                 */
+                System.out.print("Commit Record: " + entry.commitTime
+                        + ", addr=" + journal.toString(entry.addr)+", ");
                 
-                final ICommitRecord commitRecord = journal.getCommitRecord();
+                final ICommitRecord commitRecord = journal
+                        .getCommitRecord(entry.commitTime);
                 
                 System.out.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(commitRecord, dumpPages, dumpIndices,
-                        showTuples);
-                
+                dumpNamedIndicesMetadata(commitRecord, dumpPages,
+                        dumpIndices, showTuples);
+
             }
+            
+        } else {
 
-        } finally {
+            /*
+             * Dump the current commit record.
+             */
+            
+            final ICommitRecord commitRecord = journal.getCommitRecord();
+            
+            System.out.println(commitRecord.toString());
 
-            journal.close();
-
+            dumpNamedIndicesMetadata(commitRecord, dumpPages, dumpIndices,
+                    showTuples);
+            
         }
 
     }
@@ -445,32 +421,7 @@ public class DumpJournal {
 
     }
     
-//	/**
-//	 * Get the {@link Checkpoint} record for a named index.
-//	 * 
-//	 * @param journal
-//	 *            The journal.
-//	 * @param name2Addr
-//	 *            Some {@link Name2Addr} instance (might not implement
-//	 *            {@link Name2Addr}).
-//	 * @param name
-//	 *            The index name.
-//	 * @return The {@link Checkpoint} record.
-//	 */
-//    private Checkpoint getCheckpoint(final IIndex name2Addr, final String name) {
-//		final byte[] val = name2Addr.lookup(name2Addr.getIndexMetadata()
-//				.getTupleSerializer().getKeyBuilder().reset().append(name)
-//				.getKey());
-//		assert val != null;
-//		final Entry e = EntrySerializer.INSTANCE
-//				.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
-//		assert e.name.equals(name);
-//		final Checkpoint checkpoint = (Checkpoint) SerializerUtil
-//				.deserialize(journal.read(e.checkpointAddr));
-//		return checkpoint;
-//	}
-
-	/**
+    /**
      * Dump metadata about each named index as of the specified commit record.
      * 
      * @param journal
@@ -480,24 +431,15 @@ public class DumpJournal {
             final boolean dumpPages, final boolean dumpIndices,
             final boolean showTuples) {
 
-        // view as of that commit record.
-        final IIndex name2Addr = journal.getName2Addr(commitRecord
-                .getTimestamp());
-
         final Iterator<String> nitr = journal.indexNameScan(null/* prefix */,
                 commitRecord.getTimestamp());
-
-//        final ITupleIterator<?> itr = name2Addr.rangeIterator(null, null);
 
         final Map<String, PageStats> pageStats = dumpPages ? new TreeMap<String, PageStats>()
                 : null;
 		
         while (nitr.hasNext()) {
 
-//            // a registered index.
-//            final Name2Addr.Entry entry = Name2Addr.EntrySerializer.INSTANCE
-            //                    .deserialize(itr.next().getValueStream());
-
+            // a registered index.
             final String name = nitr.next();
             
             System.out.println("name=" + name);
@@ -536,12 +478,20 @@ public class DumpJournal {
             // show metadata record.
             System.out.println("\t" + ndx.getIndexMetadata());
 
-            if (ndx instanceof AbstractBTree) {
+            /*
+             * Collect statistics on the page usage for the index.
+             * 
+             * TODO If we kept the BTree counters for the #of bytes written per
+             * node and per leaf up to date when nodes and leaves were recycled
+             * then we could generate (parts of) this table very quickly. As it
+             * stands, we have to actually scan the pages in the index.
+             */
+            if (ndx instanceof ISimpleTreeIndexAccess) {
 
                 if (pageStats != null) {
 
-                    final PageStats stats = DumpIndex.dumpPages(
-                            (AbstractBTree) ndx, false/* dumpNodeState */);
+                    final PageStats stats = ((ISimpleTreeIndexAccess) ndx)
+                            .dumpPages();
 
                     System.out.println("\t" + stats);
 
@@ -549,73 +499,46 @@ public class DumpJournal {
 
                 }
 
-                if (dumpIndices)
-                    DumpIndex.dumpIndex((AbstractBTree) ndx, showTuples);
+                if (dumpIndices) {
+
+                    if (ndx instanceof AbstractBTree) {
+                    
+                        /*
+                         * TODO GIST : dumpTuples for HTree.
+                         */
+                        
+                        DumpIndex.dumpIndex((AbstractBTree) ndx, showTuples);
+                        
+                    }
+
+                }
 
             }
 
         }
 
-		if (pageStats != null) {
+        if (pageStats != null) {
 
-			/*
-			 * TODO If we kept the BTree counters for the #of bytes written per
-			 * node and per leaf up to date when nodes and leaves were recycled
-			 * then we could generate this table very quickly. As it stands, we
-			 * have to actually scan the pages in the index.
-			 */
-			System.out.print("name");
-			System.out.print('\t');
-			System.out.print("m");
-			System.out.print('\t');
-			System.out.print("height");
-			System.out.print('\t');
-			System.out.print("nnodes");
-			System.out.print('\t');
-			System.out.print("nleaves");
-			System.out.print('\t');
-			System.out.print("nentries");
-			System.out.print('\t');
-			System.out.print("nodeBytes");
-			System.out.print('\t');
-			System.out.print("leafBytes");
-			System.out.print('\t');
-			System.out.print("totalBytes");
-			System.out.print('\t');
-			System.out.print("avgNodeBytes");
-			System.out.print('\t');
-			System.out.print("avgLeafBytes");
-			System.out.print('\t');
-			System.out.print("minNodeBytes");
-			System.out.print('\t');
-			System.out.print("maxNodeBytes");
-			System.out.print('\t');
-			System.out.print("minLeafBytes");
-			System.out.print('\t');
-			System.out.print("maxLeafBytes");
-			System.out.print('\n');
+            /*
+             * Write out the header.
+             */
+            System.out.println(PageStats.getHeaderRow());
 
-			for(Map.Entry<String,PageStats> e : pageStats.entrySet()) {
+            for (Map.Entry<String, PageStats> e : pageStats.entrySet()) {
 
-				final String name = e.getKey();
-				
-				final PageStats stats = e.getValue();
+                final String name = e.getKey();
 
-                final ICheckpointProtocol tmp = journal
-                        .getIndexWithCommitRecord(name, commitRecord);
+                final PageStats stats = e.getValue();
 
-                if (!(tmp instanceof BTree)) {
+                if (stats == null) {
 
                     /*
-                     * FIXME GIST : Handle other type of named indices here in a
-                     * more graceful manner. They probably need to be grouped by
-                     * type since each type will require a different output
-                     * format for the metadata that we are writing out.
-                     * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/585
-                     * (GIST)
+                     * Something for which we did not extract the PageStats.
                      */
-    
+
+                    final ICheckpointProtocol tmp = journal
+                            .getIndexWithCommitRecord(name, commitRecord);
+
                     System.out.println("name: " + name + ", class="
                             + tmp.getClass() + ", checkpoint="
                             + tmp.getCheckpoint());
@@ -624,39 +547,12 @@ public class DumpJournal {
                     
                 }
 
-                final BTree ndx = (BTree) tmp;
+                /*
+                 * Write out the stats for this index.
+                 */
 
-				System.out.print(name);
-				System.out.print('\t');
-				System.out.print(ndx.getBranchingFactor());
-				System.out.print('\t');
-				System.out.print(ndx.getHeight());
-				System.out.print('\t');
-				System.out.print(ndx.getNodeCount());
-				System.out.print('\t');
-				System.out.print(ndx.getLeafCount());
-				System.out.print('\t');
-				System.out.print(ndx.getEntryCount());
-				System.out.print('\t');
-				System.out.print(stats.nodeBytes);
-				System.out.print('\t');
-				System.out.print(stats.leafBytes);
-				System.out.print('\t');
-				System.out.print(stats.getTotalBytes());
-				System.out.print('\t');
-				System.out.print(stats.getBytesPerNode());
-				System.out.print('\t');
-				System.out.print(stats.getBytesPerLeaf());
-				System.out.print('\t');
-				System.out.print(stats.minNodeBytes);
-				System.out.print('\t');
-				System.out.print(stats.maxNodeBytes);
-				System.out.print('\t');
-				System.out.print(stats.minLeafBytes);
-				System.out.print('\t');
-				System.out.print(stats.maxLeafBytes);
-				System.out.print('\n');
-				
+                System.out.println(stats.getDataRow());
+
 			}
 
         }

@@ -44,7 +44,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.EntryScanIterator;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDirtyListener;
@@ -55,6 +54,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
+import com.bigdata.btree.PageStats;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -63,7 +63,6 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An mutable persistence capable extensible hash tree.
@@ -1664,12 +1663,6 @@ public class HTree extends AbstractHTree
 		}
 	}
 
-    final public ICloseableIterator<?> scan() {
-        
-        return new EntryScanIterator(rangeIterator());
-        
-    }
-
     public void removeAll() {
 		
 		DirectoryPage root = getRoot();
@@ -1703,6 +1696,17 @@ public class HTree extends AbstractHTree
 		return sb.toString();
 	
 	}
+
+	@Override
+    public PageStats dumpPages() {
+
+        final HTreePageStats stats = new HTreePageStats();
+
+        getRoot().dumpPages(stats);
+
+        return stats;
+
+    }
 
 	/**
 	 * Create a new {@link HTree} or derived class. This method works by writing

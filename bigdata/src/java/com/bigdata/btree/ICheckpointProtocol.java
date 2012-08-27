@@ -29,6 +29,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Interface in support of the {@link Checkpoint} record protocol.

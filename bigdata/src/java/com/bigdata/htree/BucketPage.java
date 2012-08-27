@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Dec 19, 2006
+ */
 package com.bigdata.htree;
 
 import java.io.PrintStream;
@@ -14,6 +40,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IRawRecordAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.PageStats;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
@@ -1074,6 +1101,13 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 	}
 
+	@Override
+    public void dumpPages(final HTreePageStats stats) {
+
+        stats.visit(htree, this);
+
+    }
+	
 	/**
 	 * From the current bit resolution, determines how many extra bits are
 	 * required to ensure the current set of bucket values can be split.

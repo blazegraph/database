@@ -37,6 +37,7 @@ import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -306,6 +307,8 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Overridden to a more constrained type.
      */
     @Override

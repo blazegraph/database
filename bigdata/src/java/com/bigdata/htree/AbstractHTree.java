@@ -15,14 +15,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
-import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.EntryScanIterator;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -40,11 +40,11 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressorFactory;
-import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
@@ -59,7 +59,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 abstract public class AbstractHTree implements ICounterSetAccess,
-        ICheckpointProtocol {
+        ICheckpointProtocol, ISimpleTreeIndexAccess {
 
     /**
      * The index is already closed.
@@ -878,12 +878,12 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 //     *             if the index is read-only.
 //     */
 //    abstract public long getRevisionTimestamp();
-    
-    /**
-     * The backing store.
-     */
+
+    @Override
     public IRawStore getStore() {
-    	return store;
+        
+        return store;
+        
     }
 
 	/**
@@ -913,6 +913,28 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * The #of tuples in the {@link HTree}.
      */
     abstract public long getEntryCount();
+    
+    /**
+     * {@inheritDoc}
+     * 
+     * @return <code>false</code> since an {@link HTree} is NOT a balanced tree.
+     */
+    @Override
+    public final boolean isBalanced() {
+    
+        return false;
+        
+    }
+    
+    /**
+     * Throws an exception since the {@link HTree} is not a balanced tree.
+     */
+    @Override
+    public int getHeight() {
+    
+        throw new UnsupportedOperationException();
+        
+    }
     
     /**
 	 * The root of the {@link HTree}. This is always a {@link DirectoryPage}.
@@ -2201,6 +2223,13 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 	/** The #of index entries. */
 	abstract public long rangeCount();
 	
+	@Override
+    final public ICloseableIterator<?> scan() {
+        
+        return new EntryScanIterator(rangeIterator());
+        
+    }
+    
 	/**
 	 * Simple iterator visits all tuples in the {@link HTree} in order by the
 	 * effective prefix of their keys. Since the key is typically a hash of some

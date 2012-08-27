@@ -34,8 +34,10 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KV;
+import com.bigdata.htree.HTree;
 
 /**
  * Test suite for {@link DumpJournal}.
@@ -47,7 +49,8 @@ import com.bigdata.btree.keys.KV;
  * 
  *          TODO Test command line utility.
  * 
- *          TODO Test other types of indices.
+ *          FIXME GIST : Test other types of indices (HTree (one test exists
+ *          now), Stream (no tests yet)).
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
  *      </a>
@@ -145,6 +148,50 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
                     
                 }
                 
+            }
+
+            src.commit();
+
+            new DumpJournal(src)
+                    .dumpJournal(true/* dumpHistory */, true/* dumpPages */,
+                            true/* dumpIndices */, false/* showTuples */);
+
+        } finally {
+
+            src.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test with an HTree.
+     */
+    public void test_journal_oneIndex_HTree_RandomData() throws IOException,
+            InterruptedException, ExecutionException {
+
+        final Journal src = getStore(getProperties());
+
+        try {
+
+            // register an index and commit the journal.
+            final String NAME = "testIndex";
+
+            src.registerIndex(new HTreeIndexMetadata(NAME, UUID.randomUUID()));
+
+            {
+
+                final HTree ndx = src.getHTree(NAME);
+
+                final KV[] a = AbstractBTreeTestCase
+                        .getRandomKeyValues(1000/* ntuples */);
+
+                for (KV kv : a) {
+
+                    ndx.insert(kv.key, kv.val);
+
+                }
+
             }
 
             src.commit();

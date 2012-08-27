@@ -161,6 +161,7 @@ import com.bigdata.striterator.ICloseableIterator;
 public class BTree extends AbstractBTree implements //ICommitter,
         ICheckpointProtocol {// ILocalBTreeView {
 
+    @Override
     final public int getHeight() {
         
         return height;
@@ -185,9 +186,7 @@ public class BTree extends AbstractBTree implements //ICommitter,
         
     }
 
-    /**
-     * The backing store.
-     */
+    @Override
     final public IRawStore getStore() {
 
         return store;
@@ -1301,12 +1300,6 @@ public class BTree extends AbstractBTree implements //ICommitter,
     	
     }
 
-    final public ICloseableIterator<?> scan() {
-        
-        return new EntryScanIterator(rangeIterator());
-        
-    }
-    
     /**
      * Remove all entries in the B+Tree.
      * <p>

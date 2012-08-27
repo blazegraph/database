@@ -144,7 +144,8 @@ abstract public class Stream implements ICheckpointProtocol {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
      *      Support PSOutputStream/InputStream at IRawStore </a>
      */
-    protected IRWStrategy getStore() {
+    @Override
+    public IRWStrategy getStore() {
 
         return store;
         

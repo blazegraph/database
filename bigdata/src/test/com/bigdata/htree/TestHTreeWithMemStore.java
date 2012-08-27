@@ -40,6 +40,7 @@ import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.PageStats;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -459,6 +460,27 @@ public class TestHTreeWithMemStore extends TestCase {
                 assertTrue(htree.lookupFirst(badkey) == null); 
                 assertFalse(htree.lookupAll(badkey).hasNext()); // should not lazily create bucketPage if value not present!
 
+                if (true) {
+
+                    /*
+                     * Note: This code verifies that the dumpPages() code is
+                     * working. If you comment this out, then write an explicit
+                     * unit test for dumpPages().
+                     */
+                    
+                    // Checkpoint the index before computing the stats.
+                    htree.writeCheckpoint();
+
+                    // Verify that we can compute the page stats.
+                    final PageStats stats = htree.dumpPages();
+
+                    if (log.isInfoEnabled())
+                        log.info(stats.toString());
+                
+                    System.err.println(stats);
+
+                }
+                
             } catch (Throwable t) {
 
                 log.error(t);
