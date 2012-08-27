@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -38,6 +39,11 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public interface ISimpleIndexAccess {
 
+    /**
+     * The backing store.
+     */
+    public IRawStore getStore();
+    
     /**
      * Return the #of entries in the index.
      * <p>

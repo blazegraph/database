@@ -69,6 +69,7 @@ import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.htree.HTreePageStats;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DirectBufferPool;
@@ -85,6 +86,7 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
 
@@ -134,7 +136,7 @@ import cutthecrap.utils.striterators.IFilter;
  * @see KeyBuilder
  */
 abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
-        ILinearList, IBTreeStatistics, ILocalBTreeView {
+        ILinearList, IBTreeStatistics, ILocalBTreeView, ISimpleTreeIndexAccess {
 
     /**
      * The index is already closed.
@@ -1354,11 +1356,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *             if the index is read-only.
      */
     abstract public long getRevisionTimestamp();
-    
-    /**
-     * The backing store.
-     */
-    abstract public IRawStore getStore();
 
     final public IResourceMetadata[] getResourceMetadata() {
         
@@ -1476,6 +1473,42 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
     
+    @Override
+    public PageStats dumpPages() {
+
+        final BTreePageStats stats = new BTreePageStats();
+        
+        dumpPages(this, getRoot(), stats);
+
+        return stats;
+        
+    }
+
+    static private void dumpPages(final AbstractBTree ndx,
+            final AbstractNode<?> node, final BTreePageStats stats) {
+
+        //node.dump(System.out);
+
+        stats.visit(ndx, node);
+
+        if (!node.isLeaf()) {
+
+            final int nkeys = node.getKeyCount();
+
+            for (int i = 0; i <= nkeys; i++) {
+
+                // normal read following the node hierarchy, using cache, etc.
+                final AbstractNode<?> child = ((Node) node).getChild(i);
+
+                // recursive dump
+                dumpPages(ndx, child, stats);
+
+            }
+
+        }
+
+    }
+
     /**
      * Iff the B+Tree is an index partition then verify that the key lies within
      * the key range of an index partition.
@@ -1563,11 +1596,23 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     final int minChildren;
 
-    abstract public int getHeight();
-
-    abstract public long getNodeCount();
-
-    abstract public long getLeafCount();
+    /**
+     * {@inheritDoc}
+     * 
+     * @return <code>true</code> since a B+Tree is a balanced tree.
+     */
+    @Override
+    public final boolean isBalanced() {
+    
+        return true;
+        
+    }
+    
+//    abstract public int getHeight();
+//
+//    abstract public long getNodeCount();
+//
+//    abstract public long getLeafCount();
 
     abstract public long getEntryCount();
 
@@ -2537,6 +2582,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    @Override
+    final public ICloseableIterator<?> scan() {
+        
+        return new EntryScanIterator(rangeIterator());
+        
+    }
+    
     final public ITupleIterator rangeIterator() {
 
         return rangeIterator(null, null);
