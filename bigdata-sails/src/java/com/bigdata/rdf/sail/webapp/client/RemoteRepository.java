@@ -581,6 +581,8 @@ public class RemoteRepository {
 	 * 
 	 * @param remove
 	 *        The RDF data to be removed.
+	 *        
+     * @return The mutation count.
 	 */
 	public long remove(final RemoveOp remove) throws Exception {
 		
@@ -649,21 +651,22 @@ public class RemoteRepository {
 		
 	}
 
-	/**
-	 * Perform an ACID update (delete+insert) per the semantics of
-	 * <a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer#UPDATE_.28DELETE_.2B_INSERT.29">
-	 * the NanoSparqlServer.
-	 * </a>
-	 * <p> 
-	 * Currently, the only combination supported is delete by query with add
-	 * by post (Iterable<Statement> and File). You can embed statements you
-	 * want to delete inside a construct query without a where clause.
-	 * 
-	 * @param remove
-	 *        The RDF data to be removed.
-	 * @param add
-	 * 		  The RDF data to be added.        
-	 */
+    /**
+     * Perform an ACID update (delete+insert) per the semantics of <a href=
+     * "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer#UPDATE_.28DELETE_.2B_INSERT.29"
+     * > the NanoSparqlServer. </a>
+     * <p>
+     * Currently, the only combination supported is delete by query with add by
+     * post (Iterable<Statement> and File). You can embed statements you want to
+     * delete inside a construct query without a where clause.
+     * 
+     * @param remove
+     *            The RDF data to be removed.
+     * @param add
+     *            The RDF data to be added.
+     *            
+     * @return The mutation count.
+     */
 	public long update(final RemoveOp remove, final AddOp add) throws Exception {
 		
         final ConnectOptions opts = newConnectOptions();
