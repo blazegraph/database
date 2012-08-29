@@ -40,6 +40,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -202,7 +203,8 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A simple DESCRIBE query of a constant.
+     * A simple DESCRIBE query of a constant using the default
+     * {@link DescribeModeEnum}.
      * 
      * <pre>
      * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -220,6 +222,10 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
                 "describe-1.trig",// dataFileURL
                 "describe-1-result.trig"// resultFileURL
                 );
+
+        // This is marked as a DESCRIBE query.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
         
         // The DESCRIBE cache that we are reading on.
         final IDescribeCache describeCache = getDescribeCache(
@@ -256,6 +262,21 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
             }
             
         }
+
+        // The original AST is still a DESCRIBE.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        // The rewritten AST is a CONSTRUCT.
+        assertEquals(QueryType.CONSTRUCT, h.getASTContainer().getOptimizedAST()
+                .getQueryType());
+
+        /*
+         * The projection was not annotated with the describe mode, so we will
+         * use the default describe mode.
+         */
+        assertNull(h.getASTContainer().getOptimizedAST().getProjection()
+                .getDescribeMode());
 
     }
 
@@ -606,12 +627,175 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * This test is used to verify that we compute the Concise Bounded
-     * Description (CBD) correctly by describing all distinct blank nodes
-     * identifier in the initial DESCRIBE.
+     * A simple DESCRIBE query of a constant using
+     * {@link DescribeModeEnum#SymmetricOneStep}.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * DESCRIBE <http://www.bigdata.com/DC>
+     * {
+     *    hint:Query hint:describeMode "SymmetricOneStep"
+     * }
+     * </pre>
+     */
+    public void test_describe_SymmetricOneStep_1() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-SymmetricOneStep-1", // testURI,
+                "describe-SymmetricOneStep-1.rq",// queryFileURL
+                "describe-SymmetricOneStep-1.trig",// dataFileURL
+                "describe-SymmetricOneStep-1-result.trig"// resultFileURL
+                );
+
+        // This is marked as a DESCRIBE query.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+        
+        // The DESCRIBE cache that we are reading on.
+        final IDescribeCache describeCache = getDescribeCache(
+                h.getASTContainer(), h.getTripleStore());
+
+        final BigdataValueFactory f = h.getTripleStore().getValueFactory();
+
+        final BigdataURI dc = f.createURI("http://www.bigdata.com/DC");
+
+        final BigdataValue[] values = new BigdataValue[] { dc };
+
+        h.getTripleStore().getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+
+        if (describeCache != null) {
+
+            // Not in the cache before we run the DESCRIBE query.
+            for (BigdataValue v : values) {
+             
+                assertNull(describeCache.lookup(v.getIV()));
+                
+            }
+
+        }
+
+        h.runTest();
+        
+        if (describeCache != null) {
+
+            for (BigdataValue v : values) {
+                
+                assertDescribedResource(v, describeCache, h);
+                
+            }
+            
+        }
+
+        // The original AST is still a DESCRIBE.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        // The rewritten AST is a CONSTRUCT.
+        assertEquals(QueryType.CONSTRUCT, h.getASTContainer().getOptimizedAST()
+                .getQueryType());
+
+        /*
+         * The projection was not annotated with the describe mode, so we will
+         * use the default describe mode.
+         */
+        assertEquals(DescribeModeEnum.SymmetricOneStep, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
+
+    }
+
+    /**
+     * A simple DESCRIBE query of a constant using
+     * {@link DescribeModeEnum#ForwardOneStep}.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * DESCRIBE <http://www.bigdata.com/DC>
+     * {
+     *    hint:Query hint:describeMode "ForwardOneStep"
+     * }
+     * </pre>
+     */
+    public void test_describe_ForwardOneStep_1() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-ForwardOneStep-1", // testURI,
+                "describe-ForwardOneStep-1.rq",// queryFileURL
+                "describe-ForwardOneStep-1.trig",// dataFileURL
+                "describe-ForwardOneStep-1-result.trig"// resultFileURL
+                );
+
+        // This is marked as a DESCRIBE query.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+        
+        // The DESCRIBE cache that we are reading on.
+        final IDescribeCache describeCache = getDescribeCache(
+                h.getASTContainer(), h.getTripleStore());
+
+        final BigdataValueFactory f = h.getTripleStore().getValueFactory();
+
+        final BigdataURI dc = f.createURI("http://www.bigdata.com/DC");
+
+        final BigdataValue[] values = new BigdataValue[] { dc };
+
+        h.getTripleStore().getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+
+        if (describeCache != null) {
+
+            // Not in the cache before we run the DESCRIBE query.
+            for (BigdataValue v : values) {
+             
+                assertNull(describeCache.lookup(v.getIV()));
+                
+            }
+
+        }
+
+        h.runTest();
+        
+        if (describeCache != null) {
+
+            for (BigdataValue v : values) {
+                
+                assertDescribedResource(v, describeCache, h);
+                
+            }
+            
+        }
+
+        // The original AST is still a DESCRIBE.
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        // The rewritten AST is a CONSTRUCT.
+        assertEquals(QueryType.CONSTRUCT, h.getASTContainer().getOptimizedAST()
+                .getQueryType());
+
+        /*
+         * The projection was annotated with the appropriate describe mode.
+         */
+        assertEquals(DescribeModeEnum.ForwardOneStep, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
+
+    }
+
+    /**
+     * This test is used to verify that we compute {@link DescribeModeEnum#CBD}
+     * correctly.
      * 
      * <pre>
      * DESCRIBE <http://example.com/aReallyGreatBook>
+     * {
+     *    hint:Query hint:describeMode "CBD"
+     * }
      * </pre>
      * 
      * This example is taken directly from <a
@@ -628,12 +812,130 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_describe_CBD_1() throws Exception {
 
-        new TestHelper(
+        final TestHelper h = new TestHelper(
                 "describe-CBD-1", // testURI,
                 "describe-CBD-1.rq",// queryFileURL
                 "describe-CBD-1.rdf",// dataFileURL
                 "describe-CBD-1-result.rdf"// resultFileURL
-                ).runTest();
+                );
+        
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        h.runTest();
+        
+        // The projection was annotated with the desired DescribeMode.
+        assertEquals(DescribeModeEnum.CBD, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
+        
+    }
+
+    /**
+     * This test is used to verify that we compute {@link DescribeModeEnum#SCBD}
+     * correctly.
+     * 
+     * 
+     * <pre>
+     * DESCRIBE <http://example.com/aReallyGreatBook>
+     * {
+     *    hint:Query hint:describeMode "SCBD"
+     * }
+     * </pre>
+     * 
+     * This example is taken directly from <a
+     * href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
+     * Description </a>
+     * 
+     * FIXME This test is currently failing because it is not looking for
+     * reified statement models.
+     */
+    public void test_describe_SCBD_1() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-SCBD-1", // testURI,
+                "describe-SCBD-1.rq",// queryFileURL
+                "describe-SCBD-1.rdf",// dataFileURL
+                "describe-SCBD-1-result.rdf"// resultFileURL
+                );
+        
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        h.runTest();
+        
+        // The projection was annotated with the desired DescribeMode.
+        assertEquals(DescribeModeEnum.SCBD, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
+        
+    }
+
+    /**
+     * This test is used to verify that we compute
+     * {@link DescribeModeEnum#CBDNR} correctly.
+     * 
+     * <pre>
+     * DESCRIBE <http://example.com/aReallyGreatBook>
+     * {
+     *    hint:Query hint:describeMode "CBDNR"
+     * }
+     * </pre>
+     * 
+     * This example is taken from <a href="http://www.w3.org/Submission/CBD/">
+     * CBD - Concise Bounded Description </a>, but the expected result does not
+     * include the description of any reified statement models.
+     */
+    public void test_describe_CBDNR_1() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-CBDNR-1", // testURI,
+                "describe-CBDNR-1.rq",// queryFileURL
+                "describe-CBDNR-1.rdf",// dataFileURL
+                "describe-CBDNR-1-result.rdf"// resultFileURL
+                );
+        
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        h.runTest();
+        
+        // The projection was annotated with the desired DescribeMode.
+        assertEquals(DescribeModeEnum.CBDNR, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
+        
+    }
+
+    /**
+     * This test is used to verify that we compute
+     * {@link DescribeModeEnum#SCBDNR} correctly.
+     * 
+     * <pre>
+     * DESCRIBE <http://example.com/aReallyGreatBook>
+     * {
+     *    hint:Query hint:describeMode "SCBDNR"
+     * }
+     * </pre>
+     * 
+     * This example is taken from <a href="http://www.w3.org/Submission/CBD/">
+     * CBD - Concise Bounded Description </a>, but the expected result does not
+     * include the description of any reified statement models.
+     */
+    public void test_describe_SCBDNR_1() throws Exception {
+
+        final TestHelper h = new TestHelper(
+                "describe-SCBDNR-1", // testURI,
+                "describe-SCBDNR-1.rq",// queryFileURL
+                "describe-SCBDNR-1.rdf",// dataFileURL
+                "describe-SCBDNR-1-result.rdf"// resultFileURL
+                );
+        
+        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
+                .getQueryType());
+
+        h.runTest();
+        
+        // The projection was annotated with the desired DescribeMode.
+        assertEquals(DescribeModeEnum.SCBDNR, h.getASTContainer()
+                .getOptimizedAST().getProjection().getDescribeMode());
         
     }
 

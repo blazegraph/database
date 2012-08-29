@@ -1,5 +1,5 @@
 DESCRIBE <http://example.com/aReallyGreatBook>
 {
-   hint:Query hint:describeMode "CBD"
+   hint:Query hint:describeMode "SCBD"
 }
 
