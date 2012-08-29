@@ -570,6 +570,10 @@ public class ASTConstructIterator implements
         // Blank nodes (scoped to the solution).
         final Map<String, BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
 
+        // #of statements generated from the current solution.
+        int ngenerated = 0;
+
+        // For each statement pattern in the template.
         for (StatementPatternNode pat : templates) {
 
             /*
@@ -583,9 +587,17 @@ public class ASTConstructIterator implements
 
                 // If successful, then add to the buffer.
                 addStatementToBuffer(stmt);
+                
+                ngenerated++;
 
             }
 
+        }
+        
+        if (ngenerated == 0 && log.isDebugEnabled()) {
+
+            log.debug("No statements generated for this solution: " + solution);
+            
         }
 
     }
@@ -691,6 +703,25 @@ public class ASTConstructIterator implements
         if (term instanceof ConstantNode) {
 
             final BigdataValue value = term.getValue();
+
+            if (value == null) {
+
+                /**
+                 * This could mean that we failed to do a necessary
+                 * materialization set or that there were IVs in the original
+                 * AST whose valueCache was not set.
+                 * 
+                 * This problem was first observed when developing CBD support.
+                 * 
+                 * @see <a
+                 * href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
+                 * Concise Bounded Description </a>
+                 */
+                
+                throw new AssertionError("BigdataValue not available: " + term
+                        + ", term.iv=" + term.getValueExpression().get());
+                
+            }
             
             if(value instanceof BigdataBNode) {
 

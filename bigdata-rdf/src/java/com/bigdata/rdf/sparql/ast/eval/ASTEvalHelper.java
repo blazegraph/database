@@ -75,7 +75,9 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
+import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -100,7 +102,7 @@ public class ASTEvalHelper {
 
     /**
      * A logger whose sole purpose is to log the SPARQL queries which are being
-     * evaluated.
+     * evaluated <strong>DO NOT USE THIS FOR OTHER PURPOSES !!! </strong>
      */
     private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
 
@@ -116,7 +118,8 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-    static private IBindingSet batchResolveIVs(final AbstractTripleStore store,
+    static //private Note: Exposed to CBD class. 
+    IBindingSet batchResolveIVs(final AbstractTripleStore store,
             final BindingSet bs) throws QueryEvaluationException {
 
         if (bs == null || bs.size() == 0) {
@@ -412,10 +415,15 @@ public class ASTEvalHelper {
         final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
                 batchResolveIVs(store, bs));
 
+        // true iff the original query was a DESCRIBE.
+        final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
+
+        // TODO Allow override based on a query hint.
+        final DescribeModeEnum describeMode = QueryHints.DEFAULT_DESCRIBE_MODE;
+        
         final IDescribeCache describeCache;
         final Set<IVariable<?>> describeVars;
-        if (context.sparqlCache != null
-                && astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE) {
+        if (context.sparqlCache != null && isDescribe) {
             
             /*
              * The DESCRIBE cache is enabled.
@@ -468,6 +476,11 @@ public class ASTEvalHelper {
              * query. This is necessary to handle cases such as
              * <code>DESCRIBE ?foo WHERE {...}</code> or <code>DESCRIBE *</code>
              * 
+             * Note: We only do this for the top-level DESCRIBE. This step is
+             * NOT done the embedded DESCRIBE query(s) issued for Concise
+             * Bounded Description since we are only interested in caching the
+             * original resources that were being described.
+             * 
              * Note: The [describedResources] is a ConcurrentHashSet in order to
              * provide thread safety since new bindings for the DESCRIBE
              * variable(s) may be discovered concurrent with new constructed
@@ -504,6 +517,30 @@ public class ASTEvalHelper {
                         solutions2);
 
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src2;
+        switch (describeMode) {
+        case OneHop:
+            // No expansion. This is the base algorithm.
+            src2 = src;
+            break;
+        case CBD: {
+            /*
+             * Concise Bounded Description requires a fixed point expansion.
+             * 
+             * TODO The expansion should monitor a returned iterator so the
+             * query can be cancelled by the openrdf client. Right now the
+             * expansion is performed before the iteration is returned to the
+             * client, so there is no opportunity to cancel a running CBD
+             * DESCRIBE.
+             */
+            src2 = CBD.conciseBoundedDescription(store,
+                    src);
+            break;
+        }
+        default:
+            throw new UnsupportedOperationException("describeMode="
+                    + describeMode);
+        }
+        final CloseableIteration<BigdataStatement, QueryEvaluationException> src3;
 
         if (describeCache != null) {
 
@@ -521,18 +558,18 @@ public class ASTEvalHelper {
              * resources during an open web query).
              */
 
-            src2 = new DescribeCacheUpdater(describeCache, describedResources,
-                    src);
+            src3 = new DescribeCacheUpdater(describeCache, describedResources,
+                    src2);
 
         } else {
 
-            src2 = src;
+            src3 = src2;
 
         }
         
         return new GraphQueryResultImpl(//
                 optimizedQuery.getPrefixDecls(), //
-                src2);
+                src3);
 
     }
 
@@ -562,7 +599,8 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-    static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
+    static //private Note: Exposed to CBD class.
+    CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final ASTContainer astContainer,
             final AST2BOpContext ctx,            
             final IBindingSet[] bindingSets, 
@@ -613,7 +651,8 @@ public class ASTEvalHelper {
      * 
      * @return The {@link IBindingSet}.
      */
-    private static IBindingSet[] mergeBindingSets(
+    //private Note: Exposed to CBD class.
+    static IBindingSet[] mergeBindingSets(
             final ASTContainer astContainer, final IBindingSet src) {
 
         if (astContainer == null)

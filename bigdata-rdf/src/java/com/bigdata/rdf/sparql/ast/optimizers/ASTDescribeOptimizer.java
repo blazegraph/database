@@ -86,8 +86,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * Note: The {@link ASTConstructOptimizer} will add a {@link ProjectionNode}
  * based on the generated CONSTRUCT template.
  * 
- * TODO CBD.
- * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/578"> Concise
  *      Bounded Description </a>
  */
@@ -253,37 +251,3 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 	}
 	
 }
-///*
-// * If the DESCRIBE cache is to be maintained, then we must also add
-// * in the original DESCRIBE variable. We need to project them in
-// * order to recognize which resources are being described.
-// * 
-// * FIXME Unit test to verify this code path.
-// * 
-// * TODO Cast to interface is not compatible with remote or
-// * distributed cache.
-// */
-//final DescribeCache describeCache = ((SparqlCache) context.sparqlCache)
-//        .getDescribeCache(context.getAbstractTripleStore());
-//
-//if (describeCache != null) {
-//
-//    /*
-//     * The set of variables that were in the original DESCRIBE
-//     * projection. This can include both variables explicitly given
-//     * in the query (DESCRIBE ?foo WHERE {...}) and variables bound
-//     * to constants by an AssignmentNode (DESCRIBE uri).
-//     */
-//    
-//    final Set<IVariable<?>> describeVars = context.astContainer
-//            .getOriginalAST().getProjectedVars(
-//                    new LinkedHashSet<IVariable<?>>());
-//
-//    for (IVariable<?> var : describeVars) {
-//
-//        // Add into the new projection node.
-//        projection.addProjectionVar(new VarNode(var.getName()));
-//
-//    }
-//
-//}
