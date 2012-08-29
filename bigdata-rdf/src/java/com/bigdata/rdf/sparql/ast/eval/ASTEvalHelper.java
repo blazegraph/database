@@ -418,7 +418,7 @@ public class ASTEvalHelper {
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
 
-        // TODO Allow override based on a query hint.
+        // TODO CBD : Allow override based on a query hint.
         final DescribeModeEnum describeMode = QueryHints.DEFAULT_DESCRIBE_MODE;
         
         final IDescribeCache describeCache;
