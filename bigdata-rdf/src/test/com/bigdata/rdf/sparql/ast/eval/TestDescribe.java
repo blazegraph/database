@@ -605,4 +605,36 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * This test is used to verify that we compute the Concise Bounded
+     * Description (CBD) correctly by describing all distinct blank nodes
+     * identifier in the initial DESCRIBE.
+     * 
+     * <pre>
+     * DESCRIBE <http://example.com/aReallyGreatBook>
+     * </pre>
+     * 
+     * This example is taken directly from <a
+     * href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
+     * Description </a>
+     * 
+     * FIXME This test is currently failing because it is not looking for
+     * reified statement models. Also, we are doing SCBD (Symmetric Concise
+     * Bounded Description) not CBD (which only proceeds from the statements
+     * where the resource is a subject). We should define, implement, and test
+     * CBD, SCBD, and also variants that do not do the reification dance
+     * (assuming that this is going to be expensive or that do the reification
+     * dance efficiently by relying on "reification done right").
+     */
+    public void test_describe_CBD_1() throws Exception {
+
+        new TestHelper(
+                "describe-CBD-1", // testURI,
+                "describe-CBD-1.rq",// queryFileURL
+                "describe-CBD-1.rdf",// dataFileURL
+                "describe-CBD-1-result.rdf"// resultFileURL
+                ).runTest();
+        
+    }
+
 }
