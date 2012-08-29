@@ -809,7 +809,7 @@ public class ASTConstructIterator implements
 
         // put into the per-solution cache.
         bnodes.put(id, bnode);
-
+        
         return bnode;
 
     }

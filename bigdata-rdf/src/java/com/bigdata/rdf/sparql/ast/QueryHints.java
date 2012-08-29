@@ -438,7 +438,7 @@ public interface QueryHints {
      */
     String DESCRIBE_MODE = "describeMode";
 
-    DescribeModeEnum DEFAULT_DESCRIBE_MODE = DescribeModeEnum.OneHop;
+    DescribeModeEnum DEFAULT_DESCRIBE_MODE = DescribeModeEnum.SymmetricOneStep;
     
     /**
 	 * Option controls whether or not the proposed SPARQL extension for

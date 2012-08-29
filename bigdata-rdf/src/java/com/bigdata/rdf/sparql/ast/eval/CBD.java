@@ -45,6 +45,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -65,6 +66,68 @@ public class CBD {
 
     private static final Logger log = Logger.getLogger(CBD.class);
 
+    /**
+     * Maximum #of expansions for recursive {@link DescribeModeEnum}s.
+     * 
+     * TODO Configure.
+     * 
+     * TODO Limit #of resources that are being described.
+     * 
+     * TODO Watch a timeout on the top-level query (if present)
+     */
+    private static final int MAX_ROUNDS = 5;
+    
+    /** The {@link AbstractTripleStore}. */
+    private final AbstractTripleStore store;
+    
+    /**
+     * The {@link DescribeModeEnum} specifying how to evaluate the top-level
+     * DESCRIBE query.
+     */
+    private final DescribeModeEnum describeMode;
+    
+    /**
+     * The {@link DescribeModeEnum} specifying how to evaluate each expansion
+     * round of the DESCRIBE query.
+     */
+    private final DescribeModeEnum describeExpansionMode;
+    
+    /**
+     * @param store
+     *            The {@link AbstractTripleStore}.
+     * @param describeMode
+     *            The {@link DescribeModeEnum} specifying how to evaluate the
+     *            DESCRIBE query.
+     */
+    public CBD(final AbstractTripleStore store,
+            final DescribeModeEnum describeMode) {
+
+        this.store = store;
+        
+        this.describeMode = describeMode;
+        
+        switch(describeMode) {
+        case CBD:
+        case CBDNR:
+            // Expansion only explores the forward links.
+            describeExpansionMode = DescribeModeEnum.ForwardOneStep;
+            break;
+        case SCBD:
+        case SCBDNR:
+            // Expansion explores both forward and reverse links.
+            describeExpansionMode = DescribeModeEnum.SymmetricOneStep;
+            break;
+        case ForwardOneStep:
+        case SymmetricOneStep:
+            // There are no expansion steps for these modes.
+            throw new UnsupportedOperationException();
+        default:
+            // Unknown describe mode.
+            throw new AssertionError();
+        }
+        
+    }
+    
     /**
      * The description of the original resource(s) is expanded for each blank
      * node encountered in the constructed statements until no new blank nodes
@@ -92,13 +155,13 @@ public class CBD {
      *      TODO We might need to insist that the ASTConstructIterator pass
      *      through the original IV for the blank node by setting the original
      *      IV on the blank node.
-     * 
-     *      TODO There are some cases where the ASTConstructIterator can create
-     *      new blank nodes. Can any of those cases arise for a DESCRIBE? If so,
-     *      then it needs to use a consistent assignment.
+     *      <p>
+     *      There are some cases where the ASTConstructIterator can create new
+     *      blank nodes. Can any of those cases arise for a DESCRIBE? If so,
+     *      then it needs to use a consistent assignment (same IV in each round
+     *      for the "same" blank node).
      */
-    static CloseableIteration<BigdataStatement, QueryEvaluationException> conciseBoundedDescription(
-            final AbstractTripleStore store,
+    CloseableIteration<BigdataStatement, QueryEvaluationException> computeClosure(
             CloseableIteration<BigdataStatement, QueryEvaluationException> src)
             throws QueryEvaluationException {
 
@@ -113,14 +176,10 @@ public class CBD {
             // CBD expansion begins at round ONE (1).
             nrounds++;
 
-            if (nrounds > 10) {
-                /*
-                 * TODO Limit on #of rounds or maybe just watch a timeout on the
-                 * top-level query (if present)?
-                 */
+            if (nrounds > MAX_ROUNDS) {
                 src.close();
                 throw new QueryEvaluationException(
-                        "CSB would exceed 10 rounds.");
+                        "CSB would exceed "+MAX_ROUNDS+" rounds.");
             }
 
             /*
@@ -146,13 +205,18 @@ public class CBD {
              * new blank node IV that needs to be described.
              */
 
-            if (log.isInfoEnabled())
+            if (log.isInfoEnabled()) {
                 log.info("#rounds=" + nrounds + ", #stmts(in)=" + stmts.size()
                         + ", #bnodes(in)=" + bnodes_tm1.size()
                         + ", #bnodes(new)=" + newBnodes.size() + " : "
                         + newBnodes);
 
-            src = doRound(store, newBnodes);
+                // Conditional logging.
+                logState(stmts, bnodes_tm1, newBnodes);
+
+            }
+
+            src = doRound(newBnodes);
             
             // All of these blank nodes have been resolved.
             bnodes_tm1.addAll(newBnodes);
@@ -161,9 +225,15 @@ public class CBD {
 
         // Done.
         
-        if (log.isInfoEnabled())
+        if (log.isInfoEnabled()) {
+        
             log.info("#rounds=" + nrounds + ", #stmts(in)=" + stmts.size()
                     + ", #bnodes(in)=" + bnodes_tm1.size());
+            
+            // Conditional logging.
+            logState(stmts, bnodes_tm1, null/* newBNodes */);
+            
+        }
 
         /*
          * Stream out the fixed point collection of statements that are the
@@ -173,6 +243,53 @@ public class CBD {
 
         return new CollectionIteration<BigdataStatement, QueryEvaluationException>(
                 stmts);
+
+    }
+
+    /**
+     * Log the statements and bnode {@link IV}s @ DEBUG.
+     * 
+     * @param stmts
+     *            The statements.
+     * @param bnodes_tm1
+     *            The bnode {@link IV}s from the last round (initially empty).
+     * @param newBnodes
+     *            The bnode {@link IV}s (optional and <code>null</code> if we
+     *            are done).
+     */
+    private void logState(final Set<BigdataStatement> stmts,
+            final Set<IV<?, ?>> bnodes_tm1, final Set<IV<?, ?>> newBnodes) {
+
+        if (!log.isDebugEnabled())
+            return;
+
+        final StringBuilder sb = new StringBuilder(stmts.size() * 100);
+        {
+            sb.append("Statements\n");
+            for (BigdataStatement st : stmts) {
+                sb.append(st.toString());
+                sb.append("\n");
+            }
+            log.debug(sb.toString());
+        }
+        {
+            sb.setLength(0);// truncate.
+            sb.append("BNodes(t-1)\n");
+            for (IV<?, ?> iv : bnodes_tm1) {
+                sb.append(iv.toString());
+                sb.append("\n");
+            }
+            log.debug(sb.toString());
+        }
+        if (newBnodes != null) {
+            sb.setLength(0);// truncate.
+            sb.append("BNodes(new)\n");
+            for (IV<?, ?> iv : newBnodes) {
+                sb.append(iv.toString());
+                sb.append("\n");
+            }
+            log.debug(sb.toString());
+        }
 
     }
 
@@ -258,55 +375,13 @@ public class CBD {
      *         be read.
      * @throws QueryEvaluationException
      */
-    private static CloseableIteration<BigdataStatement, QueryEvaluationException> doRound(
-            final AbstractTripleStore store, final Set<IV<?, ?>> bnodeIVs)
-            throws QueryEvaluationException {
+    private CloseableIteration<BigdataStatement, QueryEvaluationException> doRound(
+            final Set<IV<?, ?>> bnodeIVs) throws QueryEvaluationException {
 
         /*
          * Create the DESCRIBE query for the blank node IVs.
          */
-        final ASTContainer astContainer;
-        {
-
-            /*
-             * Ensure that the bnode IVs are resolved to the corresponding
-             * BigdataBlankNode objects and that the valueCache relation is set
-             * on those bnode IVs.
-             */
-            final Map<IV<?, ?>, BigdataValue> terms = store
-                    .getLexiconRelation().getTerms(bnodeIVs);
-            
-            for (Map.Entry<IV<?, ?>, BigdataValue> e : terms.entrySet()) {
-
-                ((IV)e.getKey()).setValue(e.getValue());
-                
-            }
-
-            final QueryRoot queryRoot = new QueryRoot(QueryType.DESCRIBE);
-            {
-
-                final ProjectionNode projection = new ProjectionNode();
-                queryRoot.setProjection(projection);
-
-                for (IV<?, ?> iv : bnodeIVs) {
-
-                    if (!iv.hasValue())
-                        throw new AssertionError("valueCache not set : " + iv);
-
-                    final VarNode anonvar = new VarNode("-cbd-bnode-1");
-                    
-                    anonvar.setAnonymous(true);
-                    
-                    projection.addProjectionExpression(new AssignmentNode(
-                            anonvar, new ConstantNode(iv)));
-                    
-                }
-                
-            }
-
-            astContainer = new ASTContainer(queryRoot);
-
-        }
+        final ASTContainer astContainer = getDescribeQuery(bnodeIVs);
         
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -324,6 +399,8 @@ public class CBD {
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
         
         if (log.isDebugEnabled()) {
+            log.debug("describeMode=" + describeMode + ", expansionMode="
+                    + describeExpansionMode);
             log.debug("OriginalAST: " + astContainer.getOriginalAST());
             log.debug("OptimizedAST: " + optimizedQuery);
         }
@@ -347,6 +424,62 @@ public class CBD {
 
         return src;
         
+    }
+
+    /**
+     * Generate a DESCRIBE query for one of the expansion rounds.
+     * 
+     * @param bnodeIVs
+     *            The blank nodes that need to be described.
+     * @return The {@link ASTContainer} wrapping that DESCRIBE query.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private ASTContainer getDescribeQuery(final Set<IV<?, ?>> bnodeIVs) {
+
+        /*
+         * Ensure that the bnode IVs are resolved to the corresponding
+         * BigdataBlankNode objects and that the valueCache relation is set on
+         * those bnode IVs.
+         */
+        final Map<IV<?, ?>, BigdataValue> terms = store.getLexiconRelation()
+                .getTerms(bnodeIVs);
+
+        for (Map.Entry<IV<?, ?>, BigdataValue> e : terms.entrySet()) {
+
+            ((IV) e.getKey()).setValue(e.getValue());
+
+        }
+
+        final QueryRoot queryRoot = new QueryRoot(QueryType.DESCRIBE);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+         
+            /*
+             * Specify the describe mode appropriate for the expansion given the
+             * top-level describe algorithm that we are evaluating.
+             */
+            projection.setDescribeMode(describeExpansionMode);
+            
+            for (IV<?, ?> iv : bnodeIVs) {
+
+                if (!iv.hasValue())
+                    throw new AssertionError("valueCache not set : " + iv);
+
+                final VarNode anonvar = new VarNode("-cbd-bnode-1");
+
+                anonvar.setAnonymous(true);
+
+                projection.addProjectionExpression(new AssignmentNode(anonvar,
+                        new ConstantNode(iv)));
+
+            }
+
+        }
+
+        return new ASTContainer(queryRoot);
+
     }
 
     /**
@@ -392,7 +525,6 @@ public class CBD {
      * @return The {@link IV} for that blank node and <code>null</code> iff the
      *         value is not a blank node.
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     static private IV<?,?> getBNodeIV(final BigdataValue v) {
 
         if (v == null) {
@@ -418,15 +550,11 @@ public class CBD {
         final IV<?, ?> iv = bnode.getIV();
 
         /*
-         * FIXME No. What we really need to do is ensure that the blank node
-         * variables are projected out of the CONSTRUCT queries that are
-         * evaluated in the expansion rounds. That will ensure that the blank
-         * nodes are materialized. (I am hitting a problem where blank nodes
-         * that were given as inputs to the CONSTRUCT are not materialized in
-         * the query).
-         * 
-         * OR We can resolve the blank node IVs to blank nodes when we setup the
-         * expansion round DESCRIBE query.
+         * No. What we really need to do is ensure that the blank node variables
+         * (a) have their valueCache set when we create the DESCRIBE query for
+         * the expansion rounds; and (b) are projected out of the CONSTRUCT
+         * queries that are evaluated in the expansion rounds. That will ensure
+         * that the blank nodes are materialized.
          */
 //        /*
 //         * We need to set the valueCache relation on the IV. The

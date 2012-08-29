@@ -33,18 +33,19 @@ import java.util.LinkedHashSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -139,29 +140,39 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 
         }
 
-        final IDescribeCache describeCache = context.getDescribeCache();
+        // The effective DescribeMode.
+        final DescribeModeEnum describeMode = projection.getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
+                : projection.getDescribeMode();
         
-        if (describeCache != null) {
+//        final IDescribeCache describeCache = context.getDescribeCache();
+//        
+//        if (describeCache != null) {
 
-            /*
-             * We need to keep the projection so we can correlate the original
-             * variables for the resources that are being described with the
-             * bindings on those variables in order to figure out what resources
-             * were described when we are maintaining a DESCRIBE cache.
-             * 
-             * @see <a
-             * href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
-             * DESCRIBE CACHE </a>
-             */
+        /**
+         * We need to keep the projection so we can correlate the original
+         * variables for the resources that are being described with the
+         * bindings on those variables in order to figure out what resources
+         * were described when we are maintaining a DESCRIBE cache.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
+         *      DESCRIBE CACHE </a>
+         */
+        /**
+         * We need to keep the projection since the DescribeMode annotation is
+         * attached to the projection.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
+         *      Concise Bounded Description </a>
+         */
 
-            projection.setReduced(true);
+        projection.setReduced(true);
 
-        } else {
-         
-            // remove the projection.
-            queryRoot.setProjection(null);
-            
-        }
+//        } else {
+//         
+//            // remove the projection.
+//            queryRoot.setProjection(null);
+//            
+//        }
 
         queryRoot.setConstruct(construct); // add CONSTRUCT node.
 
@@ -201,6 +212,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 			
 			final int termNum = i++;
 			
+			if(describeMode.isForward())
 			{ // <term> ?pN-a ?oN
 			
                 /*
@@ -224,8 +236,8 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 //				union.addChild(sp);
 				
 			}
-				
-			
+
+			if(describeMode.isReverse())
 			{ // ?sN ?pN-b <term>
 			
 				final StatementPatternNode sp = new StatementPatternNode(

@@ -69,6 +69,13 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         String REDUCED = "reduced";
 
         boolean DEFAULT_REDUCED = false;
+        
+        /**
+         * Optional annotation specifies the {@link DescribeModeEnum} that will
+         * be used to evaluate a DESCRIBE query. The default is controlled by
+         * {@value QueryHints#DEFAULT_DESCRIBE_MODE}.
+         */
+        String DESCRIBE_MODE = "describeMode";
     
     }
 
@@ -127,6 +134,39 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    /**
+     * Return the {@link DescribeModeEnum} that will be used to evaluate a
+     * DESCRIBE query.
+     * <p>
+     * Note: The default is governed by
+     * {@value QueryHints#DEFAULT_DESCRIBE_MODE}.
+     * 
+     * @return The {@link DescribeModeEnum} or <code>null</code> if this has not
+     *         been explicitly specified.
+     */
+    public DescribeModeEnum getDescribeMode() {
+        
+        return (DescribeModeEnum) getProperty(Annotations.DESCRIBE_MODE);
+        
+    }
+
+    /**
+     * Set the {@link DescribeModeEnum} that will be used to evaluate a DESCRIBE
+     * query.
+     * <p>
+     * Note: The default is governed by
+     * {@value QueryHints#DEFAULT_DESCRIBE_MODE}.
+     * 
+     * @param describeMode
+     *            The {@link DescribeModeEnum} or <code>null</code> to use the
+     *            default.
+     */
+    public void setDescribeMode(final DescribeModeEnum describeMode) {
+
+        setProperty(Annotations.DESCRIBE_MODE, describeMode);
+
+    }
+    
     /**
      * Adds a variable to be projected. The variable is modeled as an assignment
      * of itself to itself, so everything in the projection node winds up
@@ -272,6 +312,14 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         if (isReduced())
             sb.append("REDUCED ");
 
+        final DescribeModeEnum describeMode = getDescribeMode();
+
+        if (describeMode != null) {
+
+            sb.append("[describeMode=" + describeMode + "]");
+            
+        }
+        
         if (isWildcard()) {
 
             sb.append("* ");

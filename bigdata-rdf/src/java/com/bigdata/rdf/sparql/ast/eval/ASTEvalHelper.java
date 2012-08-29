@@ -418,9 +418,6 @@ public class ASTEvalHelper {
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
 
-        // TODO CBD : Allow override based on a query hint.
-        final DescribeModeEnum describeMode = QueryHints.DEFAULT_DESCRIBE_MODE;
-        
         final IDescribeCache describeCache;
         final Set<IVariable<?>> describeVars;
         if (context.sparqlCache != null && isDescribe) {
@@ -463,6 +460,11 @@ public class ASTEvalHelper {
                         , materializeProjectionInQuery//
                         , optimizedQuery.getProjection().getProjectionVars()//
                 );
+
+        // The effective DescribeMode.
+        final DescribeModeEnum describeMode = optimizedQuery.getProjection()
+                .getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
+                : optimizedQuery.getProjection().getDescribeMode();
 
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
         final ConcurrentHashSet<BigdataValue> describedResources;
@@ -518,13 +520,17 @@ public class ASTEvalHelper {
 
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src2;
         switch (describeMode) {
-        case OneHop:
-            // No expansion. This is the base algorithm.
+        case SymmetricOneStep: // No expansion step.
+        case ForwardOneStep: // No expansion step.
             src2 = src;
             break;
-        case CBD: {
+        case CBD:
+        case SCBD:
+        case CBDNR:
+        case SCBDNR: {
             /*
-             * Concise Bounded Description requires a fixed point expansion.
+             * Concise Bounded Description (of any flavor) requires a fixed
+             * point expansion.
              * 
              * TODO The expansion should monitor a returned iterator so the
              * query can be cancelled by the openrdf client. Right now the
@@ -532,8 +538,7 @@ public class ASTEvalHelper {
              * client, so there is no opportunity to cancel a running CBD
              * DESCRIBE.
              */
-            src2 = CBD.conciseBoundedDescription(store,
-                    src);
+            src2 = new CBD(store, describeMode).computeClosure(src);
             break;
         }
         default:

@@ -5,5 +5,4 @@
 
 {
   :DC rdfs:label "DC" .
-  :Bryan foaf:based_near :DC .
 }

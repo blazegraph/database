@@ -113,6 +113,7 @@ public class QueryHintRegistry {
         add(new RemoteAPHint());
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
+        add(new DescribeModeHint());
 
         /*
          * BufferAnnotations
