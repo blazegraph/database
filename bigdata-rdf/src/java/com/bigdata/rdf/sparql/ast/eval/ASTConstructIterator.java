@@ -98,6 +98,46 @@ public class ASTConstructIterator implements
     private final List<StatementPatternNode> templates;
     
     /**
+     * A mapping of blank node IDs to {@link BigdataBNode}s that will be imposed
+     * across the {@link ASTConstructIterator}. This MUST be <code>null</code>
+     * for a CONSTRUCT query since the semantics of CONSTRUCT require that blank
+     * node assignments are scoped to the solution. It must be non-
+     * <code>null</code> for a DESCRIBE query since we want to have consistent
+     * blank node ID assigments for all statements in the response graph.
+     * <p>
+     * Note: DO NOT access this directly. Instead, use the
+     * {@link #getBNodeMap()} to set a <strong>lexically local</strong> map
+     * reference and then clear that map reference to <code>null</code> when you
+     * are done with a given solution. If the {@link #bnodes} reference is
+     * <code>null</code>, then a <strong>new</strong> blank node map will be
+     * returned by every invocation of {@link #getBNodeMap()}. If it is non-
+     * <code>null</code> then the <strong>same</strong> map is returned by every
+     * invocation. This makes it possible to determine the scope of the blank
+     * nodes simply by whether or not this map is supplied to the constructor.
+     */
+    final Map<String, BigdataBNode> bnodes;
+
+    /**
+     * Return the blank node map. If this was specified to the constructor, then
+     * the same map is returned for each invocation. Otherwise a
+     * <strong>new</strong> map instance is returned for each invocation.
+     * 
+     * @see #bnodes
+     */
+    private final Map<String, BigdataBNode> getBNodeMap() {
+        
+        if (bnodes == null) {
+        
+            return new LinkedHashMap<String, BigdataBNode>();
+            
+        }
+
+        return bnodes;
+        
+    }
+
+    
+    /**
      * Ground triples from the template.
      */
     private final List<BigdataStatement> groundTriples;
@@ -162,6 +202,18 @@ public class ASTConstructIterator implements
      * @param whereClause
      *            The WHERE clause (used to identify construct templates which
      *            obviously produce DISTINCT triples).
+     * @param bnodes
+     *            A mapping from bnode IDs to {@link BigdataBNode}s that will be
+     *            imposed (optional). This MUST be <code>null</code> when the
+     *            top-level operation is a CONSTRUCT since the semantics of
+     *            CONSTRUCT <strong>require</strong> that blank node ID
+     *            assignments are scoped to the solution. However, when a
+     *            DESCRIBE query is rewritten into a CONSTRUCT, the blank node
+     *            identifier mappings must be scoped to the response graph. For
+     *            a DESCRIBE that uses a recursive expansion (CBD, etc.), the
+     *            blank node IDs must be scoped to the entire response, not just
+     *            the individual DESCRIBE queries that are issued in support of
+     *            the top-level DESCRIBE request.
      * @param src
      *            The solutions that will be used to construct the triples.
      */
@@ -169,9 +221,13 @@ public class ASTConstructIterator implements
             final AbstractTripleStore tripleStore,//
             final ConstructNode construct,//
             final GraphPatternGroup<?> whereClause,//
+            final Map<String, BigdataBNode> bnodesIn,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
         this.f = tripleStore.getValueFactory();
+
+        // Note: MAY be null (MUST be null for CONSTRUCT).
+        this.bnodes = bnodesIn;
         
 //        this.toldBNodes = store.getLexiconRelation().isStoreBlankNodes();
         
@@ -186,8 +242,10 @@ public class ASTConstructIterator implements
 
             if (pat.isGround()) {
 
-                if(bnodes == null)
-                    bnodes = new LinkedHashMap<String, BigdataBNode>();
+                if (bnodes == null) {
+                    // Either new bnodes map or reuse global map.
+                    bnodes = getBNodeMap();
+                }
                 
                 // Create statement from the template.
                 final BigdataStatement stmt = makeStatement(pat,
@@ -567,8 +625,11 @@ public class ASTConstructIterator implements
             
         }
 
-        // Blank nodes (scoped to the solution).
-        final Map<String, BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
+        /*
+         * Blank nodes. Either scoped to the solution (new bnodes map) or reuse
+         * a global bnodes map.
+         */
+        final Map<String, BigdataBNode> bnodes = getBNodeMap();
 
         // #of statements generated from the current solution.
         int ngenerated = 0;
@@ -702,49 +763,90 @@ public class ASTConstructIterator implements
 
         if (term instanceof ConstantNode) {
 
+            /*
+             * A constant. Something that was specified in the original query as
+             * a constant.
+             */
+
+            // Get the BigdataValue from the valueCache on the IV for the
+            // Constant.
             final BigdataValue value = term.getValue();
 
             if (value == null) {
 
                 /**
-                 * This could mean that we failed to do a necessary
-                 * materialization set or that there were IVs in the original
-                 * AST whose valueCache was not set.
+                 * If the value is null, then the valueCache was not set on the
+                 * IV for the Constant. Since the Constant was a Constant
+                 * specified in the original query, this means that is an IV in
+                 * the original AST whose valueCache was not set.
                  * 
                  * This problem was first observed when developing CBD support.
+                 * The CBD class is explicitly setting the IVs when it builds
+                 * the DESCRIBE queries for the CBD expansions. However, it was
+                 * failing to resolve the BigdataValue for those IVs and set the
+                 * valueCache on the IV. This assert was added to detect that
+                 * problem and prevent regressions.
                  * 
                  * @see <a
-                 * href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
-                 * Concise Bounded Description </a>
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
+                 *      Concise Bounded Description </a>
                  */
-                
+
                 throw new AssertionError("BigdataValue not available: " + term
                         + ", term.iv=" + term.getValueExpression().get());
-                
-            }
-            
-            if(value instanceof BigdataBNode) {
 
-                return getBNode(((BigdataBNode) value).getID(), bnodes);
+            }
+
+            if (value instanceof BigdataBNode) {
+
+                /*
+                 * Blank nodes require special handling.
+                 */
+                
+                if (this.bnodes != null) {
+                    
+                    /*
+                     * DESCRIBE
+                     * 
+                     * Note: This preserves the ID/IV for constants in the
+                     * query, but it breaks semantics for CONSTRUCT. The test
+                     * [this.bnodes!=null] is a clear indicator that the blank
+                     * nodes need to be scoped for a DESCRIBE query.
+                     * 
+                     * Note: This can only happen when we hand-code a DESCRIBE
+                     * query for a CBD expansion round and explicitly set the IV
+                     * on the blank node in the SELECT clause.
+                     */
+          
+                    return value;
+                    
+                }
+
+                /*
+                 * CONSTRUCT.
+                 * 
+                 * Note: The blank nodes will be scoped to the solution.
+                 */
+                
+                final String id = ((BigdataBNode) value).getID();
+
+                final BigdataBNode bnode = getBNode(id, bnodes);
+
+                return bnode;
 
             }
             
             return value;
 
-        } else if(term instanceof VarNode) {
+        } else if (term instanceof VarNode) {
 
             /*
-             * I can't quite say whether or not this is a hack, so let me
-             * explain what is going on instead. When the SPARQL grammar parses
-             * a blank node in a query, it is *always* turned into an anonymous
-             * variable. So, when we interpret the CONSTRUCT template, we are
-             * going to see anonymous variables and we have to recognize them
-             * and treat them as if they were really blank nodes.
+             * A variable.
              * 
-             * The code here tests VarNode.isAnonymous() and, if the variable is
-             * anonymous, it uses the variable's *name* as a blank node
-             * identifier (ID). It then obtains a unique within scope blank node
-             * which is correlated with that blank node ID.
+             * There are two cases: (1) Variables that were specified in the
+             * original query as variables; and (2) "Anonymous" variables, which
+             * were specified in the original query and then translated into
+             * anonymous variables.
              */
             
             final VarNode v = (VarNode) term;
@@ -753,12 +855,32 @@ public class ASTConstructIterator implements
 
             if (v.isAnonymous()) {
 
+                /*
+                 * Anonymous variable. I can't quite say whether or not this is
+                 * a hack, so let me explain what is going on instead. When the
+                 * SPARQL grammar parses a blank node in a query, it is *always*
+                 * turned into an anonymous variable. So, when we interpret the
+                 * CONSTRUCT template, we are going to see anonymous variables
+                 * and we have to recognize them and treat them as if they were
+                 * really blank nodes.
+                 * 
+                 * The code here tests VarNode.isAnonymous() and, if the
+                 * variable is anonymous, it uses the variable's *name* as a
+                 * blank node identifier (ID). It then obtains a unique within
+                 * scope blank node which is correlated with that blank node ID.
+                 */
+                
                 return getBNode(varname, bnodes);
 
             }
-            
+
+            /*
+             * Given variable.
+             */
+
+            // Resolve the binding for the variable in the solution.
             final BigdataValue val = (BigdataValue) solution.getValue(varname);
-            
+
             /*
              * Note: Doing this will cause several of the DAWG CONSTRUCT tests
              * to fail...
@@ -803,7 +925,8 @@ public class ASTConstructIterator implements
          * across the solutions.
          */
 
-        // new bnode, which will be scoped to this solution.
+        // new bnode, which will be scoped by the bnodes map (that is, to
+        // the solution for CONSTRUCT and to the graph for DESCRIBE).
         final BigdataBNode bnode = f.createBNode("b"
                 + Integer.valueOf(bnodeIdFactory++).toString());
 

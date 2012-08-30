@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.rdf.sparql.ast.optimizers.ASTDescribeOptimizer;
 
 /**
  * Type-safe enumeration of the different ways in which we can evaluate a
@@ -39,10 +38,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTDescribeOptimizer;
  * 
  *      TODO This enumeration does not allow for inverse functional constraints.
  *      That extension can help with foaf data.
- * 
- *      TODO How can we encode one-step reification statement discover? Ideally
- *      this will also be declaratively indicated and then interpreted by the
- *      {@link ASTDescribeOptimizer}
  */
 public enum DescribeModeEnum {
 
@@ -130,29 +125,29 @@ public enum DescribeModeEnum {
      * no effect on the semantics of the description.
      */
     SCBD(true/* forward */, true/* reverse */, true/* reifiedStatements */,
-            true/* recursive */),
-    /**
-     * Concise Bounded Description without Reification.
-     * <p>
-     * This is the same as {@link #CBD} except that the source graph is NOT
-     * probed for reifications of statements in the subgraph thus far (step 3).
-     * This option is useful when reified statement models are not common in the
-     * data and it avoids the overhead of testing for a reified statement model
-     * for each statement in the subgraph.
-     */
-    CBDNR(true/* forward */, false/* reverse */, false/* reifiedStatements */,
-            true/* recursive */),
-    /**
-     * Symmetric Concise Bounded Description without Reification.
-     * <p>
-     * This is the same as {@link #SCBD} except that the source graph is NOT
-     * probed for reifications of statements in the subgraph thus far (step 3).
-     * This option is useful when reified statement models are not common in the
-     * data and it avoids the overhead of testing for a reified statement model
-     * for each statement in the subgraph.
-     */
-    SCBDNR(true/* forward */, true/* reverse */, false/* reifiedStatements */,
             true/* recursive */);
+//    /**
+//     * Concise Bounded Description without Reification.
+//     * <p>
+//     * This is the same as {@link #CBD} except that the source graph is NOT
+//     * probed for reifications of statements in the subgraph thus far (step 3).
+//     * This option is useful when reified statement models are not common in the
+//     * data and it avoids the overhead of testing for a reified statement model
+//     * for each statement in the subgraph.
+//     */
+//    CBDNR(true/* forward */, false/* reverse */, false/* reifiedStatements */,
+//            true/* recursive */),
+//    /**
+//     * Symmetric Concise Bounded Description without Reification.
+//     * <p>
+//     * This is the same as {@link #SCBD} except that the source graph is NOT
+//     * probed for reifications of statements in the subgraph thus far (step 3).
+//     * This option is useful when reified statement models are not common in the
+//     * data and it avoids the overhead of testing for a reified statement model
+//     * for each statement in the subgraph.
+//     */
+//    SCBDNR(true/* forward */, true/* reverse */, false/* reifiedStatements */,
+//            true/* recursive */);
 
     private final boolean forward;
     private final boolean reverse;

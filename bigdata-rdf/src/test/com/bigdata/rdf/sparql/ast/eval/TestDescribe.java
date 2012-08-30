@@ -112,6 +112,11 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Return the expected description of the resource based on the solutions
      * declared for the unit test.
+     * <p>
+     * Note: This code is not smart enough to get the expected description for
+     * CBD. It would have to fix point things, iterating through the expected
+     * statements if new blank nodes are discovered for the graph we are
+     * building.
      * 
      * @param resource
      *            The resource.
@@ -119,11 +124,6 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
      * 
      * @return The expected description -or- <code>null</code> if there is no
      *         expected description for that resource.
-     * 
-     *         TODO This code is not smart enough to get the expected
-     *         description for CBD. It would have to fix point things, iterating
-     *         through the expected statements if new blank nodes are discovered
-     *         for the graph we are building.
      */
     protected Set<Statement> getExpectedDescription(
             final BigdataValue resource, final TestHelper h) {
@@ -801,14 +801,6 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
      * This example is taken directly from <a
      * href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
      * Description </a>
-     * 
-     * FIXME This test is currently failing because it is not looking for
-     * reified statement models. Also, we are doing SCBD (Symmetric Concise
-     * Bounded Description) not CBD (which only proceeds from the statements
-     * where the resource is a subject). We should define, implement, and test
-     * CBD, SCBD, and also variants that do not do the reification dance
-     * (assuming that this is going to be expensive or that do the reification
-     * dance efficiently by relying on "reification done right").
      */
     public void test_describe_CBD_1() throws Exception {
 
@@ -845,9 +837,6 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
      * This example is taken directly from <a
      * href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
      * Description </a>
-     * 
-     * FIXME This test is currently failing because it is not looking for
-     * reified statement models.
      */
     public void test_describe_SCBD_1() throws Exception {
 
@@ -865,76 +854,6 @@ public class TestDescribe extends AbstractDataDrivenSPARQLTestCase {
         
         // The projection was annotated with the desired DescribeMode.
         assertEquals(DescribeModeEnum.SCBD, h.getASTContainer()
-                .getOptimizedAST().getProjection().getDescribeMode());
-        
-    }
-
-    /**
-     * This test is used to verify that we compute
-     * {@link DescribeModeEnum#CBDNR} correctly.
-     * 
-     * <pre>
-     * DESCRIBE <http://example.com/aReallyGreatBook>
-     * {
-     *    hint:Query hint:describeMode "CBDNR"
-     * }
-     * </pre>
-     * 
-     * This example is taken from <a href="http://www.w3.org/Submission/CBD/">
-     * CBD - Concise Bounded Description </a>, but the expected result does not
-     * include the description of any reified statement models.
-     */
-    public void test_describe_CBDNR_1() throws Exception {
-
-        final TestHelper h = new TestHelper(
-                "describe-CBDNR-1", // testURI,
-                "describe-CBDNR-1.rq",// queryFileURL
-                "describe-CBDNR-1.rdf",// dataFileURL
-                "describe-CBDNR-1-result.rdf"// resultFileURL
-                );
-        
-        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
-                .getQueryType());
-
-        h.runTest();
-        
-        // The projection was annotated with the desired DescribeMode.
-        assertEquals(DescribeModeEnum.CBDNR, h.getASTContainer()
-                .getOptimizedAST().getProjection().getDescribeMode());
-        
-    }
-
-    /**
-     * This test is used to verify that we compute
-     * {@link DescribeModeEnum#SCBDNR} correctly.
-     * 
-     * <pre>
-     * DESCRIBE <http://example.com/aReallyGreatBook>
-     * {
-     *    hint:Query hint:describeMode "SCBDNR"
-     * }
-     * </pre>
-     * 
-     * This example is taken from <a href="http://www.w3.org/Submission/CBD/">
-     * CBD - Concise Bounded Description </a>, but the expected result does not
-     * include the description of any reified statement models.
-     */
-    public void test_describe_SCBDNR_1() throws Exception {
-
-        final TestHelper h = new TestHelper(
-                "describe-SCBDNR-1", // testURI,
-                "describe-SCBDNR-1.rq",// queryFileURL
-                "describe-SCBDNR-1.rdf",// dataFileURL
-                "describe-SCBDNR-1-result.rdf"// resultFileURL
-                );
-        
-        assertEquals(QueryType.DESCRIBE, h.getASTContainer().getOriginalAST()
-                .getQueryType());
-
-        h.runTest();
-        
-        // The projection was annotated with the desired DescribeMode.
-        assertEquals(DescribeModeEnum.SCBDNR, h.getASTContainer()
                 .getOptimizedAST().getProjection().getDescribeMode());
         
     }
