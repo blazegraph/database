@@ -96,8 +96,11 @@ public class BigdataSailUpdate extends SailUpdate implements
      * 
      * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
      *      assignment in update sequences not properly scoped </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
+     *      Upgrade to Sesame 2.6.9 </a>
      */
-    @Override
+    // @Override
     public void setDataset(final Dataset dataset) {
 
         this.dataset = dataset;
@@ -109,8 +112,11 @@ public class BigdataSailUpdate extends SailUpdate implements
      * 
      * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
      *      assignment in update sequences not properly scoped </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
+     *      Upgrade to Sesame 2.6.9 </a>
      */
-    @Override
+//    @Override
     public Dataset getActiveDataset() {
 
         return dataset;
