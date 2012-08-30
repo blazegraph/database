@@ -399,19 +399,7 @@ public class BigdataSail extends SailBase implements Sail {
         return quads;
         
     }
-    
-    /**
-     * Return <code>true</code> if the SAIL is using automated truth
-     * maintenance.
-     * 
-     * @see Options#TRUTH_MAINTENANCE
-     */
-    public boolean isTruthMaintenance() {
-        
-        return truthMaintenance;
-        
-    }
-    
+
     /**
      * The configured capacity for the statement buffer(s).
      * 
@@ -420,18 +408,17 @@ public class BigdataSail extends SailBase implements Sail {
     final private int bufferCapacity;
     
     /**
-     * When true, the RDFS closure will be maintained.
-     * 
-     * @see Options#TRUTH_MAINTENANCE
-     */
-    final private boolean truthMaintenance;
-    
-    /**
      * When true, the SAIL is in the "quads" mode.
      * 
      * @see AbstractTripleStore.Options#QUADS
      */
     final private boolean quads;
+    
+    /**
+     * When <code>true</code> the SAIL is backed by an
+     * {@link IBigdataFederation}.
+     */
+    final private boolean scaleOut;
     
     /**
      * When true, SAIL will compute entailments at query time that were excluded
@@ -488,16 +475,31 @@ public class BigdataSail extends SailBase implements Sail {
      * The query engine.
      */
     final private QueryEngine queryEngine;
-    
+
     /**
-     * When true, the RDFS closure will be maintained by the <em>SAIL</em>
-     * implementation (but not by methods that go around the SAIL).
+     * <code>true</code> iff the {@link BigdataSail} can support truth
+     * maintenance, however truth maintenance may be conditionally suppressed
+     * for a {@link BigdataSailConnection} in order to allow people to
+     * temporarily disable when batching updates into the Sail.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (SPARQL UPDATE
+     *      "LOAD")
      */
-    public boolean getTruthMaintenance() {
-        
-        return truthMaintenance;
-        
-    }
+    private final boolean truthMaintenanceIsSupportable;
+    
+    /*
+     * Note: This method has been removed since truth maintenance may now
+     * be suppressed for a BigdataSailConnection.
+     */
+//    /**
+//     * When true, the RDFS closure will be maintained by the <em>SAIL</em>
+//     * implementation (but not by methods that go around the SAIL).
+//     */
+//    public boolean getTruthMaintenance() {
+//        
+//        return truthMaintenance;
+//        
+//    }
     
     /**
      * The implementation object.
@@ -866,7 +868,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         this.quads = database.isQuads();
         
-        final boolean scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
+        this.scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
         
         checkProperties(properties);
         
@@ -878,18 +880,18 @@ public class BigdataSail extends SailBase implements Sail {
              * truth maintenance is disabled automatically.
              */
 
-            truthMaintenance = false;
-            
+            truthMaintenanceIsSupportable = false;
+
         } else {
-            
-            truthMaintenance = Boolean.parseBoolean(properties.getProperty(
+
+            truthMaintenanceIsSupportable = Boolean.parseBoolean(properties.getProperty(
                     BigdataSail.Options.TRUTH_MAINTENANCE,
                     BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
 
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.TRUTH_MAINTENANCE + "="
-                        + truthMaintenance);
-            
+                        + truthMaintenanceIsSupportable);
+
         }
         
         // bufferCapacity
@@ -1261,24 +1263,62 @@ public class BigdataSail extends SailBase implements Sail {
 	 * 
 	 * @return The unisolated connection to the database
 	 */
-    public BigdataSailConnection getUnisolatedConnection() 
+    public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
-        
-    	if(lock.writeLock().isHeldByCurrentThread()) {
-    		/*
-    		 * A thread which already holds this lock already has the open
-    		 * unisolated connection and will deadlock when it attempts to
-    		 * obtain the permit for that connection from the Journal.
-    		 */
-			throw new IllegalStateException(
-					"UNISOLATED connection is not reentrant.");
-    	}
 
-    	if (getDatabase().getIndexManager() instanceof Journal) {
-			// acquire permit from Journal.
-			((Journal) getDatabase().getIndexManager())
-					.acquireUnisolatedConnection();
-		}
+        return getUnisolatedConnection(false/* suppressTruthMaintenance */);
+
+    }
+
+    /**
+     * Return an unisolated connection to the database. The unisolated
+     * connection supports fast, scalable updates against the database. The
+     * unisolated connection is ACID when used with a local {@link Journal} and
+     * shard-wise ACID when used with an {@link IBigdataFederation}.
+     * <p>
+     * In order to guarantee that operations against the unisolated connection
+     * are ACID, only one of unisolated connection is permitted at a time for a
+     * {@link Journal} and this method will block until the connection is
+     * available. If there is an open unisolated connection against a local
+     * {@link Journal}, then the open connection must be closed before a new
+     * connection can be returned by this method.
+     * <p>
+     * This constraint that there can be only one unisolated connection is not
+     * enforced in scale-out since unisolated operations in scale-out are only
+     * shard-wise ACID.
+     * 
+     * @param suppressTruthMaintenance
+     *            <code>true</code> iff truth maintenance must be suppressed and
+     *            ignored unless this is an unisolated connection (truth
+     *            maintenance is only supported for the unisolated connection
+     *            and even then only if the KB instance was configured to
+     *            support truth maintenance).
+     *            
+     * @return The unisolated connection to the database
+     * 
+     * @throws InterruptedException
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/591">
+     *      SPARQL UPDATE LOAD </a>
+     */
+    public BigdataSailConnection getUnisolatedConnection(
+            final boolean suppressTruthMaintenance) throws InterruptedException {
+
+        if (lock.writeLock().isHeldByCurrentThread()) {
+            /*
+             * A thread which already holds this lock already has the open
+             * unisolated connection and will deadlock when it attempts to
+             * obtain the permit for that connection from the Journal.
+             */
+            throw new IllegalStateException(
+                    "UNISOLATED connection is not reentrant.");
+        }
+
+        if (getDatabase().getIndexManager() instanceof Journal) {
+            // acquire permit from Journal.
+            ((Journal) getDatabase().getIndexManager())
+                    .acquireUnisolatedConnection();
+        }
 
 		// acquire the write lock.
 		final Lock writeLock = lock.writeLock();
@@ -1286,7 +1326,7 @@ public class BigdataSail extends SailBase implements Sail {
 
 		// new writable connection.
 		final BigdataSailConnection conn = new BigdataSailConnection(database,
-				writeLock, true/* unisolated */);
+				writeLock, true/* unisolated */, suppressTruthMaintenance);
 
 		return conn;
 
@@ -1439,7 +1479,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * True iff the database view is read-only.
          */
-        protected boolean readOnly;
+        final protected boolean readOnly;
 
         /**
          * True iff the {@link SailConnection} is open.
@@ -1447,7 +1487,18 @@ public class BigdataSail extends SailBase implements Sail {
         protected boolean openConn;
         
         /**
+         * When true, the RDFS closure will be maintained.
+         * 
+         * @see BigdataSail.Options#TRUTH_MAINTENANCE
+         * @see #tm
+         */
+        final private boolean truthMaintenance;
+        
+        /**
          * non-<code>null</code> iff truth maintenance is being performed.
+         * 
+         * @see BigdataSail.Options#TRUTH_MAINTENANCE
+         * @see #truthMaintenance
          */
         private TruthMaintenance tm;
         
@@ -1622,33 +1673,78 @@ public class BigdataSail extends SailBase implements Sail {
             return retractBuffer;
 
         }
-        
-        protected BigdataSailConnection(final Lock lock, final boolean unisolated) {
-            
+
+        /**
+         * Any kind of connection (core constructor).
+         * 
+         * @param lock
+         * @param unisolated
+         *            <code>true</code> iff this is an unisolated connection.
+         * @param readOnly
+         *            <code>true</code> iff this is a read-only connection.
+         * @param suppressTruthMaintenance
+         *            <code>true</code> iff truth maintenance must be suppressed
+         *            and ignored unless this is an unisolated connection (truth
+         *            maintenance is only supported for the unisolated
+         *            connection and even then only if the KB instance was
+         *            configured to support truth maintenance).
+         */
+        protected BigdataSailConnection(final Lock lock,
+                final boolean unisolated, final boolean readOnly,
+                final boolean suppressTruthMaintenance) {
+
             this.lock = lock;
-            
+
             this.unisolated = unisolated;
             
+            this.readOnly = readOnly;
+
+            // whether or not truth maintenance is enabled.
+            this.truthMaintenance = BigdataSail.this.truthMaintenanceIsSupportable
+                    && unisolated && !suppressTruthMaintenance;
+
         }
-        
+
         /**
-         * Create a {@link SailConnection} for the database.
+         * Unisolated connections.
          * 
          * @param database
          *            The database. If this is a read-only view, then the
          *            {@link SailConnection} will not support update.
+         * @param lock
+         * @param unisolated
+         *            <code>true</code> iff this is an unisolated connection.
+         * @param readOnly
+         *            <code>true</code> iff this is a read-only connection.
+         * @param suppressTruthMaintenance
+         *            <code>true</code> iff truth maintenance must be suppressed
+         *            and ignored unless this is an unisolated connection (truth
+         *            maintenance is only supported for the unisolated
+         *            connection and even then only if the KB instance was
+         *            configured to support truth maintenance).
          */
-        protected BigdataSailConnection(final AbstractTripleStore database, 
-                final Lock lock, final boolean unisolated) {
-            
+        protected BigdataSailConnection(final AbstractTripleStore database,
+                final Lock lock, final boolean unisolated,
+                final boolean suppressTruthMaintenance) {
+
+            this(lock, unisolated, database.isReadOnly(),
+                    suppressTruthMaintenance);
+
             attach(database);
-            
-            this.lock = lock;
-            
-            this.unisolated = unisolated;
             
         }
         
+        /**
+         * When true, the RDFS closure will be maintained by the
+         * {@link BigdataSailConnection} implementation (but not by methods that
+         * go around the {@link BigdataSailConnection}).
+         */
+        public boolean getTruthMaintenance() {
+            
+            return truthMaintenance;
+            
+        }
+
         /**
          * Attach to a new database view.  Useful for transactions.
          * 
@@ -1663,7 +1759,7 @@ public class BigdataSail extends SailBase implements Sail {
             
             this.database = database;
             
-            readOnly = database.isReadOnly();            
+//            readOnly = database.isReadOnly();            
          
             openConn = true;
             
@@ -3362,8 +3458,8 @@ public class BigdataSail extends SailBase implements Sail {
         public BigdataSailRWTxConnection(final Lock readLock)
                 throws IOException {
 
-            super(readLock, false/* unisolated */);
-            
+            super(readLock, false/* unisolated */, false/* readOnly */, false/* suppressTruthMaintenance */);
+
             txService = getTxService();
             
             newTx();
@@ -3577,7 +3673,8 @@ public class BigdataSail extends SailBase implements Sail {
          */
         BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
 
-            super(null/* lock */, false/* unisolated */);
+            super(null/* lock */, false/* unisolated */, true/* readOnly */,
+                    false/* suppressTruthMaintenance */);
 
             clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
 
