@@ -30,8 +30,13 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 
+import org.openrdf.model.vocabulary.RDF;
+
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -47,6 +52,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * This optimizer rewrites the projection node of a DESCRIBE query into,
@@ -206,6 +212,40 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 
         }
 
+        final BigdataURI rdfSubject;
+        if (describeMode.isForward() && describeMode.isReifiedStatements()) {
+            /*
+             * We will need to look for the rdf:subject property, so resolve
+             * that against the lexicon. If the property is not in the lexicon
+             * then there can not be any reified statement models in the data.
+             * 
+             * TODO REIFICATION DONE RIGHT : handle this differently if we are
+             * inlining statements about statements.
+             */
+
+            final AbstractTripleStore db = context.getAbstractTripleStore();
+
+            final BigdataURI tmp = db.getValueFactory().asValue(RDF.SUBJECT);
+
+            db.getLexiconRelation().addTerms(new BigdataValue[] { tmp },
+                    1/* numTerms */, true/* readOnly */);
+
+            if (tmp.getIV() == null) {
+                // Unknown.
+                rdfSubject = null;
+            } else {
+                rdfSubject = tmp;
+                // and set the valueCache on the BigdataURI.
+                rdfSubject.getIV().setValue(rdfSubject);
+            }
+
+        } else {
+            
+            // Not interested in reified statement models.
+            rdfSubject = null;
+            
+        }
+
 		int i = 0;
 		
 		for (TermNode term : terms) {
@@ -221,11 +261,11 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
                  * pattern in a union. The statement pattern has to be embedded
                  * within a group.
                  */
-				final StatementPatternNode sp = new StatementPatternNode(
-						term, 
-						new VarNode("p"+termNum+"a"),
-						new VarNode("o"+termNum)
-						);
+                final StatementPatternNode sp = new StatementPatternNode(//
+                        term, //
+                        new VarNode("p" + termNum + "a"),//
+                        new VarNode("o" + termNum)//
+                );
 
 				construct.addChild(sp);
 				
@@ -240,11 +280,11 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 			if(describeMode.isReverse())
 			{ // ?sN ?pN-b <term>
 			
-				final StatementPatternNode sp = new StatementPatternNode(
-					new VarNode("s"+termNum),
-					new VarNode("p"+termNum+"b"),
-					term
-					);
+                final StatementPatternNode sp = new StatementPatternNode(//
+                        new VarNode("s" + termNum),//
+                        new VarNode("p" + termNum + "b"),//
+                        term//
+                );
 
 				construct.addChild(sp);
 
@@ -255,6 +295,28 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 //				union.addChild(sp);
 				
 			}
+
+            if (describeMode.isForward() && describeMode.isReifiedStatements()) {
+                /*
+                 * Pick up properties associated with reified statement models
+                 * where the value of an rdf:subject assertion is the resource
+                 * to be described.
+                 * 
+                 * ?stmtN rdf:subject <term>
+                 */
+                final StatementPatternNode sp = new StatementPatternNode(//
+                        new VarNode("stmt" + termNum),//
+                        new ConstantNode(rdfSubject.getIV()),//
+                        term//
+                );
+
+                construct.addChild(sp);
+
+                final JoinGroupNode group = new JoinGroupNode();
+                group.addChild(sp);
+                union.addChild(group);
+
+            }
 			
 		}
 		

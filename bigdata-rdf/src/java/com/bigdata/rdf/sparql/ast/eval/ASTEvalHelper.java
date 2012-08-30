@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 import info.aduna.iteration.CloseableIteration;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -65,6 +66,7 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationIterator;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
@@ -417,6 +419,14 @@ public class ASTEvalHelper {
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
+        
+        /*
+         * A mapping that is used to preserve a consistent assignment from blank
+         * node IDs to BigdataBNodes scoped to the subgraph reported by the
+         * top-level DESCRIBE query.
+         */
+        final Map<String, BigdataBNode> bnodes = (isDescribe ? new LinkedHashMap<String, BigdataBNode>()
+                : null);
 
         final IDescribeCache describeCache;
         final Set<IVariable<?>> describeVars;
@@ -516,7 +526,9 @@ public class ASTEvalHelper {
                 new ASTConstructIterator(store, //
                         optimizedQuery.getConstruct(), //
                         optimizedQuery.getWhereClause(),//
-                        solutions2);
+                        bnodes,//
+                        solutions2//
+                        );
 
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src2;
         switch (describeMode) {
@@ -526,19 +538,20 @@ public class ASTEvalHelper {
             break;
         case CBD:
         case SCBD:
-        case CBDNR:
-        case SCBDNR: {
+//        case CBDNR:
+//        case SCBDNR: 
+        {
             /*
              * Concise Bounded Description (of any flavor) requires a fixed
              * point expansion.
              * 
-             * TODO The expansion should monitor a returned iterator so the
-             * query can be cancelled by the openrdf client. Right now the
+             * TODO CBD : The expansion should monitor a returned iterator so
+             * the query can be cancelled by the openrdf client. Right now the
              * expansion is performed before the iteration is returned to the
              * client, so there is no opportunity to cancel a running CBD
              * DESCRIBE.
              */
-            src2 = new CBD(store, describeMode).computeClosure(src);
+            src2 = new CBD(store, describeMode, bnodes).computeClosure(src);
             break;
         }
         default:

@@ -50,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTDescribeOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -59,6 +60,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *      Bounded Description </a>
  * @see <a href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
  *      Description </a>
+ * @see ASTDescribeOptimizer
+ * @see ASTConstructIterator
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -73,7 +76,7 @@ public class CBD {
      * 
      * TODO Limit #of resources that are being described.
      * 
-     * TODO Watch a timeout on the top-level query (if present)
+     * FIXME Watch a timeout on the top-level query (if present)
      */
     private static final int MAX_ROUNDS = 5;
     
@@ -91,6 +94,13 @@ public class CBD {
      * round of the DESCRIBE query.
      */
     private final DescribeModeEnum describeExpansionMode;
+
+    /**
+     * A mapping that is used to preserve a consistent assignment from blank
+     * node IDs to {@link BigdataBNode}s scoped to the subgraph reported by the
+     * top-level DESCRIBE query.
+     */
+    private final Map<String, BigdataBNode> bnodes;
     
     /**
      * @param store
@@ -98,22 +108,38 @@ public class CBD {
      * @param describeMode
      *            The {@link DescribeModeEnum} specifying how to evaluate the
      *            DESCRIBE query.
+     * @param bnodes
+     *            A mapping that is used to preserve a consistent assignment
+     *            from blank node IDs to {@link BigdataBNode}s scoped to the
+     *            subgraph reported by the top-level DESCRIBE query.
      */
     public CBD(final AbstractTripleStore store,
-            final DescribeModeEnum describeMode) {
+            final DescribeModeEnum describeMode,
+            final Map<String, BigdataBNode> bnodes) {
+
+        if (store == null)
+            throw new IllegalArgumentException();
+        
+        if (describeMode == null)
+            throw new IllegalArgumentException();
+        
+        if (bnodes == null)
+            throw new IllegalArgumentException();
 
         this.store = store;
         
         this.describeMode = describeMode;
+
+        this.bnodes = bnodes;
         
         switch(describeMode) {
         case CBD:
-        case CBDNR:
+//        case CBDNR:
             // Expansion only explores the forward links.
             describeExpansionMode = DescribeModeEnum.ForwardOneStep;
             break;
         case SCBD:
-        case SCBDNR:
+//        case SCBDNR:
             // Expansion explores both forward and reverse links.
             describeExpansionMode = DescribeModeEnum.SymmetricOneStep;
             break;
@@ -146,20 +172,6 @@ public class CBD {
      *         be drained.
      * 
      * @throws QueryEvaluationException
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
-     *      Concise Bounded Description </a>
-     * @see <a href="http://www.w3.org/Submission/CBD/"> CBD - Concise Bounded
-     *      Description </a>
-     * 
-     *      TODO We might need to insist that the ASTConstructIterator pass
-     *      through the original IV for the blank node by setting the original
-     *      IV on the blank node.
-     *      <p>
-     *      There are some cases where the ASTConstructIterator can create new
-     *      blank nodes. Can any of those cases arise for a DESCRIBE? If so,
-     *      then it needs to use a consistent assignment (same IV in each round
-     *      for the "same" blank node).
      */
     CloseableIteration<BigdataStatement, QueryEvaluationException> computeClosure(
             CloseableIteration<BigdataStatement, QueryEvaluationException> src)
@@ -206,7 +218,8 @@ public class CBD {
              */
 
             if (log.isInfoEnabled()) {
-                log.info("#rounds=" + nrounds + ", #stmts(in)=" + stmts.size()
+                log.info("#rounds=" + nrounds + ", describeMode="
+                        + describeMode + ", #stmts(in)=" + stmts.size()
                         + ", #bnodes(in)=" + bnodes_tm1.size()
                         + ", #bnodes(new)=" + newBnodes.size() + " : "
                         + newBnodes);
@@ -227,7 +240,8 @@ public class CBD {
         
         if (log.isInfoEnabled()) {
         
-            log.info("#rounds=" + nrounds + ", #stmts(in)=" + stmts.size()
+            log.info("#rounds=" + nrounds + " (done), describeMode="
+                    + describeMode + ", #stmts(in)=" + stmts.size()
                     + ", #bnodes(in)=" + bnodes_tm1.size());
             
             // Conditional logging.
@@ -265,7 +279,7 @@ public class CBD {
 
         final StringBuilder sb = new StringBuilder(stmts.size() * 100);
         {
-            sb.append("Statements\n");
+            sb.append("Statements: ("+stmts.size()+")\n");
             for (BigdataStatement st : stmts) {
                 sb.append(st.toString());
                 sb.append("\n");
@@ -274,7 +288,7 @@ public class CBD {
         }
         {
             sb.setLength(0);// truncate.
-            sb.append("BNodes(t-1)\n");
+            sb.append("BNodes(t-1): ("+bnodes_tm1.size()+")\n");
             for (IV<?, ?> iv : bnodes_tm1) {
                 sb.append(iv.toString());
                 sb.append("\n");
@@ -283,7 +297,7 @@ public class CBD {
         }
         if (newBnodes != null) {
             sb.setLength(0);// truncate.
-            sb.append("BNodes(new)\n");
+            sb.append("BNodes(new): ("+newBnodes.size()+")\n");
             for (IV<?, ?> iv : newBnodes) {
                 sb.append(iv.toString());
                 sb.append("\n");
@@ -324,6 +338,16 @@ public class CBD {
 
                 final BigdataStatement stmt = src.next();
 
+//                /*
+//                 * A statement of the form
+//                 * 
+//                 * ?stmtN rdf:subject <term>
+//                 * 
+//                 * where <term> is a blank node.
+//                 */
+//                final boolean foo = stmt.getPredicate().equals(RDF.SUBJECT)
+//                        && bnodes_tm1.contains(stmt.getObject());
+                
                 if (stmts.add(stmt)) {
 
                     /*
@@ -420,7 +444,9 @@ public class CBD {
                 new ASTConstructIterator(store, //
                         optimizedQuery.getConstruct(), //
                         optimizedQuery.getWhereClause(),//
-                        solutions);
+                        bnodes,//
+                        solutions//
+                        );
 
         return src;
         

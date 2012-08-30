@@ -46,4 +46,10 @@
       <ex:likes rdf:resource="http://example.com/aReallyGreatBook"/>
    </rdf:Description>
 
+   <!-- This statement was not present in the W3C CBD submission, but it
+        should be present according to the semantics of Symmetric CBD. -->
+   <rdf:Description rdf:about="http://example.com/anotherGreatBook">
+      <rdfs:seeAlso rdf:resource="http://example.com/aReallyGreatBook"/>
+   </rdf:Description>
+
 </rdf:RDF>
