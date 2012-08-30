@@ -101,6 +101,7 @@ public class BigdataSailUpdate extends SailUpdate implements
      *      Upgrade to Sesame 2.6.9 </a>
      */
     // @Override
+    @Deprecated // Remove once we upgrade to Sesame 2.6.9
     public void setDataset(final Dataset dataset) {
 
         this.dataset = dataset;
@@ -117,6 +118,7 @@ public class BigdataSailUpdate extends SailUpdate implements
      *      Upgrade to Sesame 2.6.9 </a>
      */
 //    @Override
+    @Deprecated // Remove once we upgrade to Sesame 2.6.9
     public Dataset getActiveDataset() {
 
         return dataset;
