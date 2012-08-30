@@ -146,8 +146,8 @@ public class DataLoader {
      * during a transaction (otherwise reads will not see the unflushed
      * statements).
      * <p>
-     * Note: if {@link #truthMaintenance} is enabled then this buffer is backed
-     * by a temporary store which accumulates the {@link SPO}s to be asserted.
+     * Note: if truthMaintenance is enabled then this buffer is backed by a
+     * temporary store which accumulates the {@link SPO}s to be asserted.
      * Otherwise it will write directly on the database each time it is flushed,
      * including when it overflows.
      * 
