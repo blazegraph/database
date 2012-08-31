@@ -242,8 +242,11 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * This optional boolean property may be used to specify whether or not
          * RDFS entailments are maintained by eager closure of the knowledge
-         * base (the default is <code>true</code>).  This property only effects
+         * base (the default is <code>true</code>). This property only effects
          * data loaded through the {@link Sail}.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (Manage
+         *      Truth Maintenance)
          */
         public static final String TRUTH_MAINTENANCE = BigdataSail.class
                 .getPackage().getName()
@@ -482,8 +485,8 @@ public class BigdataSail extends SailBase implements Sail {
      * for a {@link BigdataSailConnection} in order to allow people to
      * temporarily disable when batching updates into the Sail.
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (SPARQL UPDATE
-     *      "LOAD")
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (Manage Truth
+     *      Maintenance)
      */
     private final boolean truthMaintenanceIsSupportable;
     
@@ -1266,44 +1269,6 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
-        return getUnisolatedConnection(false/* suppressTruthMaintenance */);
-
-    }
-
-    /**
-     * Return an unisolated connection to the database. The unisolated
-     * connection supports fast, scalable updates against the database. The
-     * unisolated connection is ACID when used with a local {@link Journal} and
-     * shard-wise ACID when used with an {@link IBigdataFederation}.
-     * <p>
-     * In order to guarantee that operations against the unisolated connection
-     * are ACID, only one of unisolated connection is permitted at a time for a
-     * {@link Journal} and this method will block until the connection is
-     * available. If there is an open unisolated connection against a local
-     * {@link Journal}, then the open connection must be closed before a new
-     * connection can be returned by this method.
-     * <p>
-     * This constraint that there can be only one unisolated connection is not
-     * enforced in scale-out since unisolated operations in scale-out are only
-     * shard-wise ACID.
-     * 
-     * @param suppressTruthMaintenance
-     *            <code>true</code> iff truth maintenance must be suppressed and
-     *            ignored unless this is an unisolated connection (truth
-     *            maintenance is only supported for the unisolated connection
-     *            and even then only if the KB instance was configured to
-     *            support truth maintenance).
-     *            
-     * @return The unisolated connection to the database
-     * 
-     * @throws InterruptedException
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/591">
-     *      SPARQL UPDATE LOAD </a>
-     */
-    public BigdataSailConnection getUnisolatedConnection(
-            final boolean suppressTruthMaintenance) throws InterruptedException {
-
         if (lock.writeLock().isHeldByCurrentThread()) {
             /*
              * A thread which already holds this lock already has the open
@@ -1326,7 +1291,7 @@ public class BigdataSail extends SailBase implements Sail {
 
 		// new writable connection.
 		final BigdataSailConnection conn = new BigdataSailConnection(database,
-				writeLock, true/* unisolated */, suppressTruthMaintenance);
+				writeLock, true/* unisolated */);
 
 		return conn;
 
@@ -1488,11 +1453,13 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * When true, the RDFS closure will be maintained.
+         * <p>
+         * Note: This property can be changed dynamically.
          * 
          * @see BigdataSail.Options#TRUTH_MAINTENANCE
          * @see #tm
          */
-        final private boolean truthMaintenance;
+        private boolean truthMaintenance;
         
         /**
          * non-<code>null</code> iff truth maintenance is being performed.
@@ -1682,16 +1649,9 @@ public class BigdataSail extends SailBase implements Sail {
          *            <code>true</code> iff this is an unisolated connection.
          * @param readOnly
          *            <code>true</code> iff this is a read-only connection.
-         * @param suppressTruthMaintenance
-         *            <code>true</code> iff truth maintenance must be suppressed
-         *            and ignored unless this is an unisolated connection (truth
-         *            maintenance is only supported for the unisolated
-         *            connection and even then only if the KB instance was
-         *            configured to support truth maintenance).
          */
         protected BigdataSailConnection(final Lock lock,
-                final boolean unisolated, final boolean readOnly,
-                final boolean suppressTruthMaintenance) {
+                final boolean unisolated, final boolean readOnly) {
 
             this.lock = lock;
 
@@ -1699,9 +1659,13 @@ public class BigdataSail extends SailBase implements Sail {
             
             this.readOnly = readOnly;
 
-            // whether or not truth maintenance is enabled.
+            /*
+             * Notice whether or not truth maintenance is enabled.
+             * 
+             * Note: This property can be changed dynamically.
+             */
             this.truthMaintenance = BigdataSail.this.truthMaintenanceIsSupportable
-                    && unisolated && !suppressTruthMaintenance;
+                    && unisolated;
 
         }
 
@@ -1716,19 +1680,11 @@ public class BigdataSail extends SailBase implements Sail {
          *            <code>true</code> iff this is an unisolated connection.
          * @param readOnly
          *            <code>true</code> iff this is a read-only connection.
-         * @param suppressTruthMaintenance
-         *            <code>true</code> iff truth maintenance must be suppressed
-         *            and ignored unless this is an unisolated connection (truth
-         *            maintenance is only supported for the unisolated
-         *            connection and even then only if the KB instance was
-         *            configured to support truth maintenance).
          */
         protected BigdataSailConnection(final AbstractTripleStore database,
-                final Lock lock, final boolean unisolated,
-                final boolean suppressTruthMaintenance) {
+                final Lock lock, final boolean unisolated) {
 
-            this(lock, unisolated, database.isReadOnly(),
-                    suppressTruthMaintenance);
+            this(lock, unisolated, database.isReadOnly());
 
             attach(database);
             
@@ -1738,13 +1694,104 @@ public class BigdataSail extends SailBase implements Sail {
          * When true, the RDFS closure will be maintained by the
          * {@link BigdataSailConnection} implementation (but not by methods that
          * go around the {@link BigdataSailConnection}).
+         * 
+         * @see #setTruthMaintenance(boolean)
          */
         public boolean getTruthMaintenance() {
+
+            synchronized(this) {
             
-            return truthMaintenance;
+                return truthMaintenance;
             
+            }
+
         }
 
+        /**
+         * Enable or suppress incremental truth maintenance for this
+         * {@link BigdataSailConnection}. Truth maintenance MUST be configured
+         * and this MUST be the {@link ITx#UNISOLATED} connection.
+         * <p>
+         * For connections that do support truth maintenance, this method is a
+         * NOP if the truth maintenance flag would not be changed.
+         * <p>
+         * If the connection is changed either to or from a state in which it
+         * will perform incremental truth maintenance, then any buffered
+         * statements are first flushed to the backing database. This ensures
+         * that truth maintenance is either performed or not performed (as
+         * appropriate) on those statements that were already buffered and that
+         * it will be (or will not be as appropriate) performed on those
+         * assertions and retractions that follow.
+         * <p>
+         * Changing the state of this flag from <code>false</code> to
+         * <code>true</code> will not force truth maintenance as any buffered
+         * writes will first be {@link #flush() flushed}. However, once the flag
+         * is <code>true</code>, any writes followed by a subsequent
+         * {@link #flush()} WILL force truth maintenance. Therefore, it is
+         * critically important that a coherent state is re-established for the
+         * entailments BEFORE truth maintenance is re-enabled.
+         * 
+         * @param newValue
+         *            The new value.
+         * 
+         * @return The old value.
+         * 
+         * @throws UnsupportedOperationException
+         *             unless this is an UNISOLATED connection.
+         * @throws UnsupportedOperationException
+         *             unless the KB instance has been configured to support
+         *             truth maintenance.
+         *             
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/591 (Manage
+         *      Truth Maintenance)
+         */
+        public boolean setTruthMaintenance(final boolean newValue) {
+
+            if (!unisolated)
+                throw new UnsupportedOperationException(
+                        "Not an unisolated connection");
+
+            if (!truthMaintenanceIsSupportable)
+                throw new UnsupportedOperationException(
+                        "Truth maintenance is not configured");
+
+            /*
+             * Note: Lock ensures both visibility and atomicity of the change in
+             * the [truthMaintenance] flag state and the same lock is acquired
+             * by flush() if we have to actually flush the assertion and/or
+             * retraction buffers.
+             */
+            synchronized(this) {
+
+                if (this.truthMaintenance != newValue) {
+
+                    /*
+                     * Since the state of the flag has changed, any buffered
+                     * assertions or retractions MUST be synchronously flushed
+                     * so they are processed either with or without incremental
+                     * truth maintenance as appropriate for the current state of
+                     * the truthMaintenance flag.
+                     */
+
+                    flush();
+
+                }
+
+                /*
+                 * Now that any buffered assertions or retractions have been
+                 * flushed, we go ahead and change the state of the flag.
+                 */
+                
+                final boolean oldValue = this.truthMaintenance;
+
+                this.truthMaintenance = newValue;
+
+                return oldValue;
+
+            }
+            
+        }
+        
         /**
          * Attach to a new database view.  Useful for transactions.
          * 
@@ -3458,7 +3505,7 @@ public class BigdataSail extends SailBase implements Sail {
         public BigdataSailRWTxConnection(final Lock readLock)
                 throws IOException {
 
-            super(readLock, false/* unisolated */, false/* readOnly */, false/* suppressTruthMaintenance */);
+            super(readLock, false/* unisolated */, false/* readOnly */);
 
             txService = getTxService();
             
@@ -3673,10 +3720,10 @@ public class BigdataSail extends SailBase implements Sail {
          */
         BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
 
-            super(null/* lock */, false/* unisolated */, true/* readOnly */,
-                    false/* suppressTruthMaintenance */);
+            super(null/* lock */, false/* unisolated */, true/* readOnly */);
 
-            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
+//            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
+            clusterCacheBugFix = BigdataSail.this.scaleOut; // identical to the code above.
 
             txService = getTxService();
 
