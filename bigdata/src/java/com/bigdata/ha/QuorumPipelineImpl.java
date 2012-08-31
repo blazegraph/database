@@ -307,7 +307,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         try {
             // The address of the next service in the pipeline.
             final InetSocketAddress addrNext = newDownStreamId == null ? null
-                    : member.getService(newDownStreamId).getWritePipelineAddr();
+                    : getAddrNext(newDownStreamId);
             if (sendService != null) {
                 // Terminate the existing connection.
                 sendService.terminate();
@@ -325,6 +325,27 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         } finally {
             lock.unlock();
         }
+    }
+
+    private InetSocketAddress getAddrNext(final UUID downStreamId) {
+
+        if (downStreamId == null)
+            return null;
+
+        final S service = member.getService(downStreamId);
+
+        try {
+
+            final InetSocketAddress addrNext = service.getWritePipelineAddr();
+
+            return addrNext;
+            
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
     }
 
     /**
@@ -402,7 +423,15 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         
         final PipelineState<S> pipelineState = new PipelineState<S>();
         
-        pipelineState.addr = nextService.getWritePipelineAddr();
+        try {
+
+            pipelineState.addr = nextService.getWritePipelineAddr();
+            
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
         
         pipelineState.service = nextService;
         

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.ha;
 
+import java.io.IOException;
 import java.rmi.Remote;
 import java.util.UUID;
 
@@ -47,6 +48,6 @@ public interface HAGlueBase extends Remote {
      * @todo This should be handled as a smart proxy so this method does not
      *       actually perform RMI.
      */
-    UUID getServiceId();
+    UUID getServiceId() throws IOException;
     
 }

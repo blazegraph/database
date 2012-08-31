@@ -64,7 +64,16 @@ public class ServiceUUID extends AbstractEntry {
     
     public UUID serviceUUID;
 
+    /*
+     * De-Serialization constructor.
+     */
     public ServiceUUID() {
+    }
+
+    static public ServiceUUID fromString(final String name) {
+
+        return new ServiceUUID(UUID.fromString(name));
+
     }
 
     public ServiceUUID(final UUID serviceUUID) {

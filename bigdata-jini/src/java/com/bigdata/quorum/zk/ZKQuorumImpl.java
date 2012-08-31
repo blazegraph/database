@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum.zk;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -357,9 +359,15 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             // resolve the local service implementation object.
             final HAPipelineGlue tmp = (HAPipelineGlue) getMember()
                     .getService();
+            final InetSocketAddress addrNext;
+            try {
+                addrNext = tmp.getWritePipelineAddr();
+            } catch (IOException e1) {
+                throw new RuntimeException(e1);
+            }
             // ask it for the write pipeline's address and port.
             final QuorumPipelineState pipelineState = new QuorumPipelineState(
-                    serviceId, tmp.getWritePipelineAddr());
+                    serviceId, addrNext);
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
