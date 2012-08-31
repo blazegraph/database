@@ -58,7 +58,7 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
 
     /**
      * The timestamp associated with the commit point for the update and
-     * <code>-1</code> if until there is a commit.
+     * <code>-1</code> until there is a commit.
      */
     private AtomicLong commitTime = new AtomicLong(-1);
 
