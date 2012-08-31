@@ -55,7 +55,7 @@ public interface HAPipelineGlue extends Remote {
      * @todo This should be handled as a smart proxy so this method does not
      *       actually perform RMI.
      */ 
-    InetSocketAddress getWritePipelineAddr();
+    InetSocketAddress getWritePipelineAddr() throws IOException;
 
     /**
      * Instruct the service to move to the end of the write pipeline. The leader

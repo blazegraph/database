@@ -42,7 +42,7 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      * 
      * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
      */
-    public Future<Void> bounceZookeeperConnection();
+    public Future<Void> bounceZookeeperConnection() throws IOException;
     
     /*
      * Synchronization.
