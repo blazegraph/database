@@ -465,7 +465,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     protected AbstractServer(final String[] args, final LifeCycle lifeCycle) {
         
-        // Show the copyright banner during statup.
+        // Show the copyright banner during startup.
         Banner.banner();
 
         if (lifeCycle == null)
