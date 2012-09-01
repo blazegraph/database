@@ -1108,9 +1108,6 @@ public class MockQuorumFixture {
         
         private volatile ExecutorService executorService = null;
         
-        /**
-         * @param quorum
-         */
         protected MockQuorumMember(final String logicalServiceId,
                 MockQuorumFixture fixture) {
 
