@@ -57,9 +57,6 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
 
     private volatile ExecutorService executorService = null;
     
-    /**
-     * @param quorum
-     */
     protected MockQuorumMember(final String logicalServiceId,
             final MockServiceRegistrar<S> registrar) {
 
