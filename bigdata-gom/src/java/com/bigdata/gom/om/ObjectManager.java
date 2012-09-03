@@ -121,14 +121,39 @@ public class ObjectManager extends ObjectMgrModel {
             
         }
         
-        /**
-         * Local ObjectManager can flush incrementally from the dirty list
-         * 
-         * A maximum size of 4000 dirty objects is a sensible default.
+        /*
+         * Note: This MUST NOT be done by default. It breaks the ACID contract
+         * since any incremental write will be combined with any other writes
+         * because this class does not (and MUST NOT) hold the UNISOLATED
+         * connection across its life cycle.
          */
-        m_maxDirtyListSize = 4000;
+        //        /**
+//         * Local ObjectManager can flush incrementally from the dirty list
+//         * 
+//         * A maximum size of 4000 dirty objects is a sensible default.
+//         */
+//        m_maxDirtyListSize = 4000;
     }
-	
+
+    /**
+     * This may be used to break ACID and perform incremental eviction of dirty
+     * objects to the backing store. However, the use of this method is NOT
+     * recommended as the updates will become durable incrementally rather than
+     * atomically.
+     * 
+     * @param newValue
+     *            The new maximum dirty list size (default is
+     *            {@link Integer#MAX_VALUE}).
+     */
+    public void setMaxDataListSize(final int newValue) {
+
+        if (newValue <= 0)
+            throw new IllegalArgumentException();
+        
+        this.m_maxDirtyListSize = newValue;
+        
+    }
+    
 	/**
 	 * @return direct repository connection
 	 */

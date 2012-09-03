@@ -51,7 +51,6 @@ import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.striterator.ICloseableIterator;
@@ -115,8 +114,10 @@ public abstract class ObjectMgrModel implements IObjectManager {
     private final Lock lock = new ReentrantLock();
     
     /**
-     * Default to maximum dirty list size to lock out any incremental
-     * flushing.
+     * Default to maximum dirty list size to lock out any incremental flushing.
+     * <p>
+     * Note: Incremental eviction breaks the ACID contract for updates. Thus,
+     * the dirty list should not be limited in capacity.
      */
     protected int m_maxDirtyListSize = Integer.MAX_VALUE;
 	
@@ -233,12 +234,15 @@ public abstract class ObjectMgrModel implements IObjectManager {
      * GPOs are added to the dirty list when initially modified. The dirty list
      * is not bounded. Large updates should be done using the RDF and SPARQL
      * layer which do not have this implicit scaling limit.
-     * 
-     * TODO We can not do incremental eviction unless we are holding open a
+     * <p>
+     * Note: We can not do incremental eviction unless we are holding open a
      * connection to the database that will isolate those edits. This could be
      * done in principle with either full read/write transactions or with the
      * unisolated connection (if embedded) but we do not yet support remove
      * create/run/commit for full read/write transactions in the NSS REST API.
+     * The problem with holding the unisolated connection across incremental
+     * updates is that it will lock out any other updates against the backing
+     * store for the life cycle of the object manager.
      */
 	public void addToDirtyList(final GPO gpo) {
 
@@ -251,10 +255,12 @@ public abstract class ObjectMgrModel implements IObjectManager {
 	    m_dirtyGPOs.add(gpo);
 	    
 		if (m_dirtyGPOs.size() > m_maxDirtyListSize) {
-			if (log.isTraceEnabled())
+
+		    if (log.isTraceEnabled())
 				log.trace("Incremental flush of dirty objects");
 			
 			flushDirtyObjects();
+
 		}
 
 	}
