@@ -371,7 +371,7 @@ abstract public class WriteCache implements IWriteCache {
      *            checksum for a record and validate it on read.
      * @param isHighlyAvailable
      *            when <code>true</code> the whole record checksum is maintained
-     *            for use when replicating the write cache to along the write
+     *            for use when replicating the write cache along the write
      *            pipeline.
      * @param bufferHasData
      *            when <code>true</code> the caller asserts that the buffer has
@@ -1709,39 +1709,46 @@ abstract public class WriteCache implements IWriteCache {
         }
 
         /**
-         * Hook to rebuild RecordMetadata after buffer has been transferred. For
-         * the ScatteredWriteCache this means hopping trough the buffer marking
-         * offsets and data size into the RecordMetadata map, and ignoring any
-         * zero address entries that indicate a "freed" allocation.
-         * 
-         * Update: This has now been changed to avoid problems with incremental checksums by
-         * indicating removal by appending a new prefix where the data length is zero.
+         * Hook to rebuild {@link RecordMetadata} after buffer has been
+         * transferred. For the {@link FileChannelScatteredWriteCache} this
+         * means hopping trough the buffer marking offsets and data size into
+         * the {@link RecordMetadata} map, and ignoring any zero address entries
+         * that indicate a "freed" allocation.
+         * <p>
+         * Update: This has now been changed to avoid problems with incremental
+         * checksums by indicating removal by appending a new prefix where the
+         * data length is zero.
          * 
          * @throws InterruptedException
          */
-        public void resetRecordMapFromBuffer(final ByteBuffer buf, final Map<Long, RecordMetadata> recordMap) {
+        @Override
+        public void resetRecordMapFromBuffer(final ByteBuffer buf,
+                final Map<Long, RecordMetadata> recordMap) {
+
             recordMap.clear();
-            final int sp = buf.position();
-            
-            int pos = 0;
-            buf.limit(sp);
-            while (pos < buf.limit()) {
+//            final int sp = buf.position(); // start position.
+            final int limit = buf.limit(); // end position.
+            int pos = buf.position(); // start position
+//            buf.limit(sp);
+            while (pos < limit) {
                 buf.position(pos);
-                long addr = buf.getLong();
+                final long addr = buf.getLong(); // 8 bytes
                 if (addr == 0L) { // end of content
                     break;
                 }
-                int sze = buf.getInt();
+                final int sze = buf.getInt(); // 4 bytes.
                 if (sze == 0 /* deleted */) {
-                    recordMap.remove(addr); // should only happen if previous write already made to the buffer
-                                            // but the allocation has since been freed
+                    /*
+                     * Should only happen if a previous write was already made
+                     * to the buffer but the allocation has since been freed.
+                     */
+                    recordMap.remove(addr);
                 } else {
                     recordMap.put(addr, new RecordMetadata(addr, pos + 12, sze));
                 }
-                pos += 12 + sze; // hop over buffer info (addr + sze) and then
-                                    // data
+                pos += 12 + sze; // skip header (addr + sze) and data
             }
-    }
+        }
 
     }
 
@@ -2198,29 +2205,39 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     /**
-     * Hook to rebuild RecordMetadata after buffer has been transferred. The the
-     * default WrteCache this is a single entry using firstOffset and current
-     * position.
+     * Hook to rebuild RecordMetadata after buffer has been transferred. For the
+     * default {@link WriteCache} this is a single entry using firstOffset and
+     * current position. For scattered writes, it uses a map with the addr,
+     * size, and data inlined.
+     * 
+     * @see FileChannelScatteredWriteCache
      * 
      * @throws InterruptedException
      */
     public void resetRecordMapFromBuffer() throws InterruptedException {
+        
         final Lock writeLock = lock.writeLock();
 
         writeLock.lockInterruptibly();
 
         try {
+        
             resetRecordMapFromBuffer(buf.get().buffer().duplicate(), recordMap);
+
         } finally {
+            
             writeLock.unlock();
+            
         }
     }
 
-    protected void resetRecordMapFromBuffer(final ByteBuffer buf, final Map<Long, RecordMetadata> recordMap) {
+    protected void resetRecordMapFromBuffer(final ByteBuffer buf,
+            final Map<Long, RecordMetadata> recordMap) {
 
         recordMap.clear();
 
-        recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(), 0, buf.limit()));
+        recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(),
+                0, buf.limit()));
 
     }
 
