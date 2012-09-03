@@ -11,11 +11,13 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
@@ -150,6 +152,18 @@ public class GPO implements IGPO {
 
 			m_value = value;
 
+		}
+
+		public boolean contains(BigdataResource id) {
+			LinkValue tst = this;
+			while (tst != null) {
+				if (tst.m_value.equals(id)) {
+					return true;
+				}
+				tst = tst.m_next;				
+			}
+			
+			return false;
 		}
 
 	}
@@ -446,6 +460,11 @@ public class GPO implements IGPO {
 		public int size() {
 			return m_size;
 		}
+
+		public boolean contains(BigdataResource id) {
+			return (m_values != null && m_values.contains(id))
+				   || (m_addedValues != null && m_addedValues.contains(id));
+		}
 	}
 
 	/**
@@ -595,8 +614,14 @@ public class GPO implements IGPO {
 
 	@Override
 	public IGenericSkin asClass(Class theClassOrInterface) {
-		// TODO Auto-generated method stub
-		return null;
+		/**
+		 * Could simply call through to the GenericSkinRegistry
+		 * 
+		 * GenericSkinRegistry.asClass(this, theClassOrInterface);
+		 * 
+		 * but this ignores any cached skins already created.
+		 */
+		return getSkin(theClassOrInterface);
 	}
 
 	@Override
@@ -744,7 +769,7 @@ public class GPO implements IGPO {
 		while (res.hasNext()) {
 			final BindingSet bs = res.next();
 			final URI pred = (URI) bs.getBinding("p").getValue();
-			final Long count = ((BigdataLiteralImpl) bs.getBinding("count")
+			final Long count = ((Literal) bs.getBinding("count")
 					.getValue()).longValue();
 			ret.put(pred, count);
 		}
@@ -941,8 +966,13 @@ public class GPO implements IGPO {
 //            return null;
 //            
 //        }
-        
-        return m_om.getGPO(new StatementImpl(m_id, property, target.getId()));
+    	
+    	final GPOEntry entry = getEntry(property);
+     	if (entry != null && entry.contains(target.getId())) {
+            return m_om.getGPO(new StatementImpl(m_id, property, target.getId()));
+    	}
+    
+        return null;
 
     }
 
