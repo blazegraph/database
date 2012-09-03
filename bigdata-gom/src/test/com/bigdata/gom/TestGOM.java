@@ -34,10 +34,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
-import junit.extensions.proxy.IProxyTest;
-import junit.framework.Test;
-import junit.framework.TestCase;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -50,18 +46,11 @@ import com.bigdata.gom.gpo.BasicSkin;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
-import com.bigdata.gom.om.IObjectManager;
-import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
 
 /**
  * Base test suite for the embedded (local) GOM.
- * 
- * TODO We need to have unit tests that exercise the GPO API.
- * 
- * TODO This should probably use a proxy pattern so we can reuse the same tests
- * against the embedded and remote object manager.
  * 
  * @author Martyn Cutcher
  */
