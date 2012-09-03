@@ -498,7 +498,7 @@ public class HAJournalServer extends AbstractServer {
                 super.quorumMeet(token, leaderId);
                 
                 // Inform the journal that there is a new quorum token.
-                journal.setQuorumToken(Quorum.NO_QUORUM);
+                journal.setQuorumToken(token);
 
             }
             

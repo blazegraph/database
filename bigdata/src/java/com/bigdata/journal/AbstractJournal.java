@@ -30,10 +30,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.BindException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -2610,7 +2607,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             if (quorum != null) {
                 /*
-                 * Verify that the last negotiated quorum is still in valid.
+                 * Verify that the last negotiated quorum is still valid.
                  */
                 quorum.assertLeader(quorumToken);
             }
@@ -4523,11 +4520,110 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	private volatile long quorumToken = Quorum.NO_QUORUM;
 
     protected final long getQuorumToken() {
+
         return quorumToken;
+        
     }
+
     protected void setQuorumToken(final long newValue) {
+
+        /*
+         * The token is [volatile]. Save it's state on entry. Figure out if this
+         * is a quorum meet or a quorum break.
+         */
+        
         final long oldValue = quorumToken;
-        quorumToken = newValue;
+
+        if (oldValue == newValue) {
+         
+            // No change.
+            return;
+            
+        }
+        
+        final boolean didBreak;
+        final boolean didMeet;
+
+        if (newValue == Quorum.NO_QUORUM && oldValue != Quorum.NO_QUORUM) {
+
+            /*
+             * Quorum break.
+             * 
+             * Immediately invalidate the token. Do not wait for a lock.
+             */
+            
+            this.quorumToken = newValue;
+
+            didBreak = true;
+            didMeet = false;
+
+        } else if (newValue != Quorum.NO_QUORUM && oldValue == Quorum.NO_QUORUM) {
+
+            /*
+             * Quorum meet.
+             * 
+             * We must wait for the lock to update the token.
+             */
+            
+            didBreak = false;
+            didMeet = true;
+
+        } else {
+
+            /*
+             * Excluded middle. If there was no change, then we returned
+             * immediately up above. If there is a change, then it must be
+             * either a quorum break or a quorum meet, which were identified in
+             * the if-then-else above.
+             */
+
+            throw new AssertionError();
+            
+        }
+        
+        /*
+         * Both a meet and a break require an exclusive write lock.
+         */
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+
+        lock.lock();
+
+        try {
+
+            if (didBreak) {
+
+                /*
+                 * We also need to discard any active read/write tx since there
+                 * is no longer a quorum and a read/write tx was running on the
+                 * old leader.
+                 * 
+                 * We do not need to discard read-only tx since the committed
+                 * state should remain valid even when a quorum is lost.
+                 */
+                abort();
+                
+            } else if (didMeet) {
+
+                quorumToken = newValue;
+
+                /*
+                 * FIXME We need to re-open the backing store with the token for
+                 * the new quorum.
+                 */
+//                _bufferStrategy.reopen(quorumToken);
+
+            } else {
+
+                throw new AssertionError();
+                
+            }
+            
+        } finally {
+
+            lock.unlock();
+            
+        }
+
     }
 
     /**
@@ -4547,24 +4643,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	
     /**
      * Factory for the {@link HADelegate} object for this
-     * {@link AbstractJournal}. This may be overridden to publish additional
-     * methods for the low-level HA API. The object returned by this factor is
+     * {@link AbstractJournal}. The object returned by this method will be made
      * available using {@link QuorumMember#getService()}.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
      */
     protected HAGlue newHAGlue(final UUID serviceId) {
 
-        // FIXME This is defaulting to a random port on the loopback address.
-        final InetSocketAddress writePipelineAddr;
-        try {
-            writePipelineAddr =  new InetSocketAddress(getPort(0));
-        } catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        return new BasicHA(serviceId, writePipelineAddr);
-
+        throw new UnsupportedOperationException();
+        
 	}
 
     /**
@@ -4932,30 +5020,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
 	};
-
-    /**
-     * Return an unused port.
-     * 
-     * @param suggestedPort
-     *            The suggested port.
-     *            
-     * @return The suggested port, unless it is zero or already in use, in which
-     *         case an unused port is returned.
-     * 
-     * @throws IOException
-     */
-    static protected int getPort(int suggestedPort) throws IOException {
-        ServerSocket openSocket;
-        try {
-            openSocket = new ServerSocket(suggestedPort);
-        } catch (BindException ex) {
-            // the port is busy, so look for a random open port
-            openSocket = new ServerSocket(0);
-        }
-        final int port = openSocket.getLocalPort();
-        openSocket.close();
-        return port;
-    }
 
     /**
      * Remove all commit records between the two provided keys.

@@ -921,9 +921,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     final public void assertLeader(final long token) {
+        if (token == NO_QUORUM) {
+            // The quorum was not met when the client obtained that token.
+            throw new QuorumException("Client token is invalid.");
+        }
         if (this.token == NO_QUORUM) {
             // The quorum is not met.
-            throw new QuorumException();
+            throw new QuorumException("Quorum is not met.");
         }
         final UUID leaderId = getLeaderId();
         final QuorumMember<S> client = getClientAsMember();
