@@ -30,6 +30,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import junit.extensions.proxy.IProxyTest;
+import junit.framework.Test;
+import junit.framework.TestCase;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.OWL;
@@ -51,7 +55,7 @@ import com.bigdata.gom.gpo.IGPO;
  * @author Martyn Cutcher
  * 
  */
-public class TestOwlGOM extends LocalGOMTestCase {
+public class TestOwlGOM extends ProxyGOMTest {
 
     private static final Logger log = Logger.getLogger(TestOwlGOM.class);
 
@@ -88,7 +92,7 @@ public class TestOwlGOM extends LocalGOMTestCase {
     private void doLoad(final String owlFile) throws RDFParseException,
             RepositoryException, IOException {
 
-        load(TestGOM.class.getResource(owlFile), RDFFormat.RDFXML);
+        ((IGOMProxy) m_delegate).load(TestGOM.class.getResource(owlFile), RDFFormat.RDFXML);
 
         final IGPO owl = om.getGPO(OWL.ONTOLOGY);
 
@@ -153,7 +157,7 @@ public class TestOwlGOM extends LocalGOMTestCase {
 
 	}
 
-//	/**
+    //	/**
 //	 * Utility to load n3 statements from a resource
 //	 */
 //	private void load(final URL data, final RDFFormat format)
