@@ -914,10 +914,13 @@ public class TestWriteCache extends TestCase3 {
     }
     
     /**
-     * To test the buffer restore, we will share a buffer between two WriteCache instances then
-     * write data to the first cache and update its recordMap from the buffer.  This short circuits
-     * the HA pipeline that streams the ByteBuffer from one cache to the other.
-     * @throws IOException 
+     * To test the buffer restore, we will share a buffer between two WriteCache
+     * instances then write data to the first cache and update its recordMap
+     * from the buffer. This short circuits the HA pipeline that streams the
+     * ByteBuffer from one cache to the other.
+     * 
+     * FIXME This is only testing a single addr. We need to test a bunch of
+     * writes, not just one.
      */
     public void test_writeCacheScatteredBufferRestore() throws InterruptedException, IOException {
         final File file = File.createTempFile(getName(), ".tmp");
@@ -926,77 +929,113 @@ public class TestWriteCache extends TestCase3 {
 
             final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
             final IBufferAccess buf2 = DirectBufferPool.INSTANCE.acquire();
-		    try {
-		    	long addr1 = 12800;
-		    	final ByteBuffer data1 = getRandomData(20 * 1024);
-		    	final int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
-		    	final ByteBuffer data2 = getRandomData(20 * 1024);
-		    	final int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
-		    	final WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
-		    			false, opener, 0L/* fileExtent */, null);   	
-		    	final WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
-		    			false, opener, 0L/* fileExtent */, null);
-		    	
-		    	// write first data buffer
-		    	cache1.write(addr1, data1, chk1);
-		    	data1.flip();
-		    	syncBuffers(buf, buf2);
-		    	cache2.resetRecordMapFromBuffer();
-		    	
-		       	assertEquals(cache1.read(addr1), data1);
-		       	assertEquals(cache2.read(addr1), data1);
-		    	
-		    	// now simulate removal/delete
-		    	cache1.clearAddrMap(addr1);
-		    	
-		    	syncBuffers(buf, buf2);
+            try {
 
-		    	cache2.resetRecordMapFromBuffer();
-		    	
-		    	assertTrue(cache1.read(addr1) == null);
-		    	assertTrue(cache2.read(addr1) == null);
-		    	
-		    	// now write second data buffer
-		    	cache1.write(addr1, data2, chk2);
-		    	data2.flip();
-		    	// buf2.buffer().limit(buf.buffer().position());
-		    	syncBuffers(buf, buf2);
-		    	cache2.resetRecordMapFromBuffer();
-		    	assertEquals(cache2.read(addr1), data2);
-		    	assertEquals(cache1.read(addr1), data2);
+                final long addr1 = 12800;
+
+                final ByteBuffer data1 = getRandomData(20 * 1024);
+                
+                final int chk1 = ChecksumUtility.threadChk.get().checksum(
+                        data1, 0/* offset */, data1.limit());
+                
+                final ByteBuffer data2 = getRandomData(20 * 1024);
+                
+                final int chk2 = ChecksumUtility.threadChk.get().checksum(
+                        data2, 0/* offset */, data2.limit());
+                
+                final WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(
+                        buf, true/* useChecksums */,
+                        true/* isHighlyAvailable */, false/* bufferHasData */,
+                        opener, 0L/* fileExtent */, null/* BufferedWrite */);  	
+                
+                final WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(
+                        buf, true/* useChecksums */,
+                        true/* isHighlyAvailable */, false/* bufferHasData */,
+                        opener, 0L/* fileExtent */, null/* BufferedWrite */);
+
+                // write first data buffer
+                cache1.write(addr1, data1, chk1);
+                data1.flip();
+                /*
+                 * FIXME syncBuffers is not correct. I've tried to fix it but
+                 * maybe my eyes are tired. Also, this is only testing a single
+                 * address copy. We need to test much more than that.
+                 */
+                syncBuffers(buf, buf2);
+                assertEquals(buf.buffer(), buf2.buffer());
+                cache2.resetRecordMapFromBuffer();
+                assertEquals(cache1.read(addr1), data1);
+                if (cache2.read(addr1) == null)
+                    fail("Nothing in replicated cache?");
+                assertEquals(cache2.read(addr1), data1);
+
+                // now simulate removal/delete
+                cache1.clearAddrMap(addr1);
+
+                syncBuffers(buf, buf2);
+
+                cache2.resetRecordMapFromBuffer();
+
+                assertTrue(cache1.read(addr1) == null);
+                assertTrue(cache2.read(addr1) == null);
+
+                // now write second data buffer
+                cache1.write(addr1, data2, chk2);
+                data2.flip();
+                // buf2.buffer().limit(buf.buffer().position());
+                syncBuffers(buf, buf2);
+                cache2.resetRecordMapFromBuffer();
+                assertEquals(cache2.read(addr1), data2);
+                assertEquals(cache1.read(addr1), data2);
+        
             } finally {
+            
                 buf.release();
                 buf2.release();
+                
             }
+
         } finally {
+        
             opener.destroy();
+            
         }
+        
     }
     
     // ensure dst buffer is copy of src
     private void syncBuffers(final IBufferAccess src, final IBufferAccess dst) {
-    	final ByteBuffer sb = src.buffer();
-    	final ByteBuffer db = dst.buffer();
-    	int sp = sb.position();
-    	int sl = sb.limit();
-    	sb.position(0);
-    	db.position(0);
-    	sb.limit(sp);
-    	db.limit(sp);
-    	db.put(sb);
-    	sb.position(sp);
-    	db.position(sp);
-    	sb.limit(sl);
-    	db.limit(sl);   	
+
+        final ByteBuffer sb = src.buffer();//.duplicate();
+        final ByteBuffer db = dst.buffer();//.duplicate();
+        
+        db.rewind();
+        sb.flip();
+        db.put(sb/* src */);
+
+//    	int sp = sb.position();
+//    	int sl = sb.limit();
+//    	sb.position(0);
+//    	db.position(0);
+//    	sb.limit(sp);
+//    	db.limit(sp);
+//    	db.put(sb);
+//    	sb.position(sp);
+//    	db.position(sp);
+//    	sb.limit(sl);
+//    	db.limit(sl);   	
+        
     }
 
     /*
      * Now generate randomviews, first an ordered view of 10000 random lengths
      */
     class AllocView {
-    	int addr;
-    	ByteBuffer buf;
-    	AllocView(int pa, int pos, int limit, ByteBuffer src) {
+        final int addr;
+        final ByteBuffer buf;
+
+        AllocView(final int pa, final int pos, final int limit,
+                final ByteBuffer src) {
     		addr = pa;
 //    		ByteBuffer vbuf = src.duplicate();
 //    		vbuf.position(pos);
@@ -1409,55 +1448,56 @@ public class TestWriteCache extends TestCase3 {
 //
 //    }
 
-    /**
-     * Helper method verifies that the contents of <i>actual</i> from
-     * position() to limit() are consistent with the expected byte[]. A
-     * read-only view of <i>actual</i> is used to avoid side effects on the
-     * position, mark or limit properties of the buffer.
-     * 
-     * @param expected
-     *            Non-null byte[].
-     * @param actual
-     *            Buffer.
-     */
-    public static void assertEquals(ByteBuffer expectedBuffer, ByteBuffer actual) {
-
-        if (expectedBuffer == null)
-            throw new IllegalArgumentException();
-
-        if (actual == null)
-            fail("actual is null");
-
-        if (expectedBuffer.hasArray() && expectedBuffer.arrayOffset() == 0) {
-
-            // evaluate byte[] against actual.
-            assertEquals(expectedBuffer.array(), actual);
-
-            return;
-
-        }
-        
-        /*
-         * Copy the expected data into a byte[] using a read-only view on the
-         * buffer so that we do not mess with its position, mark, or limit.
-         */
-        final byte[] expected;
-        {
-
-            expectedBuffer = expectedBuffer.asReadOnlyBuffer();
-
-            final int len = expectedBuffer.remaining();
-
-            expected = new byte[len];
-
-            expectedBuffer.get(expected);
-
-        }
-
-        // evaluate byte[] against actual.
-        assertEquals(expected, actual);
-
-    }
+//    /**
+//     * Helper method verifies that the contents of <i>actual</i> from
+//     * position() to limit() are consistent with the expected byte[]. A
+//     * read-only view of <i>actual</i> is used to avoid side effects on the
+//     * position, mark or limit properties of the buffer.
+//     * 
+//     * @param expected
+//     *            Non-null byte[].
+//     * @param actual
+//     *            Buffer.
+//     */
+//    public static void assertEquals(ByteBuffer expectedBuffer,
+//            final ByteBuffer actual) {
+//
+//        if (expectedBuffer == null)
+//            throw new IllegalArgumentException();
+//
+//        if (actual == null)
+//            fail("actual is null");
+//
+//        if (expectedBuffer.hasArray() && expectedBuffer.arrayOffset() == 0) {
+//
+//            // evaluate byte[] against actual.
+//            assertEquals(expectedBuffer.array(), actual);
+//
+//            return;
+//
+//        }
+//        
+//        /*
+//         * Copy the expected data into a byte[] using a read-only view on the
+//         * buffer so that we do not mess with its position, mark, or limit.
+//         */
+//        final byte[] expected;
+//        {
+//
+//            expectedBuffer = expectedBuffer.asReadOnlyBuffer();
+//
+//            final int len = expectedBuffer.remaining();
+//
+//            expected = new byte[len];
+//
+//            expectedBuffer.get(expected);
+//
+//        }
+//
+//        // evaluate byte[] against actual.
+//        assertEquals(expected, actual);
+//
+//    }
 
 //    /**
 //     * Helper method verifies that the contents of <i>actual</i> from
