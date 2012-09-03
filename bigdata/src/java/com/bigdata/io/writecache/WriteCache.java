@@ -381,11 +381,14 @@ abstract public class WriteCache implements IWriteCache {
      *            caller's buffer will be cleared. The code presumes that the
      *            {@link WriteCache} instance will be used to lay down a single
      *            buffer worth of data onto the backing file.
-     * 
+     *  @param fileExtent
+     *            The then current extent of the backing file.
+     *
      * @throws InterruptedException
      */
     public WriteCache(IBufferAccess buf, final boolean scatteredWrites, final boolean useChecksum,
-            final boolean isHighlyAvailable, final boolean bufferHasData) throws InterruptedException {
+            final boolean isHighlyAvailable, final boolean bufferHasData,
+            final long fileExtent) throws InterruptedException {
 
         if (bufferHasData && buf == null)
             throw new IllegalArgumentException();
@@ -422,6 +425,9 @@ abstract public class WriteCache implements IWriteCache {
 
         // the capacity of the buffer in bytes.
         this.capacity = buf.buffer().capacity();
+
+        // apply the then current file extent.
+        this.fileExtent.set(fileExtent);
 
         /*
          * Discard anything in the buffer, resetting the position to zero, the
@@ -466,7 +472,7 @@ abstract public class WriteCache implements IWriteCache {
              */
             resetRecordMapFromBuffer();
         }
-
+        
     }
 
     /**
@@ -1517,11 +1523,15 @@ abstract public class WriteCache implements IWriteCache {
          * 
          * @throws InterruptedException
          */
-        public FileChannelWriteCache(final long baseOffset, final IBufferAccess buf, final boolean useChecksum,
-                final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener)
+        public FileChannelWriteCache(final long baseOffset,
+                final IBufferAccess buf, final boolean useChecksum,
+                final boolean isHighlyAvailable, final boolean bufferHasData,
+                final IReopenChannel<FileChannel> opener,
+                final long fileExtent)
                 throws InterruptedException {
 
-            super(buf, false/* scatteredWrites */, useChecksum, isHighlyAvailable, bufferHasData);
+            super(buf, false/* scatteredWrites */, useChecksum,
+                    isHighlyAvailable, bufferHasData, fileExtent);
 
             if (baseOffset < 0)
                 throw new IllegalArgumentException();
@@ -1536,8 +1546,10 @@ abstract public class WriteCache implements IWriteCache {
         }
 
         @Override
-        protected boolean writeOnChannel(final ByteBuffer data, final long firstOffset,
-                final Map<Long, RecordMetadata> recordMap, final long nanos) throws InterruptedException, IOException {
+        protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffset,
+                final Map<Long, RecordMetadata> recordMap, final long nanos)
+                throws InterruptedException, IOException {
 
             final long begin = System.nanoTime();
 
@@ -1604,12 +1616,15 @@ abstract public class WriteCache implements IWriteCache {
          * 
          * @throws InterruptedException
          */
-        public FileChannelScatteredWriteCache(final IBufferAccess buf, final boolean useChecksum,
-                final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener,
-                final BufferedWrite bufferedWrite)
+        public FileChannelScatteredWriteCache(final IBufferAccess buf,
+                final boolean useChecksum, final boolean isHighlyAvailable,
+                final boolean bufferHasData,
+                final IReopenChannel<FileChannel> opener,
+                final long fileExtent, final BufferedWrite bufferedWrite)
                 throws InterruptedException {
 
-            super(buf, true/* scatteredWrites */, useChecksum, isHighlyAvailable, bufferHasData);
+            super(buf, true/* scatteredWrites */, useChecksum,
+                    isHighlyAvailable, bufferHasData, fileExtent);
 
             if (opener == null)
                 throw new IllegalArgumentException();

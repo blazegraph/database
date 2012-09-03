@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
-import java.rmi.server.ExportException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -43,11 +42,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.service.proxy.ClientFuture;
-import com.bigdata.service.proxy.RemoteFuture;
-import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.ThickFuture;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 
@@ -104,7 +101,7 @@ public class HAJournal extends Journal {
     public HAJournal(final Properties properties,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
 
-        super(properties, quorum);
+        super(checkProperties(properties), quorum);
 
         /*
          * Note: We need this so pass it through to the HAGlue class below.
@@ -115,12 +112,40 @@ public class HAJournal extends Journal {
         writePipelineAddr = (InetSocketAddress) properties
                 .get(Options.WRITE_PIPELINE_ADDR);
 
-        if (writePipelineAddr == null)
-            throw new RuntimeException(Options.WRITE_PIPELINE_ADDR
-                    + " : required property not found.");
-
     }
 
+    /**
+     * Perform some checks on the {@link HAJournal} configuration properties.
+     * 
+     * @param properties
+     *            The configuration properties.
+     *            
+     * @return The argument.
+     */
+    protected static Properties checkProperties(final Properties properties) {
+
+        final BufferMode bufferMode = BufferMode.valueOf(properties
+                .getProperty(Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
+
+        switch (bufferMode) {
+        case DiskRW:
+            break;
+        default:
+            throw new IllegalArgumentException(Options.BUFFER_MODE + "="
+                    + bufferMode + " : does not support HA");
+        }
+
+        if (properties.get(Options.WRITE_PIPELINE_ADDR) == null) {
+
+            throw new RuntimeException(Options.WRITE_PIPELINE_ADDR
+                    + " : required property not found.");
+        
+        }
+
+        return properties;
+
+    }
+    
     @Override
     protected HAGlue newHAGlue(final UUID serviceId) {
 

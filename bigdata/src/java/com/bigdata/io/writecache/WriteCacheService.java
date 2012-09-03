@@ -357,13 +357,9 @@ abstract public class WriteCacheService implements IWriteCache {
     
     /**
      * The {@link Quorum} token under which this {@link WriteCacheService}
-     * instance is valid.
-     * 
-     * @todo As long as a service is the leader, it could use the same
-     *       {@link WriteCacheService} instance. For example, adding a new
-     *       service to the pipeline in principle need not invalidate the
-     *       {@link WriteCacheService}. However, if the leader changes then much
-     *       more has to change in concert to setup the new {@link Quorum}.
+     * instance is valid. This is fixed for the life cycle of the
+     * {@link WriteCacheService}. This ensures that all writes are buffered
+     * under a consistent quorum meet.
      */
     final private long quorumToken;
     
@@ -441,13 +437,13 @@ abstract public class WriteCacheService implements IWriteCache {
 
         // Add [current] WriteCache.
         current.set(buffers[0] = newWriteCache(null/* buf */,
-                useChecksum, false/* bufferHasData */, opener));
+                useChecksum, false/* bufferHasData */, opener, fileExtent));
 
         // add remaining buffers.
         for (int i = 1; i < nbuffers; i++) {
 
             final WriteCache tmp = newWriteCache(null/* buf */, useChecksum,
-                    false/* bufferHasData */, opener);
+                    false/* bufferHasData */, opener, fileExtent);
 
             buffers[i] = tmp;
 
@@ -833,6 +829,8 @@ abstract public class WriteCacheService implements IWriteCache {
      * @param opener
      *            The object which knows how to re-open the backing channel
      *            (required).
+     * @param fileExtent
+     *            The then current extent of the backing file.
      * 
      * @return A {@link WriteCache} wrapping that buffer and able to write on
      *         that channel.
@@ -841,7 +839,8 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     abstract public WriteCache newWriteCache(IBufferAccess buf,
             boolean useChecksum, boolean bufferHasData,
-            IReopenChannel<? extends Channel> opener) throws InterruptedException;
+            IReopenChannel<? extends Channel> opener, final long fileExtent)
+            throws InterruptedException;
 
     /**
      * {@inheritDoc}

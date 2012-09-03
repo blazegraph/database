@@ -412,7 +412,17 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 	private final Quorum<?,?> m_quorum;
 	
-	final RWWriteCacheService m_writeCache;
+	/**
+	 * The #of buffers that will be used by the {@link WriteCacheService}.
+	 */
+	private final int m_writeCacheBufferCount;
+	
+    /**
+     * Note: This is not final because we replace the {@link WriteCacheService}
+     * during {@link #reset(long)} in order to propagate the then current quorum
+     * token to the {@link WriteCacheService}.
+     */
+    RWWriteCacheService m_writeCache;
 
 	/**
 	 * The actual allocation sizes as read from the store.
@@ -536,11 +546,13 @@ public class RWStore implements IStore, IBufferedWriter {
         public WriteCacheImpl(final IBufferAccess buf,
                 final boolean useChecksum,
                 final boolean bufferHasData,
-                final IReopenChannel<FileChannel> opener)
+                final IReopenChannel<FileChannel> opener,
+                final long fileExtent)
                 throws InterruptedException {
 
             super(buf, useChecksum, m_quorum != null
                     && m_quorum.isHighlyAvailable(), bufferHasData, opener,
+                    fileExtent,
                     m_bufferedWrite);
 
         }
@@ -661,31 +673,12 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_bufferedWrite = null;
 		}
 
-		final int buffers = fileMetadata.writeCacheBufferCount;
+		m_writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
 		
 		if(log.isInfoEnabled())
-		    log.info("RWStore using writeCacheService with buffers: " + buffers);
+		    log.info("RWStore using writeCacheService with buffers: " + m_writeCacheBufferCount);
 
-        try {
-            m_writeCache = new RWWriteCacheService(buffers, m_fd.length(),
-                    m_reopener, m_quorum) {
-				
-                        @SuppressWarnings("unchecked")
-			            public WriteCache newWriteCache(final IBufferAccess buf,
-			                    final boolean useChecksum,
-			                    final boolean bufferHasData,
-			                    final IReopenChannel<? extends Channel> opener)
-			                    throws InterruptedException {
-			                return new WriteCacheImpl(buf,
-			                        useChecksum, bufferHasData,
-			                        (IReopenChannel<FileChannel>) opener);
-			            }
-				};
-		} catch (InterruptedException e) {
-			throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
-		} catch (IOException e) {
-			throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
-		}		
+		m_writeCache = newWriteCache();
 
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
@@ -748,6 +741,36 @@ public class RWStore implements IStore, IBufferedWriter {
 			throw new StorageTerminalError("Unable to initialize store", e);
 		}
 	}
+    
+    /**
+     * Create and return a new {@link RWWriteCacheService} instance. The caller
+     * is responsible for closing out the old one and must be holding the
+     * appropriate locks when it switches in the new instance.
+     */
+    private RWWriteCacheService newWriteCache() {
+        try {
+            return new RWWriteCacheService(m_writeCacheBufferCount,
+                    m_fd.length(), m_reopener, m_quorum) {
+                
+                        @SuppressWarnings("unchecked")
+                        public WriteCache newWriteCache(final IBufferAccess buf,
+                                final boolean useChecksum,
+                                final boolean bufferHasData,
+                                final IReopenChannel<? extends Channel> opener,
+                                final long fileExtent)
+                                throws InterruptedException {
+                            return new WriteCacheImpl(buf,
+                                    useChecksum, bufferHasData,
+                                    (IReopenChannel<FileChannel>) opener,
+                                    fileExtent);
+                        }
+                };
+        } catch (InterruptedException e) {
+            throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
+        } catch (IOException e) {
+            throw new IllegalStateException(ERR_WRITE_CACHE_CREATE, e);
+        }       
+    }
     
 	private void setAllocations(final FileMetadata fileMetadata)
             throws IOException {
@@ -2111,22 +2134,37 @@ public class RWStore implements IStore, IBufferedWriter {
      * Unisolated writes must also be removed from the write cache.
      * 
      * The AllocBlocks of the FixedAllocators maintain the state to determine
-     * the correct reset behaviour.
+     * the correct reset behavior.
      * 
      * If the store is using DirectFixedAllocators then an IllegalStateException
      * is thrown
      */
-	public void reset() {
-	    assertOpen();
-	    
-		if (log.isInfoEnabled()) {
-			log.info("RWStore Reset");
-		}
+    public void reset() {
+
+        if (log.isInfoEnabled()) {
+            log.info("RWStore Reset");
+        }
 	    m_allocationLock.lock();
 		try {
+	        assertOpen();
 			for (FixedAllocator fa : m_allocs) {
 				fa.reset(m_writeCache);
 			}
+            if (m_quorum != null) {
+                /**
+                 * When the RWStore is part of an HA quorum, we need to close
+                 * out and then reopen the WriteCacheService every time the
+                 * quorum token is changed. For convienence, this is handled by
+                 * extending the semantics of abort() on the Journal and reset()
+                 * on the RWStore.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
+                 *      HA Journal </a>
+                 */
+                m_writeCache.close();
+                m_writeCache = newWriteCache();
+            }
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to reset the store", e);
 		} finally {
@@ -2440,6 +2478,9 @@ public class RWStore implements IStore, IBufferedWriter {
 //	volatile private long m_curHdrAddr = 0;
 //	volatile private int m_rootAddr;
 
+    /**
+     * {@link #m_fileSize} is in units of -32K.
+     */
 	volatile private int m_fileSize;
 	volatile private int m_nextAllocation;
 	final private int m_maxFileSize;
@@ -3315,8 +3356,13 @@ public class RWStore implements IStore, IBufferedWriter {
 		    extendFile(convertFromAddr(extent - currentExtent));
 		    
 		} else if (extent < currentExtent) {
-			throw new IllegalArgumentException("Cannot shrink RWStore extent");
-		}
+         
+            throw new IllegalArgumentException(
+                    "Cannot shrink RWStore extent: currentExtent="
+                            + currentExtent + ", fileSize=" + m_fileSize
+                            + ", newValue=" + extent);
+
+        }
 		
 	}
 	
@@ -4538,7 +4584,8 @@ public class RWStore implements IStore, IBufferedWriter {
             throws IOException, InterruptedException {
 
         m_writeCache.newWriteCache(b, true/* useChecksums */,
-                true/* bufferHasData */, m_reopener).flush(false/* force */);
+                true/* bufferHasData */, m_reopener, msg.getFileExtent())
+                .flush(false/* force */);
 
     }
 

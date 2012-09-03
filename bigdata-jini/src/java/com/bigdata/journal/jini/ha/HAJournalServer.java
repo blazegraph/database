@@ -41,6 +41,7 @@ import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumEvent;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumListener;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
@@ -513,9 +514,10 @@ public class HAJournalServer extends AbstractServer {
 
                 if (serviceItem == null) {
 
-                    // Not found.
-                    return null;
-                    
+                    // Not found (per the API).
+                    throw new QuorumException("Service not found: uuid="
+                            + serviceId);
+
                 }
 
                 return (HAGlue) serviceItem.service;

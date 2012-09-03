@@ -17,16 +17,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.TestWORMWriteCacheService.MyMockQuorumMember;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCache.FileChannelWriteCache;
 import com.bigdata.quorum.MockQuorumFixture;
-import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
-import com.bigdata.rwstore.RWWriteCacheService;
+import com.bigdata.quorum.QuorumActor;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -167,20 +166,23 @@ public class TestWriteCacheServiceLifetime extends TestCase3 {
                 fileExtent, config.opener, config.quorum) {
 
             @Override
-            public WriteCache newWriteCache(IBufferAccess buf,
-                    boolean useChecksum, boolean bufferHasData,
-                    IReopenChannel<? extends Channel> opener)
+            public WriteCache newWriteCache(final IBufferAccess buf,
+                    final boolean useChecksum, final boolean bufferHasData,
+                    final IReopenChannel<? extends Channel> opener,
+                    final long fileExtent)
                     throws InterruptedException {
 
                 if (!rw) {
                 	return new FileChannelWriteCache(0/* baseOffset */,
                             buf, useChecksum, false,
                             bufferHasData,
-                            (IReopenChannel<FileChannel>) opener);
+                            (IReopenChannel<FileChannel>) opener,
+                            fileExtent);
                 } else {
-                    return new FileChannelScatteredWriteCache(buf,
-                            useChecksum, false, bufferHasData,
-                            (IReopenChannel<FileChannel>) opener, null);
+                    return new FileChannelScatteredWriteCache(buf, useChecksum,
+                            false, bufferHasData,
+                            (IReopenChannel<FileChannel>) opener, fileExtent,
+                            null);
                 }
 
             }
