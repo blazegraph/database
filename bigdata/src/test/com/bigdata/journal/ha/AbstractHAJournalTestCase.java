@@ -28,6 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.util.Properties;
@@ -340,12 +345,65 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
             super(properties, quorum);
         }
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: This uses a random port on the loopback address.
+         */
+        @Override
         public HAGlue newHAGlue(final UUID serviceId) {
          
-            return super.newHAGlue(serviceId);
-            
+            final InetSocketAddress writePipelineAddr;
+            try {
+                writePipelineAddr =  new InetSocketAddress(getPort(0));
+            } catch (UnknownHostException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            return new HAGlueService(serviceId, writePipelineAddr);
+
         }
         
+        /**
+         * Return an unused port.
+         * 
+         * @param suggestedPort
+         *            The suggested port.
+         *            
+         * @return The suggested port, unless it is zero or already in use, in which
+         *         case an unused port is returned.
+         * 
+         * @throws IOException
+         */
+        static protected int getPort(int suggestedPort) throws IOException {
+            ServerSocket openSocket;
+            try {
+                openSocket = new ServerSocket(suggestedPort);
+            } catch (BindException ex) {
+                // the port is busy, so look for a random open port
+                openSocket = new ServerSocket(0);
+            }
+            final int port = openSocket.getLocalPort();
+            openSocket.close();
+            return port;
+        }
+
+        /**
+         * Extended implementation supports RMI.
+         */
+        protected class HAGlueService extends BasicHA {
+
+            protected HAGlueService(final UUID serviceId,
+                    final InetSocketAddress writePipelineAddr) {
+
+                super(serviceId, writePipelineAddr);
+
+            }
+
+        }
+
     }
     
     protected Quorum<HAGlue, QuorumService<HAGlue>> newQuorum() {
