@@ -120,7 +120,13 @@ public class ObjectManager extends ObjectMgrModel {
             }
             
         }
-
+        
+        /**
+         * Local ObjectManager can flush incrementally from the dirty list
+         * 
+         * A maximum size of 4000 dirty objects is a sensible default.
+         */
+        m_maxDirtyListSize = 4000;
     }
 	
 	/**

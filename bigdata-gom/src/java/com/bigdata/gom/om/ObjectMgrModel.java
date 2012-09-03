@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.gom.om;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -98,7 +99,9 @@ public abstract class ObjectMgrModel implements IObjectManager {
      * single operation. The GPO.GPOEntry tracks those individual asserts and
      * retracts.
      */
-    private final List<GPO> m_dirtyGPOs = new LinkedList<GPO>();
+    // private final List<GPO> m_dirtyGPOs = new LinkedList<GPO>();
+    // Sample code indicates that an ArrayList is less overhead than a LinkedList
+    private final List<GPO> m_dirtyGPOs = new ArrayList<GPO>();
 
 	private final URI s_nmeMgr;
 
@@ -110,6 +113,12 @@ public abstract class ObjectMgrModel implements IObjectManager {
      * better concurrency (but, of course, only as appropriate).
      */
     private final Lock lock = new ReentrantLock();
+    
+    /**
+     * Default to maximum dirty list size to lock out any incremental
+     * flushing.
+     */
+    protected int m_maxDirtyListSize = Integer.MAX_VALUE;
 	
     /**
      * The native transaction counter.
@@ -241,12 +250,12 @@ public abstract class ObjectMgrModel implements IObjectManager {
 
 	    m_dirtyGPOs.add(gpo);
 	    
-//		if (m_dirtyGPOs.size() > m_maxDirtyListSize) {
-//			if (log.isTraceEnabled())
-//				log.trace("Incremental flush of dirty objects");
-//			
-//			flushDirtyObjects();
-//		}
+		if (m_dirtyGPOs.size() > m_maxDirtyListSize) {
+			if (log.isTraceEnabled())
+				log.trace("Incremental flush of dirty objects");
+			
+			flushDirtyObjects();
+		}
 
 	}
 	
@@ -425,11 +434,21 @@ public abstract class ObjectMgrModel implements IObjectManager {
         
     }
 
+    long m_materialized = 0;
+    
     protected void materializeWithDescribe(final IGPO gpo) {
 
         final String query = "DESCRIBE <" + gpo.getId().toString() + ">";
 
         initGPO((GPO) gpo, evaluateGraph(query));
+        
+        /**
+         * 
+         */
+        m_materialized++;
+        
+        if (m_materialized % 10000 == 0)
+        	System.out.println("Materialized: " + m_materialized + ", dictionary: " + m_dict.size() + ", m_dirtyGPOs: " + m_dirtyGPOs.size());
 
     }
 
@@ -552,7 +571,7 @@ public abstract class ObjectMgrModel implements IObjectManager {
             }
 
             if (log.isTraceEnabled())
-                log.trace("Materialized: " + gpo.getId() + " with "
+                log.trace("Materialized: " + (gpo == null ? "null" : gpo.getId()) + " with "
                         + statements + " statements");
 
             return map;
