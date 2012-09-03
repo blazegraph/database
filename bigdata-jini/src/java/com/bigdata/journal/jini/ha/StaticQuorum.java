@@ -142,6 +142,13 @@ class StaticQuorum implements Quorum<HAGlue, QuorumService<HAGlue>> {
     }
 
     @Override
+    public boolean isQuorum(int n) {
+
+        return n >= ((pipeline.length + 1) / 2);
+        
+    }
+    
+    @Override
     public long token() {
         
         return token;

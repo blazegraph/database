@@ -26,27 +26,22 @@ package com.bigdata.journal.jini.ha;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
-import java.rmi.Remote;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import net.jini.config.Configuration;
 import net.jini.export.Exporter;
-import net.jini.jeri.BasicILFactory;
-import net.jini.jeri.BasicJeriExporter;
-import net.jini.jeri.InvocationLayerFactory;
-import net.jini.jeri.tcp.TcpServerEndpoint;
 
-import org.apache.log4j.Logger;
-
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.proxy.ThickFuture;
-import com.bigdata.zookeeper.ZooKeeperAccessor;
 
 /**
  * A {@link Journal} that that participates in a write replication pipeline. The
@@ -77,7 +72,7 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
  */
 public class HAJournal extends Journal {
 
-    private static final Logger log = Logger.getLogger(HAJournal.class);
+//    private static final Logger log = Logger.getLogger(HAJournal.class);
 
     public interface Options extends Journal.Options {
         
@@ -172,49 +167,65 @@ public class HAJournal extends Journal {
 
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * TODO This should actually bounce the zk connection. We need to pass
-         * the {@link ZooKeeperAccessor} into the constructor for that.
-         */
         @Override
         public Future<Void> bounceZookeeperConnection() {
-            return super.bounceZookeeperConnection();
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
+                @SuppressWarnings("rawtypes")
+                public void run() {
+
+                    if(getQuorum() instanceof ZKQuorumImpl) {
+
+                        try {
+
+                            // Close the current connection (if any).
+                            ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
+                            
+                        } catch (InterruptedException e) {
+                            
+                            // Propagate the interrupt.
+                            Thread.currentThread().interrupt();
+                            
+                        }
+                        
+                    }
+                }
+            }, null);
+            ft.run();
+            return getProxy(ft);
+
+//          
         }
         
-        /**
-         * Note: The invocation layer factory is reused for each exported proxy (but
-         * the exporter itself is paired 1:1 with the exported proxy).
-         * 
-         * TODO Configuration for this stuff.
-         */
-        final private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
-        
-        /**
-         * Return an {@link Exporter} for a single object that implements one or
-         * more {@link Remote} interfaces.
-         * <p>
-         * Note: This uses TCP Server sockets.
-         * <p>
-         * Note: This uses [port := 0], which means a random port is assigned.
-         * <p>
-         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
-         * <code>false</code>).
-         * 
-         * @param enableDGC
-         *            if distributed garbage collection should be used for the
-         *            object to be exported.
-         * 
-         * @return The {@link Exporter}.
-         */
-        protected Exporter getExporter(final boolean enableDGC) {
-            
-            return new BasicJeriExporter(TcpServerEndpoint
-                    .getInstance(0/* port */), invocationLayerFactory, enableDGC,
-                    false/* keepAlive */);
-            
-        }
+//        /**
+//         * Note: The invocation layer factory is reused for each exported proxy (but
+//         * the exporter itself is paired 1:1 with the exported proxy).
+//         */
+//        final private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
+//        
+//        /**
+//         * Return an {@link Exporter} for a single object that implements one or
+//         * more {@link Remote} interfaces.
+//         * <p>
+//         * Note: This uses TCP Server sockets.
+//         * <p>
+//         * Note: This uses [port := 0], which means a random port is assigned.
+//         * <p>
+//         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
+//         * <code>false</code>).
+//         * 
+//         * @param enableDGC
+//         *            if distributed garbage collection should be used for the
+//         *            object to be exported.
+//         * 
+//         * @return The {@link Exporter}.
+//         */
+//        protected Exporter getExporter(final boolean enableDGC) {
+//            
+//            return new BasicJeriExporter(TcpServerEndpoint
+//                    .getInstance(0/* port */), invocationLayerFactory, enableDGC,
+//                    false/* keepAlive */);
+//            
+//        }
 
         /**
          * Note that {@link Future}s generated by
@@ -229,18 +240,16 @@ public class HAJournal extends Journal {
          * 
          * @return A proxy for that {@link Future} that masquerades any RMI
          *         exceptions.
-         * 
-         *         TODO All of these methods that return a {@link Future} are
-         *         going to cause a problem with DGC. They should just do the
-         *         work whenever possible, especially for methods that have high
-         *         overhead. One workaround is to return a {@link ThickFuture}.
          */
         @Override
         protected <E> Future<E> getProxy(final Future<E> future) {
 
             /*
              * This was borrowed from a fix for a DGC thread leak on the
-             * clustered database.
+             * clustered database. Returning a Future so the client can
+             * wait on the outcome is often less desirable than having
+             * the service compute the Future and then return a think
+             * future.
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/433
              * 

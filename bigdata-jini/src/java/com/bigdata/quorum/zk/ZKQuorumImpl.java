@@ -118,7 +118,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
      * 
      * @throws InterruptedException
      */
-    protected ZooKeeper getZookeeper() throws InterruptedException {
+    public ZooKeeper getZookeeper() throws InterruptedException {
 
         return zka.getZookeeper();
 
@@ -1705,7 +1705,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                     } else if (lastValidToken() != state.lastValidToken()) {
                         final UUID[] joined = getJoined();
                         final int k = replicationFactor();
-                        if (joined.length >= ((k + 1) / 2)) {
+                        if (isQuorum(joined.length)) {
                             setToken(state.lastValidToken());
                         } else {
                             log.warn("Can not set token - not enough joined services: k="

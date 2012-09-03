@@ -213,7 +213,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
         final int k = getQuorum().replicationFactor();
 
-        if (nyes < (k + 1) / 2) {
+        if (!getQuorum().isQuorum(nyes)) {
 
             log.error("prepare rejected: nyes=" + nyes + " out of " + k);
 

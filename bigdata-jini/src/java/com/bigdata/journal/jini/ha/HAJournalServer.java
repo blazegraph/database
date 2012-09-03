@@ -26,7 +26,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
 
@@ -34,9 +33,11 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
-import com.bigdata.jini.util.ConfigMath;
+import com.bigdata.io.IBufferAccess;
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
@@ -72,11 +73,6 @@ public class HAJournalServer extends AbstractServer {
     public interface ConfigurationOptions {
         
         String COMPONENT = HAJournalServer.class.getName();
-        
-        /**
-         * The root path under which the logical services are arranged.
-         */
-        String ZROOT = "zroot";
         
         /**
          * The target replication factor (k).
@@ -126,6 +122,7 @@ public class HAJournalServer extends AbstractServer {
     
     private UUID serviceUUID;
     private HAGlue haGlueService;
+    private ZookeeperClientConfig zkClientConfig;
     private String logicalServiceId;
     
     /**
@@ -226,12 +223,10 @@ public class HAJournalServer extends AbstractServer {
          * Setup the Quorum / HAJournal.
          */
 
-        final String zroot = (String) config
-                .getEntry(ConfigurationOptions.COMPONENT,
-                        ConfigurationOptions.ZROOT,
-                        String.class);
+        zkClientConfig = new ZookeeperClientConfig(config);
 
-        logicalServiceId = zroot + "/" + HAJournalServer.class.getName();
+        logicalServiceId = zkClientConfig.zroot + "/"
+                + HAJournalServer.class.getName();
 
         final int replicationFactor = (Integer) config.getEntry(
                 ConfigurationOptions.COMPONENT,
@@ -275,9 +270,9 @@ public class HAJournalServer extends AbstractServer {
                  * Zookeeper quorum.
                  */
                 
-                final List<ACL> acl = Ids.OPEN_ACL_UNSAFE; // TODO CONFIGURATION
-                final String zoohosts = "localhost:2081"; // TODO CONFIGURATION (zooclient)
-                final int sessionTimeout = (int) ConfigMath.m2ms(10);
+                final List<ACL> acl = zkClientConfig.acl;
+                final String zoohosts = zkClientConfig.servers;
+                final int sessionTimeout = zkClientConfig.sessionTimeout;
                 
                 final ZooKeeperAccessor zka = new ZooKeeperAccessor(
                         zoohosts, sessionTimeout);
@@ -296,8 +291,10 @@ public class HAJournalServer extends AbstractServer {
                  * Ensure key znodes exist.
                  */
                 try {
-                    zka.getZookeeper().create(zroot, new byte[] {/* data */},
-                            acl, CreateMode.PERSISTENT);
+                    zka.getZookeeper()
+                            .create(zkClientConfig.zroot,
+                                    new byte[] {/* data */}, acl,
+                                    CreateMode.PERSISTENT);
                 } catch (NodeExistsException ex) {
                     // ignore.
                 }
@@ -524,27 +521,42 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
-            /**
-             * FIXME handle replicated writes. Probably just dump it on the
-             * jnl's WriteCacheService. Or maybe wrap it back up using a
-             * WriteCache and let that lay it down onto the disk.
-             */
             @Override
-            protected void handleReplicatedWrite(HAWriteMessage msg,
-                    ByteBuffer data) throws Exception {
-//                new WriteCache() {
-//                    
-//                    @Override
-//                    protected boolean writeOnChannel(ByteBuffer buf, long firstOffset,
-//                            Map<Long, RecordMetadata> recordMap, long nanos)
-//                            throws InterruptedException, TimeoutException, IOException {
-//                        // TODO Auto-generated method stub
-//                        return false;
-//                    }
-//                };
-                
-                throw new UnsupportedOperationException();
+            protected void handleReplicatedWrite(final HAWriteMessage msg,
+                    final ByteBuffer data) throws Exception {
+
+                /*
+                 * Note: the ByteBuffer is owned by the HAReceiveService. This
+                 * just wraps up the reference to the ByteBuffer with an
+                 * interface that is also used by the WriteCache to control
+                 * access to ByteBuffers allocated from the DirectBufferPool.
+                 * However, release() is a NOP on this implementation since the
+                 * ByteBuffer is owner by the HAReceiveService.
+                 */
+                final IBufferAccess b = new IBufferAccess() {
+
+                    @Override
+                    public void release(long timeout, TimeUnit unit)
+                            throws InterruptedException {
+                        // NOP
+                    }
+
+                    @Override
+                    public void release() throws InterruptedException {
+                        // NOP
+                    }
+
+                    @Override
+                    public ByteBuffer buffer() {
+                        return data;
+                    }
+                };
+
+                ((RWStrategy) journal.getBufferStrategy()).writeRawBuffer(msg,
+                        b);
+
             }
+
         };
 
     }
@@ -651,19 +663,15 @@ public class HAJournalServer extends AbstractServer {
         final HAJournalServer server = new HAJournalServer(args,
                 new FakeLifeCycle());
 
-//        // FIXME Remove this. It is here to look for a quorum meet.
-//        try {
-//            server.journal.getQuorum().awaitQuorum(6L,TimeUnit.SECONDS);
-//        } catch (Exception e) {
-//            log.error(e, e);
-//        }
-
         // Wait for the HAJournalServer to terminate.
         server.run();
         
         try {
-            // Wait for the jetty server to terminate.
-            server.jettyServer.join();
+            final Server tmp = server.jettyServer;
+            if (tmp != null) {
+                // Wait for the jetty server to terminate.
+                tmp.join();
+            }
         } catch (InterruptedException e) {
             log.warn(e);
         }
