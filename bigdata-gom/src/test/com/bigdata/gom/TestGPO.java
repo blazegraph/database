@@ -23,31 +23,62 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.gom;
 
+import java.io.IOException;
 import java.net.URL;
+import java.util.Iterator;
+
+import junit.extensions.proxy.IProxyTest;
+import junit.framework.Test;
+import junit.framework.TestCase;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
+import com.bigdata.gom.om.IObjectManager;
+import com.bigdata.gom.om.ObjectManager;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
-public class TestGPO extends LocalGOMTestCase {
+public class TestGPO extends ProxyGOMTest {
 
-	/**
+    protected void checkLinkSet(final ILinkSet ls, int size) {
+    	assertTrue(ls.size() == size);
+    	Iterator<IGPO> values = ls.iterator();
+    	int count = 0;
+    	while (values.hasNext()) {
+    		count++;
+    		values.next();
+    	}
+    	assertTrue(count == size);
+    }
+
+    /**
 	 * The initial state rdf store is defined in the testgom.n3 file
 	 */
 	protected void doLoadData() {
 		final URL n3 = TestGOM.class.getResource("testgom.n3");
 
 		try {
-			load(n3, RDFFormat.N3);
+			((IGOMProxy) m_delegate).load(n3, RDFFormat.N3);
 		} catch (Exception e) {
 			fail("Unable to load test data");
 		}
 	}
 
+	public TestGPO() {
+		
+	}
+	
+	public TestGPO(String testName) {
+		super(testName);
+	}
+	
 	public void testHashCode() {
 		doLoadData();
 		
@@ -68,7 +99,12 @@ public class TestGPO extends LocalGOMTestCase {
 	    final URI clssuri = vf.createURI("gpo:#1");
 	    IGPO clssgpo = om.getGPO(clssuri);
 		
-	    ILinkSet ls = clssgpo.getLinksIn(vf.createURI("attr:/type"));
+	    final URI linkURI = vf.createURI("attr:/type");
+	    ILinkSet ls = clssgpo.getLinksIn(linkURI);
+	    
+	    assertTrue(ls.getOwner() == clssgpo);
+	    assertTrue(ls.isLinkSetIn());
+	    assertTrue(ls.getLinkProperty().equals(linkURI));
 	    
 	    checkLinkSet(ls, 2);
 	}
@@ -86,6 +122,10 @@ public class TestGPO extends LocalGOMTestCase {
 		
 	    final URI worksFor = vf.createURI("attr:/employee#worksFor");
 	    ILinkSet ls = workergpo.getLinksOut(worksFor);
+	    
+	    assertTrue(ls.getOwner() == workergpo);
+	    assertFalse(ls.isLinkSetIn());
+	    assertTrue(ls.getLinkProperty().equals(worksFor));
 	    
 	    checkLinkSet(ls, 2);
 	    
@@ -142,6 +182,22 @@ public class TestGPO extends LocalGOMTestCase {
 		
 	}
 
+	public void testStatements() {
+		doLoadData();
+		
+		final ValueFactory vf = om.getValueFactory();
+
+	    final URI workeruri = vf.createURI("gpo:#123");
+	    IGPO workergpo = om.getGPO(workeruri);
+	    
+	    assertTrue(workergpo.getStatements().size() == 6);
+	    
+	    final URI worksFor = vf.createURI("attr:/employee#worksFor");
+	    workergpo.removeValues(worksFor);
+
+	    assertTrue(workergpo.getStatements().size() == 4);
+}
+
 	public void testBound() {
 		doLoadData();
 		
@@ -166,9 +222,11 @@ public class TestGPO extends LocalGOMTestCase {
 	    IGPO workergpo = om.getGPO(workeruri);
 	    final URI worksFor = vf.createURI("attr:/employee#worksFor");
 		
+	    assertFalse(workergpo.getLinksOut(worksFor).isEmpty());
 	    assertFalse(workergpo.getValues(worksFor).isEmpty());
 	    workergpo.removeValues(worksFor);
 	    assertTrue(workergpo.getValues(worksFor).isEmpty());
+	    assertTrue(workergpo.getLinksOut(worksFor).isEmpty());
 	}
 	
 	public void testRemoveValue() {
@@ -318,7 +376,8 @@ public class TestGPO extends LocalGOMTestCase {
 	    assertTrue(worker2.getValue(worksFor) == null);
 	    checkLinkSet(ls, 2);
 	    
-	    assertTrue(om.getDirtyObjectCount() == 3);
+	    // assertTrue(om.getDirtyObjectCount() == 3);
 
 	}
+
 }

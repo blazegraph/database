@@ -34,6 +34,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+import junit.extensions.proxy.IProxyTest;
+import junit.framework.Test;
+import junit.framework.TestCase;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -46,6 +50,9 @@ import com.bigdata.gom.gpo.BasicSkin;
 import com.bigdata.gom.gpo.GPO;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
+import com.bigdata.gom.om.IObjectManager;
+import com.bigdata.gom.om.ObjectManager;
+import com.bigdata.gom.om.ObjectMgrModel;
 import com.bigdata.gom.skin.GenericSkinRegistry;
 
 /**
@@ -58,7 +65,7 @@ import com.bigdata.gom.skin.GenericSkinRegistry;
  * 
  * @author Martyn Cutcher
  */
-public class TestGOM extends LocalGOMTestCase {
+public class TestGOM extends ProxyGOMTest {
 
     private static final Logger log = Logger.getLogger(TestGOM.class);
 
@@ -69,8 +76,8 @@ public class TestGOM extends LocalGOMTestCase {
 
         final URL n3 = TestGOM.class.getResource("testgom.n3");
 
-        print(n3);
-        load(n3, RDFFormat.N3);
+        // print(n3);
+		((IGOMProxy) m_delegate).load(n3, RDFFormat.N3);
 
         final ValueFactory vf = om.getValueFactory();
 
@@ -131,7 +138,7 @@ public class TestGOM extends LocalGOMTestCase {
         }
 
         // clear cached data
-        om.clearCache();
+        ((ObjectMgrModel) om).clearCache();
 
         // reads from backing journal
         final IGPO gpo = om.getGPO(vf.createURI("gpo:test#1"));
@@ -187,7 +194,7 @@ public class TestGOM extends LocalGOMTestCase {
         }
 
         // clear cached data
-        om.clearCache();
+        ((ObjectMgrModel) om).clearCache();
 
         {
             // reads from backing journal
@@ -237,7 +244,7 @@ public class TestGOM extends LocalGOMTestCase {
         }
 
         // clear cached data
-        om.clearCache();
+        ((ObjectMgrModel) om).clearCache();
 
         IGPO gpo = om.getGPO((Resource) om.recall(nme)); // reads from
                                                          // backing journal
@@ -316,7 +323,7 @@ public class TestGOM extends LocalGOMTestCase {
         }
 
         // clear cached data and run again rebuilding
-        om.clearCache();
+        ((ObjectMgrModel) om).clearCache();
         {
             final IGPO clssclss = om.recallAsGPO(clssclssName);
             final Iterator<IGPO> classes = clssclss.getLinksIn(gpoType)
@@ -370,7 +377,9 @@ public class TestGOM extends LocalGOMTestCase {
             // go for it
             final long start = System.currentTimeMillis();
 
-            final int creates = 100000;
+            // The LocalGOMTestcase can handle much larger tests if
+            //	incremental updating is enabled
+            final int creates = 50000;
             for (int i = 0; i < creates; i++) {
                 final IGPO tst = om.createGPO();
                 tst.setValue(name, vf.createLiteral("Name" + i));
@@ -383,6 +392,9 @@ public class TestGOM extends LocalGOMTestCase {
             om.commitNativeTransaction(transCounter);
 
             final long duration = (System.currentTimeMillis() - start);
+            
+            final long objectsPS = creates * 1000 / duration;
+            final long statementsPS = objectsPS * 5;
 
             /*
              * Note that this is a conservative estimate for statements per
@@ -391,13 +403,16 @@ public class TestGOM extends LocalGOMTestCase {
              */
             if (log.isInfoEnabled()) {
 
-                log.info("Creation rate of " + (creates * 1000 / duration)
+                log.info("Creation rate of " + objectsPS
                         + " objects per second");
 
-                log.info("Creation rate of " + (creates * 5 * 1000 / duration)
+                log.info("Creation rate of " + statementsPS
                         + " statements per second");
 
             }
+            
+            // Anything less than 5000 statements per second is a failure
+            assertTrue(statementsPS > 5000);
         } catch (Throwable t) {
             // t.printStackTrace();
 
@@ -453,30 +468,4 @@ public class TestGOM extends LocalGOMTestCase {
 		
 	}
 
-	/*
-	 * API method tests.
-	 */
-	
-//    public void test_addValue() {
-//        fail("write test");
-//    }
-//
-//    public void test_setValue() {
-//        fail("write test");
-//    }
-//    
-//    public void test_removeValue() {
-//        fail("write test");
-//    }
-//
-//    public void test_removeValues() {
-//        fail("write test");
-//    }
-//
-//    public void test_dirtyObjectsAreCleanAfterCommit() {
-//        fail("write test");
-//    }
-    
-    // TODO Test ALL of the API.
-    
 }

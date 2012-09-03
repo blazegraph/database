@@ -39,6 +39,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import junit.extensions.proxy.ProxyTestSuite;
+import junit.framework.Test;
 import junit.framework.TestCase;
 
 import org.apache.http.conn.ClientConnectionManager;
@@ -79,7 +81,7 @@ import com.bigdata.util.config.NicUtil;
  * @author Martyn Cutcher
  * 
  */
-public class RemoteGOMTestCase extends TestCase {
+public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
     private static final Logger log = Logger.getLogger(RemoteGOMTestCase.class);
 
@@ -97,10 +99,29 @@ public class RemoteGOMTestCase extends TestCase {
 
 	protected BigdataSailRepository repo;
 
-//	protected BigdataSailRepositoryConnection m_cxn;
-	
-    protected NanoSparqlObjectManager om;
+    protected ValueFactory m_vf;
+    protected IObjectManager om;
 
+	public static Test suite() {
+
+		final RemoteGOMTestCase delegate = new RemoteGOMTestCase(); // !!!! THIS CLASS
+															// !!!!
+
+		/*
+		 * Use a proxy test suite and specify the delegate.
+		 */
+
+		final ProxyTestSuite suite = new ProxyTestSuite(delegate, "Remote GOM tests");
+		
+		suite.addTestSuite(TestGPO.class);
+		suite.addTestSuite(TestGOM.class);
+		suite.addTestSuite(TestOwlGOM.class);
+
+		return suite;
+	}
+
+	//	protected BigdataSailRepositoryConnection m_cxn;
+	
     protected Properties getProperties() throws Exception {
     	
         final Properties properties = new Properties();
@@ -218,7 +239,7 @@ public class RemoteGOMTestCase extends TestCase {
             m_server = null;
 
         }
-
+        
         m_repo = null;
 
         m_serviceURL = null;
@@ -246,6 +267,10 @@ public class RemoteGOMTestCase extends TestCase {
             }
             
         }
+        
+        if (m_indexManager != null) {
+        	m_indexManager.destroy();
+        }
 
         m_indexManager = null;
 
@@ -260,7 +285,7 @@ public class RemoteGOMTestCase extends TestCase {
     /**
      * Utility to load statements from a resource
      */
-    protected void load(final URL n3, final RDFFormat rdfFormat)
+    public void load(final URL n3, final RDFFormat rdfFormat)
             throws IOException, RDFParseException, RepositoryException {
         final InputStream in = n3.openConnection().getInputStream();
         try {
@@ -298,5 +323,25 @@ public class RemoteGOMTestCase extends TestCase {
 				reader.close();
 			}
 		}
+	}
+
+	@Override
+	public IObjectManager getObjectManager() {
+		return om;
+	}
+
+	@Override
+	public ValueFactory getValueFactory() {
+		return m_vf;
+	}
+
+	@Override
+	public void proxySetup() throws Exception {
+		setUp();
+	}
+
+	@Override
+	public void proxyTearDown() throws Exception {
+		tearDown();
 	}
 }

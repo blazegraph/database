@@ -52,15 +52,14 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("GOM");
 
         // Embedded GOM test suite.
-        suite.addTestSuite(com.bigdata.gom.TestGPO.class);
-        suite.addTestSuite(com.bigdata.gom.TestGOM.class);
-
-        suite.addTestSuite(com.bigdata.gom.TestOwlGOM.class);
-
+        suite.addTest(com.bigdata.gom.LocalGOMTestCase.suite());
+        
+        // Remote GOM test suite
+        suite.addTest(com.bigdata.gom.RemoteGOMTestCase.suite());
+        
+        
+ 
         suite.addTestSuite(com.bigdata.gom.TestOWLSkin.class);
-
-        // Remote GOM test suite.
-        suite.addTestSuite(com.bigdata.gom.TestRemoteGOM.class);
 
         // JavaScript GOM test suite.
         suite.addTestSuite(com.bigdata.gom.TestJavaScriptGOM.class);

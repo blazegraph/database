@@ -32,6 +32,8 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.Properties;
 
+import junit.extensions.proxy.ProxyTestSuite;
+import junit.framework.Test;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
@@ -45,6 +47,7 @@ import org.openrdf.rio.RDFParseException;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.gpo.ILinkSet;
+import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
@@ -53,15 +56,17 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rwstore.TestRWJournal;
 
-abstract public class LocalGOMTestCase extends TestCase {
+public class LocalGOMTestCase extends TestCase implements IGOMProxy {
 
     private static final Logger log = Logger.getLogger(LocalGOMTestCase.class);
 
     protected BigdataSailRepository m_repo;
     protected BigdataSail m_sail;
     protected ValueFactory m_vf;
-    protected ObjectManager om;
+    protected IObjectManager om;
+    
 
     public LocalGOMTestCase() {
     }
@@ -70,7 +75,29 @@ abstract public class LocalGOMTestCase extends TestCase {
         super(name);
     }
 
-    protected Properties getProperties() throws Exception {
+	public static Test suite() {
+
+		final LocalGOMTestCase delegate = new LocalGOMTestCase(); // !!!! THIS CLASS
+															// !!!!
+
+		/*
+		 * Use a proxy test suite and specify the delegate.
+		 */
+
+		final ProxyTestSuite suite = new ProxyTestSuite(delegate, "Local GOM tests");
+		
+		suite.addTestSuite(TestGPO.class);
+		suite.addTestSuite(TestGOM.class);
+		suite.addTestSuite(TestOwlGOM.class);
+
+		return suite;
+	}
+
+		/*
+		 * List any non-proxied tests (typically bootstrapping tests).
+		 */
+
+		protected Properties getProperties() throws Exception {
     	
         final Properties properties = new Properties();
 
@@ -149,7 +176,7 @@ abstract public class LocalGOMTestCase extends TestCase {
     /**
      * Utility to load n3 statements from a resource
      */
-    protected void load(final URL n3, final RDFFormat rdfFormat)
+    public void load(final URL n3, final RDFFormat rdfFormat)
             throws IOException, RDFParseException, RepositoryException {
 
         final InputStream in = n3.openConnection().getInputStream();
@@ -175,50 +202,24 @@ abstract public class LocalGOMTestCase extends TestCase {
         
     }
 
-    protected void showClassHierarchy(final Iterator<IGPO> classes,
-            final int indent) {
-        StringBuilder out = new StringBuilder();
-        showClassHierarchy(out, classes, indent);
-        System.out.println("Hierarchy: " + out.toString());
-    }
+	@Override
+	public IObjectManager getObjectManager() {
+		return om;
+	}
 
-    private void showClassHierarchy(StringBuilder out, Iterator<IGPO> classes,
-            int indent) {
-        while (classes.hasNext()) {
-            final IGPO clss = classes.next();
-            out.append(indentOut(clss, indent + 1));
-            showClassHierarchy(out,
-                    clss.getLinksIn(RDFS.SUBCLASSOF).iterator(), indent + 1);
-        }
-    }
+	@Override
+	public ValueFactory getValueFactory() {
+		return m_vf;
+	}
 
-    String indents = "\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	@Override
+	public void proxySetup() throws Exception {
+		setUp();
+	}
 
-    private Object indentOut(IGPO clss, int indent) {
-        Value lbl = clss.getValue(RDFS.LABEL);
-        final String display = lbl == null ? clss.getId().stringValue() : lbl
-                .stringValue();
-        return indents.substring(0, indent) + display;
-    }
-
-    protected void showOntology(IGPO onto) {
-        System.out.println("Ontology: " + onto.pp());
-        Iterator<IGPO> parts = onto.getLinksIn().iterator();
-        while (parts.hasNext()) {
-            IGPO part = parts.next();
-            System.out.println("Onto Part: " + part.pp());
-        }
-    }
-    
-    protected void checkLinkSet(final ILinkSet ls, int size) {
-    	assertTrue(ls.size() == size);
-    	Iterator<IGPO> values = ls.iterator();
-    	int count = 0;
-    	while (values.hasNext()) {
-    		count++;
-    		values.next();
-    	}
-    	assertTrue(count == size);
-    }
+	@Override
+	public void proxyTearDown() throws Exception {
+		tearDown();
+	}
 
 }
