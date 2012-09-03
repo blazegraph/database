@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.util;
 
 import java.io.File;
+import java.lang.reflect.Array;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.jini.config.ConfigUtil;
@@ -216,6 +217,39 @@ public class ConfigMath {
         
         return sb.toString(); 
         
+    }
+
+    /**
+     * Combines the two arrays, appending the contents of the 2nd array to the
+     * contents of the first array.
+     * 
+     * @param a
+     * @param b
+     * @return
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T[] concat(final T[] a, final T[] b) {
+    
+        if (a == null && b == null)
+            return a;
+    
+        if (a == null)
+            return b;
+    
+        if (b == null)
+            return a;
+    
+        final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
+                .getComponentType(), a.length + b.length);
+    
+        // final String[] c = new String[a.length + b.length];
+    
+        System.arraycopy(a, 0, c, 0, a.length);
+    
+        System.arraycopy(b, 0, c, a.length, b.length);
+    
+        return c;
+    
     }
 
 }

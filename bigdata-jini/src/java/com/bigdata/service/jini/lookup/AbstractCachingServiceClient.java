@@ -71,7 +71,6 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     protected static final transient Logger log = Logger
             .getLogger(AbstractCachingServiceClient.class);
 
-//    final protected JiniFederation fed;
     private final ServiceDiscoveryManager serviceDiscoveryManager;
     
     protected ServiceDiscoveryManager getServiceDiscoveryManager() {
@@ -142,7 +141,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * @param serviceDiscoveryManager
      *            Used to discovery services matching the template and filter.
      * @param serviceDiscoveryListener
-     *            Service discovery notices are delivered to this class.
+     *            Service discovery notices are delivered to this class
+     *            (optional).
      * @param serviceIface
      *            The most interesting interface on the service (this is used
      *            for log messages).

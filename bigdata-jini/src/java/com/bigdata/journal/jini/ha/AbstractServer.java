@@ -176,8 +176,22 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         String EXPORTER = "exporter";
         
+        /**
+         * The timeout in milliseconds to await the discovery of a service if
+         * there is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
+         */
+        String CACHE_MISS_TIMEOUT = "cacheMissTimeout";
+
+        long DEFAULT_CACHE_MISS_TIMEOUT = 2000L;
+     
     }
 
+    /**
+     * The timeout in milliseconds to await the discovery of a service if there
+     * is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).
+     */
+    final protected long cacheMissTimeout;
+    
     /**
      * The {@link ServiceID} for this server is either read from a local file,
      * assigned by the registrar (if this is a new service instance), or given
@@ -536,6 +550,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             config = ConfigurationProvider.getInstance(args);
 
+            cacheMissTimeout = (Long) config.getEntry(COMPONENT,
+                    ConfigurationOptions.CACHE_MISS_TIMEOUT, Long.TYPE,
+                    ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);
+
             groups = (String[]) config.getEntry(
                     COMPONENT, ConfigurationOptions.GROUPS, String[].class);
 
@@ -792,44 +810,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
                 
-        /*
-         * Create the service object.
-         */
-        try {
-            
-            /*
-             * Note: By creating the service object here rather than outside of
-             * the constructor we potentially create problems for subclasses of
-             * AbstractServer since their own constructor will not have been
-             * executed yet.
-             * 
-             * Some of those problems are worked around using a JiniClient to
-             * handle all aspects of service discovery (how this service locates
-             * the other services in the federation).
-             * 
-             * Note: If you explicitly assign values to those clients when the
-             * fields are declared, e.g., [timestampServiceClient=null] then the
-             * ctor will overwrite the values set by [newService] since it is
-             * running before those initializations are performed. This is
-             * really crufty, may be JVM dependent, and needs to be refactored
-             * to avoid this subclass ctor init problem.
-             */
-
-            if (log.isInfoEnabled())
-                log.info("Creating service impl...");
-
-            // init.
-            impl = newService(config);
-            
-            if (log.isInfoEnabled())
-                log.info("Service impl is " + impl);
-            
-        } catch(Exception ex) {
-        
-            fatal("Could not start service: "+this, ex);
-            throw new AssertionError();// keeps compiler happy.
-        }
-
         try {
 
             /*
@@ -870,6 +850,44 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             fatal("Could not setup discovery", ex);
             throw new AssertionError();// keep the compiler happy.
 
+        }
+
+        /*
+         * Create the service object.
+         */
+        try {
+            
+            /*
+             * Note: By creating the service object here rather than outside of
+             * the constructor we potentially create problems for subclasses of
+             * AbstractServer since their own constructor will not have been
+             * executed yet.
+             * 
+             * Some of those problems are worked around using a JiniClient to
+             * handle all aspects of service discovery (how this service locates
+             * the other services in the federation).
+             * 
+             * Note: If you explicitly assign values to those clients when the
+             * fields are declared, e.g., [timestampServiceClient=null] then the
+             * ctor will overwrite the values set by [newService] since it is
+             * running before those initializations are performed. This is
+             * really crufty, may be JVM dependent, and needs to be refactored
+             * to avoid this subclass ctor init problem.
+             */
+
+            if (log.isInfoEnabled())
+                log.info("Creating service impl...");
+
+            // init.
+            impl = newService(config);
+            
+            if (log.isInfoEnabled())
+                log.info("Service impl is " + impl);
+            
+        } catch(Exception ex) {
+        
+            fatal("Could not start service: "+this, ex);
+            throw new AssertionError();// keeps compiler happy.
         }
 
         /*
@@ -936,6 +954,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
 
         /*
+         * TODO Not needed since the ServiceID is being set from the config
+         * file, but we do not yet verify that it *is* set from the config file.
+         * Do that, and then remove this code,
+         * 
          * Note: This is synchronized in case set via listener by the
          * JoinManager, which would be rather fast action on its part.
          */
@@ -1724,7 +1746,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
     }
 
-    private Object keepAlive = new Object();
+    final private Object keepAlive = new Object();
 
     /**
      * Runs {@link AbstractServer#shutdownNow()} and terminates all asynchronous
@@ -1890,8 +1912,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @param config
      *            The {@link Configuration}.
+     * @throws Exception 
      */
     abstract protected Remote newService(Configuration config)
-            throws ConfigurationException;
+            throws Exception;
     
 }

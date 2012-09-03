@@ -38,6 +38,7 @@ import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.JavaServiceConfiguration.JavaServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 
 /**
  * Starts an unmanaged service using the specified configuration.
@@ -169,7 +170,7 @@ public class ServiceStarter {
                 className, config);
 
         // pass through any options.
-        serviceConfig.options = ServiceConfiguration.concat(
+        serviceConfig.options = ConfigMath.concat(
                 serviceConfig.options, args2);
 
         // get the service starter.

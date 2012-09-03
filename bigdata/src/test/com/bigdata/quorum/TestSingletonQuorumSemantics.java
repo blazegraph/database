@@ -30,6 +30,7 @@ package com.bigdata.quorum;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 
@@ -233,8 +234,15 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
     public void test_voting() throws InterruptedException,
             AsynchronousQuorumCloseException, TimeoutException {
 
-	    // This is a debug flag.  It should be [false] normally.
-	    final boolean awaitMeetsAndBreaks = true;
+        /*
+         * When true, this test also exercises the awaitQuorum() and
+         * awaitBreak() methods that accept a timeout, but only for the case in
+         * which the condition should be true on entry. There is another unit
+         * test in this class that verifies that the TimeoutException is
+         * correctly thrown if the condition does not become true within the
+         * timeout.
+         */
+        final boolean awaitMeetsAndBreaks = true;
 	    
         final Quorum<?, ?> quorum = quorums[0];
         final MockQuorumMember<?> client = clients[0];
@@ -470,4 +478,160 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         
     }
 
+    /**
+     * Unit test of timeout in {@link Quorum#awaitQuorum(long, TimeUnit)}. and
+     * {@link Quorum#awaitBreak(long, TimeUnit)}.
+     * 
+     * @throws AsynchronousQuorumCloseException
+     * @throws InterruptedException
+     */
+    public void test_awaitQuorum() throws AsynchronousQuorumCloseException, InterruptedException {
+        
+        final AbstractQuorum<?, ?> quorum = quorums[0];
+        final MockQuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
+
+        final long lastCommitTime = 0L;
+        final long lastCommitTime2 = 2L;
+
+        // declare the service as a quorum member.
+        actor.memberAdd();
+        fixture.awaitDeque();
+        
+        assertTrue(client.isMember());
+        assertEquals(new UUID[]{serviceId},quorum.getMembers());
+        
+        // add to the pipeline.
+        actor.pipelineAdd();
+        fixture.awaitDeque();
+
+        assertTrue(client.isPipelineMember());
+        assertEquals(new UUID[]{serviceId},quorum.getPipeline());
+
+        final long timeout = 1500;// ms
+        final long slop = 100;// margin of error.
+        {
+            /*
+             * Verify that a we timeout when awaiting a quorum meet that does
+             * not occur.
+             */
+            final AtomicLong didTimeout = new AtomicLong(-1L);
+
+            final Thread t = new Thread() {
+                public void run() {
+                    final long begin = System.currentTimeMillis();
+                    try {
+                        // wait for a quorum (but will not meet).
+                        log.info("Waiting for quorum meet.");
+                        quorum.awaitQuorum(timeout, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException e) {
+                        // This is what we are looking for.
+                        final long elapsed = System.currentTimeMillis() - begin;
+                        didTimeout.set(elapsed);
+                        if (log.isInfoEnabled())
+                            log.info("Timeout after " + elapsed + "ms");
+                    } catch (Exception e) {
+                        log.error(e, e);
+                    }
+                }
+            };
+            t.run();
+            Thread.sleep(timeout + 250/* ms */);
+            t.interrupt();
+            final long elapsed = didTimeout.get();
+            assertTrue("did not timeout", elapsed != -1);
+            assertTrue("Timeout occurred too soon: elapsed=" + elapsed
+                    + ",timeout=" + timeout, elapsed >= timeout);
+            assertTrue("Timeout took too long: elapsed=" + elapsed
+                    + ",timeout=" + timeout, elapsed < (timeout + slop));
+        }
+
+        // cast a vote for a lastCommitTime.
+        actor.castVote(lastCommitTime);
+        fixture.awaitDeque();
+
+        assertEquals(1,quorum.getVotes().size());
+        assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
+                lastCommitTime));
+
+        // verify the consensus was updated.
+        assertEquals(lastCommitTime, client.lastConsensusValue);
+
+        // wait for quorum meet.
+        final long token1 = quorum.awaitQuorum();
+
+        // verify service was joined.
+        assertTrue(client.isJoinedMember(quorum.token()));
+        assertEquals(new UUID[] { serviceId }, quorum.getJoined());
+
+        // validate the token was assigned.
+        fixture.awaitDeque();
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.token());
+        assertTrue(quorum.isQuorumMet());
+        
+        {
+            /*
+             * Verify that we timeout when awaiting a quorum break that does not
+             * occur.
+             */
+            final AtomicLong didTimeout = new AtomicLong(-1L);
+
+            final Thread t = new Thread() {
+                public void run() {
+                    final long begin = System.currentTimeMillis();
+                    try {
+                        // wait for a quorum break (but will not break).
+                        log.info("Waiting for quorum break.");
+                        quorum.awaitBreak(timeout, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException e) {
+                        // This is what we are looking for.
+                        final long elapsed = System.currentTimeMillis() - begin;
+                        didTimeout.set(elapsed);
+                        if (log.isInfoEnabled())
+                            log.error("Timeout after " + elapsed + "ms");
+                    } catch (Exception e) {
+                        log.error(e, e);
+                    }
+                }
+            };
+            t.run();
+            Thread.sleep(timeout + 250/* ms */);
+            t.interrupt();
+            final long elapsed = didTimeout.get();
+            assertTrue("did not timeout", elapsed != -1);
+            assertTrue("Timeout occurred too soon: elapsed=" + elapsed
+                    + ",timeout=" + timeout, elapsed >= timeout);
+            assertTrue("Timeout took too long: elapsed=" + elapsed
+                    + ",timeout=" + timeout, elapsed < (timeout + slop));
+        }
+
+        try {
+            // Verify awaitBreak() does not return normally.
+            quorum.awaitBreak(1, TimeUnit.MILLISECONDS);
+            fail("Not expecting quorum break");
+        } catch (TimeoutException e) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected excption: " + e);
+        }
+
+        /*
+         * Do service leave, quorum should break. 
+         */
+
+        actor.serviceLeave();
+        fixture.awaitDeque();
+
+        quorum.awaitBreak();
+
+        try {
+            // Verify awaitBreak() returns normally.
+            quorum.awaitBreak(1, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            fail("Not expecting " + e, e);
+        }
+
+    }
+    
 }

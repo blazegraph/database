@@ -44,8 +44,8 @@ import net.jini.config.ConfigurationProvider;
 import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.jini.lookup.DataServicesClient;
 import com.bigdata.util.NV;
@@ -360,7 +360,7 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
         } else
             b = null;
     
-        final NV[] tmp = ServiceConfiguration.concat(a, b);
+        final NV[] tmp = ConfigMath.concat(a, b);
     
         final Properties properties = new Properties();
 

@@ -478,7 +478,7 @@ abstract public class JiniServiceConfiguration extends
 
             final ServiceUUID serviceUUID = new ServiceUUID(this.serviceUUID);
 
-            return concat(new Entry[] { serviceName, hostName, serviceDir,
+            return ConfigMath.concat(new Entry[] { serviceName, hostName, serviceDir,
                     serviceUUID }, entries);
 
         }
@@ -926,7 +926,7 @@ abstract public class JiniServiceConfiguration extends
     public static String[] getJiniOptions(final String className,
             final Configuration config) throws ConfigurationException {
 
-        return concat( // for all services
+        return ConfigMath.concat( // for all services
                 getStringArray(Options.JINI_OPTIONS,
                         JiniClient.class.getName(), config, new String[0]),
                 // for this service.

@@ -41,14 +41,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.BadVersionException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.NotEmptyException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
@@ -1703,7 +1703,14 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                     if (state.token() == NO_QUORUM && token() != NO_QUORUM) {
                         clearToken();
                     } else if (lastValidToken() != state.lastValidToken()) {
-                        setToken(state.lastValidToken());
+                        final UUID[] joined = getJoined();
+                        final int k = replicationFactor();
+                        if (joined.length >= ((k + 1) / 2)) {
+                            setToken(state.lastValidToken());
+                        } else {
+                            log.warn("Can not set token - not enough joined services: k="
+                                    + k + ", joined=" + joined.length);
+                        }
                     }
                 } finally {
                     lock.unlock();
@@ -1894,6 +1901,75 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
     } // ZkQuorumWatcher
 
+    @Override
+    protected long getLastValidTokenFromQuorumState(final C client) {
+
+        super.getLastValidTokenFromQuorumState(client);
+        /*
+         * Since the QourumTokenState exists, we need to initialize the
+         * lastValidToken from the QuorumTokenState in case the quorum has
+         * met in the past.
+         */
+        final String logicalServiceId = client.getLogicalServiceId();
+        final byte[] data;
+        try {
+
+            final Stat stat = new Stat();
+
+            data = zka
+                    .getZookeeper().getData(logicalServiceId + "/" + QUORUM,
+                            false/* watch */, stat);
+            
+            final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
+                    .deserialize(data);
+            
+            log.warn("Starting with quorum that has already met in the past: "
+                    + tokenState);
+            
+            if (tokenState.token() != NO_QUORUM && !isQuorumMet()) {
+
+                try {
+
+                    /*
+                     * Replace the QuorumTokenState.
+                     * 
+                     * There is a durable QuorumTokenState, but it has a valid
+                     * token even though the quorum is not met. This can occur
+                     * on restart since it is quorum clients that are
+                     * responsible for managing the state in zookeeper. If all
+                     * clients were killed, then none of them will have had the
+                     * opportunity to update the QuorumTokenState in zookeeper
+                     * and it will falsely report a valid quorum. We fix that
+                     * now by replacing the data in the znode.
+                     */
+                    QuorumTokenState tmp = new QuorumTokenState(//
+                            tokenState.lastValidToken(),// lastValidToken
+                            Quorum.NO_QUORUM// currentToken
+                    );
+
+                    // update znode unless version is changed.
+                    zka.getZookeeper().setData(logicalServiceId + "/" + QUORUM,
+                            SerializerUtil.serialize(tmp), stat.getVersion());
+
+                } catch (BadVersionException ex) {
+                    // ignore.
+                    if (log.isInfoEnabled())
+                        log.info("Version no longer current: " + ex);
+                }
+
+            }
+            return tokenState.lastValidToken();
+        } catch (NoNodeException e) {
+            // This is Ok. The node just does not exist yet.
+            return NO_QUORUM;
+        } catch (KeeperException e) {
+            // Anything else is a problem.
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
     /**
      * Ensure that the zpaths for the {@link BigdataZooDefs#QUORUM} and its
      * various persistent children exist.
@@ -1908,16 +1984,19 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
      * @throws KeeperException
      * @throws InterruptedException
      */
-    static public void setupQuorum(String logicalServiceId,
+    static public void setupQuorum(final String logicalServiceId,
             final ZooKeeperAccessor zka, final List<ACL> acl)
             throws KeeperException, InterruptedException {
 
+        QuorumTokenState tokenState = new QuorumTokenState(//
+                Quorum.NO_QUORUM,// lastValidToken
+                Quorum.NO_QUORUM// currentToken
+        );
+
         try {
             zka.getZookeeper().create(logicalServiceId + "/" + QUORUM,
-                    SerializerUtil.serialize(new QuorumTokenState(//
-                            Quorum.NO_QUORUM,// lastValidToken
-                            Quorum.NO_QUORUM// currentToken
-                            )), acl, CreateMode.PERSISTENT);
+                    SerializerUtil.serialize(tokenState), acl,
+                    CreateMode.PERSISTENT);
         } catch (NodeExistsException ex) {
             // ignore.
         }
@@ -1954,6 +2033,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             // ignore.
         }
 
+//        return tokenState;
+        
     }
 
 }

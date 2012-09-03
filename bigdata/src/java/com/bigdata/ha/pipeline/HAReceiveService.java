@@ -300,7 +300,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
             server.socket().bind(addrSelf);
             server.configureBlocking(false);
             if(log.isInfoEnabled())
-                log.info("Listening on" + addrSelf);
+                log.info("Listening on: " + addrSelf);
             runNoBlock(server);
         } catch (InterruptedException e) {
             /*

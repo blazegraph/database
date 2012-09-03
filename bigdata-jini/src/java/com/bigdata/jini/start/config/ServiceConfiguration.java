@@ -24,6 +24,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
 import com.sun.jini.tool.ClassServer;
@@ -778,8 +779,8 @@ abstract public class ServiceConfiguration implements Serializable {
                 final long timeout, final TimeUnit unit) throws Exception {
 
             try {
-
                 final int exitValue = processHelper.exitValue(timeout, unit);
+                
 
                 throw new IOException("exitValue=" + exitValue);
 
@@ -927,7 +928,7 @@ abstract public class ServiceConfiguration implements Serializable {
                 IServiceConstraint[].class, new IServiceConstraint[0]);
 
         if (a != null && b != null)
-            return concat(a, b);
+            return ConfigMath.concat(a, b);
 
         if (a != null)
             return a;
@@ -947,7 +948,7 @@ abstract public class ServiceConfiguration implements Serializable {
                 String[].class, defaultValue);
 
         if (a != null && b != null)
-            return concat(a, b);
+            return ConfigMath.concat(a, b);
 
         if (a != null)
             return a;
@@ -963,30 +964,12 @@ abstract public class ServiceConfiguration implements Serializable {
      * @param a
      * @param b
      * @return
+     * @deprecated Use {@link ConfigMath#concat(T[],T[])} instead
      */
-    @SuppressWarnings("unchecked")
     public static <T> T[] concat(final T[] a, final T[] b) {
 
-        if (a == null && b == null)
-            return a;
-
-        if (a == null)
-            return b;
-
-        if (b == null)
-            return a;
-
-        final T[] c = (T[]) java.lang.reflect.Array.newInstance(a.getClass()
-                .getComponentType(), a.length + b.length);
-
-        // final String[] c = new String[a.length + b.length];
-
-        System.arraycopy(a, 0, c, 0, a.length);
-
-        System.arraycopy(b, 0, c, a.length, b.length);
-
-        return c;
-
+        return ConfigMath.concat(a, b);
+        
     }
 
     /**

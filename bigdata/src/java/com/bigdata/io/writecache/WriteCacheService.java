@@ -584,9 +584,12 @@ abstract public class WriteCacheService implements IWriteCache {
                             b.flip();
                             assert b.remaining() > 0 : "Empty cache: " + cache; 
                             // send to 1st follower.
-                            remoteWriteFuture = ((QuorumPipeline<HAPipelineGlue>) quorum
-                                    .getMember()).replicate(cache
-                                    .newHAWriteMessage(quorumToken), b);
+                            @SuppressWarnings("unchecked")
+                            final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
+                                    .getMember();
+                            assert quorumMember != null : "No quorum member?";
+                            remoteWriteFuture = quorumMember.replicate(
+                                    cache.newHAWriteMessage(quorumToken), b);
                             counters.get().nsend++;
                         }
 

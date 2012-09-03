@@ -35,7 +35,7 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
 
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
-import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.util.ConfigMath;
 
 /**
  * Helper class for jini core services (reggie, etc).
@@ -140,7 +140,7 @@ public class JiniCoreServicesHelper {
 //    @SuppressWarnings("unchecked")
     protected static <T> T[] concat(final T[] a, final T[] b) {
 
-        return ServiceConfiguration.concat(a, b);
+        return ConfigMath.concat(a, b);
         
     }
 

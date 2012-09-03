@@ -69,7 +69,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
 
     /**
      * An optional delegate listener that will also see the
-     * {@link ServiceDiscoveryEvent}s observed by this class=.
+     * {@link ServiceDiscoveryEvent}s observed by this class.
      */
     private final ServiceDiscoveryListener listener;
     

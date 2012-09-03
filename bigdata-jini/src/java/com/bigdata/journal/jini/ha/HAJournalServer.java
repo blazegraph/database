@@ -2,44 +2,85 @@ package com.bigdata.journal.jini.ha;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
 import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.ZooDefs.Ids;
+import org.apache.zookeeper.data.ACL;
+import org.eclipse.jetty.server.Server;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumEvent;
+import com.bigdata.quorum.QuorumListener;
+import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.bigdata.util.config.NicUtil;
+import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.sun.jini.start.LifeCycle;
 
 /**
  * An administratable server for an {@link HAJournal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         TODO Make sure that ganglia reporting can be enabled.
  */
 public class HAJournalServer extends AbstractServer {
 
     private static final Logger log = Logger.getLogger(HAJournal.class);
 
+    /**
+     * Configuration options for the {@link HAJournalServer}.
+     */
     public interface ConfigurationOptions {
         
         String COMPONENT = HAJournalServer.class.getName();
+        
+        /**
+         * The root path under which the logical services are arranged.
+         */
+        String ZROOT = "zroot";
+        
+        /**
+         * The target replication factor (k).
+         */
+        String REPLICATION_FACTOR = "replicationFactor";
         
         /**
          * The {@link InetSocketAddress} at which the managed {@link HAJournal}
@@ -54,55 +95,535 @@ public class HAJournalServer extends AbstractServer {
         
     }
     
+    /**
+     * Configuration options for the {@link NanoSparqlServer}.
+     */
+    public interface NSSConfigurationOptions extends ConfigParams {
+        
+        String COMPONENT = NanoSparqlServer.class.getName();
+        
+        /**
+         * The port at which the embedded {@link NanoSparqlServer} will respond
+         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
+         * (0) to use a random open port.
+         */
+        String PORT = "port";
+
+        int DEFAULT_PORT = 8080;
+        
+    }
+    
+    /**
+     * Caching discovery client for the {@link HAGlue} services.
+     */
+    private HAJournalDiscoveryClient discoveryClient;
+    
+    /**
+     * The journal.
+     */
+    private HAJournal journal;
+    
+    private UUID serviceUUID;
+    private HAGlue haGlueService;
+    private String logicalServiceId;
+    
+    /**
+     * The {@link Quorum} for the {@link HAJournal}.
+     */
+    private Quorum<HAGlue, QuorumService<HAGlue>> quorum;
+
+    /**
+     * An embedded jetty server exposing the {@link NanoSparqlServer} webapp.
+     * The {@link NanoSparqlServer} webapp exposes a SPARQL endpoint for the
+     * Journal, which is how you read/write on the journal (the {@link HAGlue}
+     * interface does not expose any {@link Remote} methods to write on the
+     * {@link HAJournal}.
+     */
+    private Server jettyServer;
+
     public HAJournalServer(final String[] args, final LifeCycle lifeCycle) {
 
         super(args, lifeCycle);
 
     }
+    
+    @Override
+    protected void terminate() {
+
+        if (discoveryClient != null) {
+        
+            discoveryClient.terminate();
+            
+            discoveryClient = null;
+            
+        }
+
+        try {
+            if (jettyServer != null) {
+                // Shut down the NanoSparqlServer.
+                jettyServer.stop();
+                jettyServer = null;
+            }
+        } catch (Exception e) {
+            log.error(e);
+        }
+        
+        super.terminate();
+    
+    }
 
     @Override
     protected HAGlue newService(final Configuration config)
-            throws ConfigurationException {
-
-        // The address at which this service exposes its write pipeline.
-        final InetSocketAddress writePipelineAddr = (InetSocketAddress) config
-                .getEntry(ConfigurationOptions.COMPONENT,
-                        ConfigurationOptions.WRITE_PIPELINE_ADDR,
-                        InetSocketAddress.class);
-
-        // The write replication pipeline.
-        final UUID[] pipelineUUIDs = (UUID[]) config.getEntry(
-                ConfigurationOptions.COMPONENT,
-                ConfigurationOptions.PIPELINE_UUIDS, UUID[].class);
+            throws Exception {
 
         /*
-         * Configuration properties for this HAJournal.
+         * Verify discovery of at least one ServiceRegistrar.
          */
-        final Properties properties = JiniClient.getProperties(
-                HAJournal.class.getName(), config);
+        {
+            final long begin = System.currentTimeMillis();
 
-        // Force the writePipelineAddr into the Properties.
-        properties
-                .put(HAJournal.Options.WRITE_PIPELINE_ADDR, writePipelineAddr);
+            ServiceRegistrar[] registrars = null;
 
+            long elapsed = 0;
+
+            while ((registrars == null || registrars.length == 0)
+                    && elapsed < TimeUnit.SECONDS.toMillis(10)) {
+
+                registrars = getDiscoveryManagement().getRegistrars();
+
+                Thread.sleep(100/* ms */);
+
+                elapsed = System.currentTimeMillis() - begin;
+
+            }
+
+            if (registrars == null || registrars.length == 0) {
+
+                throw new RuntimeException(
+                        "Could not discover ServiceRegistrar(s)");
+
+            }
+
+            if (log.isInfoEnabled()) {
+                log.info("Found " + registrars.length + " service registrars");
+            }
+
+        }
+
+       // Setup discovery for HAGlue clients.
+        discoveryClient = new HAJournalDiscoveryClient(
+                getServiceDiscoveryManager(),
+                null/* serviceDiscoveryListener */, cacheMissTimeout);
+
+        // Jini/River ServiceID.
         final ServiceID serviceID = getServiceID();
 
-        final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceID);
+        // UUID variant of that ServiceID.
+        serviceUUID = JiniUtil.serviceID2UUID(serviceID);
+        
+        /*
+         * Setup the Quorum / HAJournal.
+         */
 
-        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = new StaticQuorum(
-                serviceUUID, pipelineUUIDs);
+        final String zroot = (String) config
+                .getEntry(ConfigurationOptions.COMPONENT,
+                        ConfigurationOptions.ZROOT,
+                        String.class);
 
-        final HAJournal journal = new HAJournal(properties, quorum);
+        logicalServiceId = zroot + "/" + HAJournalServer.class.getName();
 
-        final HAGlue service = journal.newHAGlue(serviceUUID);
+        final int replicationFactor = (Integer) config.getEntry(
+                ConfigurationOptions.COMPONENT,
+                ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);        
+
+        {
+
+            // The address at which this service exposes its write pipeline.
+            final InetSocketAddress writePipelineAddr = (InetSocketAddress) config
+                    .getEntry(ConfigurationOptions.COMPONENT,
+                            ConfigurationOptions.WRITE_PIPELINE_ADDR,
+                            InetSocketAddress.class);
+
+            // The write replication pipeline.
+            final UUID[] pipelineUUIDs = (UUID[]) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.PIPELINE_UUIDS, UUID[].class);
+
+            /*
+             * Configuration properties for this HAJournal.
+             */
+            final Properties properties = JiniClient.getProperties(
+                    HAJournal.class.getName(), config);
+
+            // Force the writePipelineAddr into the Properties.
+            properties.put(HAJournal.Options.WRITE_PIPELINE_ADDR,
+                    writePipelineAddr);
+
+            if(false){
+
+                /*
+                 * Jini/River only quorum.
+                 */
+                
+                quorum = new StaticQuorum(serviceUUID, pipelineUUIDs,
+                        discoveryClient);
+
+            } else {
+
+                /*
+                 * Zookeeper quorum.
+                 */
+                
+                final List<ACL> acl = Ids.OPEN_ACL_UNSAFE; // TODO CONFIGURATION
+                final String zoohosts = "localhost:2081"; // TODO CONFIGURATION (zooclient)
+                final int sessionTimeout = (int) ConfigMath.m2ms(10);
+                
+                final ZooKeeperAccessor zka = new ZooKeeperAccessor(
+                        zoohosts, sessionTimeout);
+                
+                if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
+                
+                    throw new RuntimeException("Could not connect to zk");
+                    
+                }
+                
+                if (log.isInfoEnabled()) {
+                    log.info("Connected to zookeeper");
+                }
+
+                /*
+                 * Ensure key znodes exist.
+                 */
+                try {
+                    zka.getZookeeper().create(zroot, new byte[] {/* data */},
+                            acl, CreateMode.PERSISTENT);
+                } catch (NodeExistsException ex) {
+                    // ignore.
+                }
+                try {
+                    zka.getZookeeper()
+                            .create(logicalServiceId, new byte[] {/* data */},
+                                    acl, CreateMode.PERSISTENT);
+                } catch (NodeExistsException ex) {
+                    // ignore.
+                }
+
+                quorum = new ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>(
+                        replicationFactor, zka, acl);
+
+            }
+
+            this.journal = new HAJournal(properties, quorum);
+            
+        }
+
+        haGlueService = journal.newHAGlue(serviceUUID);
 
         final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
-                this, service);
+                this, haGlueService);
 
         return administrableService;
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to handle initialization that must wait until the
+     * {@link ServiceItem} is registered.
+     */
+    @Override
+    public void run() {
+
+        if (log.isInfoEnabled())
+            log.info("Started server.");
+
+        /*
+         * Name the thread for the class of server that it is running.
+         * 
+         * Note: This is generally the thread that ran main(). The thread does
+         * not really do any work - it just waits until the server is terminated
+         * and then returns to the caller where main() will exit.
+         */
+        try {
+
+            Thread.currentThread().setName(getClass().getName());
+            
+        } catch(SecurityException ex) {
+            
+            // ignore.
+            log.warn("Could not set thread name: " + ex);
+            
+        }
+        
+        quorum.addListener(new QuorumListener() {
+
+            @Override
+            public void notify(final QuorumEvent e) {
+                System.err.println("QuorumEvent: "+e);
+                switch(e.getEventType()) {
+                case CAST_VOTE:
+                    break;
+                case CONSENSUS:
+                    break;
+                case MEMBER_ADD:
+                    break;
+                case MEMBER_REMOVE:
+                    break;
+                case PIPELINE_ADD:
+                    break;
+                case PIPELINE_REMOVE:
+                    break;
+                case QUORUM_BROKE:
+                    break;
+                case QUORUM_MEET:
+                    if (jettyServer == null) {
+                        /*
+                         * Submit task since we can not do this in the event
+                         * thread.
+                         */
+                        journal.getExecutorService().submit(
+                                new Callable<Void>() {
+                                    @Override
+                                    public Void call() throws Exception {
+                                        if (jettyServer == null
+                                                && quorum.getMember().isLeader(
+                                                        e.token())) {
+                                            try {
+                                                System.err
+                                                        .println("Starting NSS");
+                                                startNSS();
+                                            } catch (Exception e1) {
+                                                log.error(
+                                                        "Could not start NanoSparqlServer: "
+                                                                + e1, e1);
+                                            }
+                                        }
+                                        return null;
+                                    }
+                                });
+                    }
+                    break;
+                case SERVICE_JOIN:
+                    break;
+                case SERVICE_LEAVE:
+                    break;
+                case WITHDRAW_VOTE:
+                    break;
+                }
+            }
+        });
+
+        quorum.start(newQuorumService(logicalServiceId, serviceUUID, haGlueService,
+                journal));
+
+        final QuorumActor actor = quorum.getActor();
+        actor.memberAdd();
+        actor.pipelineAdd();
+        actor.castVote(journal.getLastCommitTime());
+
+        /*
+         * Wait until the server is terminated.
+         * 
+         * TODO Since spurious wakeups are possible, this should be used in a loop
+         * with a condition variable.
+         */
+        
+        synchronized (keepAlive) {
+            
+            try {
+                
+                keepAlive.wait();
+                
+            } catch (InterruptedException ex) {
+                
+                if (log.isInfoEnabled())
+                    log.info(ex.getLocalizedMessage());
+
+            } finally {
+                
+                // terminate.
+                
+                shutdownNow(false/* destroy */);
+                
+            }
+            
+        }
+        
+        System.out.println("Service is down: class=" + getClass().getName()
+                + ", name=" + getServiceName());
+        
+    }
+
+    final private Object keepAlive = new Object();
+
+    /**
+     * Factory for the {@link QuorumService} implementation.
+     * 
+     * @param remoteServiceImpl
+     *            The object that implements the {@link Remote} interfaces
+     *            supporting HA operations.
+     */
+    private QuorumServiceBase<HAGlue, AbstractJournal> newQuorumService(
+            final String logicalServiceId,
+            final UUID serviceId, final HAGlue remoteServiceImpl,
+            final AbstractJournal store) {
+
+        return new QuorumServiceBase<HAGlue, AbstractJournal>(logicalServiceId,
+                serviceId, remoteServiceImpl, store) {
+
+            @Override
+            public void start(final Quorum<?,?> quorum) {
+                
+                super.start(quorum);
+
+                // Inform the Journal about the current token (if any).
+                journal.setQuorumToken(quorum.token());
+                
+            }
+            
+            @Override
+            public void quorumBreak() {
+
+                super.quorumBreak();
+                
+                // Inform the Journal that the quorum token is invalid.
+                journal.setQuorumToken(Quorum.NO_QUORUM);
+                
+            }
+
+            @Override
+            public void quorumMeet(final long token, final UUID leaderId) {
+
+                super.quorumMeet(token, leaderId);
+                
+                // Inform the journal that there is a new quorum token.
+                journal.setQuorumToken(Quorum.NO_QUORUM);
+
+            }
+            
+            /**
+             * Resolve an {@link HAGlue} object from its Service UUID.
+             */
+            @Override
+            public HAGlue getService(final UUID serviceId) {
+                
+                final ServiceItem serviceItem = discoveryClient
+                        .getServiceItem(serviceId);
+
+                if (serviceItem == null) {
+
+                    // Not found.
+                    return null;
+                    
+                }
+
+                return (HAGlue) serviceItem.service;
+                
+            }
+
+            /**
+             * FIXME handle replicated writes. Probably just dump it on the
+             * jnl's WriteCacheService. Or maybe wrap it back up using a
+             * WriteCache and let that lay it down onto the disk.
+             */
+            @Override
+            protected void handleReplicatedWrite(HAWriteMessage msg,
+                    ByteBuffer data) throws Exception {
+//                new WriteCache() {
+//                    
+//                    @Override
+//                    protected boolean writeOnChannel(ByteBuffer buf, long firstOffset,
+//                            Map<Long, RecordMetadata> recordMap, long nanos)
+//                            throws InterruptedException, TimeoutException, IOException {
+//                        // TODO Auto-generated method stub
+//                        return false;
+//                    }
+//                };
+                
+                throw new UnsupportedOperationException();
+            }
+        };
+
+    }
+
+    /**
+     * Setup and start the {@link NanoSparqlServer}.
+     * <p>
+     * Note: We need to wait for a quorum meet since this will create the KB
+     * instance if it does not exist and we can not write on the
+     * {@link HAJournal} until we have a quorum meet.
+     */
+    private void startNSS() throws Exception {
+
+        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+
+        final String namespace = (String) config.getEntry(COMPONENT,
+                NSSConfigurationOptions.NAMESPACE, String.class,
+                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+
+        final Integer queryPoolThreadSize = (Integer) config.getEntry(
+                COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
+                Integer.TYPE,
+                NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
+
+        final boolean create = (Boolean) config.getEntry(COMPONENT,
+                NSSConfigurationOptions.CREATE, Boolean.TYPE,
+                NSSConfigurationOptions.DEFAULT_CREATE);
+
+        final Integer port = (Integer) config.getEntry(COMPONENT,
+                NSSConfigurationOptions.PORT, Integer.TYPE,
+                NSSConfigurationOptions.DEFAULT_PORT);
+
+        final Map<String, String> initParams = new LinkedHashMap<String, String>();
+        {
+
+            initParams.put(ConfigParams.NAMESPACE, namespace);
+
+            initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
+                    queryPoolThreadSize.toString());
+
+            initParams.put(ConfigParams.CREATE, Boolean.toString(create));
+
+        }
+
+        // Setup the embedded jetty server for NSS webapp.
+        jettyServer = NanoSparqlServer.newInstance(port, journal, initParams);
+
+        // Start the server.
+        jettyServer.start();
+
+        /*
+         * Report *an* effective URL of this service.
+         * 
+         * Note: This is an effective local URL (and only one of them, and even
+         * then only one for the first connector). It does not reflect any
+         * knowledge about the desired external deployment URL for the service
+         * end point.
+         */
+        final String serviceURL;
+        {
+
+            final int actualPort = jettyServer.getConnectors()[0].getLocalPort();
+
+            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+                    true/* loopbackOk */);
+
+            if (hostAddr == null) {
+
+                hostAddr = "localhost";
+
+            }
+
+            serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
+                    .toExternalForm();
+
+            System.out.println("serviceURL: " + serviceURL);
+
+        }
+
+    }
+    
     /**
      * Start an {@link HAJournal}.
      * <p>
@@ -125,8 +646,26 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-        new HAJournalServer(args, new FakeLifeCycle()).run();
+        final HAJournalServer server = new HAJournalServer(args,
+                new FakeLifeCycle());
+
+//        // FIXME Remove this. It is here to look for a quorum meet.
+//        try {
+//            server.journal.getQuorum().awaitQuorum(6L,TimeUnit.SECONDS);
+//        } catch (Exception e) {
+//            log.error(e, e);
+//        }
+
+        // Wait for the HAJournalServer to terminate.
+        server.run();
         
+        try {
+            // Wait for the jetty server to terminate.
+            server.jettyServer.join();
+        } catch (InterruptedException e) {
+            log.warn(e);
+        }
+
         System.exit(0);
 
     }
@@ -265,6 +804,11 @@ public class HAJournalServer extends AbstractServer {
                  * 
                  * Note: By running this is a thread, we avoid closing the
                  * service end point during the method call.
+                 * 
+                 * TODO We also need to destroy the persistent state (dataDir,
+                 * serviceDir), the zk state for this service, and ensure that
+                 * the proxy is unexported from any discovered registrars (that
+                 * is probably being done).
                  */
 
                 server.runDestroy();
