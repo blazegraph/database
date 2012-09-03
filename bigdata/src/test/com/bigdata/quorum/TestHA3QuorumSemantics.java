@@ -1030,8 +1030,24 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
             assertCondition(new Runnable() {
                 public void run() {
-                    // services have voted for a single lastCommitTime.
+                    // Services have voted for a single lastCommitTime.
                     assertEquals(0, quorum0.getVotes().size());
+                    /**
+                     * TODO The assert above occasionally fails with this trace.
+                     * 
+                     * <pre>
+                     * junit.framework.AssertionFailedError: expected:<0> but was:<1>
+                     *     at junit.framework.Assert.fail(Assert.java:47)
+                     *     at junit.framework.Assert.failNotEquals(Assert.java:282)
+                     *     at junit.framework.Assert.assertEquals(Assert.java:64)
+                     *     at junit.framework.Assert.assertEquals(Assert.java:201)
+                     *     at junit.framework.Assert.assertEquals(Assert.java:207)
+                     *     at com.bigdata.quorum.TestHA3QuorumSemantics$19.run(TestHA3QuorumSemantics.java:1034)
+                     *     at com.bigdata.quorum.AbstractQuorumTestCase.assertCondition(AbstractQuorumTestCase.java:184)
+                     *     at com.bigdata.quorum.AbstractQuorumTestCase.assertCondition(AbstractQuorumTestCase.java:225)
+                     *     at com.bigdata.quorum.TestHA3QuorumSemantics.test_serviceJoin3_simple(TestHA3QuorumSemantics.java:1031)
+                     * </pre>
+                     */
 
                     // verify the vote order.
                     assertEquals(null, quorum0.getVotes().get(lastCommitTime));

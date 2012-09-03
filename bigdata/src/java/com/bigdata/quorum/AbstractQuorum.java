@@ -115,6 +115,22 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     private final int k;
 
     /**
+     * The minimum #of joined services that constitutes a quorum as defined by
+     * <code>(k + 1) / 2 </code>.
+     * <p>
+     * Note: This constant is isolated here so we can have "quorums" that
+     * require ALL services to be joined. For example, a highly available system
+     * that can replicate writes but can not resynchronize services that were
+     * not present during a quorum commit would specify the same value for
+     * {@link #k} and {@link #kmeet} in order to ensure that all services are
+     * joined before the quorum "meets".
+     * 
+     * TODO Specify means to compute this. It is fixed by the constructor right
+     * now. Maybe we should just pull out an interface for this?
+     */
+    protected final int kmeet;
+    
+    /**
      * The current quorum token. This is volatile and will be cleared as soon as
      * the leader fails or the quorum breaks.
      * 
@@ -326,7 +342,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             throw new IllegalArgumentException("k must be odd: " + k);
 
         this.k = k;
-
+        
+        this.kmeet = (k + 1) / 2;
+        
         this.token = this.lastValidToken = NO_QUORUM;
 
         /*
@@ -703,12 +721,22 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     final public int replicationFactor() {
+
         // Note: [k] is final.
         return k;
+        
     }
 
+    public final boolean isQuorum(final int njoined) {
+
+        return njoined >= kmeet;
+
+    }
+    
     final public boolean isHighlyAvailable() {
+        
         return replicationFactor() > 1;
+        
     }
 
     final public long lastValidToken() {
@@ -782,7 +810,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * 
      * @return The lastCommitTime for which the service has cast its vote -or-
      *         <code>null</code> if the service is not participating in a
-     *         consensus of at least <code>(k+1)/2</code> services.
+     *         consensus.
      */
     private Long getLastCommitTimeConsensus(final UUID serviceId) {
         final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
@@ -1032,8 +1060,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     /**
-     * Enforce a precondition that at least <code>(k+1)/2</code> services have
-     * joined.
+     * Enforce a precondition that at least {@link #kmeet} services have joined.
      * <p>
      * Note: This is used in certain places to work around concurrent
      * indeterminism.
@@ -1045,7 +1072,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             final long begin = System.nanoTime();
             final long nanos = timeout;
             long remaining = nanos;
-            while (joined.size() < ((k + 1) / 2)) {
+            while (!isQuorum(joined.size())) {
                 if (client == null)
                     throw new AsynchronousQuorumCloseException();
                 if (!joinedChange.await(remaining, TimeUnit.NANOSECONDS))
@@ -1289,7 +1316,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 //        final public void setLastValidToken(final long newToken) {
 //            lock.lock();
 //            try {
-//                if (joined.size() < ((k + 1) / 2))
+//                if (!isQuorum(joined.size()))
 //                    throw new QuorumException(ERR_CAN_NOT_MEET
 //                            + " too few services are joined: #joined="
 //                            + joined.size() + ", k=" + k);
@@ -1325,7 +1352,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         final public void setToken(final long newToken) {
             lock.lock();
             try {
-                if (joined.size() < ((k + 1) / 2))
+                if (!isQuorum(joined.size()))
                     throw new QuorumException(ERR_CAN_NOT_MEET
                             + " too few services are joined: #joined="
                             + joined.size() + ", k=" + k);
@@ -2210,9 +2237,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     // queue event.
                     sendEvent(new E(QuorumEventEnum.CAST_VOTE, lastValidToken,
                             token, serviceId, lastCommitTime));
-                    if (nvotes >= (k + 1) / 2) {
+                    if (isQuorum(nvotes)) {
                         final QuorumMember<S> client = getClientAsMember();
-                        if (nvotes == (k + 1) / 2) {
+                        if (nvotes == kmeet) {
                             if (client != null) {
                                 /*
                                  * Tell the client that consensus has been
@@ -2228,7 +2255,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         if (client != null) {
                             final UUID clientId = client.getServiceId();
                             final UUID[] voteOrder = tmp.toArray(new UUID[0]);
-                            if (nvotes == (k + 1) / 2
+                            if (nvotes == kmeet
                                     && clientId.equals(voteOrder[0])) {
                                 /*
                                  * The client is the first service in the vote
@@ -2318,7 +2345,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         votesChange.signalAll();
                         sendEvent(new E(QuorumEventEnum.WITHDRAW_VOTE,
                                 lastValidToken, token, serviceId));
-                        if (votes.size() + 1 == (k + 1) / 2) {
+                        if (votes.size() + 1 == kmeet) {
                             final QuorumMember<S> client = getClientAsMember();
                             if (client != null) {
                                 // Tell the client that the consensus was lost.
@@ -2555,7 +2582,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     log.info("serviceId=" + serviceId.toString());
 //                final int njoined = joined.size();
 //                final int k = replicationFactor();
-//                final boolean willMeet = njoined == (k + 1) / 2;
+//                final boolean willMeet = njoined == kmeet;
 //                if (willMeet) {
 //                    /*
 //                     * The quorum will meet.
@@ -2604,7 +2631,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         final boolean isLeader = leaderId.equals(clientId);
                         if (isLeader) {
                             final int njoined = joined.size();
-                            if (njoined >= ((k + 1) / 2) && token == NO_QUORUM) {
+                            if (njoined >= kmeet && token == NO_QUORUM) {
                                 /*
                                  * Elect the leader.
                                  */
@@ -2704,13 +2731,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 joinedChange.signalAll();
                 final int k = replicationFactor();
                 // iff the quorum was joined.
-                final boolean wasJoined = njoinedBefore >= ((k + 1) / 2);
+                final boolean wasJoined = njoinedBefore >= kmeet;
                 // iff the leader just left the quorum.
                 final boolean leaderLeft = wasJoined
                         && serviceId.equals(leaderId);
                 // iff the quorum will break.
                 final boolean willBreak = leaderLeft
-                        || (njoinedBefore == ((k + 1) / 2));
+                        || (njoinedBefore == kmeet);
                 if (log.isInfoEnabled())
                     log.info("serviceId=" + serviceId + ", k=" + k
                             + ", njoined(before)=" + njoinedBefore + ", wasJoined="

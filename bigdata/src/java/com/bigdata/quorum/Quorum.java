@@ -83,16 +83,40 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
     long NO_QUORUM = -1;
 
     /**
-     * Return <em>k</em>, the target replication factor. The replication factor
-     * must be a non-negative odd integer (1, 3, 5, 7, etc). A quorum exists
-     * only when <code>(k + 1)/2</code> physical services for the same logical
-     * service have an agreement on state. A single service with
+     * Return <em>k</em>, the target replication factor.
+     * <p>
+     * A normal quorum requires a simple majority and a replication factor that
+     * is a non-negative odd integer (1, 3, 5, 7, etc). For this case, a quorum
+     * exists only when <code>(k + 1)/2</code> physical services for the same
+     * logical service have an agreement on state. A single service with
      * <code>k := 1</code> is the degenerate case and has a minimum quorum size
      * of ONE (1). High availability is only possible when <code>k</code> is GT
      * ONE (1). Thus <code>k := 3</code> is the minimum value for which services
      * can be highly available and has a minimum quorum size of <code>2</code>.
+     * 
+     * @see #isQuorum(int)
      */
     int replicationFactor();
+    
+    /**
+     * Return <code>true</code> iff the argument is large enough to constitute a
+     * quorum.
+     * <p>
+     * Note: This method makes it easier to write code that obeys policies other
+     * than simple majority rule. For example, a quorum could exist only when
+     * ALL services are joined. This alternative rule is useful when the
+     * services do not support a resynchronization policy. For such services,
+     * all services must participate in all commits since services can not
+     * recover if they miss a commit. Simple replication is an example of this
+     * policy.
+     * 
+     * @param njoined
+     *            The argument.
+     * 
+     * @return <code>true</code> if that a quorum is met for that many joined
+     *         services.
+     */
+    boolean isQuorum(int njoined);
 
     /**
      * The current token for the quorum. The initial value before the quorum has

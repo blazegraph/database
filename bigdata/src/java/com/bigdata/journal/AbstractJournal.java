@@ -4924,7 +4924,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<byte[]> readFromDisk(final long token,
                 final UUID storeId, final long addr) {
 
-			final FutureTask<byte[]> ft = new FutureTask<byte[]>(new Callable<byte[]>() {
+            final FutureTask<byte[]> ft = new FutureTask<byte[]>(
+                    new Callable<byte[]>() {
 				
 			    public byte[] call() throws Exception {
 
@@ -4972,10 +4973,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * @todo Trap truncation vs extend?
              */
             try {
+
                 ((IHABufferStrategy) AbstractJournal.this._bufferStrategy)
                         .setExtentForLocalStore(msg.getFileExtent());
+            
             } catch (InterruptedException e) {
+            
                 throw new RuntimeException(e);
+                
             }
 
             final Future<Void> ft = getQuorum().getClient()
@@ -5000,10 +5005,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-		/** NOP. */
         public Future<Void> bounceZookeeperConnection() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
+                    // NOP (no zookeeper at this layer).
                 }
             }, null);
             ft.run();
@@ -5011,7 +5016,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
         /**
-         * Does pipeline remove/add.
+         * {@inheritDoc}
+         * <p>
+         * This implementation does pipeline remove() followed by pipline add().
          */
         public Future<Void> moveToEndOfPipeline() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {

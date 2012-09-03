@@ -6,7 +6,6 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IRootBlockView;
 
 /**
  * A {@link Remote} interface for methods supporting high availability for a set
