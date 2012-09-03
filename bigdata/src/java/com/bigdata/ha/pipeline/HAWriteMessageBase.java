@@ -85,14 +85,21 @@ public class HAWriteMessageBase implements Externalizable {
         
     }
     
-	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-		sze = in.readInt();
-		chk = in.readInt();
-	}
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
-	public void writeExternal(ObjectOutput out) throws IOException {
-		out.writeInt(sze);
-		out.writeInt(chk);
-	}	
+        sze = in.readInt();
+        
+        chk = in.readInt();
+        
+    }
+
+    public void writeExternal(final ObjectOutput out) throws IOException {
+        
+        out.writeInt(sze);
+        
+        out.writeInt(chk);
+        
+    }
 
 }

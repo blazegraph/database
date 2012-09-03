@@ -63,7 +63,8 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
     public WriteCache newWriteCache(final IBufferAccess buf,
             final boolean useChecksum,
             final boolean bufferHasData,
-            final IReopenChannel<? extends Channel> opener)
+            final IReopenChannel<? extends Channel> opener,
+            final long fileExtent)
             throws InterruptedException {
 
         final boolean highlyAvailable = getQuorum() != null
@@ -72,7 +73,7 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
                 highlyAvailable,
                 bufferHasData,
-                (IReopenChannel<FileChannel>) opener, null);
+                (IReopenChannel<FileChannel>) opener, fileExtent, null);
 
     }
 

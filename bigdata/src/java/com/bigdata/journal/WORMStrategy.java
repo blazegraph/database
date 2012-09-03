@@ -902,11 +902,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     public WriteCache newWriteCache(final IBufferAccess buf,
                             final boolean useChecksum,
                             final boolean bufferHasData,
-                            final IReopenChannel<? extends Channel> opener)
+                            final IReopenChannel<? extends Channel> opener,
+                            final long fileExtent)
                             throws InterruptedException {
                         return new WriteCacheImpl(0/* baseOffset */, buf,
                                 useChecksum, bufferHasData,
-                                (IReopenChannel<FileChannel>) opener);
+                                (IReopenChannel<FileChannel>) opener,
+                                fileExtent);
                     }
                 };
                 this._checkbuf = null;
@@ -939,11 +941,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         public WriteCacheImpl(final long baseOffset, final IBufferAccess buf,
                 final boolean useChecksum,
                 final boolean bufferHasData,
-                final IReopenChannel<FileChannel> opener)
+                final IReopenChannel<FileChannel> opener,
+                final long fileExtent)
                 throws InterruptedException {
 
             super(baseOffset, buf, useChecksum, isHighlyAvailable,
-                    bufferHasData, opener);
+                    bufferHasData, opener, fileExtent);
 
         }
 
@@ -2251,7 +2254,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             throws IOException, InterruptedException {
 
         writeCacheService.newWriteCache(b, useChecksums,
-                true/* bufferHasData */, opener).flush(false/* force */);
+                true/* bufferHasData */, opener, msg.getFileExtent()).flush(
+                false/* force */);
 
     }
 

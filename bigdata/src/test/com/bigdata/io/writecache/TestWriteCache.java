@@ -108,8 +108,8 @@ public class TestWriteCache extends TestCase3 {
                 // The buffer size must be at least 1k for these tests.
                 assertTrue(DirectBufferPool.INSTANCE.getBufferCapacity() >= Bytes.kilobyte32);
 
-                final WriteCache writeCache =  new WriteCache.FileChannelWriteCache(0, buf,
-                        true, isHighlyAvailable, false, opener);
+                final WriteCache writeCache = new WriteCache.FileChannelWriteCache(
+                        0, buf, true, isHighlyAvailable, false, opener, 0L/* fileExtent */);
 
                 final long addr1 = 0;
             	final long addr2 = 12800;
@@ -207,7 +207,7 @@ public class TestWriteCache extends TestCase3 {
                 // ctor correct rejection tests: baseOffset is negative.
                 try {
                     new WriteCache.FileChannelWriteCache(-1L, buf, useChecksum,
-                            isHighlyAvailable, bufferHasData, opener);
+                            isHighlyAvailable, bufferHasData, opener, 0L/* fileExtent */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -217,7 +217,8 @@ public class TestWriteCache extends TestCase3 {
                 // ctor correct rejection tests: opener is null.
                 try {
                     new WriteCache.FileChannelWriteCache(baseOffset, buf,
-                            useChecksum, isHighlyAvailable, bufferHasData, null/* opener */);
+                            useChecksum, isHighlyAvailable, bufferHasData,
+                            null/* opener */, 0L/* fileExtent */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -227,7 +228,7 @@ public class TestWriteCache extends TestCase3 {
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelWriteCache(
                         baseOffset, buf, useChecksum, isHighlyAvailable,
-                        bufferHasData, opener);
+                        bufferHasData, opener, 0L/*fileExtent*/);
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity(),
@@ -588,7 +589,8 @@ public class TestWriteCache extends TestCase3 {
                 // ctor correct rejection tests: opener is null.
                 try {
                     new WriteCache.FileChannelScatteredWriteCache(buf,
-                            useChecksum, isHighlyAvailable, bufferHasData, null/* opener */, null);
+                            useChecksum, isHighlyAvailable, bufferHasData,
+                            null/* opener */, 0L/* fileExtent */, null);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -597,7 +599,8 @@ public class TestWriteCache extends TestCase3 {
 
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                        buf, useChecksum, isHighlyAvailable, bufferHasData, opener, null);
+                        buf, useChecksum, isHighlyAvailable, bufferHasData,
+                        opener, 0L/* fileExtent */, null);
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity()
@@ -925,14 +928,14 @@ public class TestWriteCache extends TestCase3 {
             final IBufferAccess buf2 = DirectBufferPool.INSTANCE.acquire();
 		    try {
 		    	long addr1 = 12800;
-		    	ByteBuffer data1 = getRandomData(20 * 1024);
-		    	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
-		    	ByteBuffer data2 = getRandomData(20 * 1024);
-		    	int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
-		    	WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
-		    			false, opener, null);   	
-		    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
-		    			false, opener, null);
+		    	final ByteBuffer data1 = getRandomData(20 * 1024);
+		    	final int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
+		    	final ByteBuffer data2 = getRandomData(20 * 1024);
+		    	final int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
+		    	final WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
+		    			false, opener, 0L/* fileExtent */, null);   	
+		    	final WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
+		    			false, opener, 0L/* fileExtent */, null);
 		    	
 		    	// write first data buffer
 		    	cache1.write(addr1, data1, chk1);
@@ -1063,8 +1066,9 @@ public class TestWriteCache extends TestCase3 {
             try {
 
             // allocate write cache using our buffer.
-            final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                    buf, useChecksum, isHighlyAvailable, bufferHasData, opener, null);
+                final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
+                        buf, useChecksum, isHighlyAvailable, bufferHasData,
+                        opener, 0L/* fileExtent */, null);
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay

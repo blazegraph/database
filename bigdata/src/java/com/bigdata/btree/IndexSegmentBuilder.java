@@ -1537,7 +1537,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     : new WriteCache.FileChannelWriteCache(
                             IndexSegmentCheckpoint.SIZE, null/* buf */,
                             useChecksums, false/* isHighlyAvailable */,
-                            false/* bufferHasData */, new NOPReopener(out));
+                            false/* bufferHasData */, new NOPReopener(out), 0L/* fileExtent */);
 
             /*
              * Open the node buffer. We only do this if there will be at least
@@ -3018,7 +3018,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 final WriteCache.FileChannelWriteCache writeCache = new WriteCache.FileChannelWriteCache(
                         offsetNodes, null/* buf */, useChecksums,
                         false/* isHighlyAvailable */, false/* bufferHasData */,
-                        new NOPReopener(out));
+                        new NOPReopener(out), 0L/* fileExtent */);
 
                 try {
 

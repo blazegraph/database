@@ -4607,10 +4607,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 quorumToken = newValue;
 
                 /*
-                 * FIXME We need to re-open the backing store with the token for
-                 * the new quorum.
+                 * We need to reset the backing store with the token for the new
+                 * quorum. There should not be any active writers since there
+                 * was no quorum. Thus, this should just cause the backing store
+                 * to become aware of the new quorum and enable writes.
+                 * 
+                 * Note: This is done using a local abort, not a 2-phase abort.
+                 * Each node in the quorum should handle this locally when it
+                 * sees the quorum meet event.
                  */
-//                _bufferStrategy.reopen(quorumToken);
+                _abort();
 
             } else {
 

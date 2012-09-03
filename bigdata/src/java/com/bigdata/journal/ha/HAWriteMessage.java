@@ -114,9 +114,9 @@ public class HAWriteMessage extends HAWriteMessageBase {
      *            The file offset at which the data will be written (WORM only).
      */
     public HAWriteMessage(final int sze, final int chk,
-            StoreTypeEnum storeType, long quorumToken, long fileExtent,
-            long firstOffset) {
-        
+            final StoreTypeEnum storeType, final long quorumToken,
+            final long fileExtent, final long firstOffset) {
+
         super(sze, chk);
 
         if (storeType == null)
@@ -134,8 +134,9 @@ public class HAWriteMessage extends HAWriteMessageBase {
 
     private static final byte VERSION0 = 0x0;
 
-    public void readExternal(ObjectInput in) throws IOException,
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
+        
         super.readExternal(in);
         final byte version = in.readByte();
         switch (version) {
@@ -144,16 +145,16 @@ public class HAWriteMessage extends HAWriteMessageBase {
         default:
             throw new IOException("Unknown version: " + version);
         }
-        storeType = (StoreTypeEnum) in.readObject();
+        storeType = StoreTypeEnum.valueOf(in.readByte());
         quorumToken = in.readLong();
         fileExtent = in.readLong();
         firstOffset = in.readLong();
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
         super.writeExternal(out);
         out.write(VERSION0);
-        out.writeObject(storeType);
+        out.writeByte(storeType.getType());
         out.writeLong(quorumToken);
         out.writeLong(fileExtent);
         out.writeLong(firstOffset);

@@ -223,15 +223,19 @@ public class MockQuorumFixture {
      * 
      * @return The service.
      * 
-     * @throws IllegalArgumentException
+     * @throws QuorumException
      *             if there is no known {@link QuorumMember} for that serviceId.
      */
     public Object getService(final UUID serviceId) {
 
         final QuorumMember<?> member = getMember(serviceId);
 
-        if (member == null)
-            throw new IllegalArgumentException("Unknown: " + serviceId);
+        if (member == null) {
+         
+            // Per the API.
+            throw new QuorumException("Unknown: " + serviceId);
+            
+        }
 
         return member.getService();
 
@@ -315,7 +319,8 @@ public class MockQuorumFixture {
                  */
                 if ((e = deque.peek()) == null)
                     throw new AssertionError();
-                log.info("\n==> Next event: " + e);
+                if (log.isInfoEnabled())
+                    log.info("\n==> Next event: " + e);
             } finally {
                 lock.unlock();
             }

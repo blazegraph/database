@@ -1877,9 +1877,10 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     fileExtent, opener, quorum) {
 
                 @Override
-                public WriteCache newWriteCache(IBufferAccess buf,
-                        boolean useChecksum, boolean bufferHasData,
-                        IReopenChannel<? extends Channel> opener)
+                public WriteCache newWriteCache(final IBufferAccess buf,
+                        final boolean useChecksum, final boolean bufferHasData,
+                        final IReopenChannel<? extends Channel> opener,
+                        final long fileExtent)
                         throws InterruptedException {
 
                     switch (storeType) {
@@ -1887,11 +1888,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
                         return new FileChannelWriteCache(0/* baseOffset */,
                                 buf, useChecksum, isHighlyAvailable,
                                 bufferHasData,
-                                (IReopenChannel<FileChannel>) opener);
+                                (IReopenChannel<FileChannel>) opener,
+                                fileExtent);
                     case RW:
                         return new FileChannelScatteredWriteCache(buf,
                                 useChecksum, isHighlyAvailable, bufferHasData,
-                                (IReopenChannel<FileChannel>) opener, null);
+                                (IReopenChannel<FileChannel>) opener, fileExtent,
+                                null);
                     default:
                         throw new UnsupportedOperationException();
                     }
