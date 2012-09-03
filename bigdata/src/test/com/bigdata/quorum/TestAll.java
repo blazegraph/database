@@ -27,9 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum;
 
+import java.util.concurrent.atomic.AtomicLong;
+
+import junit.framework.AssertionFailedError;
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestListener;
+import junit.framework.TestResult;
 import junit.framework.TestSuite;
+import junit.textui.ResultPrinter;
+
+import org.apache.log4j.Logger;
 
 /**
  * Aggregates test suites in increasing dependency order.
@@ -39,8 +47,11 @@ import junit.framework.TestSuite;
  */
 public class TestAll extends TestCase {
 
-	public static boolean s_includeQuorum = false;
-   /**
+    private final static Logger log = Logger.getLogger(TestAll.class);
+    
+    final private static boolean s_includeQuorum = false;
+
+    /**
      * 
      */
     public TestAll() {
@@ -92,5 +103,61 @@ public class TestAll extends TestCase {
         return suite;
         
     }
-    
+
+    /**
+     * Run the test suite many times.
+     * 
+     * @param args
+     *            The #of times to run the test suite (defaults to 100).
+     */
+    public static void main(final String[] args) {
+        
+        final int LIMIT = args.length == 0 ? 100 : Integer.valueOf(args[0]);
+
+        final AtomicLong nerrs = new AtomicLong(0);
+        final AtomicLong nfail = new AtomicLong(0);
+        
+        // Setup test result.
+        final TestResult result = new TestResult();
+        
+        // Setup listener, which will write the result on System.out
+        result.addListener(new ResultPrinter(System.out));
+
+        result.addListener(new TestListener() {
+            
+            public void startTest(Test arg0) {
+                log.info(arg0);
+            }
+            
+            public void endTest(Test arg0) {
+                log.info(arg0);
+            }
+            
+            public void addFailure(Test arg0, AssertionFailedError arg1) {
+                nfail.incrementAndGet();
+                log.error(arg0,arg1);
+            }
+            
+            public void addError(Test arg0, Throwable arg1) {
+                nerrs.incrementAndGet();
+                log.error(arg0,arg1);
+            }
+        });
+        
+        final Test suite = TestAll.suite();
+
+        int i = 0;
+        for (; i < LIMIT && nerrs.get() == 0 && nfail.get() == 0; i++) {
+
+            System.out.println("Starting iteration: " + i);
+
+            suite.run(result);
+
+        }
+
+        System.out
+                .println("Finished " + i + " out of " + LIMIT + " iterations");
+
+    }
+
 }

@@ -120,7 +120,7 @@ abstract public class AbstractHAJournalTestCase
 //                + ":BEGIN:====================");
 
         fixture = new MockQuorumFixture();
-        fixture.start();
+//        fixture.start();
         logicalServiceId = "logicalService_" + getName();
 
         k = 3;
@@ -172,6 +172,51 @@ abstract public class AbstractHAJournalTestCase
         }
 
         /*
+         * FIXME It appears that it is necessary to start the QuorumFixture and
+         * then each Quorum *BEFORE* any quorum member takes an action, e.g.,
+         * by doing a memberAdd().  That is likely a flaw in the QuorumFixture
+         * or the Quorum code.
+         */
+        fixture.start();
+
+        for (int i = 0; i < replicationCount; i++) {
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = stores[i]
+                    .getQuorum();
+            final HAJournal jnl = (HAJournal) stores[i];
+            final UUID serviceId = jnl.getUUID();
+            quorum.start(newQuorumService(logicalServiceId, serviceId,
+                    jnl.newHAGlue(serviceId), jnl));
+        }
+        
+        for (int i = 0; i < replicationCount; i++) {
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = stores[i]
+                    .getQuorum();
+            final HAJournal jnl = (HAJournal) stores[i];
+            /*
+             * Tell the actor to try and join the quorum. It will join iff our
+             * current root block can form a simple majority with the other
+             * services in the quorum.
+             */
+            final QuorumActor<?, ?> actor = quorum.getActor();
+            try {
+
+                actor.memberAdd();
+                fixture.awaitDeque();
+
+                actor.pipelineAdd();
+                fixture.awaitDeque();
+
+                actor.castVote(jnl.getLastCommitTime());
+                fixture.awaitDeque();
+
+            } catch (InterruptedException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+        }
+
+        /*
          * Initialize the master first. The followers will get their root blocks
          * from the master.
          */
@@ -199,7 +244,7 @@ abstract public class AbstractHAJournalTestCase
             assertEquals(k, q.getMembers().length);
         
         } catch (TimeoutException ex) {
-        
+for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toString());
             throw new RuntimeException(ex);
 
         } catch (InterruptedException ex) {
@@ -223,12 +268,12 @@ abstract public class AbstractHAJournalTestCase
 
         final HAJournal jnl = new HAJournal(properties, quorum);
 
-        /*
-         * FIXME This probably should be a constant across the life cycle of the
-         * service, in which case it needs to be elevated outside of this method
-         * which is used both to open and re-open the journal.
-         */
-        final UUID serviceId = UUID.randomUUID();
+//        /*
+//         * FIXME This probably should be a constant across the life cycle of the
+//         * service, in which case it needs to be elevated outside of this method
+//         * which is used both to open and re-open the journal.
+//         */
+//        final UUID serviceId = UUID.randomUUID();
 
         /*
          * Set the client on the quorum.
@@ -236,8 +281,8 @@ abstract public class AbstractHAJournalTestCase
          * FIXME The client needs to manage the quorumToken and various other
          * things.
          */
-        quorum.start(newQuorumService(logicalServiceId, serviceId, jnl
-                .newHAGlue(serviceId), jnl));
+//        quorum.start(newQuorumService(logicalServiceId, serviceId, jnl
+//                .newHAGlue(serviceId), jnl));
 
 //      // discard the current write set.
 //      abort();
@@ -248,28 +293,28 @@ abstract public class AbstractHAJournalTestCase
 //      // save off the current token (typically NO_QUORUM unless standalone).
 //      quorumToken = quorum.token();
 
-        /*
-         * Tell the actor to try and join the quorum. It will join iff our
-         * current root block can form a simple majority with the other services
-         * in the quorum.
-         */
-        final QuorumActor<?, ?> actor = quorum.getActor();
-        try {
-            
-            actor.memberAdd();
-            fixture.awaitDeque();
-            
-            actor.pipelineAdd();
-            fixture.awaitDeque();
-            
-            actor.castVote(jnl.getLastCommitTime());
-            fixture.awaitDeque();
-
-        } catch (InterruptedException ex) {
-        
-            throw new RuntimeException(ex);
-            
-        }
+//        /*
+//         * Tell the actor to try and join the quorum. It will join iff our
+//         * current root block can form a simple majority with the other services
+//         * in the quorum.
+//         */
+//        final QuorumActor<?, ?> actor = quorum.getActor();
+//        try {
+//            
+//            actor.memberAdd();
+//            fixture.awaitDeque();
+//            
+//            actor.pipelineAdd();
+//            fixture.awaitDeque();
+//            
+//            actor.castVote(jnl.getLastCommitTime());
+//            fixture.awaitDeque();
+//
+//        } catch (InterruptedException ex) {
+//        
+//            throw new RuntimeException(ex);
+//            
+//        }
         
         return jnl;
         

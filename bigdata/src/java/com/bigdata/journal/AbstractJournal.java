@@ -2607,8 +2607,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * the store.
 			 */
 			final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
-			
-			
 
             if (quorum != null) {
                 /*
@@ -4522,7 +4520,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *       if (quorum.isHighlyAvailable() && quorum.isQuorumMet() &&
      *       quorum.getClient().isFollower(quorumToken)) { return true; }
      */
-	private volatile long quorumToken;
+	private volatile long quorumToken = Quorum.NO_QUORUM;
+
+    protected final long getQuorumToken() {
+        return quorumToken;
+    }
+    protected void setQuorumToken(final long newValue) {
+        final long oldValue = quorumToken;
+        quorumToken = newValue;
+    }
 
     /**
      * The current {@link Quorum} (if any).
@@ -4606,6 +4612,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+        /**
+         * Return a proxy object for a {@link Future} suitable for use in an RMI
+         * environment (the default implementation returns its argument).
+         * 
+         * @param future
+         *            The future.
+         * 
+         * @return The proxy for that future.
+         */
+        protected <E> Future<E> getProxy(final Future<E> future) {
+
+            return future;
+
+        }
+        
         /*
          * @todo if the leader is synchronized with the followers then they
          * should all agree on whether they should be writing rootBlock0 or
@@ -4709,7 +4730,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			    
 			}
 			
-			return ft;
+			return getProxy(ft);
 			
 		}
 
@@ -4763,7 +4784,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             ft.run();
             
-            return ft;
+            return getProxy(ft);
 
 		}
 
@@ -4790,7 +4811,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              */
             ft.run();
 
-            return ft;
+            return getProxy(ft);
 
 		}
 
@@ -4842,7 +4863,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 			ft.run();
 			
-			return ft;
+            return getProxy(ft);
 
 		}
 
@@ -4863,8 +4884,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 throw new RuntimeException(e);
             }
 
-            return getQuorum().getClient().receiveAndReplicate(msg);
+            final Future<Void> ft = getQuorum().getClient()
+                    .receiveAndReplicate(msg);
 
+            return getProxy(ft);
+            
 		}
 
         public byte[] getRootBlock(final UUID storeId) {
@@ -4889,7 +4913,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 }
             }, null);
             ft.run();
-            return ft;
+            return getProxy(ft);
         }
 
         /**
@@ -4904,7 +4928,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 }
             }, null/* result */);
             getExecutorService().execute(ft);
-            return ft;
+            return getProxy(ft);
         }
 
 	};

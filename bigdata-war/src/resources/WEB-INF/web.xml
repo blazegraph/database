@@ -5,7 +5,7 @@
   <context-param>
   	<!-- Note: This path is relative to the directory in which you start -->
   	<!-- the servlet container. -->
-  	<param-name>property-file</param-name>
+  	<param-name>propertyFile</param-name>
   	<!-- Note: This path may be used with WebAppUnassembled for testing.
   	<param-value>bigdata-war/src/resources/RWStore.properties</param-value>
   	 -->
@@ -31,7 +31,7 @@
   	if none is found at that namespace.</description>
   </context-param>
   <context-param>
-  	<param-name>query-thread-pool-size</param-name>
+  	<param-name>queryThreadPoolSize</param-name>
   	<param-value>16</param-value>
   	<description>The size of the thread pool used to service SPARQL queries -OR-
     ZERO (0) for an unbounded thread pool.</description>

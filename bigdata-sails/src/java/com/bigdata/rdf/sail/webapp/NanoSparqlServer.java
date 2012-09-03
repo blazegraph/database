@@ -284,13 +284,12 @@ public class NanoSparqlServer {
         server.start();
 
         /*
-         * Report the effective URL of this service.
+         * Report *an* effective URL of this service.
          * 
-         * TODO This is only the effective local URL (and only one of them, and
-         * even then only one for the first connector). It does not reflect any
-         * knowledge about the desired external deployment URL for the service
-         * end point. That should probably be directly configured so it can be
-         * exposed correctly for VoID and ServiceDescription responses.
+         * Note: This is an effective local URL (and only one of them, and
+         * even then only one for the first connector). It does not reflect
+         * any knowledge about the desired external deployment URL for the
+         * service end point.
          */
         final String serviceURL;
         {

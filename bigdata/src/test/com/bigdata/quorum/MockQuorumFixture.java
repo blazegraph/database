@@ -315,7 +315,7 @@ public class MockQuorumFixture {
                  */
                 if ((e = deque.peek()) == null)
                     throw new AssertionError();
-                log.warn("Next event: " + e);
+                log.info("\n==> Next event: " + e);
             } finally {
                 lock.unlock();
             }
@@ -759,7 +759,7 @@ public class MockQuorumFixture {
                     } catch (Throwable t) {
                         if (InnerCause.isInnerCause(t,
                                 InterruptedException.class))
-                            log.warn("Shutdown : " + t);
+                            log.info("Shutdown : " + t);
                         else
                             log.error(t, t);
                         break;
@@ -1245,21 +1245,25 @@ public class MockQuorumFixture {
 
                                 if (isPipelineMember()) {
 
-                                    log.warn("Will remove self from the pipeline: "
-                                                    + getServiceId());
+                                    if (log.isDebugEnabled())
+                                        log.debug("Will remove self from the pipeline: "
+                                                + getServiceId());
 
                                     getActor().pipelineRemove();
 
-                                    log.warn("Will add self back into the pipeline: "
-                                                    + getServiceId());
+                                    if (log.isDebugEnabled())
+                                        log.debug("Will add self back into the pipeline: "
+                                                + getServiceId());
 
                                     getActor().pipelineAdd();
 
                                     if (lastCommitTime != null) {
 
-                                        log.warn("Will cast our vote again: lastCommitTime="
-                                                        + +lastCommitTime
-                                                        + ", " + getServiceId());
+                                        if (log.isDebugEnabled())
+                                            log.debug("Will cast our vote again: lastCommitTime="
+                                                    + +lastCommitTime
+                                                    + ", "
+                                                    + getServiceId());
 
                                         getActor().castVote(lastCommitTime);
 

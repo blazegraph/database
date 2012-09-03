@@ -39,6 +39,11 @@ public interface QuorumListener {
 
     /**
      * Notify the client of a quorum event.
+     * <p>
+     * The listener MUST NOT take any event that could block. In particular, it
+     * MUST NOT wait on another thread that will access the {@link Quorum} as
+     * that will cause a deadlock around the internal lock maintained by the
+     * {@link Quorum}.
      */
     void notify(QuorumEvent e);
 
