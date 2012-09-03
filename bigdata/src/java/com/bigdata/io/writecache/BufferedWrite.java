@@ -239,7 +239,16 @@ public class BufferedWrite {
 	synchronized
 	public void reset() {
 		
-		final ByteBuffer m_data = this.m_data.get().buffer();
+        final IBufferAccess tmp = m_data.get();
+
+        if (tmp == null) {
+
+            // Already closed.
+            return;
+
+        }
+
+        final ByteBuffer m_data = tmp.buffer();
 
 		// reset the buffer state.
 		m_data.position(0);
