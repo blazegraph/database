@@ -31,6 +31,12 @@ package com.bigdata.rdf.sail;
  */
 public interface ISPARQLUpdateListener {
 
+    /**
+     * Notify the listener of an event.
+     * 
+     * @param e
+     *            The event.
+     */
     void updateEvent(SPARQLUpdateEvent e);
     
 }
