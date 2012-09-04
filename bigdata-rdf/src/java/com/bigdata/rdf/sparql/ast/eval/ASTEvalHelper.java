@@ -1036,7 +1036,7 @@ public class ASTEvalHelper {
         }
 
     }
-
+    
     /**
      * Apply the {@link Dataset} to each {@link DeleteInsertGraph} in the UPDATE
      * request.

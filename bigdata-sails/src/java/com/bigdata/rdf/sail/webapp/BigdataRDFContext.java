@@ -86,6 +86,8 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
+import com.bigdata.rdf.sail.ISPARQLUpdateListener;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -666,7 +668,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query begins to execute and storing the {@link RunningQuery} in the
          * {@link #m_queries} map.
          * 
-         * @param The connection.
+         * @param cxn
+         *            The connection.
          */
         final BigdataSailUpdate setupUpdate(
                 final BigdataSailRepositoryConnection cxn) {
@@ -1006,12 +1009,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This executes the SPARQL UPDATE and formats the HTTP response.
+         */
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
 
+            // Prepare the UPDATE request.
             final BigdataSailUpdate update = setupUpdate(cxn);
-
-            this.commitTime.set(update.execute2());
 
             /*
              * Setup the response headers.
@@ -1028,23 +1035,76 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                 final HTMLBuilder doc = new HTMLBuilder(charset.name(), w);
 
+                XMLBuilder.Node current = doc.root("html");
                 {
+                    current = current.node("head");
+                    current.node("meta")
+                            .attr("http-equiv", "Content-Type")
+                            .attr("content",
+                                    "text/html;charset=" + charset.name())
+                            .close();
+                    current.node("title").textNoEncode("bigdata&#174;")
+                            .close();
+                    current = current.close();// close the head.
+                }
 
-                    XMLBuilder.Node current = doc.root("html");
-                    {
-                        current = current.node("head");
-                        current.node("meta")
-                                .attr("http-equiv", "Content-Type")
-                                .attr("content",
-                                        "text/html;charset=" + charset.name())
-                                .close();
-                        current.node("title").textNoEncode("bigdata&#174;")
-                                .close();
-                        current = current.close();// close the head.
+                // open the body
+                current = current.node("body");
+                final XMLBuilder.Node body = current;
+
+                final ISPARQLUpdateListener listener = new ISPARQLUpdateListener() {
+                    
+                    @Override
+                    public void updateEvent(final SPARQLUpdateEvent e) {
+                        /*
+                         * TODO We may need to flush the writer to get the
+                         * progress reports back to the client incrementally.
+                         */
+                        try {
+                            final long ms = TimeUnit.NANOSECONDS.toMillis(e
+                                    .getElapsedNanos());
+                            if (e instanceof SPARQLUpdateEvent.LoadProgress) {
+                                /*
+                                 * Incremental progress on LOAD.
+                                 * 
+                                 * TODO Flag the first such event for a given
+                                 * load and then begin a nexted structure in
+                                 * which we report the progress with the details
+                                 * of the LOAD request in attributes for the
+                                 * parent element.
+                                 */
+                                final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
+                                final long parsed = tmp.getParsedCount();
+                                body.node("p").text(
+                                        "elapsed=" + ms + "ms, parsed="
+                                                + parsed);
+                            } else {
+                                /*
+                                 * End of some UPDATE operation.
+                                 */
+                                body.node("p").text("elapsed=" + ms + "ms")
+                                        .node("pre")
+                                        .text(e.getUpdate().toString()).close()
+                                        .close();
+                            }
+                        } catch (IOException e1) {
+                            throw new RuntimeException(e1);
+                        }
                     }
+                };
 
-                    // open the body
-                    current = current.node("body");
+                /*
+                 * Add the SPARQL UPDATE listener
+                 * 
+                 * FIXME Finish up the formatting of the listener output. The
+                 * listener itself is Ok. Except the timestamps are a bit off.
+                 */
+//                cxn.getSailConnection().addListener(listener);
+                
+                // Execute the UPDATE.
+                this.commitTime.set(update.execute2());
+
+                {
 
                     current.node("p")//
                             .text("commitTime=" + commitTime.get())//
@@ -1054,9 +1114,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     // .text("commitTime=" + updateTask.commitTime.get())//
                     // .close();
 
-                    doc.closeAll(current);
-
                 }
+
+                doc.closeAll(current);
 
                 w.flush();
 

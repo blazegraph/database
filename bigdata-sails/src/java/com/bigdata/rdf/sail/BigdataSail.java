@@ -68,6 +68,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -147,6 +148,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
@@ -1667,6 +1669,13 @@ public class BigdataSail extends SailBase implements Sail {
             this.truthMaintenance = BigdataSail.this.truthMaintenanceIsSupportable
                     && unisolated;
 
+            /*
+             * Permit registration of SPARQL UPDATE listeners iff the connection
+             * is mutable.
+             */
+            listeners = readOnly ? null
+                    : new CopyOnWriteArraySet<ISPARQLUpdateListener>();
+            
         }
 
         /**
@@ -3481,6 +3490,87 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link BigdataSailRWTxConnection#commit2()}.
          */
         protected DelegatingChangeLog changeLog;
+
+        /*
+         * SPARQL UPDATE LISTENER API
+         */
+        
+        /** Registered listeners. */
+        private final CopyOnWriteArraySet<ISPARQLUpdateListener> listeners;
+
+        /** Add a SPARQL UDPATE listener. */
+        public void addListener(final ISPARQLUpdateListener l) {
+
+            if(isReadOnly())
+                throw new UnsupportedOperationException();
+            
+            if (l == null)
+                throw new IllegalArgumentException();
+
+            listeners.add(l);
+
+        }
+
+        /** Remove a SPARQL UDPATE listener. */
+        public void removeListener(final ISPARQLUpdateListener l) {
+            
+            if(isReadOnly())
+                throw new UnsupportedOperationException();
+            
+            if (l == null)
+                throw new IllegalArgumentException();
+            
+            listeners.remove(l);
+            
+        }
+
+        /**
+         * Send an event to all registered listeners.
+         */
+        public void fireEvent(final SPARQLUpdateEvent e) {
+            
+            if(isReadOnly())
+                throw new UnsupportedOperationException();
+            
+            if (e == null)
+                throw new IllegalArgumentException();
+            
+            if(listeners.isEmpty()) {
+             
+                // NOP
+                return;
+
+            }
+
+            final ISPARQLUpdateListener[] a = listeners
+                    .toArray(new ISPARQLUpdateListener[0]);
+
+            for (ISPARQLUpdateListener l : a) {
+
+                final ISPARQLUpdateListener listener = l;
+
+                try {
+
+                    // send event.
+                    listener.updateEvent(e);
+
+                } catch (Throwable t) {
+
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                        // Propagate interrupt.
+                        throw new RuntimeException(t);
+
+                    }
+
+                    // Log and ignore.
+                    log.error(t, t);
+
+                }
+
+            }
+
+        }
 
     } // class BigdataSailConnection
    
