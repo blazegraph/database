@@ -49,7 +49,13 @@ public class TestAll extends TestCase {
 
     private final static Logger log = Logger.getLogger(TestAll.class);
     
-    final private static boolean s_includeQuorum = false;
+    /**
+     * FIXME This is used to avoid a CI deadlock that needs to be tracked down.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
+     *      Journal HA </a>
+     */
+    final private static boolean s_includeQuorum = true;
 
     /**
      * 
