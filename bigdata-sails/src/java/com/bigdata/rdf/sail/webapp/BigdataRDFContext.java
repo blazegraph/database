@@ -86,8 +86,6 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
-import com.bigdata.rdf.sail.ISPARQLUpdateListener;
-import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -1021,102 +1019,50 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BigdataSailUpdate update = setupUpdate(cxn);
 
             /*
-             * Setup the response headers.
+             * Execute first. This let's us know whether or not the entire
+             * UPDATE request (one or more operations) was successful and that
+             * let's us communicate the outcome of the request via an HTTP
+             * status code.
+             * 
+             * If you write on the response before doing this step, you will be
+             * unable to send back an HTTP status code indicating a failure.
+             * 
+             * If we want to provide incremental status reports on running
+             * UPDATE requests, then we need to change the API contract and make
+             * sure that our client (RemoteRepository) parses the response
+             * document to figure out whether or not the UPDATE request was
+             * successful instead of just looking at the status code.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/597
              */
 
-//        // No caching for UPDATE.
-//        resp.addHeader("Cache-Control", "no-cache");
+            /*
+             * Note: The SPARQL UPDATE listener can not provide incremental
+             * reporting due to problem with the timing of when the http
+             * response is committed.  See comments immediately above.
+             */
+            // cxn.getSailConnection().addListener(listener);
 
-//            final Charset charset = updateTask.charset;
+            this.commitTime.set(update.execute2());
+
+            /*
+             * Write out the response.
+             */
 
             final Writer w = new OutputStreamWriter(os, charset);
 
+            final HTMLBuilder doc = new HTMLBuilder(charset.name(), w);
+
+            final XMLBuilder.Node body = writeSparqlUpdateResponseHeader(doc,
+                    charset);
+
             try {
 
-                final HTMLBuilder doc = new HTMLBuilder(charset.name(), w);
+                body.node("p")//
+                        .text("commitTime=" + commitTime.get())//
+                        .close();
 
-                XMLBuilder.Node current = doc.root("html");
-                {
-                    current = current.node("head");
-                    current.node("meta")
-                            .attr("http-equiv", "Content-Type")
-                            .attr("content",
-                                    "text/html;charset=" + charset.name())
-                            .close();
-                    current.node("title").textNoEncode("bigdata&#174;")
-                            .close();
-                    current = current.close();// close the head.
-                }
-
-                // open the body
-                current = current.node("body");
-                final XMLBuilder.Node body = current;
-
-                final ISPARQLUpdateListener listener = new ISPARQLUpdateListener() {
-                    
-                    @Override
-                    public void updateEvent(final SPARQLUpdateEvent e) {
-                        /*
-                         * TODO We may need to flush the writer to get the
-                         * progress reports back to the client incrementally.
-                         */
-                        try {
-                            final long ms = TimeUnit.NANOSECONDS.toMillis(e
-                                    .getElapsedNanos());
-                            if (e instanceof SPARQLUpdateEvent.LoadProgress) {
-                                /*
-                                 * Incremental progress on LOAD.
-                                 * 
-                                 * TODO Flag the first such event for a given
-                                 * load and then begin a nexted structure in
-                                 * which we report the progress with the details
-                                 * of the LOAD request in attributes for the
-                                 * parent element.
-                                 */
-                                final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
-                                final long parsed = tmp.getParsedCount();
-                                body.node("p").text(
-                                        "elapsed=" + ms + "ms, parsed="
-                                                + parsed);
-                            } else {
-                                /*
-                                 * End of some UPDATE operation.
-                                 */
-                                body.node("p").text("elapsed=" + ms + "ms")
-                                        .node("pre")
-                                        .text(e.getUpdate().toString()).close()
-                                        .close();
-                            }
-                        } catch (IOException e1) {
-                            throw new RuntimeException(e1);
-                        }
-                    }
-                };
-
-                /*
-                 * Add the SPARQL UPDATE listener
-                 * 
-                 * FIXME Finish up the formatting of the listener output. The
-                 * listener itself is Ok. Except the timestamps are a bit off.
-                 */
-//                cxn.getSailConnection().addListener(listener);
-                
-                // Execute the UPDATE.
-                this.commitTime.set(update.execute2());
-
-                {
-
-                    current.node("p")//
-                            .text("commitTime=" + commitTime.get())//
-                            .close();
-
-                    // current.node("p")//
-                    // .text("commitTime=" + updateTask.commitTime.get())//
-                    // .close();
-
-                }
-
-                doc.closeAll(current);
+                doc.closeAll(body);
 
                 w.flush();
 
@@ -1131,6 +1077,107 @@ public class BigdataRDFContext extends BigdataBaseContext {
         }
 
     }
+    
+    /**
+     * Write the header of the SPARQL UPDATE response.
+     * 
+     * @param doc
+     *            The document.
+     * @param charset
+     *            The character set.
+     *            
+     * @return The body.
+     * 
+     * @throws IOException
+     */
+    private static XMLBuilder.Node writeSparqlUpdateResponseHeader(
+            final HTMLBuilder doc, final Charset charset) throws IOException {
+
+        XMLBuilder.Node current = doc.root("html");
+        {
+            current = current.node("head");
+            current.node("meta")
+                    .attr("http-equiv", "Content-Type")
+                    .attr("content",
+                            "text/html;charset=" + charset.name())
+                    .close();
+            current.node("title").textNoEncode("bigdata&#174;")
+                    .close();
+            current = current.close();// close the head.
+        }
+
+        // open the body
+        current = current.node("body");
+        
+        return current;
+        
+    }
+
+    /*
+     * Dead code. In order for this approach to work, the client
+     * (RemoteRepository) needs to parse the response document rather than
+     * checking the status code of the response.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/597
+     */
+//    /**
+//     * Writes the SPARQL UPDATE response document.
+//     */
+//    private static class SparqlUpdateResponseWriter implements
+//            ISPARQLUpdateListener {
+//
+//        private final AtomicReference<HTMLBuilder> docRef;
+//        private final Charset charset;
+//        private final AtomicReference<XMLBuilder.Node> bodyRef;
+//        private final Writer w;
+//
+//        public SparqlUpdateResponseWriter(
+//                final AtomicReference<HTMLBuilder> docRef,
+//                final Charset charset,
+//                final AtomicReference<XMLBuilder.Node> bodyRef,
+//                final Writer w) {
+//
+//            this.docRef = docRef;
+//            this.charset = charset;
+//            this.bodyRef = bodyRef;
+//            this.w = w;
+//
+//        }
+//
+//        @Override
+//        public void updateEvent(final SPARQLUpdateEvent e) {
+//            try {
+//                if (bodyRef.get() == null) {
+//                    if (docRef.get() == null) {
+//                        docRef.set();
+//                    }
+//                    bodyRef.set(writeSparqlUpdateResponseHeader(docRef.get(),
+//                            charset));
+//                }
+//                final long ms = TimeUnit.NANOSECONDS.toMillis(e
+//                        .getElapsedNanos());
+//                if (e instanceof SPARQLUpdateEvent.LoadProgress) {
+//                    /*
+//                     * Incremental progress on LOAD.
+//                     */
+//                    final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
+//                    final long parsed = tmp.getParsedCount();
+//                    bodyRef.get().node("p")
+//                            .text("elapsed=" + ms + "ms, parsed=" + parsed);
+//                } else {
+//                    /*
+//                     * End of some UPDATE operation.
+//                     */
+//                    bodyRef.get().node("p").text("elapsed=" + ms + "ms")
+//                            .node("pre").text(e.getUpdate().toString()).close()
+//                            .close();
+//                }
+//            } catch (IOException e1) {
+//                throw new RuntimeException(e1);
+//            }
+//        }
+//
+//    }
 
     /**
      * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
