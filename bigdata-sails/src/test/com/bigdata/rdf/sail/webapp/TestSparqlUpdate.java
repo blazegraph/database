@@ -90,14 +90,6 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
-
-    /**
-     * When <code>true</code>, the unit tests of the BINDINGS clause are
-     * enabled.
-     * 
-     * FIXME BINDINGS does not work correctly for UPDATE.
-     */
-    private static boolean BINDINGS = false;
     
     public TestSparqlUpdate() {
 
