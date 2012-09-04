@@ -146,5 +146,5 @@ public class AST2BOpUpdateContext extends AST2BOpContext {
     }
     
     private BigdataURI nullGraph = null;
-        
+
 }

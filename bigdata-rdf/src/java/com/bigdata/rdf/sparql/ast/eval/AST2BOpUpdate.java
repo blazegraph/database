@@ -93,6 +93,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -204,8 +205,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
-     * Generate physical plan for the update operations (attached to the AST as
-     * a side-effect).
+     * Convert and/or execute the update request.
      * 
      * @throws Exception
      */
@@ -270,8 +270,16 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
 			}
 			
+			final long begin = System.nanoTime();
+			
 			// convert/run the update operation.
 			left = convertUpdateSwitch(left, op, context);
+
+			final long elapsed = begin - System.nanoTime();
+			
+			// notify listener(s)
+            context.conn.getSailConnection().fireEvent(
+                    new SPARQLUpdateEvent(op, elapsed));
 
 			updateIndex++;
 			
@@ -1236,7 +1244,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                             + defaultContext);
                 
                 doLoad(context.conn.getSailConnection(), sourceURL,
-                        defaultContext, op.getRDFParserOptions(), nmodified);
+                        defaultContext, op.getRDFParserOptions(), nmodified,
+                        op);
 
             } catch (Throwable t) {
 
@@ -1336,9 +1345,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      */
     private static void doLoad(final BigdataSailConnection conn,
             final URL sourceURL, final URI defaultContext,
-            final IRDFParserOptions parserOptions,
-            final AtomicLong nmodified) throws IOException, RDFParseException,
-            RDFHandlerException {
+            final IRDFParserOptions parserOptions, final AtomicLong nmodified,
+            final LoadGraph op) throws IOException,
+            RDFParseException, RDFHandlerException {
 
         // Use the default context if one was given and otherwise
         // the URI from which the data are being read.
@@ -1423,7 +1432,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             rdfParser.setDatatypeHandling(parserOptions.getDatatypeHandling());
 
             rdfParser.setRDFHandler(new AddStatementHandler(conn, nmodified,
-                    defactoContext));
+                    defactoContext, op));
 
             /*
              * Setup the input stream.
@@ -1497,12 +1506,15 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      */
     private static class AddStatementHandler extends RDFHandlerBase {
 
+        private final LoadGraph op;
+        private final long beginNanos;
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
         private final Resource[] defaultContexts;
 
         public AddStatementHandler(final BigdataSailConnection conn,
-                final AtomicLong nmodified, final Resource defaultContext) {
+                final AtomicLong nmodified, final Resource defaultContext,
+                final LoadGraph op) {
             this.conn = conn;
             this.nmodified = nmodified;
             final boolean quads = conn.getTripleStore().isQuads();
@@ -1512,6 +1524,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             } else {
                 this.defaultContexts = new Resource[0];
             }
+            this.op = op;
+            this.beginNanos = System.nanoTime();
         }
 
         public void handleStatement(final Statement stmt)
@@ -1533,7 +1547,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             }
 
-            nmodified.incrementAndGet();
+            final long nparsed = nmodified.incrementAndGet();
+
+            if (nparsed % 10000 == 0L) {
+
+                final long elapsed = System.nanoTime() - beginNanos;
+
+                // notify listener(s)
+                conn.fireEvent(new SPARQLUpdateEvent.LoadProgress(op, elapsed,
+                        nparsed));
+
+            }
 
         }
 
