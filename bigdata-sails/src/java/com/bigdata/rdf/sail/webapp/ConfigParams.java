@@ -93,9 +93,18 @@ public interface ConfigParams {
      * detail as the default graph (default
      * {@value #DEFAULT_DESCRIBE_EACH_NAMED_GRAPH}). Otherwise only the default
      * graph will be described.
+     * <p>
+     * Note: I have changed the default to <code>false</code> since this
+     * operation can be long-running for messy web graphs such as the TBL six
+     * degrees of freedom crawl. We wind up with one named graph for each
+     * "friend", which is a lot of named graphs, plus there are a lot of
+     * predicates that show up in web data. Together, this makes the per-named
+     * graph response not a very good default. However, you can certainly enable
+     * this if you only have a reasonable number of named graphs and/or only
+     * expose the SPARQL end point to a limited audience.
      */
     String DESCRIBE_EACH_NAMED_GRAPH = "describeEachNamedGraph";
     
-    boolean DEFAULT_DESCRIBE_EACH_NAMED_GRAPH = true;
+    boolean DEFAULT_DESCRIBE_EACH_NAMED_GRAPH = false;
     
 }
