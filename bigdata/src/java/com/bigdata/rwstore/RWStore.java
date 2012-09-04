@@ -4583,9 +4583,27 @@ public class RWStore implements IStore, IBufferedWriter {
     public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
-        m_writeCache.newWriteCache(b, true/* useChecksums */,
-                true/* bufferHasData */, m_reopener, msg.getFileExtent())
-                .flush(false/* force */);
+        /*
+         * Wrap up the data from the message as a WriteCache object. This will
+         * build up a RecordMap containing the allocations to be made, and
+         * including a ZERO (0) data length if any offset winds up being deleted
+         * (released).
+         */
+        final WriteCache writeCache = m_writeCache.newWriteCache(b,
+                true/* useChecksums */, true/* bufferHasData */, m_reopener,
+                msg.getFileExtent());
+
+        /*
+         * FIXME We need to update the allocators either here based on that
+         * RecordMap. Expose it via a read-only interface and then mock up the
+         * bits in the appropriate allocators.
+         */
+        
+        /*
+         * Flush the scattered writes in the write cache to the backing
+         * store.
+         */
+        writeCache.flush(false/* force */);
 
     }
 
