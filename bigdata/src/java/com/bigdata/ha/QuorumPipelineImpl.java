@@ -251,6 +251,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * pipeline order.
      */
     public void pipelineAdd() {
+        if (log.isInfoEnabled())
+            log.info("");
         super.pipelineAdd();
         lock.lock();
         try {
@@ -270,6 +272,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     }
 
     public void pipelineElectedLeader() {
+        if (log.isInfoEnabled())
+            log.info("");
         super.pipelineElectedLeader();
         lock.lock();
         try {
@@ -286,6 +290,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      */
     @Override
     public void pipelineRemove() {
+        if (log.isInfoEnabled())
+            log.info("");
         super.pipelineRemove();
         lock.lock();
         try {
@@ -302,6 +308,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      */
     public void pipelineChange(final UUID oldDownStreamId,
             final UUID newDownStreamId) {
+        if (log.isInfoEnabled())
+            log.info("");
         super.pipelineChange(oldDownStreamId, newDownStreamId);
         lock.lock();
         try {
@@ -354,6 +362,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * receive buffer.
      */
     protected void tearDown() {
+        if (log.isInfoEnabled())
+            log.info("");
         lock.lock();
         try {
             /*
@@ -443,6 +453,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * Setup the send service.
      */
     protected void setUpSendService() {
+        if (log.isInfoEnabled())
+            log.info("");
         lock.lock();
         try {
             // Allocate the send service.
@@ -554,6 +566,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
             throws IOException {
 
+        if (log.isTraceEnabled())
+            log.trace("Leader will send: " + b.remaining() + " bytes");
+
         member.assertLeader(msg.getQuorumToken());
 
         final PipelineState<S> downstream = pipelineStateRef.get();
@@ -563,9 +578,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         /*
          * This is the leader, so send() the buffer.
          */
-
-        if (log.isTraceEnabled())
-            log.trace("Leader will send: " + b.remaining() + " bytes");
 
         ft = new FutureTask<Void>(new Callable<Void>() {
 

@@ -193,6 +193,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
 
     /**
+     * Logger for HA events.
+     */
+    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
+
+    /**
 	 * The index of the root address containing the address of the persistent
 	 * {@link Name2Addr} mapping names to {@link BTree}s registered for the
 	 * store.
@@ -2081,14 +2086,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Return <code>true</code> if the journal is configured for high
-	 * availability. High availability exists (in principle) when the
-	 * {@link QuorumManager#replicationFactor()} <em>k</em> is greater than one.
-	 * 
-	 * @see #getQuorum()
-	 * @see QuorumManager#isHighlyAvailable()
-	 */
+    /**
+     * Return <code>true</code> if the journal is configured for high
+     * availability.
+     * 
+     * @see QuorumManager#isHighlyAvailable()
+     */
 	public boolean isHighlyAvailable() {
 
 		return getQuorum().isHighlyAvailable();
@@ -2574,11 +2577,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				return 0L;
 			}
 			
-			/*
-			 * Explicitly call the RootBlockCommitter
-			 */
-			rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter.handleCommit(commitTime);
-			
+            /*
+             * Explicitly call the RootBlockCommitter
+             */
+            rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter
+                    .handleCommit(commitTime);
+
 			/*
 			 * Write the commit record onto the store.
 			 * 
@@ -2592,10 +2596,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			final long newCommitCounter = old.getCommitCounter() + 1;
 			
-			final ICommitRecord commitRecord = new CommitRecord(commitTime, newCommitCounter, rootAddrs);
+            final ICommitRecord commitRecord = new CommitRecord(commitTime,
+                    newCommitCounter, rootAddrs);
 
-			final long commitRecordAddr = write(ByteBuffer
-					.wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
+            final long commitRecordAddr = write(ByteBuffer
+                    .wrap(CommitRecordSerializer.INSTANCE
+                            .serialize(commitRecord)));
 
 			/*
 			 * Before flushing the commitRecordIndex we need to check for
@@ -2614,18 +2620,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 			_commitRecordIndex.add(commitRecordAddr, commitRecord);
 			
-			/*
-			 * Flush the commit record index to the store and stash the address
-			 * of its metadata record in the root block.
-			 * 
-			 * Note: The address of the root of the CommitRecordIndex itself
-			 * needs to go right into the root block. We are unable to place it
-			 * into the commit record since we need to serialize the commit
-			 * record, get its address, and add the entry to the
-			 * CommitRecordIndex before we can flush the CommitRecordIndex to
-			 * the store.
-			 */
-			final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
+            /*
+             * Flush the commit record index to the store and stash the address
+             * of its metadata record in the root block.
+             * 
+             * Note: The address of the root of the CommitRecordIndex itself
+             * needs to go right into the root block. We are unable to place it
+             * into the commit record since we need to serialize the commit
+             * record, get its address, and add the entry to the
+             * CommitRecordIndex before we can flush the CommitRecordIndex to
+             * the store.
+             */
+            final long commitRecordIndexAddr = _commitRecordIndex
+                    .writeCheckpoint();
 
             if (quorum != null) {
                 /*
@@ -2634,12 +2641,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 quorum.assertLeader(quorumToken);
             }
 
-			/*
-			 * Call commit on buffer strategy prior to retrieving root block,
-			 * required for RWStore since the metaBits allocations are not made
-			 * until commit, leading to invalid addresses for recent store
-			 * allocations.
-			 */
+            /*
+             * Call commit on buffer strategy prior to retrieving root block,
+             * required for RWStore since the metaBits allocations are not made
+             * until commit, leading to invalid addresses for recent store
+             * allocations.
+             * 
+             * Note: This will flush the write cache. For HA, that ensures that
+             * the write set has been replicated to the followers.
+             * 
+             * Note: After this, we do not write anything on the backing store
+             * other than the root block. The rest of this code is dedicated to
+             * creating a properly formed root block. For a non-HA deployment,
+             * we just lay down the root block. For an HA deployment, we do a
+             * 2-phase commit.
+             */
 			_bufferStrategy.commit();
 
 			/*
@@ -2662,9 +2678,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				 * unisolated transactions).
 				 */
 
-				final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime : old.getFirstCommitTime());
+                final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
+                        : old.getFirstCommitTime());
 
-				final long priorCommitTime = old.getLastCommitTime();
+                final long priorCommitTime = old.getLastCommitTime();
 
 				if (priorCommitTime != 0L) {
 
@@ -2744,12 +2761,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
                 final QuorumService<HAGlue> quorumService = quorum.getClient();
 
+                boolean didVoteYes = false;
                 try {
 
-                    final int minYes = (quorum.replicationFactor() + 1) >> 1;
-
-                    // @todo config prepare timeout (Watch out for long GC
-                    // pauses!)
+                    // TODO Configure prepare timeout (Watch out for long GC pauses!)
                     final int nyes = quorumService.prepare2Phase(//
                             !old.isRootBlock0(),//
                             newRootBlock,//
@@ -2757,8 +2772,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             TimeUnit.MILLISECONDS//
                             );
 
-                    if (nyes >= minYes) {
+                    final boolean willCommit = quorum.isQuorum(nyes);
+                    
+                    if (haLog.isInfoEnabled())
+                        haLog.info("Will " + (willCommit ? "" : "not ")
+                                + "commit: " + nyes + " out of "
+                                + quorum.replicationFactor()
+                                + " services voted yes.");
 
+                    if (willCommit) {
+
+                        didVoteYes = true;
+                        
                         quorumService.commit2Phase(quorumToken, commitTime);
 
                     } else {
@@ -2768,20 +2793,34 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     }
 
                 } catch (Throwable e) {
-                    /*
-                     * FIXME At this point the quorum is probably inconsistent
-                     * in terms of their root blocks. Rather than attempting to
-                     * send an abort() message to the quorum, we probably should
-                     * force the master to yield its role at which point the
-                     * quorum will attempt to elect a new master and
-                     * resynchronize.
-                     */
-                    if (quorumService != null) {
-                        try {
-                            quorumService.abort2Phase(quorumToken);
-                        } catch (Throwable t) {
-                            log.warn(t, t);
+                    if (didVoteYes) {
+                        /*
+                         * The quorum voted to commit, but something went wrong.
+                         * 
+                         * FIXME At this point the quorum is probably
+                         * inconsistent in terms of their root blocks. Rather
+                         * than attempting to send an abort() message to the
+                         * quorum, we probably should force the master to yield
+                         * its role at which point the quorum will attempt to
+                         * elect a new master and resynchronize.
+                         */
+                        if (quorumService != null) {
+                            try {
+                                quorumService.abort2Phase(quorumToken);
+                            } catch (Throwable t) {
+                                log.warn(t, t);
+                            }
                         }
+                    } else {
+                        /*
+                         * This exception was thrown during the abort handling
+                         * logic. Note that we already attempting an 2-phase
+                         * abort since the quorum did not vote "yes".
+                         * 
+                         * TODO We should probably force a quorum break since
+                         * there is clearly something wrong with the lines of
+                         * communication among the nodes.
+                         */
                     }
                     throw new RuntimeException(e);
                 }
@@ -4563,6 +4602,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
         
+        if (haLog.isInfoEnabled())
+            haLog.info("oldValue=" + oldValue + ", newToken=" + newValue);
+
         final boolean didBreak;
         final boolean didMeet;
 
@@ -4761,10 +4803,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     new ChecksumUtility()//
             );
 
+            if (haLog.isInfoEnabled())
+                haLog.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
+                        + rootBlock + ", timeout=" + timeout + ", unit=" + unit);
+
 			if (rootBlock.getLastCommitTime() <= getLastCommitTime())
 				throw new IllegalStateException();
 
-			getQuorum().assertQuorum(rootBlock.getQuorumToken());
+			quorum.assertQuorum(rootBlock.getQuorumToken());
 
 			prepareRequest.set(rootBlock);
 
@@ -4780,10 +4826,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 					final IRootBlockView rootBlock = prepareRequest.get();
 
+                    if (haLog.isInfoEnabled())
+                        haLog.info("preparedRequest=" + rootBlock);
+
 					if (rootBlock == null)
 						throw new IllegalStateException();
 
-					getQuorum().assertQuorum(prepareToken);
+					quorum.assertQuorum(prepareToken);
 
 					/*
 					 * Call to ensure strategy does everything required for
@@ -4852,11 +4901,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		public Future<Void> commit2Phase(final long commitTime) {
 
-			final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
+            if (haLog.isInfoEnabled())
+                haLog.info("commitTime=" + commitTime);
+
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
 			    
 				public void run() {
 
-					final IRootBlockView rootBlock = prepareRequest.get();
+                    if (haLog.isInfoEnabled())
+                        haLog.info("commitTime=" + commitTime);
+
+		            final IRootBlockView rootBlock = prepareRequest.get();
 
 					if (rootBlock == null)
 						throw new IllegalStateException();
@@ -4869,7 +4924,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 							throw new IllegalStateException();
 
 						// verify that the qourum has not changed.
-						getQuorum().assertQuorum(rootBlock.getQuorumToken());
+						quorum.assertQuorum(rootBlock.getQuorumToken());
 
 						// write the root block on to the backing store.
 						_bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
@@ -4881,6 +4936,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						_commitRecord = _getCommitRecord();
 
 						prepareRequest.set(null/* discard */);
+
+		                if (txLog.isInfoEnabled())
+		                    txLog.info("COMMIT: commitTime=" + commitTime);
 
 					} finally {
 
@@ -4906,10 +4964,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         public Future<Void> abort2Phase(final long token) {
 
+            if (haLog.isInfoEnabled())
+                haLog.info("token=" + token);
+
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
 
-                    getQuorum().assertQuorum(token);
+                    if (haLog.isInfoEnabled())
+                        haLog.info("token=" + token);
+                    
+                    quorum.assertQuorum(token);
 
                     prepareRequest.set(null/* discard */);
 
@@ -4946,11 +5010,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<byte[]> readFromDisk(final long token,
                 final UUID storeId, final long addr) {
 
+            if (haLog.isInfoEnabled())
+                haLog.info("token=" + token);
+            
             final FutureTask<byte[]> ft = new FutureTask<byte[]>(
                     new Callable<byte[]>() {
 				
 			    public byte[] call() throws Exception {
 
+		            if (haLog.isInfoEnabled())
+		                haLog.info("token=" + token);
+		            
 				    quorum.assertQuorum(token);
 				    
 					// final ILRUCache<Long, Object> cache = (LRUNexus.INSTANCE
@@ -4987,10 +5057,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
                 throws IOException {
 
+            if (haLog.isInfoEnabled())
+                haLog.info("msg=" + msg);
+            
             /*
              * Adjust the size on the disk of the local store to that given in
-             * the message. For the RW store, this can cause the allocation
-             * blocks to be moved if the store is extended.
+             * the message.
              * 
              * @todo Trap truncation vs extend?
              */
@@ -5005,7 +5077,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
             }
 
-            final Future<Void> ft = getQuorum().getClient()
+            final Future<Void> ft = quorum.getClient()
                     .receiveAndReplicate(msg);
 
             return getProxy(ft);
@@ -5016,6 +5088,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             if (storeId == null)
                 throw new IllegalArgumentException();
+
+            if (haLog.isInfoEnabled())
+                haLog.info("storeId=" + storeId);
 
             if (getUUID().equals(storeId)) {
                 // A request for a different journal's root block.
@@ -5031,6 +5106,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
                     // NOP (no zookeeper at this layer).
+                    if (haLog.isInfoEnabled())
+                        haLog.info("");
                 }
             }, null);
             ft.run();
@@ -5045,6 +5122,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<Void> moveToEndOfPipeline() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
+                    if (haLog.isInfoEnabled())
+                        haLog.info("");
                     final QuorumActor<?, ?> actor = quorum.getActor();
                     actor.pipelineRemove();
                     actor.pipelineAdd();
