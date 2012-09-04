@@ -49,7 +49,7 @@ public class TestAll extends TestCase {
 
     private final static Logger log = Logger.getLogger(TestAll.class);
     
-    final private static boolean s_includeQuorum = true;
+    final private static boolean s_includeQuorum = false;
 
     /**
      * 
