@@ -91,6 +91,9 @@ public class QuorumReadImpl<S extends HAReadGlue> extends
     public byte[] readFromQuorum(final UUID storeId, final long addr)
             throws InterruptedException, IOException {
 
+        if (log.isInfoEnabled())
+            log.info("storeId=" + storeId + ", addr=" + addr);
+
         if (storeId == null)
             throw new IllegalArgumentException();
 
@@ -107,9 +110,7 @@ public class QuorumReadImpl<S extends HAReadGlue> extends
         // @todo monitoring hook (Nagios)?
         //
         // @todo counters (in WORMStrategy right now).
-        if (log.isInfoEnabled())
-            log.info("Failover read: storeId=" + storeId + ", addr=" + addr);
-
+        
         // Block if necessary awaiting a met quorum.
         final long token = member.getQuorum().awaitQuorum();
 

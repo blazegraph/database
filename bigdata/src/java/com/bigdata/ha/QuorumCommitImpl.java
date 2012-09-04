@@ -62,6 +62,9 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
     protected <F extends Future<T>, T> void cancelRemoteFutures(
             final List<F> remoteFutures) {
 
+        if (log.isInfoEnabled())
+            log.info("");
+
         for (F rf : remoteFutures) {
 
             try {
@@ -96,6 +99,10 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
         if (unit == null)
             throw new IllegalArgumentException();
+        
+        if (log.isInfoEnabled())
+            log.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
+                    + rootBlock + ", timeout=" + timeout + ", unit=" + unit);
         
         /*
          * The token of the quorum for which the leader issued this prepare
@@ -226,6 +233,9 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
     public void commit2Phase(final long token, final long commitTime)
             throws IOException, InterruptedException {
 
+        if (log.isInfoEnabled())
+            log.info("token=" + token + ", commitTime=" + commitTime);
+
         /*
          * To minimize latency, we first submit the futures for the other
          * services and then do f.run() on the leader. This will allow the other
@@ -328,6 +338,9 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
     public void abort2Phase(final long token) throws IOException,
             InterruptedException {
+
+        if (log.isInfoEnabled())
+            log.info("token=" + token);
 
         /*
          * To minimize latency, we first submit the futures for the other

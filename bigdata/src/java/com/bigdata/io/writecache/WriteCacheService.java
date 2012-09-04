@@ -168,6 +168,11 @@ abstract public class WriteCacheService implements IWriteCache {
     protected static final Logger log = Logger.getLogger(WriteCacheService.class);
 
     /**
+     * Logger for HA events.
+     */
+    private static final Logger haLog = Logger.getLogger("com.bigdata.ha");
+
+    /**
      * <code>true</code> until the service is {@link #close() closed}.
      */
 //  private volatile boolean open = true;
@@ -1248,6 +1253,18 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
+
+        if (haLog.isInfoEnabled()) {
+            /*
+             * Note: This is an important event for HA. The write cache is
+             * flushed to ensure that the entire write set is replicated on the
+             * followers. Once that has been done, HA will do a 2-phase commit
+             * to verify that there is a quorum that agrees to write the root
+             * block. Writing the root block is the only thing that the nodes in
+             * the quorum need to do once the write cache has been flushed.
+             */
+            haLog.info("Flushing the write cache.");
+        }
 
         final long begin = System.nanoTime();
         final long nanos = units.toNanos(timeout);

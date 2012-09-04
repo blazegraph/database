@@ -1730,6 +1730,7 @@ abstract public class WriteCache implements IWriteCache {
             final int limit = buf.limit(); // end position.
             int pos = buf.position(); // start position
 //            buf.limit(sp);
+            int nwrite = 0;
             while (pos < limit) {
                 buf.position(pos);
                 final long addr = buf.getLong(); // 8 bytes
@@ -1746,6 +1747,7 @@ abstract public class WriteCache implements IWriteCache {
                 } else {
                     recordMap.put(addr, new RecordMetadata(addr, pos + 12, sze));
                 }
+                nwrite++;
                 pos += 12 + sze; // skip header (addr + sze) and data
             }
         }

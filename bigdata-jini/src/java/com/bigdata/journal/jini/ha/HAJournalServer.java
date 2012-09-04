@@ -68,6 +68,11 @@ public class HAJournalServer extends AbstractServer {
     private static final Logger log = Logger.getLogger(HAJournal.class);
 
     /**
+     * Logger for HA events.
+     */
+    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
+
+    /**
      * Configuration options for the {@link HAJournalServer}.
      */
     public interface ConfigurationOptions {
@@ -524,6 +529,9 @@ public class HAJournalServer extends AbstractServer {
             @Override
             protected void handleReplicatedWrite(final HAWriteMessage msg,
                     final ByteBuffer data) throws Exception {
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("msg=" + msg);
 
                 /*
                  * Note: the ByteBuffer is owned by the HAReceiveService. This

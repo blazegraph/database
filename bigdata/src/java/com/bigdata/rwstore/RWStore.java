@@ -938,7 +938,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				// Can handle minor store version incompatibility
 				final int storeVersion = strBuf.readInt();
 				if ((storeVersion & 0xFF00) != (cVersion & 0xFF00)) {
-					throw new IllegalStateException("Incompatible RWStore header version");
+					throw new IllegalStateException("Incompatible RWStore header version: storeVersion="+(storeVersion&0xff00)+", cVersion="+(cVersion&0xff00));
 				}
 				m_lastDeferredReleaseTime = strBuf.readLong();
 				cDefaultMetaBitsSize = strBuf.readInt();
@@ -1876,7 +1876,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
 //	private volatile long m_maxAllocation = 0;
 	private volatile long m_spareAllocation = 0;
-	
+	/** Core allocation method. */
 	public int alloc(final int size, final IAllocationContext context) {
 		if (size > m_maxFixedAlloc) {
 			throw new IllegalArgumentException("Allocation size to big: " + size + " > " + m_maxFixedAlloc);

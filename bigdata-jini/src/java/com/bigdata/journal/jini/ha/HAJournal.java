@@ -148,6 +148,11 @@ public class HAJournal extends Journal {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to expose this method to the {@link HAJournalServer}.
+     */
     @Override
     protected final void setQuorumToken(final long newValue) {
     
@@ -173,7 +178,10 @@ public class HAJournal extends Journal {
                 @SuppressWarnings("rawtypes")
                 public void run() {
 
-                    if(getQuorum() instanceof ZKQuorumImpl) {
+                    if (haLog.isInfoEnabled())
+                        haLog.info("");
+
+                    if (getQuorum() instanceof ZKQuorumImpl) {
 
                         try {
 
@@ -255,7 +263,7 @@ public class HAJournal extends Journal {
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/437
              */
-            return new ThickFuture(future);
+            return new ThickFuture<E>(future);
 
 //            /*
 //             * Setup the Exporter for the Future.
