@@ -63,11 +63,18 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	static final Logger logger = LoggerFactory.getLogger(SPARQLUpdateTest.class);
 
-	/**
+    /**
      * When <code>true</code>, the unit tests of the BINDINGS clause are
      * enabled.
      * 
-     * FIXME BINDINGS does not work correctly for UPDATE.
+     * FIXME BINDINGS does not work correctly for UPDATE (actually, BINDINGS are
+     * not allowed for UPDATE in the SPARQL 1.1 specification draft that we
+     * currently implement and have been replaced by VALUES in the more recent
+     * draft, so these unit tests need to go when we pick up the change set from
+     * openrdf).
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593" >
+     *      openrdf 2.6.9 </a>
      */
     private static boolean BINDINGS = false;
     
@@ -883,6 +890,15 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		StringBuilder update = new StringBuilder();
 		update.append(getNamespaceDeclarations());
 		update.append("CREATE GRAPH <" + graph1 + "> ");
+
+//        ((BigdataSailRepositoryConnection) con).getSailConnection()
+//                .addListener(new ISPARQLUpdateListener() {
+//            
+//            @Override
+//            public void updateEvent(SPARQLUpdateEvent e) {
+//                System.err.println("elapsed="+e.getElapsedNanos()+", op="+e.getUpdate());
+//            }
+//        });
 
 		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
