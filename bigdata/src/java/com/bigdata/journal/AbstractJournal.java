@@ -1981,9 +1981,31 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * if {@link #closeForWrites(long)} was used to seal the journal against
      * further writes.
      */
-	public boolean isReadOnly() {
+    public boolean isReadOnly() {
 
-        return readOnly || getRootBlockView().getCloseTime() != 0L;
+        if (readOnly) {
+            // Opened in a read-only mode.
+            return true;
+        }
+
+        if (getRootBlockView().getCloseTime() != 0L) {
+            // Closed for writes.
+            return true;
+        }
+
+        final long token = this.quorumToken;
+
+        if (token != Quorum.NO_QUORUM) {
+
+            // Quorum exists, are we the leader for that token?
+            final boolean isLeader = quorum.getClient().isLeader(token);
+
+            // read-only unless this is the leader.
+            return !isLeader;
+
+        }
+
+        return false;
 
     }
 
