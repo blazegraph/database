@@ -476,4 +476,9 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 		return m_mmgr.getOutputStream(context);
 	}
 
+	@Override
+	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
+		throw new UnsupportedOperationException("MemStrategy cannot be used in HA pipeline");
+	}
+
 }

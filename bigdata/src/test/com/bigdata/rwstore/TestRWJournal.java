@@ -1820,6 +1820,46 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	store.destroy();
             }
 		}
+		
+		public void testResetHARootBlock() {
+            final Properties properties = new Properties(getProperties());
+
+ 			final Journal store = (Journal) getStore(properties);
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStore rw = bs.getStore();
+            	
+ 	        	for (int r = 0; r < 10; r++) {
+		        	ArrayList<Long> addrs = new ArrayList<Long>();
+		        	for (int i = 0; i < 1000; i++) {
+		        		addrs.add(bs.write(randomData(2048)));
+		        	}
+		        	store.commit();
+		        	
+		        	final StorageStats stats1 = rw.getStorageStats();
+		        	
+		        	bs.resetFromHARootBlock(store.getRootBlockView());
+		        	
+		        	final StorageStats stats2 = rw.getStorageStats();
+
+		        	// Now check that we can read all allocations after reset
+		        	for (long addr : addrs) {
+		        		store.read(addr);
+		        	}
+		
+	        	}
+	        	
+				final String fname = bs.getStore().getStoreFile().getAbsolutePath();
+				
+	        	store.close();
+	        	
+ 			} finally {
+            	store.destroy();
+            }
+		}
+		
+		
 
 		private Journal getStore(Properties props) {
 			return new Journal(props);

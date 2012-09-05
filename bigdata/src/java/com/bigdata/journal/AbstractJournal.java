@@ -4931,6 +4931,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 						// set the new root block.
 						_rootBlock = rootBlock;
+						
+						if (_bufferStrategy instanceof IRWStrategy) {
+							// ensure allocators are synced after commit
+							((IRWStrategy) _bufferStrategy).resetFromHARootBlock(_rootBlock);
+						}
 
 						// reload the commit record from the new root block.
 						_commitRecord = _getCommitRecord();

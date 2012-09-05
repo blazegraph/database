@@ -1006,24 +1006,28 @@ public class TestWriteCache extends TestCase3 {
     // ensure dst buffer is copy of src
     private void syncBuffers(final IBufferAccess src, final IBufferAccess dst) {
 
-        final ByteBuffer sb = src.buffer();//.duplicate();
-        final ByteBuffer db = dst.buffer();//.duplicate();
+        final ByteBuffer sb = src.buffer(); //.duplicate();
+        final ByteBuffer db = dst.buffer(); //.duplicate();
         
-        db.rewind();
-        sb.flip();
-        db.put(sb/* src */);
+//        db.position(0);
+//        sb.position(0);
+//        
+//        db.put(sb/* src */);
+//        
+//        db.position(0);
+//        sb.position(0);
 
-//    	int sp = sb.position();
-//    	int sl = sb.limit();
-//    	sb.position(0);
-//    	db.position(0);
-//    	sb.limit(sp);
+    	int sp = sb.position();
+    	int sl = sb.limit();
+    	sb.position(0);
+    	db.position(0);
+    	sb.limit(sp);
 //    	db.limit(sp);
-//    	db.put(sb);
-//    	sb.position(sp);
-//    	db.position(sp);
-//    	sb.limit(sl);
-//    	db.limit(sl);   	
+    	db.put(sb);
+    	sb.position(sp);
+    	db.position(sp);
+    	sb.limit(sl);
+    	db.limit(sl);   	
         
     }
 

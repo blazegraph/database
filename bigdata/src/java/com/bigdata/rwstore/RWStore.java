@@ -2264,7 +2264,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				m_storageStatsAddr = (addr << 16) + buf.length;
 			}
 			
-			// Allocate storage for metaBits
+			// Pre-allocate storage for metaBits from FixedAllocators
 			final long oldMetaBits = m_metaBitsAddr;
 			final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
 			m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
@@ -3950,6 +3950,21 @@ public class RWStore implements IStore, IBufferedWriter {
 
     }
 
+    /**
+     * This can be called as part of the HA downstream replication.
+     * 
+     * FIXME: If part of downstream replication then the current metabits
+     * held by the RWStore will not be in sync with that stored on disk.
+     * 
+     * This will only be a problem if the RWStore needs to take over as
+     * leader and be able to allocate and write to the store.
+     * 
+     * Note that the metabits are not needed in order to determine the
+     * physical address mapping of an rw-native address.
+     * 
+     * @param rootBlock
+     * @param forceOnCommit
+     */
     public void writeRootBlock(final IRootBlockView rootBlock,
             final ForceEnum forceOnCommit) {
 
@@ -4597,6 +4612,14 @@ public class RWStore implements IStore, IBufferedWriter {
          * FIXME We need to update the allocators either here based on that
          * RecordMap. Expose it via a read-only interface and then mock up the
          * bits in the appropriate allocators.
+         * 
+         * Determining FixedAllocators from sequentially allocated addesses is
+         * not straightforward.  However, if we can assume that allocations are
+         * made sequentially, and we know the slot size of the allocation, then it
+         * may be possible to infer the FixedAllocation requirements and therefore
+         * any rw-native address.
+         * 
+         * 
          */
         
         /*
@@ -4758,6 +4781,35 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	public IPSOutputStream getOutputStream(final IAllocationContext context) {
 		return PSOutputStream.getNew(this, m_maxFixedAlloc, context);
+	}
+
+	/**
+	 * Called from AbstractJournal commit2Phase to ensure that a downstream HA
+	 * quorum member ensures it is able to read committed data that has been
+	 * streamed directly to the backing store.
+	 * 
+	 * The data stream will have included metabits and modified FixedAllocators
+	 * so these must be reset using the metabitsAddr data in the rootblock.
+	 */
+	public void resetFromHARootBlock(IRootBlockView rootBlock) {
+		try {
+			// should not be any dirty allocators
+			assert m_commitList.size() == 0;
+			
+			
+			// Remove all current allocators
+			m_allocs.clear();
+			
+			assert m_nextAllocation != 0;
+			
+			m_nextAllocation = 0;
+
+			initfromRootBlock(rootBlock);
+			
+			assert m_nextAllocation != 0;
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}  
 
 //    /**

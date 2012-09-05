@@ -1,6 +1,7 @@
 package com.bigdata.rwstore;
 
 import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 
@@ -29,5 +30,10 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
      * @return <code>true</code> iff the address is currently committed.
      */
     public boolean isCommitted(long addr);
+
+    /**
+     * Resets allocators from current rootblock
+     */
+	void resetFromHARootBlock(IRootBlockView rootBlock);
     
 }
