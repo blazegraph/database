@@ -52,7 +52,9 @@ public class FixedAllocator implements Allocator {
 
     /**
      * Address of the {@link FixedAllocator} within the meta allocation space on
-     * the disk.
+     * the disk of the last committed version of this {@link FixedAllocator}.
+     * This is a bit that can be decoded by {@link RWStore#metaBit2Addr(int)}.
+     * The value is initially ZERO (0) which is never a legal bit.
      */
 	volatile private int m_diskAddr;
 	volatile private int m_index;
@@ -96,43 +98,76 @@ public class FixedAllocator implements Allocator {
 		return this == o;
 	}
 
+    /**
+     * Return the bit in metabits for the last persisted version of this
+     * allocator. This bit can be translated into the actual byte offset on the
+     * file by {@link RWStore#metaBit2Addr(int)}.
+     */
 	public int getDiskAddr() {
 		return m_diskAddr;
 	}
 
+    /**
+     * Set the bit in metabits for this allocator.
+     * 
+     * @param addr
+     *            A bit obtained from {@link RWStore#metaAlloc()}.
+     */
 	public void setDiskAddr(final int addr) {
 		m_diskAddr = addr;
 	}
 
     /**
+     * Return the byte offset on the file corresponding to a bit index into this
+     * {@link FixedAllocator}.
+     * <p>
      * The tweak of 3 to the offset is to ensure 1, that no address is zero and
      * 2 to enable the values 1 & 2 to be special cased (this aspect is now
      * historical).
+     * 
+     * @param offset
+     *            The bit index into the {@link FixedAllocator}.
+     * 
+     * @return The byte offset on the backing file.
      */
 	public long getPhysicalAddress(int offset, final boolean nocheck) {
 	  	offset -= 3;
 
-		final int allocBlockRange = 32 * m_bitSize;
-
-		final AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+	  	// The AllocBlock that manages that bit.
+        final AllocBlock block = (AllocBlock) m_allocBlocks.get(offset
+                / allocBlockRange);
 		
+        // The bit offset into the AllocBlock.
 		final int bit = offset % allocBlockRange;
 		
 //		if (RWStore.tstBit(block.m_live, bit) 
 //				|| (m_sessionActive && RWStore.tstBit(block.m_transients, bit))) { 
+
+        /*
+         * Compute the offset into the region managed by that AllocBlock and
+         * then add it to the byte offset of the AllocBlock on the backing file.
+         * This gives us the total offset on the backing file associated with
+         * that bit.
+         */
+		final long paddr = RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
+		
 		/*
 		 * Just check transients since there are case (eg CommitRecordIndex)
 		 * where committed data is accessed even if has been marked as ready to
 		 * be recycled after the next commit
 		 */
-		final long paddr = RWStore.convertAddr(block.m_addr) + ((long) m_size * bit);
 		if (nocheck || RWStore.tstBit(block.m_transients, bit)) {			
-			return paddr;
+		
+		    return paddr;
+		    
 		} else {
-			if (RWStore.tstBit(block.m_commit, bit)) {
-				throw new IllegalStateException("Address committed but not set in transients");
-			}
-			m_store.showWriteCacheDebug(paddr);			
+			
+		    if (RWStore.tstBit(block.m_commit, bit)) {
+                throw new IllegalStateException(
+                        "Address committed but not set in transients");
+            }
+			
+		    m_store.showWriteCacheDebug(paddr);			
 			
 			return 0L;
 		}
@@ -274,7 +309,7 @@ public class FixedAllocator implements Allocator {
 
                     str.writeInt(block.m_addr);
                     for (int i = 0; i < m_bitSize; i++) {
-                    	str.writeInt(block.m_live[i]);
+                    	    str.writeInt(block.m_live[i]);
                     }
 
                     if (!protectTransients) {
@@ -447,10 +482,18 @@ public class FixedAllocator implements Allocator {
 	private int m_startAddr = 0;
 	private int m_endAddr = 0;
 
-	/**
-	 * The #of ints in the {@link AllocBlock}'s internal arrays.
-	 */
-	private final int m_bitSize;
+    /**
+     * The #of int32 values in a single {@link AllocBlock} region. The
+     * {@link FixedAllocator} can manage many {@link AllocBlock}s.
+     */
+    private final int m_bitSize;
+
+    /**
+     * The #of bits in an {@link AllocBlock} (the #of slots managed by that
+     * {@link AllocBlock}). Each slot managed by the {@link AllocBlock} is
+     * {@link #m_size} bytes.
+     */
+    private final int allocBlockRange;
 
 	private final ArrayList<AllocBlock> m_allocBlocks;
 
@@ -471,14 +514,19 @@ public class FixedAllocator implements Allocator {
 	 * @param cache
 	 */
 	FixedAllocator(final RWStore store, final int size) {//, final RWWriteCacheService cache) {
-		m_diskAddr = 0;
+
+	    // Note: ZERO (0) is never a valid metabits bit.
+	    m_diskAddr = 0;
 		m_store = store;
 
 		m_size = size;
 
-		// By default, disk-based allocators should optimise for density
+		// By default, disk-based allocators should optimize for density
 		m_bitSize = calcBitSize(true /* optDensity */, size, cMinAllocation, cModAllocation);
 
+		// The #of bits in an AllocBlock.
+		allocBlockRange = 32 * m_bitSize;
+		 
 		// number of blocks in this allocator, bitSize plus 1 for start address
 		// The 1K allocator is 256 ints, one is used to record the slot size and
 		// another for the checksum; leaving 254 to be used to store the 

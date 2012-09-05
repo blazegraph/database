@@ -54,13 +54,14 @@ public class AllocBlock {
 	 * to allow the AllocBlock to determine the session state and whether to
 	 * clear the transient bits.
 	 */
-	final FixedAllocator m_allocator;
-	/**
-	 * The address of the {@link AllocBlock} -or- ZERO (0) if {@link AllocBlock}
-	 * has not yet been allocated on the persistent heap. Note that the space
-	 * for the allocation slots managed by an {@link AllocBlock} is not reserved
-	 * until the {@link AllocBlock} is allocated on the persistent heap.
-	 */
+    final FixedAllocator m_allocator;
+    /**
+     * The address of the data managed by the {@link AllocBlock} -or- ZERO (0)
+     * if {@link AllocBlock} has not yet been allocated on the persistent heap.
+     * Note that the space for the allocation slots managed by an
+     * {@link AllocBlock} is not reserved until the {@link AllocBlock} is
+     * allocated on the persistent heap.
+     */
 	int m_addr;
 	/**
 	 * The dimension of the arrays, which is the #of allocation slots divided by
