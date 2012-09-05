@@ -534,7 +534,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public byte[] remove(byte[] key) {
+    public byte[] remove(final byte[] key) {
 
         final Lock lock = writeLock();
         
