@@ -1329,9 +1329,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * started on this data service).
                      */
 
-                    transactionManager.getTransactionService().declareResources(
-                            timestamp, dataServiceUUID, resource);
+                    final IDistributedTransactionService txs = (IDistributedTransactionService) transactionManager
+                            .getTransactionService();
                     
+                    txs.declareResources(timestamp, dataServiceUUID, resource);
+
                 } catch (IOException e) {
 
                     // RMI problem.

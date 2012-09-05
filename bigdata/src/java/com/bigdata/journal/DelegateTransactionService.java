@@ -38,11 +38,12 @@ import java.util.concurrent.BrokenBarrierException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DelegateTransactionService implements ITransactionService {
+public class DelegateTransactionService implements
+        IDistributedTransactionService {
 
-    private final ITransactionService proxy;
+    private final IDistributedTransactionService proxy;
 
-    public DelegateTransactionService(final ITransactionService proxy) {
+    public DelegateTransactionService(final IDistributedTransactionService proxy) {
         if (proxy == null)
             throw new IllegalArgumentException();
         this.proxy = proxy;

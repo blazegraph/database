@@ -59,6 +59,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IDistributedTransactionService;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionService;
@@ -1145,7 +1146,7 @@ abstract public class DataService extends AbstractService
         @Override
         protected Void doTask() throws Exception {
 
-            final ITransactionService txService = resourceManager
+            final IDistributedTransactionService txService = (IDistributedTransactionService) resourceManager
                     .getLiveJournal().getLocalTransactionManager()
                     .getTransactionService();
 

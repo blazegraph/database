@@ -61,6 +61,7 @@ import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.journal.IDistributedTransactionService;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
@@ -76,7 +77,7 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * @version $Id$
  */
 public abstract class DistributedTransactionService extends
-        AbstractTransactionService {
+        AbstractTransactionService implements IDistributedTransactionService {
 
     /**
      * Options understood by this service.
@@ -1692,6 +1693,82 @@ public abstract class DistributedTransactionService extends
     }
 
     /**
+     * Note: Only those {@link DataService}s on which a read-write transaction
+     * has started will participate in the commit. If there is only a single
+     * such {@link IDataService}, then a single-phase commit will be used.
+     * Otherwise a distributed transaction commit protocol will be used.
+     * <p>
+     * Note: The commits requests are placed into a partial order by sorting the
+     * total set of resources which the transaction declares (via this method)
+     * across all operations executed by the transaction and then contending for
+     * locks on the named resources using a LockManager. This is
+     * handled by the {@link DistributedTransactionService}.
+     */
+    @Override
+    public void declareResources(final long tx, final UUID dataServiceUUID,
+            final String[] resource) throws IllegalStateException {
+
+        setupLoggingContext();
+
+        lock.lock();
+        try {
+
+            switch (getRunState()) {
+            case Running:
+            case Shutdown:
+                break;
+            default:
+                throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
+            }
+
+            if (dataServiceUUID == null)
+                throw new IllegalArgumentException();
+
+            if (resource == null)
+                throw new IllegalArgumentException();
+
+            final TxState state = getTxState(tx);
+
+            if (state == null) {
+
+                throw new IllegalStateException(ERR_NO_SUCH);
+
+            }
+
+            state.lock.lock();
+
+            try {
+
+                if (state.isReadOnly()) {
+
+                    throw new IllegalStateException(ERR_READ_ONLY);
+
+                }
+
+                if (!state.isActive()) {
+
+                    throw new IllegalStateException(ERR_NOT_ACTIVE);
+
+                }
+
+                state.declareResources(dataServiceUUID, resource);
+
+            } finally {
+
+                state.lock.unlock();
+
+            }
+
+        } finally {
+
+            lock.unlock();
+            clearLoggingContext();
+
+        }
+        
+    }
+
+    /**
      * Waits at "prepared" barrier. When the barrier breaks, examing the
      * {@link TxState}. If the transaction is aborted, then throw an
      * {@link InterruptedException}. Otherwise return the commitTime assigned
@@ -1700,6 +1777,7 @@ public abstract class DistributedTransactionService extends
      * @throws InterruptedException
      *             if the barrier is reset while the caller is waiting.
      */
+    @Override
     public long prepared(final long tx, final UUID dataService)
             throws IOException, InterruptedException, BrokenBarrierException {
 
@@ -1752,6 +1830,7 @@ public abstract class DistributedTransactionService extends
      * an exception of their {@link ITxCommitProtocol#prepare(long, long)}
      * method.
      */
+    @Override
     public boolean committed(final long tx, final UUID dataService)
             throws IOException, InterruptedException, BrokenBarrierException {
 

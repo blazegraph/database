@@ -28,9 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.IOException;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.service.AbstractFederation;
@@ -471,25 +469,27 @@ public class JournalTransactionService extends AbstractTransactionService {
 //        
 //    }
 
-    /**
-     * Throws exception since distributed transactions are not used for a single
-     * {@link Journal}.
-     */
-    public long prepared(long tx, UUID dataService) throws IOException {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    /**
-     * Throws exception since distributed transactions are not used for a single
-     * {@link Journal}.
-     */
-    public boolean committed(long tx, UUID dataService) throws IOException {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * Throws exception since distributed transactions are not used for a single
+//     * {@link Journal}.
+//     */
+//    @Override
+//    public long prepared(long tx, UUID dataService) throws IOException {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
+//
+//    /**
+//     * Throws exception since distributed transactions are not used for a single
+//     * {@link Journal}.
+//     */
+//    @Override
+//    public boolean committed(long tx, UUID dataService) throws IOException {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
     /**
      * Throws exception.

@@ -30,8 +30,6 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
@@ -74,7 +72,7 @@ public class TestTransactionService extends TestCase2 {
     /**
      * Implementation uses a mock client.
      */
-    protected MockTransactionService newFixture(Properties p) {
+    protected MockTransactionService newFixture(final Properties p) {
 
         return new MockTransactionService(p).start();
 
@@ -83,7 +81,7 @@ public class TestTransactionService extends TestCase2 {
     protected static class MockTransactionService extends
             AbstractTransactionService {
 
-        public MockTransactionService(Properties p) {
+        public MockTransactionService(final Properties p) {
 
             super(p);
 
@@ -110,14 +108,14 @@ public class TestTransactionService extends TestCase2 {
         }
 
         @Override
-        protected void abortImpl(TxState state) {
+        protected void abortImpl(final TxState state) {
 
             state.setRunState(RunState.Aborted);
 
         }
 
         @Override
-        protected long commitImpl(TxState state) throws Exception {
+        protected long commitImpl(final TxState state) throws Exception {
 
             state.setRunState(RunState.Committed);
 
@@ -129,23 +127,23 @@ public class TestTransactionService extends TestCase2 {
 
         }
 
-        /**
-         * Note: We are not testing distributed commits here so this is not
-         * implemented.
-         */
-        public long prepared(long tx, UUID dataService)
-                throws InterruptedException, BrokenBarrierException {
-            return 0;
-        }
-
-        /**
-         * Note: We are not testing distributed commits here so this is not
-         * implemented.
-         */
-        public boolean committed(long tx, UUID dataService) throws IOException,
-                InterruptedException, BrokenBarrierException {
-            return false;
-        }
+//        /**
+//         * Note: We are not testing distributed commits here so this is not
+//         * implemented.
+//         */
+//        public long prepared(long tx, UUID dataService)
+//                throws InterruptedException, BrokenBarrierException {
+//            return 0;
+//        }
+//
+//        /**
+//         * Note: We are not testing distributed commits here so this is not
+//         * implemented.
+//         */
+//        public boolean committed(long tx, UUID dataService) throws IOException,
+//                InterruptedException, BrokenBarrierException {
+//            return false;
+//        }
 
         @Override
         public long getLastCommitTime() {
@@ -983,9 +981,11 @@ public class TestTransactionService extends TestCase2 {
 
 //            try {
                 // request a timestamp in the future.
-                final long tx = service.newTx(timestamp1 * 2);
-                System.err.println("ts="+timestamp1);
-                System.err.println("tx="+tx);
+            final long tx = service.newTx(timestamp1 * 2);
+            if (log.isInfoEnabled()) {
+                log.info("ts=" + timestamp1);
+                log.info("tx=" + tx);
+            }
 //                fail("Expecting: "+IllegalStateException.class);
 //            } catch(IllegalStateException ex) {
 //                log.info("Ignoring expected exception: "+ex);

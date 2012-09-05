@@ -73,6 +73,7 @@ import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.DelegateTransactionService;
+import com.bigdata.journal.IDistributedTransactionService;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -588,7 +589,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         if (transactionServiceClient == null)
             return null;
 
-        final ITransactionService proxy = transactionServiceClient
+        final IDistributedTransactionService proxy = (IDistributedTransactionService) transactionServiceClient
                 .getTransactionService();
 
         if(proxy == null)
