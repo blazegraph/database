@@ -28,10 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
-import java.io.IOException;
 import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.BrokenBarrierException;
 
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
@@ -57,7 +54,6 @@ class MockTransactionService extends AbstractTransactionService {
     @Override
     protected void abortImpl(TxState state) throws Exception {
         // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -90,16 +86,16 @@ class MockTransactionService extends AbstractTransactionService {
         return null;
     }
 
-    public boolean committed(long tx, UUID dataService) throws IOException,
-            InterruptedException, BrokenBarrierException {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    public long prepared(long tx, UUID dataService) throws IOException,
-            InterruptedException, BrokenBarrierException {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+//    public boolean committed(long tx, UUID dataService) throws IOException,
+//            InterruptedException, BrokenBarrierException {
+//        // TODO Auto-generated method stub
+//        return false;
+//    }
+//
+//    public long prepared(long tx, UUID dataService) throws IOException,
+//            InterruptedException, BrokenBarrierException {
+//        // TODO Auto-generated method stub
+//        return 0;
+//    }
 
 }

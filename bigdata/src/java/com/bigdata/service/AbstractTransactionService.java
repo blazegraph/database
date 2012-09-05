@@ -222,6 +222,25 @@ abstract public class AbstractTransactionService extends AbstractService
     final private ConcurrentHashMap<Long, TxState> activeTx = new ConcurrentHashMap<Long, TxState>();
 
     /**
+     * Return the {@link TxState} associated with the specified transition
+     * identifier.
+     * <p>
+     * Note: This method is an internal API. The caller must adhere to the
+     * internal synchronization APIs for the transaction service.
+     * 
+     * @param tx
+     *            The transaction identifier.
+     * 
+     * @return The {@link TxState} -or- <code>null</code> if there is no such
+     *         active transaction.
+     */
+    final protected TxState getTxState(final long tx) {
+
+        return activeTx.get(tx);
+
+    }
+    
+    /**
      * The #of open transactions in any {@link RunState}.
      */
     final public int getActiveCount() {
@@ -1876,81 +1895,6 @@ abstract public class AbstractTransactionService extends AbstractService
 
         }
 
-    }
-
-    /**
-     * Note: Only those {@link DataService}s on which a read-write transaction
-     * has started will participate in the commit. If there is only a single
-     * such {@link IDataService}, then a single-phase commit will be used.
-     * Otherwise a distributed transaction commit protocol will be used.
-     * <p>
-     * Note: The commits requests are placed into a partial order by sorting the
-     * total set of resources which the transaction declares (via this method)
-     * across all operations executed by the transaction and then contending for
-     * locks on the named resources using a LockManager. This is
-     * handled by the {@link DistributedTransactionService}.
-     */
-    public void declareResources(final long tx, final UUID dataServiceUUID,
-            final String[] resource) throws IllegalStateException {
-
-        setupLoggingContext();
-
-        lock.lock();
-        try {
-
-            switch (getRunState()) {
-            case Running:
-            case Shutdown:
-                break;
-            default:
-                throw new IllegalStateException(ERR_SERVICE_NOT_AVAIL);
-            }
-
-            if (dataServiceUUID == null)
-                throw new IllegalArgumentException();
-
-            if (resource == null)
-                throw new IllegalArgumentException();
-
-            final TxState state = activeTx.get(tx);
-
-            if (state == null) {
-
-                throw new IllegalStateException(ERR_NO_SUCH);
-
-            }
-
-            state.lock.lock();
-
-            try {
-
-                if (state.isReadOnly()) {
-
-                    throw new IllegalStateException(ERR_READ_ONLY);
-
-                }
-
-                if (!state.isActive()) {
-
-                    throw new IllegalStateException(ERR_NOT_ACTIVE);
-
-                }
-
-                state.declareResources(dataServiceUUID, resource);
-
-            } finally {
-
-                state.lock.unlock();
-
-            }
-
-        } finally {
-
-            lock.unlock();
-            clearLoggingContext();
-
-        }
-        
     }
 
     /**
