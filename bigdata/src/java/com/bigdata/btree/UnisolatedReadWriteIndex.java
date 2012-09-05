@@ -59,7 +59,7 @@ import cutthecrap.utils.striterators.IFilter;
 /**
  * <p>
  * A view onto an unisolated index partition which enforces the constraint that
- * either concurrent writers -or- a single writer may have access to the
+ * either concurrent readers -or- a single writer may have access to the
  * unisolated index at any given time. This provides the maximum possible
  * concurrency for an unisolated index using an internal {@link ReadWriteLock}
  * to coordinate threads.
@@ -422,7 +422,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public boolean contains(Object key) {
+    public boolean contains(final Object key) {
 
         final Lock lock = readLock();
         
@@ -438,7 +438,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public Object insert(Object key, Object value) {
+    public Object insert(final Object key, final Object value) {
 
         final Lock lock = writeLock();
         
@@ -454,7 +454,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     }
 
-    public Object lookup(Object key) {
+    public Object lookup(final Object key) {
         
         final Lock lock = readLock();
         
@@ -470,7 +470,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public Object remove(Object key) {
+    public Object remove(final Object key) {
 
         final Lock lock = writeLock();
         
@@ -486,7 +486,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     
     }
 
-    public boolean contains(byte[] key) {
+    public boolean contains(final byte[] key) {
 
         final Lock lock = readLock();
         
@@ -502,7 +502,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
     
-    public byte[] lookup(byte[] key) {
+    public byte[] lookup(final byte[] key) {
 
         final Lock lock = readLock();
         
@@ -518,7 +518,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public byte[] insert(byte[] key, byte[] value) {
+    public byte[] insert(final byte[] key, final byte[] value) {
 
         final Lock lock = writeLock();
         
@@ -566,7 +566,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
     
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
 
@@ -582,7 +582,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     }
 
-    public long rangeCountExact(byte[] fromKey, byte[] toKey) {
+    public long rangeCountExact(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
 
@@ -598,7 +598,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
 
-    public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
+    public long rangeCountExactWithDeleted(final byte[] fromKey, final byte[] toKey) {
 
         final Lock lock = readLock();
 
@@ -620,7 +620,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     }
     
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 IRangeQuery.DEFAULT, null/* filter */);
@@ -636,8 +636,8 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * from the underlying index. Likewise, the mutation methods on the iterator
      * will acquire the exclusive write lock.
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilter filter) {
+    public ITupleIterator rangeIterator(final byte[] fromKey, final byte[] toKey,
+            int capacity, int flags, final IFilter filter) {
 
         if (capacity == 0) {
          
@@ -681,12 +681,12 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * for the {@link Lock}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * 
      */
     private class ChunkedIterator<E> extends ChunkedLocalRangeIterator<E> {
 
-        private ChunkedIterator(IIndex ndx, byte[] fromKey, byte[] toKey,
-                int capacity, int flags, IFilter filter) {
+        private ChunkedIterator(final IIndex ndx, final byte[] fromKey, final byte[] toKey,
+                final int capacity, final int flags, final IFilter filter) {
             
             super(ndx, fromKey, toKey, capacity, flags, filter);
             
@@ -696,7 +696,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
          * Extended to acquire the exclusive write lock.
          */
         @Override
-        protected void deleteBehind(int n, Iterator<byte[]> keys) {
+        protected void deleteBehind(final int n, final Iterator<byte[]> keys) {
 
             final Lock lock = writeLock();
             
@@ -716,7 +716,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
          * Extended to acquire the exclusive write lock.
          */
         @Override
-        protected void deleteLast(byte[] key) {
+        protected void deleteLast(final byte[] key) {
 
             final Lock lock = writeLock();
             
@@ -737,8 +737,8 @@ public class UnisolatedReadWriteIndex implements IIndex {
          * if {@link IRangeQuery#REMOVEALL} was specified for the iterator).
          */
         @Override
-        protected ResultSet getResultSet(long timestamp, byte[] fromKey,
-                byte[] toKey, int capacity, int flags, IFilter filter) {
+        protected ResultSet getResultSet(final long timestamp, final byte[] fromKey,
+                final byte[] toKey, final int capacity, final int flags, final IFilter filter) {
 
             final boolean mutation = (flags & IRangeQuery.REMOVEALL) != 0;
 
@@ -780,7 +780,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     }
 
-    public void submit(byte[] fromKey, byte[] toKey,
+    public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         final Lock lock = lock(proc);
@@ -803,9 +803,9 @@ public class UnisolatedReadWriteIndex implements IIndex {
     }
 
     @SuppressWarnings("unchecked")
-    public void submit(int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,
-            IResultHandler aggregator) {
+    public void submit(final int fromIndex, final int toIndex, final byte[][] keys,
+            final byte[][] vals, final AbstractKeyArrayIndexProcedureConstructor ctor,
+            final IResultHandler aggregator) {
 
         if (ctor == null)
             throw new IllegalArgumentException();
