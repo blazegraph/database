@@ -4931,10 +4931,22 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 						// set the new root block.
 						_rootBlock = rootBlock;
-						
-						if (_bufferStrategy instanceof IRWStrategy) {
-							// ensure allocators are synced after commit
-							((IRWStrategy) _bufferStrategy).resetFromHARootBlock(_rootBlock);
+
+                        if (_bufferStrategy instanceof IRWStrategy
+                                && quorum.getMember().isFollower(
+                                        rootBlock.getQuorumToken())) {
+                            /*
+                             * Ensure allocators are synced after commit. This
+                             * is only done for the followers. The leader has
+                             * been updating the in-memory allocators as it lays
+                             * down the writes. The followers have not be
+                             * updating the allocators.
+                             */
+                            if (haLog.isInfoEnabled())
+                                haLog.error("Reloading allocators: serviceUUID="
+                                        + quorum.getMember().getServiceId());
+                            ((IRWStrategy) _bufferStrategy)
+                                    .resetFromHARootBlock(_rootBlock);
 						}
 
 						// reload the commit record from the new root block.

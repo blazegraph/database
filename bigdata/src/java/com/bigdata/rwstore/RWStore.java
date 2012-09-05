@@ -4783,19 +4783,21 @@ public class RWStore implements IStore, IBufferedWriter {
 		return PSOutputStream.getNew(this, m_maxFixedAlloc, context);
 	}
 
-	/**
-	 * Called from AbstractJournal commit2Phase to ensure that a downstream HA
-	 * quorum member ensures it is able to read committed data that has been
-	 * streamed directly to the backing store.
-	 * 
-	 * The data stream will have included metabits and modified FixedAllocators
-	 * so these must be reset using the metabitsAddr data in the rootblock.
-	 */
-	public void resetFromHARootBlock(IRootBlockView rootBlock) {
-		try {
-			// should not be any dirty allocators
+    /**
+     * Called from {@link AbstractJournal} commit2Phase to ensure that a
+     * downstream HA quorum member ensures it is able to read committed data
+     * that has been streamed directly to the backing store.
+     * <p>
+     * The data stream will have included metabits and modified
+     * {@link FixedAllocator}s so these must be reset using the metabitsAddr
+     * data in the root block.
+     */
+	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
+
+	    try {
+
+		    // should not be any dirty allocators
 			assert m_commitList.size() == 0;
-			
 			
 			// Remove all current allocators
 			m_allocs.clear();
@@ -4807,9 +4809,13 @@ public class RWStore implements IStore, IBufferedWriter {
 			initfromRootBlock(rootBlock);
 			
 			assert m_nextAllocation != 0;
-		} catch (IOException e) {
-			throw new RuntimeException(e);
+		
+	    } catch (IOException e) {
+		
+	        throw new RuntimeException(e);
+	        
 		}
+
 	}  
 
 //    /**
