@@ -239,8 +239,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 		return alloc;
 	}
 
+	/** Pull the latched address out of the int64 address. */
 	private int decodeAddr(long addr) {
-		addr >>= 32;
+
+	    addr >>= 32;
 
 		return (int) addr;
 	}
@@ -609,9 +611,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
     
     public long getPhysicalAddress(final long addr) {
 
+        // extract the latched address.
         final int rwaddr = decodeAddr(addr);        
         
+        // obtain the byte offset on the file.
         return m_store.physicalAddress(rwaddr);
+        
     }
 
 	/*

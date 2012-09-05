@@ -353,6 +353,16 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 //	// from 32 bits, need 13 to hold max offset of 8 * 1024, leaving 19 for number of blocks: 256K
 //	static final int BLOCK_INDEX_BITS = 19;
+    /**
+     * The #of low bits in a latched address that encode the offset of the bit
+     * in a {@link FixedAllocator}. The {@link FixedAllocator} will map the bit
+     * onto an allocation slot.
+     * <p>
+     * The high bits of the latched address is index of the
+     * {@link FixedAllocator}. The index of the {@link FixedAllocator} is the
+     * order in which it was created. This is used to index into
+     * {@link #m_allocs}, which are the {@link FixedAllocator}s.
+     */
 	static final int OFFSET_BITS = 13;
 	static final int OFFSET_BITS_MASK = 0x1FFF; // was 0xFFFF
 	
@@ -706,11 +716,11 @@ public class RWStore implements IStore, IBufferedWriter {
 				m_minFixedAlloc = m_allocSizes[0]*64;
 
 				if (m_storageStatsAddr != 0) {
-					long statsAddr = m_storageStatsAddr >> 16;
-					int statsLen = ((int) m_storageStatsAddr) & 0xFFFF;
-					byte[] stats = new byte[statsLen + 4]; // allow for checksum
+					final long statsAddr = m_storageStatsAddr >> 16;
+					final int statsLen = ((int) m_storageStatsAddr) & 0xFFFF;
+					final byte[] stats = new byte[statsLen + 4]; // allow for checksum
 					getData(statsAddr, stats);
-					DataInputStream instr = new DataInputStream(new ByteArrayInputStream(stats));
+					final DataInputStream instr = new DataInputStream(new ByteArrayInputStream(stats));
 					m_storageStats = new StorageStats(instr);
 					
 					for (FixedAllocator fa: m_allocs) {
@@ -720,6 +730,12 @@ public class RWStore implements IStore, IBufferedWriter {
 	        		m_storageStats = new StorageStats(m_allocSizes);
 				}
 				
+                if (log.isTraceEnabled()) {
+                    final StringBuilder str = new StringBuilder();
+                    this.showAllocators(str);
+                    log.trace(str);
+                }
+                
 			}
 			
             final int maxBlockLessChk = m_maxFixedAlloc-4;
@@ -900,36 +916,88 @@ public class RWStore implements IStore, IBufferedWriter {
 		assert(m_rb != null);
 
 		if (m_rb.getNextOffset() == 0) {
-			defaultInit();
+
+		    defaultInit();
+		    
 		} else {		
-			final long nxtOffset = m_rb.getNextOffset();
-			m_nextAllocation = -(int) (nxtOffset >> 32);
+
+            /*
+             * The RWStore stores in IRootBlock.getNextOffset() two distinct
+             * int32 words.
+             * 
+             * The high int32 word is the next allocation that will handed out
+             * and is represented in units of -32K. This is used for things like
+             * getting a new metabits region or a new region from which fixed
+             * allocators will be recruited (through the metabits).
+             * 
+             * The low int32 word is the latched address of the current metabits
+             * region. It must be interpreted using the metaBits and the
+             * FixedAllocators in order to turn it into a byte offset on the
+             * file.
+             */
+		    final long nxtOffset = m_rb.getNextOffset();
+
+		    // next allocation to be made (in -32K units).
+		    m_nextAllocation = -(int) (nxtOffset >> 32);
 			
 			if (m_nextAllocation == 0) {
-				m_nextAllocation = -(1 + META_ALLOCATION);
+
+                /*
+                 * Skip the first 32K in the file. The root blocks live here but
+                 * nothing else.
+                 */
+	
+			    m_nextAllocation = -(1 + META_ALLOCATION);
+			    
 			}
 	
+			// latched offset of the metabits region.
 			m_metaBitsAddr = -(int) nxtOffset;
 			
 			if (log.isInfoEnabled()) {
 				log.info("MetaBitsAddr: " + m_metaBitsAddr);
 			}
+
+			/*
+			 * Get the fileSize in -32K units from the root block.
+			 */
+			{
+                final long metaAddr = m_rb.getMetaStartAddr();
+
+                // in units of -32K.
+                m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
+
+			}
 	
-			final long metaAddr = m_rb.getMetaStartAddr();
-			m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
-	
+            /*
+             * This stores the byte offset and length of the metabits region in
+             * the file. The bottom 16-bits are the length (see below). The top
+             * 48-bits are the byte offset.
+             */
 			long rawmbaddr = m_rb.getMetaBitsAddr();
 			
-	        /*
-	         * Take bottom 16 bits (even 1K of metabits is more than sufficient)
-	         */
+            /*
+             * The #of int32 values in the metabits region.
+             * 
+             * We get this by taking bottom 16 bits of the metaBitsAddr. This
+             * gives the #of int32 values in the metabits regions (up to 64k
+             * int32 values). Each int32 value in the metaBits[] gives us 32
+             * allocators. So, 16-bits gives us up 64k * 32 = 2M allocators.
+             * Except, that the total #of allocators is reduced by the presence
+             * of a startAddr every N positions in the metaBits[].
+             */
 			final int metaBitsStore = (int) (rawmbaddr & 0xFFFF);
 			
 			if (metaBitsStore > 0) {
-				rawmbaddr >>= 16;
 				
-				// RWStore now restore metabits
-				final byte[] buf = new byte[metaBitsStore * 4];
+			    // The byte offset of the metabits region in the file.
+			    rawmbaddr >>= 16;
+				
+                /*
+                 * Read the metabits block, including a header and the int32[]
+                 * that encodes both startAddrs and bit vectors.
+                 */
+                final byte[] buf = new byte[metaBitsStore * 4];
 	
 				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
 		
@@ -938,7 +1006,9 @@ public class RWStore implements IStore, IBufferedWriter {
 				// Can handle minor store version incompatibility
 				final int storeVersion = strBuf.readInt();
 				if ((storeVersion & 0xFF00) != (cVersion & 0xFF00)) {
-					throw new IllegalStateException("Incompatible RWStore header version: storeVersion="+(storeVersion&0xff00)+", cVersion="+(cVersion&0xff00));
+                    throw new IllegalStateException(
+                            "Incompatible RWStore header version: storeVersion="
+                                    + storeVersion + ", cVersion=" + cVersion);
 				}
 				m_lastDeferredReleaseTime = strBuf.readLong();
 				cDefaultMetaBitsSize = strBuf.readInt();
@@ -948,7 +1018,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
 				// and let's read in those reserved ints
 	            for (int i = 0; i < cReservedMetaBits; i++) {
-	            	strBuf.readInt();
+	                strBuf.readInt();
 	            }
 
 				m_allocSizes = new int[allocBlocks];
@@ -979,12 +1049,6 @@ public class RWStore implements IStore, IBufferedWriter {
 				
 				// clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
 	
-				if (log.isTraceEnabled()) {
-					final StringBuilder str = new StringBuilder();
-					this.showAllocators(str);
-					log.trace(str);
-				}
-				
 				if (physicalAddress(m_metaBitsAddr) == 0) {
 					throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
 				}
@@ -2147,9 +2211,16 @@ public class RWStore implements IStore, IBufferedWriter {
 	    m_allocationLock.lock();
 		try {
 	        assertOpen();
-			for (FixedAllocator fa : m_allocs) {
+            /*
+             * Clear all allocators, not just dirty allocators, since we also
+             * need to reset the transient bits associated with session
+             * protection.
+             */
+            for (FixedAllocator fa : m_allocs) {
 				fa.reset(m_writeCache);
 			}
+			// Clear the dirty list.
+//			m_commitList.clear();
             if (m_quorum != null) {
                 /**
                  * When the RWStore is part of an HA quorum, we need to close
@@ -2206,9 +2277,18 @@ public class RWStore implements IStore, IBufferedWriter {
             	str.writeInt(0);
             }
             
+            /*
+             * Write out the size of the allocation slots as defined by
+             * Options.ALLOCATION_SIZES (this is where we store that
+             * information).
+             */
             for (int i = 0; i < m_allocSizes.length; i++) {
                 str.writeInt(m_allocSizes[i]);
             }
+            
+            /*
+             * Write out XXX
+             */
             for (int i = 0; i < m_metaBits.length; i++) {
                 str.writeInt(m_metaBits[i]);
             }
@@ -2218,6 +2298,10 @@ public class RWStore implements IStore, IBufferedWriter {
             str.close();
         }
 
+        /*
+         * Note: this address is set by commit() prior to calling
+         * writeMetaBits().
+         */
 		final long addr = physicalAddress(m_metaBitsAddr);
 		if (addr == 0) {
 			throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
@@ -2263,8 +2347,12 @@ public class RWStore implements IStore, IBufferedWriter {
 				final long addr = alloc(buf, buf.length, null);
 				m_storageStatsAddr = (addr << 16) + buf.length;
 			}
-			
-			// Pre-allocate storage for metaBits from FixedAllocators
+
+            /*
+             * Pre-allocate storage for metaBits from FixedAllocators (ensure
+             * that we do not need to reallocate the metabits region when we are
+             * writing out the updated versions of the FixedAllocators).
+             */
 			final long oldMetaBits = m_metaBitsAddr;
 			final int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
 			m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
@@ -2284,12 +2372,21 @@ public class RWStore implements IStore, IBufferedWriter {
 
 			// save allocation headers
 			final Iterator<Allocator> iter = m_commitList.iterator();
+			
 			while (iter.hasNext()) {
+			    
 				final Allocator allocator = iter.next();
+				
+				// the bit in metabits for the old allocator version.
 				final int old = allocator.getDiskAddr();
+
+				// mark old version - reclaimed after commit.
 				metaFree(old);
 				
+				// the bit in metabits for the new allocator version.
 				final int naddr = metaAlloc();
+
+				// set that bit on the allocator.
 				allocator.setDiskAddr(naddr);
 				
                 if (log.isTraceEnabled())
@@ -2297,11 +2394,15 @@ public class RWStore implements IStore, IBufferedWriter {
                             + ", old addr: " + old + ", new addr: " + naddr);
 
 				try {
+
 				    // do not use checksum
 				    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
                         .wrap(allocator.write()), 0, false);
+				    
 				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
+					
+				    throw new RuntimeException(e);
+				    
 				}
 			}
 			m_commitList.clear();
@@ -2541,6 +2642,9 @@ public class RWStore implements IStore, IBufferedWriter {
 	 */
 	final int cDefaultFreeBitsThreshold;
 	
+	/**
+	 * Each "metaBit" is a file region
+	 */
 	private int m_metaBits[];
 	private int m_metaTransientBits[];
 	// volatile private int m_metaStartAddr;
@@ -2635,7 +2739,9 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_metaBitsSize = nsize;
 
 			// now get new allocation!
-			bit = fndMetabit();
+            bit = fndMetabit();
+
+            assert bit >= 0;
 		}
 
 		setBit(m_metaTransientBits, bit);
@@ -2655,6 +2761,13 @@ public class RWStore implements IStore, IBufferedWriter {
 		return bit;
 	}
 
+    /**
+     * Search the metabits for a bit that is free for allocation of space that
+     * an allocator could write on.
+     * 
+     * @return The bit -or- <code>-1</code> if the meta bits region is currently
+     *         ful.
+     */
     private int fndMetabit() {
         final int blocks = m_metaBits.length / cDefaultMetaBitsSize;
         for (int b = 0; b < blocks; b++) {
@@ -2692,46 +2805,122 @@ public class RWStore implements IStore, IBufferedWriter {
 		m_writeCache.clearWrite(metaBit2Addr(bit));
 	}
 
-	/**
-	 * The metabits are encoded in cDefaultMetaBitsSize int runs as follows
-	 * [start addr1][bits0][bits1]...[bitsN]
-	 * [start addr2]...
-	 * ...
-	 * The bit parameter is processed to determine which run it is part of.
-	 * 
-	 * Note that the bit offsets are not contiguous since there are "holes"
-	 * where the meta allocation [start addr] are stored.
-	 * 
-	 */
+    /**
+     * The metabits are encoded in {@link #cDefaultMetaBitsSize} int runs as
+     * follows
+     * 
+     * <pre>
+     * [startAddr1][bits0][bits1]...[bitsN]
+     * [startAddr2]...
+     * ...
+     * </pre>
+     * 
+     * where <code>N</code> is {@link #cDefaultMetaBitsSize} MINUS TWO and
+     * <code>[bits0]...[bitsN]</code> are interpreted as a bit map.
+     * <p>
+     * The bit parameter is processed to determine which run it is part of.
+     * <p>
+     * Note that the bit offsets are not contiguous since there are "holes"
+     * where the meta allocation [startAddr] are stored.
+     * <p>
+     * When the metabits region is first created, and each time it is grown, a
+     * region is reserved at the then current nextOffset on the file that is
+     * used for {@link FixedAllocator}s associated with the bit vector in the
+     * next run of the metabits block. Those {@link FixedAllocator}s will be
+     * recruited and used as needed. Note that {@link FixedAllocator}s are
+     * always written onto an unused "bit" at each commit, and the old "bit" is
+     * then freed. Thus dirty {@link FixedAllocator}s move at each commit and
+     * can move between runs in the metabits.
+     */
 	long metaBit2Addr(final int bit) {
 //		final int bitsPerBlock = 9 * 32;
 		
+	    /*
+	     * The integer index into the m_metaBits[].
+	     */
 		final int intIndex = bit / 32; // divide 32;
-		
+
+        /*
+         * Make sure that the [bit] is a bit that falls into one of the bit
+         * regions (versus one of the startAddr int32 values).
+         */
+
 		assert intIndex % cDefaultMetaBitsSize != 0; // used by the start addrs!
 		
-		final int addrIndex = (intIndex/cDefaultMetaBitsSize)*cDefaultMetaBitsSize;
-		final long addr = convertAddr(m_metaBits[addrIndex]);
-
-		final int intOffset = bit - ((addrIndex+1) * 32);
-
-		final long ret =  addr + (ALLOC_BLOCK_SIZE * intOffset);
+        /*
+         * The index into the metabits region corresponding to the int32 value
+         * before the start of the bit vector in which this bit falls. This
+         * offset is relative to the start of the m_metaBits[].
+         */
 		
-		return ret;
+        final int addrIndex = (intIndex / cDefaultMetaBitsSize)
+                * cDefaultMetaBitsSize;
+
+        /*
+         * Pull out convert the startAddr for the bit vector addressed by that
+         * bit. This gives us the int64 byte offset of some region on the
+         * backing file.
+         */
+        final long addr = convertAddr(m_metaBits[addrIndex]);
+
+        /*
+         * The bit index of this bit in the bit vector for this region in the
+         * metaBits[].
+         */
+        final int intOffset = bit - ((addrIndex + 1) * 32);
+
+        /*
+         * The byte offset into the backing file of the FixedAllocator for that
+         * bit. All FixedAllocators are the same size [ALLOC_BLOCK_SIZE]. The
+         * FixedAllocator knows what size allocations it makes and manages the
+         * regions on the backing store in which those allocation are made.
+         */
+        final long ret = addr + (ALLOC_BLOCK_SIZE * intOffset);
+
+        return ret;
+
 	}
 
-	public static long convertAddr(final int addr) {
-	    final long laddr = addr;
-		if (laddr < 0) {
-		    final long ret = (-laddr) << ALLOCATION_SCALEUP; 
-			return ret;
-		} else {
-			return laddr & 0xFFFFFFF0;
-		}
-	}
+    /**
+     * Convert an implicitly scaled int32 offset into the backing file into an
+     * int64 address into the backing file.
+     * 
+     * @param addr
+     *            An int32 offset into the backing file formed by
+     *            {@link #convertFromAddr(long)}. The representation is a
+     *            negative integer that has been left shifted by
+     *            {@link #ALLOCATION_SCALEUP} to reduce its bit size.
+     * 
+     * @return A byte offset in the backing file.
+     * 
+     * @see #convertFromAddr(long)
+     * @see #ALLOCATION_SCALEUP
+     */
+    public static long convertAddr(final int addr) {
+        final long laddr = addr;
+        if (laddr < 0) {
+            final long ret = (-laddr) << ALLOCATION_SCALEUP;
+            return ret;
+        } else {
+            return laddr & 0xFFFFFFF0;
+        }
+    }
 
+    /**
+     * Convert an int64 address into the backing file into an int32 offset that
+     * is implicitly scaled by {@link #ALLOCATION_SCALEUP}.
+     * 
+     * @param addr
+     *            An int64 offset into the backing file.
+     * 
+     * @return The implicitly scaled int32 offset.
+     * @see #convertAddr(int)
+     * @see #ALLOCATION_SCALEUP
+     */
 	public int convertFromAddr(final long addr) {
-		return (int) -(addr >> ALLOCATION_SCALEUP); 
+
+	    return (int) -(addr >> ALLOCATION_SCALEUP);
+	    
 	}
 
 	private volatile boolean m_extendingFile = false;
@@ -3036,25 +3225,52 @@ public class RWStore implements IStore, IBufferedWriter {
 		return getBlockByAddress(addr) != null;
 	}
 
-	/*****************************************************************************
-	 * Address transformation
-	 * 
-	 * latched2Physical
-	 **/
-	final public long physicalAddress(final int addr, final boolean nocheck) {
-		if (addr >= 0) {
-			return addr & 0xFFFFFFE0;
-		} else {
-			final FixedAllocator allocator = getBlock(addr);
-			final int offset = getOffset(addr);
-			final long laddr = allocator.getPhysicalAddress(offset, nocheck);
-			
-			return laddr;
-		}
+    /*****************************************************************************
+     * Address transformation: latched2Physical
+     */
+	
+    /**
+     * Return the byte offset in the file.
+     * 
+     * @param addr
+     *            The latched address.
+     * 
+     * @return The byte offset in the file.
+     */
+    final private long physicalAddress(final int addr, final boolean nocheck) {
+
+        if (addr >= 0) {
+
+            return addr & 0xFFFFFFE0;
+
+        } else {
+
+            // Find the allocator.
+            final FixedAllocator allocator = getBlock(addr);
+
+            // Get the bit index into the allocator.
+            final int offset = getOffset(addr);
+
+            // Translate the bit index into a byte offset on the file.
+            final long laddr = allocator.getPhysicalAddress(offset, nocheck);
+
+            return laddr;
+        }
+
 	}
 	
+    /**
+     * Return the byte offset in the file.
+     * 
+     * @param addr
+     *            A latched address.
+     *            
+     * @return The byte offset.
+     */
 	final public long physicalAddress(final int addr) {
-		return physicalAddress(addr, false);
+
+        return physicalAddress(addr, false/* nocheck */);
+
 	}
 
 	/********************************************************************************
@@ -3081,18 +3297,43 @@ public class RWStore implements IStore, IBufferedWriter {
 		return alloc;
 	}
 
+    /**
+     * Get the {@link FixedAllocator} for a latched address.
+     * 
+     * @param addr
+     *            The latched address.
+     * 
+     * @return The {@link FixedAllocator} for that latched address.
+     */
 	private FixedAllocator getBlock(final int addr) {
+	    
+	    // index of the FixedAllocator for that latched address.
 		final int index = (-addr) >>> OFFSET_BITS;
 		
 		if (index >= m_allocs.size()) {
 			throw new PhysicalAddressResolutionException(addr);
 		}
 
+		// Return the FixedAllocator for that index.
 		return m_allocs.get(index);
 	}
 
+    /**
+     * Return the bit index into a {@link FixedAllocator}.
+     * <p>
+     * Note: This is directly encoded by the latched address. You do not need to
+     * know which {@link FixedAllocator} is being addressed in order to figure
+     * this out.
+     * 
+     * @param addr
+     *            A latched address.
+     *            
+     * @return The bit index into the {@link FixedAllocator}.
+     */
 	private int getOffset(final int addr) {
-		return (-addr) & OFFSET_BITS_MASK; // OFFSET_BITS
+
+	    return (-addr) & OFFSET_BITS_MASK; // OFFSET_BITS
+	    
 	}
 
 	/**
