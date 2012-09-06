@@ -774,9 +774,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 		return m_store.getOutputStream(context);
 	}
 
-	@Override
-	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
-		m_store.resetFromHARootBlock(rootBlock);
-	}
+//	@Override
+//	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
+//		m_store.resetFromHARootBlock(rootBlock);
+//	}
 
 }

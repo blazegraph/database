@@ -1406,10 +1406,13 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     public boolean write(final long offset, final ByteBuffer data, final int chk)
-    throws InterruptedException, IllegalStateException {
-        return write(offset, data, chk, useChecksum);
+            throws InterruptedException, IllegalStateException {
+     
+        return write(offset, data, chk, useChecksum, 0/* latchedAddr */);
+        
     }
-   /**
+    
+    /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
      * Otherwise it is written onto a cache buffer which is lazily flushed onto
@@ -1430,6 +1433,8 @@ abstract public class WriteCacheService implements IWriteCache {
      * resulting in a high-level abort() and {@link #reset()} of the
      * {@link WriteCacheService}.
      * 
+     * @param latchedAddr The latched address (RWStore only).
+     * 
      * @return <code>true</code> since the record is always accepted by the
      *         {@link WriteCacheService} (unless an exception is thrown).
      * 
@@ -1445,7 +1450,7 @@ abstract public class WriteCacheService implements IWriteCache {
      *       store but would require an override of this method specific to that
      *       implementation.
      */
-    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
+    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum,final int latchedAddr)
             throws InterruptedException, IllegalStateException {
 
         if (log.isTraceEnabled()) {
@@ -1499,7 +1504,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 debugAddrs(offset, data.remaining(), 'A');
 
                 // write on the cache.
-                if (cache.write(offset, data, chk, useChecksum)) {
+                if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
                     WriteCache old = recordMap.put(offset, cache);
                     // There should be no duplicate address in the record
                     //  map since these entries should be removed, although
@@ -1553,7 +1558,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 try {
 
                     // While holding the write lock, see if the record fits.
-                    if (cache.write(offset, data, chk, useChecksum)) {
+                    if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
 
                         /*
                          * It fits: someone already changed to a new cache,
@@ -1635,7 +1640,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         current.set(cache = newBuffer);
 
                         // Try to write on the new buffer.
-                        if (cache.write(offset, data, chk, useChecksum)) {
+                        if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
 
                             // This must be the only occurrence of this record.
                             if (recordMap.put(offset, cache) != null) {
@@ -1802,7 +1807,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         tmp.position(p);
                         // Note: For WORM, this MUST NOT add the checksum except
                         // for the last chunk!
-                        if (!cache.write(offset + p, tmp, chk, false/* writeChecksum */))
+                        if (!cache.write(offset + p, tmp, chk, false/* writeChecksum */,0/*latchedAddr*/))
                             throw new AssertionError();
                         r -= ncpy;
                         p += ncpy;
@@ -1829,7 +1834,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     // Prepare for reading.
                     t.flip();
                     // Note: [t] _is_ the checksum.
-                    if (!cache.write(offset + p, t, chk, false/* writeChecksum */))
+                    if (!cache.write(offset + p, t, chk, false/* writeChecksum */,0/*latchedAddr*/))
                         throw new AssertionError();
                 } finally {
                     release();
@@ -2015,7 +2020,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @param offset
      *            the address to check
      */
-    public boolean clearWrite(final long offset) {
+    public boolean clearWrite(final long offset,final int latchedAddr) {
         try {
             counters.get().nclearRequests++;
             final WriteCache cache = recordMap.remove(offset);
@@ -2029,7 +2034,7 @@ abstract public class WriteCacheService implements IWriteCache {
             counters.get().nclears++;
             //try {
             debugAddrs(offset, 0, 'F');
-                cache.clearAddrMap(offset);
+                cache.clearAddrMap(offset, latchedAddr);
                 
                 return true;
             //} finally {

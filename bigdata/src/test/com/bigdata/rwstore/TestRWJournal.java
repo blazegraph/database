@@ -1839,7 +1839,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		        	
 		        	final StorageStats stats1 = rw.getStorageStats();
 		        	
-		        	bs.resetFromHARootBlock(store.getRootBlockView());
+		        	rw.resetFromHARootBlock(store.getRootBlockView());
 		        	
 		        	final StorageStats stats2 = rw.getStorageStats();
 

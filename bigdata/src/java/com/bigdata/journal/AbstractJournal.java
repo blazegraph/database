@@ -4932,7 +4932,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						// set the new root block.
 						_rootBlock = rootBlock;
 
-                        if (_bufferStrategy instanceof IRWStrategy
+                        if (_bufferStrategy instanceof RWStrategy
                                 && quorum.getMember().isFollower(
                                         rootBlock.getQuorumToken())) {
                             /*
@@ -4945,7 +4945,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             if (haLog.isInfoEnabled())
                                 haLog.error("Reloading allocators: serviceUUID="
                                         + quorum.getMember().getServiceId());
-                            ((IRWStrategy) _bufferStrategy)
+                            ((RWStrategy) _bufferStrategy).getStore()
                                     .resetFromHARootBlock(_rootBlock);
 						}
 

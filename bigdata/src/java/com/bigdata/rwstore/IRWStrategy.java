@@ -31,9 +31,9 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
      */
     public boolean isCommitted(long addr);
 
-    /**
-     * Resets allocators from current rootblock
-     */
-	void resetFromHARootBlock(IRootBlockView rootBlock);
+//    /**
+//     * Resets allocators from current rootblock
+//     */
+//	void resetFromHARootBlock(IRootBlockView rootBlock);
     
 }

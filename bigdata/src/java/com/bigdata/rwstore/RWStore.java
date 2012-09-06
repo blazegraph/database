@@ -597,6 +597,12 @@ public class RWStore implements IStore, IBufferedWriter {
     		m_writeCache.debugAddrs(offset, length, action);
         }
 		
+        @Override
+        protected void addAddress(int latchedAddr, int size) {}
+
+        @Override
+        protected void removeAddress(int latchedAddr) {}
+
 	};
 	
     /**
@@ -1842,7 +1848,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			if (overrideSession || !this.isSessionProtected()) {
                 // Only overwrite if NOT committed
                 if (!alloc.isCommitted(addrOffset)) {
-    				    m_writeCache.clearWrite(pa);
+    				    m_writeCache.clearWrite(pa,addr);
 //                    m_writeCache.overwrite(pa, sze);
                     /*
                      * Pass the size of the allocator, NOT the size of the
@@ -2109,7 +2115,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		final long pa = physicalAddress(newAddr);
 
 		try {
-			m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk);
+			m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk, true/*writeChecksum*/, newAddr/*latchedAddr*/);
 		} catch (InterruptedException e) {
             throw new RuntimeException("Closed Store?", e);
 		}
@@ -2310,7 +2316,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		assert addr > 0;
 		
 		try {
-			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
+			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr/*latchedAddr*/);
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
@@ -2397,7 +2403,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
 				    // do not use checksum
 				    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
-                        .wrap(allocator.write()), 0, false);
+                        .wrap(allocator.write()), 0/*chk*/, false/*useChecksum*/,0/*latchedAddr*/);
 				    
 				} catch (InterruptedException e) {
 					
@@ -2802,7 +2808,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			clrBit(m_metaTransientBits, bit);
 		}
 		
-		m_writeCache.clearWrite(metaBit2Addr(bit));
+		m_writeCache.clearWrite(metaBit2Addr(bit),0/*latchedAddr*/);
 	}
 
     /**

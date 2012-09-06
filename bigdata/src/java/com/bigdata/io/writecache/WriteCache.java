@@ -117,6 +117,11 @@ abstract public class WriteCache implements IWriteCache {
     private final boolean prefixWrites;
 
     /**
+     * The size of the header for a prefix write.
+     */
+    static final int SIZEOF_PREFIX_WRITE_METADATA = 8/* offset */+ 4/* size */+ 4/* latchedAddr */;
+    
+    /**
      * The buffer used to absorb writes that are destined for some channel.
      * <p>
      * Note: This is an {@link AtomicReference} since we want to clear this
@@ -268,13 +273,22 @@ abstract public class WriteCache implements IWriteCache {
          */
         public final int recordLength;
 
-        public RecordMetadata(final long fileOffset, final int bufferOffset, final int recordLength) {
+        /**
+         * The RWStore latched address for the record. This can be used to
+         * recover the FixedAllocator. This field is only required for the
+         * RWStore and then only for HA.
+         */
+        public final int latchedAddr;
+        
+        public RecordMetadata(final long fileOffset, final int bufferOffset, final int recordLength, final int latchedAddr) {
 
             this.fileOffset = fileOffset;
 
             this.bufferOffset = bufferOffset;
 
             this.recordLength = recordLength;
+            
+            this.latchedAddr = latchedAddr;
 
         }
 
@@ -522,7 +536,7 @@ abstract public class WriteCache implements IWriteCache {
      */
     final public int capacity() {
 
-        return capacity - (useChecksum ? 4 : 0) - (prefixWrites ? 12 : 0);
+        return capacity - (useChecksum ? 4 : 0) - (prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0);
 
     }
 
@@ -631,7 +645,7 @@ abstract public class WriteCache implements IWriteCache {
      */
     public boolean write(final long offset, final ByteBuffer data, final int chk) throws InterruptedException {
 
-        return write(offset, data, chk, true/* writeChecksum */);
+        return write(offset, data, chk, true/* writeChecksum */,0/*latchedAddr*/);
 
     }
 
@@ -646,7 +660,7 @@ abstract public class WriteCache implements IWriteCache {
      * @return
      * @throws InterruptedException
      */
-    boolean write(final long offset, final ByteBuffer data, final int chk, boolean writeChecksum)
+    boolean write(final long offset, final ByteBuffer data, final int chk, boolean writeChecksum, final int latchedAddr)
             throws InterruptedException {
 
         // Note: The offset MAY be zero. This allows for stores without any
@@ -670,7 +684,7 @@ abstract public class WriteCache implements IWriteCache {
 
             // The #of bytes to transfer into the write cache.
             final int datalen = remaining + (writeChecksum && useChecksum ? 4 : 0);
-            final int nwrite = datalen + (prefixWrites ? 12 : 0);
+            final int nwrite = datalen + (prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0);
 
             if (nwrite > capacity) {
                 // This is more bytes than the total capacity of the buffer.
@@ -711,7 +725,8 @@ abstract public class WriteCache implements IWriteCache {
                 if (prefixWrites) {
                     tmp.putLong(offset);
                     tmp.putInt(datalen);
-                    pos = spos + 12;
+                    tmp.putInt(latchedAddr);
+                    pos = spos + SIZEOF_PREFIX_WRITE_METADATA;
                 } else {
                     pos = spos;
                 }
@@ -752,7 +767,7 @@ abstract public class WriteCache implements IWriteCache {
              * Add metadata for the record so it can be read back from the
              * cache.
              */
-            if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, datalen)) != null) {
+            if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, datalen, latchedAddr)) != null) {
                 /*
                  * Note: This exception indicates that the abort protocol did
                  * not reset() the current write cache before new writes were
@@ -1738,21 +1753,42 @@ abstract public class WriteCache implements IWriteCache {
                     break;
                 }
                 final int sze = buf.getInt(); // 4 bytes.
+                final int latchedAddr = buf.getInt(); // 4 bytes.
                 if (sze == 0 /* deleted */) {
                     /*
                      * Should only happen if a previous write was already made
                      * to the buffer but the allocation has since been freed.
                      */
                     recordMap.remove(addr);
+                    removeAddress(latchedAddr);
                 } else {
-                    recordMap.put(addr, new RecordMetadata(addr, pos + 12, sze));
+                    recordMap.put(addr, new RecordMetadata(addr, pos + SIZEOF_PREFIX_WRITE_METADATA, sze, latchedAddr));
+                    addAddress(latchedAddr, sze);
                 }
                 nwrite++;
-                pos += 12 + sze; // skip header (addr + sze) and data
+                pos += SIZEOF_PREFIX_WRITE_METADATA + sze; // skip header (addr + sze) and data
             }
         }
 
-    }
+        /**
+         * A record add has been decoded.
+         * 
+         * @param latchedAddr
+         *            The latched address.
+         * @param size
+         *            The size of the allocation in bytes.
+         */
+        protected void addAddress(int latchedAddr, int size) {}
+
+        /**
+         * A record delete has been decoded.
+         * 
+         * @param latchedAddr
+         *            The latched address.
+         */
+        protected void removeAddress(int latchedAddr) {}
+        
+    } // class FileChannelScatteredWriteCache
 
     /**
      * To support deletion we will remove any entries for the provided address.
@@ -1795,7 +1831,7 @@ abstract public class WriteCache implements IWriteCache {
      * @throws InterruptedException
      * @throws IllegalStateException
      */
-    /*public*/ void clearAddrMap(final long addr) throws IllegalStateException, InterruptedException {
+    /*public*/ void clearAddrMap(final long addr, final int latchedAddr) throws IllegalStateException, InterruptedException {
         final RecordMetadata entry = recordMap.remove(addr);
         if (prefixWrites) {
             // final int pos = entry.bufferOffset - 12;
@@ -1818,10 +1854,11 @@ abstract public class WriteCache implements IWriteCache {
                  * position.
                  */
                 synchronized (tmp) {
-                    if (tmp.remaining() >= 12) {
+                    if (tmp.remaining() >= SIZEOF_PREFIX_WRITE_METADATA) {
                             final int spos = tmp.position();
                             tmp.putLong(addr);
-                            tmp.putInt(0);
+                            tmp.putInt(0); // wipe out size.
+                            tmp.putInt(latchedAddr);
                             if (checker != null) {
                                 // update the checksum (no side-effects on [data])
                                 final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
@@ -1845,7 +1882,7 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     protected void registerWriteStatus(long offset, int length, char action) {
-        // NOP to be overidden for debug if required
+        // NOP to be overridden for debug if required
     }
 
     boolean m_written = false;
@@ -2233,13 +2270,22 @@ abstract public class WriteCache implements IWriteCache {
         }
     }
 
+    /**
+     * Overridden by
+     * {@link FileChannelScatteredWriteCache#resetRecordMapFromBuffer(ByteBuffer, Map)}
+     * .
+     * 
+     * @param buf
+     * @param recordMap
+     */
     protected void resetRecordMapFromBuffer(final ByteBuffer buf,
             final Map<Long, RecordMetadata> recordMap) {
 
         recordMap.clear();
 
+        // put a single empty entry into the buffer.
         recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(),
-                0, buf.limit()));
+                0, buf.limit(), 0/* latchedAddr */));
 
     }
 
