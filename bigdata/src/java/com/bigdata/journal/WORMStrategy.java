@@ -194,7 +194,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * set a new value on this field in {@link #abort()}.  The field used to
      * be final.  Perhaps an {@link AtomicReference} would be appropriate now?
      */
-    private volatile WriteCacheService writeCacheService;
+    private volatile WORMWriteCacheService writeCacheService;
 
     /**
      * <code>true</code> iff the backing store has record level checksums.
@@ -912,23 +912,44 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
-    private WriteCacheService newWriteCacheService() {
+    private WORMWriteCacheService newWriteCacheService() {
+     
         try {
-            return new WriteCacheService(writeCacheBufferCount, useChecksums,
-                    extent, opener, quorum) {
-                @Override
-                public WriteCache newWriteCache(final IBufferAccess buf,
-                        final boolean useChecksum, final boolean bufferHasData,
-                        final IReopenChannel<? extends Channel> opener,
-                        final long fileExtent) throws InterruptedException {
-                    return new WriteCacheImpl(0/* baseOffset */, buf,
-                            useChecksum, bufferHasData,
-                            (IReopenChannel<FileChannel>) opener, fileExtent);
-                }
-            };
+        
+            return new WORMWriteCacheService(writeCacheBufferCount,
+                    useChecksums, extent, opener, quorum);
+
         } catch (InterruptedException e) {
+            
             throw new RuntimeException(e);
+
         }
+        
+    }
+
+    private class WORMWriteCacheService extends WriteCacheService {
+        
+        WORMWriteCacheService(final int nbuffers, final boolean useChecksum,
+                final long fileExtent,
+                final IReopenChannel<? extends Channel> opener,
+                final Quorum quorum) throws InterruptedException {
+
+            super(writeCacheBufferCount, useChecksums, extent, opener, quorum);
+
+        }
+
+        @Override
+        public WriteCacheImpl newWriteCache(final IBufferAccess buf,
+                final boolean useChecksum, final boolean bufferHasData,
+                final IReopenChannel<? extends Channel> opener,
+                final long fileExtent) throws InterruptedException {
+            
+            return new WriteCacheImpl(0/* baseOffset */, buf, useChecksum,
+                    bufferHasData, (IReopenChannel<FileChannel>) opener,
+                    fileExtent);
+            
+        }
+
     }
     
     /**
@@ -953,6 +974,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to expose this method to the {@link WORMStrategy} class.
+         */
+        @Override
+        protected void setFirstOffset(final long firstOffset) {
+            
+            super.setFirstOffset(firstOffset);
+            
+        }
+        
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final long firstOffset,
@@ -2278,14 +2311,35 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * including a ZERO (0) data length if any offset winds up being deleted
          * (released).
          */
-        final WriteCache writeCache = writeCacheService.newWriteCache(b,
+        final WriteCacheImpl writeCache = writeCacheService.newWriteCache(b,
                 useChecksums, true/* bufferHasData */, opener,
                 msg.getFileExtent());
         
+        final long firstOffset = msg.getFirstOffset();
+        
+        if (firstOffset < getHeaderSize())
+            throw new IllegalArgumentException(
+                    "firstOffset must be beyond header: firstOffset="
+                            + firstOffset + ", headerSize=" + getHeaderSize());
+
+        if (firstOffset < getNextOffset())
+            throw new IllegalArgumentException(
+                    "firstOffset must be beyond nextOffset: firstOffset="
+                            + firstOffset + ", nextOffset=" + getNextOffset());
+
+        writeCache.setFirstOffset(firstOffset);
+
         /*
-         * Flush the scattered writes in the write cache to the backing
-         * store.
+         * Setup buffer for writing. We receive the buffer with pos=0,
+         * limit=#ofbyteswritten. However, flush() expects pos=limit, will clear
+         * pos to zero and then write bytes up to the limit. So, we set the
+         * position to the limit before calling flush.
          */
+        final ByteBuffer bb = b.buffer();
+        final int limit = bb.limit();
+        bb.position(limit);
+
+        // Flush the write in the write cache to the backing store.
         writeCache.flush(false/* force */);
     }
 

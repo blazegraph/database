@@ -2969,33 +2969,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	
     }
 
-//    // Note: RW store method.
-//    @Override
-//    public long write(final ByteBuffer data, final long oldAddr) {
-//
-//        assertCanWrite();
-//
-//        return _bufferStrategy.write(data, oldAddr);
-//        
-//    }
-
-//    public long write(final ByteBuffer data, final long oldAddr,
-//            final IAllocationContext context) {
-//
-//        assertCanWrite();
-//
-//        if (_bufferStrategy instanceof IRWStrategy) {
-//
-//            return ((IRWStrategy) _bufferStrategy).write(data, oldAddr, context);
-//
-//        } else {
-//
-//            return _bufferStrategy.write(data, oldAddr);
-//
-//        }
-//
-//    }
-
     public long write(final ByteBuffer data, final IAllocationContext context) {
 
         assertCanWrite();
