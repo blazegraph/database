@@ -175,9 +175,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAcc
         return data.getKeyCount();
         
     }
-    
+    // See https://sourceforge.net/apps/trac/bigdata/ticket/550 (NPE in Leaf.getKey())
     final public IRaba getKeys() {
-        
+        if(data==null) throw new NullPointerException("leaf="+toString());
         return data.getKeys();
         
     }
