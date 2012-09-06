@@ -4932,9 +4932,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						// set the new root block.
 						_rootBlock = rootBlock;
 
-                        if (_bufferStrategy instanceof RWStrategy
-                                && quorum.getMember().isFollower(
-                                        rootBlock.getQuorumToken())) {
+                        if (quorum.getMember().isFollower(
+                                rootBlock.getQuorumToken())) {
                             /*
                              * Ensure allocators are synced after commit. This
                              * is only done for the followers. The leader has
@@ -4943,11 +4942,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                              * updating the allocators.
                              */
                             if (haLog.isInfoEnabled())
-                                haLog.error("Reloading allocators: serviceUUID="
+                                haLog.error("Reset from root block: serviceUUID="
                                         + quorum.getMember().getServiceId());
-                            ((RWStrategy) _bufferStrategy).getStore()
+                            ((IHABufferStrategy) _bufferStrategy)
                                     .resetFromHARootBlock(_rootBlock);
-						}
+                        }
 
 						// reload the commit record from the new root block.
 						_commitRecord = _getCommitRecord();
