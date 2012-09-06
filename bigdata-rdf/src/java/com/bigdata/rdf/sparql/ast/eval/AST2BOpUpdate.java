@@ -272,8 +272,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 			
 			final long begin = System.nanoTime();
 			
-			// convert/run the update operation.
-			left = convertUpdateSwitch(left, op, context);
+            try {
+                // convert/run the update operation.
+                left = convertUpdateSwitch(left, op, context);
+            } catch (Throwable t) {
+                log.error("SPARQL UPDATE failure: op=" + op + ", ex=" + t, t);
+                if (t instanceof Exception)
+                    throw (Exception) t;
+                if (t instanceof RuntimeException)
+                    throw (RuntimeException) t;
+                throw new RuntimeException(t);
+            }
 
 			final long elapsed = begin - System.nanoTime();
 			
