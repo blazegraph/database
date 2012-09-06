@@ -129,7 +129,9 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite(StressTestLockContention.class);
         // stress test of group commit.
         suite.addTestSuite(StressTestGroupCommit.class);
-        // stress tests of writes on unisolated named indices.
+        // stress tests of writes on unisolated named indices using ConcurrencyManager.
+        suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
+        // stress tests of writes on unisolated named indices using UnisolatedReadWriteIndex.
         suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
         /*
          * Stress test of concurrent transactions.
