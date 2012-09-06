@@ -321,6 +321,18 @@ abstract public class WriteCache implements IWriteCache {
     final private AtomicLong firstOffset = new AtomicLong(-1L);
 
     /**
+     * Exposed to the WORM for HA support.
+     * 
+     * @param firstOffset
+     *            The first offset (from the HA message).
+     */
+    protected void setFirstOffset(final long firstOffset) {
+
+        this.firstOffset.set(firstOffset);
+        
+    }
+    
+    /**
      * The capacity of the backing buffer.
      */
     final private int capacity;
@@ -739,7 +751,7 @@ abstract public class WriteCache implements IWriteCache {
                 // by zeroing an address.
                 if (checker != null) {
                     // update the checksum (no side-effects on [data])
-                    ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+                    final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
                     chkBuf.position(spos);
                     chkBuf.limit(tmp.position());
                     checker.update(chkBuf);
@@ -993,9 +1005,9 @@ abstract public class WriteCache implements IWriteCache {
             // #of bytes to write on the disk.
             final int nbytes = tmp.position();
 
-            if (log.isTraceEnabled()) {
-                log.trace("nbytes=" + nbytes + ", firstOffset=" + getFirstOffset() + ", nflush=" + counters.nflush);
-            }
+            if (log.isTraceEnabled())
+                log.trace("nbytes=" + nbytes + ", firstOffset="
+                        + getFirstOffset() + ", nflush=" + counters.nflush);
 
             if (nbytes == 0) {
 
@@ -1022,8 +1034,8 @@ abstract public class WriteCache implements IWriteCache {
                 remaining = nanos - (System.nanoTime() - begin);
 
                 // write the data on the disk file.
-                final boolean ret = writeOnChannel(view, getFirstOffset(), Collections.unmodifiableMap(recordMap),
-                        remaining);
+                final boolean ret = writeOnChannel(view, getFirstOffset(),
+                        Collections.unmodifiableMap(recordMap), remaining);
                 
                 if (!ret) {
                     throw new TimeoutException("Unable to flush WriteCache");

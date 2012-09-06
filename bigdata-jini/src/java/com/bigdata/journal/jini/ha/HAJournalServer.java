@@ -531,7 +531,7 @@ public class HAJournalServer extends AbstractServer {
                     final ByteBuffer data) throws Exception {
 
                 if (haLog.isInfoEnabled())
-                    haLog.info("msg=" + msg);
+                    haLog.info("msg=" + msg + ", buf=" + data);
 
                 /*
                  * Note: the ByteBuffer is owned by the HAReceiveService. This
