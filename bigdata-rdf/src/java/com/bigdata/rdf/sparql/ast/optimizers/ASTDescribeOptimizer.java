@@ -147,8 +147,9 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
         }
 
         // The effective DescribeMode.
-        final DescribeModeEnum describeMode = projection.getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
-                : projection.getDescribeMode();
+//        final DescribeModeEnum describeMode = projection.getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
+//                : projection.getDescribeMode();
+        final DescribeModeEnum describeMode = context.getDescribeMode(projection);
         
 //        final IDescribeCache describeCache = context.getDescribeCache();
 //        

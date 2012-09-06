@@ -431,10 +431,6 @@ public interface QueryHints {
      * @see #DEFAULT_DESCRIBE_MODE
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/578">
      *      Concise Bounded Description </a>
-     * 
-     *      FIXME Add a query hint to control this. Note that DESCRIBE is often
-     *      issued without a WHERE clause, so after translating away the query
-     *      hint we may have an empty WHERE clause.
      */
     String DESCRIBE_MODE = "describeMode";
 

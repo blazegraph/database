@@ -119,6 +119,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
@@ -345,7 +346,17 @@ public class BigdataSail extends SailBase implements Sail {
                 .getName()+ ".namespace";
 
         public static final String DEFAULT_NAMESPACE = "kb";
-                
+
+        /**
+         * Option specifies the algorithm used to compute DESCRIBE responses
+         * (optional).
+         * 
+         * @see QueryHints#DESCRIBE_MODE
+         * @see QueryHints#DEFAULT_DESCRIBE_MODE
+         */
+        public static final String DESCRIBE_MODE = BigdataSail.class
+                .getPackage().getName() + ".describeMode";
+
     }
 
     /**
