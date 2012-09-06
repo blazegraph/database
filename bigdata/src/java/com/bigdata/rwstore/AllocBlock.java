@@ -216,6 +216,16 @@ public class AllocBlock {
 			return -1;
 		}
 	}
+	
+	/**
+	 * Called as part of HA downstream synchronization
+	 * 
+	 * @param bit
+	 */
+	void setBitExternal(final int bit) {
+		RWStore.setBit(m_live, bit);
+		RWStore.setBit(m_transients, bit);
+	}
 
 	public boolean hasFree() {
 		for (int i = 0; i < m_ints; i++) {

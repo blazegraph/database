@@ -1120,4 +1120,18 @@ public class FixedAllocator implements Allocator {
 	public long getPhysicalAddress(final int offset) {
 		return getPhysicalAddress(offset, false); // do NOT override address checks
 	}
+
+	void setAddressExternal(final int latchedAddr) {
+		final int offset = ((-latchedAddr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
+	
+		final int nbits = 32 * getBlockSize();
+		final int block = offset/nbits;
+		final int bit = offset % nbits;
+		
+		m_allocBlocks.get(block).setBitExternal(bit);
+	}
+
+	public int getSlotSize() {
+		return m_size;
+	}
 }
