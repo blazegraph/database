@@ -68,4 +68,10 @@ public interface IHABufferStrategy extends IBufferStrategy {
     void setExtentForLocalStore(final long extent) throws IOException,
     		InterruptedException;
     
+    /**
+     * Called from {@link AbstractJournal} commit2Phase to ensure is able to
+     * read committed data that has been streamed directly to the backing store.
+     */
+    public void resetFromHARootBlock(final IRootBlockView rootBlock);
+    
 }

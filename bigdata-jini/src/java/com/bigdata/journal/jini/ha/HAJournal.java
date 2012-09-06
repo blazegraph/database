@@ -125,10 +125,20 @@ public class HAJournal extends Journal {
         switch (bufferMode) {
         case DiskRW:
             break;
+        case DiskWORM:
+            break;
         default:
             throw new IllegalArgumentException(Options.BUFFER_MODE + "="
                     + bufferMode + " : does not support HA");
         }
+
+        final boolean writeCacheEnabled = Boolean.valueOf(properties
+                .getProperty(Options.WRITE_CACHE_ENABLED,
+                        Options.DEFAULT_WRITE_CACHE_ENABLED));
+
+        if (!writeCacheEnabled)
+            throw new IllegalArgumentException(Options.WRITE_CACHE_ENABLED
+                    + " : must be true.");
 
         if (properties.get(Options.WRITE_PIPELINE_ADDR) == null) {
 

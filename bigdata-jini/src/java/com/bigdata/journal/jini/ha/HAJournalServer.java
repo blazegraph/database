@@ -37,7 +37,7 @@ import com.bigdata.io.IBufferAccess;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.RWStrategy;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
@@ -393,7 +393,7 @@ public class HAJournalServer extends AbstractServer {
                                                 && quorum.getMember().isLeader(
                                                         e.token())) {
                                             try {
-                                                System.err
+                                                System.out// TODO LOG @ INFO
                                                         .println("Starting NSS");
                                                 startNSS();
                                             } catch (Exception e1) {
@@ -420,7 +420,7 @@ public class HAJournalServer extends AbstractServer {
         quorum.start(newQuorumService(logicalServiceId, serviceUUID, haGlueService,
                 journal));
 
-        final QuorumActor actor = quorum.getActor();
+        final QuorumActor<?,?> actor = quorum.getActor();
         actor.memberAdd();
         actor.pipelineAdd();
         actor.castVote(journal.getLastCommitTime());
@@ -560,8 +560,8 @@ public class HAJournalServer extends AbstractServer {
                     }
                 };
 
-                ((RWStrategy) journal.getBufferStrategy()).writeRawBuffer(msg,
-                        b);
+                ((IHABufferStrategy) journal.getBufferStrategy())
+                        .writeRawBuffer(msg, b);
 
             }
 

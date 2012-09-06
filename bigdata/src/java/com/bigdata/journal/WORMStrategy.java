@@ -186,21 +186,28 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     /**
      * The service responsible for migrating dirty records onto the backing file
      * and (for HA) onto the other members of the {@link Quorum}.
+     * <p>
+     * This MAY be <code>null</code> for a read-only store or if the write cache
+     * is disabled. It is required for HA.
      * 
-     * @todo This MAY be <code>null</code> for a read-only store or if the write
-     *       cache is disabled.
-     * 
-     * @todo Is HA read-only allowed? If so, then since the
-     *       {@link WriteCacheService} handles failover reads it should be
-     *       enabled for HA read-only.
+     * TODO This should not really be volatile. For HA, we wind up needing to
+     * set a new value on this field in {@link #abort()}.  The field used to
+     * be final.  Perhaps an {@link AtomicReference} would be appropriate now?
      */
-    private final WriteCacheService writeCacheService;
+    private volatile WriteCacheService writeCacheService;
 
     /**
      * <code>true</code> iff the backing store has record level checksums.
      */
     private final boolean useChecksums;
 
+    /**
+     * The #of write cache buffers to use.
+     * 
+     * @see FileMetadata#writeCacheBufferCount
+     */
+    private final int writeCacheBufferCount;
+    
     /**
      * <code>true</code> if the backing store will be used in an HA
      * {@link Quorum} (this is passed through to the {@link WriteCache} objects
@@ -883,6 +890,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * handles the write pipeline to the downstream quorum members).
          */
 //        final Quorum<?,?> quorum = quorumRef.get();
+
+        this.writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
         
         isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
 
@@ -894,40 +903,34 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             /*
              * WriteCacheService.
              */
-            try {
-                this.writeCacheService = new WriteCacheService(
-                        fileMetadata.writeCacheBufferCount, useChecksums,
-                        extent, opener, quorum) {
-                    @Override
-                    public WriteCache newWriteCache(final IBufferAccess buf,
-                            final boolean useChecksum,
-                            final boolean bufferHasData,
-                            final IReopenChannel<? extends Channel> opener,
-                            final long fileExtent)
-                            throws InterruptedException {
-                        return new WriteCacheImpl(0/* baseOffset */, buf,
-                                useChecksum, bufferHasData,
-                                (IReopenChannel<FileChannel>) opener,
-                                fileExtent);
-                    }
-                };
-                this._checkbuf = null;
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            this.writeCacheService = newWriteCacheService();
+            this._checkbuf = null;
         } else {
             this.writeCacheService = null;
             this._checkbuf = useChecksums ? ByteBuffer.allocateDirect(4) : null;
         }
 
-//        System.err.println("WARNING: alpha impl: "
-//                + this.getClass().getName()
-//                + (writeCacheService != null ? " : writeCacheBuffers="
-//                        + fileMetadata.writeCacheBufferCount : " : No cache")
-//                + ", useChecksums=" + useChecksums);
-
     }
 
+    private WriteCacheService newWriteCacheService() {
+        try {
+            return new WriteCacheService(writeCacheBufferCount, useChecksums,
+                    extent, opener, quorum) {
+                @Override
+                public WriteCache newWriteCache(final IBufferAccess buf,
+                        final boolean useChecksum, final boolean bufferHasData,
+                        final IReopenChannel<? extends Channel> opener,
+                        final long fileExtent) throws InterruptedException {
+                    return new WriteCacheImpl(0/* baseOffset */, buf,
+                            useChecksum, bufferHasData,
+                            (IReopenChannel<FileChannel>) opener, fileExtent);
+                }
+            };
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
     /**
      * Implementation coordinates writes using the read lock of the
      * {@link DiskOnlyStrategy#extensionLock}. This is necessary in order to
@@ -1076,8 +1079,24 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         if (writeCacheService != null) {
             try {
+                if (quorum != null) {
+                    /**
+                     * When the WORMStrategy is part of an HA quorum, we need to
+                     * close out and then reopen the WriteCacheService every
+                     * time the quorum token is changed. For convenience, this
+                     * is handled by extending the semantics of abort() on the
+                     * Journal and reset() on the WORMStrategy.
+                     * 
+                     * @see <a
+                     *      href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
+                     *      HA Journal </a>
+                     */
+                    writeCacheService.close();
+                    writeCacheService = newWriteCacheService();
+                } else {
                 writeCacheService.reset();
                 writeCacheService.setExtent(extent);
+                }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -2253,10 +2272,21 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
-        writeCacheService.newWriteCache(b, useChecksums,
-                true/* bufferHasData */, opener, msg.getFileExtent()).flush(
-                false/* force */);
-
+        /*
+         * Wrap up the data from the message as a WriteCache object. This will
+         * build up a RecordMap containing the allocations to be made, and
+         * including a ZERO (0) data length if any offset winds up being deleted
+         * (released).
+         */
+        final WriteCache writeCache = writeCacheService.newWriteCache(b,
+                useChecksums, true/* bufferHasData */, opener,
+                msg.getFileExtent());
+        
+        /*
+         * Flush the scattered writes in the write cache to the backing
+         * store.
+         */
+        writeCache.flush(false/* force */);
     }
 
     public void setExtentForLocalStore(final long extent) throws IOException,
@@ -2264,6 +2294,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         truncate(extent);
 
+    }
+
+    public void resetFromHARootBlock(final IRootBlockView rootBlock) {
+
+        nextOffset.set(rootBlock.getNextOffset());
+        
     }
 
 }
