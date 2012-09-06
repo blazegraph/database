@@ -759,7 +759,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
         
     }
     
-    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
+    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         final Lock lock = lock(proc);
 
