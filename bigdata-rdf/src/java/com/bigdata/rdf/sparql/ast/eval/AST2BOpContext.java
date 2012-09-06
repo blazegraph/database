@@ -26,11 +26,14 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.EmptySolutionSetStats;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
@@ -537,6 +540,41 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
 
+    public DescribeModeEnum getDescribeMode(final ProjectionNode projection) {
+
+        // The effective DescribeMode.
+        DescribeModeEnum describeMode = projection.getDescribeMode();
+
+        if (describeMode != null) {
+            /*
+             * Explicitly specified on the project. E.g., set by a query hint or
+             * through code.
+             */
+            return describeMode;
+        }
+
+        /*
+         * Consult the KB for a configured default behavior. 
+         */
+        final String describeDefaultStr = db.getProperties().getProperty(
+                BigdataSail.Options.DESCRIBE_MODE);
+
+        if (describeDefaultStr != null) {
+
+            // The KB has specified a default DESCRIBE algorithm.
+            describeMode = DescribeModeEnum.valueOf(describeDefaultStr);
+            
+        } else {
+            
+            // Use the default specified on QueryHints.
+            describeMode = QueryHints.DEFAULT_DESCRIBE_MODE;
+            
+        }
+
+        return describeMode;
+
+    }
+    
     @Override
     public ISolutionSetStats getSolutionSetStats(final String localName) {
 

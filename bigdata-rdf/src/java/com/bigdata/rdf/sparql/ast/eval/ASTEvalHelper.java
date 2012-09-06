@@ -472,9 +472,11 @@ public class ASTEvalHelper {
                 );
 
         // The effective DescribeMode.
-        final DescribeModeEnum describeMode = optimizedQuery.getProjection()
-                .getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
-                : optimizedQuery.getProjection().getDescribeMode();
+//        final DescribeModeEnum describeMode = optimizedQuery.getProjection()
+//                .getDescribeMode() == null ? QueryHints.DEFAULT_DESCRIBE_MODE
+//                : optimizedQuery.getProjection().getDescribeMode();
+        final DescribeModeEnum describeMode = context
+                .getDescribeMode(optimizedQuery.getProjection());
 
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
         final ConcurrentHashSet<BigdataValue> describedResources;
