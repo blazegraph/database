@@ -2061,7 +2061,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             for (int i = 0; i < tasks.size(); i++) {
                 
-                futures.get(i).get();
+//                futures.get(i).get();
+                logFuture(futures.get(i));
 
             }
 /*
@@ -2103,6 +2104,19 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
     }
 
+    private <T> T logFuture(final Future<T> f) throws ExecutionException,
+            InterruptedException {
+        try {
+            return f.get();
+        } catch (InterruptedException e) {
+            log.warn(e, e);
+            throw e;
+        } catch (ExecutionException e) {
+            log.error(e, e);
+            throw e;
+        }
+    }
+    
     /**
      * Delete the {@link SPO}s from the statement indices. Any justifications
      * for those statements will also be deleted. The {@link ISPO#isModified()}
