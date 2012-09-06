@@ -598,10 +598,14 @@ public class RWStore implements IStore, IBufferedWriter {
         }
 		
         @Override
-        protected void addAddress(int latchedAddr, int size) {}
+        protected void addAddress(int latchedAddr, int size) {
+        	RWStore.this.addAddress(latchedAddr, size);
+        }
 
         @Override
-        protected void removeAddress(int latchedAddr) {}
+        protected void removeAddress(int latchedAddr) {
+        	RWStore.this.removeAddress(latchedAddr);
+        }
 
 	};
 	
@@ -765,6 +769,83 @@ public class RWStore implements IStore, IBufferedWriter {
 	}
     
     /**
+     * Called from WriteCache.resetRecordMapFromBuffer
+     * 
+     * If a FixedAllocator already exists for the address then just set the address as active,
+     * otherwise, create a new allocator and try again, which should work second time around
+     * if we are correctly in sync.
+     * 
+     * @param latchedAddr
+     * @param size
+     */
+    void addAddress(int latchedAddr, int size) {
+		m_allocationLock.lock();
+		try {		
+	    	FixedAllocator alloc = null;
+	    	try {
+	    		alloc = getBlockByAddress(latchedAddr);			
+	    	} catch (final PhysicalAddressResolutionException par) {
+	    		// Must create new allocator    		
+	    	}
+	    	if (alloc == null) {
+				final int i = fixedAllocatorIndex(size);
+				final int block = 64 * m_allocSizes[i];
+				final ArrayList<FixedAllocator> list = m_freeFixed[i];
+				final FixedAllocator allocator = new FixedAllocator(this, block);
+						
+				allocator.setFreeList(list);
+				allocator.setIndex(m_allocs.size());
+	
+				m_allocs.add(allocator);
+				
+				// Check correctly synchronized creation
+				assert allocator == getBlockByAddress(latchedAddr);
+	    		
+				alloc = allocator;    		
+	    	}
+	    	
+	   		assert size <= alloc.getSlotSize();
+			
+			alloc.setAddressExternal(latchedAddr);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+    
+    /**
+     * Called from WriteCache.resetRecordMapFromBuffer
+     * 
+     * Must clear the bit in the allocator.
+     * 
+     * @param latchedAddr
+     */
+	void removeAddress(int latchedAddr) {
+		m_allocationLock.lock();
+		try {		
+			// assert m_commitList.size() == 0;
+			
+			final FixedAllocator alloc = getBlockByAddress(latchedAddr);
+			
+			assert alloc != null;
+			
+			final int addrOffset = getOffset(latchedAddr);
+			if (alloc == null) {
+				throw new IllegalArgumentException("Invalid address provided to immediateFree: " + latchedAddr);
+			}
+	        final long pa = alloc.getPhysicalAddress(addrOffset);
+	        
+	        if (log.isTraceEnabled())
+	            log.trace("Freeing allocation at " + latchedAddr + ", physical address: " + pa);
+	        
+	        alloc.free(latchedAddr, 0, false);
+	        
+			// assert m_commitList.size() == 0;
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	/**
      * Create and return a new {@link RWWriteCacheService} instance. The caller
      * is responsible for closing out the old one and must be holding the
      * appropriate locks when it switches in the new instance.
