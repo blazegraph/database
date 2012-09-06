@@ -25,7 +25,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 
@@ -34,8 +33,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -73,12 +72,17 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
                 highlyAvailable,
                 bufferHasData,
-                (IReopenChannel<FileChannel>) opener, fileExtent, null);
+                (IReopenChannel<FileChannel>) opener, fileExtent, null) {
+
+        };
 
     }
 
-    public boolean removeWriteToAddr(long address) {
-        return clearWrite(address);
+    @Override
+    public boolean removeWriteToAddr(final long address, final int latchedAddr) {
+
+        return clearWrite(address, latchedAddr);
+
     }
     
 }

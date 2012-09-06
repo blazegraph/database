@@ -335,7 +335,10 @@ public class AllocBlock {
 					if (log.isTraceEnabled())
 						log.trace("releasing address: " + clr);
 					
-					cache.clearWrite(clr);
+					// obtained the latched address for that bit.
+					final int latchedAddr = -((m_allocator.getIndex() << RWStore.OFFSET_BITS) + (startBit + b));
+					
+					cache.clearWrite(clr, latchedAddr);
 					
 //					cache.overwrite(clr, m_allocator.m_size);
 					

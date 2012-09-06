@@ -603,8 +603,11 @@ public class TestWriteCache extends TestCase3 {
                         opener, 0L/* fileExtent */, null);
 
                 // verify the write cache self-reported capacity.
-                assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity()
-                        - (useChecksum ? 4 : 0) - 12 /* prefixWrites*/, writeCache.capacity());
+                assertEquals(
+                        DirectBufferPool.INSTANCE.getBufferCapacity()
+                                - (useChecksum ? 4 : 0)
+                                - WriteCache.SIZEOF_PREFIX_WRITE_METADATA /* prefixWrites */,
+                        writeCache.capacity());
 
                 // correct rejection test for null write.
                 try {
@@ -957,9 +960,8 @@ public class TestWriteCache extends TestCase3 {
                 cache1.write(addr1, data1, chk1);
                 data1.flip();
                 /*
-                 * FIXME syncBuffers is not correct. I've tried to fix it but
-                 * maybe my eyes are tired. Also, this is only testing a single
-                 * address copy. We need to test much more than that.
+                 * FIXME This is only testing a single address copy. We need to
+                 * test much more than that.
                  */
                 syncBuffers(buf, buf2);
                 assertEquals(buf.buffer(), buf2.buffer());
@@ -970,7 +972,7 @@ public class TestWriteCache extends TestCase3 {
                 assertEquals(cache2.read(addr1), data1);
 
                 // now simulate removal/delete
-                cache1.clearAddrMap(addr1);
+                cache1.clearAddrMap(addr1, 0/*latchedAddr*/);
 
                 syncBuffers(buf, buf2);
 

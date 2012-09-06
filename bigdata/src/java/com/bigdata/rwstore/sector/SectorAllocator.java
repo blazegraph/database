@@ -298,7 +298,7 @@ public class SectorAllocator implements Comparable<SectorAllocator> {
 				m_store.addToFreeList(this);
 			}
 			
-			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit))) {
+			if (m_writes != null && m_writes.removeWriteToAddr(getPhysicalAddress(bit),0/*latchedAddr*/)) {
 				if (log.isTraceEnabled())
 					log.trace("Removed potential DUPLICATE");
 			}
