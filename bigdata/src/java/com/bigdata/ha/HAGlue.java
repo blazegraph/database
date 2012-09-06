@@ -53,19 +53,22 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
 
     /**
-     * Return the current root block for the persistence store. The initial root
-     * blocks are identical, so this may be used to create a new journal in a
-     * quorum by replicating the root blocks of the quorum leader.
+     * Return a root block for the persistence store. The initial root blocks
+     * are identical, so this may be used to create a new journal in a quorum by
+     * replicating the root blocks of the quorum leader.
      * 
      * @param storeId
-     *            The {@link UUID} of the journal whose current root block will
-     *            be returned.
+     *            The {@link UUID} of the journal whose root block will be
+     *            returned (optional, defaults to the current Journal). This
+     *            parameter is intended for scale-out if there is a need to
+     *            fetch the root block of a historical journal (versus the live
+     *            journal).
      * 
-     * @return The current root block.
+     * @return The root block.
      * 
-     * @todo Whether or not we send the rootBlock0 flag depends on whether or
-     *       not resynchronization guarantees that the root blocks (both of
-     *       them) are the same for all services in the quorum.
+     *         TODO Whether or not we send the rootBlock0 flag depends on
+     *         whether or not resynchronization guarantees that the root blocks
+     *         (both of them) are the same for all services in the quorum.
      */
     byte[] getRootBlock(UUID storeId) throws IOException;
 
