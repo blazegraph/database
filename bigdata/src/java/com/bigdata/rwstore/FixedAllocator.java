@@ -1128,7 +1128,17 @@ public class FixedAllocator implements Allocator {
 		final int block = offset/nbits;
 		final int bit = offset % nbits;
 		
-		m_allocBlocks.get(block).setBitExternal(bit);
+		final AllocBlock ab = m_allocBlocks.get(block);
+		if (ab.m_addr == 0) {
+			// fixup offset
+			int blockSize = 32 * m_bitSize;
+			blockSize *= m_size;
+			blockSize >>= RWStore.ALLOCATION_SCALEUP;
+
+			ab.m_addr = grabAllocation(m_store, blockSize);
+		}
+		
+		ab.setBitExternal(bit);
 	}
 
 	public int getSlotSize() {

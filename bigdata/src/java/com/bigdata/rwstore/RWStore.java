@@ -778,12 +778,16 @@ public class RWStore implements IStore, IBufferedWriter {
      * @param latchedAddr
      * @param size
      */
-    void addAddress(int latchedAddr, int size) {
+    void addAddress(final int latchedAddr, final int size) {
+    	// ignore zero address
+    	if (latchedAddr == 0)
+    		return;
+    	
 		m_allocationLock.lock();
 		try {		
 	    	FixedAllocator alloc = null;
 	    	try {
-	    		alloc = getBlockByAddress(latchedAddr);			
+	    		alloc = getBlock(latchedAddr);			
 	    	} catch (final PhysicalAddressResolutionException par) {
 	    		// Must create new allocator    		
 	    	}
@@ -799,7 +803,7 @@ public class RWStore implements IStore, IBufferedWriter {
 				m_allocs.add(allocator);
 				
 				// Check correctly synchronized creation
-				assert allocator == getBlockByAddress(latchedAddr);
+				assert allocator == getBlock(latchedAddr);
 	    		
 				alloc = allocator;    		
 	    	}
@@ -819,8 +823,12 @@ public class RWStore implements IStore, IBufferedWriter {
      * 
      * @param latchedAddr
      */
-	void removeAddress(int latchedAddr) {
-		m_allocationLock.lock();
+	void removeAddress(final int latchedAddr) {
+    	// ignore zero address
+    	if (latchedAddr == 0)
+    		return;
+
+    	m_allocationLock.lock();
 		try {		
 			// assert m_commitList.size() == 0;
 			
@@ -4949,6 +4957,16 @@ public class RWStore implements IStore, IBufferedWriter {
          * 
          * 
          */
+
+		/*
+		 * Setup buffer for writing. We receive the buffer with pos=0, Ê
+		 * limit=#ofbyteswritten. However, flush() expects pos=limit, will
+		 * clear pos to zero and then write bytes up to the limit. So,
+		 * we set the position to the limit before calling flush. Ê Ê Ê
+		 */
+		final ByteBuffer bb = b.buffer();
+		final int limit = bb.limit();
+		bb.position(limit);
         
         /*
          * Flush the scattered writes in the write cache to the backing
@@ -5125,7 +5143,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	    try {
 
 		    // should not be any dirty allocators
-			assert m_commitList.size() == 0;
+			// assert m_commitList.size() == 0;
 			
 			// Remove all current allocators
 			m_allocs.clear();
