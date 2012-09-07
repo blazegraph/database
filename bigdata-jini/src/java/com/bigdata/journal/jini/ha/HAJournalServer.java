@@ -420,6 +420,7 @@ public class HAJournalServer extends AbstractServer {
         quorum.start(newQuorumService(logicalServiceId, serviceUUID, haGlueService,
                 journal));
 
+        // TODO These methods could be moved into QuorumServiceImpl.start(Quorum)
         final QuorumActor<?,?> actor = quorum.getActor();
         actor.memberAdd();
         actor.pipelineAdd();

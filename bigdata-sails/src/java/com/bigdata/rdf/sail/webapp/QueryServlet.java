@@ -259,6 +259,11 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doUpdate(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+        
         final String namespace = getNamespace(req);
 
         final long timestamp = ITx.UNISOLATED;//getTimestamp(req);

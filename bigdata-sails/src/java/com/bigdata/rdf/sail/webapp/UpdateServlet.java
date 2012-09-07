@@ -75,6 +75,11 @@ public class UpdateServlet extends BigdataRDFServlet {
     protected void doPut(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
 
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         final String queryStr = req.getParameter("query");
 
         final String contentType = req.getContentType();
@@ -318,7 +323,12 @@ public class UpdateServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-    	if (ServletFileUpload.isMultipartContent(req)) {
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
+        if (ServletFileUpload.isMultipartContent(req)) {
     		
     		doUpdateWithBody(req, resp);
     		

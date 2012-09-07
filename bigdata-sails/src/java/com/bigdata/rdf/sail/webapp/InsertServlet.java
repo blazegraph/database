@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
@@ -101,18 +102,21 @@ public class InsertServlet extends BigdataRDFServlet {
 	 * </p>
 	 */
     @Override
-	protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
-		try {
-			if (req.getParameter("uri") != null) {
-				doPostWithURIs(req, resp);
-				return;
-			} else {
-				doPostWithBody(req, resp);
-				return;
-			}
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
+        if (req.getParameter("uri") != null) {
+            doPostWithURIs(req, resp);
+            return;
+        } else {
+            doPostWithBody(req, resp);
+            return;
+        }
 	}
 
 	/**
@@ -126,7 +130,7 @@ public class InsertServlet extends BigdataRDFServlet {
 	 * @throws Exception
 	 */
 	private void doPostWithBody(final HttpServletRequest req,
-			final HttpServletResponse resp) throws Exception {
+			final HttpServletResponse resp) throws IOException {
 
 	    final long begin = System.currentTimeMillis();
 	    
@@ -263,7 +267,7 @@ public class InsertServlet extends BigdataRDFServlet {
 	 * @throws Exception
 	 */
 	private void doPostWithURIs(final HttpServletRequest req,
-			final HttpServletResponse resp) throws Exception {
+			final HttpServletResponse resp) throws IOException {
 
 	    final long begin = System.currentTimeMillis();
 	    

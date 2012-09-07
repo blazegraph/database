@@ -32,11 +32,16 @@ import java.io.Writer;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
+import com.bigdata.quorum.Quorum;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -126,6 +131,64 @@ abstract public class BigdataServlet extends HttpServlet {
 	
 	    return getRequiredServletContextAttribute(ATTRIBUTE_INDEX_MANAGER);
 	    
+	}
+
+    /**
+     * Return the {@link Quorum} -or- <code>null</code> if the
+     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
+     */
+    protected Quorum<HAGlue, QuorumService<HAGlue>> getQuorum() {
+
+        final IIndexManager indexManager = getIndexManager();
+
+        if (indexManager instanceof Journal) {
+
+            return ((Journal) indexManager).getQuorum();
+
+        }
+
+        return null;
+	    
+	}
+	
+    /**
+     * If the node is not writable, then commit a response and return
+     * <code>false</code>. Otherwise return <code>true</code>.
+     * 
+     * @param req
+     * @param resp
+     * 
+     * @return <code>true</code> iff the node is writable.
+     * 
+     * @throws IOException
+     */
+    protected boolean isWritable(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+	    
+        if(quorum == null) {
+         
+            // No quorum.
+            return true;
+            
+        }
+        
+        if (quorum.getClient().isLeader(quorum.token())) {
+            
+            /*
+             * There is a quorum. The quorum is met. This is the leader.
+             */
+ 
+            return true;
+
+        }
+        
+        buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                "Not quorum leader.");
+        
+        return false;
+        
 	}
 	
 //	/**

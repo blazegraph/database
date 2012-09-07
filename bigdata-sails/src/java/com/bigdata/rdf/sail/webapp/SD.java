@@ -36,6 +36,8 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -44,6 +46,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * SPARQL 1.1 Service Description vocabulary class.
@@ -156,7 +159,19 @@ public class SD {
     
     static public final URI IsolatableIndices = new URIImpl(BDFNS
             + "KB/IsolatableIndices");
-    
+
+    /**
+     * A highly available deployment.
+     */
+    static public final URI HighlyAvailable = new URIImpl(BDFNS
+            + "HighlyAvailable");
+
+    /**
+     * An {@link IBigdataFederation}.
+     */
+    static public final URI ScaleOut = new URIImpl(BDFNS
+            + "ScaleOut");
+
     /**
      * The <code>namespace</code> for this KB instance as configured by the
      * {@link BigdataSail.Options#NAMESPACE} property.
@@ -616,7 +631,29 @@ public class SD {
             g.add(aService, SD.feature, IsolatableIndices);
 
         }
-        
+
+        {
+
+            final IIndexManager indexManager = tripleStore.getIndexManager();
+
+            if (indexManager instanceof Journal) {
+
+                final Journal jnl = (Journal) indexManager;
+
+                if (jnl.getQuorum() != null) {
+
+                    g.add(aService, SD.feature, HighlyAvailable);
+
+                }
+
+            } else if (indexManager instanceof IBigdataFederation) {
+
+                g.add(aService, SD.feature, ScaleOut);
+
+            }
+
+        }
+
     }
     
     /**
