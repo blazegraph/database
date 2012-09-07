@@ -72,6 +72,11 @@ public class DeleteServlet extends BigdataRDFServlet {
 	protected void doDelete(final HttpServletRequest req,
 			final HttpServletResponse resp) throws IOException {
 
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         final String queryStr = req.getParameter("query");
 
         if (queryStr != null) {
@@ -226,6 +231,11 @@ public class DeleteServlet extends BigdataRDFServlet {
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
 
         final String contentType = req.getContentType();
 

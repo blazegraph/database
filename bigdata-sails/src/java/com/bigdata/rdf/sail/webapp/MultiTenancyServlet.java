@@ -105,6 +105,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         if (req.getRequestURI().endsWith("/namespace")) {
         
             doCreateNamespace(req, resp);
@@ -125,6 +130,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         final String namespace = getNamespace(req);
 
         if (req.getRequestURI().endsWith("/namespace/" + namespace)) {
@@ -144,6 +154,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     @Override
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        if (!isWritable(req, resp)) {
+            // Service must be writable.
+            return;
+        }
 
         // Pass through to the SPARQL end point REST API.
         m_restServlet.doPut(req, resp);

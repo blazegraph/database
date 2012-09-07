@@ -51,6 +51,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -449,8 +450,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
              * 
              * Note: We can not do this until everything is in place, but we
              * also must do this before the watcher setups up for discovery
-             * since that could will sending messages to the client as it
-             * discovers the distributed quorum state.
+             * since it will be sending messages to the client as it discovers
+             * the distributed quorum state.
              */
             client.start(this);
             /*
@@ -495,7 +496,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             /*
              * Let the service know that it is no longer running w/ the quorum.
              */
-            client.terminate();
+            try {
+                client.terminate();
+            } catch (Throwable t) {
+                launderThrowable(t);
+            }
             watcher.terminate();
             if (watcherActionService != null) {
                 watcherActionService.shutdown();
@@ -2032,7 +2037,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * send it a synchronous message so it can handle
                              * that add event.
                              */
-                            client.memberAdd();
+                            try {
+                                client.memberAdd();
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                     }
                     // queue client event.
@@ -2071,7 +2080,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * we send it a synchronous message so it can handle
                              * that add event.
                              */
-                            client.memberRemove();
+                            try {
+                                client.memberRemove();
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                     }
                     // queue client event.
@@ -2117,7 +2130,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * message so it can handle that add event, e.g., by
                              * setting itself up to receive data.
                              */
-                            client.pipelineAdd();
+                            try {
+                                client.pipelineAdd();
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                         if (lastId != null && clientId.equals(lastId)) {
                             /*
@@ -2127,8 +2144,12 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * this event by configuring itself to send data to
                              * that service.
                              */
-                            client.pipelineChange(null/* oldDownStream */,
-                                    serviceId/* newDownStream */);
+                            try {
+                                client.pipelineChange(null/* oldDownStream */,
+                                        serviceId/* newDownStream */);
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                     }
                     // queue client event.
@@ -2175,7 +2196,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * event, e.g., by tearing down its service which is
                              * receiving writes from the pipeline.
                              */
-                            client.pipelineRemove();
+                            try {
+                                client.pipelineRemove();
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                         if (priorNext != null && clientId.equals(priorNext[0])) {
                             /*
@@ -2184,8 +2209,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * to handle this event by configuring itself to
                              * send data to that service.
                              */
-                            client.pipelineChange(serviceId/* oldDownStream */,
-                                    priorNext[1]/* newDownStream */);
+                            try {
+                                client.pipelineChange(
+                                        serviceId/* oldDownStream */,
+                                        priorNext[1]/* newDownStream */);
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                         if (priorNext != null && priorNext[0] == null
                                 && clientId.equals(priorNext[1])) {
@@ -2197,7 +2227,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                              * configuring itself with an HASendService rather
                              * than an HAReceiveService.
                              */
-                            client.pipelineElectedLeader();
+                            try {
+                                client.pipelineElectedLeader();
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
                         }
                     }
                     // queue client event.
@@ -2268,7 +2302,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                  * Tell the client that consensus has been
                                  * reached on this last commit time.
                                  */
-                                client.consensus(lastCommitTime);
+                                try {
+                                    client.consensus(lastCommitTime);
+                                } catch (Throwable t) {
+                                    launderThrowable(t);
+                                }
                             }
                             // queue event.
                             sendEvent(new E(QuorumEventEnum.CONSENSUS,
@@ -2372,7 +2410,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                             final QuorumMember<S> client = getClientAsMember();
                             if (client != null) {
                                 // Tell the client that the consensus was lost.
-                                client.lostConsensus();
+                                try {
+                                    client.lostConsensus();
+                                } catch (Throwable t) {
+                                    launderThrowable(t);
+                                }
                             }
                         }
                         // found where the service had cast its vote.
@@ -2435,7 +2477,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         );
                 final QuorumMember<S> client = getClientAsMember();
                 if (client != null) {
-                    client.quorumMeet(token, leaderId);
+                    try {
+                        client.quorumMeet(token, leaderId);
+                    } catch (Throwable t) {
+                        launderThrowable(t);
+                    }
                 }
                 /*
                  * Note: If we send out an event here then any code path that
@@ -2565,7 +2611,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         // Notify the client that the quorum broke.
-                        client.quorumBreak();
+                        try {
+                            client.quorumBreak();
+                        } catch(Exception t) {
+                            launderThrowable(t);
+                        }
                     }
                     sendEvent(new E(QuorumEventEnum.QUORUM_BROKE,
                             lastValidToken, token, null/* serviceId */));
@@ -2628,7 +2678,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                      */
                     final UUID clientId = client.getServiceId();
                     if(serviceId.equals(clientId)) {
-                        client.serviceJoin();
+                        try {
+                            client.serviceJoin();
+                        } catch (Throwable t) {
+                            launderThrowable(t);
+                        }
                     }
                 }
                 // queue event.
@@ -2778,9 +2832,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                      * 
                      * Note: Services which are members of the quorum will see
                      * the quorumBreak() message. They MUST handle that message
-                     * by (a) doing an abort() which will any buffered writes
-                     * and reload their current root block; and (b) cast a vote
-                     * for their current commit time. Once a consensus is
+                     * by (a) doing an abort() which will discard any buffered
+                     * writes and reload their current root block; and (b) cast
+                     * a vote for their current commit time. Once a consensus is
                      * reached on the current commit time, the services will
                      * join in the vote order, a new leader will be elected, and
                      * the quorum will meet again.
@@ -2790,7 +2844,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 }
                 if (client != null) {
                     // Notify all quorum members that a service left.
-                    client.serviceLeave();
+                    try {
+                        client.serviceLeave();
+                    } catch (Throwable t) {
+                        launderThrowable(t);
+                    }
                 }
                 sendEvent(new E(QuorumEventEnum.SERVICE_LEAVE, lastValidToken,
                         token, serviceId));
@@ -2976,6 +3034,31 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     + (type == QuorumEventEnum.CAST_VOTE ? ",lastCommitTime="
                             + lastCommitTime : "") + "}";
         }
+
+    }
+
+    /**
+     * Launder something thrown by the {@link QuorumClient}.
+     * 
+     * @param t
+     *            The throwable.
+     */
+    private void launderThrowable(final Throwable t) {
+
+        if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+            // Propagate the interrupt.
+            Thread.currentThread().interrupt();
+
+            return;
+        }
+
+        /*
+         * Log and ignore. We do not want bugs in the QuorumClient to interfere
+         * with the Quorum protocol.
+         */
+        
+        log.error(t, t);
 
     }
 

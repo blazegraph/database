@@ -4642,8 +4642,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * 
                  * TODO QUORUM TX INTEGRATION
                  */
-                abort();
                 
+                // local abort (no quorum, so we can do 2-phase abort).
+                _abort();
+
             } else if (didMeet) {
 
                 quorumToken = newValue;
