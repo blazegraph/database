@@ -1588,6 +1588,40 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			    store.destroy();
 			}
 		}
+		
+		/**
+		 * Test low level RWStore add/removeAddress methods as used in HA
+		 * WriteCache replication to ensure Allocation consistency
+		 * 
+		 * @throws IOException
+		 */
+		public void testSimpleReplication() throws IOException {
+
+			// Create a couple of stores with temp files
+			Journal store1 = (Journal) getStore();
+			Journal store2 = (Journal) getStore();
+			
+			final RWStore rw1 = ((RWStrategy) store1.getBufferStrategy()).getStore();
+			final RWStore rw2 = ((RWStrategy) store2.getBufferStrategy()).getStore();
+
+			assertTrue(rw1 != rw2);
+			
+			final int addr1 = rw1.alloc(123, null);
+			rw2.addAddress(addr1, 123);
+			assertTrue(rw1.physicalAddress(addr1) == rw2.physicalAddress(addr1));
+			
+			rw1.free(addr1, 123);
+			rw2.removeAddress(addr1);
+			
+			// address will still be valid
+			assertTrue(rw1.physicalAddress(addr1) == rw2.physicalAddress(addr1));
+			
+			// confirm address re-cycled
+			assert(addr1 == rw1.alloc(123, null));
+			
+			// and can be "re-added"
+			rw2.addAddress(addr1, 123);
+		}
 
 		/**
 		 * The pureAlloc test is to test the allocation aspect of the memory
