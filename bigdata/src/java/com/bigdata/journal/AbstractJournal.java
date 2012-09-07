@@ -34,6 +34,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.rmi.RemoteException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -77,6 +78,7 @@ import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
@@ -5178,6 +5180,47 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }, null/* result */);
             getExecutorService().execute(ft);
             return getProxy(ft);
+        }
+
+        /*
+         * IService
+         */
+        
+        @Override
+        public UUID getServiceUUID() throws IOException {
+
+            return getServiceId();
+            
+        }
+
+        @Override
+        public Class getServiceIface() throws IOException {
+            
+            return HAGlue.class;
+            
+        }
+
+        @Override
+        public String getHostname() throws IOException {
+
+            return AbstractStatisticsCollector.fullyQualifiedHostName;
+            
+        }
+
+        @Override
+        public String getServiceName() throws IOException {
+
+            // TODO Configurable service name?
+            return getServiceIface().getName() + "@" + getHostname() + "#"
+                    + hashCode();
+            
+        }
+
+        @Override
+        public void destroy() throws RemoteException {
+
+            AbstractJournal.this.destroy();
+            
         }
 
 	};
