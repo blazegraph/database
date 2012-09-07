@@ -311,6 +311,37 @@ public class TestDefaultResourceLocator extends TestCase2 {
                         ITx.UNISOLATED) == mockRelation);
 
                 /*
+                 * Note: The read-committed view is not, in fact, locatable.
+                 * This is because the GRS update on the Journal does not
+                 * include a commit.  That update will become visible only
+                 * once we do a Journal.commit().
+                 */
+                assertNull(store.getResourceLocator().locate(namespace,
+                        ITx.READ_COMMITTED));
+
+//                /*
+//                 * The read-committed view of the resource is also locatable.
+//                 */
+//                assertNotNull(store.getResourceLocator().locate(namespace,
+//                        ITx.READ_COMMITTED));
+//
+//                /*
+//                 * The read committed view is not the same instance as the
+//                 * unisolated view.
+//                 */
+//                assertTrue(((MockRelation) store.getResourceLocator().locate(
+//                        namespace, ITx.READ_COMMITTED)) != mockRelation);
+
+            }
+
+            // commit time immediately proceeding this commit.
+            final long priorCommitTime = store.getLastCommitTime();
+            
+            // commit, noting the commit time.
+            final long lastCommitTime = store.commit();
+
+            {
+                /*
                  * The read-committed view of the resource is also locatable.
                  */
                 assertNotNull(store.getResourceLocator().locate(namespace,
@@ -324,12 +355,6 @@ public class TestDefaultResourceLocator extends TestCase2 {
                         namespace, ITx.READ_COMMITTED)) != mockRelation);
 
             }
-
-            // commit time immediately proceeding this commit.
-            final long priorCommitTime = store.getLastCommitTime();
-            
-            // commit, noting the commit time.
-            final long lastCommitTime = store.commit();
 
             if(log.isInfoEnabled()) {
                 log.info("priorCommitTime=" + priorCommitTime);

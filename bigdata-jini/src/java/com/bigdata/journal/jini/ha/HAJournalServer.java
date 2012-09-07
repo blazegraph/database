@@ -382,6 +382,10 @@ public class HAJournalServer extends AbstractServer {
                 case QUORUM_MEET:
                     if (jettyServer == null) {
                         /*
+                         * The NSS will start on each service in the quorum.
+                         * However, only the leader will create the default KB
+                         * (if that option is configured).
+                         * 
                          * Submit task since we can not do this in the event
                          * thread.
                          */
@@ -389,12 +393,8 @@ public class HAJournalServer extends AbstractServer {
                                 new Callable<Void>() {
                                     @Override
                                     public Void call() throws Exception {
-                                        if (jettyServer == null
-                                                && quorum.getMember().isLeader(
-                                                        e.token())) {
+                                        if (jettyServer == null) {
                                             try {
-                                                System.out// TODO LOG @ INFO
-                                                        .println("Starting NSS");
                                                 startNSS();
                                             } catch (Exception e1) {
                                                 log.error(
@@ -596,6 +596,8 @@ public class HAJournalServer extends AbstractServer {
         final Integer port = (Integer) config.getEntry(COMPONENT,
                 NSSConfigurationOptions.PORT, Integer.TYPE,
                 NSSConfigurationOptions.DEFAULT_PORT);
+
+        log.warn("Starting NSS: port=" + port);
 
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {

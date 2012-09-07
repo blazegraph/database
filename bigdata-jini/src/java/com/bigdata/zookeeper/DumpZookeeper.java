@@ -38,10 +38,10 @@ import net.jini.config.ConfigurationProvider;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -79,6 +79,8 @@ public class DumpZookeeper {
      * @throws InterruptedException
      * @throws KeeperException
      * @throws ConfigurationException 
+     * 
+     * TODO Add a listener mode (tail zk events).
      */
     public static void main(final String[] args) throws IOException,
             InterruptedException, KeeperException, ConfigurationException {
@@ -110,14 +112,42 @@ public class DumpZookeeper {
                     }
                 });
 
+        /*
+         * The sessionTimeout as negotiated (effective sessionTimeout).
+         * 
+         * Note: This is not available until we actually request something
+         * from zookeeper. 
+         */
+        {
+
+            try {
+                z.getData(zooClientConfig.zroot, false/* watch */, null/* stat */);
+            } catch (NoNodeException ex) {
+                // Ignore.
+            } catch (KeeperException ex) {
+                // Oops.
+                log.error(ex, ex);
+            }
+
+            System.out.println("Negotiated sessionTimeout="
+                    + z.getSessionTimeout() + "ms");
+        }
+
+        final PrintWriter w = new PrintWriter(System.out);
         try {
 
-            new DumpZookeeper(z).dump(new PrintWriter(System.out), showData,
-                    zooClientConfig.zroot, 0/*depth*/);
+            // recursive dump.
+            new DumpZookeeper(z)
+                    .dump(w, showData, zooClientConfig.zroot, 0/* depth */);
+
+            w.println("----");
+
+            w.flush();
 
         } finally {
 
             z.close();
+            w.close();
 
         }
         
