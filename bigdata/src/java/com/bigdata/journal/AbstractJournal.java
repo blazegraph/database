@@ -2759,6 +2759,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * HA mode.
                  */
                 
+                // Local HA service implementation (non-Remote).
                 final QuorumService<HAGlue> quorumService = quorum.getClient();
 
                 boolean didVoteYes = false;
@@ -3162,7 +3163,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
 
-		if (!isReadOnly()) { // quorumManager.getQuorum().isLeader()) {
+		if (!isReadOnly()) {
 
 			/*
 			 * Only the leader can accept writes so only the leader will
@@ -4636,6 +4637,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * 
                  * We do not need to discard read-only tx since the committed
                  * state should remain valid even when a quorum is lost.
+                 * 
+                 * TODO QUORUM TX INTEGRATION
                  */
                 abort();
                 
@@ -4643,6 +4646,54 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 quorumToken = newValue;
 
+                // This quorum member.
+                final QuorumService<HAGlue> localService = quorum.getClient();
+                
+                if (_rootBlock.getCommitCounter() == 0
+                        && localService.isFollower(quorumToken)) {
+
+                    // Remote interface for the quorum leader.
+                    final HAGlue leader = localService.getLeader(quorumToken);
+
+                    /*
+                     * When the quorum meets for the first time, we need to take
+                     * the root block from the leader and use it to replace both
+                     * of our root blocks (the initial root blocks are
+                     * identical). That will make the root blocks the same on
+                     * all quorum members.
+                     */
+                    log.info("Fetching root block from leader.");
+                    final ByteBuffer buf;
+                    try {
+                        buf = ByteBuffer.wrap(leader
+                                .getRootBlock(null/* storeUUID */));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+
+                    final IRootBlockView rootBlock0 = new RootBlockView(
+                            true/* rootBlock0 */, buf, checker);
+
+                    final IRootBlockView rootBlock1 = new RootBlockView(
+                            false/* rootBlock0 */, buf, checker);
+
+                    log.info("Synchronizing root blocks with leader.");
+                    
+                    // write root block through to disk and sync.
+                    _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.Force);
+
+                    // write 2nd root block through to disk and sync.
+                    _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.Force);
+
+                    // Choose the "current" root block.
+                    _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0,
+                            rootBlock1);
+
+                    log.info("Synchronized root blocks with leader: rootBlock="
+                            + _rootBlock);
+
+                }
+                
                 /*
                  * We need to reset the backing store with the token for the new
                  * quorum. There should not be any active writers since there
@@ -4653,6 +4704,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * Each node in the quorum should handle this locally when it
                  * sees the quorum meet event.
                  */
+
                 _abort();
 
             } else {
@@ -4791,7 +4843,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			final long prepareToken = rootBlock.getQuorumToken();
 			
 			// true the token is valid and this service is the quorum leader
-			final boolean isLeader = quorum.getMember().isLeader(prepareToken);
+			final boolean isLeader = quorum.getClient().isLeader(prepareToken);
 			
 			final FutureTask<Boolean> ft = new FutureTaskMon<Boolean>(new Runnable() {
 
@@ -4905,8 +4957,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						// set the new root block.
 						_rootBlock = rootBlock;
 
-                        if (quorum.getMember().isFollower(
-                                rootBlock.getQuorumToken())) {
+						final QuorumService<HAGlue> localService = quorum.getClient();
+						
+                        if (localService.isFollower(rootBlock.getQuorumToken())) {
+                            
                             /*
                              * Ensure allocators are synced after commit. This
                              * is only done for the followers. The leader has
@@ -4914,11 +4968,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                              * down the writes. The followers have not be
                              * updating the allocators.
                              */
+                            
                             if (haLog.isInfoEnabled())
                                 haLog.error("Reset from root block: serviceUUID="
-                                        + quorum.getMember().getServiceId());
+                                        + localService.getServiceId());
+
                             ((IHABufferStrategy) _bufferStrategy)
                                     .resetFromHARootBlock(_rootBlock);
+                            
                         }
 
 						// reload the commit record from the new root block.
@@ -5075,8 +5132,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         public byte[] getRootBlock(final UUID storeId) {
 
-            if (storeId == null)
-                throw new IllegalArgumentException();
+            // storeId is optional (used in scale-out).
+//            if (storeId == null)
+//                throw new IllegalArgumentException();
 
             if (haLog.isInfoEnabled())
                 haLog.info("storeId=" + storeId);

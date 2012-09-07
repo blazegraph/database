@@ -355,11 +355,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
             
             protected void activateTx(final TxState state) {
+                if (txLog.isInfoEnabled())
+                    txLog.info("OPEN : txId=" + state.tx
+                            + ", readsOnCommitTime=" + state.readsOnCommitTime);
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
                 if (bufferStrategy instanceof IRWStrategy) {
-                    if (txLog.isInfoEnabled())
-                        txLog.info("OPEN : txId=" + state.tx
-                                + ", readsOnCommitTime=" + state.readsOnCommitTime);
                     final IRawTx tx = ((IRWStrategy)bufferStrategy).newTx();
                     if (m_rawTxs.put(state.tx, tx) != null) {
                         throw new IllegalStateException(
@@ -508,8 +508,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
 			tmp.attach(super.getCounters());
 
-			tmp.makePath(IJournalCounters.indexManager).attach(
-					_getName2Addr().getIndexCounters());
+            if (!isReadOnly()) {
+                /*
+                 * These index counters are only available for the unisolated
+                 * Name2Addr view. If this is a read-only journal, then we can
+                 * not report out that information.
+                 */
+                tmp.makePath(IJournalCounters.indexManager).attach(
+                        _getName2Addr().getIndexCounters());
+            }
 
 			tmp.makePath(IJournalCounters.concurrencyManager)
                     .attach(concurrencyManager.getCounters());

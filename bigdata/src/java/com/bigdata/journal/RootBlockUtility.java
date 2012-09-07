@@ -71,9 +71,13 @@ public class RootBlockUtility {
      * 
      * @param opener
      * @param file
-     * @param validateChecksum 
-     * @param alternateRootBlock 
+     * @param validateChecksum
+     * @param alternateRootBlock
+     *            When <code>true</code>, the alternate root block will be
+     *            chosen. This flag only makes sense when you have two root
+     *            blocks to choose from and you want to choose the other one.
      * @param ignoreBadRootBlock
+     *            When <code>true</code>, a bad root block will be ignored.
      * 
      * @throws IOException
      * 
@@ -100,11 +104,15 @@ public class RootBlockUtility {
         IRootBlockView rootBlock0 = null, rootBlock1 = null;
         try {
             rootBlock0 = new RootBlockView(true, tmp0, checker);
+            if (log.isInfoEnabled())
+                log.info("rootBlock0: " + rootBlock0);
         } catch (RootBlockException ex) {
             log.error("Bad root block zero: " + ex);
         }
         try {
             rootBlock1 = new RootBlockView(false, tmp1, checker);
+            if (log.isInfoEnabled())
+                log.info("rootBlock1: " + rootBlock1);
         } catch (RootBlockException ex) {
             log.error("Bad root block one: " + ex);
         }
@@ -117,6 +125,68 @@ public class RootBlockUtility {
         this.rootBlock0 = rootBlock0;
         this.rootBlock1 = rootBlock1;
 
+        this.rootBlock = chooseRootBlock(rootBlock0, rootBlock1,
+                ignoreBadRootBlock, alternateRootBlock);
+    }
+
+    /**
+     * Return the chosen root block. The root block having the greater
+     * {@link IRootBlockView#getCommitCounter() commit counter} is chosen by
+     * default.
+     * <p>
+     * Note: For historical compatibility, <code>rootBlock1</code> is chosen if
+     * both root blocks have the same {@link IRootBlockView#getCommitCounter()}.
+     * 
+     * @param rootBlock0
+     *            Root block 0 (may be <code>null</code> if this root block is bad).
+     * @param rootBlock1
+     *            Root block 1 (may be <code>null</code> if this root block is bad).
+     * 
+     * @return The chosen root block.
+     * 
+     * @throws RuntimeException
+     *             if no root block satisfies the criteria.
+     */
+    public static IRootBlockView chooseRootBlock(
+            final IRootBlockView rootBlock0, final IRootBlockView rootBlock1) {
+
+        return chooseRootBlock(rootBlock0, rootBlock1,
+                false/* alternateRootBlock */, false/* ignoreBadRootBlock */);
+
+    }
+
+    /**
+     * Return the chosen root block. The root block having the greater
+     * {@link IRootBlockView#getCommitCounter() commit counter} is chosen by
+     * default.
+     * <p>
+     * Note: For historical compatibility, <code>rootBlock1</code> is chosen if
+     * both root blocks have the same {@link IRootBlockView#getCommitCounter()}.
+     * 
+     * @param rootBlock0
+     *            Root block 0 (may be <code>null</code> if this root block is
+     *            bad).
+     * @param rootBlock1
+     *            Root block 1 (may be <code>null</code> if this root block is
+     *            bad).
+     * @param alternateRootBlock
+     *            When <code>true</code>, the alternate root block will be
+     *            chosen. This flag only makes sense when you have two root
+     *            blocks to choose from and you want to choose the other one.
+     * @param ignoreBadRootBlock
+     *            When <code>true</code>, a bad root block will be ignored.
+     * 
+     * @return The chosen root block.
+     * 
+     * @throws RuntimeException
+     *             if no root block satisfies the criteria.
+     */
+    public static IRootBlockView chooseRootBlock(
+            final IRootBlockView rootBlock0, final IRootBlockView rootBlock1,
+            final boolean alternateRootBlock,final boolean ignoreBadRootBlock) {
+
+        final IRootBlockView rootBlock;
+        
         if (!ignoreBadRootBlock
                 && (rootBlock0 == null || rootBlock1 == null)) {
             /*
@@ -129,28 +199,38 @@ public class RootBlockUtility {
                             + ", rootBlock1="
                             + (rootBlock1 == null ? "bad" : "ok"));
         }
-        if(alternateRootBlock) {
+
+        if (alternateRootBlock) {
+        
             /*
              * A request was made to use the alternative root block.
              */
+            
             if (rootBlock0 == null || rootBlock1 == null) {
+
                 /*
                  * Note: The [alternateRootBlock] flag only makes sense when you
                  * have two root blocks to choose from and you want to choose
                  * the other one.
                  */
+
                 throw new RuntimeException(
                         "Can not use alternative root block since one root block is damaged.");
             } else {
+
                 log.warn("Using alternate root block");
+                
             }
+            
         }
+        
         /*
          * Choose the root block based on the commit counter.
          * 
          * Note: The commit counters MAY be equal. This will happen if
          * we rollback the journal and override the current root block
-         * with the alternate root block.
+         * with the alternate root block.  It is also true when we first
+         * create a Journal.
          * 
          * Note: If either root block was damaged then that rootBlock
          * reference will be null and we will use the other rootBlock
@@ -159,21 +239,45 @@ public class RootBlockUtility {
          */
         final long cc0 = rootBlock0 == null ? -1L : rootBlock0
                 .getCommitCounter();
+
         final long cc1 = rootBlock1 == null ? -1L : rootBlock1
                 .getCommitCounter();
+        
         if (rootBlock0 == null) {
+        
             // No choice. The other root block does not exist.
             rootBlock = rootBlock1;
+            
         } else if (rootBlock1 == null) {
+            
             // No choice. The other root block does not exist.
             rootBlock = rootBlock0;
+            
         } else {
-            // A choice exists, compare the timestamps.
-            this.rootBlock = (cc0 > cc1 //
+            
+            /*
+             * A choice exists, compare the commit counters.
+             * 
+             * Note: As a historical artifact, this logic will choose
+             * [rootBlock1] when the two root blocks have the same
+             * [commitCounter]. With the introduction of HA support, code in
+             * AbstractJournal#setQuorumToken() now depends on this choice
+             * policy to decide which root block it will take as the current
+             * root block.
+             */
+
+            rootBlock = (cc0 > cc1 //
                     ? (alternateRootBlock ? rootBlock1 : rootBlock0) //
                     : (alternateRootBlock ? rootBlock0 : rootBlock1)//
                     );
+
         }
+        
+        if (log.isInfoEnabled())
+            log.info("chosenRoot: " + rootBlock);
+
+        return rootBlock;
+        
     }
 
     /**

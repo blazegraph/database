@@ -764,19 +764,85 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
         } else {
 
+            final SparseRowStore rowStore;
+            
             /*
              * Look up the GRS for a non-read-historical view.
              * 
              * Note: We do NOT cache the property set on this code path.
+             * 
+             * Note: This used to use the UNISOLATED view for all such requests.
+             * I have modified the code (9/7/2012) to use the caller's view.
+             * This allows a caller using a READ_COMMITTED view to obtain a
+             * read-only view of the GRS. That is required to support GRS reads
+             * on followers in an HA quorum (followers are read-only and do not
+             * have access to the unisolated versions of indices).
              */
 
-            final SparseRowStore rowStore = indexManager
-                    .getGlobalRowStore(/* timestamp */);
+            if (timestamp == ITx.UNISOLATED) {
+                
+                /*
+                 * The unisolated view.
+                 */
+                
+                rowStore = indexManager.getGlobalRowStore();
+
+            } else if (timestamp == ITx.READ_COMMITTED) {
+
+                /*
+                 * View for the last commit time.
+                 */
+                
+                rowStore = indexManager.getGlobalRowStore(indexManager
+                        .getLastCommitTime());
+
+            } else if (TimestampUtility.isReadWriteTx(timestamp)) {
+
+                if (indexManager instanceof Journal) {
+
+                    final Journal journal = (Journal) indexManager;
+
+                    final ITx tx = journal.getTransactionManager().getTx(
+                            timestamp);
+
+                    if (tx == null) {
+
+                        // No such tx?
+                        throw new IllegalStateException("No such tx: "
+                                + timestamp);
+                        
+                    }
+
+                    // Use the view that the tx is reading on.
+                    rowStore = indexManager.getGlobalRowStore(tx
+                            .getReadsOnCommitTime());
+
+                } else {
+
+                    /*
+                     * TODO This should use the readsOnCommitTime on the cluster
+                     * as well.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+                     * (thin txId)
+                     */
+
+                    rowStore = indexManager.getGlobalRowStore(/* unisolated */);
+
+                }
+                
+
+            } else {
+
+                throw new AssertionError("timestamp="
+                        + TimestampUtility.toString(timestamp));
+                
+            }
 
             // Read the properties from the GRS.
             map = rowStore == null ? null : rowStore.read(
                     RelationSchema.INSTANCE, namespace);
-            
+
         }
 
         if (map == null) {

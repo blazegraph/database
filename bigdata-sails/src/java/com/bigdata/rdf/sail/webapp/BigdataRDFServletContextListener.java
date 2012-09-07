@@ -48,11 +48,15 @@ import com.bigdata.cache.SynchronizedHardReferenceQueueWithTimeout;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.IProcessCounters;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -173,58 +177,101 @@ public class BigdataRDFServletContextListener implements
 
         }
 
-        if(create) {
-            
-            // Attempt to resolve the namespace.
-            if (indexManager.getResourceLocator().locate(namespace,
-                    ITx.UNISOLATED) == null) {
+        if (create) {
 
-                log.warn("Creating KB instance: namespace=" + namespace);
-                
-                if (indexManager instanceof Journal) {
+            if (indexManager instanceof Journal) {
 
-                    /*
-                     * Create a local triple store.
-                     * 
-                     * Note: This hands over the logic to some custom code
-                     * located on the BigdataSail.
-                     */
-                    
-                    final Journal jnl = (Journal) indexManager;
+                /*
+                 * Create a local triple store.
+                 * 
+                 * Note: This hands over the logic to some custom code located
+                 * on the BigdataSail.
+                 */
 
-                    final Properties properties = new Properties(jnl
-                            .getProperties());
+                final Journal jnl = (Journal) indexManager;
 
-                    // override the namespace.
-                    properties.setProperty(BigdataSail.Options.NAMESPACE,
-                            namespace);
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
+                        .getQuorum();
 
-                    // create the appropriate as configured triple/quad store.
-                    BigdataSail.createLTS(jnl, properties);
+                boolean isSoloOrLeader;
+                if (quorum == null) {
+
+                    isSoloOrLeader = true;
 
                 } else {
-                    
+
+                    final long token;
+                    try {
+                        log.warn("Awaiting quorum.");
+                        token = quorum.awaitQuorum();
+                    } catch (AsynchronousQuorumCloseException e1) {
+                        throw new RuntimeException(e1);
+                    } catch (InterruptedException e1) {
+                        throw new RuntimeException(e1);
+                    }
+
+                    if (quorum.getMember().isLeader(token)) {
+                        isSoloOrLeader = true;
+                    } else {
+                        isSoloOrLeader = false;
+                    }
+                }
+
+                if (isSoloOrLeader) {
+
+                    // Attempt to resolve the namespace.
+                    if (indexManager.getResourceLocator().locate(namespace,
+                            ITx.UNISOLATED) == null) {
+
+                        log.warn("Creating KB instance: namespace=" + namespace);
+
+                        final Properties properties = new Properties(
+                                jnl.getProperties());
+
+                        // override the namespace.
+                        properties.setProperty(BigdataSail.Options.NAMESPACE,
+                                namespace);
+
+                        // create the appropriate as configured triple/quad
+                        // store.
+                        BigdataSail.createLTS(jnl, properties);
+
+                    } // if( tripleStore == null )
+
+                }
+
+            } else {
+
+                // Attempt to resolve the namespace.
+                if (indexManager.getResourceLocator().locate(namespace,
+                        ITx.UNISOLATED) == null) {
+
                     /*
                      * Register triple store for scale-out.
                      */
-                    
+
+                    log.warn("Creating KB instance: namespace=" + namespace);
+
                     final JiniFederation<?> fed = (JiniFederation<?>) indexManager;
-                    
-                    final Properties properties = fed.getClient().getProperties();
-                    
+
+                    final Properties properties = fed.getClient()
+                            .getProperties();
+
                     final ScaleOutTripleStore lts = new ScaleOutTripleStore(
                             indexManager, namespace, ITx.UNISOLATED, properties);
-                    
+
                     lts.create();
-                    
-                }
-            
-            } // if( tripleStore == null ) 
-            
+
+                } // if( tripleStore == null )
+
+            }
+
         } // if( create )
         
-        txs = (indexManager instanceof Journal ? ((Journal) indexManager).getTransactionManager()
-                .getTransactionService() : ((IBigdataFederation<?>) indexManager).getTransactionService());
+        txs = (indexManager instanceof Journal ? ((Journal) indexManager)
+                .getTransactionManager().getTransactionService()
+                : ((IBigdataFederation<?>) indexManager)
+                        .getTransactionService());
 
         final long timestamp;
         {
