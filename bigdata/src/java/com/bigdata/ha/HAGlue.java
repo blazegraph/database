@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.service.IService;
 
 /**
  * A {@link Remote} interface for methods supporting high availability for a set
@@ -23,7 +24,7 @@ import com.bigdata.journal.AbstractJournal;
  *       the standard jini smart proxy naming pattern.
  */
 public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
-        HACommitGlue {
+        HACommitGlue, IService {
 
     /*
      * Administrative

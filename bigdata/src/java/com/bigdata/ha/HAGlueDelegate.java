@@ -25,6 +25,7 @@ package com.bigdata.ha;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -90,6 +91,31 @@ public class HAGlueDelegate implements HAGlue {
     public Future<Void> receiveAndReplicate(HAWriteMessage msg)
             throws IOException {
         return delegate.receiveAndReplicate(msg);
+    }
+
+    @Override
+    public UUID getServiceUUID() throws IOException {
+        return delegate.getServiceUUID();
+    }
+
+    @Override
+    public Class getServiceIface() throws IOException {
+        return delegate.getServiceIface();
+    }
+
+    @Override
+    public String getHostname() throws IOException {
+        return delegate.getHostname();
+    }
+
+    @Override
+    public String getServiceName() throws IOException {
+        return delegate.getServiceName();
+    }
+
+    @Override
+    public void destroy() throws RemoteException {
+        delegate.destroy();
     }
 
 }
