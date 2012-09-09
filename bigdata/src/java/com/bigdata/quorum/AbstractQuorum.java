@@ -51,6 +51,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -1291,14 +1292,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (!members.contains(serviceId))
                     throw new QuorumException(ERR_NOT_MEMBER + serviceId);
                 /*
-                 * FIXME This has been modified to automatically add the service
-                 * back to the pipeline, which we need to do following a service
-                 * leave or quorum break. However, this conflicts with the
-                 * pre-/post- conditions declared in QuorumActor.
+                 * Note: This has been modified to automatically add the service
+                 * to the pipeline and the javadoc for the pre-/post- conditions
+                 * declared in QuorumActor has been updated (9/9/2012). The
+                 * change is inside of conditionalCastVoteImpl().
                  */
 //                if (!pipeline.contains(serviceId))
 //                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
-                conditionalPipelineAddImpl();
                 conditionalCastVoteImpl(lastCommitTime);
             } catch(InterruptedException e) {
                 // propagate the interrupt.
@@ -1513,16 +1513,24 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         private void conditionalCastVoteImpl(final long lastCommitTime)
                 throws InterruptedException {
-            final Set<UUID> tmp = votes.get(lastCommitTime);
-            if (tmp != null && tmp.contains(serviceId)) {
-                // The service has already cast this vote.
-                return;
+            final Set<UUID> votesForCommitTime = votes.get(lastCommitTime);
+            if (votesForCommitTime != null
+                    && votesForCommitTime.contains(serviceId)) {
+                // The service has already cast *a* vote.
+                final Long lastCommitTime2 = getCastVote(serviceId);
+                if (lastCommitTime2 != null
+                        && lastCommitTime2.longValue() == lastCommitTime) {
+                    // The service has already cast *this* vote.
+                    return;
+                }
             }
             if (log.isDebugEnabled())
                 log.debug("serviceId=" + serviceId + ",lastCommitTime="
                         + lastCommitTime);
             // Withdraw any existing vote by this service.
             conditionalWithdrawVoteImpl();
+            // Ensure part of the pipeline.
+            conditionalPipelineAddImpl();
             // Cast a vote.
             doCastVote(lastCommitTime);
             Long t = null;
@@ -1539,7 +1547,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 while (getCastVote(serviceId) != null) {
                     votesChange.await();
                 }
-            }
+                if (log.isDebugEnabled())
+                    log.debug("withdrew vote: serviceId=" + serviceId
+                            + ",lastCommitTime=" + lastCommitTime);            }
         }
 
         private void conditionalPipelineAddImpl() throws InterruptedException {
@@ -2276,17 +2286,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             lock.lock();
             try {
                 // Look for a set of votes for that lastCommitTime.
-                LinkedHashSet<UUID> tmp = votes.get(lastCommitTime);
-                if (tmp == null) {
+                LinkedHashSet<UUID> votesForCommitTime = votes
+                        .get(lastCommitTime);
+                if (votesForCommitTime == null) {
                     // None found, so create an empty set now.
-                    tmp = new LinkedHashSet<UUID>();
+                    votesForCommitTime = new LinkedHashSet<UUID>();
                     // And add it to the map.
-                    votes.put(lastCommitTime, tmp);
+                    votes.put(lastCommitTime, votesForCommitTime);
                 }
-                if (tmp.add(serviceId)) {
+                if (votesForCommitTime.add(serviceId)) {
                     // The service cast its vote.
                     votesChange.signalAll();
-                    final int nvotes = tmp.size();
+                    final int nvotes = votesForCommitTime.size();
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString()
                                 + ", lastCommitTime=" + lastCommitTime
@@ -2315,7 +2326,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         }
                         if (client != null) {
                             final UUID clientId = client.getServiceId();
-                            final UUID[] voteOrder = tmp.toArray(new UUID[0]);
+                            final UUID[] voteOrder = votesForCommitTime.toArray(new UUID[0]);
                             if (nvotes == kmeet
                                     && clientId.equals(voteOrder[0])) {
                                 /*
@@ -2400,13 +2411,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 while (itr.hasNext()) {
                     final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr
                             .next();
-                    final Set<UUID> votes = entry.getValue();
-                    if (votes.remove(serviceId)) {
+                    final Set<UUID> votesForCommitTime = entry.getValue();
+                    if (votesForCommitTime.remove(serviceId)) {
                         // The vote was withdrawn.
                         votesChange.signalAll();
                         sendEvent(new E(QuorumEventEnum.WITHDRAW_VOTE,
                                 lastValidToken, token, serviceId));
-                        if (votes.size() + 1 == kmeet) {
+                        if (votesForCommitTime.size() + 1 == kmeet) {
                             final QuorumMember<S> client = getClientAsMember();
                             if (client != null) {
                                 // Tell the client that the consensus was lost.
@@ -2421,7 +2432,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         if (log.isInfoEnabled())
                             log.info("serviceId=" + serviceId
                                     + ", lastCommitTime=" + entry.getKey());
-                        if (votes.isEmpty()) {
+                        if (votesForCommitTime.isEmpty()) {
                             // remove map entry with no votes cast.
                             itr.remove();
                         }
@@ -2619,14 +2630,60 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     }
                     sendEvent(new E(QuorumEventEnum.QUORUM_BROKE,
                             lastValidToken, token, null/* serviceId */));
-                    if (client != null) {
-                        final UUID clientId = client.getServiceId();
-                        if(joined.contains(clientId)) {
-                            // If our client is joined, then force serviceLeave.
-//                            new Thread() {public void run() {actor.serviceLeave();}}.start();
-                            doAction(new Runnable() {public void run() {actor.serviceLeave();}});
-                        }
+/*
+ * Note: Replacing this code with the logic below fixes a problem where a leader
+ * was failing to update its lastCommitTime after a quorum break caused by
+ * a follower that was halted.  The quorum could not meet after the follower
+ * was restarted because the leader had not voted for a lastCommitTime. The
+ * code below addresses that explicitly as long as the QuorumMember is a 
+ * QuorumService. 
+ */
+//                    if (client != null) {
+//                        final UUID clientId = client.getServiceId();
+//                        if(joined.contains(clientId)) {
+//                            // If our client is joined, then force serviceLeave.
+////                            new Thread() {public void run() {actor.serviceLeave();}}.start();
+//                            doAction(new Runnable() {public void run() {actor.serviceLeave();}});
+//                        }
+//                    }
+                  if (client != null) {
+                    final UUID clientId = client.getServiceId();
+                    if (joined.contains(clientId)) {
+                      final QuorumMember<S> member = getMember();
+                      if (member instanceof QuorumService) {
+                        /*
+                         * Set the last commit time.
+                         * 
+                         * Note: After a quorum break, a service MUST
+                         * recast its vote for it's then-current
+                         * lastCommitTime. If it fails to do this, then
+                         * it will be impossible for a consensus to form
+                         * around the then current lastCommitTimes for
+                         * the services. It appears to be quite
+                         * difficult for the service to handle this
+                         * itself since it can not easily recognize when
+                         * it's old vote has been widthdrawn. Therefore,
+                         * the logic to do this has been moved into the
+                         * QuorumWatcherBase.
+                         */
+                        final long lastCommitTime = ((QuorumService<?>) member)
+                                .getLastCommitTime();
+                        doAction(new Runnable() {
+                            public void run() {
+                                // recast our vote.
+                                actor.castVote(lastCommitTime);
+                            }
+                        });
+                    } else {
+                        // just withdraw the vote.
+                        doAction(new Runnable() {
+                            public void run() {
+                                actor.withdrawVote();
+                            }
+                        });
                     }
+                }
+                }
                 }
             } finally {
                 lock.unlock();

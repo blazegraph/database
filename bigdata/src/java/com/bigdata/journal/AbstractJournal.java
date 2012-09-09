@@ -4646,6 +4646,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // local abort (no quorum, so we can do 2-phase abort).
                 _abort();
 
+                /*
+                 * Note: We can not re-cast our vote until our last vote is
+                 * widthdrawn. That is currently done by QuorumWatcherBase. So,
+                 * we have to wait until we observe that to cast a new vote.
+                 */
+                
             } else if (didMeet) {
 
                 quorumToken = newValue;

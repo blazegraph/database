@@ -363,7 +363,7 @@ public class HAJournalServer extends AbstractServer {
 
             @Override
             public void notify(final QuorumEvent e) {
-                System.err.println("QuorumEvent: "+e);
+                System.err.println("QuorumEvent: " + e);// FIXME remove logger.
                 switch(e.getEventType()) {
                 case CAST_VOTE:
                     break;
@@ -411,8 +411,7 @@ public class HAJournalServer extends AbstractServer {
                     break;
                 case SERVICE_LEAVE:
                     break;
-                case WITHDRAW_VOTE:
-                    break;
+                case WITHDRAW_VOTE: 
                 }
             }
         });

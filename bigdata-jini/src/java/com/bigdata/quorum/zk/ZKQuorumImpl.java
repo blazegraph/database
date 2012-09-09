@@ -512,6 +512,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             // zpath for the lastCommitTime.
             final String lastCommitTimeZPath = logicalServiceId + "/" + QUORUM
                     + "/" + QUORUM_VOTES + "/" + lastCommitTime;
+            if (log.isInfoEnabled())
+                log.info("lastCommitTime=" + lastCommitTime
+                        + ", lastCommitTimeZPath=" + lastCommitTimeZPath);
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -587,6 +590,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             // zpath for votes.
             final String votesZPath = logicalServiceId + "/" + QUORUM + "/"
                     + QUORUM_VOTES;
+            if (log.isInfoEnabled())
+                log.info("votesZPath=" + votesZPath);
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -1888,12 +1893,12 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             }
 
             @Override
-            protected void add(UUID serviceId) {
+            protected void add(final UUID serviceId) {
                 castVote(serviceId, lastCommitTime);
             }
 
             @Override
-            protected void remove(UUID serviceId) {
+            protected void remove(final UUID serviceId) {
                 withdrawVote(serviceId);
             }
 

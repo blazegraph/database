@@ -58,4 +58,10 @@ import com.bigdata.quorum.QuorumMember;
 public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
         QuorumRead<S>, QuorumCommit<S>, QuorumPipeline<S> {
 
+    /**
+     * Return the lastCommitTime for this service (based on its current root
+     * block).
+     */
+    long getLastCommitTime();
+
 }

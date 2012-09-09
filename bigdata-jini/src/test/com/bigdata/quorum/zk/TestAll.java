@@ -76,8 +76,8 @@ public class TestAll extends TestCase {
         // unit tests for a singleton quorum.
         suite.addTestSuite(TestZkSingletonQuorumSemantics.class);
         
-        // FIXME Enable HA test suite again: unit tests for a highly available quorum.
-//        suite.addTestSuite(TestZkHA3QuorumSemantics.class);
+        // unit tests for a highly available quorum.
+        suite.addTestSuite(TestZkHA3QuorumSemantics.class);
         
         return suite;
 
