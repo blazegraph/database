@@ -128,6 +128,19 @@ public class HAJournalServer extends AbstractServer {
     private UUID serviceUUID;
     private HAGlue haGlueService;
     private ZookeeperClientConfig zkClientConfig;
+    
+    /*
+     * TODO Explicit configuration of this property. We will need to add another
+     * level in the zpath for the logicalService under the HAJournal layer so we
+     * can have multiple HA Journals in a zk ensemble (and we need to ensure
+     * that znode gets created). We will no longer need to explicitly declare
+     * the UUID of the service, but we should report an error if the service
+     * becomes over subscribed (too many quorum members). Without a limit on the
+     * #of services that can join a quorum we can erode the HA guarantee by not
+     * recognizing a critical set of [k] distinct services. We could also handle
+     * this by explicitly declaring the UUIDs of those services. That tends to
+     * be robust.
+     */
     private String logicalServiceId;
     
     /**
@@ -260,34 +273,23 @@ public class HAJournalServer extends AbstractServer {
             properties.put(HAJournal.Options.WRITE_PIPELINE_ADDR,
                     writePipelineAddr);
 
-            if(false){
-
-                /*
-                 * Jini/River only quorum.
-                 */
-                
-                quorum = new StaticQuorum(serviceUUID, pipelineUUIDs,
-                        discoveryClient);
-
-            } else {
-
-                /*
-                 * Zookeeper quorum.
-                 */
-                
+            /*
+             * Zookeeper quorum.
+             */
+            {
                 final List<ACL> acl = zkClientConfig.acl;
                 final String zoohosts = zkClientConfig.servers;
                 final int sessionTimeout = zkClientConfig.sessionTimeout;
-                
-                final ZooKeeperAccessor zka = new ZooKeeperAccessor(
-                        zoohosts, sessionTimeout);
-                
+
+                final ZooKeeperAccessor zka = new ZooKeeperAccessor(zoohosts,
+                        sessionTimeout);
+
                 if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
-                
+
                     throw new RuntimeException("Could not connect to zk");
-                    
+
                 }
-                
+
                 if (log.isInfoEnabled()) {
                     log.info("Connected to zookeeper");
                 }
@@ -313,7 +315,6 @@ public class HAJournalServer extends AbstractServer {
 
                 quorum = new ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>(
                         replicationFactor, zka, acl);
-
             }
 
             this.journal = new HAJournal(properties, quorum);
@@ -828,7 +829,7 @@ public class HAJournalServer extends AbstractServer {
                  * TODO We also need to destroy the persistent state (dataDir,
                  * serviceDir), the zk state for this service, and ensure that
                  * the proxy is unexported from any discovered registrars (that
-                 * is probably being done).
+                 * is probably being done). [unit tests for the admin methods.]
                  */
 
                 server.runDestroy();
