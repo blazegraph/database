@@ -152,6 +152,9 @@ public class TestAll_BTreeBasics extends TestCase {
         suite.addTestSuite(TestBloomFilter.class);
         suite.addTestSuite(TestBTreeWithBloomFilter.class);
 
+        // Unit test for initialization of the B+Tree with non-default m.
+        suite.addTestSuite(TestBTreeBranchingFactors.class);
+        
         return suite;
 
     }
