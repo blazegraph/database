@@ -335,22 +335,24 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
     /**
      * When true, events are send synchronously in the thread of the watcher.
-     * 
-     * FIXME This makes it easy to write the unit tests since we do not need to
+     * <p>
+     * Note: The events are not guaranteed to arrive in the same order that the
+     * internal state changes are made. In order to be robust, the inner classes
+     * use patterns where they wait until a {@link Condition} becomes true (or
+     * false) in a loop.
+     * <p>
+     * Note: This makes it easy to write the unit tests since we do not need to
      * "wait" for events to arrive (and they are much faster without the
-     * eventService contending for the {@link #lock} all the time). Is this Ok
-     * as a long standing policy? [I think so. These events are only going out
-     * to local objects.]
+     * eventService contending for the {@link #lock} all the time). However,
+     * sending the event in the caller's thread means that the caller will be
+     * holding the {@link #lock} and thus the receiver MUST NOT execute any
+     * blocking code. Specifically, it must not cause a different thread to
+     * execute code that would content for the {@link #lock}.
      * <p>
-     * Note that the events are not guaranteed to arrive in the same order that
-     * the internal state changes are made.
-     * <p>
-     * However, sending the event in the caller's thread means that the caller
-     * will be holding the {@link #lock} and thus the receiver MUST NOT execute
-     * any blocking code. Specifically, it must not cause a different thread to
-     * execute code that would content for the {@link #lock}. That means that
-     * the receiver must not wait on any other thread to perform an action that
-     * touches the {@link AbstractQuorum}.
+     * Note: The receiver must not wait on any other thread to perform an action
+     * that touches the {@link AbstractQuorum}. This is documented on the
+     * {@link QuorumStateChangeListener}. {@link QuorumClient} implementations
+     * must also be wary of blocking in the event thread.
      */
     private final boolean sendSynchronous = true;
 
