@@ -117,6 +117,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         
     }
     
+    @Override
     public S getService() {
         
         return service;
@@ -139,6 +140,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         
     }
 
+    @Override
     public Executor getExecutor() {
 
         return getLocalService().getExecutorService();
@@ -154,18 +156,21 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * QuorumPipeline
      */
     
+    @Override
     public HAReceiveService<HAWriteMessage> getHAReceiveService() {
         
         return pipelineImpl.getHAReceiveService();
         
     }
 
+    @Override
     public HASendService getHASendService() {
         
         return pipelineImpl.getHASendService();
         
     }
 
+    @Override
     public Future<Void> receiveAndReplicate(HAWriteMessage msg)
             throws IOException {
         
@@ -173,6 +178,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         
     }
 
+    @Override
     public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
             throws IOException {
     
@@ -201,6 +207,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * QuorumCommit.
      */
 
+    @Override
     public void abort2Phase(final long token) throws IOException,
             InterruptedException {
 
@@ -208,6 +215,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     }
 
+    @Override
     public void commit2Phase(final long token, final long commitTime)
             throws IOException, InterruptedException {
 
@@ -215,6 +223,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     }
 
+    @Override
     public int prepare2Phase(final boolean isRootBlock0,
             final IRootBlockView rootBlock, final long timeout,
             final TimeUnit unit) throws InterruptedException, TimeoutException,
@@ -224,10 +233,20 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     }
 
+    @Override
+    public long getLastCommitTime() {
+
+        final L localService = getLocalService();
+
+        return localService.getLastCommitTime();
+        
+    }
+    
     /*
      * QuorumRead
      */
 
+    @Override
     public byte[] readFromQuorum(UUID storeId, long addr)
             throws InterruptedException, IOException {
 

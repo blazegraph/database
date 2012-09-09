@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum;
 
+import java.util.Map;
 import java.util.UUID;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
@@ -388,7 +389,8 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         /*
          * Should be two timestamps for which services have voted (but we can
          * only. check the one that enacted the change since that is the only
-         * one for which the update is guaranteed to be visible).
+         * one for which the update is guaranteed to be visible without awaiting
+         * the Condition).
          */
 //        assertEquals(2, quorum0.getVotes().size());
         assertEquals(2, quorum1.getVotes().size());
@@ -403,8 +405,8 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // wait for quorums to meet (visibility guarantee).
         final long token1 = quorum0.awaitQuorum();
-        quorum1.awaitQuorum();
-        quorum2.awaitQuorum();
+        assertEquals(token1, quorum1.awaitQuorum());
+        assertEquals(token1, quorum2.awaitQuorum());
         
         // The last consensus timestamp should have been updated for all quorum members.
         assertEquals(lastCommitTime1, client0.lastConsensusValue);
@@ -478,9 +480,12 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                 assertEquals(-1L, client2.lastConsensusValue);
 
                 // Should be no timestamps for which services have voted.
-                assertEquals(0, quorum0.getVotes().size());
-                assertEquals(0, quorum1.getVotes().size());
-                assertEquals(0, quorum2.getVotes().size());
+                final Map<Long, UUID[]> votes0 = quorum0.getVotes();
+                final Map<Long, UUID[]> votes1 = quorum1.getVotes();
+                final Map<Long, UUID[]> votes2 = quorum2.getVotes();
+                assertEquals(AbstractQuorumTestCase.toString(votes0), 0, votes0.size());
+                assertEquals(AbstractQuorumTestCase.toString(votes1), 0, votes1.size());
+                assertEquals(AbstractQuorumTestCase.toString(votes2), 0, votes2.size());
 
                 // Verify the specific services voting for each timestamp.
                 assertEquals(null, quorum0.getVotes().get(lastCommitTime1));

@@ -103,7 +103,11 @@ public class TestAll extends TestCase {
 	         */
 	        suite.addTestSuite(TestHA3QuorumSemantics.class);
 	
-	        suite.addTest(StressTestHA3.suite());
+            /*
+             * Run the test HA3 suite a bunch of times.
+             */
+            suite.addTest(StressTestHA3.suite());
+
         }
         
         return suite;

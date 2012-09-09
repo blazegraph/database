@@ -53,7 +53,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         return member.getService(serviceId);
         
     }
-    
+
     /**
      * Cancel the requests on the remote services (RMI). This is a best effort
      * implementation. Any RMI related errors are trapped and ignored in order

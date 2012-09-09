@@ -54,7 +54,7 @@ import java.util.UUID;
  * <dt>{@link #pipelineAdd()}</dt>
  * <dd>member.</dd>
  * <dt>{@link #castVote(long)}</dt>
- * <dd>member, pipeline.</dd>
+ * <dd>member (service implicitly joins pipeline if not present).</dd>
  * <dt>{@link #serviceJoin()}</dt>
  * <dd>member, pipeline, consensus around cast vote, predecessor in the vote
  * order is joined</dd>
@@ -129,12 +129,13 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
     void pipelineRemove();
 
     /**
-     * Cast a vote on the behalf of the associated service. If the service has
-     * already voted for some other lastCommitTime, then that vote is withdrawn
-     * before the new vote is cast. Services do not withdraw their cast votes
-     * until a quorum breaks and a new consensus needs to be established. When
-     * it does, then need to consult their root blocks and vote their then
-     * current lastCommitTime.
+     * Cast a vote on the behalf of the associated service. If the service is
+     * not part of the pipeline, then it is implicitly added to the pipeline. If
+     * the service has already voted for some other lastCommitTime, then that
+     * vote is withdrawn before the new vote is cast. Services do not withdraw
+     * their cast votes until a quorum breaks and a new consensus needs to be
+     * established. When it does, then need to consult their root blocks and
+     * vote their then current lastCommitTime.
      * <p>
      * When a service needs to re-synchronize with a quorum, it initially votes
      * its current lastCommitTime. Once the service is receiving writes from the

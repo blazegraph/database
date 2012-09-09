@@ -32,7 +32,6 @@ import java.rmi.Remote;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.concurrent.TimeoutException;
 import com.bigdata.journal.AbstractJournal;
 
 /**

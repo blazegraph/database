@@ -27,14 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum;
 
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
 /**
  * Abstract base class for testing using a {@link MockQuorumFixture}.
@@ -174,36 +178,40 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
     static public void assertCondition(final Runnable cond,
             final long timeout, final TimeUnit units) {
         final long begin = System.nanoTime();
-        long nanos = units.toNanos(timeout);
-        // remaining -= (now - begin) [aka elapsed]
-        nanos -= System.nanoTime() - begin;
+        final long nanos = units.toNanos(timeout);
+        long remaining = nanos;
+        // remaining = nanos - (now - begin) [aka elapsed]
+        remaining = nanos - (System.nanoTime() - begin);
         while (true) {
-            AssertionFailedError cause = null;
             try {
                 // try the condition
                 cond.run();
                 // success.
                 return;
-            } catch (AssertionFailedError e) {
-                nanos -= System.nanoTime() - begin;
-                if (nanos < 0) {
+            } catch (final AssertionFailedError e) {
+                remaining = nanos - (System.nanoTime() - begin);
+                if (remaining < 0) {
                     // Timeout - rethrow the failed assertion.
                     throw e;
                 }
-                cause = e;
-            }
-            // Sleep up to 10ms or the remaining nanos, which ever is less.
-            final int millis = (int) Math.min(TimeUnit.NANOSECONDS
-                    .toMillis(nanos), 10);
-            if (log.isInfoEnabled())
-                log.info("Will retry: millis=" + millis + ", cause=" + cause);
-            // sleep and retry.
-            try {
-                Thread.sleep(millis);
-            } catch (InterruptedException e1) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
+                // Sleep up to 10ms or the remaining nanos, which ever is less.
+                final int millis = (int) Math.min(
+                        TimeUnit.NANOSECONDS.toMillis(remaining), 10);
+                if (millis > 0) {
+                    // sleep and retry.
+                    try {
+                        Thread.sleep(millis);
+                    } catch (InterruptedException e1) {
+                        // propagate the interrupt.
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    remaining = nanos - (System.nanoTime() - begin);
+                    if (remaining < 0) {
+                        // Timeout - rethrow the failed assertion.
+                        throw e;
+                    }
+                }
             }
         }
     }
@@ -223,6 +231,50 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
     static public void assertCondition(final Runnable cond) {
         
         assertCondition(cond, 5, TimeUnit.SECONDS);
+        
+    }
+
+    /**
+     * Helper method provides nice rendering of a votes snapshot.
+     * <p>
+     * Note: The snapshot uses a {@link UUID}[] rather than a collection for
+     * each <code>lastCommitTime</code> key. However, by default toString() for
+     * an array does not provide a nice rendering.
+     * 
+     * @param votes
+     *            The votes.
+     * @return The human readable representation.
+     */
+    public static String toString(final Map<Long, UUID[]> votes) {
+
+        // put things into a ordered Collection. toString() for the Collection is nice.
+        final Map<Long, LinkedHashSet<UUID>> m = new LinkedHashMap<Long, LinkedHashSet<UUID>>();
+        
+        for(Map.Entry<Long,UUID[]> e : votes.entrySet()) {
+            
+            final Long commitTime = e.getKey();
+
+            final UUID[] a = e.getValue();
+
+            LinkedHashSet<UUID> votesForCommitTime = m.get(commitTime);
+
+            if(votesForCommitTime == null) {
+
+                votesForCommitTime = new LinkedHashSet<UUID>();
+
+                m.put(commitTime, votesForCommitTime);
+                
+            }
+            
+            for (UUID uuid : a) {
+            
+                votesForCommitTime.add(uuid);
+
+            }
+            
+        }
+        
+        return m.toString();
         
     }
     
