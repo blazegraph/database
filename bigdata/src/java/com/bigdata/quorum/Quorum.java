@@ -148,10 +148,26 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
     boolean isHighlyAvailable();
 
     /**
-     * Return true iff the #of services joined with the quorum is GTE (k + 1). A
-     * service with a met quorum is highly available <em>in practice</em>.
+     * Return true iff the #of services joined with the quorum is GTE
+     * <code>(k + 1)/2</code>. A service with a met quorum is highly available
+     * <em>in practice</em>.
      */
     boolean isQuorumMet();
+
+    /**
+     * Return true iff the #of services joined with the quorum EQUALS
+     * <code>k</code> AND the provided quorum token is valid. A service with a
+     * fully met quorum may be eligible to release storage associated with
+     * historical allocations since it does not need to maintain history in
+     * support of resynchronization of disconnected quorum services.
+     * 
+     * @param token
+     *            The quorum token.
+     * 
+     * @throws QuorumException
+     *             if the token is no longer valid.
+     */
+    boolean isQuorumFullyMet(long token);
 
     /**
      * Add a listener

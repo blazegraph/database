@@ -1001,7 +1001,27 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     }
 
     final public boolean isQuorumMet() {
+
         return token != NO_QUORUM;
+        
+    }
+    
+    final public boolean isQuorumFullyMet(final long token) {
+        
+        lock.lock();
+
+        try {
+            
+            assertQuorum(token);
+
+            return joined.size() == k;
+
+        } finally {
+
+            lock.unlock();
+            
+        }
+        
     }
 
     /**
