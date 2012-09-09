@@ -3126,7 +3126,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		} else {
 
 			// Read the commit record from the store.
-			return CommitRecordSerializer.INSTANCE.deserialize(_bufferStrategy.read(commitRecordAddr));
+            return CommitRecordSerializer.INSTANCE.deserialize(_bufferStrategy
+                    .read(commitRecordAddr));
 
 		}
 
@@ -3451,6 +3452,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		try {
 
+            if (log.isDebugEnabled())
+                log.debug("Loading from addr=" + addr);
+		    
 			return getCommitRecordIndex(addr);
 
 		} catch (RuntimeException ex) {
@@ -3545,11 +3549,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	private boolean isHistoryGone(final long commitTime) {
 
 	    if (this._bufferStrategy instanceof IRWStrategy) {
-	            if (commitTime <= ((IRWStrategy) _bufferStrategy).getLastReleaseTime()) {
-	                return true; // no index available
-	            }
-	        }
+
+	        final long lastReleaseTime = ((IRWStrategy) _bufferStrategy)
+                    .getLastReleaseTime();
+	        
+            if (commitTime <= lastReleaseTime) {
+            
+                if (log.isDebugEnabled())
+                    log.info("History gone: commitTime=" + commitTime);
+                
+                return true; // no index available
+                
+            }
+
+	    }
+	    
 	    return false;
+	    
 	}
 	
     /**
@@ -3565,24 +3581,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         if (isHistoryGone(commitTime))
             return null;
-	    
-//		if (this._bufferStrategy instanceof RWStrategy) {
-//            /*
-//             * There are some bigdata releases (such as 1.0.4) where the commit
-//             * record index was not pruned when deferred deletes were recycled.
-//             * By maintaining this test, we will correctly refuse to return a
-//             * commit record for a commit point whose deferred deletes have been
-//             * recycled, even when the commit record is still present in the
-//             * commit record index.
-//             * 
-//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/480
-//             */
-//			if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
-//				return null; // no index available
-//			}
-//		}
 
-		final ReadLock lock = _fieldReadWriteLock.readLock();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
 
 		lock.lock();
 
@@ -4967,10 +4967,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						// set the new root block.
 						_rootBlock = rootBlock;
 
-						final QuorumService<HAGlue> localService = quorum.getClient();
-						
-                        if (localService.isFollower(rootBlock.getQuorumToken())) {
-                            
+                        final QuorumService<HAGlue> localService = quorum
+                                .getClient();
+
+                        final boolean follower = localService
+                                .isFollower(rootBlock.getQuorumToken());
+
+                        if (follower) {
+
                             /*
                              * Ensure allocators are synced after commit. This
                              * is only done for the followers. The leader has
@@ -4986,10 +4990,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                             ((IHABufferStrategy) _bufferStrategy)
                                     .resetFromHARootBlock(_rootBlock);
                             
+                            /*
+                             * Clear reference and reload from the store.
+                             * 
+                             * The leader does not need to do this since it is
+                             * writing on the unisolated commit record index and
+                             * thus the new commit record is already visible in
+                             * the commit record index before the commit.
+                             * However, the follower needs to do this since it
+                             * will otherwise not see the new commit points.
+                             */
+                
+                            _commitRecordIndex = _getCommitRecordIndex();
+
                         }
 
 						// reload the commit record from the new root block.
-						_commitRecord = _getCommitRecord();
+                        _commitRecord = _getCommitRecord();
 
 						prepareRequest.set(null/* discard */);
 
