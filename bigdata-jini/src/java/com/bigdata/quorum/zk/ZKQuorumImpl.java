@@ -1197,7 +1197,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         private final AtomicReference<ExecutorService> watcherServiceRef = new AtomicReference<ExecutorService>();
         
         /**
-         * @param logicalServiceId
+         * @param logicalServiceZPath
          */
         protected ZkQuorumWatcher(final String logicalServiceZPath) {
 
