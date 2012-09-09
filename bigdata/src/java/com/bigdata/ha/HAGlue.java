@@ -66,10 +66,6 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      *            journal).
      * 
      * @return The root block.
-     * 
-     *         TODO Whether or not we send the rootBlock0 flag depends on
-     *         whether or not resynchronization guarantees that the root blocks
-     *         (both of them) are the same for all services in the quorum.
      */
     byte[] getRootBlock(UUID storeId) throws IOException;
 
