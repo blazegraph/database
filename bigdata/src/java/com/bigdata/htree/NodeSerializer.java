@@ -174,7 +174,8 @@ public class NodeSerializer {
     /**
      * The default initial capacity multiplier for the (de-)serialization buffer.
      * The total initial buffer capacity is this value times the
-     * {@link #branchingFactor}.
+     * effective branching factor, which is computed from the addressBits
+     * constructor parameter.
      */
     public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 / 4;
     
@@ -195,21 +196,17 @@ public class NodeSerializer {
      *            An object that knows how to construct {@link INodeData}s and
      *            {@link ILeafData leaves}.
      * 
-     * @param branchingFactor
-     *            The branching factor for target B+Tree. For the
-     *            {@link IndexSegmentBuilder} this should be the branching
-     *            factor of the {@link IndexSegment} which is being generated.
-     *            Otherwise it is the branching factor of the
-     *            {@link AbstractBTree} itself.
+     * @param addressBits
+     *            The #of address bits for target {@link HTree}.
      * 
      * @param initialBufferCapacity
      *            The initial capacity for internal buffer used to serialize
      *            nodes and leaves. The buffer will be resized as necessary
      *            until it is sufficient for the records being serialized for
-     *            the {@link BTree}. When zero (0), a default is used. A
+     *            the {@link HTree}. When zero (0), a default is used. A
      *            non-zero value is worth specifying only when the actual buffer
      *            size is consistently less than the default for some
-     *            {@link BTree}. See {@link #DEFAULT_BUFFER_CAPACITY_PER_ENTRY}
+     *            {@link HTree}. See {@link #DEFAULT_BUFFER_CAPACITY_PER_ENTRY}
      * 
      * @param indexMetadata
      *            The {@link IndexMetadata} record for the index.
@@ -228,7 +225,7 @@ public class NodeSerializer {
     public NodeSerializer(//
             final IAddressManager addressManager,
             final INodeFactory nodeFactory,//
-            final int branchingFactor,
+            final int addressBits,//
             final int initialBufferCapacity, //
             final IndexMetadata indexMetadata,//
             final boolean readOnly,//
@@ -275,6 +272,9 @@ public class NodeSerializer {
         } else {
             
             if (initialBufferCapacity == 0) {
+                
+                // The effective branching factor.
+                final int branchingFactor = (1 << addressBits);
                 
                 this.initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
                         * branchingFactor;

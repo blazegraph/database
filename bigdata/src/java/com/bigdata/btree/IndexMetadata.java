@@ -288,11 +288,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * A large maximum write retention queue capacity. A reasonable value
-         * with a large heap is generally in 8000 to 50000. The larger values
-         * are of benefit only if you are doing sustained writes on the index
-         * and have a large java heap.
+         * with a large heap is generally in 4000 to 8000, depending on the
+         * branching factor. The impact on the JVM heap is a function of both
+         * the write retention queue capacity and the B+Tree branching factor.
+         * Larger values are of benefit if you are doing sustained writes on the
+         * index and have a large java heap (and even then, GC will probably
+         * prevent values larger than 10000 from being useful).
          */
-        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 500000;
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 50000;
         
          /*
          * Options that apply to FusedViews as well as to AbstractBTrees.

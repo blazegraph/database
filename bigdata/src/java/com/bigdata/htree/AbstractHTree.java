@@ -72,9 +72,14 @@ abstract public class AbstractHTree implements ICounterSetAccess,
     protected static final String ERROR_LESS_THAN_ZERO = "Less than zero";
 
     /**
+     * A parameter was too small
+     */
+    protected static final String ERROR_TOO_SMALL = "Too small: ";
+
+    /**
      * A parameter was too large.
      */
-    protected static final String ERROR_TOO_LARGE = "Too large";
+    protected static final String ERROR_TOO_LARGE = "Too large: ";
 
     /**
      * The index is read-only but a mutation operation was requested.
@@ -87,6 +92,17 @@ abstract public class AbstractHTree implements ICounterSetAccess,
 	 */
 	final protected static String ERROR_TRANSIENT = "Transient";
 
+	final public int MIN_ADDRESS_BITS = 1;
+    /**
+     * The maximum value for the <code>addressBits</code> parameter.
+     * <p>
+     * Note: <code>1^32</code> overflows an int32. However, <code>2^16</code> is
+     * 65536 which is a pretty large page. <code>2^20</code> is 1,048,576. It is
+     * pretty difficult to imagine use cases where the fan out for the
+     * {@link HTree} should be that large.
+     */
+	final public int MAX_ADDRESS_BITS = 16;
+	
 	private static final transient Logger log = Logger
 			.getLogger(AbstractHTree.class);
 
@@ -1043,20 +1059,15 @@ abstract public class AbstractHTree implements ICounterSetAccess,
         this.readOnly = readOnly;
 
         this.addressBits = metadata.getAddressBits();
-        
-        if (addressBits <= 0)
-            throw new IllegalArgumentException();
 
-        if (addressBits > 16) {
-            /*
-             * NB: 1<<32 overflows an int32. However, 2^16 is 65536 which is a
-             * pretty large page. 2^20 is 1,048,576. It is pretty difficult to
-             * imagine use cases where the fan out for the HTree should be that
-             * large.
-             */
-            throw new IllegalArgumentException();
-        }
-        
+        if (addressBits < MIN_ADDRESS_BITS)
+            throw new IllegalArgumentException(ERROR_TOO_SMALL + "addressBits="
+                    + addressBits);
+
+        if (addressBits > MAX_ADDRESS_BITS)
+            throw new IllegalArgumentException(ERROR_TOO_LARGE + "addressBits="
+                    + addressBits);
+
         /**
          * FIXME: add bucketSlots to IndexMataData
          */
