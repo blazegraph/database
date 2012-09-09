@@ -51,13 +51,16 @@ import java.util.UUID;
  * connection, then zookeeper will the <i>ephemeral</i> znodes for that client.
  * The <i>order</i> in which other clients observe those state changes in
  * essentially arbitrary.
+ * <p>
+ * Implementations of this interface must not block in the event thread.
  * 
  * @see QuorumMember
  * @see QuorumActor
  * @see QuorumWatcher
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: QuorumStateChangeListener.java 4069 2011-01-09 20:58:02Z
+ *          thompsonbry $
  */
 public interface QuorumStateChangeListener {
 
