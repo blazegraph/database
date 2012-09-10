@@ -2116,7 +2116,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 // the total length of this code in bits.
                 final long codeLength = O_to - O_from;
 
-                assert codeLength >= 0;
+                assert codeLength >= 0 : "codeLength=" + codeLength;
                 
                 /*
                  * Copy the decoded symbols into the buffer.
