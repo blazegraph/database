@@ -76,6 +76,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.PIDUtil;
+import com.bigdata.ha.HAGlue;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.util.JiniUtil;
@@ -122,11 +123,13 @@ import com.sun.jini.start.ServiceStarter;
  * Services may be <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
  * the Jini service browser. Note that all persistent data associated with that
  * service is also destroyed!
- * <p>
- * Note: This class was cloned from the com.bigdata.service.jini package.
+ * 
+ * TODO This class was cloned from the com.bigdata.service.jini package.
  * Zookeeper support was stripped out and the class was made to align with a
  * write replication pipeline for {@link HAJournal} rather than with a
- * federation of bigdata services.
+ * federation of bigdata services. However, {@link HAGlue} now extends
+ * {@link IService} and we are using zookeeper, so maybe we can line these base
+ * classes up again?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -137,11 +140,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     final static private Logger log = Logger.getLogger(AbstractServer.class);
 
     public interface ConfigurationOptions {
-
-        /**
-         * The pathname of the service directory as a {@link File} (required).
-         */
-        String SERVICE_DIR = "serviceDir";
 
         /**
          * A {@link String}[] whose values are the group(s) to be used for
@@ -168,6 +166,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         String ENTRIES = "entries";
         
         /**
+         * The pathname of the service directory as a {@link File} (required).
+         */
+        String SERVICE_DIR = "serviceDir";
+
+//        String LOGICAL_SERVICE_ZPATH = "logicalServiceZPath";
+
+        /**
          * This object is used to export the service proxy. The choice here
          * effects the protocol that will be used for communications between the
          * clients and the service. The default {@link Exporter} if none is
@@ -175,7 +180,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * {@link TcpServerEndpoint}.
          */
         String EXPORTER = "exporter";
-        
+
         /**
          * The timeout in milliseconds to await the discovery of a service if
          * there is a cache miss (default {@value #DEFAULT_CACHE_MISS_TIMEOUT}).

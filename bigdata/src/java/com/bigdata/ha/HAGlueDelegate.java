@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
@@ -116,6 +117,41 @@ public class HAGlueDelegate implements HAGlue {
     @Override
     public void destroy() throws RemoteException {
         delegate.destroy();
+    }
+
+    @Override
+    public long nextTimestamp() throws IOException {
+        return delegate.nextTimestamp();
+    }
+
+    @Override
+    public long newTx(long timestamp) throws IOException {
+        return delegate.newTx(timestamp);
+    }
+
+    @Override
+    public long commit(long tx) throws ValidationError, IOException {
+        return delegate.commit(tx);
+    }
+
+    @Override
+    public void abort(long tx) throws IOException {
+        delegate.abort(tx);
+    }
+
+    @Override
+    public void notifyCommit(long commitTime) throws IOException {
+        delegate.notifyCommit(commitTime);
+    }
+
+    @Override
+    public long getLastCommitTime() throws IOException {
+        return delegate.getLastCommitTime();
+    }
+
+    @Override
+    public long getReleaseTime() throws IOException {
+        return delegate.getReleaseTime();
     }
 
 }

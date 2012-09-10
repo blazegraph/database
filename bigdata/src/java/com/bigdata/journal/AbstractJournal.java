@@ -4640,12 +4640,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * We do not need to discard read-only tx since the committed
                  * state should remain valid even when a quorum is lost.
                  * 
-                 * TODO QUORUM TX INTEGRATION
+                 * FIXME QUORUM TX INTEGRATION (discard running read/write tx).
                  */
                 
                 // local abort (no quorum, so we can do 2-phase abort).
                 _abort();
-
+//                getLocalTransactionManager().
+                
                 /*
                  * Note: We can not re-cast our vote until our last vote is
                  * widthdrawn. That is currently done by QuorumWatcherBase. So,
@@ -4793,12 +4794,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
 
+        @Override
         public UUID getServiceId() {
 
             return serviceId;
             
 		}
 
+        @Override
         public InetSocketAddress getWritePipelineAddr() {
             
             return writePipelineAddr;
@@ -4825,6 +4828,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * should all agree on whether they should be writing rootBlock0 or
          * rootBlock1.
          */
+        @Override
         public Future<Boolean> prepare2Phase(final boolean isRootBlock0,
                 final byte[] tmp, final long timeout, final TimeUnit unit) {
 
@@ -4842,8 +4846,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 haLog.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
                         + rootBlock + ", timeout=" + timeout + ", unit=" + unit);
 
-			if (rootBlock.getLastCommitTime() <= getLastCommitTime())
-				throw new IllegalStateException();
+            if (rootBlock.getLastCommitTime() <= AbstractJournal.this
+                    .getLastCommitTime()) {
+
+                throw new IllegalStateException();
+                
+            }
 
 			quorum.assertQuorum(rootBlock.getQuorumToken());
 
@@ -4934,6 +4942,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 		}
 
+        @Override
 		public Future<Void> commit2Phase(final long commitTime) {
 
             if (haLog.isInfoEnabled())
@@ -5035,6 +5044,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		}
 
+        @Override
         public Future<Void> abort2Phase(final long token) {
 
             if (haLog.isInfoEnabled())
@@ -5127,6 +5137,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		}
 
+        @Override
         public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
                 throws IOException {
 
@@ -5157,6 +5168,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
 		}
 
+        @Override
         public byte[] getRootBlock(final UUID storeId) {
 
             // storeId is optional (used in scale-out).
@@ -5176,6 +5188,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
+        @Override
         public Future<Void> bounceZookeeperConnection() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
@@ -5193,6 +5206,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * <p>
          * This implementation does pipeline remove() followed by pipline add().
          */
+        @Override
         public Future<Void> moveToEndOfPipeline() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 public void run() {
@@ -5205,6 +5219,49 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }, null/* result */);
             getExecutorService().execute(ft);
             return getProxy(ft);
+        }
+
+        /*
+         * ITransactionService.
+         * 
+         * Note: API is mostly implemented by Journal/HAJournal.
+         */
+        
+        @Override
+        public long newTx(long timestamp) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long commit(long tx) throws ValidationError, IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void abort(long tx) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public void notifyCommit(long commitTime) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long getLastCommitTime() throws IOException {
+            
+            return AbstractJournal.this.getLastCommitTime();
+            
+        }
+
+        @Override
+        public long getReleaseTime() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long nextTimestamp() throws IOException {
+            throw new UnsupportedOperationException();
         }
 
         /*

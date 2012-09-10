@@ -180,7 +180,7 @@ abstract public class JiniServiceConfiguration extends
     /**
      * @param fed
      * @param listener
-     * @param logicalServiceZPath
+     * @param zpath
      *            This zpath of the logicalService instance.
      * @param attributes
      *            This provides the information required to restart a persistent

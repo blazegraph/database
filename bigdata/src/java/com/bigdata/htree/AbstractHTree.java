@@ -21,6 +21,7 @@ import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.EntryScanIterator;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICheckpointProtocol;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITuple;
@@ -952,6 +953,16 @@ abstract public class AbstractHTree implements ICounterSetAccess,
         
     }
     
+    /**
+     * The object responsible for (de-)serializing the nodes and leaves of the
+     * {@link IIndex}.
+     */
+    final public NodeSerializer getNodeSerializer() {
+
+        return nodeSer;
+
+    }
+
     /**
 	 * The root of the {@link HTree}. This is always a {@link DirectoryPage}.
 	 * <p>

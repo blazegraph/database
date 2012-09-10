@@ -178,7 +178,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         String SERVICE_DIR = "serviceDir";
         
         /**
-         * @todo javadoc.
+         * The zpath of the logical service. The service must use
+         * {@link CreateMode#EPHEMERAL_SEQUENTIAL} to create a child of this
+         * zpath to represent itself.
          */
         String LOGICAL_SERVICE_ZPATH = "logicalServiceZPath";
 

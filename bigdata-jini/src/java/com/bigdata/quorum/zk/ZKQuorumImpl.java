@@ -1210,15 +1210,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             
             super.start();
 
-            /*
-             * FIXME Resolve source of recursion and how to handle them.
-             */
             watcherServiceRef.set(Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
                             .getName())));
-//            watcherServiceRef.set(Executors
-//                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
-//                            .getName())));
             try {
 
                 /*

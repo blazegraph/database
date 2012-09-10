@@ -1515,4 +1515,68 @@ public class BytesUtil {
 
 	}
 
+    static private final char[] HEX_CHAR_TABLE = {
+        '0', '1','2','3',
+        '4','5','6','7',
+        '8','9','a','b',
+        'c','d','e','f'
+       };    
+
+    /**
+     * Utility to convert a byte array to a hex string.
+     * 
+     * @param buf
+     *            The data.
+     *            
+     * @return The hex string.
+     */
+    static public String toHexString(final byte[] buf) {
+        
+        return toHexString(buf, buf.length);
+        
+    }
+    
+    /**
+     * Utility to display byte array of maximum i bytes as hexString.
+     * 
+     * @param buf
+     *            The data.
+     * @param n
+     *            The #of bytes to convert.
+     * 
+     * @return The hex string.
+     */
+    static public String toHexString(final byte[] buf, int n) {
+        n = n < buf.length ? n : buf.length;
+        final StringBuffer out = new StringBuffer();
+        for (int i = 0; i < n; i++) {
+            final int v = buf[i] & 0xFF;
+            out.append(HEX_CHAR_TABLE[v >>> 4]);
+            out.append(HEX_CHAR_TABLE[v & 0xF]);
+        }
+        return out.toString();
+    }
+
+    /**
+     * Formats hex dta into 64 byte rows.
+     * 
+     * @param sb
+     *            Where to format the data.
+     * @param hexData
+     *            The data.
+     */
+    static public void printHexString(final StringBuilder sb,
+            final String hexData) {
+        
+        int rem = hexData.length();
+        int curs = 0;
+        while (rem >= 64) {
+            sb.append(String.format("%8d: ", curs));
+            sb.append(hexData.substring(curs, curs + 64) + "\n");
+            curs += 64;
+            rem -= 64;
+        }
+
+    }
+
 }

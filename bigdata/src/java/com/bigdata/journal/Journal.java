@@ -337,6 +337,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              */
             final private ConcurrentHashMap<Long, IRawTx> m_rawTxs = new ConcurrentHashMap<Long, IRawTx>();
 
+            // Note: This is the implicit constructor call.
 			{
                 
                 final long lastCommitTime = Journal.this.getLastCommitTime();
@@ -352,6 +353,315 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                     
                 }
                 
+            }
+
+            /*
+             * HA Quorum Overrides.
+             * 
+             * Note: The basic pattern is that the quorum must be met, a leader
+             * executes the operation directly, and a follower delegates the
+             * operation to the leader. This centralizes the decisions about the
+             * open transactions, and the read locks responsible for pinning
+             * commit points, on the leader.
+             * 
+             * If the journal is not highly available, then the request is
+             * passed to the base class (JournalTransactionService, which
+             * extends AbstractTransactionService).
+             */
+			
+			@Override
+            public long newTx(final long timestamp) {
+
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    return super.newTx(timestamp);
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    return super.newTx(timestamp);
+
+                }
+                
+                /*
+                 * The transaction needs to be allocated by the leader.
+                 * 
+                 * Note: Heavy concurrent query on a HAJournal will pin history
+                 * on the leader. However, the lastReleaseTime will advance
+                 * since clients will tend to read against the then current
+                 * lastCommitTime, so we will still recycle the older commit
+                 * points once there is no longer an active reader for those
+                 * commit points.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+                
+                final long tx;
+                try {
+
+                    // delegate to the quorum leader.
+                    tx = leaderService.newTx(timestamp);
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return tx;
+
+            }
+			
+            @Override
+            public long commit(final long tx) {
+
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    return super.commit(tx);
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    return super.commit(tx);
+
+                }
+                
+                /*
+                 * Delegate to the quorum leader.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+                
+                final long commitTime;
+                try {
+
+                    // delegate to the quorum leader.
+                    commitTime = leaderService.commit(tx);
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return commitTime;
+
+            }
+            
+            @Override
+            public void abort(final long tx) {
+
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    super.abort(tx);
+                    
+                    return;
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    super.abort(tx);
+                    
+                    return;
+
+                }
+                
+                /*
+                 * Delegate to the quorum leader.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+                
+                try {
+
+                    // delegate to the quorum leader.
+                    leaderService.abort(tx);
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return;
+
+            }
+
+            @Override
+            public void notifyCommit(final long commitTime) {
+                
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    super.notifyCommit(commitTime);
+                    
+                    return;
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    super.notifyCommit(commitTime);
+                    
+                    return;
+
+                }
+                
+                /*
+                 * Delegate to the quorum leader.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+                
+                try {
+
+                    // delegate to the quorum leader.
+                    leaderService.notifyCommit(commitTime);
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return;
+
+            }
+
+            @Override
+            public long getReleaseTime() {
+                
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    return super.getReleaseTime();
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    return super.getReleaseTime();
+                    
+                }
+                
+                /*
+                 * Delegate to the quorum leader.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+
+                final long releaseTime;
+                try {
+
+                    // delegate to the quorum leader.
+                    releaseTime = leaderService.getReleaseTime();
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return releaseTime;
+
+            }
+
+            @Override
+            public long nextTimestamp(){
+            
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+
+                if (quorum == null) {
+
+                    // Not HA. 
+                    return super.nextTimestamp();
+
+                }
+
+                final long token = getQuorumToken();
+
+                if (quorum.getMember().isLeader(token)) {
+
+                    // HA and this is the leader.
+                    return super.nextTimestamp();
+                    
+                }
+                
+                /*
+                 * Delegate to the quorum leader.
+                 */
+                
+                final HAGlue leaderService = quorum.getMember()
+                        .getLeader(token);
+
+                final long nextTimestamp;
+                try {
+
+                    // delegate to the quorum leader.
+                    nextTimestamp = leaderService.nextTimestamp();
+
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // Make sure the quorum is still valid.
+                quorum.assertQuorum(token);
+
+                return nextTimestamp;
+
             }
             
             protected void activateTx(final TxState state) {

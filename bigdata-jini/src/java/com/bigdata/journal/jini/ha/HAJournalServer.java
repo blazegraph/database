@@ -140,6 +140,9 @@ public class HAJournalServer extends AbstractServer {
      * recognizing a critical set of [k] distinct services. We could also handle
      * this by explicitly declaring the UUIDs of those services. That tends to
      * be robust.
+     * 
+     * This also needs to be reconciled with the federation.  The federation uses
+     * ephemeral sequential to create the logical service identifiers.
      */
     private String logicalServiceId;
     
@@ -175,13 +178,20 @@ public class HAJournalServer extends AbstractServer {
         }
 
         try {
+            
             if (jettyServer != null) {
+
                 // Shut down the NanoSparqlServer.
                 jettyServer.stop();
+                
                 jettyServer = null;
+                
             }
+
         } catch (Exception e) {
+        
             log.error(e);
+            
         }
         
         super.terminate();
