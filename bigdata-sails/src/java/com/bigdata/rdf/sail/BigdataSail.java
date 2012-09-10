@@ -656,6 +656,18 @@ public class BigdataSail extends SailBase implements Sail {
         // throws an exception if there are inconsistent properties
         checkProperties(properties);
         
+        /*
+         * Note: We need to make this operation mutually exclusive with KB level
+         * writers in order to avoid the possibility of a triggering a commit
+         * during the middle of a BigdataSailConnection level operation (or visa
+         * versa).
+         */
+        try {
+            // acquire the unisolated connection permit.
+            journal.acquireUnisolatedConnection();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         try {
             
 //            final boolean create;
@@ -740,6 +752,10 @@ public class BigdataSail extends SailBase implements Sail {
             
             throw new RuntimeException(ex);
             
+        } finally {
+
+            journal.releaseUnisolatedConnection();
+
         }
         
     }
