@@ -36,6 +36,7 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -5162,9 +5163,170 @@ public class RWStore implements IStore, IBufferedWriter {
 	        
 		}
 
-	}  
+	}
 
-//    /**
+	/**
+	 * Simple class to collect up DeleteBlockStats and returned by
+	 * checkDeleteBlocks, called from DumpJournal.
+	 */
+	public static class DeleteBlockStats {
+		int m_commitRecords = 0;;
+		int m_addresses = 0;
+		int m_blobs = 0;
+		int m_badAddresses = 0;
+		HashMap<Integer, Integer> m_freed = new HashMap<Integer, Integer>();
+		ArrayList<Long> m_duplicates = new ArrayList<Long>();
+		ArrayList<String> m_dupData = new ArrayList<String>();
+			
+		public int getCommitRecords() {
+			return m_commitRecords;
+		}
+		
+		public int getddresses() {
+			return m_addresses;
+		}
+		
+		public int getBadAddresses() {
+			return m_badAddresses;
+		}
+		
+		public String toString() {
+			final StringBuilder sb = new StringBuilder();
+			sb.append("CommitRecords: " + m_commitRecords + ", Addresses: " + m_addresses 
+					+ ", Blobs: " + m_blobs + ", bad: " + + m_badAddresses);
+			if (m_duplicates.size() > 0) {
+				for (int i = 0; i < m_duplicates.size(); i++) {
+					sb.append("\nDuplicate: " + m_duplicates.get(i) + "\n");
+					final String hexData = m_dupData.get(i);
+					int rem = hexData.length();
+					int curs = 0;
+					while (rem >= 64) {
+						sb.append(String.format("%8d: ", curs));
+						sb.append(hexData.substring(curs, curs + 64) + "\n");
+						curs += 64;
+						rem -= 64;
+					}
+				}
+			}
+			
+			return sb.toString();
+		}
+	}
+	
+	/**
+	 * Utility to check the deleteBlocks associated with each active CommitRecord
+	 */
+	public DeleteBlockStats checkDeleteBlocks(final AbstractJournal journal) {
+		DeleteBlockStats stats = new DeleteBlockStats();
+
+		/*
+		 * Commit can be called prior to Journal initialisation, in which case
+		 * the commitRecordIndex will not be set.
+		 */
+		final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+		if (commitRecordIndex == null) { // TODO Why is this here?
+			return stats;
+		}
+
+		final ITupleIterator<CommitRecordIndex.Entry> commitRecords = commitRecordIndex
+				.rangeIterator();
+
+		while (commitRecords.hasNext()) {
+
+			final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
+
+			final CommitRecordIndex.Entry entry = tuple.getObject();
+
+			try {
+
+				final ICommitRecord record = CommitRecordSerializer.INSTANCE
+						.deserialize(journal.read(entry.addr));
+
+				final long blockAddr = record
+						.getRootAddr(AbstractJournal.DELETEBLOCK);
+
+				if (blockAddr != 0) {
+
+					checkDeferrals(blockAddr, record.getTimestamp(), stats);
+
+				}
+
+				stats.m_commitRecords++;
+
+			} catch (RuntimeException re) {
+
+				throw new RuntimeException("Problem with entry at "
+						+ entry.addr, re);
+
+			}
+
+		}
+
+		return stats;
+	}
+
+	private void checkDeferrals(final long blockAddr,
+			final long lastReleaseTime, final DeleteBlockStats stats) {
+		final int addr = (int) (blockAddr >> 32);
+		final int sze = (int) blockAddr & 0xFFFFFF;
+
+		if (log.isTraceEnabled())
+			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: "
+					+ sze + " releaseTime: " + lastReleaseTime);
+
+		final byte[] buf = new byte[sze + 4]; // allow for checksum
+		getData(addr, buf);
+		final DataInputStream strBuf = new DataInputStream(
+				new ByteArrayInputStream(buf));
+		m_allocationLock.lock();
+		int totalFreed = 0;
+		try {
+			int nxtAddr = strBuf.readInt();
+
+			int cnt = 0;
+
+			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
+
+				stats.m_addresses++;
+
+				if (nxtAddr > 0) { // Blob
+					stats.m_blobs++;
+					final int bloblen = strBuf.readInt();
+					assert bloblen > 0; // a Blob address MUST have a size
+					nxtAddr = -nxtAddr;
+				}
+
+				if (!isCommitted(nxtAddr)) {
+					stats.m_badAddresses++;
+				}
+				
+				if (stats.m_freed.containsKey(nxtAddr)) {
+					final FixedAllocator alloc = getBlockByAddress(nxtAddr);
+					final byte[] data = new byte[alloc.m_size];
+					
+				    final ByteBuffer bb = ByteBuffer.wrap(data);
+			        final int offset = getOffset(nxtAddr);
+				    final long paddr = alloc.getPhysicalAddress(offset);
+					FileChannelUtility.readAll(m_reopener, bb, paddr);
+
+		            stats.m_dupData.add(toHexString(data, data.length));
+					stats.m_duplicates.add(paddr);
+				} else {
+					stats.m_freed.put(nxtAddr, nxtAddr);
+				}
+
+				nxtAddr = strBuf.readInt();
+			}
+			// now check delete block
+			assert isCommitted(addr);
+		} catch (IOException e) {
+			throw new RuntimeException("Problem freeing deferrals", e);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+	 //    /**
 //     * Only blacklist the addr if not already available, in other words
 //     * a blacklisted address only makes sense if it for previously 
 //     * committed data and not instantly recyclable.
