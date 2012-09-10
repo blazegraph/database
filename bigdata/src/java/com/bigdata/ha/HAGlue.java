@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.service.IService;
 
 /**
@@ -24,7 +25,7 @@ import com.bigdata.service.IService;
  *       the standard jini smart proxy naming pattern.
  */
 public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
-        HACommitGlue, IService {
+        HACommitGlue, ITransactionService, IService {
 
     /*
      * Administrative

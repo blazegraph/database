@@ -422,6 +422,11 @@ public class QueryServlet extends BigdataRDFServlet {
     void doQuery(final HttpServletRequest req, final HttpServletResponse resp)
             throws IOException {
 
+        if (!isReadable(req, resp)) {
+            // HA Quorum in use, but quorum is not met.
+            return;
+        }
+
         final String namespace = getNamespace(req);
 
         final long timestamp = getTimestamp(req);
@@ -939,6 +944,11 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doEstCard(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+        if (!isReadable(req, resp)) {
+            // HA Quorum in use, but quorum is not met.
+            return;
+        }
+        
         final long begin = System.currentTimeMillis();
         
         final String namespace = getNamespace(req);
@@ -1022,6 +1032,11 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     private void doShardReport(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        if (!isReadable(req, resp)) {
+            // HA Quorum in use, but quorum is not met.
+            return;
+        }
 
         if (!getBigdataRDFContext().isScaleOut()) {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,

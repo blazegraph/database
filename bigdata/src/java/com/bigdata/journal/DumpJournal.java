@@ -28,23 +28,40 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.PageStats;
+import com.bigdata.htree.AbstractHTree;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.RelationSchema;
+import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.rwstore.IStore;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.RWStore.DeleteBlockStats;
+import com.bigdata.sparse.GlobalRowStoreSchema;
+import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.stream.Stream;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 
@@ -68,7 +85,23 @@ import com.bigdata.util.InnerCause;
 public class DumpJournal {
 
     private static final Logger log = Logger.getLogger(DumpJournal.class);
+
+    /**
+     * Dump out the Global Row Store.
+     * 
+     * TODO Raise as parameter, put on main(), and clean up the code.
+     */
+    private static final boolean dumpGRS = false;
     
+    /**
+     * Validate the delete blocks (RWStore only). If there are double- deletes
+     * in the delete blocks, then log out more information about those
+     * addresses.
+     * 
+     * TODO Raise as parameter, put on main(), and clean up the code.
+     */
+    private static final boolean validateDeleteBlocks = false;
+
 //    public DumpJournal() {
 //        
 //    }
@@ -91,6 +124,9 @@ public class DumpJournal {
      *            <dd>Dump the records in the indices.</dd>
      *            </dl>
      */
+//    FIXME feature is not finished.  Must differentiate different address types.
+//    *            <dt>-addr ADDR</dt>
+//    *            <dd>Dump the record at that address on the store.</dd>
     public static void main(final String[] args) {
         
 		if (args.length == 0) {
@@ -110,6 +146,8 @@ public class DumpJournal {
         boolean dumpPages = false;
         
         boolean showTuples = false;
+        
+        final List<Long> addrs = new LinkedList<Long>();
         
         for(; i<args.length; i++) {
             
@@ -143,6 +181,14 @@ public class DumpJournal {
             else if(arg.equals("-tuples")) {
                 
                 showTuples = true;
+                
+            }
+            
+            else if(arg.equals("-addr")) {
+                
+                addrs.add(Long.valueOf(args[i + 1]));
+
+                i++;
                 
             }
             
@@ -210,6 +256,17 @@ public class DumpJournal {
                     dumpJournal.dumpJournal(dumpHistory, dumpPages,
                             dumpIndices, showTuples);
 
+                    for(Long addr : addrs) {
+                        
+                        System.out.println("addr=" + addr + ", offset="
+                                + journal.getOffset(addr) + ", length="
+                                + journal.getByteCount(addr));
+
+                        // Best effort attempt to dump the record.
+                        System.out.println(dumpJournal.dumpRawRecord(addr));
+
+                    }
+                    
                 } finally {
                     
                     journal.close();
@@ -336,12 +393,61 @@ public class DumpJournal {
 
             final RWStore store = ((RWStrategy) strategy).getStore();
 
-            final StringBuilder sb = new StringBuilder();
+            {
+                final StringBuilder sb = new StringBuilder();
 
-            store.showAllocators(sb);
+                store.showAllocators(sb);
 
-            System.out.println(sb);
+                System.out.println(sb);
 
+            }
+
+            // Validate the logged delete blocks.
+            if (validateDeleteBlocks) {
+
+                final DeleteBlockStats stats = store.checkDeleteBlocks(journal);
+
+                System.out.println(stats.toString(store));
+                
+                final Set<Integer> duplicateAddrs = stats
+                        .getDuplicateAddresses();
+
+                if(!duplicateAddrs.isEmpty()) {
+                    
+                    for(int latchedAddr : duplicateAddrs) {
+
+                        final byte[] b;
+                        try {
+                            b = store.readFromLatchedAddress(latchedAddr);
+                        } catch (IOException ex) {
+                            log.error("Could not read: latchedAddr="
+                                    + latchedAddr, ex);
+                            continue;
+                        }
+                        final ByteBuffer buf = ByteBuffer.wrap(b);
+                        
+                        final Object obj = decodeData(buf);
+
+                        if (obj == null) {
+                            System.err.println("Could not decode: latchedAddr="
+                                    + latchedAddr);
+                            final StringBuilder sb = new StringBuilder();
+                            BytesUtil.printHexString(sb,
+                                    BytesUtil.toHexString(b, b.length));
+                            System.err.println("Undecoded record:"
+                                    + sb.toString());
+                        } else {
+                            System.err.println("Decoded record: latchedAddr="
+                                    + latchedAddr + " :: class="
+                                    + obj.getClass() + ", object="
+                                    + obj.toString());
+                        }
+                    }
+
+                }
+                
+            }
+            
         }
         
 		final CommitRecordIndex commitRecordIndex = journal
@@ -350,6 +456,12 @@ public class DumpJournal {
 		System.out.println("There are " + commitRecordIndex.getEntryCount()
 				+ " commit points.");
 
+        if (dumpGRS) {
+
+            dumpGlobalRowStore();
+            
+		}
+		
 		if (dumpHistory) {
 
             System.out.println("Historical commit points follow in temporal sequence (first to last):");
@@ -418,6 +530,43 @@ public class DumpJournal {
             throw new IllegalArgumentException();
         
         this.journal = journal;
+
+    }
+    
+    public void dumpGlobalRowStore() {
+        
+        final SparseRowStore grs = journal.getGlobalRowStore(journal
+                .getLastCommitTime());
+        
+        {
+            final Iterator<? extends ITPS> itr = grs
+                    .rangeIterator(GlobalRowStoreSchema.INSTANCE);
+            
+            while(itr.hasNext()) {
+                
+                final ITPS tps = itr.next();
+                
+                System.out.println(tps.toString());
+                
+            }
+            
+        }
+
+        // The schema for "relations".
+        {
+            
+            final Iterator<? extends ITPS> itr = grs
+                    .rangeIterator(RelationSchema.INSTANCE);
+            
+            while(itr.hasNext()) {
+                
+                final ITPS tps = itr.next();
+                
+                System.out.println(tps.toString());
+                
+            }
+            
+        }
 
     }
     
@@ -515,7 +664,7 @@ public class DumpJournal {
 
             }
 
-        }
+        } // while(itr) (next index)
 
         if (pageStats != null) {
 
@@ -553,10 +702,234 @@ public class DumpJournal {
 
                 System.out.println(stats.getDataRow());
 
-			}
+            }
 
         }
         
     } // dumpNamedIndicesMetadata
+
+    /**
+     * Utility method dumps the data associated with an address on the backing
+     * store. A variety of methods are attempted.
+     * 
+     * @param addr
+     *            The address.
+     * 
+     * @return
+     */
+    public String dumpRawRecord(final long addr) {
+
+        if (journal.getBufferStrategy() instanceof IRWStrategy) {
+            /**
+             * TODO When we address this issue, do this test for all stores.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/555">
+             *      Support PSOutputStream/InputStream at IRawStore </a>
+             */
+            final IStore store = ((IRWStrategy) journal.getBufferStrategy())
+                    .getStore();
+            try {
+                final InputStream is = store.getInputStream(addr);
+                try {
+                    // TODO Could dump the stream.
+                } finally {
+                    try {
+                        is.close();
+                    } catch (IOException e) {
+                        // Ignore.
+                    }
+                }
+                return "Address is stream: addr=" + addr;
+            } catch (RuntimeException ex) {
+                // ignore.
+            }
+        }
+        
+        final ByteBuffer buf;
+        try {
+        
+            buf = journal.read(addr);
+            
+        } catch (Throwable t) {
+            
+            final String msg = "Could not read: addr=" + addr + ", ex=" + t;
+            
+            log.error(msg, t);
+            
+            return msg;
+        }
+ 
+        if (buf == null)
+            throw new IllegalArgumentException("Nothing at that address");
+        
+        final Object obj = decodeData(buf);
+        
+        if (obj == null) {
+
+            return "Could not decode: addr=" + addr;
+            
+        } else {
+
+            return obj.toString();
+            
+        }
+
+    }
+
+    /**
+     * Attempt to decode data read from some address using a variety of
+     * mechanisms.
+     * 
+     * @param b
+     *            The data.
+     *            
+     * @return The decoded object -or- <code>null</code> if the object could not
+     *         be decoded.
+     */
+    private Object decodeData(final ByteBuffer buf) {
+
+        if(buf == null)
+            throw new IllegalArgumentException();
+      
+        /*
+         * Note: Always use buf.duplicate() to avoid a side-effect on the
+         * ByteBuffer that we are trying to decode!
+         */
+        
+        try {
+            /**
+             * Note: This handles a lot of cases, including:
+             * 
+             * Checkpoint, IndexMetadata
+             */
+            return SerializerUtil.deserialize(buf.duplicate());
+        } catch (RuntimeException ex) {
+            // fall through
+        }
+
+        /*
+         * TODO Root blocks and what else?
+         */
+        
+        /*
+         * Try to decode an index node/leaf.
+         */
+        {
+            final long commitTime = journal.getLastCommitTime();
+            
+            final Iterator<String> nitr = journal.indexNameScan(
+                    null/* prefix */, commitTime);
+
+            while (nitr.hasNext()) {
+
+                // a registered index.
+                final String name = nitr.next();
+
+                final ICheckpointProtocol ndx = journal.getIndexLocal(name,
+                        commitTime);
+
+                final IndexTypeEnum indexType = ndx.getCheckpoint()
+                        .getIndexType();
+                
+                switch (indexType) {
+                case BTree: {
+                    
+                    final AbstractBTree btree = (AbstractBTree) ndx;
+
+                    final com.bigdata.btree.NodeSerializer nodeSer = btree
+                            .getNodeSerializer();
+                    
+                    try {
+                    
+                        final com.bigdata.btree.data.IAbstractNodeData nodeOrLeaf = nodeSer
+                                .decode(buf.duplicate());
+
+                        log.warn("Record decoded from index=" + name);
+                        
+                        return nodeOrLeaf;
+                        
+                    } catch (Throwable t) {
+                        // ignore.
+                        continue;
+                    }
+                }
+                case HTree: {
+
+                    final AbstractHTree htree = (AbstractHTree)ndx;
+                    
+                    final com.bigdata.htree.NodeSerializer nodeSer = htree.getNodeSerializer();
+
+                    try {
+
+                        final com.bigdata.btree.data.IAbstractNodeData nodeOrLeaf = nodeSer
+                                .decode(buf.duplicate());
+
+                        log.warn("Record decoded from index=" + name);
+
+                        return nodeOrLeaf;
+                        
+                    } catch (Throwable t) {
+                        // Ignore.
+                        continue;
+                    }
+                }
+                case Stream:
+                    final Stream stream = (Stream) ndx;
+                    /*
+                     * Note: We can't do anything here with a Stream, but we do
+                     * try to read on the address as a stream in the caller.
+                     */
+                    continue;
+                default:
+                    throw new UnsupportedOperationException(
+                            "Unknown indexType=" + indexType);
+                }
+
+            }
+
+        }
+
+        // Could not decode.
+        return null;
+
+    }
+
+    /**
+     * Return the data in the buffer.
+     */
+    public static byte[] getBytes(ByteBuffer buf) {
+
+        if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
+                && buf.limit() == buf.capacity()) {
+
+            /*
+             * Return the backing array.
+             */
+
+            return buf.array();
+
+        }
+
+        /*
+         * Copy the expected data into a byte[] using a read-only view on the
+         * buffer so that we do not mess with its position, mark, or limit.
+         */
+        final byte[] a;
+        {
+
+            buf = buf.asReadOnlyBuffer();
+
+            final int len = buf.remaining();
+
+            a = new byte[len];
+
+            buf.get(a);
+
+        }
+
+        return a;
+
+    }
 
 }

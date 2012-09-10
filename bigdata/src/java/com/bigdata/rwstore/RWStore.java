@@ -38,7 +38,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,6 +51,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree.Counter;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -1644,23 +1647,24 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 
-	static private final char[] HEX_CHAR_TABLE = {
-		   '0', '1','2','3',
-		   '4','5','6','7',
-		   '8','9','a','b',
-		   'c','d','e','f'
-		  };    
+//	static private final char[] HEX_CHAR_TABLE = {
+//		   '0', '1','2','3',
+//		   '4','5','6','7',
+//		   '8','9','a','b',
+//		   'c','d','e','f'
+//		  };    
 
 	// utility to display byte array of maximum i bytes as hexString
 	static private String toHexString(final byte[] buf, int n) {
-		n = n < buf.length ? n : buf.length;
-		final StringBuffer out = new StringBuffer();
-		for (int i = 0; i < n; i++) {
-			final int v = buf[i] & 0xFF;
-			out.append(HEX_CHAR_TABLE[v >>> 4]);
-			out.append(HEX_CHAR_TABLE[v &0xF]);
-		}
-		return out.toString();
+//		n = n < buf.length ? n : buf.length;
+//		final StringBuffer out = new StringBuffer();
+//		for (int i = 0; i < n; i++) {
+//			final int v = buf[i] & 0xFF;
+//			out.append(HEX_CHAR_TABLE[v >>> 4]);
+//			out.append(HEX_CHAR_TABLE[v &0xF]);
+//		}
+//		return out.toString();
+	    return BytesUtil.toHexString(buf, n);
 	}
 
 	public void free(final long laddr, final int sze) {
@@ -5170,44 +5174,82 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * checkDeleteBlocks, called from DumpJournal.
 	 */
 	public static class DeleteBlockStats {
-		int m_commitRecords = 0;;
-		int m_addresses = 0;
-		int m_blobs = 0;
-		int m_badAddresses = 0;
-		HashMap<Integer, Integer> m_freed = new HashMap<Integer, Integer>();
-		ArrayList<Long> m_duplicates = new ArrayList<Long>();
-		ArrayList<String> m_dupData = new ArrayList<String>();
+		private int m_commitRecords = 0;;
+		private int m_addresses = 0;
+		private int m_blobs = 0;
+		private int m_badAddresses = 0;
+		private final HashMap<Integer, Integer> m_freed = new HashMap<Integer, Integer>();
+        /**
+         * The latched address of each address that appears more than once
+         * across the delete blocks.
+         */
+        private final Set<Integer> m_duplicates = new LinkedHashSet<Integer>();
+//        /**
+//         * The hexstring version of the data associated with the addresses that
+//         * are present more than once in the delete blocks.
+//         */
+//		private final ArrayList<String> m_dupData = new ArrayList<String>();
 			
+		/**
+		 * The #of commit records that would be processed.
+		 */
 		public int getCommitRecords() {
 			return m_commitRecords;
-		}
-		
-		public int getddresses() {
-			return m_addresses;
-		}
-		
+        }
+
+        /**
+         * Return the #of addresses in the delete blocks acrosss the commit
+         * records.
+         */
+        public int getAddresses() {
+            return m_addresses;
+        }
+
+        /**
+         * Return the #of addresses that are not committed data across the
+         * commit records.
+         */
 		public int getBadAddresses() {
 			return m_badAddresses;
 		}
+
+        /**
+         * Return the latched addresses that appear more than once in the delete
+         * blocks across the commit records.
+         */
+		public Set<Integer> getDuplicateAddresses() {
+		    return m_duplicates;
+		}
 		
-		public String toString() {
+		public String toString(final RWStore store) {
 			final StringBuilder sb = new StringBuilder();
 			sb.append("CommitRecords: " + m_commitRecords + ", Addresses: " + m_addresses 
 					+ ", Blobs: " + m_blobs + ", bad: " + + m_badAddresses);
-			if (m_duplicates.size() > 0) {
-				for (int i = 0; i < m_duplicates.size(); i++) {
-					sb.append("\nDuplicate: " + m_duplicates.get(i) + "\n");
-					final String hexData = m_dupData.get(i);
-					int rem = hexData.length();
-					int curs = 0;
-					while (rem >= 64) {
-						sb.append(String.format("%8d: ", curs));
-						sb.append(hexData.substring(curs, curs + 64) + "\n");
-						curs += 64;
-						rem -= 64;
-					}
-				}
-			}
+			if (!m_duplicates.isEmpty()) {
+				for (int latchedAddr : m_duplicates) {
+//				    final int latchedAddr = m_duplicates.get(i);
+					sb.append("\nDuplicate: latchedAddr=" + latchedAddr + "\n");
+					/*
+					 * Note: Now dumped by DumpJournal.
+					 */
+//                    final byte[] data;
+//                    try {
+//                        data = store.readFromLatchedAddress(latchedAddr);
+//                    } catch (IOException ex) {
+//                        final String msg = "Could not read data: addr="
+//                                + latchedAddr;
+//                        log.error(msg, ex);
+//                        sb.append(msg);
+//                        continue;
+//                    }
+//
+//                    final String hexStr = BytesUtil.toHexString(data,
+//                            data.length);
+//                    
+//                    BytesUtil.printHexString(sb, hexStr);
+                    
+                }
+            }
 			
 			return sb.toString();
 		}
@@ -5217,18 +5259,23 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * Utility to check the deleteBlocks associated with each active CommitRecord
 	 */
 	public DeleteBlockStats checkDeleteBlocks(final AbstractJournal journal) {
-		DeleteBlockStats stats = new DeleteBlockStats();
+
+	    final DeleteBlockStats stats = new DeleteBlockStats();
 
 		/*
 		 * Commit can be called prior to Journal initialisation, in which case
 		 * the commitRecordIndex will not be set.
 		 */
 		final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
-		if (commitRecordIndex == null) { // TODO Why is this here?
-			return stats;
+
+		if (commitRecordIndex == null) {
+		
+		    return stats;
+		    
 		}
 
-		final ITupleIterator<CommitRecordIndex.Entry> commitRecords = commitRecordIndex
+		@SuppressWarnings("unchecked")
+        final ITupleIterator<CommitRecordIndex.Entry> commitRecords = commitRecordIndex
 				.rangeIterator();
 
 		while (commitRecords.hasNext()) {
@@ -5265,25 +5312,42 @@ public class RWStore implements IStore, IBufferedWriter {
 		return stats;
 	}
 
+    /**
+     * Utility method to verify the deferred delete blocks.
+     * 
+     * @param blockAddr
+     *            The address of a deferred delete block.
+     * @param commitTime
+     *            The commitTime associated with the {@link ICommitRecord}.
+     * @param stats
+     *            Where to collect statistics.
+     */
 	private void checkDeferrals(final long blockAddr,
-			final long lastReleaseTime, final DeleteBlockStats stats) {
+			final long commitTime, final DeleteBlockStats stats) {
+
+        /**
+         * Debug flag. When true, writes all frees onto stderr so they can be
+         * read into a worksheet for analysis.
+         */
+        final boolean writeAll = false;
+	    
 		final int addr = (int) (blockAddr >> 32);
 		final int sze = (int) blockAddr & 0xFFFFFF;
 
 		if (log.isTraceEnabled())
 			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: "
-					+ sze + " releaseTime: " + lastReleaseTime);
+					+ sze + " releaseTime: " + commitTime);
 
 		final byte[] buf = new byte[sze + 4]; // allow for checksum
 		getData(addr, buf);
 		final DataInputStream strBuf = new DataInputStream(
 				new ByteArrayInputStream(buf));
 		m_allocationLock.lock();
-		int totalFreed = 0;
+//		int totalFreed = 0;
 		try {
 			int nxtAddr = strBuf.readInt();
 
-			int cnt = 0;
+//			int cnt = 0;
 
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 
@@ -5300,32 +5364,65 @@ public class RWStore implements IStore, IBufferedWriter {
 					stats.m_badAddresses++;
 				}
 				
-				if (stats.m_freed.containsKey(nxtAddr)) {
-					final FixedAllocator alloc = getBlockByAddress(nxtAddr);
-					final byte[] data = new byte[alloc.m_size];
-					
-				    final ByteBuffer bb = ByteBuffer.wrap(data);
-			        final int offset = getOffset(nxtAddr);
-				    final long paddr = alloc.getPhysicalAddress(offset);
-					FileChannelUtility.readAll(m_reopener, bb, paddr);
-
-		            stats.m_dupData.add(toHexString(data, data.length));
-					stats.m_duplicates.add(paddr);
-				} else {
-					stats.m_freed.put(nxtAddr, nxtAddr);
+                if (stats.m_freed.containsKey(nxtAddr)) {
+                    stats.m_duplicates.add(nxtAddr);
+                    if (writeAll) {
+                        System.err.println("" + commitTime + " " + nxtAddr
+                                + " FREE DUP");
+                    }
+                } else {
+                    stats.m_freed.put(nxtAddr, nxtAddr);
+                    if (writeAll) {
+                        System.err.println("" + commitTime + " " + nxtAddr
+                                + " FREE");
+                    }
 				}
 
 				nxtAddr = strBuf.readInt();
 			}
 			// now check delete block
 			assert isCommitted(addr);
-		} catch (IOException e) {
-			throw new RuntimeException("Problem freeing deferrals", e);
-		} finally {
-			m_allocationLock.unlock();
-		}
-	}
+        } catch (IOException e) {
+            throw new RuntimeException("Problem checking deferrals: " + e, e);
+        } finally {
+            m_allocationLock.unlock();
+        }
+    }
 
+    /**
+     * A low level utility method that reads directly from the backing
+     * {@link FileChannel}.
+     * <p>
+     * Note: The latched address does not encode the actual length of the data.
+     * Therefore, all data in the slot addressed by the latched address will be
+     * returned.
+     * 
+     * @param nxtAddr
+     *            The latched address.
+     *            
+     * @return The byte[] in the addressed slot.
+     * 
+     * @throws IOException
+     */
+    public final byte[] readFromLatchedAddress(final int nxtAddr)
+            throws IOException {
+
+        final FixedAllocator alloc = getBlockByAddress(nxtAddr);
+
+        final byte[] data = new byte[alloc.m_size];
+
+        final ByteBuffer bb = ByteBuffer.wrap(data);
+        
+        final int offset = getOffset(nxtAddr);
+        
+        final long paddr = alloc.getPhysicalAddress(offset);
+        
+        FileChannelUtility.readAll(m_reopener, bb, paddr);
+        
+        return data;
+
+    }
+	
 	 //    /**
 //     * Only blacklist the addr if not already available, in other words
 //     * a blacklisted address only makes sense if it for previously 

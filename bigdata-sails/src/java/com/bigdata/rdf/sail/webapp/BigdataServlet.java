@@ -191,6 +191,46 @@ abstract public class BigdataServlet extends HttpServlet {
         
 	}
 	
+    /**
+     * If the node is not writable, then commit a response and return
+     * <code>false</code>. Otherwise return <code>true</code>.
+     * 
+     * @param req
+     * @param resp
+     * 
+     * @return <code>true</code> iff the node is writable.
+     * 
+     * @throws IOException
+     */
+    protected boolean isReadable(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+        
+        if(quorum == null) {
+         
+            // No quorum.
+            return true;
+            
+        }
+        
+        if (quorum.isQuorumMet()) {
+            
+            /*
+             * There is a quorum. The quorum is met.
+             */
+ 
+            return true;
+
+        }
+        
+        buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                "Quorum is not met.");
+        
+        return false;
+        
+    }
+    
 //	/**
 //	 * The {@link SparqlCache}.
 //	 */
