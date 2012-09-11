@@ -70,6 +70,7 @@ import com.bigdata.service.proxy.ThickFuture;
  * pipeline is in a globally consistent order that excludes the down node.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal HA </a>
  */
 public class HAJournal extends Journal {
 

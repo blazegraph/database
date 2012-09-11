@@ -60,8 +60,10 @@ import com.sun.jini.start.LifeCycle;
  * An administratable server for an {@link HAJournal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal
+ *      HA </a>
  * 
- *         TODO Make sure that ganglia reporting can be enabled.
+ *      TODO Make sure that ganglia reporting can be enabled.
  */
 public class HAJournalServer extends AbstractServer {
 

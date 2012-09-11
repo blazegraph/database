@@ -65,6 +65,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -377,7 +378,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (quorum == null) {
 
                     // Not HA. 
-                    return super.newTx(timestamp);
+                    return this._newTx(timestamp);
 
                 }
 
@@ -386,7 +387,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 if (quorum.getMember().isLeader(token)) {
 
                     // HA and this is the leader.
-                    return super.newTx(timestamp);
+                    return this._newTx(timestamp);
 
                 }
                 
@@ -422,6 +423,58 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 return tx;
 
             }
+			
+            /**
+             * Core impl.
+             * <p>
+             * This code pre-increments the active transaction count within the
+             * RWStore before requesting a new transaction from the transaction
+             * service. This ensures that the RWStore does not falsely believe
+             * that there are no open transactions during the call to
+             * AbstractTransactionService#newTx().
+             * <p>
+             * Note: This code was moved into the inner class extending the
+             * {@link JournalTransactionService} in order to ensure that we
+             * follow this pre-incremental pattern for an {@link HAJournal} as
+             * well.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13">
+             *      BTree can not be case to Name2Addr </a>
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
+             *      Journal HA </a>
+             */
+			private final long _newTx(final long timestamp) {
+
+			    IRawTx tx = null;
+		        try {
+		        
+                    if (getBufferStrategy() instanceof IRWStrategy) {
+
+                        // pre-increment the active tx count.
+                        tx = ((IRWStrategy) getBufferStrategy()).newTx();
+                    }
+
+                    return super.newTx(timestamp);
+
+                } finally {
+
+                    if (tx != null) {
+
+                        /*
+                         * If we had pre-incremented the transaction counter in
+                         * the RWStore, then we decrement it before leaving this
+                         * method.
+                         */
+
+                        tx.close();
+
+                    }
+
+                }
+
+			}
 			
             @Override
             public long commit(final long tx) {
@@ -1341,6 +1394,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * Create a new transaction on the {@link Journal}.
+     * <p>
+     * Note: This is a convenience method. The implementation of this method is
+     * delegated to the object returned by {@link #getTransactionService()}.
      * 
      * @param timestamp
      *            A positive timestamp for a historical read-only transaction as
@@ -1355,64 +1411,86 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @see ITransactionService#newTx(long)
      */
-    public long newTx(final long timestamp) {
+    final public long newTx(final long timestamp) {
 
-        IRawTx tx = null;
+//        IRawTx tx = null;
+//        try {
+//            if (getBufferStrategy() instanceof IRWStrategy) {
+//                
+//                /*
+//                 * This code pre-increments the active transaction count within
+//                 * the RWStore before requesting a new transaction from the
+//                 * transaction service. This ensures that the RWStore does not
+//                 * falsely believe that there are no open transactions during
+//                 * the call to AbstractTransactionService#newTx().
+//                 * 
+//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13
+//                 */
+//                tx = ((IRWStrategy) getBufferStrategy()).newTx();
+//            }
+//            try {
+//
+//                return getTransactionService().newTx(timestamp);
+//
+//            } catch (IOException ioe) {
+//
+//                /*
+//                 * Note: IOException is declared for RMI but will not be thrown
+//                 * since the transaction service is in fact local.
+//                 */
+//
+//                throw new RuntimeException(ioe);
+//
+//            }
+//
+//        } finally {
+//        
+//            if (tx != null) {
+//            
+//                /*
+//                 * If we had pre-incremented the transaction counter in the
+//                 * RWStore, then we decrement it before leaving this method.
+//                 */
+//
+//                tx.close();
+//
+//            }
+//            
+//        }
+
+        /*
+         * Note: The RWStore native tx pre-increment logic is now handled by
+         * _newTx() in the inner class that extends JournalTransactionService.
+         */
         try {
-            if (getBufferStrategy() instanceof IRWStrategy) {
-                
-                /*
-                 * This code pre-increments the active transaction count within
-                 * the RWStore before requesting a new transaction from the
-                 * transaction service. This ensures that the RWStore does not
-                 * falsely believe that there are no open transactions during
-                 * the call to AbstractTransactionService#newTx().
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13
-                 */
-                tx = ((IRWStrategy) getBufferStrategy()).newTx();
-            }
-            try {
 
-                return getTransactionService().newTx(timestamp);
+            return getTransactionService().newTx(timestamp);
 
-            } catch (IOException ioe) {
+        } catch (IOException ioe) {
 
-                /*
-                 * Note: IOException is declared for RMI but will not be thrown
-                 * since the transaction service is in fact local.
-                 */
+            /*
+             * Note: IOException is declared for RMI but will not be thrown
+             * since the transaction service is in fact local.
+             */
 
-                throw new RuntimeException(ioe);
+            throw new RuntimeException(ioe);
 
-            }
-
-        } finally {
-        
-            if (tx != null) {
-            
-                /*
-                 * If we had pre-incremented the transaction counter in the
-                 * RWStore, then we decrement it before leaving this method.
-                 */
-
-                tx.close();
-
-            }
-            
         }
 
     }
 
     /**
      * Abort a transaction.
+     * <p>
+     * Note: This is a convenience method. The implementation of this method is
+     * delegated to the object returned by {@link #getTransactionService()}.
      * 
      * @param tx
      *            The transaction identifier.
      *            
      * @see ITransactionService#abort(long)
      */
-    public void abort(final long tx) {
+    final public void abort(final long tx) {
 
         try {
 
@@ -1439,6 +1517,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * Commit a transaction.
+     * <p>
+     * Note: This is a convenience method. The implementation of this method is
+     * delegated to the object returned by {@link #getTransactionService()}.
      * 
      * @param tx
      *            The transaction identifier.
@@ -1447,7 +1528,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * 
      * @see ITransactionService#commit(long)
      */
-    public long commit(final long tx) throws ValidationError {
+    final public long commit(final long tx) throws ValidationError {
 
         try {
 
@@ -1457,7 +1538,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * protocol.
              */
 
-            return localTransactionManager.getTransactionService().commit(tx);
+            return getTransactionService().commit(tx);
 
         } catch (IOException e) {
 
@@ -1487,12 +1568,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * Returns the next timestamp from the {@link ILocalTransactionManager}.
+     * <p>
+     * Note: This is a convenience method. The implementation of this method is
+     * delegated to the object returned by {@link #getTransactionService()}.
      * 
      * @deprecated This is here for historical reasons and is only used by the
-     *             test suite.  Use {@link #getLocalTransactionManager()} and
+     *             test suite. Use {@link #getLocalTransactionManager()} and
      *             {@link ITransactionService#nextTimestamp()}.
+     * 
+     * @see ITransactionService#nextTimestamp()
      */
-    public long nextTimestamp() {
+    final public long nextTimestamp() {
     
         return localTransactionManager.nextTimestamp();
     
@@ -1697,13 +1783,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     public ILocalTransactionManager getTransactionManager() {
 
-        return concurrencyManager.getTransactionManager();
+//        return concurrencyManager.getTransactionManager();
+        return localTransactionManager;
         
     }
     
     public ITransactionService getTransactionService() {
     	
-    	return getTransactionManager().getTransactionService();
+//       return getTransactionManager().getTransactionService();
+        return localTransactionManager.getTransactionService();
 
     }
 
