@@ -51,13 +51,11 @@ import net.jini.admin.JoinAdmin;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
-import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.DiscoveryEvent;
 import net.jini.discovery.DiscoveryListener;
-import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
@@ -79,12 +77,14 @@ import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
+import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.jini.FakeLifeCycle;
+import com.bigdata.service.jini.JiniClientConfig;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
@@ -139,38 +139,25 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     
     final static private Logger log = Logger.getLogger(AbstractServer.class);
 
+    /**
+     * Configuration options.
+     * <p>
+     * Note: The {@link ServiceID} is optional and may be specified using the
+     * {@link Entry}[] for the {@link JiniClientConfig} as a {@link ServiceUUID}
+     * . If it is not specified, then a random {@link ServiceID} will be
+     * assigned. Either way, the {@link ServiceID} is written into the
+     * {@link #SERVICE_DIR} and is valid for the life cycle of the persistent
+     * service.
+     * 
+     * @see JiniClientConfig
+     * @see ZookeeperClientConfig
+     */
     public interface ConfigurationOptions {
 
-        /**
-         * A {@link String}[] whose values are the group(s) to be used for
-         * discovery (no default). Note that multicast discovery is always used
-         * if {@link LookupDiscovery#ALL_GROUPS} (a <code>null</code>) is
-         * specified. {@link LookupDiscovery#NO_GROUPS} is the symbolic constant
-         * for an empty String[].
-         */
-        String GROUPS = "groups";
-
-        /**
-         * An array of one or more {@link LookupLocator}s specifying unicast
-         * URIs of the form <code>jini://host/</code> or
-         * <code>jini://host:port/</code> (no default) -or- an empty array if
-         * you want to use multicast discovery <strong>and</strong> you have
-         * specified {@link #GROUPS} as {@link LookupDiscovery#ALL_GROUPS} (a
-         * <code>null</code>).
-         */
-        String LOCATORS = "locators";
-
-        /**
-         * {@link Entry}[] attributes used to describe the client or service.
-         */
-        String ENTRIES = "entries";
-        
         /**
          * The pathname of the service directory as a {@link File} (required).
          */
         String SERVICE_DIR = "serviceDir";
-
-//        String LOGICAL_SERVICE_ZPATH = "logicalServiceZPath";
 
         /**
          * This object is used to export the service proxy. The choice here
@@ -205,6 +192,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * {@link ServiceID} is assigned by jini, then it is assigned the
      * asynchronously after the service has discovered a
      * {@link ServiceRegistrar}.
+     * 
+     * @see ConfigurationOptions
      */
     private ServiceID serviceID;
     
@@ -549,8 +538,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         List<Entry> entries = null;
         
         final String COMPONENT = getClass().getName();
-        final String[] groups;
-        final LookupLocator[] locators;
+        final JiniClientConfig jiniClientConfig;
         try {
 
             config = ConfigurationProvider.getInstance(args);
@@ -559,22 +547,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     ConfigurationOptions.CACHE_MISS_TIMEOUT, Long.TYPE,
                     ConfigurationOptions.DEFAULT_CACHE_MISS_TIMEOUT);
 
-            groups = (String[]) config.getEntry(
-                    COMPONENT, ConfigurationOptions.GROUPS, String[].class);
-
-            locators = (LookupLocator[]) config.getEntry(
-                    COMPONENT, ConfigurationOptions.LOCATORS, LookupLocator[].class);
+            jiniClientConfig = new JiniClientConfig(
+                    JiniClientConfig.Options.NAMESPACE, config);
 
             // convert Entry[] to a mutable list.
-            entries = new LinkedList<Entry>(Arrays.asList((Entry[]) config
-                    .getEntry(COMPONENT, ConfigurationOptions.ENTRIES,
-                            Entry[].class, new Entry[0])));
+            entries = new LinkedList<Entry>(
+                    Arrays.asList((Entry[]) jiniClientConfig.entries));
 
-            if (log.isInfoEnabled()) {
-                log.info(ConfigurationOptions.GROUPS + "=" + Arrays.toString(groups));
-                log.info(ConfigurationOptions.LOCATORS + "=" + Arrays.toString(locators));
-                log.info(ConfigurationOptions.ENTRIES+ "=" + entries);
-            }
+            if (log.isInfoEnabled())
+                log.info(jiniClientConfig.toString());
 
             /*
              * Make sure that the parent directory exists.
@@ -824,8 +805,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * an alternative, you can use LookupDiscovery, which always does
              * multicast discovery.
              */
-            lookupDiscoveryManager = new LookupDiscoveryManager(groups,
-                    locators, this /* DiscoveryListener */, config);
+            lookupDiscoveryManager = new LookupDiscoveryManager(
+                    jiniClientConfig.groups, jiniClientConfig.locators,
+                    this /* DiscoveryListener */, config);
 
             /*
              * Setup a helper class that will be notified as services join or
@@ -959,10 +941,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
 
         /*
-         * TODO Not needed since the ServiceID is being set from the config
-         * file, but we do not yet verify that it *is* set from the config file.
-         * Do that, and then remove this code,
-         * 
          * Note: This is synchronized in case set via listener by the
          * JoinManager, which would be rather fast action on its part.
          */

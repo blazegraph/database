@@ -28,12 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.util;
 
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.concurrent.TimeUnit;
 
-import com.sun.jini.config.ConfigUtil;
-
 import net.jini.config.Configuration;
+
+import com.sun.jini.config.ConfigUtil;
 
 /**
  * A utility class to help with {@link Configuration}s.
@@ -67,6 +66,18 @@ public class ConfigMath {
         return a * b;
     }
 
+    public static int divide(int a, int b) {
+        return a / b;
+    }
+
+    public static long divide(long a, long b) {
+        return a / b;
+    }
+
+    public static double divide(double a, double b) {
+        return a / b;
+    }
+
     /**
      * Useful for enums which can't be handled otherwise.
      * 
@@ -74,7 +85,7 @@ public class ConfigMath {
      * 
      * @return
      */
-    public static String toString(Object o) {
+    public static String toString(final Object o) {
         
         return o.toString();
         
@@ -252,4 +263,59 @@ public class ConfigMath {
     
     }
 
+    /**
+     * Trinary logic operator (if-then-else).
+     * 
+     * @param condition
+     *            The boolean condition.
+     * @param ifTrue
+     *            The result if the condition is <code>true</code>.
+     * @param ifFalse
+     *            The result if the condition is <code>false</code>.
+     *            
+     * @return The appropriate argument depending on whether the
+     *         <i>condition</i> is <code>true</code> or <code>false</code>.
+     */
+    public static <T> T trinary(final boolean condition, final T ifTrue,
+            final T ifFalse) {
+        
+        if(condition) {
+            
+            return ifTrue;
+            
+        }
+        
+        return ifFalse;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the argument is <code>null</code>.
+     * 
+     * @param o
+     *            The argument.
+     */
+    public static boolean isNull(final Object o) {
+        
+        return o == null;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the argument is not <code>null</code>.
+     * 
+     * @param o
+     *            The argument.
+     */
+    public static boolean isNotNull(final Object o) {
+
+//        ConfigMath.trinary(ConfigMath.isNull(bigdata.service)
+//                , new Comment("Auto-generated ServiceID")
+//                , new ServiceUUID( bigdata.serviceId )
+//             );
+
+        return o != null;
+        
+    }
+    
 }

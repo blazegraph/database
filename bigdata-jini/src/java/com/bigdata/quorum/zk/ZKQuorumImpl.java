@@ -1267,7 +1267,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                      */
                     public void run() {
                         try {
-                            log.warn(e.toString());
+                            if (log.isInfoEnabled())
+                                log.info(e.toString());
                             switch (e.getState()) {
                             case Disconnected:
                                 return;
@@ -1922,9 +1923,10 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             final QuorumTokenState tokenState = (QuorumTokenState) SerializerUtil
                     .deserialize(data);
             
-            log.warn("Starting with quorum that has already met in the past: "
-                    + tokenState);
-            
+            if (log.isInfoEnabled())
+                log.info("Starting with quorum that has already met in the past: "
+                        + tokenState);
+
             if (tokenState.token() != NO_QUORUM && !isQuorumMet()) {
 
                 try {

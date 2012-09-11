@@ -91,11 +91,25 @@ public class HAJournalServer extends AbstractServer {
          * exposes its write pipeline interface (required).
          */
         String WRITE_PIPELINE_ADDR = "writePipelineAddr";
-        
+
         /**
-         * The ordered {@link UUID} each service in the write replication
+         * The logical service identifier for this highly available journal.
+         * There may be multiple logical highly available journals, each
+         * comprised of <em>k</em> physical services. The logical service
+         * identifier is used to differentiate these different logical HA
+         * journals. The service {@link UUID} is used to differentiate the
+         * physical service instances. By assigning a logical service identifier
+         * to an {@link HAJournalServer} you associate that server instance with
+         * the specified logical highly available journal.
+         * <p>
+         * The identifier may be any legal znode node.
+         * 
+         * TODO This needs to be reconciled with the federation. The federation
+         * uses ephemeral sequential to create the logical service identifiers.
+         * Here they are being assigned manually. This is basically the "flex"
+         * versus "static" issue.
          */
-        String PIPELINE_UUIDS = "pipelineUUIDs";
+        String LOGICAL_SERVICE_ID = "logicalServiceId";
         
     }
     
@@ -131,22 +145,19 @@ public class HAJournalServer extends AbstractServer {
     private HAGlue haGlueService;
     private ZookeeperClientConfig zkClientConfig;
     
-    /*
-     * TODO Explicit configuration of this property. We will need to add another
-     * level in the zpath for the logicalService under the HAJournal layer so we
-     * can have multiple HA Journals in a zk ensemble (and we need to ensure
-     * that znode gets created). We will no longer need to explicitly declare
-     * the UUID of the service, but we should report an error if the service
-     * becomes over subscribed (too many quorum members). Without a limit on the
-     * #of services that can join a quorum we can erode the HA guarantee by not
-     * recognizing a critical set of [k] distinct services. We could also handle
-     * this by explicitly declaring the UUIDs of those services. That tends to
-     * be robust.
+    /**
+     * The znode name for the logical service.
      * 
-     * This also needs to be reconciled with the federation.  The federation uses
-     * ephemeral sequential to create the logical service identifiers.
+     * @see ConfigurationOptions#LOGICAL_SERVICE_ID
      */
     private String logicalServiceId;
+    
+    /**
+     * The zpath for the logical service.
+     * 
+     * @see ConfigurationOptions#LOGICAL_SERVICE_ID
+     */
+    private String logicalServiceZPath;
     
     /**
      * The {@link Quorum} for the {@link HAJournal}.
@@ -255,8 +266,17 @@ public class HAJournalServer extends AbstractServer {
 
         zkClientConfig = new ZookeeperClientConfig(config);
 
-        logicalServiceId = zkClientConfig.zroot + "/"
+        // znode name for the logical service.
+        logicalServiceId = (String) config.getEntry(
+                ConfigurationOptions.COMPONENT,
+                ConfigurationOptions.LOGICAL_SERVICE_ID, String.class); 
+
+        final String logicalServiceZPathPrefix = zkClientConfig.zroot + "/"
                 + HAJournalServer.class.getName();
+        
+        // zpath for the logical service.
+        logicalServiceZPath = logicalServiceZPathPrefix + "/"
+                + logicalServiceId;
 
         final int replicationFactor = (Integer) config.getEntry(
                 ConfigurationOptions.COMPONENT,
@@ -269,11 +289,6 @@ public class HAJournalServer extends AbstractServer {
                     .getEntry(ConfigurationOptions.COMPONENT,
                             ConfigurationOptions.WRITE_PIPELINE_ADDR,
                             InetSocketAddress.class);
-
-            // The write replication pipeline.
-            final UUID[] pipelineUUIDs = (UUID[]) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
-                    ConfigurationOptions.PIPELINE_UUIDS, UUID[].class);
 
             /*
              * Configuration properties for this HAJournal.
@@ -319,8 +334,17 @@ public class HAJournalServer extends AbstractServer {
                 }
                 try {
                     zka.getZookeeper()
-                            .create(logicalServiceId, new byte[] {/* data */},
-                                    acl, CreateMode.PERSISTENT);
+                            .create(logicalServiceZPathPrefix,
+                                    new byte[] {/* data */}, acl,
+                                    CreateMode.PERSISTENT);
+                } catch (NodeExistsException ex) {
+                    // ignore.
+                }
+                try {
+                    zka.getZookeeper()
+                            .create(logicalServiceZPath,
+                                    new byte[] {/* data */}, acl,
+                                    CreateMode.PERSISTENT);
                 } catch (NodeExistsException ex) {
                     // ignore.
                 }
@@ -376,7 +400,8 @@ public class HAJournalServer extends AbstractServer {
 
             @Override
             public void notify(final QuorumEvent e) {
-                System.err.println("QuorumEvent: " + e);// FIXME remove logger.
+                if (log.isTraceEnabled())
+                    System.err.print("QuorumEvent: " + e);
                 switch(e.getEventType()) {
                 case CAST_VOTE:
                     break;
@@ -429,8 +454,8 @@ public class HAJournalServer extends AbstractServer {
             }
         });
 
-        quorum.start(newQuorumService(logicalServiceId, serviceUUID, haGlueService,
-                journal));
+        quorum.start(newQuorumService(logicalServiceZPath, serviceUUID,
+                haGlueService, journal));
 
         // TODO These methods could be moved into QuorumServiceImpl.start(Quorum)
         final QuorumActor<?,?> actor = quorum.getActor();
@@ -481,12 +506,12 @@ public class HAJournalServer extends AbstractServer {
      *            supporting HA operations.
      */
     private QuorumServiceBase<HAGlue, AbstractJournal> newQuorumService(
-            final String logicalServiceId,
+            final String logicalServiceZPath,
             final UUID serviceId, final HAGlue remoteServiceImpl,
             final AbstractJournal store) {
 
-        return new QuorumServiceBase<HAGlue, AbstractJournal>(logicalServiceId,
-                serviceId, remoteServiceImpl, store) {
+        return new QuorumServiceBase<HAGlue, AbstractJournal>(
+                logicalServiceZPath, serviceId, remoteServiceImpl, store) {
 
             @Override
             public void start(final Quorum<?,?> quorum) {
@@ -655,6 +680,7 @@ public class HAJournalServer extends AbstractServer {
             serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
                     .toExternalForm();
 
+            System.out.println("logicalServiceZPath: " + logicalServiceZPath);
             System.out.println("serviceURL: " + serviceURL);
 
         }

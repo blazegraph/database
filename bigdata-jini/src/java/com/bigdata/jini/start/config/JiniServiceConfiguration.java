@@ -130,7 +130,7 @@ abstract public class JiniServiceConfiguration extends
     public final Properties properties;
     public final String[] jiniOptions;
     
-    protected void toString(StringBuilder sb) {
+    protected void toString(final StringBuilder sb) {
 
         super.toString(sb);
 

@@ -31,7 +31,7 @@ public class JiniClientConfig {
     public interface Options {
     
         /**
-         * The namespace for these options.
+         * The component name for these {@link Configuration} options.
          */
         String NAMESPACE = JiniClient.class.getName();
 
@@ -69,15 +69,44 @@ public class JiniClientConfig {
          * merged, overwriting those specified for {@link JiniClient} directly.
          * This allows both general defaults and both additional service
          * properties and service specific overrides of the general defaults.
+         * 
+         * @deprecated This is used by the {@link JiniClient}, not the
+         *             {@link JiniClientConfig}. It's presents on this interface
+         *             is therefore confusing. It should be moved to the
+         *             {@link JiniClient.Options}. This symbolic constant can
+         *             show up in {@link Configuration} files, so we probably
+         *             need to leave in a reference here to redirect people to
+         *             the {@link JiniClient.Options} interface.
+         *             <p>
+         *             The historical presence of this property on the
+         *             {@link JiniClientConfig} class is the reason why the
+         *             {@link JiniClientConfig} constructor has an ignored class
+         *             name argument.
          */
         String PROPERTIES = "properties";
         
     }
-    
+
+    /**
+     * The {@link Entry}[] and never null. This will be an empty {@link Entry}[]
+     * if no {@link Entry}s were specified.
+     * 
+     * @see Options#ENTRIES
+     */
     final public Entry[] entries;
     
+    /**
+     * The join group(s).
+     * 
+     * @see Options#GROUPS
+     */
     final public String[] groups;
 
+    /**
+     * The locators.
+     * 
+     * @see Options#LOCATORS
+     */
     final public LookupLocator[] locators;
 
 //    final public Properties properties;
@@ -94,7 +123,7 @@ public class JiniClientConfig {
     }
 
     /**
-     * @param className
+     * @param classNameIsIgnored
      *            The class name of the client or service (optional). When
      *            specified, properties defined for that class in the
      *            configuration will be used and will override those specified
@@ -108,8 +137,8 @@ public class JiniClientConfig {
      * 
      * @see Options
      */
-    public JiniClientConfig(final String className, final Configuration config)
-        throws ConfigurationException {
+    public JiniClientConfig(final String classNameIsIgnored,
+            final Configuration config) throws ConfigurationException {
         
         /*
          * Extract how the service will advertise itself from the Configuration
