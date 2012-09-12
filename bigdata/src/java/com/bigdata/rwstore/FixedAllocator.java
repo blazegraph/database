@@ -1040,7 +1040,9 @@ public class FixedAllocator implements Allocator {
 				break;
 			
 			ab.reset(cache);
-			if (ab.m_addr > nextAllocation) {
+			if (ab.m_addr <= nextAllocation) { // note that addresses are negative ints
+				// this should mean that all allocations were made since last commit
+				// in which case...
 				assert ab.freeBits() == ab.totalBits();
 				
 				ab.m_addr = 0;
