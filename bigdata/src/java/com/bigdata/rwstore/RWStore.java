@@ -920,6 +920,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		m_metaBits[0] = -1;
 		m_metaTransientBits[0] = -1;
 		m_nextAllocation = -(1 + META_ALLOCATION); // keep on a minimum 8K boundary
+		m_committedNextAllocation = m_nextAllocation;
 		
 		if (m_fileSize > m_nextAllocation) {
 			m_fileSize = m_nextAllocation;
@@ -2311,16 +2312,45 @@ public class RWStore implements IStore, IBufferedWriter {
 	    m_allocationLock.lock();
 		try {
 	        assertOpen();
-            /*
+            /**
              * Clear all allocators, not just dirty allocators, since we also
              * need to reset the transient bits associated with session
              * protection.
              */
             for (FixedAllocator fa : m_allocs) {
-				fa.reset(m_writeCache);
+				fa.reset(m_writeCache, m_committedNextAllocation);
 			}
+            /**
+             * Now we should be able to unwind any unused allocators and unused
+             * alloc blocks.  An unused allocator is one with no diskAddr (never
+             * committed).  But it may be more difficult to determine if
+             * an alloc block has never been used, for that we really need to
+             * know what the nextAllocationOffset was at the previous commit.
+             * This could be cached as lastCommittedOffset, in which case we can unwind any
+             * allocBlocks with addresses >= to that.
+             */
+            int origAllocs = m_allocs.size();
+            while (m_allocs.size() > 0) {
+            	final int last = m_allocs.size()-1;
+            	final FixedAllocator fa = m_allocs.get(last);
+            	if (fa.getDiskAddr() == 0) {
+            		// must remove from free list!
+            		m_freeFixed[fixedAllocatorIndex(fa.m_size)].remove(fa);
+            		// ..and then from main allocation list
+            		m_allocs.remove(last);
+            	} else {
+            		break;
+            	}
+            }
+            m_nextAllocation = m_committedNextAllocation;
+            if (log.isDebugEnabled())
+            	log.debug("Reset allocators, old: " + origAllocs + ", now: " + m_allocs.size());
+            
 			// Clear the dirty list.
-//			m_commitList.clear();
+            // FIXME: we should be able to clear the dirty list, but this currently causes
+            //	problems in HA.
+            // If the allocators are torn down correctly, we should be good to clear the commitList
+			m_commitList.clear();
             if (m_quorum != null) {
                 /**
                  * When the RWStore is part of an HA quorum, we need to close
@@ -2515,6 +2545,9 @@ public class RWStore implements IStore, IBufferedWriter {
 			    log.error(e, e);
 				throw new RuntimeException(e);
 			}
+			
+			// Now remember the committed next allocation that will be checked in reset()
+			m_committedNextAllocation = m_nextAllocation;
 
 			// Should not write rootBlock, this is responsibility of client
 			// to provide control
@@ -2684,6 +2717,11 @@ public class RWStore implements IStore, IBufferedWriter {
      */
 	volatile private int m_fileSize;
 	volatile private int m_nextAllocation;
+	/**
+	 * The value of nextAllocation at commit is cached and used
+	 * in reset() to unwind new FixedAllocators and/or AllocBlocks
+	 */
+	volatile private int m_committedNextAllocation;
 	final private int m_maxFileSize;
 
 //	private int m_headerSize = 2048;

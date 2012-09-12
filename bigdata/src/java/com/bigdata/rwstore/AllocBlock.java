@@ -103,6 +103,13 @@ public class AllocBlock {
 		m_live = new int[bitSize];
 		m_transients = new int[bitSize];
 	}
+	
+	/**
+	 * @return total bits managed by this allocBlock
+	 */
+	int totalBits() {
+		return m_ints * 32;
+	}
 
 	public boolean verify(final int addr, final int size) {
 		if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
@@ -375,6 +382,9 @@ public class AllocBlock {
 	 * @param cache containing buffered writes to be cleared
 	 */
 	void reset(final RWWriteCacheService cache) {
+		if (m_addr == 0)
+			return;
+		
 		for (int i = 0; i < m_live.length; i++) {
 			final int startBit = i * 32;
 			if (m_saveCommit == null) {

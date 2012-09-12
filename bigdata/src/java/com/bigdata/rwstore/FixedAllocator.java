@@ -1032,10 +1032,19 @@ public class FixedAllocator implements Allocator {
 	 * since the last commit point.
 	 * 
 	 * @param cache
+	 * @param nextAllocation 
 	 */
-	void reset(RWWriteCacheService cache) {
+	void reset(RWWriteCacheService cache, final int nextAllocation) {
 		for (AllocBlock ab : m_allocBlocks) {
+			if (ab.m_addr == 0)
+				break;
+			
 			ab.reset(cache);
+			if (ab.m_addr > nextAllocation) {
+				assert ab.freeBits() == ab.totalBits();
+				
+				ab.m_addr = 0;
+			}
 		}
 		
 		m_freeTransients = transientbits();

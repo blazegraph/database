@@ -1893,6 +1893,34 @@ public class TestRWJournal extends AbstractJournalTestCase {
             }
 		}
 		
+		public void testSimpleReset() {
+            final Properties properties = new Properties(getProperties());
+
+ 			final Journal store = (Journal) getStore(properties);
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStore rw = bs.getStore();
+            	
+ 	        	for (int r = 0; r < 10; r++) {
+		        	ArrayList<Long> addrs = new ArrayList<Long>();
+		        	for (int i = 0; i < 1000; i++) {
+		        		addrs.add(bs.write(randomData(2048)));
+		        	}
+		        	
+		        	rw.reset();
+		        	
+	        	}
+	        	
+				final String fname = bs.getStore().getStoreFile().getAbsolutePath();
+				
+	        	store.close();
+	        	
+ 			} finally {
+            	store.destroy();
+            }
+		}
+		
 		
 
 		private Journal getStore(Properties props) {
