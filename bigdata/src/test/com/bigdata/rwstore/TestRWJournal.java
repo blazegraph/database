@@ -2300,6 +2300,68 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		/**
+		 * Tests semantics of a simple reset after reopen to emulate
+		 * an HAJournal reopen
+		 * 
+		 * As for simple reset but also re-open, then write and abort.
+		 * 
+		 * @throws IOException 
+		 */
+		public void test_reopenReset() throws IOException {
+			final Properties properties = new Properties(getProperties());
+			final File tmpfile = File.createTempFile("TestRW", ".rw");
+			properties.setProperty(Options.FILE, tmpfile.getAbsolutePath());
+			properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//			Journal store = new Journal(properties);
+			Journal store = getStore(properties);
+	        try {
+	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	
+	        	final long addr = bs.write(randomData(78));
+	        	
+	        	// Has just been written so must be in cache
+	        	assertTrue(bs.inWriteCache(addr));
+	        	
+	        	store.commit();
+	        	
+	        	bs.delete(addr);
+	        	
+	        	final long addr2 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr2));
+	        	
+	        	bs.abort();
+	        	
+	        	assertTrue(bs.inWriteCache(addr)); // not removed in reset
+	           	assertFalse(bs.inWriteCache(addr2));
+	        	try {
+	        		bs.read(addr2);
+	        		fail("Exception expected");
+	        	} catch (IllegalArgumentException e) {
+	        		// expected
+	        	}
+	        	store.commit();
+
+	        	assertTrue(bs.isCommitted(addr));
+	        	
+	        	store.close();
+				store = new Journal(properties);
+				bs = (RWStrategy) store.getBufferStrategy();
+				
+	        	final long addr3 = bs.write(randomData(78));
+	           	assertTrue(bs.inWriteCache(addr3));
+	        	
+	        	bs.abort();
+	        	
+	        	assertFalse(bs.inWriteCache(addr3)); // not removed in reset
+
+	        	
+	        } finally {
+	        	store.destroy();
+	        }
+			
+		}
+		
+		/**
 		 * Tests semantics of a simple isolated reset
 		 * 
 		 * Commit some data
