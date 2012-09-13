@@ -272,11 +272,17 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 			
 			final long begin = System.nanoTime();
 			
+			Throwable cause = null;
             try {
                 // convert/run the update operation.
                 left = convertUpdateSwitch(left, op, context);
             } catch (Throwable t) {
+                cause = t;
                 log.error("SPARQL UPDATE failure: op=" + op + ", ex=" + t, t);
+                // notify listener(s)
+                final long elapsed = System.nanoTime() - begin;
+                context.conn.getSailConnection().fireEvent(
+                        new SPARQLUpdateEvent(op, elapsed, cause));
                 if (t instanceof Exception)
                     throw (Exception) t;
                 if (t instanceof RuntimeException)
@@ -284,11 +290,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                 throw new RuntimeException(t);
             }
 
-			final long elapsed = begin - System.nanoTime();
+			final long elapsed = System.nanoTime() - begin;
 			
 			// notify listener(s)
             context.conn.getSailConnection().fireEvent(
-                    new SPARQLUpdateEvent(op, elapsed));
+                    new SPARQLUpdateEvent(op, elapsed, cause));
 
 			updateIndex++;
 			
@@ -1558,7 +1564,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             final long nparsed = nmodified.incrementAndGet();
 
-            if (nparsed % 10000 == 0L) {
+            if ((nparsed % 10000) == 0L) {
 
                 final long elapsed = System.nanoTime() - beginNanos;
 
