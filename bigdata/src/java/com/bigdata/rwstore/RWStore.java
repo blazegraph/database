@@ -1050,6 +1050,8 @@ public class RWStore implements IStore, IBufferedWriter {
 			    m_nextAllocation = -(1 + META_ALLOCATION);
 			    
 			}
+			
+			m_committedNextAllocation = m_nextAllocation;
 	
 			// latched offset of the metabits region.
 			m_metaBitsAddr = -(int) nxtOffset;
@@ -1792,6 +1794,9 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * supporting immediate re-cycling of localized allocations (those made
 	 * and released within the same AllocationContext).
 	 * 
+	 * Also check to see if there is an uncomplete quorum being established, in
+	 * which case provide default session protection to avoid recycling.
+	 * 
 	 * @return whether there is a logical active session
 	 */
 	boolean isSessionProtected() {
@@ -1803,7 +1808,12 @@ public class RWStore implements IStore, IBufferedWriter {
              */
             throw new IllegalMonitorStateException();
         }
-      
+	    
+	    // protect recyling with unmet quorum
+	    if (m_quorum != null && !m_quorum.isQuorumMet()) {
+	    	return true;
+	    }
+	    
 	    return m_minReleaseAge == 0 && (m_activeTxCount > 0 || !m_contexts.isEmpty());
 	}
 
