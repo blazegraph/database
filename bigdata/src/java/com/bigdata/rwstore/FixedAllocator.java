@@ -1034,13 +1034,17 @@ public class FixedAllocator implements Allocator {
 	 * @param cache
 	 * @param nextAllocation 
 	 */
-	void reset(RWWriteCacheService cache, final int nextAllocation) {
+	boolean reset(RWWriteCacheService cache, final int nextAllocation) {
+		boolean isolatedWrites = false;
 		for (AllocBlock ab : m_allocBlocks) {
 			if (ab.m_addr == 0)
 				break;
 			
 			ab.reset(cache);
-			if (ab.m_addr <= nextAllocation) { // note that addresses are negative ints
+			
+			isolatedWrites = isolatedWrites || ab.m_saveCommit != null;
+			
+			if (ab.m_addr <= nextAllocation && ab.m_saveCommit == null) { // only free if no isolated writes
 				// this should mean that all allocations were made since last commit
 				// in which case...
 				assert ab.freeBits() == ab.totalBits();
@@ -1052,6 +1056,8 @@ public class FixedAllocator implements Allocator {
 		m_freeTransients = transientbits();
 		
 		assert calcSessionFrees();
+		
+		return isolatedWrites;
 	}
 	
 	private boolean calcSessionFrees() {
