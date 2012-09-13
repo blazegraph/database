@@ -22,9 +22,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.Iterator;
@@ -86,6 +89,8 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
+import com.bigdata.rdf.sail.ISPARQLUpdateListener;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -117,9 +122,29 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String EXPLAIN = "explain";
     
     /**
-     * URL Query parameter used to request the "analytic" query hints.
+     * URL Query parameter used to request the "analytic" query hints. MAY be
+     * <code>null</code>, in which case we do not set
+     * {@link QueryHints#ANALYTIC} query hint.
      */
     protected static final String ANALYTIC = "analytic";
+    
+    /**
+     * URL Query parameter used to request an XHTML response for SPARQL
+     * QUERY or SPARQL UPDATE.  For SPARQL QUERY, this provides an XHTML
+     * table view of the solutions.  For SPARQL UPDATE, this provides an
+     * incremental progress report on the UPDATE request.
+     */
+    protected static final String XHTML = "xhtml";
+    
+    /**
+     * URL Query parameter used to request an incremental XHTML representation
+     * reporting on the progress of a SPARQL UPDATE.
+     * <p>
+     * Note: When this option is specified, the SPARQL UPDATE will use an HTTP
+     * status code of 200 (Ok) even if the UPDATE fails. In the event of an
+     * UPDATE failure, the stack trace will be formatted into the response.
+     */
+    protected static final String MONITOR = "monitor";
     
     /**
      * URL query parameter used to specify a URI in the default graph for SPARQL
@@ -383,7 +408,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
         /** The request. */
         protected final HttpServletRequest req;
-        
+
+        /** The response. */
+        protected final HttpServletResponse resp;
+
         /** Where to write the response. */
         protected final OutputStream os;
 
@@ -419,16 +447,36 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected AbstractOperation sailQueryOrUpdate;
         
         /**
-         * When true, provide an "explanation" for the query (query plan, query
-         * evaluation statistics) rather than the results of the query.
+         * When <code>true</code>, provide an "explanation" for the query (query
+         * plan, query evaluation statistics) rather than the results of the
+         * query.
          */
         final boolean explain;
-        
+
         /**
-         * When true, enable the "analytic" query hints. MAY be
-         * <code>null</code>, in which case we do not set the query hint.
+         * When <code>true</code>, enable the "analytic" query hints. 
          */
         final Boolean analytic;
+
+        /**
+         * When <code>true</code>, provide an view of the XHTML representation
+         * of the solutions or graph result (SPARQL QUERY)
+         * 
+         * @see BigdataRDFContext#XHTML
+         */
+        final boolean xhtml;
+        
+        /**
+         * When <code>true</code>, provide an incremental XHTML representation
+         * reporting on the progress of a SPARQL UPDATE.
+         * <p>
+         * Note: When <code>true</code>, the SPARQL UPDATE will use an HTTP
+         * status code of 200 (Ok) even if the UPDATE fails. In the event of an
+         * UPDATE failure, the stack trace will be formatted into the response.
+         * 
+         * @see BigdataRDFContext#MONITOR
+         */
+        final boolean monitor;
         
         /**
          * 
@@ -470,6 +518,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final Charset charset,//
                 final String fileExt,//
                 final HttpServletRequest req,//
+                final HttpServletResponse resp,//
                 final OutputStream os//
         ) {
 
@@ -487,6 +536,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 throw new IllegalArgumentException();
             if (req == null)
                 throw new IllegalArgumentException();
+            if (resp == null)
+                throw new IllegalArgumentException();
             if (os == null)
                 throw new IllegalArgumentException();
 
@@ -500,9 +551,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.charset = charset;
             this.fileExt = fileExt;
             this.req = req;
+            this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
+                    false);
+            this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
+                    false);
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
 
@@ -523,6 +579,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            tree, etc.
          * @param req
          *            The request.
+         * @param resp
+         *            The response.
          * @param os
          *            Where to write the data for the query result.
          */
@@ -536,6 +594,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                final Charset charset,//
 //                final String fileExt,//
                 final HttpServletRequest req,//
+                final HttpServletResponse resp,//
                 final OutputStream os//
         ) {
 
@@ -546,6 +605,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             if (astContainer == null)
                 throw new IllegalArgumentException();
             if (req == null)
+                throw new IllegalArgumentException();
+            if (resp == null)
                 throw new IllegalArgumentException();
             if (os == null)
                 throw new IllegalArgumentException();
@@ -560,9 +621,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.charset = Charset.forName("UTF-8");
             this.fileExt = null;
             this.req = req;
+            this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
+                    false);
+            this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
+                    false);
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
 
@@ -858,12 +924,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String baseURI,
                 final ASTContainer astContainer, final QueryType queryType,
                 final BooleanQueryResultFormat format,
-                final HttpServletRequest req, final OutputStream os) {
+                final HttpServletRequest req, final HttpServletResponse resp,
+                final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer,
-                    queryType, format.getDefaultMIMEType(),
-                    format.getCharset(), format.getDefaultFileExtension(), req,
-                    os);
+            super(namespace, timestamp, baseURI, astContainer, queryType,
+                    format.getDefaultMIMEType(), format.getCharset(), format
+                            .getDefaultFileExtension(), req, resp, os);
 
         }
 
@@ -871,38 +937,36 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final OutputStream os) throws Exception {
 
             final BigdataSailBooleanQuery query = (BigdataSailBooleanQuery) setupQuery(cxn);
-            
+
             // Note: getQueryTask() verifies that format will be non-null.
             final BooleanQueryResultFormat format = BooleanQueryResultWriterRegistry
                     .getInstance().getFileFormatForMIMEType(mimeType);
 
             final BooleanQueryResultWriter w = BooleanQueryResultWriterRegistry
                     .getInstance().get(format).getWriter(os);
-            
+
             final boolean result = query.evaluate();
-            
+
             w.write(result);
 
         }
 
     }
 
-	/**
-	 * Executes a tuple query.
-	 */
-	private class TupleQueryTask extends AbstractQueryTask {
+    /**
+     * Executes a tuple query.
+     */
+    private class TupleQueryTask extends AbstractQueryTask {
 
         public TupleQueryTask(final String namespace, final long timestamp,
-                final String baseURI,
-                final ASTContainer astContainer, final QueryType queryType,
-                final TupleQueryResultFormat format,
-                final HttpServletRequest req,
+                final String baseURI, final ASTContainer astContainer,
+                final QueryType queryType, final TupleQueryResultFormat format,
+                final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer,
-                    queryType, format.getDefaultMIMEType(),
-                    format.getCharset(), format.getDefaultFileExtension(), req,
-                    os);
+            super(namespace, timestamp, baseURI, astContainer, queryType,
+                    format.getDefaultMIMEType(), format.getCharset(), format
+                            .getDefaultFileExtension(), req, resp, os);
 
 		}
 
@@ -932,11 +996,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public GraphQueryTask(final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
                 final QueryType queryType, final RDFFormat format,
-                final HttpServletRequest req, final OutputStream os) {
+                final HttpServletRequest req, final HttpServletResponse resp,
+                final OutputStream os) {
 
             super(namespace, timestamp, baseURI, astContainer, queryType,
                     format.getDefaultMIMEType(), format.getCharset(), format
-                            .getDefaultFileExtension(), req, os);
+                            .getDefaultFileExtension(), req, resp, os);
 
         }
 
@@ -994,7 +1059,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
         public UpdateTask(final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
-                final HttpServletRequest req, final OutputStream os) {
+                final HttpServletRequest req, final HttpServletResponse resp,
+                final OutputStream os) {
 
             super(namespace, timestamp, baseURI, astContainer,
 //                    null,//queryType
@@ -1002,6 +1068,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                    null,//format.getCharset(), 
 //                    null,//format.getDefaultFileExtension(), 
                     req,//
+                    resp,//
                     os//
                     );
 
@@ -1018,166 +1085,308 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Prepare the UPDATE request.
             final BigdataSailUpdate update = setupUpdate(cxn);
 
-            /*
-             * Execute first. This let's us know whether or not the entire
-             * UPDATE request (one or more operations) was successful and that
-             * let's us communicate the outcome of the request via an HTTP
-             * status code.
-             * 
-             * If you write on the response before doing this step, you will be
-             * unable to send back an HTTP status code indicating a failure.
-             * 
-             * If we want to provide incremental status reports on running
-             * UPDATE requests, then we need to change the API contract and make
-             * sure that our client (RemoteRepository) parses the response
-             * document to figure out whether or not the UPDATE request was
-             * successful instead of just looking at the status code.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/597
-             */
+            final SparqlUpdateResponseWriter listener;
+            final ByteArrayOutputStream baos;
+            if(monitor) {
 
-            /*
-             * Note: The SPARQL UPDATE listener can not provide incremental
-             * reporting due to problem with the timing of when the http
-             * response is committed.  See comments immediately above.
-             */
-            // cxn.getSailConnection().addListener(listener);
+                /*
+                 * Establish a listener that will log the process onto an XHTML
+                 * document that will be delivered (flushed) incrementally to
+                 * the client. The status code for the response will always be
+                 * 200 (Ok). If there is an error, then that error will be
+                 * reported in the XHTML response but NOT in the status code.
+                 */
+                
+                // Do not buffer the response.
+                baos = null;
+                
+                // Always sending an OK with a response entity.
+                resp.setStatus(BigdataServlet.HTTP_OK);
 
-            this.commitTime.set(update.execute2());
+                // This will write the response entity.
+                listener = new SparqlUpdateResponseWriter(resp, os, charset,
+                        true /* reportLoadProgress */, true/* flushEachEvent */);
 
-            /*
-             * Write out the response.
-             */
+            } else {
 
-            final Writer w = new OutputStreamWriter(os, charset);
+                /*
+                 * The listener logs the progress report (with the incremental
+                 * load events) onto an xml document model but DOES NOT write
+                 * anything on the servlet response. If there is an error, the
+                 * HTTP status code will reflect that error. Otherwise we send
+                 * back the XML document with a 200 (Ok) status code.
+                 * 
+                 * Note: This code path supports REST clients that expect the
+                 * status code to reflect the *outcome* of the SPARQL UPDATE
+                 * request. We MUST NOT write the XML document onto the response
+                 * incrementally since the servlet response can become committed
+                 * and we will be unable to change the status code from Ok (200)
+                 * if an error occurs.
+                 */
 
-            final HTMLBuilder doc = new HTMLBuilder(charset.name(), w);
+                // buffer the response here.
+                baos = new ByteArrayOutputStream();
 
-            final XMLBuilder.Node body = writeSparqlUpdateResponseHeader(doc,
-                    charset);
+                listener = new SparqlUpdateResponseWriter(resp, os, charset,
+                        false/* reportLoadProgress */, false/* flushEachEvent */);
+
+            }
 
             try {
+ 
+                // Setup the SPARQL UPDATE listener.
+                cxn.getSailConnection().addListener(listener);
 
-                body.node("p")//
-                        .text("commitTime=" + commitTime.get())//
-                        .close();
+                // Execute the SPARQL UPDATE.
+                this.commitTime.set(update.execute2());
 
-                doc.closeAll(body);
-
-                w.flush();
+                // Write out the response.
+                listener.commit(this.commitTime.get());
 
             } finally {
+                
+                if (monitor)
+                    listener.flush();
 
-                w.close();
-                // os.flush();
-                // os.close();
+            }
+
+            if (baos != null) {
+
+                /*
+                 * Since we buffered the response, we have to send it out now.
+                 */
+                
+                os.write(baos.toByteArray());
+                
+                os.flush();
 
             }
 
         }
 
     }
-    
+
     /**
-     * Write the header of the SPARQL UPDATE response.
-     * 
-     * @param doc
-     *            The document.
-     * @param charset
-     *            The character set.
-     *            
-     * @return The body.
-     * 
-     * @throws IOException
-     */
-    private static XMLBuilder.Node writeSparqlUpdateResponseHeader(
-            final HTMLBuilder doc, final Charset charset) throws IOException {
-
-        XMLBuilder.Node current = doc.root("html");
-        {
-            current = current.node("head");
-            current.node("meta")
-                    .attr("http-equiv", "Content-Type")
-                    .attr("content",
-                            "text/html;charset=" + charset.name())
-                    .close();
-            current.node("title").textNoEncode("bigdata&#174;")
-                    .close();
-            current = current.close();// close the head.
-        }
-
-        // open the body
-        current = current.node("body");
-        
-        return current;
-        
-    }
-
-    /*
-     * Dead code. In order for this approach to work, the client
-     * (RemoteRepository) needs to parse the response document rather than
-     * checking the status code of the response.
+     * Writes the SPARQL UPDATE response document onto the caller's
+     * {@link OutputStream}. Depending on the use case, the stream will either
+     * write directly onto the servlet response or it will be buffered until the
+     * UPDATE request is finished.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/597
+     * 
+     *      TODO Add total elapsed time (in addition to elapsed per operation).
      */
-//    /**
-//     * Writes the SPARQL UPDATE response document.
-//     */
-//    private static class SparqlUpdateResponseWriter implements
-//            ISPARQLUpdateListener {
-//
-//        private final AtomicReference<HTMLBuilder> docRef;
-//        private final Charset charset;
-//        private final AtomicReference<XMLBuilder.Node> bodyRef;
-//        private final Writer w;
-//
-//        public SparqlUpdateResponseWriter(
-//                final AtomicReference<HTMLBuilder> docRef,
-//                final Charset charset,
-//                final AtomicReference<XMLBuilder.Node> bodyRef,
-//                final Writer w) {
-//
-//            this.docRef = docRef;
-//            this.charset = charset;
-//            this.bodyRef = bodyRef;
-//            this.w = w;
-//
-//        }
-//
-//        @Override
-//        public void updateEvent(final SPARQLUpdateEvent e) {
-//            try {
-//                if (bodyRef.get() == null) {
-//                    if (docRef.get() == null) {
-//                        docRef.set();
-//                    }
-//                    bodyRef.set(writeSparqlUpdateResponseHeader(docRef.get(),
-//                            charset));
-//                }
-//                final long ms = TimeUnit.NANOSECONDS.toMillis(e
-//                        .getElapsedNanos());
-//                if (e instanceof SPARQLUpdateEvent.LoadProgress) {
-//                    /*
-//                     * Incremental progress on LOAD.
-//                     */
-//                    final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
-//                    final long parsed = tmp.getParsedCount();
-//                    bodyRef.get().node("p")
-//                            .text("elapsed=" + ms + "ms, parsed=" + parsed);
-//                } else {
-//                    /*
-//                     * End of some UPDATE operation.
-//                     */
-//                    bodyRef.get().node("p").text("elapsed=" + ms + "ms")
-//                            .node("pre").text(e.getUpdate().toString()).close()
-//                            .close();
-//                }
-//            } catch (IOException e1) {
-//                throw new RuntimeException(e1);
-//            }
-//        }
-//
-//    }
+    private static class SparqlUpdateResponseWriter implements
+            ISPARQLUpdateListener {
+
+        private final HttpServletResponse resp;
+        private final OutputStream os;
+        private final Writer w;
+        private final HTMLBuilder doc;
+        private final Charset charset;
+        private final XMLBuilder.Node body;
+        private final boolean reportLoadProgress;
+        private final boolean flushEachEvent;
+
+        /**
+         * 
+         * 
+         * @param os
+         *            The {@link OutputStream}.
+         * @param charset
+         *            The character set.
+         * @param reportLoadProgress
+         *            When <code>true</code>, the incremental load progress will
+         *            be included in the document. Note that this only makes
+         *            sense when the document will be delivered incrementally to
+         *            the client rather than "at-once" after the completion of
+         *            the UPDATE operation.
+         * @param flushEachEvent
+         *            When <code>true</code>, each the {@link Writer} will be
+         *            flushed after each logged event in order to ensure timely
+         *            delivery to the client.
+         * 
+         * @throws IOException
+         */
+        public SparqlUpdateResponseWriter(final HttpServletResponse resp,
+                final OutputStream os, final Charset charset,
+                final boolean reportLoadProgress, final boolean flushEachEvent)
+                throws IOException {
+
+            if (resp == null)
+                throw new IllegalArgumentException();
+            
+            if (os == null)
+                throw new IllegalArgumentException();
+            
+            this.resp = resp;
+            
+            this.os = os;
+            
+            this.charset = charset;
+
+            this.w = new OutputStreamWriter(os, charset);
+
+            this.doc = new HTMLBuilder(charset.name(), w);
+
+            this.reportLoadProgress = reportLoadProgress;
+            
+            this.flushEachEvent = flushEachEvent;
+            
+            this.body = writeSparqlUpdateResponseHeader();
+
+        }
+
+        /**
+         * Write the header of the SPARQL UPDATE response.
+         * 
+         * @return The body.
+         * 
+         * @throws IOException
+         */
+        private XMLBuilder.Node writeSparqlUpdateResponseHeader()
+                throws IOException {
+
+            XMLBuilder.Node current = doc.root("html");
+            {
+                current = current.node("head");
+                current.node("meta").attr("http-equiv", "Content-Type")
+                        .attr("content", "text/html;charset=" + charset.name())
+                        .close();
+                current.node("title").textNoEncode("bigdata&#174;").close();
+                current = current.close();// close the head.
+            }
+
+            // open the body
+            current = current.node("body");
+
+            return current;
+            
+        }
+
+        @Override
+        public void updateEvent(final SPARQLUpdateEvent e) {
+
+            try {
+
+                final long ms = TimeUnit.NANOSECONDS.toMillis(e
+                        .getElapsedNanos());
+            
+                if (e instanceof SPARQLUpdateEvent.LoadProgress) {
+                
+                    if (reportLoadProgress) {
+
+                        /*
+                         * Incremental progress on LOAD.
+                         * 
+                         * TODO Write out the LOAD operation on the first
+                         * incremental update rather than at the end, but only
+                         * if we are doing incremental updates.
+                         */
+                        
+                        final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
+                        
+                        final long parsed = tmp.getParsedCount();
+                        
+                        body.node("br")
+                                .text("elapsed=" + ms + "ms, parsed=" + parsed)
+                                .close();
+
+                    }
+
+                } else if (e.getCause() != null) {
+
+                    /*
+                     * An exception occurred when processing some update
+                     * operation.
+                     */
+                    
+                    final Throwable t = e.getCause();
+                    
+                    final StringWriter w = new StringWriter();
+                    
+                    final PrintWriter pw = new PrintWriter(w);
+                    
+                    t.printStackTrace(pw);
+                    
+                    pw.flush();
+                    pw.close();
+                    
+                    body.node("p").text("ABORT")//
+                    .node("pre").text(e.getUpdate().toString()).close()//
+                    .node("pre").text(w.toString()).close()//
+                    .text("elapsed=" + ms + "ms").close();
+
+                    // horizontal line after each operation.
+                    body.node("hr").close();
+
+                } else {
+
+                    /*
+                     * End of some UPDATE operation.
+                     */
+                    
+                    body.node("p")//
+                            .node("pre").text(e.getUpdate().toString()).close()//
+                            .text("elapsed=" + ms + "ms")//
+                            .close();
+
+                    // horizontal line after each operation.
+                    body.node("hr").close();
+
+                }
+
+                if (flushEachEvent) {
+
+                    /*
+                     * Flush the response for each event so the client
+                     * (presumably a human operator) can see the progress log
+                     * update "live".
+                     */
+                    
+                    w.flush();
+                    
+                    os.flush();
+                    
+                    /*
+                     * Note: appears to be necessary for incremental writes.
+                     */
+                    resp.flushBuffer();
+                    
+                }
+
+            } catch (IOException e1) {
+            
+                throw new RuntimeException(e1);
+                
+            }
+
+        }
+
+        /**
+         * Write the commit time into the document.
+         * 
+         * @param commitTime
+         *            The commit time.
+         */
+        public void commit(final long commitTime) throws IOException {
+
+            body.node("p").text("COMMIT: commitTime=" + commitTime)//
+                    .close();
+
+        }
+
+        public void flush() throws IOException {
+
+            doc.closeAll(body);
+
+            w.flush();
+
+            w.close();
+            
+        }
+        
+    }
 
     /**
      * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
@@ -1255,7 +1464,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 log.debug(astContainer.toString());
 
             return new UpdateTask(namespace, timestamp, baseURI, astContainer,
-                    req, os);
+                    req, resp, os);
 
         }
         
@@ -1300,7 +1509,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
 
             return new AskQueryTask(namespace, timestamp, baseURI,
-                    astContainer, queryType, format, req, os);
+                    astContainer, queryType, format, req, resp, os);
 
         }
         case DESCRIBE:
@@ -1309,7 +1518,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final RDFFormat format = util.getRDFFormat(RDFFormat.RDFXML);
 
             return new GraphQueryTask(namespace, timestamp, baseURI,
-                    astContainer, queryType, format, req, os);
+                    astContainer, queryType, format, req, resp, os);
 
         }
         case SELECT: {
@@ -1318,7 +1527,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     .getTupleQueryResultFormat(TupleQueryResultFormat.SPARQL);
 
             return new TupleQueryTask(namespace, timestamp, baseURI,
-                    astContainer, queryType, format, req, os);
+                    astContainer, queryType, format, req, resp, os);
 
         }
         } // switch(queryType)

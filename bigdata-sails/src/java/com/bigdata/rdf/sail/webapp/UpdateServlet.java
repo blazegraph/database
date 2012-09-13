@@ -80,7 +80,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             return;
         }
 
-        final String queryStr = req.getParameter("query");
+        final String queryStr = req.getParameter(QueryServlet.ATTR_QUERY);
 
         final String contentType = req.getContentType();
 
@@ -119,7 +119,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         final String namespace = getNamespace(req);
 
-        final String queryStr = req.getParameter("query");
+        final String queryStr = req.getParameter(QueryServlet.ATTR_QUERY);
 
         if (queryStr == null)
             throw new UnsupportedOperationException();

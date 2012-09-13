@@ -29,19 +29,34 @@ import com.bigdata.rdf.sparql.ast.Update;
  * An event reflecting progress for some sequence of SPARQL UPDATE operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- *         TODO Support incremental reporting on long running operations,
- *         especially LOAD.
  */
 public class SPARQLUpdateEvent {
 
     private final Update op;
     private final long elapsed;
+    private final Throwable cause;
     
-    public SPARQLUpdateEvent(final Update op, final long elapsed) {
+    /**
+     * 
+     * @param op
+     *            The {@link Update} operation.
+     * @param elapsed
+     *            The elapsed time.
+     * @param cause
+     *            The cause iff an error occurred and otherwise
+     *            <code>null</code>.
+     */
+    public SPARQLUpdateEvent(final Update op, final long elapsed,
+            final Throwable cause) {
 
+        if (op == null)
+            throw new IllegalArgumentException();
+        
         this.op = op;
+        
         this.elapsed = elapsed;
+        
+        this.cause = cause;
         
     }
     
@@ -60,6 +75,13 @@ public class SPARQLUpdateEvent {
     }
 
     /**
+     * The cause iff an error occurred and otherwise <code>null</code>.
+     */
+    public Throwable getCause() {
+        return cause;
+    }
+    
+    /**
      * Incremental progress report during <code>LOAD</code>.
      */
     public static class LoadProgress extends SPARQLUpdateEvent {
@@ -69,7 +91,7 @@ public class SPARQLUpdateEvent {
         public LoadProgress(final Update op, final long elapsed,
                 final long nparsed) {
 
-            super(op, elapsed);
+            super(op, elapsed, null/* cause */);
 
             this.nparsed = nparsed;
 

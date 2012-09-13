@@ -99,7 +99,31 @@ public class QueryServlet extends BigdataRDFServlet {
      * a SPARQL DESCRIBE query.
      */
     static final transient String ATTR_QUERY = "query";
+
+    /**
+     * The name of the URL query parameter that contains the SPARQL UPDATE
+     * request.
+     */
+    static final transient String ATTR_UPDATE = "update";
+
+    /**
+     * The name of the URL query parameter that indicates an ESTCARD request
+     * (fast range count).
+     */
+    static final transient String ATTR_ESTCARD = "ESTCARD";
     
+    /**
+     * The name of the URL query parameter that indicates a shards report
+     * request (scale-out only).
+     */
+    static final transient String ATTR_SHARDS = "SHARDS";
+    
+    /**
+     * The name of the URL query parameter that indicates a request for a random
+     * {@link UUID}.
+     */
+    static final transient String ATTR_UUID = "uuid";
+
 //    /**
 //     * The name of the request attribute for the {@link AbstractQueryTask}.
 //     */
@@ -113,7 +137,7 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (req.getParameter("update") != null) {
+        if (req.getParameter(ATTR_UPDATE) != null) {
             
             // SPARQL 1.1 UPDATE.
             doUpdate(req, resp);
@@ -134,19 +158,19 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (req.getParameter("query") != null) {
+        if (req.getParameter(ATTR_QUERY) != null) {
             
             doQuery(req, resp);
             
-        } else if (req.getParameter("uuid") != null) {
+        } else if (req.getParameter(ATTR_UUID) != null) {
 
             doUUID(req, resp);
             
-        } else if (req.getParameter("ESTCARD") != null) {
+        } else if (req.getParameter(ATTR_ESTCARD) != null) {
             
             doEstCard(req, resp);
             
-        } else if (req.getParameter("SHARDS") != null) {
+        } else if (req.getParameter(ATTR_SHARDS) != null) {
             
             doShardReport(req, resp);
             
