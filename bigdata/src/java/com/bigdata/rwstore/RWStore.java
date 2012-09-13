@@ -1809,10 +1809,11 @@ public class RWStore implements IStore, IBufferedWriter {
             throw new IllegalMonitorStateException();
         }
 	    
-	    // protect recyling with unmet quorum
-	    if (m_quorum != null && !m_quorum.isQuorumMet()) {
-	    	return true;
-	    }
+	    // backoff until synchronization is implemented
+//	    // protect recyling with unmet quorum
+//	    if (m_quorum != null && !m_quorum.isQuorumMet()) {
+//	    	return true;
+//	    }
 	    
 	    return m_minReleaseAge == 0 && (m_activeTxCount > 0 || !m_contexts.isEmpty());
 	}
