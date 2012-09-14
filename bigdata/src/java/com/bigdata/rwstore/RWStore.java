@@ -2385,6 +2385,11 @@ public class RWStore implements IStore, IBufferedWriter {
                 m_writeCache.close();
                 m_writeCache = newWriteCache();
             }
+            /*
+             * Discard any writes on the delete blocks. Those deletes MUST NOT
+             * be applied after a reset() on the RWStore.
+             */
+            m_deferredFreeOut.reset();
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to reset the store", e);
 		} finally {
