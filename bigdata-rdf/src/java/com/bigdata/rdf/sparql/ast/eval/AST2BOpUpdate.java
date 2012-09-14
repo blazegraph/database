@@ -41,6 +41,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
@@ -93,8 +94,8 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
@@ -1496,7 +1497,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
              */
 
             rdfParser.parse(is, baseURL);
-
+            
         } finally {
 
             if (hconn instanceof HttpURLConnection) {
@@ -1570,10 +1571,27 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                 // notify listener(s)
                 conn.fireEvent(new SPARQLUpdateEvent.LoadProgress(op, elapsed,
-                        nparsed));
+                        nparsed, false/* done */));
 
             }
 
+        }
+
+        /**
+         * Overridden to send out an incremental progress report for the end of
+         * the LOAD operation.
+         */
+        @Override
+        public void endRDF() throws RDFHandlerException {
+
+            final long nparsed = nmodified.get();
+
+            final long elapsed = System.nanoTime() - beginNanos;
+
+            // notify listener(s)
+            conn.fireEvent(new SPARQLUpdateEvent.LoadProgress(op, elapsed,
+                    nparsed, true/* done */));
+            
         }
 
     }

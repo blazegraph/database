@@ -312,6 +312,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
         final NxParser parser = new NxParser(r, strict, parseDTs);
 
+        handler.startRDF();
+        
         while (parser.hasNext()) {
 
             final Node[] nodes = parser.next();
@@ -368,6 +370,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
         }
 
+        handler.endRDF();
+        
     }
 
 }
