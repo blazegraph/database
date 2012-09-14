@@ -1308,7 +1308,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                             // Write out the LOAD operation.
                             body.node("p")//
-                            .node("pre").text(e.getUpdate().toString()).close()//
+                            .node("pre").text(thisOp.toString()).close()//
                             .close();
 
                         }
