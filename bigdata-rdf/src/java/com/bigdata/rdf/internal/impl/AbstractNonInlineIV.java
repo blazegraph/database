@@ -177,10 +177,10 @@ abstract public class AbstractNonInlineIV<V extends BigdataValue, T>
      * Implements {@link URI#getNamespace()}.
      */
     public String getNamespace() {
-    	
-    	if (!isURI())
-    		throw new ClassCastException();
-    	
+
+        if (!isURI())
+            throw new ClassCastException();
+
 		return ((URI) getValue()).getNamespace();
     	
     }
@@ -189,11 +189,11 @@ abstract public class AbstractNonInlineIV<V extends BigdataValue, T>
      * Implements {@link BNode#getID()}.
      */
     public String getID() {
-    	
-    	if (!isBNode())
-    		throw new ClassCastException();
-    	
-		return ((BNode) getValue()).getID();
+
+        if (!isBNode())
+            throw new ClassCastException();
+
+        return ((BNode) getValue()).getID();
     	
     }
 

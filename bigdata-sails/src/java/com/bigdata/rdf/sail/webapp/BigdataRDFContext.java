@@ -1179,6 +1179,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private static class SparqlUpdateResponseWriter implements
             ISPARQLUpdateListener {
 
+        private final long begin;
         private final HttpServletResponse resp;
         private final OutputStream os;
         private final Writer w;
@@ -1233,6 +1234,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             this.flushEachEvent = flushEachEvent;
             
+            this.begin = System.nanoTime();
+            
             this.body = writeSparqlUpdateResponseHeader();
 
         }
@@ -1269,7 +1272,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             try {
 
-                final long ms = TimeUnit.NANOSECONDS.toMillis(e
+                // Total elapsed milliseconds from start of update request.
+                final long totalElapsedMillis = TimeUnit.NANOSECONDS
+                        .toMillis(System.nanoTime() - begin);
+
+                // Elapsed milliseconds for this update operation.
+                final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(e
                         .getElapsedNanos());
             
                 if (e instanceof SPARQLUpdateEvent.LoadProgress) {
@@ -1289,8 +1297,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                         final long parsed = tmp.getParsedCount();
                         
                         body.node("br")
-                                .text("elapsed=" + ms + "ms, parsed=" + parsed)
-                                .close();
+                                .text("totalElapsed=" + totalElapsedMillis
+                                        + "ms, elapsed=" + elapsedMillis
+                                        + "ms, parsed=" + parsed).close();
 
                     }
 
@@ -1315,7 +1324,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     body.node("p").text("ABORT")//
                     .node("pre").text(e.getUpdate().toString()).close()//
                     .node("pre").text(w.toString()).close()//
-                    .text("elapsed=" + ms + "ms").close();
+                    .text("totalElapsed=" + totalElapsedMillis
+                            + "ms, elapsed=" + elapsedMillis + "ms")
+                    .close();
 
                     // horizontal line after each operation.
                     body.node("hr").close();
@@ -1325,10 +1336,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     /*
                      * End of some UPDATE operation.
                      */
-                    
+
                     body.node("p")//
                             .node("pre").text(e.getUpdate().toString()).close()//
-                            .text("elapsed=" + ms + "ms")//
+                            .text("totalElapsed=" + totalElapsedMillis
+                                    + "ms, elapsed=" + elapsedMillis + "ms")//
                             .close();
 
                     // horizontal line after each operation.
@@ -1371,7 +1383,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         public void commit(final long commitTime) throws IOException {
 
-            body.node("p").text("COMMIT: commitTime=" + commitTime)//
+            // Total elapsed milliseconds from start of update request.
+            final long totalElapsedMillis = TimeUnit.NANOSECONDS
+                    .toMillis(System.nanoTime() - begin);
+
+            body.node("p")
+                    .text("COMMIT: totalElapsed=" + totalElapsedMillis
+                            + "ms, commitTime=" + commitTime)//
                     .close();
 
         }

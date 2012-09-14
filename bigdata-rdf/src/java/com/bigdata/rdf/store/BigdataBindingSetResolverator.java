@@ -201,8 +201,8 @@ public class BigdataBindingSetResolverator
             if (required == null) {
             	
                 @SuppressWarnings("rawtypes")
-                final Iterator<Map.Entry<IVariable, IConstant>> itr = 
-                	bindingSet.iterator();
+                final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
+                        .iterator();
 
 	            while (itr.hasNext()) {
 	

@@ -383,22 +383,26 @@ public class BlobIV<V extends BigdataValue> extends
 //
 //	}
 
-//    /**
-//     * {@inheritDoc}
-//     * <p>
-//     * Creates a unique blank node ID based on the {@link BlobIV}'s internal
-//     * data.
-//     */
-//    public String getID() {
-//
-//        final long id = ((long) flags()) << 56/* hash:int + counter:short */
-//                | ((long) hash) << 16/* short */| counter;
-//
-//		final String idStr = Long.toString(id);
-//		
-//		return idStr;
-//
-//	}
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Creates a unique blank node ID based on the {@link BlobIV}'s internal
+     * data.
+     */
+    @Override
+    public String getID() {
+
+        if (!isBNode())
+            throw new ClassCastException();
+
+        final long id = ((long) flags()) << 56/* hash:int + counter:short */
+                | ((long) hash) << 16/* short */| counter;
+
+        final String idStr = Long.toString(id);
+
+        return idStr;
+
+    }
 
     @Override
     final public byte getExtensionByte() {

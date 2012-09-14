@@ -2468,24 +2468,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             if (iv == null)
                 throw new AssertionError();
-            
-    		if (iv.hasValue()) {
-                
-            	if (isDebugEnabled)
-            		log.debug("already materialized: " + iv.getValue());
-            	
-            	// already materialized
-            	ret.put(iv, iv.getValue());
-            	
+
+            if (iv.hasValue()) {
+
+                if (isDebugEnabled)
+                    log.debug("already materialized: " + iv.getValue());
+
+                // already materialized
+                ret.put(iv, iv.getValue());
+
             } else if (iv.isInline()) {
-                
+
                 // translate it into a value directly
                 ret.put(iv, iv.asValue(this));
 
             } else {
 
                 final BigdataValue value = _getTermId(iv);
-                
+
                 if (value != null) {
 
                     assert value.getValueFactory() == valueFactory;
@@ -2515,16 +2515,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 }
 
             }
-    		
+
         }
 
         if (numNotFound == 0) {
 
             // Done.
             return ret;
-            
+
         }
-        
+   
         /*
          * Setup and run task(s) to resolve IV(s).
          */
@@ -2684,8 +2684,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * identifier.
              */
 
-        	final String id = 't' + ((BNode) iv).getID();
-        	
+            final String id = 't' + ((BNode) iv).getID();
+
             final BigdataBNode bnode = valueFactory.createBNode(id);
 
             // set the term identifier on the object.
