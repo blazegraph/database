@@ -347,6 +347,180 @@ public class TestRWJournal extends AbstractJournalTestCase {
     }
 
     /**
+     * Unit test for an issue where the {@link RWStore} did not discard the
+     * logged delete blocks in {@link RWStore#reset()}.
+     * <p>
+     * This test writes some records and commits. It then deletes those records
+     * and invokes {@link RWStore#reset()}. It then re-deletes those records and
+     * commits. If we have failed to discard the logged deletes, then we will
+     * now have double-deletes in the delete blocks for that commit point. The
+     * commit time is noted.
+     * <p>
+     * Next, the test creates several more commit points in order to trigger
+     * recycling. We verify that the commit record for the commit time noted
+     * above is no longer accessible. If the test reaches this point, then we
+     * know that double-deletes were not logged.
+     * <p>
+     * Note: This test was verified as correctly detecting the bug described in
+     * the ticket.
+     * <p>
+     * Note: The recycler MUST be used for this test.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/602">
+     *      RWStore does not discard logged deletes on reset()</a>
+     */
+    public void test_deleteBlocksDiscardedOnReset() {
+
+        final Properties p = getProperties();
+        
+        // The recycler MUST be used so we log delete blocks.
+        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "1");
+
+        final Journal store = new Journal(p);
+
+        try {
+        
+            /*
+             * Create a named index and write a bunch of data.
+             */
+            final String name = "name";
+            final long commitTime0;
+            {
+
+                final BTree btree;
+                final IndexMetadata metadata = new IndexMetadata(
+                        UUID.randomUUID());
+
+                metadata.setBranchingFactor(3);
+
+                metadata.setDeleteMarkers(false);
+
+                btree = (BTree) store.register(name, metadata);
+
+                final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
+
+                final int NTRIALS = 1;
+
+                final int NINSERTS = 100;
+
+                final double removeAllRate = 0.001;
+
+                final double checkpointRate = 0.001;
+
+                for (int i = 0; i < NTRIALS; i++) {
+
+                    for (int j = 0; j < NINSERTS; j++) {
+
+                        if (r.nextDouble() < checkpointRate) {
+
+                            // flush to the backing store.
+                            if (log.isInfoEnabled())
+                                log.info("checkpoint: " + btree.getStatistics());
+
+                            btree.writeCheckpoint();
+
+                        }
+
+                        if (r.nextDouble() < removeAllRate) {
+
+                            if (log.isInfoEnabled())
+                                log.info("removeAll: " + btree.getStatistics());
+
+                            btree.removeAll();
+
+                        }
+
+                        final int tmp = r.nextInt(10000);
+
+                        final byte[] key = keyBuilder.reset().append(tmp)
+                                .getKey();
+
+                        btree.insert(key, new SimpleEntry(tmp));
+
+                    }
+
+                }
+
+                // We've written a bunch of data, now commit.
+                commitTime0 = store.commit();
+
+            }
+            
+            /*
+             * Now, removeAll(). This will cause a bunch of deletes, but we will
+             * abort rather than committing.
+             */
+            {
+
+                final BTree btree = store.getIndex(name);
+                
+                assertNotNull(btree);
+
+                if (log.isInfoEnabled())
+                    log.info("will removeAll: " + btree.getStatistics());
+
+                btree.removeAll();
+
+                if (log.isInfoEnabled())
+                    log.info("will checkpoint: " + btree.getStatistics());
+
+                btree.writeCheckpoint();
+
+                if (log.isInfoEnabled())
+                    log.info(" did checkpoint: " + btree.getStatistics());
+                
+                // discard the write set (and hopefully the delete blocks)
+                store.abort();
+
+            }
+            
+            /*
+             * Now do it again, but this time we will do the commit.
+             */
+            final long commitTime1;
+            {
+                
+                final BTree btree = store.getIndex(name);
+                
+                assertNotNull(btree);
+
+                if (log.isInfoEnabled())
+                    log.info("will removeAll: " + btree.getStatistics());
+
+                btree.removeAll();
+
+                if (log.isInfoEnabled())
+                    log.info("will checkpoint: " + btree.getStatistics());
+
+                btree.writeCheckpoint();
+
+                if (log.isInfoEnabled())
+                    log.info(" did checkpoint: " + btree.getStatistics());
+                
+                commitTime1 = store.commit();
+                
+            }
+
+            /*
+             * Write ahead, forcing recycling of commit points.
+             */
+            for(int i=0; i<10; i++) {
+                
+                store.write(getRandomData());
+                
+                store.commit();
+                
+            }
+            
+        } finally {
+
+            store.destroy();
+
+        }
+        
+    }
+
+    /**
 	 * Test suite integration for {@link AbstractRestartSafeTestCase}.
 	 * 
 	 * @todo there are several unit tests in this class that deal with
