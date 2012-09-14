@@ -69,7 +69,7 @@ public class BlobsIndexHelper {
     public static final transient int SIZEOF_COUNTER = Bytes.SIZEOF_SHORT;
 
     /** The maximum value of the hash collision counter (unsigned short). */
-    public static final transient int MAX_COUNTER = (2 ^ 16) - 1;
+    public static final transient int MAX_COUNTER = ((1 << 16) - 1);
 
     /** The offset at which the counter occurs in the key. */
     public static final transient int OFFSET_COUNTER = 1/* flags */+ 1/* extension */+ SIZEOF_HASH /* hashCode */;

@@ -95,6 +95,7 @@ import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
@@ -1172,9 +1173,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * write directly onto the servlet response or it will be buffered until the
      * UPDATE request is finished.
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/597
-     * 
-     *      TODO Add total elapsed time (in addition to elapsed per operation).
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/597">
+     *      SPARQL UPDATE Listener </a>
      */
     private static class SparqlUpdateResponseWriter implements
             ISPARQLUpdateListener {
@@ -1188,6 +1188,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
         private final XMLBuilder.Node body;
         private final boolean reportLoadProgress;
         private final boolean flushEachEvent;
+        /**
+         * Used to correlate incremental LOAD progress messages.
+         */
+        private volatile Update lastOp = null;
 
         /**
          * 
@@ -1286,20 +1290,35 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                         /*
                          * Incremental progress on LOAD.
-                         * 
-                         * TODO Write out the LOAD operation on the first
-                         * incremental update rather than at the end, but only
-                         * if we are doing incremental updates.
                          */
                         
                         final SPARQLUpdateEvent.LoadProgress tmp = (SPARQLUpdateEvent.LoadProgress) e;
                         
                         final long parsed = tmp.getParsedCount();
                         
+                        final Update thisOp = e.getUpdate();
+
+                        if (thisOp != lastOp) {
+
+                            /*
+                             * This is the first incremental load progress
+                             * report for this LOAD operation.
+                             */
+                            lastOp = thisOp;
+
+                            // Write out the LOAD operation.
+                            body.node("p")//
+                            .node("pre").text(e.getUpdate().toString()).close()//
+                            .close();
+
+                        }
+                        
                         body.node("br")
                                 .text("totalElapsed=" + totalElapsedMillis
                                         + "ms, elapsed=" + elapsedMillis
-                                        + "ms, parsed=" + parsed).close();
+                                        + "ms, parsed=" + parsed + ", tps="
+                                        + tmp.triplesPerSecond() + ", done="
+                                        + tmp.isDone()).close();
 
                     }
 
@@ -1337,12 +1356,38 @@ public class BigdataRDFContext extends BigdataBaseContext {
                      * End of some UPDATE operation.
                      */
 
-                    body.node("p")//
-                            .node("pre").text(e.getUpdate().toString()).close()//
-                            .text("totalElapsed=" + totalElapsedMillis
-                                    + "ms, elapsed=" + elapsedMillis + "ms")//
-                            .close();
-
+                    if (lastOp == e.getUpdate()) {
+                        /*
+                         * The end of a LOAD operation for which we reported the
+                         * incremental progress. In this case, the LOAD
+                         * operation was already written onto the response
+                         * document, including the final report from the end of
+                         * the parser run. So, all we have to do here is clear
+                         * the reference.
+                         */
+                        lastOp = null;
+//                        body.node("p")
+//                                //
+////                                .node("pre")
+////                                .text(e.getUpdate().toString())
+////                                .close()
+//                                //
+//                                .text("totalElapsed=" + totalElapsedMillis
+//                                        + "ms, elapsed=" + elapsedMillis + "ms")//
+//                                .close();
+                    } else {
+                    
+                        body.node("p")
+                                //
+                                .node("pre")
+                                .text(e.getUpdate().toString())
+                                .close()
+                                //
+                                .text("totalElapsed=" + totalElapsedMillis
+                                        + "ms, elapsed=" + elapsedMillis + "ms")//
+                                .close();
+                    }
+                    
                     // horizontal line after each operation.
                     body.node("hr").close();
 

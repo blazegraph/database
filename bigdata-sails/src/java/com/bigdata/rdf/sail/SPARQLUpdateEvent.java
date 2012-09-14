@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail;
 
+import java.util.concurrent.TimeUnit;
+
 import com.bigdata.rdf.sparql.ast.Update;
 
 /**
@@ -87,13 +89,16 @@ public class SPARQLUpdateEvent {
     public static class LoadProgress extends SPARQLUpdateEvent {
 
         private final long nparsed;
+        private final boolean done;
 
         public LoadProgress(final Update op, final long elapsed,
-                final long nparsed) {
+                final long nparsed, final boolean done) {
 
             super(op, elapsed, null/* cause */);
 
             this.nparsed = nparsed;
+            
+            this.done = done;
 
         }
 
@@ -120,6 +125,38 @@ public class SPARQLUpdateEvent {
 
         }
         
+        /**
+         * Return <code>true</code> iff the LOAD operation has finished parsing
+         * the document.
+         * <p>
+         * Note: This does not mean that the statements have been written
+         * through to the disk, just that the parsed is done running.
+         */
+        public boolean isDone() {
+            
+            return done;
+            
+        }
+        
+        /**
+         * Report the parser rate in triples per second.
+         */
+        public long triplesPerSecond() {
+
+            long elapsedMillis = TimeUnit.NANOSECONDS
+                    .toMillis(getElapsedNanos());
+
+            if (elapsedMillis == 0) {
+
+                // Note: Avoid divide by zero error.
+                elapsedMillis = 1;
+
+            }
+
+            return ((long) (((double) nparsed) / ((double) elapsedMillis) * 1000d));
+
+        }
+
     }
-    
+
 }
