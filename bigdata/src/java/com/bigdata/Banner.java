@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -78,6 +79,12 @@ public class Banner {
         String QUIET = "com.bigdata.Banner.quiet";
 
         /**
+         * Suppress the installation of a default
+         * {@link UncaughtExceptionHandler}.
+         */
+        String NOCATCH = "com.bigdata.Banner.nocatch";
+
+        /**
          * This may be used to disable JMX MBeans which self-report on the log4j
          * properties.
          */
@@ -88,8 +95,22 @@ public class Banner {
     static public void banner() {
         
         if(didBanner.compareAndSet(false/*expect*/, true/*update*/)) {
-        
+
             final boolean quiet = Boolean.getBoolean(Options.QUIET);
+
+            final boolean nocatch = Boolean.getBoolean(Options.NOCATCH);
+
+            if (!nocatch) {
+                /*
+                 * Set a logger for any uncaught exceptions.
+                 */
+                Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+                    public void uncaughtException(final Thread t,
+                            final Throwable e) {
+                        log.error("Uncaught exception in thread", e);
+                    }
+                });
+            }
 
             if (!quiet) {
 
