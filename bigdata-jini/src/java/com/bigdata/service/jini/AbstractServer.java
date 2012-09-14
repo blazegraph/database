@@ -477,12 +477,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         setSecurityManager();
 
-        Thread.setDefaultUncaughtExceptionHandler(
-                new Thread.UncaughtExceptionHandler() {
-                    public void uncaughtException(Thread t, Throwable e) {
-                        log.warn("Uncaught exception in thread", e);
-                    }
-                });
+        /*
+         * Display the banner.
+         * 
+         * Note: This also installs the UncaughtExceptionHandler.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/601
+         */
+        Banner.banner();
+//        Thread.setDefaultUncaughtExceptionHandler(
+//                new Thread.UncaughtExceptionHandler() {
+//                    public void uncaughtException(Thread t, Throwable e) {
+//                        log.warn("Uncaught exception in thread", e);
+//                    }
+//                });
 
         /*
          * Read jini configuration & service properties 
