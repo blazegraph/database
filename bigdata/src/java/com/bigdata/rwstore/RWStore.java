@@ -2388,6 +2388,9 @@ public class RWStore implements IStore, IBufferedWriter {
             /*
              * Discard any writes on the delete blocks. Those deletes MUST NOT
              * be applied after a reset() on the RWStore.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/602
+             * (RWStore does not discard deferred deletes on reset)
              */
             m_deferredFreeOut.reset();
 		} catch (Exception e) {
