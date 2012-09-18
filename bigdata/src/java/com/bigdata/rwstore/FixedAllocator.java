@@ -1141,7 +1141,7 @@ public class FixedAllocator implements Allocator {
 	void setAddressExternal(final int latchedAddr) {
 		final int offset = ((-latchedAddr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
 	
-		final int nbits = 32 * getBlockSize();
+		final int nbits = 32 * m_bitSize;
 		final int block = offset/nbits;
 		final int bit = offset % nbits;
 		
