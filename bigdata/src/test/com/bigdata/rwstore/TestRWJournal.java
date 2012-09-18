@@ -37,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -1795,6 +1796,36 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			
 			// and can be "re-added"
 			rw2.addAddress(addr1, 123);
+		}
+
+		/**
+		 * Test low level RWStore add/removeAddress methods as used in HA
+		 * WriteCache replication to ensure Allocation consistency
+		 * 
+		 * @throws IOException
+		 */
+		public void testStressReplication() throws IOException {
+
+			// Create a couple of stores with temp files
+			final Journal store1 = (Journal) getStore();
+			final Journal store2 = (Journal) getStore();
+			try {		
+				final RWStore rw1 = ((RWStrategy) store1.getBufferStrategy()).getStore();
+				final RWStore rw2 = ((RWStrategy) store2.getBufferStrategy()).getStore();
+	
+				assertTrue(rw1 != rw2);
+				
+				final Random r = new Random();
+				
+				for (int i = 0; i < 100000; i++) {
+					final int sze = 1 + r.nextInt(2000);
+					final int addr = rw1.alloc(sze, null);
+					rw2.addAddress(addr, sze);
+				}
+			} finally {
+				store1.destroy();
+				store2.destroy();
+			}
 		}
 
 		/**
