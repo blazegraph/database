@@ -1133,8 +1133,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             }
 
-            try {
- 
+            /*
+             * Run the update.
+             */
+            {
+
                 // Setup the SPARQL UPDATE listener.
                 cxn.getSailConnection().addListener(listener);
 
@@ -1144,10 +1147,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // Write out the response.
                 listener.commit(this.commitTime.get());
 
-            } finally {
-                
-                if (monitor)
-                    listener.flush();
+                // Flush the listener (close document elements, etc).
+                listener.flush();
 
             }
 
@@ -1157,8 +1158,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
                  * Since we buffered the response, we have to send it out now.
                  */
                 
+                // Send an OK with a response entity.
+                resp.setStatus(BigdataServlet.HTTP_OK);
+
+                // Copy the document into the response.
+                baos.flush();
                 os.write(baos.toByteArray());
-                
+
+                // Flush the response.
                 os.flush();
 
             }
