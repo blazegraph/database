@@ -1068,7 +1068,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
                 // in units of -32K.
                 m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
-
+                
 			}
 	
             /*
@@ -3179,6 +3179,9 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_reopener.raf.setLength(toAddr);
             storeCounters.get().ntruncate++;
 			
+            // must ensure writeCache is in sync for HA
+			m_writeCache.setExtent(toAddr);
+
 			if (log.isInfoEnabled()) log.info("Extend file done");
 		} catch (Throwable t) {
 			throw new RuntimeException("Force Reopen", t);
@@ -3758,16 +3761,14 @@ public class RWStore implements IStore, IBufferedWriter {
 	    final long currentExtent = convertAddr(m_fileSize);
 		
 		if (extent > currentExtent) {
-
+			
 		    extendFile(convertFromAddr(extent - currentExtent));
 		    
 		} else if (extent < currentExtent) {
-         
             throw new IllegalArgumentException(
                     "Cannot shrink RWStore extent: currentExtent="
                             + currentExtent + ", fileSize=" + m_fileSize
                             + ", newValue=" + extent);
-
         }
 		
 	}
