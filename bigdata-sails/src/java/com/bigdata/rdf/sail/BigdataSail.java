@@ -357,6 +357,26 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DESCRIBE_MODE = BigdataSail.class
                 .getPackage().getName() + ".describeMode";
 
+        /**
+         * Option specifies the iteration limit for the algorithm used to
+         * compute DESCRIBE responses (optional).
+         * 
+         * @see QueryHints#DESCRIBE_ITERATION_LIMIT
+         * @see QueryHints#DEFAULT_DESCRIBE_ITERATION_LIMIT
+         */
+        public static final String DESCRIBE_ITERATION_LIMIT = BigdataSail.class
+                .getPackage().getName() + ".describeIterationLimit";
+
+        /**
+         * Option specifies the statement limit for the algorithm used to
+         * compute DESCRIBE responses (optional).
+         * 
+         * @see QueryHints#DESCRIBE_STATEMENT_LIMIT
+         * @see QueryHints#DEFAULT_DESCRIBE_STATEMENT_LIMIT
+         */
+        public static final String DESCRIBE_STATEMENT_LIMIT = BigdataSail.class
+                .getPackage().getName() + ".describeIterationStatementLimit";
+
     }
 
     /**

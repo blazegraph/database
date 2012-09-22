@@ -478,6 +478,12 @@ public class ASTEvalHelper {
         final DescribeModeEnum describeMode = context
                 .getDescribeMode(optimizedQuery.getProjection());
 
+        final int describeIterationLimit = context
+                .getDescribeIterationLimit(optimizedQuery.getProjection());
+
+        final int describeStatementlimit = context
+                .getDescribeStatementLimit(optimizedQuery.getProjection());
+
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions2;
         final ConcurrentHashSet<BigdataValue> describedResources;
         if (describeCache != null) {
@@ -553,7 +559,8 @@ public class ASTEvalHelper {
              * client, so there is no opportunity to cancel a running CBD
              * DESCRIBE.
              */
-            src2 = new CBD(store, describeMode, bnodes).computeClosure(src);
+            src2 = new CBD(store, describeMode, describeIterationLimit,
+                    describeStatementlimit, bnodes).computeClosure(src);
             break;
         }
         default:

@@ -114,6 +114,8 @@ public class QueryHintRegistry {
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
         add(new DescribeModeHint());
+        add(new DescribeIterationLimitHint());
+        add(new DescribeStatementLimitHint());
 
         /*
          * BufferAnnotations

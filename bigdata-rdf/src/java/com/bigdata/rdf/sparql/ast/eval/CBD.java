@@ -64,22 +64,13 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @see ASTConstructIterator
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ *         FIXME Watch a timeout on the top-level query (if present)
  */
 public class CBD {
 
     private static final Logger log = Logger.getLogger(CBD.class);
-
-    /**
-     * Maximum #of expansions for recursive {@link DescribeModeEnum}s.
-     * 
-     * TODO Configure.
-     * 
-     * TODO Limit #of resources that are being described.
-     * 
-     * FIXME Watch a timeout on the top-level query (if present)
-     */
-    private static final int MAX_ROUNDS = 5;
-    
+   
     /** The {@link AbstractTripleStore}. */
     private final AbstractTripleStore store;
     
@@ -88,6 +79,18 @@ public class CBD {
      * DESCRIBE query.
      */
     private final DescribeModeEnum describeMode;
+
+    /**
+     * The limit on the #of iterations (iff the statement limit is also
+     * reached) -or- ZERO (0) for no limit.
+     */
+    private final int describeIterationLimit;
+    
+    /**
+     * The limit on the #of statements (iff the iteration limit is also
+     * reached) -or- ZERO (0) for no limit.
+     */
+    private final int describeStatementLimit;
     
     /**
      * The {@link DescribeModeEnum} specifying how to evaluate each expansion
@@ -108,6 +111,12 @@ public class CBD {
      * @param describeMode
      *            The {@link DescribeModeEnum} specifying how to evaluate the
      *            DESCRIBE query.
+     * @param describeIterationLimit
+     *            The limit on the #of iterations (iff the statement limit is
+     *            also reached) -or- ZERO (0) for no limit.
+     * @param describeStatementLimit
+     *            The limit on the #of statements (iff the iteration limit is
+     *            also reached) -or- ZERO (0) for no limit..
      * @param bnodes
      *            A mapping that is used to preserve a consistent assignment
      *            from blank node IDs to {@link BigdataBNode}s scoped to the
@@ -115,12 +124,20 @@ public class CBD {
      */
     public CBD(final AbstractTripleStore store,
             final DescribeModeEnum describeMode,
+            final int describeIterationLimit,
+            final int describeStatementLimit,
             final Map<String, BigdataBNode> bnodes) {
 
         if (store == null)
             throw new IllegalArgumentException();
         
         if (describeMode == null)
+            throw new IllegalArgumentException();
+        
+        if (describeIterationLimit < 0)
+            throw new IllegalArgumentException();
+        
+        if (describeStatementLimit < 0)
             throw new IllegalArgumentException();
         
         if (bnodes == null)
@@ -130,6 +147,10 @@ public class CBD {
         
         this.describeMode = describeMode;
 
+        this.describeIterationLimit = describeIterationLimit;
+        
+        this.describeStatementLimit = describeStatementLimit;
+        
         this.bnodes = bnodes;
         
         switch(describeMode) {
@@ -188,10 +209,13 @@ public class CBD {
             // CBD expansion begins at round ONE (1).
             nrounds++;
 
-            if (nrounds > MAX_ROUNDS) {
+            // #of statements on entry to this round.
+            final int nstmts = stmts.size();
+
+            if (cutoffQuery(nrounds - 1, nstmts)) {
                 src.close();
-                throw new QueryEvaluationException(
-                        "CSB would exceed "+MAX_ROUNDS+" rounds.");
+                throw new QueryEvaluationException("CBD cutoff: nrounds="
+                        + nrounds + ", nstatements=" + nstmts + ".");
             }
 
             /*
@@ -257,6 +281,35 @@ public class CBD {
 
         return new CollectionIteration<BigdataStatement, QueryEvaluationException>(
                 stmts);
+
+    }
+
+    /**
+     * Return <code>true</code> iff the DESCRIBE query should be cutoff because
+     * the limits have been exceeded.
+     * 
+     * @param nrounds
+     *            The #of evaluation rounds that have already been computed and
+     *            ZERO (0) if this is the ffirst round.
+     * @param nstmts
+     *            The #of statements at the start of this round.
+     *            
+     * @return <code>true</code> iff evaluation should be cutoff.
+     */
+    private boolean cutoffQuery(int nrounds, int nstmts) {
+
+        // ZERO implies MAX_INT
+        final int describeIterationLimit = this.describeIterationLimit == 0 ? Integer.MAX_VALUE
+                : this.describeIterationLimit;
+
+        final int describeStatementLimit = this.describeStatementLimit == 0 ? Integer.MAX_VALUE
+                : this.describeStatementLimit;
+        
+        final boolean cutoffRounds = nrounds >= describeIterationLimit;
+
+        final boolean cutoffStatements =nrounds >= describeStatementLimit;
+
+        return cutoffRounds && cutoffStatements;
 
     }
 
