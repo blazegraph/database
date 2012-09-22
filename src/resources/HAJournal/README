@@ -1,0 +1,29 @@
+This directory contains some sample configuration for a highly available
+Journal.  The basic procedure is to edit the various configuration files,
+make sure that zookeeper is up and running with a consistent configuration,
+start the ClassServer on at least one machine.  Start the service registrar
+on at least one machine (as configured by the locators).  Start the 
+HAJournalServer instances on each machine.
+
+HAJournal.env - A shell script containing sample configuration values. This
+                is sourced by the various scripts.
+
+HAJournal.config - A sample configuration file for the HAJournalServer.
+
+classServer.sh - A shell script that will start the jini class server (for
+                 downloadable code).
+                 
+lookupStarter.sh - A shell script that will start the jini service registrar.
+
+HAJournalServer.sh - A shell script that will start the HAJournalServer.
+
+log4j.properties - A default log4j configuration file for use by the bigdata
+                   services.
+				   
+logging.properties - A default Java logging configuration.  This may be used
+					 to control the log levels for jini/river, which uses
+					 java logging rather than log4j.
+
+policy.all - A default java permissions file.  This file grants ALL permissions.
+			 You may specify a more rigorous security policy.
+
