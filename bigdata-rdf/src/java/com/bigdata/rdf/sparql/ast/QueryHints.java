@@ -437,6 +437,34 @@ public interface QueryHints {
     DescribeModeEnum DEFAULT_DESCRIBE_MODE = DescribeModeEnum.SymmetricOneStep;
     
     /**
+     * For iterative {@link DescribeModeEnum}s, this property places a limit on
+     * the number of iterative expansions that will be performed before the
+     * DESCRIBE query is cut off, providing that the limit on the maximum #of
+     * statements in the description is also satisfied (the cut off requires
+     * that both limits are reached).  May be ZERO (0) for NO limit.
+     * 
+     * @see #DESCRIBE_MODE
+     * @see #DESCRIBE_STATEMENT_LIMIT
+     */
+    String DESCRIBE_ITERATION_LIMIT = "describeIterationLimit";
+
+    int DEFAULT_DESCRIBE_ITERATION_LIMIT = 5;
+
+    /**
+     * For iterative {@link DescribeModeEnum}s, this property places a limit on
+     * the number of statements that will be accumulated before the DESCRIBE
+     * query is cut off, providing that the limit on the maximum #of iterations
+     * in the description is also satisfied (the cut off requires that both
+     * limits are reached). May be ZERO (0) for NO limit.
+     * 
+     * @see #DESCRIBE_MODE
+     * @see #DESCRIBE_ITERATION_LIMIT
+     */
+    String DESCRIBE_STATEMENT_LIMIT = "describeStatementLimit";
+
+    int DEFAULT_DESCRIBE_STATEMENT_LIMIT = 5000;
+
+    /**
 	 * Option controls whether or not the proposed SPARQL extension for
 	 * reification done right is enabled.
 	 * 

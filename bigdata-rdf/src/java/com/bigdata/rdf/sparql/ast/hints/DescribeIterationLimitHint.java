@@ -28,35 +28,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Query hint used to indicate the {@link DescribeMode} that will be used to
- * evaluate a DESCRIBE query.
+ * Query hint used to indicate optional iteration limit for a DESCRIBE query.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/578"> Concise
  *      Bounded Description </a>
- * 
- * @see QueryHints#DESCRIBE_MODE
+ *      
+ * @see QueryHints#DESCRIBE_ITERATION_LIMIT
  */
-final class DescribeModeHint extends AbstractQueryHint<DescribeModeEnum> {
+final class DescribeIterationLimitHint extends AbstractIntQueryHint {
 
-    protected DescribeModeHint() {
-        super(QueryHints.DESCRIBE_MODE, QueryHints.DEFAULT_DESCRIBE_MODE);
+    protected DescribeIterationLimitHint() {
+        super(QueryHints.DESCRIBE_ITERATION_LIMIT,
+                QueryHints.DEFAULT_DESCRIBE_ITERATION_LIMIT);
     }
 
     @Override
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op,
-            final DescribeModeEnum value) {
+            final Integer value) {
 
         if (op instanceof ProjectionNode) {
 
             //_setQueryHint(context, scope, op, getName(), value);
-            ((ProjectionNode) op).setDescribeMode(value);
+            ((ProjectionNode) op).setDescribeIterationLimit(value);
 
             return;
 
@@ -67,9 +66,9 @@ final class DescribeModeHint extends AbstractQueryHint<DescribeModeEnum> {
     }
 
     @Override
-    public DescribeModeEnum validate(String value) {
+    public Integer validate(final String value) {
 
-        return DescribeModeEnum.valueOf(value);
+        return Integer.valueOf(value);
         
     }
 

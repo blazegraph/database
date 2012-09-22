@@ -540,6 +540,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
 
+    /**
+     * Return the effective {@link DescribeModeEnum}.
+     * 
+     * @param projection
+     *            The query projection.
+     *            
+     * @return The effective {@link DescribeModeEnum}
+     * 
+     * @see QueryHints#DESCRIBE_MODE
+     */
     public DescribeModeEnum getDescribeMode(final ProjectionNode projection) {
 
         // The effective DescribeMode.
@@ -572,6 +582,96 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         }
 
         return describeMode;
+
+    }
+    
+    /**
+     * Return the effective iteration limit for a DESCRIBE query.
+     * 
+     * @param projection
+     *            The query projection.
+     *            
+     * @return The effective iteration limit.
+     * 
+     * @see QueryHints#DESCRIBE_ITERATION_LIMIT
+     */
+    public int getDescribeIterationLimit(final ProjectionNode projection) {
+
+        // The effective limit.
+        Integer limit = projection.getDescribeIterationLimit();
+
+        if (limit != null) {
+            /*
+             * Explicitly specified on the project. E.g., set by a query hint or
+             * through code.
+             */
+            return limit;
+        }
+
+        /*
+         * Consult the KB for a configured default behavior. 
+         */
+        final String limitStr = db.getProperties().getProperty(
+                BigdataSail.Options.DESCRIBE_ITERATION_LIMIT);
+
+        if (limitStr != null) {
+
+            // The KB has specified a default DESCRIBE algorithm.
+            limit = Integer.valueOf(limitStr);
+            
+        } else {
+            
+            // Use the default specified on QueryHints.
+            limit = QueryHints.DEFAULT_DESCRIBE_ITERATION_LIMIT;
+            
+        }
+
+        return limit;
+
+    }
+    
+    /**
+     * Return the effective statement limit for a DESCRIBE query.
+     * 
+     * @param projection
+     *            The query projection.
+     *            
+     * @return The effective statement limit.
+     * 
+     * @see QueryHints#DESCRIBE_STATEMENT_LIMIT
+     */
+    public int getDescribeStatementLimit(final ProjectionNode projection) {
+
+        // The effective limit.
+        Integer limit = projection.getDescribeStatementLimit();
+
+        if (limit != null) {
+            /*
+             * Explicitly specified on the project. E.g., set by a query hint or
+             * through code.
+             */
+            return limit;
+        }
+
+        /*
+         * Consult the KB for a configured default behavior. 
+         */
+        final String limitStr = db.getProperties().getProperty(
+                BigdataSail.Options.DESCRIBE_STATEMENT_LIMIT);
+
+        if (limitStr != null) {
+
+            // The KB has specified a default DESCRIBE algorithm.
+            limit = Integer.valueOf(limitStr);
+            
+        } else {
+            
+            // Use the default specified on QueryHints.
+            limit = QueryHints.DEFAULT_DESCRIBE_STATEMENT_LIMIT;
+            
+        }
+
+        return limit;
 
     }
     

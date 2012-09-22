@@ -74,9 +74,27 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
          * Optional annotation specifies the {@link DescribeModeEnum} that will
          * be used to evaluate a DESCRIBE query. The default is controlled by
          * {@value QueryHints#DEFAULT_DESCRIBE_MODE}.
+         * 
+         * @see QueryHints#DESCRIBE_MODE
          */
         String DESCRIBE_MODE = "describeMode";
-    
+
+        /**
+         * Optional annotation specifies the limit on the #of iterations for an
+         * iterative DESCRIBE algorithm.
+         * 
+         * @see QueryHints#DESCRIBE_ITERATION_LIMIT
+         */
+        String DESCRIBE_ITERATION_LIMIT = "describeIterationLimit";
+        
+        /**
+         * Optional annotation specifies the limit on the #of statements for an
+         * iterative DESCRIBE algorithm.
+         * 
+         * @see QueryHints#DESCRIBE_STATEMENT_LIMIT
+         */
+        String DESCRIBE_STATEMENT_LIMIT = "describeStatementLimit";
+        
     }
 
     public ProjectionNode() {
@@ -160,6 +178,8 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
      * @param describeMode
      *            The {@link DescribeModeEnum} or <code>null</code> to use the
      *            default.
+     *            
+     * @see Annotations#DESCRIBE_MODE
      */
     public void setDescribeMode(final DescribeModeEnum describeMode) {
 
@@ -167,6 +187,50 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
     
+    /**
+     * Return the optional limit on the #of iterations for a DESCRIBE query.
+     * 
+     * @return The limit -or- <code>null</code>.
+     * 
+     * @see Annotations#DESCRIBE_ITERATION_LIMIT
+     */
+    public Integer getDescribeIterationLimit() {
+
+        return (Integer) getProperty(Annotations.DESCRIBE_ITERATION_LIMIT);
+
+    }
+
+    /**
+     * Return the optional limit on the #of statements for a DESCRIBE query.
+     * 
+     * @return The limit -or- <code>null</code>.
+     * 
+     * @see Annotations#DESCRIBE_STATEMENT_LIMIT
+     */
+    public Integer getDescribeStatementLimit() {
+        
+        return (Integer) getProperty(Annotations.DESCRIBE_STATEMENT_LIMIT);
+        
+    }
+
+    /**
+     * Set the optional limit on the #of iterations for a DESCRIBE query.
+     */
+    public void setDescribeIterationLimit(final int newValue) {
+
+        setProperty(Annotations.DESCRIBE_ITERATION_LIMIT, newValue);
+
+    }
+
+    /**
+     * Set the optional limit on the #of statements for a DESCRIBE query.
+     */
+    public void setDescribeStatementLimit(final int newValue) {
+
+        setProperty(Annotations.DESCRIBE_STATEMENT_LIMIT, newValue);
+
+    }
+
     /**
      * Adds a variable to be projected. The variable is modeled as an assignment
      * of itself to itself, so everything in the projection node winds up
@@ -314,12 +378,28 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
         final DescribeModeEnum describeMode = getDescribeMode();
 
+        final Integer describeIterationLimit = getDescribeIterationLimit();
+
+        final Integer describeStatementLimit = getDescribeStatementLimit();
+
         if (describeMode != null) {
 
             sb.append("[describeMode=" + describeMode + "]");
-            
+
         }
-        
+
+        if (describeIterationLimit != null) {
+
+            sb.append("[describeIterationLimit=" + describeIterationLimit + "]");
+
+        }
+
+        if (describeStatementLimit != null) {
+
+            sb.append("[describeStatement=" + describeStatementLimit + "]");
+
+        }
+
         if (isWildcard()) {
 
             sb.append("* ");
