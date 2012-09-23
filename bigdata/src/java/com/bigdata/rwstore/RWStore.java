@@ -5051,7 +5051,13 @@ public class RWStore implements IStore, IBufferedWriter {
          * Flush the scattered writes in the write cache to the backing
          * store.
          */
-        writeCache.flush(false/* force */);
+        m_allocationLock.lock();
+        try {
+            // Flush writes.
+            writeCache.flush(false/* force */);
+        } finally {
+            m_allocationLock.unlock();
+        }
 
     }
 
