@@ -16,5 +16,5 @@ java \
  -Dcodebase.port=${CODEBASE_PORT}\
  -Djava.net.preferIPv4Stack=true\
  -Dbigdata.fedname=${FEDNAME}\
- -Ddefault.nic=\
+ -Ddefault.nic=`hostname`\
  com.bigdata.service.jini.util.LookupStarter 
