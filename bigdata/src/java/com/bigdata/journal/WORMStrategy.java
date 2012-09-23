@@ -2340,7 +2340,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         bb.position(limit);
 
         // Flush the write in the write cache to the backing store.
-        writeCache.flush(false/* force */);
+        final Lock readLock = extensionLock.readLock();
+        readLock.lock();
+        try {
+            writeCache.flush(false/* force */);
+        } finally {
+            readLock.unlock();
+        }
+
     }
 
     public void setExtentForLocalStore(final long extent) throws IOException,
