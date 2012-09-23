@@ -454,6 +454,7 @@ public class HAJournalServer extends AbstractServer {
             }
         });
 
+        // Set the quorum client aka quorum service and start the quorum.
         quorum.start(newQuorumService(logicalServiceZPath, serviceUUID,
                 haGlueService, journal));
 
