@@ -562,7 +562,7 @@ abstract public class WriteCache implements IWriteCache {
      */
     final int remaining() {
 
-        final int remaining = capacity - buf.get().buffer().position();
+        final int remaining = capacity - bytesWritten();//buf.get().buffer().position();
 
         return remaining;
 
@@ -570,6 +570,11 @@ abstract public class WriteCache implements IWriteCache {
 
     /**
      * The #of bytes written on the backing buffer.
+     * <p>
+     * Note: in order to rely on this value the caller MUST have exclusive
+     * access to the buffer. This API does not provide the means for acquiring
+     * that exclusive access. This is something that the caller has to arrange
+     * for themselves, which is why this is a package private method.
      */
     public final int bytesWritten() {
 
@@ -973,8 +978,9 @@ abstract public class WriteCache implements IWriteCache {
      * @throws TimeoutException
      * @throws InterruptedException
      */
-    public boolean flush(final boolean force, final long timeout, final TimeUnit unit) throws IOException,
-            TimeoutException, InterruptedException {
+    public boolean flush(final boolean force, final long timeout,
+            final TimeUnit unit) throws IOException, TimeoutException,
+            InterruptedException {
 
         // start time
         final long begin = System.nanoTime();
