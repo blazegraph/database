@@ -112,31 +112,40 @@ public class TestRuleOwlFunctionalProperty extends AbstractRuleTestCase {
             buffer.add(john, wife, susie);
             buffer.flush();
 
-            try {
-            	
-	            // apply the rule.
-	            applyRule(store, r, -1/*solutionCount*/,0/*mutationCount*/);
-	            
-	            fail("should have violated the functional property");
-	            
-            } catch (Exception ex) {
-            	
-                if (!InnerCause.isInnerCause(ex,
-                        ConstraintViolationException.class)) {
-                    fail("Expected: " + ConstraintViolationException.class);
-                }
-                
-//            	final ExecutionExceptions ex2 = (ExecutionExceptions)
-//            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+            applyRule(store, r, -1/*solutionCount*/, 2/*mutationCount*/);
+            
+            assertTrue(store.hasStatement(mary, OWL.SAMEAS, susie));
+            assertTrue(store.hasStatement(susie, OWL.SAMEAS, mary));
+
+            // final #of statements in the store.
+            assertEquals(nbefore+3, store.getStatementCount());
+            
+            
+//            try {
 //            	
-//            	Throwable t = ex2.causes().get(0);
-//            	while (t.getCause() != null)
-//            		t = t.getCause();
+//	            // apply the rule.
+//	            applyRule(store, r, -1/*solutionCount*/,0/*mutationCount*/);
+//	            
+//	            fail("should have violated the functional property");
+//	            
+//            } catch (Exception ex) {
 //            	
-//            	if (!(t instanceof ConstraintViolationException))
-//            		fail("inner cause should be a ConstraintViolationException");
-            	
-            }
+//                if (!InnerCause.isInnerCause(ex,
+//                        ConstraintViolationException.class)) {
+//                    fail("Expected: " + ConstraintViolationException.class);
+//                }
+//                
+////            	final ExecutionExceptions ex2 = (ExecutionExceptions)
+////            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+////            	
+////            	Throwable t = ex2.causes().get(0);
+////            	while (t.getCause() != null)
+////            		t = t.getCause();
+////            	
+////            	if (!(t instanceof ConstraintViolationException))
+////            		fail("inner cause should be a ConstraintViolationException");
+//            	
+//            }
 
         } finally {
 
@@ -193,30 +202,38 @@ public class TestRuleOwlFunctionalProperty extends AbstractRuleTestCase {
             buffer.add(paul, wife, mary);
             buffer.flush();
 
-            try {
-            	
-	            // apply the rule.
-	            applyRule(store, r, -1/*solutionCount*/,0/*mutationCount*/);
-	            
-	            fail("should have violated the inverse functional property");
-	            
-            } catch (Exception ex) {
-            	
-                if (!InnerCause.isInnerCause(ex,
-                        ConstraintViolationException.class)) {
-                    fail("Expected: " + ConstraintViolationException.class);
-                }
-//            	final ExecutionExceptions ex2 = (ExecutionExceptions)
-//            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+            applyRule(store, r, -1/*solutionCount*/, 2/*mutationCount*/);
+            
+            assertTrue(store.hasStatement(john, OWL.SAMEAS, paul));
+            assertTrue(store.hasStatement(paul, OWL.SAMEAS, john));
+
+            // final #of statements in the store.
+            assertEquals(nbefore+3, store.getStatementCount());
+            
+//            try {
 //            	
-//            	Throwable t = ex2.causes().get(0);
-//            	while (t.getCause() != null)
-//            		t = t.getCause();
+//	            // apply the rule.
+//	            applyRule(store, r, -1/*solutionCount*/,0/*mutationCount*/);
+//	            
+//	            fail("should have violated the inverse functional property");
+//	            
+//            } catch (Exception ex) {
 //            	
-//            	if (!(t instanceof ConstraintViolationException))
-//            		fail("inner cause should be a ConstraintViolationException");
-            	
-            }
+//                if (!InnerCause.isInnerCause(ex,
+//                        ConstraintViolationException.class)) {
+//                    fail("Expected: " + ConstraintViolationException.class);
+//                }
+////            	final ExecutionExceptions ex2 = (ExecutionExceptions)
+////            			InnerCause.getInnerCause(ex, ExecutionExceptions.class);
+////            	
+////            	Throwable t = ex2.causes().get(0);
+////            	while (t.getCause() != null)
+////            		t = t.getCause();
+////            	
+////            	if (!(t instanceof ConstraintViolationException))
+////            		fail("inner cause should be a ConstraintViolationException");
+//            	
+//            }
 
         } finally {
 
