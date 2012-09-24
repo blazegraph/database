@@ -30,7 +30,6 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
@@ -42,8 +41,8 @@ import com.bigdata.relation.rule.Rule;
  * owl:InverseFunctionalProperty
  * 
  * <pre>
- *   (x rdf:type owl:InverseFunctionalProperty), (a x c), (b x c) -&gt; 
- *   throw ConstraintViolationException
+ *   (p rdf:type owl:InverseFunctionalProperty), (b p a), (c p a) -&gt; 
+ *   (b owl:sameAs c)
  * </pre>
  */
 @SuppressWarnings("rawtypes")
@@ -60,37 +59,37 @@ public class RuleOwlInverseFunctionalProperty extends Rule {
     public RuleOwlInverseFunctionalProperty(String relationName, Vocabulary vocab) {
 
         super( "owlInverseFunctionalProperty", //
-                new SPOPredicate(relationName,var("x"), vocab.getConstant(RDF.TYPE), vocab.getConstant(OWL.INVERSEFUNCTIONALPROPERTY)),//
+                new SPOPredicate(relationName,var("b"), vocab.getConstant(OWL.SAMEAS), var("c")),//
                 new SPOPredicate[] {//
                     new SPOPredicate(relationName,var("x"), vocab.getConstant(RDF.TYPE), vocab.getConstant(OWL.INVERSEFUNCTIONALPROPERTY)),//
-                    new SPOPredicate(relationName,var("a"), var("x"), var("c")),//
-                    new SPOPredicate(relationName,var("b"), var("x"), var("c"))//
+                    new SPOPredicate(relationName,var("b"), var("x"), var("a")),//
+                    new SPOPredicate(relationName,var("c"), var("x"), var("a"))//
                 },
                 new IConstraint[] {
-					Constraint.wrap(new NE(var("a"),var("b")))
+					Constraint.wrap(new NE(var("b"),var("c")))
 		        }
                 );
         
     }
     
-    /**
-     * If this rule ever becomes consistent in the data then the rule will
-     * throw a {@link ConstraintViolationException} and the closure operation
-     * will fail.
-     */
-    @Override
-	public boolean isConsistent(final IBindingSet bset) {
-
-		boolean ret = super.isConsistent(bset);
-
-		if (ret && isFullyBound(bset)) {
-
-			throw new ConstraintViolationException(getName());
-
-		}
-
-		return ret;
-
-	}
+//    /**
+//     * If this rule ever becomes consistent in the data then the rule will
+//     * throw a {@link ConstraintViolationException} and the closure operation
+//     * will fail.
+//     */
+//    @Override
+//	public boolean isConsistent(final IBindingSet bset) {
+//
+//		boolean ret = super.isConsistent(bset);
+//
+//		if (ret && isFullyBound(bset)) {
+//
+//			throw new ConstraintViolationException(getName());
+//
+//		}
+//
+//		return ret;
+//
+//	}
 
 }

@@ -30,7 +30,6 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
@@ -42,8 +41,8 @@ import com.bigdata.relation.rule.Rule;
  * owl:FunctionalProperty
  * 
  * <pre>
- *   (x rdf:type owl:FunctionalProperty), (a x b), (a x c) -&gt; 
- *   throw ConstraintViolationException
+ *   (p rdf:type owl:FunctionalProperty), (a p b), (a p c) -&gt; 
+ *   (b owl:sameAs c)
  * </pre>
  */
 @SuppressWarnings("rawtypes")
@@ -60,7 +59,7 @@ public class RuleOwlFunctionalProperty extends Rule {
     public RuleOwlFunctionalProperty(String relationName, Vocabulary vocab) {
 
         super( "owlFunctionalProperty", //
-                new SPOPredicate(relationName,var("x"), vocab.getConstant(RDF.TYPE), vocab.getConstant(OWL.FUNCTIONALPROPERTY)),//
+                new SPOPredicate(relationName,var("b"), vocab.getConstant(OWL.SAMEAS), var("c")),//
                 new SPOPredicate[] {//
                     new SPOPredicate(relationName,var("x"), vocab.getConstant(RDF.TYPE), vocab.getConstant(OWL.FUNCTIONALPROPERTY)),//
                     new SPOPredicate(relationName,var("a"), var("x"), var("b")),//
@@ -73,24 +72,24 @@ public class RuleOwlFunctionalProperty extends Rule {
         
     }
     
-    /**
-     * If this rule ever becomes consistent in the data then the rule will
-     * throw a {@link ConstraintViolationException} and the closure operation
-     * will fail.
-     */
-    @Override
-	public boolean isConsistent(final IBindingSet bset) {
-
-		boolean ret = super.isConsistent(bset);
-
-		if (ret && isFullyBound(bset)) {
-
-			throw new ConstraintViolationException(getName());
-
-		}
-
-		return ret;
-
-	}
+//    /**
+//     * If this rule ever becomes consistent in the data then the rule will
+//     * throw a {@link ConstraintViolationException} and the closure operation
+//     * will fail.
+//     */
+//    @Override
+//	public boolean isConsistent(final IBindingSet bset) {
+//
+//		boolean ret = super.isConsistent(bset);
+//
+//		if (ret && isFullyBound(bset)) {
+//
+//			throw new ConstraintViolationException(getName());
+//
+//		}
+//
+//		return ret;
+//
+//	}
 
 }

@@ -235,6 +235,14 @@ public class FastClosure extends BaseClosure {
     
                 }
                 
+                if (enableOwlFunctionalAndInverseFunctionalProperty) {
+                    
+                	tmp.add(new RuleOwlFunctionalProperty(db, vocab));
+                	
+                	tmp.add(new RuleOwlInverseFunctionalProperty(db, vocab));
+
+                }
+                
                 // add the custom rules
                 tmp.addAll(getCustomRules(db));
     
@@ -317,13 +325,6 @@ public class FastClosure extends BaseClosure {
 
             }
             
-            if (enableOwlFunctionalAndInverseFunctionalProperty) {
-                
-            	program.addStep(new RuleOwlFunctionalProperty(db, vocab));
-            	program.addStep(new RuleOwlInverseFunctionalProperty(db, vocab));
-
-            }
-
         }
         
         return program;
