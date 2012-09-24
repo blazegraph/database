@@ -726,7 +726,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
                     final int rdlen = client.client.read(localBuffer);
                     if (log.isTraceEnabled())
-                        log.trace("Read " + rdlen + " bytes");
+                        log.trace("Read " + rdlen + " bytes with "+rem+" bytes remaining.");
 
                     if (rdlen > 0)
                         updateChk(rdlen);
