@@ -428,7 +428,9 @@ public class HASendService {
                 log.trace("Sent total of " + remaining + " bytes");
 
             // check all data written
-            assert data.remaining() == 0 : "remaining=" + data.remaining();
+            if (data.remaining() != 0)
+                throw new IOException("Did not write all data: expected="
+                        + remaining + ", actual=" + data.remaining());
 
             return null;
 
