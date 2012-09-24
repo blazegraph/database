@@ -77,7 +77,7 @@ import org.apache.log4j.Logger;
  */
 public class HASendService {
 	
-    protected static final Logger log = Logger.getLogger(HASendService.class);
+    private static final Logger log = Logger.getLogger(HASendService.class);
 
     /**
      * The Internet socket address of the receiving service.
@@ -395,22 +395,37 @@ public class HASendService {
 
             try {
 
-                /*
-                 * Write the data -- should block until finished or until this
-                 * thread is interrupted, e.g., by shutting down the thread pool
-                 * on which it is running.
-                 */
-                socketChannel.write(data);
+                int nwritten = 0;
+                
+                while (nwritten < remaining) {
+
+                    /*
+                     * Write the data. Depending on the channel, will either
+                     * block or write as many bytes as can be written
+                     * immediately (this latter is true for socket channels in a
+                     * non-blocking mode). IF it blocks, should block until
+                     * finished or until this thread is interrupted, e.g., by
+                     * shutting down the thread pool on which it is running.
+                     */
+
+                    final int nbytes = socketChannel.write(data);
+
+                    nwritten += nbytes;
+
+                    if (log.isTraceEnabled())
+                        log.trace("Sent " + nbytes + " bytes with " + nwritten + " of out " + remaining + " written so far");
+
+                }
 
             } finally {
 
-                // do no close the socket, leave to explicit closeIncSend
+                // do not close the socket, leave to explicit closeIncSend
                 // socketChannel.close();
 
             }
 
             if (log.isTraceEnabled())
-                log.trace("Sent " + remaining + " bytes");
+                log.trace("Sent total of " + remaining + " bytes");
 
             // check all data written
             assert data.remaining() == 0 : "remaining=" + data.remaining();
