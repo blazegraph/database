@@ -59,7 +59,7 @@ import com.bigdata.util.ChecksumError;
  */
 public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
             .getLogger(HAReceiveService.class);
 
     /** The Internet socket address at which this service will listen. */
@@ -726,7 +726,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
                     final int rdlen = client.client.read(localBuffer);
                     if (log.isTraceEnabled())
-                        log.trace("Read " + rdlen + " bytes with "+rem+" bytes remaining.");
+                        log.trace("Read " + rdlen + " bytes of " + (rdlen > 0 ? rem - rdlen : rem) + " bytes remaining.");
 
                     if (rdlen > 0)
                         updateChk(rdlen);
