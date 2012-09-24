@@ -171,7 +171,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
             throws IOException {
         
         return pipelineImpl.receiveAndReplicate(msg);
@@ -179,7 +179,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
+    public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
             throws IOException {
     
         return pipelineImpl.replicate(msg, b);
