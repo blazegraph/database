@@ -588,7 +588,7 @@ abstract public class WriteCacheService implements IWriteCache {
                             @SuppressWarnings("unchecked")
                             final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
                                     .getMember();
-                            assert quorumMember != null : "No quorum member?";
+                            assert quorumMember != null : "Not quorum member?";
                             remoteWriteFuture = quorumMember.replicate(
                                     cache.newHAWriteMessage(quorumToken), b);
                             counters.get().nsend++;
@@ -649,7 +649,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         final long nhit = tmp.nhit.get();
                         final long ntests = nhit + tmp.nmiss.get();
                         final double hitRate=(ntests == 0L ? 0d : (double) nhit / ntests);
-                        log.info("WriteCacheService: bufferSize="
+                        log.info("WriteCacheService: bufferCapacity="
                                 + buffers[0].capacity() + ",nbuffers="
                                 + tmp.nbuffers + ",nclean=" + tmp.nclean
                                 + ",ndirty=" + tmp.ndirty + ",maxDirty="
