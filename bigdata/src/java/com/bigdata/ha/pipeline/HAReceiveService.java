@@ -825,7 +825,8 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
         lock.lockInterruptibly();
         try {
-            message = msg;
+        	    assert message == null;
+        	    message = msg;
             localBuffer = buffer;// DO NOT duplicate()! (side-effects required)
             localBuffer.limit(message.getSize());
             localBuffer.position(0);

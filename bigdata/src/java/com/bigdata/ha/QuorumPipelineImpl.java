@@ -19,8 +19,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.pipeline.HAReceiveService;
-import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
+import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.journal.ha.HAWriteMessage;
@@ -62,9 +62,9 @@ import com.bigdata.quorum.QuorumStateChangeListenerBase;
  * all joined services. However, services must add themselves to the pipeline
  * before they join the quorum and the pipeline will be reorganized if necessary
  * when the quorum leader is elected. This will result in a
- * {@link #pipelineElectedLeader()} event. A follower leave only causes follower
- * to leave the pipeline and results in a {@link #pipelineChange(UUID, UUID)}
- * event.
+ * {@link #pipelineElectedLeader()} event. A follower leave only causes the
+ * follower to leave the pipeline and results in a
+ * {@link #pipelineChange(UUID, UUID)} event.
  * <p>
  * There are two cases for a follower leave: (A) when the follower did not did
  * not have a downstream node; and (B) when there is downstream node. For (B),
@@ -146,35 +146,30 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private HASendService sendService;
 
     /**
-     * The receive services for the k-1 followers.
-     * <p>
-     * Note: you index directly into this array (the first element is
-     * <code>null</code>).
+     * The receive service (iff this is a follower in a met quorum).
      */
     private HAReceiveService<HAWriteMessage> receiveService;
 
     /**
      * The buffer used to relay the data. This is only allocated for a
-     * follower. The indices are the quorum index values. Quorum members
-     * that do not relay will have a <code>null</code> at their
-     * corresponding index.
+     * follower. 
      */
     private IBufferAccess receiveBuffer;
 
     /**
      * Cached metadata about the downstream service.
      */
-    private AtomicReference<PipelineState<S>> pipelineStateRef = new AtomicReference<PipelineState<S>>();
-    
+    private final AtomicReference<PipelineState<S>> pipelineStateRef = new AtomicReference<PipelineState<S>>();
+
     public QuorumPipelineImpl(final QuorumMember<S> member) {
 
         if (member == null)
             throw new IllegalArgumentException();
-        
+
         this.member = member;
 
         this.serviceId = member.getServiceId();
-        
+
     }
 
     /**
@@ -182,9 +177,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * release of the {@link #receiveBuffer} and the shutdown of the
      * {@link #sendService} or {@link #receiveService}.
      */
+    @Override
     protected void finalize() throws Throwable {
+
         tearDown();
+
         super.finalize();
+
     }
 
     /**
@@ -199,17 +198,85 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * @return The index of the service in the array -or- <code>-1</code> if the
      *         service does not appear in the array.
      */
-    protected int getIndex(final UUID serviceId, final UUID[] a) {
+    private int getIndex(final UUID serviceId, final UUID[] a) {
+
         if (serviceId == null)
             throw new IllegalArgumentException();
+
         for (int i = 0; i < a.length; i++) {
+
             if (serviceId.equals(a[i])) {
+
                 return i;
+
             }
         }
+
         return -1;
+
     }
-    
+
+    /**
+     * Return the NIO buffer used to receive payloads written on the HA write
+     * pipeline.
+     * 
+     * @return The buffer -or- <code>null</code> if the pipeline has been torn
+     *         down or if this is the leader.
+     */
+    private ByteBuffer getReceiveBuffer() {
+
+        if (!lock.isHeldByCurrentThread()) {
+
+            // The caller MUST be holding the lock.
+            throw new IllegalMonitorStateException();
+
+        }
+
+        // trinary pattern is safe while thread has lock.
+        return receiveBuffer == null ? null : receiveBuffer.buffer();
+
+    }
+
+    /**
+     * Return the {@link HAReceiveService} used to receive payloads written on
+     * the HA write pipeline.
+     * 
+     * @return The buffer -or- <code>null</code> if the pipeline has been torn
+     *         down or if this is the leader.
+     */
+    private HAReceiveService<HAWriteMessage> getHAReceiveService() {
+
+        if (!lock.isHeldByCurrentThread()) {
+
+            // The caller MUST be holding the lock.
+            throw new IllegalMonitorStateException();
+
+        }
+
+        return receiveService;
+        
+    }
+
+    /**
+     * Return the {@link HASendService} used to write payloads on the HA write
+     * pipeline.
+     * 
+     * @return The {@link HASendService} -or- <code>null</code> if the pipeline
+     *         has been torn down.
+     */
+    private HASendService getHASendService() {
+        
+        if (!lock.isHeldByCurrentThread()) {
+
+            // The caller MUST be holding the lock.
+            throw new IllegalMonitorStateException();
+
+        }
+
+        return sendService;
+        
+    }
+
     /*
      * QuorumStateChangeListener 
      */
@@ -335,6 +402,15 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         }
     }
 
+    /**
+     * Request the {@link InetSocketAddress} of the write pipeline for a service
+     * (RMI).
+     * 
+     * @param downStreamId
+     *            The service.
+     *            
+     * @return It's {@link InetSocketAddress}
+     */
     private InetSocketAddress getAddrNext(final UUID downStreamId) {
 
         if (downStreamId == null)
@@ -361,7 +437,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * implementation tears down the send/receive service and releases the
      * receive buffer.
      */
-    protected void tearDown() {
+    private void tearDown() {
         if (log.isInfoEnabled())
             log.info("");
         lock.lock();
@@ -452,7 +528,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     /**
      * Setup the send service.
      */
-    protected void setUpSendService() {
+    private void setUpSendService() {
         if (log.isInfoEnabled())
             log.info("");
         lock.lock();
@@ -543,92 +619,90 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             lock.unlock();
         }
     }
-    
-    /**
-     * Return the NIO buffer used to receive payloads written on the HA write
-     * pipeline.
-     * 
-     * @throws IllegalStateException
-     *             if this is the leader.
+
+    /*
+     * This is the leader, so send() the buffer.
      */
-    protected ByteBuffer getReceiveBuffer() {
-        return receiveBuffer.buffer();
-    }
-
-    public HASendService getHASendService() {
-        return sendService;
-    }
-
-    public HAReceiveService<HAWriteMessage> getHAReceiveService() {
-        return receiveService;
-    }
-
     public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
             throws IOException {
 
-        if (log.isTraceEnabled())
-            log.trace("Leader will send: " + b.remaining() + " bytes");
-
-        member.assertLeader(msg.getQuorumToken());
-
-        final PipelineState<S> downstream = pipelineStateRef.get();
-
         final RunnableFuture<Void> ft;
 
-        /*
-         * This is the leader, so send() the buffer.
-         */
+        lock.lock();
+        try {
 
-        ft = new FutureTask<Void>(new Callable<Void>() {
+            if (log.isTraceEnabled())
+                log.trace("Leader will send: " + b.remaining() + " bytes");
 
-            public Void call() throws Exception {
+            member.assertLeader(msg.getQuorumToken());
 
-                // Get Future for send() outcome on local service.
-                final Future<Void> futSnd = getHASendService().send(b);
+            final PipelineState<S> downstream = pipelineStateRef.get();
 
-                try {
+            final HASendService sendService = getHASendService();
 
-                    // Get Future for receive outcome on the remote service.
-                    final Future<Void> futRec = downstream.service
-                            .receiveAndReplicate(msg);
+            ft = new FutureTask<Void>(new SendBufferTask<S>(msg, b, downstream,
+                    sendService));
 
-                    try {
+        } finally {
 
-                        /*
-                         * Await the Futures, but spend more time waiting on the
-                         * local Future and only check the remote Future every
-                         * second. Timeouts are ignored during this loop.
-                         */
-                        while (!futSnd.isDone() && !futRec.isDone()) {
-                            try {
-                                futSnd.get(1L, TimeUnit.SECONDS);
-                            } catch (TimeoutException ignore) {
-                            }
-                            try {
-                                futRec.get(10L, TimeUnit.MILLISECONDS);
-                            } catch (TimeoutException ignore) {
-                            }
-                        }
-                        futSnd.get();
-                        futRec.get();
+            lock.unlock();
 
-                    } finally {
-                        if (!futRec.isDone()) {
-                            // cancel remote Future unless done.
-                            futRec.cancel(true/* mayInterruptIfRunning */);
-                        }
-                    }
+        }
 
-                } finally {
-                    // cancel the local Future.
-                    futSnd.cancel(true/* mayInterruptIfRunning */);
-                }
-
-                // done
-                return null;
-            }
-
-        });
+//        /*
+//         * This is the leader, so send() the buffer.
+//         */
+//
+//        ft = new FutureTask<Void>(new Callable<Void>() {
+//
+//            public Void call() throws Exception {
+//
+//                // Get Future for send() outcome on local service.
+//                final Future<Void> futSnd = getHASendService().send(b);
+//
+//                try {
+//
+//                    // Get Future for receive outcome on the remote service (RMI).
+//                    final Future<Void> futRec = downstream.service
+//                            .receiveAndReplicate(msg);
+//
+//                    try {
+//
+//                        /*
+//                         * Await the Futures, but spend more time waiting on the
+//                         * local Future and only check the remote Future every
+//                         * second. Timeouts are ignored during this loop.
+//                         */
+//                        while (!futSnd.isDone() && !futRec.isDone()) {
+//                            try {
+//                                futSnd.get(1L, TimeUnit.SECONDS);
+//                            } catch (TimeoutException ignore) {
+//                            }
+//                            try {
+//                                futRec.get(10L, TimeUnit.MILLISECONDS);
+//                            } catch (TimeoutException ignore) {
+//                            }
+//                        }
+//                        futSnd.get();
+//                        futRec.get();
+//
+//                    } finally {
+//                        if (!futRec.isDone()) {
+//                            // cancel remote Future unless done.
+//                            futRec.cancel(true/* mayInterruptIfRunning */);
+//                        }
+//                    }
+//
+//                } finally {
+//                    // cancel the local Future.
+//                    futSnd.cancel(true/* mayInterruptIfRunning */);
+//                }
+//
+//                // done
+//                return null;
+//            }
+//
+//        });
 
         // execute the FutureTask.
         member.getExecutor().execute(ft);
@@ -637,104 +711,268 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
     }
 
-    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
-            throws IOException {
+    /**
+     * Task to send() a buffer to the follower.
+     */
+    static private class SendBufferTask<S extends HAPipelineGlue> implements
+            Callable<Void> {
 
-        final PipelineState<S> downstream = pipelineStateRef.get();
+        private final HAWriteMessage msg;
+        private final ByteBuffer b;
+        private final PipelineState<S> downstream;
+        private final HASendService sendService;
 
-        if (log.isTraceEnabled())
-            log.trace("Will receive "
-                    + ((downstream != null) ? " and replicate" : "") + ": msg="
-                    + msg);
+        public SendBufferTask(final HAWriteMessage msg, final ByteBuffer b,
+                final PipelineState<S> downstream, final HASendService sendService) {
 
-        final ByteBuffer b = getReceiveBuffer();
+            this.msg = msg;
+            this.b = b;
+            this.downstream = downstream;
+            this.sendService = sendService;
+            
+        }
 
-        if (downstream == null) {
+        public Void call() throws Exception {
 
-            /*
-             * This is the last service in the write pipeline, so just receive
-             * the buffer.
-             * 
-             * Note: The receive service is executing this Future locally on
-             * this host. We do not submit it for execution ourselves.
-             */
+            // Get Future for send() outcome on local service.
+            final Future<Void> futSnd = sendService.send(b);
 
             try {
 
-                return getHAReceiveService().receiveData(msg, b);
+                // Get Future for receive outcome on the remote service (RMI).
+                final Future<Void> futRec = downstream.service
+                        .receiveAndReplicate(msg);
 
-            } catch (InterruptedException e) {
+                try {
 
-                throw new RuntimeException(e);
+                    /*
+                     * Await the Futures, but spend more time waiting on the
+                     * local Future and only check the remote Future every
+                     * second. Timeouts are ignored during this loop.
+                     */
+                    while (!futSnd.isDone() && !futRec.isDone()) {
+                        try {
+                            futSnd.get(1L, TimeUnit.SECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                        try {
+                            futRec.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                    }
+                    futSnd.get();
+                    futRec.get();
 
+                } finally {
+                    if (!futRec.isDone()) {
+                        // cancel remote Future unless done.
+                        futRec.cancel(true/* mayInterruptIfRunning */);
+                    }
+                }
+
+            } finally {
+                // cancel the local Future.
+                futSnd.cancel(true/* mayInterruptIfRunning */);
             }
 
+            // done
+            return null;
+
+        }
+        
+    }
+    
+    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+            throws IOException {
+
+        final RunnableFuture<Void> ft;
+
+        lock.lock();
+
+        try {
+        
+            final PipelineState<S> downstream = pipelineStateRef.get();
+
+            if (log.isTraceEnabled())
+                log.trace("Will receive "
+                        + ((downstream != null) ? " and replicate" : "") + ": msg="
+                        + msg);
+
+            final ByteBuffer b = getReceiveBuffer();
+            
+            final HAReceiveService<HAWriteMessage> receiveService = getHAReceiveService();
+
+            if (downstream == null) {
+
+                /*
+                 * This is the last service in the write pipeline, so just receive
+                 * the buffer.
+                 * 
+                 * Note: The receive service is executing this Future locally on
+                 * this host. We do not submit it for execution ourselves.
+                 */
+
+                try {
+
+                    return receiveService.receiveData(msg, b);
+
+                } catch (InterruptedException e) {
+
+                    throw new RuntimeException(e);
+
+                }
+
+            }
+            
+            /*
+             * A service in the middle of the write pipeline (not the first and
+             * not the last).
+             */
+
+            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(msg, b,
+                    downstream, receiveService));
+
+        } finally {
+            
+            lock.unlock();
+            
         }
 
-        /*
-         * A service in the middle of the write pipeline (not the first and not
-         * the last).
-         */
-        final RunnableFuture<Void> ft = new FutureTask<Void>(
-                new Callable<Void>() {
-
-                    public Void call() throws Exception {
-
-                        // Get Future for send() outcome on local service.
-                        final Future<Void> futSnd = getHAReceiveService()
-                                .receiveData(msg, b);
-
-                        try {
-
-                            // Get future for receive outcome on the remote
-                            // service.
-                            final Future<Void> futRec = downstream.service
-                                    .receiveAndReplicate(msg);
-
-                            try {
-
-                                /*
-                                 * Await the Futures, but spend more time
-                                 * waiting on the local Future and only check
-                                 * the remote Future every second. Timeouts are
-                                 * ignored during this loop.
-                                 */
-                                while (!futSnd.isDone() && !futRec.isDone()) {
-                                    try {
-                                        futSnd.get(1L, TimeUnit.SECONDS);
-                                    } catch (TimeoutException ignore) {
-                                    }
-                                    try {
-                                        futRec.get(10L, TimeUnit.MILLISECONDS);
-                                    } catch (TimeoutException ignore) {
-                                    }
-                                }
-                                futSnd.get();
-                                futRec.get();
-
-                            } finally {
-                                if (!futRec.isDone()) {
-                                    // cancel remote Future unless done.
-                                    futRec
-                                            .cancel(true/* mayInterruptIfRunning */);
-                                }
-                            }
-
-                        } finally {
-                            // cancel the local Future.
-                            futSnd.cancel(true/* mayInterruptIfRunning */);
-                        }
-
-                        // done
-                        return null;
-                    }
-
-                });
+//        final RunnableFuture<Void> ft = new FutureTask<Void>(
+//                new Callable<Void>() {
+//
+//                    public Void call() throws Exception {
+//
+//                        // Get Future for send() outcome on local service.
+//                        final Future<Void> futSnd = getHAReceiveService()
+//                                .receiveData(msg, b);
+//
+//                        try {
+//
+//                            // Get future for receive outcome on the remote
+//                            // service.
+//                            final Future<Void> futRec = downstream.service
+//                                    .receiveAndReplicate(msg);
+//
+//                            try {
+//
+//                                /*
+//                                 * Await the Futures, but spend more time
+//                                 * waiting on the local Future and only check
+//                                 * the remote Future every second. Timeouts are
+//                                 * ignored during this loop.
+//                                 */
+//                                while (!futSnd.isDone() && !futRec.isDone()) {
+//                                    try {
+//                                        futSnd.get(1L, TimeUnit.SECONDS);
+//                                    } catch (TimeoutException ignore) {
+//                                    }
+//                                    try {
+//                                        futRec.get(10L, TimeUnit.MILLISECONDS);
+//                                    } catch (TimeoutException ignore) {
+//                                    }
+//                                }
+//                                futSnd.get();
+//                                futRec.get();
+//
+//                            } finally {
+//                                if (!futRec.isDone()) {
+//                                    // cancel remote Future unless done.
+//                                    futRec
+//                                            .cancel(true/* mayInterruptIfRunning */);
+//                                }
+//                            }
+//
+//                        } finally {
+//                            // cancel the local Future.
+//                            futSnd.cancel(true/* mayInterruptIfRunning */);
+//                        }
+//
+//                        // done
+//                        return null;
+//                    }
+//
+//                });
 
         // execute the FutureTask.
         member.getExecutor().execute(ft);
 
         return ft;
+
+    }
+    
+    /**
+     * A service in the middle of the write pipeline (not the first and not the
+     * last).
+     */
+    private static class ReceiveAndReplicateTask<S extends HAPipelineGlue>
+            implements Callable<Void> {
+        
+        private final HAWriteMessage msg;
+        private final ByteBuffer b;
+        private final PipelineState<S> downstream;
+        private final HAReceiveService<HAWriteMessage> receiveService;
+
+        public ReceiveAndReplicateTask(final HAWriteMessage msg,
+                final ByteBuffer b, final PipelineState<S> downstream,
+                final HAReceiveService<HAWriteMessage> receiveService) {
+
+            this.msg = msg;
+            this.b = b;
+            this.downstream = downstream;
+            this.receiveService = receiveService;
+            
+        }
+
+        public Void call() throws Exception {
+
+            // Get Future for send() outcome on local service.
+            final Future<Void> futSnd = receiveService.receiveData(msg, b);
+
+            try {
+
+                // Get future for receive outcome on the remote
+                // service.
+                final Future<Void> futRec = downstream.service
+                        .receiveAndReplicate(msg);
+
+                try {
+
+                    /*
+                     * Await the Futures, but spend more time
+                     * waiting on the local Future and only check
+                     * the remote Future every second. Timeouts are
+                     * ignored during this loop.
+                     */
+                    while (!futSnd.isDone() && !futRec.isDone()) {
+                        try {
+                            futSnd.get(1L, TimeUnit.SECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                        try {
+                            futRec.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                    }
+                    futSnd.get();
+                    futRec.get();
+
+                } finally {
+                    if (!futRec.isDone()) {
+                        // cancel remote Future unless done.
+                        futRec
+                                .cancel(true/* mayInterruptIfRunning */);
+                    }
+                }
+
+            } finally {
+                // cancel the local Future.
+                futSnd.cancel(true/* mayInterruptIfRunning */);
+            }
+
+            // done
+            return null;
+        }
 
     }
 
@@ -792,7 +1030,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         }
 
         @SuppressWarnings("unchecked")
-        public void readExternal(ObjectInput in) throws IOException,
+        public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
             addr = (InetSocketAddress) in.readObject();
@@ -801,7 +1039,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         }
 
-        public void writeExternal(ObjectOutput out) throws IOException {
+        public void writeExternal(final ObjectOutput out) throws IOException {
 
             out.writeObject(addr);
 

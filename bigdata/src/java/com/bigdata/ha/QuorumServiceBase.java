@@ -156,19 +156,19 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * QuorumPipeline
      */
     
-    @Override
-    public HAReceiveService<HAWriteMessage> getHAReceiveService() {
-        
-        return pipelineImpl.getHAReceiveService();
-        
-    }
+//    @Override
+//    public HAReceiveService<HAWriteMessage> getHAReceiveService() {
+//        
+//        return pipelineImpl.getHAReceiveService();
+//        
+//    }
 
-    @Override
-    public HASendService getHASendService() {
-        
-        return pipelineImpl.getHASendService();
-        
-    }
+//    @Override
+//    public HASendService getHASendService() {
+//        
+//        return pipelineImpl.getHASendService();
+//        
+//    }
 
     @Override
     public Future<Void> receiveAndReplicate(final HAWriteMessage msg)

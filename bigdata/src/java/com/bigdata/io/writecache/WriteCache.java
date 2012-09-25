@@ -40,6 +40,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -361,6 +362,14 @@ abstract public class WriteCache implements IWriteCache {
      * @see WriteCacheService#setExtent(long)
      */
     private final AtomicLong fileExtent = new AtomicLong();
+
+    /**
+     * m_closedForWrites is set when the buffer is about to be flushed and ensures that
+     * nothing will be appended to the buffer until it is reset for reuse.  This
+     * fixes a problem in the HA Pipeline where deletes could append to the buffer resulting
+     * in a reported buffer length in the HAMessage greater than the data sent.
+     */
+	private final AtomicBoolean m_closedForWrites = new AtomicBoolean(false);
 
     /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
@@ -1300,6 +1309,8 @@ abstract public class WriteCache implements IWriteCache {
         // Martyn: I moved your debug flag here so it is always cleared by
         // reset().
         m_written = false;
+        
+        m_closedForWrites.set(false);
 
     }
 
@@ -1843,15 +1854,21 @@ abstract public class WriteCache implements IWriteCache {
      * A problem previously existed with unsynchronized access to the ByteBuffer.
      * Resulting in a conflict over the position() and buffer corruption.
      * 
+     * If the WriteCache is closed then it must not be modified at all otherwise
+     * any HA replication will not be binary compatible. 
+     * 
      * @param addr
      *            The address of a cache entry.
      * 
      * @throws InterruptedException
      * @throws IllegalStateException
      */
-    /*public*/ void clearAddrMap(final long addr, final int latchedAddr) throws IllegalStateException, InterruptedException {
+    /* public */void clearAddrMap(final long addr, final int latchedAddr)
+            throws IllegalStateException, InterruptedException {
+
         final RecordMetadata entry = recordMap.remove(addr);
-        if (prefixWrites) {
+        // TODO entry should not be null. assert?
+        if (prefixWrites && !m_closedForWrites.get()) {
             // final int pos = entry.bufferOffset - 12;
             // final ByteBuffer tmp = acquire();
             // try {
@@ -2306,5 +2323,15 @@ abstract public class WriteCache implements IWriteCache {
                 0, buf.limit(), 0/* latchedAddr */));
 
     }
+
+    /**
+     * Called from writeCacheService to lock buffer content immediately prior to flushing
+     * and HA pipline replication.
+     */
+    void closeForWrites() {
+		assert !m_closedForWrites.get();
+		
+		m_closedForWrites.set(true);
+	}
 
 }
