@@ -42,6 +42,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.proxy.ThickFuture;
 
 /**
@@ -121,12 +122,34 @@ public class HAJournal extends Journal {
      */
     protected static Properties checkProperties(final Properties properties) {
 
+        final long minReleaseAge = Long.valueOf(properties.getProperty(
+                AbstractTransactionService.Options.MIN_RELEASE_AGE,
+                AbstractTransactionService.Options.DEFAULT_MIN_RELEASE_AGE));
+
         final BufferMode bufferMode = BufferMode.valueOf(properties
                 .getProperty(Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 
         switch (bufferMode) {
-        case DiskRW:
+        case DiskRW: {
+            if (minReleaseAge <= 0) {
+                /*
+                 * Note: Session protection is used by the RWStore when the
+                 * minReleaseAge is ZERO (0). However, session protection is not
+                 * compatible with HA. We MUST log delete blocks in order to
+                 * ensure that the question of allocation slot recycling is
+                 * deferred until the ACID decision at the commit point,
+                 * otherwise we can not guarantee that the read locks asserted
+                 * when lose a service and no longer have a fully met quorum
+                 * will be effective as of the *start* of the writer (that is,
+                 * atomically as of the last commit point).)
+                 */
+                throw new IllegalArgumentException(
+                        AbstractTransactionService.Options.MIN_RELEASE_AGE
+                                + "=" + minReleaseAge
+                                + " : must be GTE ONE (1) for HA.");
+            }
             break;
+        }
         case DiskWORM:
             break;
         default:
