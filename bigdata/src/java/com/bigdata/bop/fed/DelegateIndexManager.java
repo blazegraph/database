@@ -9,6 +9,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IResourceLockService;
@@ -165,10 +166,15 @@ class DelegateIndexManager implements IIndexManager {
 //	    
 //	}
 	
+    @Override
+    public CounterSet getCounters() {
+        return dataService.getFederation().getCounters();
+    }
+    
 	public String toString() {
 
-    	return super.toString() + "{dataServiceUUID="
-				+ dataService.getServiceUUID() + "}";
+        return super.toString() + "{dataServiceUUID="
+                + dataService.getServiceUUID() + "}";
     	
 	}
 

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.ICounterSetAccess;
 
 /**
  * Interface for managing named indices.
@@ -35,7 +36,7 @@ import com.bigdata.btree.IndexMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndexManager extends IIndexStore {
+public interface IIndexManager extends IIndexStore, ICounterSetAccess {
 
     /**
      * Register a named index.

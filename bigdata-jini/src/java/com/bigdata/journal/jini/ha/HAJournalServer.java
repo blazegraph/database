@@ -62,8 +62,6 @@ import com.sun.jini.start.LifeCycle;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal
  *      HA </a>
- * 
- *      TODO Make sure that ganglia reporting can be enabled.
  */
 public class HAJournalServer extends AbstractServer {
 
@@ -257,6 +255,9 @@ public class HAJournalServer extends AbstractServer {
         // Jini/River ServiceID.
         final ServiceID serviceID = getServiceID();
 
+        if (serviceID == null)
+            throw new AssertionError("ServiceID not assigned?");
+        
         // UUID variant of that ServiceID.
         serviceUUID = JiniUtil.serviceID2UUID(serviceID);
         
@@ -899,7 +900,7 @@ public class HAJournalServer extends AbstractServer {
 
         @Override
         synchronized public void shutdownNow() {
-
+            
 //            // immediate service shutdown (blocks).
 //            super.shutdownNow();
 

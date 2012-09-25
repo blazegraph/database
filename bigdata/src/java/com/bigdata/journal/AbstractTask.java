@@ -3239,6 +3239,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public Iterator<String> indexNameScan(String prefix, long timestamp) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public CounterSet getCounters() {
+            return delegate.getCounters();
+        }
         
     }
     
