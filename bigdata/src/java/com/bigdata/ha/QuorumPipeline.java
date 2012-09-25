@@ -31,8 +31,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
-import com.bigdata.ha.pipeline.HAReceiveService;
-import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 
@@ -69,24 +67,34 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      */
     Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
 
-    /**
-     * The service used by the leader to transmit NIO buffers to the next node
-     * in the write pipeline. The returned object is valid as long as this node
-     * remains the quorum leader.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the quorum is not highly available.
+    /*
+     * Note: Method removed since it does not appear necessary to let this
+     * service out of the scope of the QuorumPipelineImpl and the send service
+     * itself is not aware of pipeline state changes.
      */
-    HASendService getHASendService();
+//    /**
+//     * The service used by the leader to transmit NIO buffers to the next node
+//     * in the write pipeline. The returned object is valid as long as this node
+//     * remains the quorum leader.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the quorum is not highly available.
+//     */
+//    HASendService getHASendService();
 
-    /**
-     * The service used by the followers to accept and relay NIO buffers along
-     * the write pipeline. The returned object is valid until the service
-     * becomes the leader or disconnects from the {@link Quorum}.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the quorum is not highly available.
+    /*
+     * Note: Method removed since it does not appear necessary to let this
+     * service out of the scope of the QuorumPipelineImpl and the send service
+     * itself is not aware of pipeline state changes.
      */
-    HAReceiveService<HAWriteMessage> getHAReceiveService();
+//    /**
+//     * The service used by the followers to accept and relay NIO buffers along
+//     * the write pipeline. The returned object is valid until the service
+//     * becomes the leader or disconnects from the {@link Quorum}.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the quorum is not highly available.
+//     */
+//    HAReceiveService<HAWriteMessage> getHAReceiveService();
 
 }

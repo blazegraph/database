@@ -55,7 +55,7 @@ public class TestAll extends TestCase {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
      *      Journal HA </a>
      */
-    final private static boolean s_includeQuorum = false;
+    final private static boolean s_includeQuorum = true;
 
     /**
      * 

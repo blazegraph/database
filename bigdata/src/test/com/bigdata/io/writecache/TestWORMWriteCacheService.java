@@ -307,36 +307,42 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         }
 
+        @Override
         public S getService(final UUID serviceId) {
             
             return (S) fixture.getService(serviceId);
             
         }
 
+        @Override
         public Executor getExecutor() {
             
             return fixture.getExecutor();
             
         }
 
+        @Override
         public S getService() {
             
             return serviceImpl;
 
         }
 
-        public HAReceiveService<HAWriteMessage> getHAReceiveService() {
-            
-            return pipelineImpl.getHAReceiveService();
-            
-        }
+//        @Override
+//        public HAReceiveService<HAWriteMessage> getHAReceiveService() {
+//            
+//            return pipelineImpl.getHAReceiveService();
+//            
+//        }
 
-        public HASendService getHASendService() {
-            
-            return pipelineImpl.getHASendService();
-            
-        }
+//        @Override
+//        public HASendService getHASendService() {
+//            
+//            return pipelineImpl.getHASendService();
+//            
+//        }
 
+        @Override
         public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
                 throws IOException {
             
@@ -344,6 +350,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
         }
 
+        @Override
         public Future<Void> replicate(final HAWriteMessage msg,
                 final ByteBuffer b) throws IOException {
 
@@ -869,10 +876,10 @@ public class TestWORMWriteCacheService extends TestCase3 {
      */
     private boolean skipHATest() {
     	
-    	log.warn("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
-
-        return true;
-//        return false;
+//    	log.warn("Test not run.  See https://sourceforge.net/apps/trac/bigdata/ticket/235");
+//
+//        return true;
+        return false;
         
     }
 

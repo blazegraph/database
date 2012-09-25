@@ -545,6 +545,11 @@ abstract public class WriteCacheService implements IWriteCache {
                     } finally {
                         dirtyListLock.unlock();
                     }
+                    
+                    /*
+                     * Ensure nothing will modify this buffer before written to disk or HA pipeline
+                     */
+                    cache.closeForWrites();
 
                     if (!cache.isEmpty()) {
                         
