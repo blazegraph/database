@@ -15,6 +15,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IResourceLockService;
@@ -531,6 +532,11 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             return dataService.getFederation().getHttpdPort();
         }
 
+        @Override
+        public CounterSet getCounters() {
+            return dataService.getFederation().getCounters();
+        }
+        
         /**
          * {@inheritDoc}
          * 

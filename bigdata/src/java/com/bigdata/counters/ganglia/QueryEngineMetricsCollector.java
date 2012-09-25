@@ -11,7 +11,9 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.ganglia.GangliaMunge;
 import com.bigdata.ganglia.IGangliaMetricsCollector;
 import com.bigdata.ganglia.IGangliaMetricsReporter;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IFederationDelegate;
 
 /**
  * Reflects query engine metrics from the data server nodes to ganglia.
@@ -41,19 +43,20 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 //        
 //    }
 
-    private final IBigdataFederation<?> fed;
+//    private final IBigdataFederation<?> fed;
+    private final IIndexManager indexManager;
 	private final AbstractStatisticsCollector statisticsCollector;
 
-	public QueryEngineMetricsCollector(final IBigdataFederation<?> fed,
+	public QueryEngineMetricsCollector(final IIndexManager indexManager,
 			final AbstractStatisticsCollector statisticsCollector) {
 
-		if (fed == null)
+		if (indexManager == null)
 			throw new IllegalArgumentException();
 		
 		if (statisticsCollector == null)
 			throw new IllegalArgumentException();
 
-		this.fed = fed;
+		this.indexManager = indexManager;
 		
 		this.statisticsCollector = statisticsCollector;
 		
@@ -79,10 +82,14 @@ public class QueryEngineMetricsCollector implements IGangliaMetricsCollector {
 		 */
 		final String pathPrefix = basePrefix + "Query Engine";
 
-		// Note: Necessary for some kinds of things (lazily created).
-		fed.reattachDynamicCounters();
+        if (indexManager instanceof IBigdataFederation) {
+         
+            // Note: Necessary for some kinds of things (lazily created).
+            ((IFederationDelegate<?>) indexManager).reattachDynamicCounters();
+            
+        }
 
-		final CounterSet counters = (CounterSet) fed.getCounters().getPath(
+		final CounterSet counters = (CounterSet) indexManager.getCounters().getPath(
 				pathPrefix);
 
 		if (counters == null) {
