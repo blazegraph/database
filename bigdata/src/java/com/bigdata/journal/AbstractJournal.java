@@ -5141,8 +5141,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
                 throws IOException {
 
-            if (haLog.isInfoEnabled())
-                haLog.info("msg=" + msg);
+            if (haLog.isDebugEnabled())
+                haLog.debug("msg=" + msg);
             
             /*
              * Adjust the size on the disk of the local store to that given in
