@@ -570,8 +570,8 @@ public class HAJournalServer extends AbstractServer {
             protected void handleReplicatedWrite(final HAWriteMessage msg,
                     final ByteBuffer data) throws Exception {
 
-                if (haLog.isInfoEnabled())
-                    haLog.info("msg=" + msg + ", buf=" + data);
+                if (haLog.isDebugEnabled())
+                    haLog.debug("msg=" + msg + ", buf=" + data);
 
                 /*
                  * Note: the ByteBuffer is owned by the HAReceiveService. This
