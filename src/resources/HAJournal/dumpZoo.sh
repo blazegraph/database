@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Setup the environment.                                                                                                                       
 source src/resources/HAJournal/HAJournal.env
 
