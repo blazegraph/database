@@ -143,7 +143,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param os
      *            The stream on which the response will be written.
      * @param queryStr
-     *            The query string (if available).
+     *            The SPARQL Query -or- SPARQL Update command (if available).
      * 
      * @return The laundered exception.
      * 
@@ -175,9 +175,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                     resp.setContentType(MIME_TEXT_PLAIN);
                 }
             }
-    	    OutputStream os = null;
-    		try {
-    		    os = resp.getOutputStream();
+            OutputStream os = null;
+            try {
+                os = resp.getOutputStream();
                 final PrintWriter w = new PrintWriter(os);
                 if (queryStr != null) {
                     /*
@@ -191,12 +191,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                  */
                 t.printStackTrace(w);
                 w.flush();
-    			// flush the output stream.
-    			os.flush();
-    		} catch(IOException ex) {
-    		    // Could not write on output stream.
-    		} finally {
-    			// ignore any problems here.
+                // flush the output stream.
+                os.flush();
+            } catch (IOException ex) {
+                // Could not write on output stream.
+            } finally {
+                // ignore any problems here.
             }
             if (os != null) {
                 try {
@@ -206,15 +206,15 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                     // ignore any problems here.
                 }
             }
-    	}
-    	if (t instanceof RuntimeException) {
-    		return (RuntimeException) t;
-    	} else if (t instanceof Error) {
-    		throw (Error) t;
-    	} else if (t instanceof IOException) {
-    		throw (IOException) t;
-    	} else
-    		throw new RuntimeException(t);
+        }
+        if (t instanceof RuntimeException) {
+            return (RuntimeException) t;
+        } else if (t instanceof Error) {
+            throw (Error) t;
+        } else if (t instanceof IOException) {
+            throw (IOException) t;
+        } else
+            throw new RuntimeException(t);
     }
 
     /**
