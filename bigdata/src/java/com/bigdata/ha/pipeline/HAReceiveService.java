@@ -713,10 +713,21 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
              * We should now have parameters ready in the WriteMessage and can
              * begin transferring data from the stream to the writeCache.
              */
-            int rem = message.getSize();
+            final long begin = System.currentTimeMillis();
+            int rem = message.getSize(); // #of bytes remaining (to be received).
             while (rem > 0) {
 
-                client.clientSelector.select();
+                // block up to the timeout.
+                final int nkeys = client.clientSelector.select(10000/* ms */);
+                if (nkeys == 0) {
+                    // Nothing available.
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    if (elapsed > 10000) {
+                        // Issue warning if we have been blocked for a while.
+                        log.warn("Blocked: awaiting " + rem + " out of "
+                                + message.getSize() + " bytes.");
+                    }
+                }
                 final Set<SelectionKey> keys = client.clientSelector
                         .selectedKeys();
                 final Iterator<SelectionKey> iter = keys.iterator();
