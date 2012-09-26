@@ -593,6 +593,8 @@ abstract public class WriteCache implements IWriteCache {
 
     /**
      * Return <code>true</code> if there are no records buffered on the cache.
+     * Note: The caller MUST be holding a lock for this to be value. Probably
+     * the write lock.
      * 
      * @todo This currently tests the {@link #recordMap}. In fact, for at least
      *       the {@link RWStore} the record map COULD be empty with cleared
@@ -1895,19 +1897,19 @@ abstract public class WriteCache implements IWriteCache {
                 return;
             }
             /*
-             * Remove the entry.
-             */
-            if (recordMap.remove(addr) == null)
-                throw new AssertionError("Address already cleared: addr="
-                        + addr + ", latchedAddr=" + latchedAddr);
-            /*
              * Note: We must synchronize before having a side effect on position
              * (which includes depending on remaining()). Also see write(...)
              * which is synchronized on the buffer during critical sections
-             * which have a side effect on the buffer position.
+             * which have a side effect on the buffer position. Finally, note
+             * that we do not always have enough room in the buffer to record
+             * the delete entry. If there is not enough room, then we can not
+             * remove it from the recordMap (at least for HA).
              */
             synchronized (tmp) {
                 if (tmp.remaining() >= SIZEOF_PREFIX_WRITE_METADATA) {
+                    /*
+                     * Add the delete entry to the buffer.
+                     */
                     final int spos = tmp.position();
                     tmp.putLong(addr);
                     tmp.putInt(0); // wipe out size.
@@ -1919,6 +1921,13 @@ abstract public class WriteCache implements IWriteCache {
                         chkBuf.limit(tmp.position());
                         checker.update(chkBuf);
                     }
+                    /*
+                     * Remove the entry.
+                     */
+                    if (recordMap.remove(addr) == null)
+                        throw new AssertionError(
+                                "Address already cleared: addr=" + addr
+                                        + ", latchedAddr=" + latchedAddr);
                 }
             } // synchronized(tmp)
 
