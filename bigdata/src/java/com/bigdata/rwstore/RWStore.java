@@ -702,7 +702,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		if(log.isInfoEnabled())
 		    log.info("RWStore using writeCacheService with buffers: " + m_writeCacheBufferCount);
 
-		m_writeCache = newWriteCache();
+		// m_writeCache = newWriteCache();
 
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
@@ -752,7 +752,11 @@ public class RWStore implements IStore, IBufferedWriter {
                 
 			}
 			
-            final int maxBlockLessChk = m_maxFixedAlloc-4;
+            // setup write cache AFTER init to ensure filesize is correct!
+            
+    		m_writeCache = newWriteCache();
+
+    		final int maxBlockLessChk = m_maxFixedAlloc-4;
              
             m_maxBlobAllocSize = Integer.MAX_VALUE;
             
@@ -865,7 +869,7 @@ public class RWStore implements IStore, IBufferedWriter {
     private RWWriteCacheService newWriteCache() {
         try {
             return new RWWriteCacheService(m_writeCacheBufferCount,
-                    m_fd.length(), m_reopener, m_quorum) {
+            		convertAddr(m_fileSize), m_reopener, m_quorum) {
                 
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
@@ -925,6 +929,9 @@ public class RWStore implements IStore, IBufferedWriter {
 		if (m_fileSize > m_nextAllocation) {
 			m_fileSize = m_nextAllocation;
 		}
+		
+		if (log.isInfoEnabled())
+			log.info("Set default file extent " + convertAddr(m_fileSize));
 		
 		m_reopener.raf.setLength(convertAddr(m_fileSize));
 
@@ -1069,6 +1076,9 @@ public class RWStore implements IStore, IBufferedWriter {
                 // in units of -32K.
                 m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
                 
+        		if (log.isInfoEnabled())
+        			log.info("InitFromRootBlock m_fileSize: " + convertAddr(m_fileSize));
+        		
 			}
 	
             /*
@@ -1548,7 +1558,7 @@ public class RWStore implements IStore, IBufferedWriter {
                  */
 				final ByteBuffer bbuf;
 				try {
-					bbuf = m_writeCache.read(paddr);
+					bbuf = m_writeCache != null ? m_writeCache.read(paddr) : null;
 				} catch (Throwable t) {
                     throw new IllegalStateException(
                             "Error reading from WriteCache addr: " + paddr
