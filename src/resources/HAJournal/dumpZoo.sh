@@ -10,3 +10,5 @@ java\
  -Dlog4j.configuration=${LOG4J_CONFIG}\
  com.bigdata.zookeeper.DumpZookeeper\
  ${HAJOURNAL_CONFIG}
+ 
+ 
