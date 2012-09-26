@@ -56,7 +56,9 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
     }
 
     /**
-     * Provide default FileChannelScatteredWriteCache
+     * Provide default {@link FileChannelScatteredWriteCache}.
+     * <p>
+     * Note: This is used by the unit tests, but not by the {@link RWStore}.
      */
     @Override
     public WriteCache newWriteCache(final IBufferAccess buf,
@@ -72,9 +74,7 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
                 highlyAvailable,
                 bufferHasData,
-                (IReopenChannel<FileChannel>) opener, fileExtent, null) {
-
-        };
+                (IReopenChannel<FileChannel>) opener, fileExtent, null);
 
     }
 
