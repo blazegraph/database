@@ -1395,6 +1395,8 @@ abstract public class WriteCacheService implements IWriteCache {
         final WriteCache cache = acquireForWriter();
 
         try {
+        	if (log.isDebugEnabled())
+        		log.debug("Set fileExtent: " + fileExtent);
 
             // make a note of the current file extent.
             this.fileExtent.set(fileExtent);
@@ -1627,6 +1629,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     try {
 
+                    	if (log.isInfoEnabled() && cleanList.isEmpty())
+                    		log.info("Waiting for clean buffer");
+                    	
                         while (cleanList.isEmpty() && !halt) {
                             cleanListNotEmpty.await();
                         }
