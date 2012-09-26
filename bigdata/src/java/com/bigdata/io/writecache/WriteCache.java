@@ -1886,6 +1886,14 @@ abstract public class WriteCache implements IWriteCache {
          */
         final ByteBuffer tmp = acquire();
         try {
+            if (m_closedForWrites) {
+                /*
+                 * Neither the buffer nor the record map may be modified. The
+                 * WriteCacheService is in the process of writing this buffer to
+                 * the disk and replicating it to the downstream nodes (HA).
+                 */
+                return;
+            }
             /*
              * Remove the entry.
              */
