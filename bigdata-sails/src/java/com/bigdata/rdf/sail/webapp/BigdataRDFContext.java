@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import info.aduna.xml.XMLWriter;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -61,6 +63,7 @@ import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultWriter;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
+import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.rio.RDFFormat;
@@ -136,6 +139,20 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * incremental progress report on the UPDATE request.
      */
     protected static final String XHTML = "xhtml";
+    
+    /**
+     * URL Query parameter used to specify an XSL style sheet to be associated
+     * with the response in combination with the {@link #XHTML} URL query
+     * parameter.
+     */
+    protected static final String XSL_STYLESHEET = "xsl-stylesheet";
+    
+    /**
+     * The default XSL style sheet.
+     * 
+     * @see #XSL_STYLESHEET
+     */
+    protected static final String DEFAULT_XSL_STYLESHEET = "result-to-html.xsl";
     
     /**
      * URL Query parameter used to request an incremental XHTML representation
@@ -346,6 +363,37 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
 
+    /**
+     * Return the effective string value of a URL query parameter. If the URL
+     * query parameter was not given, or if it was given without an explicit
+     * value, then the effective string value is the <i>defaultValue</o>.
+     * 
+     * @param s
+     *            The value of the URL query parameter.
+     * @param defaultValue
+     *            The default value to return if the parameter was not given or
+     *            given without an explicit value.
+     * 
+     * @return The effective value.
+     */
+    protected static String getEffectiveStringValue(String s,
+            final String defaultValue) {
+
+        if (s == null)
+            return defaultValue;
+
+        s = s.trim();
+
+        if (s.length() == 0) {
+
+            return defaultValue;
+
+        }
+
+        return s;
+
+    }
+    
 	/**
      * Abstract base class for running queries handles the timing, pipe,
      * reporting, obtains the connection, and provides the finally {} semantics
@@ -961,13 +1009,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public TupleQueryTask(final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
-                final QueryType queryType, final TupleQueryResultFormat format,
+                final QueryType queryType, final String mimeType,
+                final Charset charset, final String fileExt,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
             super(namespace, timestamp, baseURI, astContainer, queryType,
-                    format.getDefaultMIMEType(), format.getCharset(), format
-                            .getDefaultFileExtension(), req, resp, os);
+                    mimeType, charset, fileExt, req, resp, os);
 
 		}
 
@@ -976,18 +1024,68 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final BigdataSailTupleQuery query = (BigdataSailTupleQuery) setupQuery(cxn);
 			
-            // Note: getQueryTask() verifies that format will be non-null.
-            final TupleQueryResultFormat format = TupleQueryResultWriterRegistry
-                    .getInstance().getFileFormatForMIMEType(mimeType);
+            final TupleQueryResultWriter w;
 
-            final TupleQueryResultWriter w = TupleQueryResultWriterRegistry
-                    .getInstance().get(format).getWriter(os);
+            if (xhtml) {
+            
+                /*
+                 * Override the XMLWriter to ensure that the XSL style sheet is
+                 * declared in the generated XML document. This will tell the
+                 * browser that it should style the result.
+                 * 
+                 * Note: The Content-Type header also needs to be overridden in
+                 * order to have the browser apply the style sheet.
+                 */
+                
+                final String stylesheet = getEffectiveStringValue(
+                        req.getParameter(XSL_STYLESHEET),
+                        DEFAULT_XSL_STYLESHEET);
+                
+                final XMLWriter xmlWriter = new MyXMLWriter(os, stylesheet);
+                
+                w = new SPARQLResultsXMLWriter(xmlWriter);
+                
+            } else {
 
-			query.evaluate(w);
+                // Note: getQueryTask() verifies that format will be non-null.
+                final TupleQueryResultFormat format = TupleQueryResultWriterRegistry
+                        .getInstance().getFileFormatForMIMEType(mimeType);
+
+                w = TupleQueryResultWriterRegistry.getInstance().get(format)
+                        .getWriter(os);
+                
+            }
+
+            query.evaluate(w);
 
 		}
 
 	}
+    
+    private static class MyXMLWriter extends XMLWriter {
+
+        final private String stylesheet;
+        
+        public MyXMLWriter(final OutputStream outputStream,
+                final String stylesheet) {
+            
+            super(outputStream);
+            
+            this.stylesheet = stylesheet;
+            
+        }
+
+        @Override
+        public void startDocument() throws IOException {
+
+            super.startDocument();
+            
+            _writeLn("<?xml-stylesheet type=\"text/xsl\" href=\"" + stylesheet
+                    + "\" ?>");
+
+        }
+        
+    }
 
 	/**
 	 * Executes a graph query.
@@ -1560,6 +1658,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 */
 		final boolean explain = req.getParameter(EXPLAIN) != null;
 
+		final boolean xhtml = req.getParameter(XHTML) != null;
+
         /*
          * CONNEG for the MIME type.
          * 
@@ -1567,11 +1667,43 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * a given type of query will result in a response using a default MIME
          * Type for that query.
          */
-        final String acceptStr = explain ? "text/html"
-                : acceptOverride != null ? acceptOverride : req.getHeader("Accept");
+        final String acceptStr;
+        if (explain) {
+            acceptStr = BigdataServlet.MIME_TEXT_HTML;
+        } else if (acceptOverride != null) {
+            acceptStr = acceptOverride;
+        } else if (xhtml) {
+            switch (queryType) {
+            case ASK:
+                // Should be all we need to do.
+                acceptStr = BooleanQueryResultFormat.TEXT.getDefaultMIMEType();
+                break;
+            case SELECT:
+                /*
+                 * We will send back an XML document with an XSLT style sheet
+                 * declaration. The Content-Type needs to be application/xml in
+                 * order for the browser to interpret the style sheet
+                 * declaration.
+                 */
+                // Generate XML solutions so we can apply XSLT transform.
+                acceptStr = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
+                break;
+            case DESCRIBE:
+            case CONSTRUCT:
+                // Generate RDF/XML so we can apply XSLT transform.
+                acceptStr = RDFFormat.RDFXML.getDefaultMIMEType();
+                break;
+            default:
+                throw new AssertionError("QueryType=" + queryType);
+            }
+        } else {
+            // Use whatever was specified by the client.
+            acceptStr = req.getHeader("Accept");
+        }
 
+        // Do conneg.
         final ConnegUtil util = new ConnegUtil(acceptStr);
-        
+
         switch (queryType) {
         case ASK: {
 
@@ -1596,8 +1728,25 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final TupleQueryResultFormat format = util
                     .getTupleQueryResultFormat(TupleQueryResultFormat.SPARQL);
 
+            final String mimeType;
+            final Charset charset;
+            final String fileExt;
+            if(xhtml) {
+                /*
+                 * Override as application/xml so the browser will interpret the
+                 * XSL style sheet directive.
+                 */
+                mimeType = BigdataServlet.MIME_APPLICATION_XML;
+                charset = Charset.forName("UTF-8");
+                fileExt = "xml";
+            } else {
+                mimeType = format.getDefaultMIMEType();
+                charset = format.getCharset();
+                fileExt = format.getDefaultFileExtension();
+            }
             return new TupleQueryTask(namespace, timestamp, baseURI,
-                    astContainer, queryType, format, req, resp, os);
+                    astContainer, queryType, mimeType, charset, fileExt, req,
+                    resp, os);
 
         }
         } // switch(queryType)
