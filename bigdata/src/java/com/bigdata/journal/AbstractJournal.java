@@ -4694,7 +4694,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                      */
                     {
                     
-                        if (_rootBlock.getStoreType().equals(
+                        if (!_rootBlock.getStoreType().equals(
                                 rootBlock0.getStoreType())) {
                             /*
                              * The StoreType must agree.
