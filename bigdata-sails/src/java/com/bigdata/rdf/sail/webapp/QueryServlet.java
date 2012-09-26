@@ -503,8 +503,8 @@ public class QueryServlet extends BigdataRDFServlet {
                 queryTask = context.getQueryTask(namespace, timestamp,
                         queryStr, null/* acceptOverride */, req, resp, os,
                         false/* update */);
-                
-                if(queryTask == null) {
+
+                if (queryTask == null) {
                     // KB not found. Response already committed.
                     return;
                 }
@@ -534,8 +534,52 @@ public class QueryServlet extends BigdataRDFServlet {
 //                }
 //                
 //            }
-            
-            final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+
+            final FutureTask<Void> ft;
+
+            if (!queryTask.explain && queryTask.xhtml) {
+
+                /*
+                 * Wrap the query result with an XSL transform that will paint
+                 * the page.
+                 */
+
+                switch(queryTask.queryType) {
+                case ASK:
+                    // For ASK, just delivery the text/plain response.
+                    ft = new FutureTask<Void>(queryTask);
+                    break;
+                case SELECT:
+                    /*
+                     * XSLT from XML representation of the solutions to XHTML.
+                     * 
+                     * Note: This is handled by attaching a processor
+                     * declaration when we generate the RDF/XML.
+                     */
+                    ft = new FutureTask<Void>(queryTask);
+                    break;
+                case DESCRIBE:
+                case CONSTRUCT:
+                    /*
+                     * FIXME : XSLT from RDF/XML => RDFa. Maybe using a Fresnel
+                     * lens.
+                     */
+                    ft = new FutureTask<Void>(queryTask);
+                    break;
+                default:
+                    throw new AssertionError("QueryType=" + queryTask.queryType);
+                }
+
+            } else {
+
+                /*
+                 * Send back the data using whatever was the negotiated content
+                 * type.
+                 */
+
+                ft = new FutureTask<Void>(queryTask);
+
+            }
 
             if (log.isTraceEnabled())
                 log.trace("Will run query: " + queryStr);
@@ -547,6 +591,12 @@ public class QueryServlet extends BigdataRDFServlet {
             resp.setStatus(HTTP_OK);
 
             if (queryTask.explain) {
+                
+                /*
+                 * Send back an explanation of the query execution, not the
+                 * query results.
+                 */
+                
                 resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
                 final Writer w = new OutputStreamWriter(os, queryTask.charset);
                 try {
@@ -562,6 +612,11 @@ public class QueryServlet extends BigdataRDFServlet {
                 }
 
             } else {
+
+                /*
+                 * Send back the query results.
+                 */
+                
                 resp.setContentType(queryTask.mimeType);
 
                 if (queryTask.charset != null) {

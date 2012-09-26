@@ -694,26 +694,6 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
     }
 
     /**
-	 * Unit test where we INSERT some solutions into the same named solution set
-	 * on which we are reading. This is done using an INCLUDE to join against
-	 * the named solution set within an UPDATE operation which writes on that
-	 * named solution set. The isolation semantics should provide one view for
-	 * the reader and a different view for the writer.
-	 * <p>
-	 * Note: In order to setup this test, we will have to pre-populate the
-	 * solution set. E.g., first load the data into graphs, then INSERT INTO
-	 * SOLUTIONS. At that point we can do the INSERT which is also doing the
-	 * "self-join" against the named solution set.
-	 * 
-	 * TODO DO a variant test where the operation is a DELETE.
-	 */
-	public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
-
-		fail("write test");
-		
-	}
-
-    /**
 	 * Unit test where we are deleting from one solution set and inserting into
 	 * another.
 	 * 
@@ -772,7 +752,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             
         }
 
-        // Query the solution set from which the solution were removed.
+        // Query the solution set from which the solutions were removed.
         {
          
             final StringBuilder sb = new StringBuilder();
@@ -795,7 +775,7 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
         }
 
-        // Query the solution set into which the solution were inserted.
+        // Query the solution set into which the solutions were inserted.
         {
          
             final StringBuilder sb = new StringBuilder();
@@ -820,6 +800,26 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
     }
     
+    /**
+     * Unit test where we INSERT some solutions into the same named solution set
+     * on which we are reading. This is done using an INCLUDE to join against
+     * the named solution set within an UPDATE operation which writes on that
+     * named solution set. The isolation semantics should provide one view for
+     * the reader and a different view for the writer.
+     * <p>
+     * Note: In order to setup this test, we will have to pre-populate the
+     * solution set. E.g., first load the data into graphs, then INSERT INTO
+     * SOLUTIONS. At that point we can do the INSERT which is also doing the
+     * "self-join" against the named solution set.
+     * 
+     * TODO DO a variant test where the operation is a DELETE.
+     */
+    public void test_isolation_insertIntoSolutionsWithIncludeFromSolutions() {
+
+        fail("write test");
+        
+    }
+
     /**
      * Unit test of CREATE SOLUTIONS.
      * <p>
@@ -909,15 +909,40 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
 
     }
 
+    /**
+     * A correct rejection test which verifies that an exception is thrown if
+     * the named solution set does not exist.
+     */
+    public void test_clearSolutionSet_01() throws UpdateExecutionException,
+            RepositoryException, MalformedQueryException {
+
+        try {
+            con.prepareUpdate(QueryLanguage.SPARQL, "clear solutions %namedSet1")
+                    .execute();
+            fail("Excepting: " + UpdateExecutionException.class);
+        } catch(UpdateExecutionException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
+    }
+    
+    /**
+     * A test which verifies that an exception is NOT thrown if
+     * the named solution set does not exist and SILENT is specified.
+     */
+    public void test_clearSolutionSet_02() throws UpdateExecutionException,
+            RepositoryException, MalformedQueryException {
+
+        con.prepareUpdate(QueryLanguage.SPARQL,
+                "clear silent solutions %namedSet1").execute();
+
+    }
+
     /*
-     * TODO Write tests for CLEAR exactly as per DROP.
-     * 
      * TODO Write tests for DROP/CLEAR GRAPHS, DROP/CLEAR ALL, and DROP/CLEAR
      * SOLUTIONS to verify that the effect the correct resources (graphs,
      * graphs+solutions, and solutions respectively).
      */
-//    public void test_clearSolutionSet_01() {
-//        
-//    }
 
 }
