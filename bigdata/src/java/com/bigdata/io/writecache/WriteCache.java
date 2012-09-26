@@ -40,7 +40,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -131,8 +130,9 @@ abstract public class WriteCache implements IWriteCache {
     final private AtomicReference<IBufferAccess> buf;
 
     /**
-     * The read lock allows concurrent {@link #acquire()}s while the write lock
-     * prevents {@link #acquire()} during critical sections such as
+     * The read lock allows concurrent {@link #acquire()}s and permits both
+     * reads and writes on the acquired buffer, while the write lock prevents
+     * {@link #acquire()} during critical sections such as
      * {@link #flush(boolean, long, TimeUnit)}, {@link #reset()}, and
      * {@link #close()}.
      */
@@ -369,7 +369,7 @@ abstract public class WriteCache implements IWriteCache {
      * fixes a problem in the HA Pipeline where deletes could append to the buffer resulting
      * in a reported buffer length in the HAMessage greater than the data sent.
      */
-	private final AtomicBoolean m_closedForWrites = new AtomicBoolean(false);
+	private boolean m_closedForWrites = false;
 
     /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
@@ -1289,6 +1289,11 @@ abstract public class WriteCache implements IWriteCache {
         if (tmp == null)
             throw new IllegalArgumentException();
 
+        if (!lock.writeLock().isHeldByCurrentThread()) {
+            // The caller must be holding the write lock.
+            throw new IllegalMonitorStateException();
+        }
+        
         // clear the index since all records were flushed to disk.
         recordMap.clear();
 
@@ -1310,7 +1315,7 @@ abstract public class WriteCache implements IWriteCache {
         // reset().
         m_written = false;
         
-        m_closedForWrites.set(false);
+        m_closedForWrites = false;
 
     }
 
@@ -1839,23 +1844,24 @@ abstract public class WriteCache implements IWriteCache {
      * with a full buffer where there is not room for the dummy "remove" prefix.
      * Whilst we could of course ensure that a buffer with less than the space
      * required for prefixWrites should be moved immediately to the dirtlyList,
-     * there would still exist the possibility that the clear could be
-     * requested on a buffer already on the dirtyList. It looks like this should
-     * not matter, since each buffer update can be considered as an atomic
-     * update even if the set of writes are individually not atomic (the updates
-     * from a previous buffer will always have been completed before the next
-     * buffer is processed).
+     * there would still exist the possibility that the clear could be requested
+     * on a buffer already on the dirtyList. It looks like this should not
+     * matter, since each buffer update can be considered as an atomic update
+     * even if the set of writes are individually not atomic (the updates from a
+     * previous buffer will always have been completed before the next buffer is
+     * processed).
      * 
      * In that case it appears we could ignore the situation where there is no
      * room for the dummy "remove" prefix, since there will be no room for a new
      * write also and the buffer will be flushed either on commit or a
      * subsequent write.
      * 
-     * A problem previously existed with unsynchronized access to the ByteBuffer.
-     * Resulting in a conflict over the position() and buffer corruption.
+     * A problem previously existed with unsynchronized access to the
+     * ByteBuffer. Resulting in a conflict over the position() and buffer
+     * corruption.
      * 
      * If the WriteCache is closed then it must not be modified at all otherwise
-     * any HA replication will not be binary compatible. 
+     * any HA replication will not be binary compatible.
      * 
      * @param addr
      *            The address of a cache entry.
@@ -1866,53 +1872,56 @@ abstract public class WriteCache implements IWriteCache {
     /* public */void clearAddrMap(final long addr, final int latchedAddr)
             throws IllegalStateException, InterruptedException {
 
-        final RecordMetadata entry = recordMap.remove(addr);
-        // TODO entry should not be null. assert?
-        if (prefixWrites && !m_closedForWrites.get()) {
-            // final int pos = entry.bufferOffset - 12;
-            // final ByteBuffer tmp = acquire();
-            // try {
-            // final ByteBuffer view = tmp.duplicate();
-            // view.limit(8);
-            // view.position(pos);
-            // view.putLong(0);
-            // } finally {
-            // release();
-            // }
-            final ByteBuffer tmp = acquire();
-            try {
-                /*
-                 * Note: We must synchronize before having a side effect on
-                 * position (which includes depending on remaining()). Also see
-                 * write(...) which is synchronized on the buffer during
-                 * critical sections which have a side effect on the buffer
-                 * position.
-                 */
-                synchronized (tmp) {
-                    if (tmp.remaining() >= SIZEOF_PREFIX_WRITE_METADATA) {
-                            final int spos = tmp.position();
-                            tmp.putLong(addr);
-                            tmp.putInt(0); // wipe out size.
-                            tmp.putInt(latchedAddr);
-                            if (checker != null) {
-                                // update the checksum (no side-effects on [data])
-                                final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
-                                chkBuf.position(spos);
-                                chkBuf.limit(tmp.position());
-                                checker.update(chkBuf);
-                            }
+        if (!prefixWrites) {
+            /*
+             * We will not record a deleted record.  We are not in HA mode.
+             */
+            recordMap.remove(addr);
+            return;
+        }
+        /*
+         * Note: acquire() is mutex with the writeLock. clearAddrMap() will take
+         * the writeLock in order to ensure that this operation is atomic with
+         * respect to closeForWrites().
+         */
+        final ByteBuffer tmp = acquire();
+        try {
+            /*
+             * Remove the entry.
+             */
+            if (recordMap.remove(addr) == null)
+                throw new AssertionError("Address already cleared: addr="
+                        + addr + ", latchedAddr=" + latchedAddr);
+            /*
+             * Note: We must synchronize before having a side effect on position
+             * (which includes depending on remaining()). Also see write(...)
+             * which is synchronized on the buffer during critical sections
+             * which have a side effect on the buffer position.
+             */
+            synchronized (tmp) {
+                if (tmp.remaining() >= SIZEOF_PREFIX_WRITE_METADATA) {
+                    final int spos = tmp.position();
+                    tmp.putLong(addr);
+                    tmp.putInt(0); // wipe out size.
+                    tmp.putInt(latchedAddr);
+                    if (checker != null) {
+                        // update the checksum (no side-effects on [data])
+                        final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+                        chkBuf.position(spos);
+                        chkBuf.limit(tmp.position());
+                        checker.update(chkBuf);
                     }
-                } // synchronized(tmp)
-                
-                /*
-                 * Fix up the debug flag when last address is cleared.
-                 */
-                if (m_written && recordMap.isEmpty()) {
-                    m_written = false;
                 }
-            } finally {
-                release();
+            } // synchronized(tmp)
+
+            /*
+             * Fix up the debug flag when last address is cleared.
+             */
+            if (m_written && recordMap.isEmpty()) {
+                m_written = false;
             }
+        } finally {
+            release();
         }
     }
 
@@ -2325,13 +2334,41 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     /**
-     * Called from writeCacheService to lock buffer content immediately prior to flushing
-     * and HA pipline replication.
+     * Called from {@link WriteCacheService} to lock buffer content immediately
+     * prior to flushing and HA pipline replication. Neither the internal buffer
+     * state nor the {@link #recordMap} may be changed once the
+     * {@link WriteCache} has been closed for writes. This is necessary to
+     * provide 100% binary replication. Otherwise the stores can differ in the
+     * data in freed allocation slots.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
      */
-    void closeForWrites() {
-		assert !m_closedForWrites.get();
-		
-		m_closedForWrites.set(true);
-	}
+    void closeForWrites() throws IllegalStateException, InterruptedException {
+
+        /*
+         * Note: clearAddrMap() uses acquire() to operate on the recordMap and
+         * the buffer. This method must be mutex with clearAddrMap(), so we take
+         * the writeLock.
+         */
+        
+        final Lock lock = this.lock.writeLock();
+
+        lock.lockInterruptibly();
+
+        try {
+
+            if (m_closedForWrites)
+                throw new AssertionError();
+
+            m_closedForWrites = true;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
 
 }

@@ -4688,6 +4688,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     final IRootBlockView rootBlock1 = new RootBlockView(
                             false/* rootBlock0 */, buf, checker);
 
+                    /*
+                     * Verify that the root blocks are consistent with the
+                     * assumptions for this Journal.
+                     */
+                    {
+                    
+                        if (_rootBlock.getStoreType().equals(
+                                rootBlock0.getStoreType())) {
+                            /*
+                             * The StoreType must agree.
+                             */
+                            throw new RuntimeException(
+                                    "Incompatible StoreType: expected="
+                                            + _rootBlock.getStoreType()
+                                            + ", actual="
+                                            + rootBlock0.getStoreType());
+                        }
+
+                    }
+
                     log.info("Synchronizing root blocks with leader.");
                     
                     // write root block through to disk and sync.
