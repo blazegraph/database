@@ -24,7 +24,9 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.Writer;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -50,7 +52,10 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -85,7 +90,22 @@ public class StatusServlet extends BigdataRDFServlet {
      * which could be served.
      */
     private static final String SHOW_NAMESPACES = "showNamespaces";
-    
+
+    /**
+     * Request a low-level dump of the journal.
+     * 
+     * @see DumpJournal
+     */
+    private static final String DUMP_JOURNAL = "dumpJournal";
+
+    /**
+     * Request a low-level dump of the pages in the indices for the journal. The
+     * {@link #DUMP_JOURNAL} option MUST also be specified.
+     * 
+     * @see DumpJournal
+     */
+    private static final String DUMP_PAGES = "dumpPages";
+
     /**
      * The name of a request parameter used to request a display of the
      * currently running queries. Legal values for this request parameter are
@@ -234,6 +254,10 @@ public class StatusServlet extends BigdataRDFServlet {
      * <dt>showNamespaces</dt>
      * <dd>List the namespaces for the registered {@link AbstractTripleStore}s.</dd>
      * </dl>
+     * <dt>dumpJournal</dt>
+     * <dd>Provides low-level information about the backing {@link Journal} (if
+     * any).</dd>
+     * </dl>
      * </p>
      * 
      * @todo This status page combines information about the addressed KB and
@@ -290,8 +314,47 @@ public class StatusServlet extends BigdataRDFServlet {
             }
             
             // open the body
-            current = current.node("body");
+            current = current.node("body","");
 
+            // Dump Journal?
+            final boolean dumpJournal = req.getParameter(DUMP_JOURNAL) != null;
+            
+            if(dumpJournal && getIndexManager() instanceof AbstractJournal) {
+                
+                current.node("h1", "Dump Journal").node("p", "Running...");
+                
+//                final XMLBuilder.Node section = current.node("pre");
+                // flush writer before writing on PrintStream.
+                w.flush();
+                
+                // dump onto the response.
+                final PrintStream out = new PrintStream(resp.getOutputStream());
+
+                out.print("<pre>\n");
+                
+                final DumpJournal dump = new DumpJournal((Journal) getIndexManager());
+
+                final List<String> namespaces = Collections.emptyList();
+                
+                final boolean dumpHistory = false;
+                
+                final boolean dumpPages = req.getParameter(DUMP_PAGES) != null;
+                
+                final boolean dumpIndices = false;
+                
+                final boolean dumpTuples = false;
+                
+                dump.dumpJournal(out, namespaces, dumpHistory, dumpPages, dumpIndices, dumpTuples);
+
+                // flush PrintStream before resuming writes on Writer.
+                out.flush();
+                
+                // close section.
+//                section.close();
+                out.print("\n</pre>");
+                
+            }
+            
             current.node("br", "Accepted query count="
                     + getBigdataRDFContext().getQueryIdFactory().get());
 

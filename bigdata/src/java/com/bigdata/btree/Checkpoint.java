@@ -29,6 +29,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 
+import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -489,12 +490,12 @@ public class Checkpoint implements Externalizable {
                  * is defined but the bloom filter has been disabled, then we
                  * also write a 0L so that the bloom filter is no longer
                  * reachable from the new checkpoint.
+                 * 
+                 * FIXME GIST : The SolutionSetStats are hacked into the
+                 * bloom filter addr for the Stream.
                  */
-//                (htree.bloomFilter == null ? htree.getCheckpoint()
-//                        .getBloomFilterAddr()
-//                        : htree.bloomFilter.isEnabled() ? htree.bloomFilter
-//                                .getAddr() : 0L),//
-                0L, // TODO No bloom filter yet. Do we want to support this?
+                ((SolutionSetStream)stream).getStatsAddr(),//
+                // 
                 0, // htree.height,// Note: HTree is not balanced (height not uniform)
                 0L,//stream.getNodeCount(),//
                 0L,//stream.getLeafCount(),//
@@ -830,6 +831,9 @@ public class Checkpoint implements Externalizable {
             break;
         case HTree:
             ndx = HTree.load(store, checkpointAddr, readOnly);
+            break;
+        case Stream:
+            ndx = Stream.load(store, checkpointAddr, readOnly);
             break;
         default:
             throw new AssertionError("Unknown: " + checkpoint.getIndexType());

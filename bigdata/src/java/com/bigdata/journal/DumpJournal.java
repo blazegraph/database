@@ -30,6 +30,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Iterator;
@@ -71,9 +72,6 @@ import com.bigdata.util.InnerCause;
  * 
  * TODO add an option to dump only as of a specified commitTime?
  * 
- * TODO add an option to restrict the names of the indices to be dumped
- * (-name=<regex>).
- * 
  * TODO GIST : Support all types of indices.
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585"> GIST
@@ -107,22 +105,29 @@ public class DumpJournal {
 //    }
     
     /**
-     * Dump one or more journal files.
+     * Dump one or more journal files:
      * 
-     * @param args
-     *            The name(s) of the journal file to open.
-     *            <dl>
-     *            <dt>-history </dt>
-     *            <dd>Dump metadata for indices in all commit records (default
-     *            only dumps the metadata for the indices as of the most current
-     *            committed state).</dd>
-     *            <dt>-indices</dt>
-     *            <dd>Dump the indices (does not show the tuples by default).</dd>
-     *            <dt>-pages</dt>
-     *            <dd>Dump the pages of the indices and reports some information on the page size.</dd>
-     *            <dt>-tuples</dt>
-     *            <dd>Dump the records in the indices.</dd>
-     *            </dl>
+     * <pre>
+     * usage: (option*) filename+
+     * </pre>
+     * 
+     * where <i>option</i> is any of:
+     * <dl>
+     * <dt>-namespace</dt>
+     * <dd>Dump only those indices having the specified namespace prefix.</dd>
+     * <dt>-history</dt>
+     * <dd>Dump metadata for indices in all commit records (default only dumps
+     * the metadata for the indices as of the most current committed state).</dd>
+     * <dt>-indices</dt>
+     * <dd>Dump the indices (does not show the tuples by default).</dd>
+     * <dt>-pages</dt>
+     * <dd>Dump the pages of the indices and reports some information on the
+     * page size.</dd>
+     * <dt>-tuples</dt>
+     * <dd>Dump the records in the indices.</dd>
+     * </dl>
+     * 
+     * where <i>filename</i> is one or more journal file names.
      */
 //    FIXME feature is not finished.  Must differentiate different address types.
 //    *            <dt>-addr ADDR</dt>
@@ -138,6 +143,10 @@ public class DumpJournal {
         }
 
         int i = 0;
+        
+        // Zero or more namespaces to be dumped. All are dumped if none are
+        // specified.
+        final List<String> namespaces = new LinkedList<String>();
         
         boolean dumpHistory = false;
         
@@ -163,6 +172,12 @@ public class DumpJournal {
             if(arg.equals("-history")) {
                 
                 dumpHistory = true;
+                
+            }
+            
+            else if(arg.equals("-namespace")) {
+                
+                namespaces.add(args[i + 1]);
                 
             }
             
@@ -196,9 +211,9 @@ public class DumpJournal {
 				throw new RuntimeException("Unknown argument: " + arg);
             
         }
-        
-        for(; i<args.length; i++) {
-            
+
+        for (; i < args.length; i++) {
+
             final File file = new File(args[i]);
 
             try {
@@ -253,8 +268,8 @@ public class DumpJournal {
 
                     final DumpJournal dumpJournal = new DumpJournal(journal);
 
-                    dumpJournal.dumpJournal(dumpHistory, dumpPages,
-                            dumpIndices, showTuples);
+                    dumpJournal.dumpJournal(System.out, namespaces,
+                            dumpHistory, dumpPages, dumpIndices, showTuples);
 
                     for(Long addr : addrs) {
                         
@@ -304,6 +319,33 @@ public class DumpJournal {
     public void dumpJournal(final boolean dumpHistory, final boolean dumpPages,
             final boolean dumpIndices, final boolean showTuples) {
 
+        dumpJournal(System.out, null/* namespaces */, dumpHistory, dumpPages,
+                dumpIndices, showTuples);
+        
+    }
+    
+    /**
+     * @param out
+     *            Where to write the output.
+     * @param namespaces
+     *            When non-empty and non-<code>null</code>, dump only those
+     *            indices having any of the specified namespaces.
+     * @param dumpHistory
+     *            Dump metadata for indices in all commit records (default only
+     *            dumps the metadata for the indices as of the most current
+     *            committed state).
+     * @param dumpPages
+     *            Dump the pages of the indices and reports some information on
+     *            the page size.
+     * @param dumpIndices
+     *            Dump the indices (does not show the tuples by default).
+     * @param showTuples
+     *            Dump the records in the indices.
+     */
+    public void dumpJournal(final PrintStream out, final List<String> namespaces,
+            final boolean dumpHistory, final boolean dumpPages,
+            final boolean dumpIndices, final boolean showTuples) {
+
         final FileMetadata fmd = journal.getFileMetadata();
 
         if (fmd != null) {
@@ -314,8 +356,8 @@ public class DumpJournal {
              */
 
             // dump the MAGIC and VERSION.
-            System.out.println("magic=" + Integer.toHexString(fmd.magic));
-            System.out.println("version="
+            out.println("magic=" + Integer.toHexString(fmd.magic));
+            out.println("version="
                     + Integer.toHexString(fmd.version));
 
             /*
@@ -329,7 +371,7 @@ public class DumpJournal {
 
             final long bytesAvailable = (fmd.userExtent - fmd.nextOffset);
 
-            System.out.println("extent=" + fmd.extent + "(" + fmd.extent
+            out.println("extent=" + fmd.extent + "(" + fmd.extent
                     / Bytes.megabyte + "M)" + ", userExtent="
                     + fmd.userExtent + "(" + fmd.userExtent
                     / Bytes.megabyte + "M)" + ", bytesAvailable="
@@ -356,7 +398,7 @@ public class DumpJournal {
                 
                 if (rootBlock0 != null) {
                 
-                    System.out.println(new RootBlockView(
+                    out.println(new RootBlockView(
                             true/* rootBlock0 */, rootBlock0,
                             new ChecksumUtility()).toString());
                     
@@ -371,18 +413,18 @@ public class DumpJournal {
                 
                 if (rootBlock1 != null) {
                 
-                    System.out.println(new RootBlockView(
+                    out.println(new RootBlockView(
                             false/* rootBlock0 */, rootBlock1,
                             new ChecksumUtility()).toString());
                     
                 }
                 
             }
-            // System.out.println(fmd.rootBlock0.toString());
-            // System.out.println(fmd.rootBlock1.toString());
+            // out.println(fmd.rootBlock0.toString());
+            // out.println(fmd.rootBlock1.toString());
 
             // report on which root block is the current root block.
-            System.out.println("The current root block is #"
+            out.println("The current root block is #"
                     + (journal.getRootBlockView().isRootBlock0() ? 0 : 1));
 
         }
@@ -398,7 +440,7 @@ public class DumpJournal {
 
                 store.showAllocators(sb);
 
-                System.out.println(sb);
+                out.println(sb);
 
             }
 
@@ -407,7 +449,7 @@ public class DumpJournal {
 
                 final DeleteBlockStats stats = store.checkDeleteBlocks(journal);
 
-                System.out.println(stats.toString(store));
+                out.println(stats.toString(store));
                 
                 final Set<Integer> duplicateAddrs = stats
                         .getDuplicateAddresses();
@@ -453,18 +495,18 @@ public class DumpJournal {
 		final CommitRecordIndex commitRecordIndex = journal
 				.getCommitRecordIndex();
 
-		System.out.println("There are " + commitRecordIndex.getEntryCount()
+		out.println("There are " + commitRecordIndex.getEntryCount()
 				+ " commit points.");
 
         if (dumpGRS) {
 
-            dumpGlobalRowStore();
+            dumpGlobalRowStore(out);
             
 		}
 		
 		if (dumpHistory) {
 
-            System.out.println("Historical commit points follow in temporal sequence (first to last):");
+            out.println("Historical commit points follow in temporal sequence (first to last):");
             
 //                final IKeyBuilder keyBuilder = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
 //
@@ -488,20 +530,20 @@ public class DumpJournal {
             
             while(itr.hasNext()) {
                 
-                System.out.println("----");
+                out.println("----");
 
                 final CommitRecordIndex.Entry entry = itr.next().getObject();
                 
-                System.out.print("Commit Record: " + entry.commitTime
+                out.print("Commit Record: " + entry.commitTime
                         + ", addr=" + journal.toString(entry.addr)+", ");
                 
                 final ICommitRecord commitRecord = journal
                         .getCommitRecord(entry.commitTime);
                 
-                System.out.println(commitRecord.toString());
+                out.println(commitRecord.toString());
 
-                dumpNamedIndicesMetadata(commitRecord, dumpPages,
-                        dumpIndices, showTuples);
+                dumpNamedIndicesMetadata(out, namespaces, commitRecord,
+                        dumpPages, dumpIndices, showTuples);
 
             }
             
@@ -513,11 +555,11 @@ public class DumpJournal {
             
             final ICommitRecord commitRecord = journal.getCommitRecord();
             
-            System.out.println(commitRecord.toString());
+            out.println(commitRecord.toString());
 
-            dumpNamedIndicesMetadata(commitRecord, dumpPages, dumpIndices,
-                    showTuples);
-            
+            dumpNamedIndicesMetadata(out, namespaces, commitRecord,
+                    dumpPages, dumpIndices, showTuples);
+
         }
 
     }
@@ -533,7 +575,7 @@ public class DumpJournal {
 
     }
     
-    public void dumpGlobalRowStore() {
+    public void dumpGlobalRowStore(final PrintStream out) {
         
         final SparseRowStore grs = journal.getGlobalRowStore(journal
                 .getLastCommitTime());
@@ -546,7 +588,7 @@ public class DumpJournal {
                 
                 final ITPS tps = itr.next();
                 
-                System.out.println(tps.toString());
+                out.println(tps.toString());
                 
             }
             
@@ -562,7 +604,7 @@ public class DumpJournal {
                 
                 final ITPS tps = itr.next();
                 
-                System.out.println(tps.toString());
+                out.println(tps.toString());
                 
             }
             
@@ -576,7 +618,8 @@ public class DumpJournal {
      * @param journal
      * @param commitRecord
      */
-    private void dumpNamedIndicesMetadata(final ICommitRecord commitRecord,
+    private void dumpNamedIndicesMetadata(final PrintStream out,
+            final List<String> namespaces, final ICommitRecord commitRecord,
             final boolean dumpPages, final boolean dumpIndices,
             final boolean showTuples) {
 
@@ -590,8 +633,33 @@ public class DumpJournal {
 
             // a registered index.
             final String name = nitr.next();
+
+            if (namespaces != null && !namespaces.isEmpty()) {
+
+                boolean found = false;
+                
+                for(String namespace : namespaces) {
+                    
+                    if (name.startsWith(namespace)) {
+                        
+                        found = true;
+                
+                        break;
+                        
+                    }
+
+                }
+                
+                if (!found) {
+                 
+                    // Skip this index. Not a desired namespace.
+                    continue;
+                    
+                }
+
+            }
             
-            System.out.println("name=" + name);
+            out.println("name=" + name);
 
             // load index from its checkpoint record.
             final ICheckpointProtocol ndx;
@@ -622,10 +690,10 @@ public class DumpJournal {
             }
 
             // show checkpoint record.
-            System.out.println("\t" + ndx.getCheckpoint());
+            out.println("\t" + ndx.getCheckpoint());
 
             // show metadata record.
-            System.out.println("\t" + ndx.getIndexMetadata());
+            out.println("\t" + ndx.getIndexMetadata());
 
             /*
              * Collect statistics on the page usage for the index.
@@ -642,7 +710,7 @@ public class DumpJournal {
                     final PageStats stats = ((ISimpleTreeIndexAccess) ndx)
                             .dumpPages();
 
-                    System.out.println("\t" + stats);
+                    out.println("\t" + stats);
 
                     pageStats.put(name, stats);
 
@@ -671,7 +739,7 @@ public class DumpJournal {
             /*
              * Write out the header.
              */
-            System.out.println(PageStats.getHeaderRow());
+            out.println(PageStats.getHeaderRow());
 
             for (Map.Entry<String, PageStats> e : pageStats.entrySet()) {
 
@@ -688,7 +756,7 @@ public class DumpJournal {
                     final ICheckpointProtocol tmp = journal
                             .getIndexWithCommitRecord(name, commitRecord);
 
-                    System.out.println("name: " + name + ", class="
+                    out.println("name: " + name + ", class="
                             + tmp.getClass() + ", checkpoint="
                             + tmp.getCheckpoint());
 
@@ -700,7 +768,7 @@ public class DumpJournal {
                  * Write out the stats for this index.
                  */
 
-                System.out.println(stats.getDataRow());
+                out.println(stats.getDataRow());
 
             }
 

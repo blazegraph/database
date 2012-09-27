@@ -47,6 +47,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamDecoder;
 import com.bigdata.rdf.internal.encoder.SolutionSetStreamEncoder;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
+import com.bigdata.rdf.sparql.ast.SolutionSetStats;
 import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.stream.Stream;
 import com.bigdata.striterator.Chunkerator;
@@ -190,11 +191,34 @@ public final class SolutionSetStream extends Stream implements
 	 * @return The {@link ISolutionSetStats}.
 	 */
     public ISolutionSetStats getStats() {
-    	
+
+        /*
+         * Note: This field is set by setCheckpoint().
+         */
+        
     		return solutionSetStats;
     	
     }
 
+    /**
+     * Return the address of the {@link SolutionSetStats} to be written into the
+     * next {@link Checkpoint} record. The caller must have {@link #flush()} the
+     * {@link SolutionSetStream} as a pre-condition (to ensure that the stats
+     * have been written out). If the {@link SolutionSetStats} are not loaded,
+     * then the address from the last {@link Checkpoint} record is returned.
+     */
+    public long getStatsAddr() {
+
+        if (solutionSetStats != null) {
+
+            return solutionSetStats.addr;
+
+        }
+
+        return getCheckpoint().getBloomFilterAddr();
+
+    }
+    
     public ICloseableIterator<IBindingSet[]> get() {
 
         if (rootAddr == IRawStore.NULL)
@@ -375,9 +399,10 @@ public final class SolutionSetStream extends Stream implements
          */
 
         if (solutionSetStats != null
-                && solutionSetStats.addr != getCheckpoint()
-                        .getBloomFilterAddr()) {
-            
+                && (solutionSetStats.addr == IRawStore.NULL //
+                 || solutionSetStats.addr != getCheckpoint().getBloomFilterAddr())//
+                 ) {
+
             solutionSetStats.addr = getStore()
                     .write(ByteBuffer.wrap(SerializerUtil
                             .serialize(solutionSetStats.delegate)));

@@ -3776,7 +3776,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			}
 
 			// Resolve the index against that commit record.
-            ndx = (BTree) getIndexWithCommitRecord(name, commitRecord);
+            ndx = (ICheckpointProtocol) getIndexWithCommitRecord(name, commitRecord);
 
             if (ndx == null) {
 
