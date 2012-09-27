@@ -30,7 +30,6 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -52,6 +51,17 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
 
+    /**
+     * The maximum capacity for the backing array.
+     * 
+     * FIXME Array limits in truth maintenance code. This should probably be
+     * close to the branching factor or chunk capacity.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/606">
+     *      Array limits in truth maintenance code. </a>
+     */
+    private static final long MAX_CAPACITY = 10000000;
+    
     private boolean open = true;
     
     /**
@@ -197,14 +207,16 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
         
         final long rangeCount = accessPath.rangeCount(false/*exact*/);
 
-        if (rangeCount > 10000000) {
+        if (rangeCount >= MAX_CAPACITY) {
             
             /*
              * Note: This is a relatively high limit (10M statements). You are
              * much better off processing smaller chunks!
              */
             
-            throw new RuntimeException("Too many statements to read into memory: "+rangeCount);
+            throw new RuntimeException(
+                    "Too many statements to read into memory: rangeCount="
+                            + rangeCount + ", maxCapacity=" + MAX_CAPACITY);
             
         }
         

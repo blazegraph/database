@@ -188,14 +188,17 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
     }
     
     /**
-     * The maximum <em>limit</em> that is allowed for a fully-buffered read.
-     * The {@link #asynchronousIterator(Iterator)} will always be used above
-     * this limit.
+     * The maximum <em>limit</em> that is allowed for a fully-buffered read. The
+     * {@link #asynchronousIterator(Iterator)} will always be used above this
+     * limit.
      * 
-     * @todo This should probably be close to the branching factor or chunk
-     * capacity.
+     * FIXME Array limits in truth maintenance code. This should probably be
+     * close to the branching factor or chunk capacity.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/606">
+     *      Array limits in truth maintenance code. </a>
      */
-    protected static final int MAX_FULLY_BUFFERED_READ_LIMIT = 250000;
+    protected static final int MAX_FULLY_BUFFERED_READ_LIMIT = 10000000;
     
     /**
      * We cache some stuff for historical reads.
