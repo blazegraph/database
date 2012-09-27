@@ -1675,7 +1675,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
         } else if (xhtml) {
             switch (queryType) {
             case ASK:
-                // Should be all we need to do.
+                /*
+                 * TODO This is just sending back text/plain. If we want to keep
+                 * to the XHTML semantics, then we should send back XML with an
+                 * XSL style sheet.
+                 */
                 acceptStr = BooleanQueryResultFormat.TEXT.getDefaultMIMEType();
                 break;
             case SELECT:
@@ -1690,7 +1694,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 break;
             case DESCRIBE:
             case CONSTRUCT:
-                // Generate RDF/XML so we can apply XSLT transform.
+                /* Generate RDF/XML so we can apply XSLT transform.
+                 * 
+                 * FIXME This should be sending back RDFs or using a lens.
+                 */
                 acceptStr = RDFFormat.RDFXML.getDefaultMIMEType();
                 break;
             default:

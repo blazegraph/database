@@ -332,6 +332,9 @@ public class SolutionSetCache implements ISolutionSetCache {
                     timestamp);
 
         }
+
+        // Note: Forces all access to be unisolated.
+//        return (SolutionSetStream) cache.getStore().getUnisolatedIndex(fqn);
    
     }
     
@@ -479,8 +482,14 @@ public class SolutionSetCache implements ISolutionSetCache {
 
         if (sset != null) {
 
-            return sset.getStats();
+            final ISolutionSetStats stats = sset.getStats();
 
+            if (stats == null)
+                throw new RuntimeException("No statistics? solutionSet="
+                        + solutionSet);
+
+            return stats;
+            
         }
 
         return null;

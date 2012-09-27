@@ -229,6 +229,8 @@ abstract public class Stream implements ICheckpointProtocol {
         // this.counter = new AtomicLong( checkpoint.getCounter() );
 
         this.recordVersion = checkpoint.getRecordVersion();
+
+        this.rootAddr = checkpoint.getRootAddr();
         
     }
     

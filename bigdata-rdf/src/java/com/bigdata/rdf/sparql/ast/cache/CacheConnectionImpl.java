@@ -133,7 +133,7 @@ public class CacheConnectionImpl implements ICacheConnection {
      * journal instance, then the commit protocol should be taking care of
      * things for us.
      */
-    private static final boolean useMainDatabaseForCache = false;
+    private static final boolean useMainDatabaseForCache = true;
     
     private IIndexManager getLocalIndexManager() {
         
