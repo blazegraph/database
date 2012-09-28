@@ -1058,13 +1058,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         try {
             // remaining = nanos - (now - begin) [aka elapsed]
             remaining = nanos - (System.nanoTime() - begin);
-            while (token == NO_QUORUM && client != null) {
-                if(!quorumChange.await(remaining,TimeUnit.NANOSECONDS))
+            while (token == NO_QUORUM && client != null && remaining > 0) {
+                if (!quorumChange.await(remaining, TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
                 remaining = nanos - (System.nanoTime() - begin);
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
+            if (remaining <= 0)
+                throw new TimeoutException();
             return token;
         } finally {
             lock.unlock();
@@ -1097,13 +1099,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         try {
             // remaining = nanos - (now - begin) [aka elapsed]
             remaining = nanos - (System.nanoTime() - begin);
-            while (token != NO_QUORUM && client != null) {
+            while (token != NO_QUORUM && client != null && remaining > 0) {
                 if (!quorumChange.await(remaining, TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
                 remaining = nanos - (System.nanoTime() - begin);
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
+            if (remaining <= 0)
+                throw new TimeoutException();
             return;
         } finally {
             lock.unlock();
@@ -1115,17 +1119,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * <p>
      * Note: This is used in certain places to work around concurrent
      * indeterminism.
+     * 
+     * @throws TimeoutException
      */
-    private void awaitEnoughJoinedToMeet() throws QuorumException {
+    private void awaitEnoughJoinedToMeet() throws QuorumException,
+            TimeoutException {
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         try {
             final long begin = System.nanoTime();
             final long nanos = timeout;
             long remaining = nanos;
-            while (!isQuorum(joined.size())) {
-                if (client == null)
-                    throw new AsynchronousQuorumCloseException();
+            while (!isQuorum(joined.size()) && client != null && remaining > 0) {
                 if (!joinedChange.await(remaining, TimeUnit.NANOSECONDS))
                     throw new QuorumException(
                             "Not enough joined services: njoined="
@@ -1134,6 +1139,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 // remaining = nanos - (now - begin) [aka elapsed]
                 remaining = nanos - (System.nanoTime() - begin);
             }
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+            if (remaining <= 0)
+                throw new TimeoutException();
             return;
         } catch (InterruptedException e) {
             // propagate interrupt.
@@ -2492,7 +2501,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                             + lastValidToken + ", newToken=" + newToken);
                     return;
                 }
-                awaitEnoughJoinedToMeet();
+                try {
+                    awaitEnoughJoinedToMeet();
+                } catch (TimeoutException e1) {
+                    throw new QuorumException(e1);
+                }
                 token = lastValidToken = newToken;
                 quorumChange.signalAll();
                 if (log.isInfoEnabled())

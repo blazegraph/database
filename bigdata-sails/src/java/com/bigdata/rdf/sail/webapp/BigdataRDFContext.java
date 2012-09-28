@@ -938,9 +938,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
 //                }
                 return null;
-//            } catch (Throwable t) {
-//                // launder and rethrow the exception.
-//                throw BigdataRDFServlet.launderThrowable(t, resp, queryStr);
+            } catch (Throwable t) {
+                if (cxn != null && !cxn.isReadOnly()) {
+                    /*
+                     * Force rollback of the connection.
+                     */
+                    cxn.rollback();
+                }
+                throw new Exception(t);
             } finally {
                 m_queries.remove(queryId);
 //                if (os != null) {
@@ -952,6 +957,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                }
                 if (cxn != null) {
                     try {
+                        // Force close of the connection.
                         cxn.close();
                         if(log.isTraceEnabled())
                             log.trace("Connection closed.");
@@ -1810,8 +1816,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	}
 
     /**
-     * Return a read-only transaction which will read from the commit point
-     * associated with the given timestamp.
+     * Return a connection transaction. When the timestamp is associated with a
+     * historical commit point, this will be a read-only connection. When it is
+     * associated with the {@link ITx#UNISOLATED} view or a read-write
+     * transaction, this will be a mutable connection.
      * 
      * @param namespace
      *            The namespace.

@@ -2218,8 +2218,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             if (quorum != null) {
 
-                // HA mode
-                quorum.getClient().abort2Phase(quorumToken);
+                try {
+
+                    // HA mode
+                    quorum.getClient().abort2Phase(quorumToken);
+                    
+                } catch (Throwable t) {
+
+                    haLog.error(
+                            "2-Phase abort failure.  Will do local abort. cause="
+                                    + t, t);
+
+                    // Low-level abort.
+                    _abort();
+                    
+                }
 
             } else {
 
@@ -4644,7 +4657,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  */
                 
                 // local abort (no quorum, so we can do 2-phase abort).
-                _abort();
+//                _abort();
 //                getLocalTransactionManager().
                 
                 /*
