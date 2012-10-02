@@ -487,7 +487,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         for (SPO spo : axioms) {
 
             final byte[] key = SPOKeyOrder.SPO.encodeKey(keyBuilder, spo);
-            
+
             if (true) {
                 
                 final IV[] ivs = IVUtility.decodeAll(key);

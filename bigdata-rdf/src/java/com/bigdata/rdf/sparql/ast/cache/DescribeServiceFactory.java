@@ -5,9 +5,9 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
@@ -196,9 +196,19 @@ public class DescribeServiceFactory implements CustomServiceFactory {
         }
 
         @Override
-        public void transactionCommited(long commitTime) {
+        public void transactionBegin() {
+
+        }
+
+        @Override
+        public void transactionPrepare() {
 
             flush();
+
+        }
+
+        @Override
+        public void transactionCommited(final long commitTime) {
 
         }
 

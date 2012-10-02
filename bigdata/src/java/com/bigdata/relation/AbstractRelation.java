@@ -95,23 +95,40 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * @param keyOrder
      *            The natural index order.
      * 
-     * @return The index name.
+     * @return The fully qualified index name.
      */
     static public <E> String getFQN(final IRelation<E> relation,
             final IKeyOrder<? extends E> keyOrder) {
-
-		/*
-		 * TODO We wind up calling this a lot. intern() might help reduce the
-		 * heap requirements while the returned value is being held, but it is
-		 * not reducing the heap pressure caused by this string concatenation.
-		 * To do that we would have to search a cache using the component
-		 * elements [namespace] and [keyOrder].
-		 */
-		return (relation.getNamespace() + "." + keyOrder.getIndexName())
-				.intern();
-
+        
+        return getFQN(relation, keyOrder.getIndexName());
+        
     }
 
+    /**
+     * The fully qualified name of the index.
+     * 
+     * @param relation
+     *            The relation.
+     * @param localName
+     *            The local name of the index.
+     * 
+     * @return The fully qualified index name.
+     */
+    static public <E> String getFQN(final IRelation<E> relation,
+            final String localName) {
+
+        /*
+         * TODO We wind up calling this a lot. intern() might help reduce the
+         * heap requirements while the returned value is being held, but it is
+         * not reducing the heap pressure caused by this string concatenation.
+         * To do that we would have to search a cache using the component
+         * elements [namespace] and [keyOrder].
+         */
+        
+        return (relation.getNamespace() + "." + localName).intern();
+
+    }
+    
     /**
      * Return the index for the {@link IKeyOrder} the timestamp for this view of
      * the relation.

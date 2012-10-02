@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.changesets;
 
 import java.util.Comparator;
@@ -10,20 +32,10 @@ public class ChangeRecord implements IChangeRecord {
     
     private final ChangeAction action;
     
-//    private final StatementEnum oldType;
-    
     public ChangeRecord(final ISPO stmt, final ChangeAction action) {
         
-//        this(stmt, action, null);
-//        
-//    }
-//    
-//    public ChangeRecord(final BigdataStatement stmt, final ChangeAction action, 
-//            final StatementEnum oldType) {
-//        
         this.stmt = stmt;
         this.action = action;
-//        this.oldType = oldType;
         
     }
     
@@ -33,12 +45,6 @@ public class ChangeRecord implements IChangeRecord {
         
     }
 
-//    public StatementEnum getOldStatementType() {
-//        
-//        return oldType;
-//        
-//    }
-
     public ISPO getStatement() {
         
         return stmt;
@@ -46,7 +52,14 @@ public class ChangeRecord implements IChangeRecord {
     }
    
     @Override
-    public boolean equals(Object o) {
+    public int hashCode() {
+
+        return stmt.hashCode();
+        
+    }
+    
+    @Override
+    public boolean equals(final Object o) {
         
         if (o == this)
             return true;
@@ -73,14 +86,17 @@ public class ChangeRecord implements IChangeRecord {
     
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append(action).append(": ").append(stmt);
         
         return sb.toString();
         
     }
-    
+
+    /**
+     * Comparator imposes an {@link ISPO} order.
+     */
     public static final Comparator<IChangeRecord> COMPARATOR = 
         new Comparator<IChangeRecord>() {
         

@@ -10,10 +10,11 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
@@ -82,6 +83,19 @@ public class ServiceRegistry {
 
             add(new URIImpl(BD.NAMESPACE + "describe"),
                     new DescribeServiceFactory());
+
+        }
+        
+        if (true) {
+
+            /**
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/607">
+             *      HISTORY SERVICE </a>
+             */
+
+            add(new URIImpl(BD.NAMESPACE + "history"),
+                    new HistoryServiceFactory());
 
         }
         
