@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -267,8 +268,10 @@ public class ASTBindingAssigner implements IASTOptimizer {
         
         final FunctionNode functionNode = (FunctionNode) vexpr;
         
-        if (!functionNode.getFunctionURI().equals(
-                FunctionRegistry.SAME_TERM))
+        final URI functionURI = functionNode.getFunctionURI();
+        
+        if (!functionURI.equals(FunctionRegistry.SAME_TERM) &&
+        		!functionURI.equals(FunctionRegistry.EQ))
             return;
 
         final IValueExpressionNode left = (IValueExpressionNode) functionNode
@@ -279,13 +282,25 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
         if (left instanceof VarNode && right instanceof ConstantNode) {
 
-            willReplace(replacements, (VarNode) left,
-                    ((ConstantNode) right).getValueExpression().get());
+        	final IV constant = ((ConstantNode) right).getValueExpression().get();
+        	
+        	// we cannot do the replace for EQ when then constant is a literal
+        	if (functionURI.equals(FunctionRegistry.EQ) && constant.isLiteral())
+        		return;
+        	
+            willReplace(replacements, (VarNode) left, constant);
+//                    ((ConstantNode) right).getValueExpression().get());
 
         } else if (left instanceof ConstantNode && right instanceof VarNode) {
 
-            willReplace(replacements, (VarNode) right,
-                    ((ConstantNode) left).getValueExpression().get());
+        	final IV constant = ((ConstantNode) left).getValueExpression().get();
+        	
+        	// we cannot do the replace for EQ when then constant is a literal
+        	if (functionURI.equals(FunctionRegistry.EQ) && constant.isLiteral())
+        		return;
+        	
+            willReplace(replacements, (VarNode) right, constant);
+//                    ((ConstantNode) left).getValueExpression().get());
 
         }
         
