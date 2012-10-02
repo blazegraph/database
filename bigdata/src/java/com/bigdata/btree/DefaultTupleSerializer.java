@@ -249,6 +249,12 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
             
         }
         
+        /*
+         * TODO This should probably to a reset() before returning the object.
+         * However, we need to verify that no callers are assuming that it does
+         * NOT do a reset and implicitly relying on passing the intermediate key
+         * via the return value (which would be very bad style).
+         */
         return threadLocalKeyBuilderFactory.getKeyBuilder();
 
     }
