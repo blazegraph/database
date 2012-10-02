@@ -68,6 +68,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
+import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
@@ -76,6 +77,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -84,6 +86,7 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sparql.ast.service.history.HistoryIndexTupleSerializer;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -185,7 +188,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @see Options#BLOOM_FILTER
      */
     final protected boolean bloomFilter;
-    
+
+    /**
+     * This is used to conditionally index the {@link IChangeLog}.
+     */
+    final private boolean historyService;
+
     /**
      * When <code>true</code> the database will support statement identifiers.
      * A statement identifier is a unique 64-bit integer taken from the same
@@ -241,6 +249,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
         this.statementIdentifiers = Boolean.parseBoolean(getProperty(
                 AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
                 AbstractTripleStore.Options.DEFAULT_STATEMENT_IDENTIFIERS));
+
+        this.historyService= Boolean.parseBoolean(getProperty(
+                AbstractTripleStore.Options.HISTORY_SERVICE,
+                AbstractTripleStore.Options.DEFAULT_HISTORY_SERVICE));
 
         this.keyArity = Boolean.valueOf(getProperty(
                 AbstractTripleStore.Options.QUADS,
@@ -390,7 +402,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             final IIndexManager indexManager = getIndexManager();
 
-            if (keyArity == 3) {
+            final boolean triples = keyArity == 3;
+
+            if (triples) {
 
                 // triples
                 
@@ -442,6 +456,15 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             }
 
+            if (historyService) {
+
+                final SPOKeyOrder keyOrder = triples ? SPOKeyOrder.PCSO
+                        : SPOKeyOrder.POS;
+
+                indexManager.registerIndex(getHistoryIndexMetadata(keyOrder));
+
+            }
+            
 //            lookupIndices();
 
         } finally {
@@ -818,6 +841,57 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return metadata;
 
     }
+
+    /**
+     * Overrides for the statement indices.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/607" >
+     *      History Service </a>
+     */
+    protected IndexMetadata getHistoryIndexMetadata(final SPOKeyOrder keyOrder) {
+
+        final IndexMetadata metadata = newIndexMetadata(getFQN(this, NAME_HISTORY));
+
+        // leading key compression works great.
+        final IRabaCoder leafKeySer = DefaultTupleSerializer
+                .getDefaultLeafKeysCoder();
+
+        /*
+         * There is one byte per tuple. The low nibble is the flags and
+         * statement enum. The high nibble is the ChangeAction.
+         */
+        final IRabaCoder leafValSer = new FixedLengthValueRabaCoder(1/* len */);
+
+        metadata.setTupleSerializer(new HistoryIndexTupleSerializer(keyOrder,
+                statementIdentifiers, leafKeySer, leafValSer));
+
+        if (TimestampUtility.isReadWriteTx(getTimestamp())) {
+
+            /*
+             * Enable isolatable indices.
+             * 
+             * Note: we can not use an unisolated history index since changes
+             * could become committed before a given tx commits due to a
+             * concurrent tx commit. That would break the semantics of the
+             * history index if the tx then fails rather than committing since
+             * some of its changes would have become visible and durable anyway.
+             */
+  
+            metadata.setIsolatable(true);
+
+            /*
+             * TODO We might need to add a write-write resolver for the history
+             * index.
+             */
+            
+//            metadata.setConflictResolver(new HistoryWriteWriteResolver());
+
+        }
+
+        return metadata;
+
+    }
+    public static transient final String NAME_HISTORY = "HIST";
 
     /**
      * Conflict resolver for add/add conflicts and retract/retract conflicts for

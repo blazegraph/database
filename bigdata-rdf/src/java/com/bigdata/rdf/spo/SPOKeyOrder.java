@@ -48,7 +48,6 @@ import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.striterator.AbstractKeyOrder;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Represents the key order used by an index for a triple relation.
@@ -689,14 +688,44 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     /**
      * Forms the key for a given index order (the {@link SPOTupleSerializer}
      * delegates its behavior to this method).
+     * <p>
+     * Note: The {@link IKeyBuilder} is {@link IKeyBuilder#reset()} by this
+     * method. 
      * 
      * @param keyBuilder
+     *            The key builder.
      * @param spo
-     * @return
+     *            The {@link ISPO}.
+     * @return The encoded key.
+     * 
+     * @see #appendKey(IKeyBuilder, ISPO)
      */
     final public byte[] encodeKey(final IKeyBuilder keyBuilder, final ISPO spo) {
 
         keyBuilder.reset();
+        
+        appendKey(keyBuilder,spo);
+
+        return keyBuilder.getKey();
+
+    }
+
+    /**
+     * Appends the key for a given index order into the {@link IKeyBuilder}.
+     * <p>
+     * Note: The {@link IKeyBuilder} is NOT {@link IKeyBuilder#reset()} by this
+     * method.
+     * 
+     * @param keyBuilder
+     *            The key builder - this is NOT reset().
+     * @param spo
+     *            The {@link ISPO}.
+     *            
+     * @return The {@link IKeyBuilder}.
+     * 
+     * @see #appendKey(IKeyBuilder, ISPO)
+     */
+    final public IKeyBuilder appendKey(final IKeyBuilder keyBuilder, final ISPO spo) {
 
         final int[] a = orders[index];
 
@@ -706,10 +735,10 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         }
 
-        return keyBuilder.getKey();
+        return keyBuilder;
 
     }
-    
+
     /**
      * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
      * optional SID will not be decoded, since it is carried in the B+Tree

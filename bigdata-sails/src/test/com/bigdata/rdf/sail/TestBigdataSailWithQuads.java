@@ -105,6 +105,9 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestChangeSets.class);
 
+        // test suite for the history index.
+        suite.addTestSuite(TestHistoryIndex.class);
+
 		suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacks.class);
 		suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacksTx.class);
 		suite.addTestSuite(com.bigdata.rdf.sail.TestMROWTransactionsNoHistory.class);

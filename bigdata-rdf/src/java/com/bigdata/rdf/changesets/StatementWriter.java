@@ -1,10 +1,31 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.changesets;
 
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.spo.SPO;
@@ -15,7 +36,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 
 public class StatementWriter {
     
-    protected static final Logger log = Logger.getLogger(StatementWriter.class);
+//    private static final Logger log = Logger.getLogger(StatementWriter.class);
     
     public static long addStatements(final AbstractTripleStore database,
             final AbstractTripleStore statementStore, 

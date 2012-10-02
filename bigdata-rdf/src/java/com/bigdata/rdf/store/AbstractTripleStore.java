@@ -123,7 +123,6 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -1150,7 +1149,36 @@ abstract public class AbstractTripleStore extends
                 .intern();
         
         String DEFAULT_CONSTRAIN_XXXC_SHARDS = "true";
+
+        /*
+         * History Service.
+         */
         
+        /**
+         * When <code>true</code> a HISTORY SERVICE and its associated index
+         * will be maintained.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/607">
+         *      HISTORY SERVICE </a>
+         */
+        public static String HISTORY_SERVICE = AbstractTripleStore.class
+                .getName() + ".historyService";
+
+        public static String DEFAULT_HISTORY_SERVICE = "false";
+
+        /**
+         * The minimum amount of history (in milliseconds) that will be retained
+         * by the {@link #HISTORY_SERVICE} (default
+         * {@value #DEFAULT_HISTORY_SERVICE_MIN_RELEASE_AGE}). The head of the
+         * index will be pruned during update to remove tuples associated with
+         * older commit points.
+         */
+        public static String HISTORY_SERVICE_MIN_RELEASE_AGE = AbstractTripleStore.class
+                .getName() + ".historyService.minReleaseAge";
+
+        public static String DEFAULT_HISTORY_SERVICE_MIN_RELEASE_AGE = Long
+                .toString(Long.MAX_VALUE);
+
     }
 
     protected Class determineAxiomClass() {

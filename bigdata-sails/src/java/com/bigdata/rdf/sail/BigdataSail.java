@@ -1225,7 +1225,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * Give each registered ServiceFactory instance an opportunity
                  * to intercept the start of this connection.
                  */
-                
+
                 final Iterator<CustomServiceFactory> itr = ServiceRegistry
                         .getInstance().customServices();
 
@@ -1247,6 +1247,18 @@ public class BigdataSail extends SailBase implements Sail {
 
                 }
 
+                if (conn.changeLog != null) {
+
+                    /*
+                     * Note: The read/write tx will also do this after each
+                     * commit since it always starts a newTx() when the last one
+                     * is done.
+                     */
+                    
+                    conn.changeLog.transactionBegin();
+
+                }
+                
             }
             
             return conn;
@@ -2912,6 +2924,12 @@ public class BigdataSail extends SailBase implements Sail {
             
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
+            if (changeLog != null) {
+             
+                changeLog.transactionPrepare();
+                
+            }
+            
             final long commitTime = database.commit();
             
 //log.error("COMMIT : changeLog="+(changeLog!=null)+", commitTime="+commitTime); // FIXME LOGGER
@@ -3730,6 +3748,12 @@ public class BigdataSail extends SailBase implements Sail {
             
             try {
             
+                if (changeLog != null) {
+                    
+                    changeLog.transactionPrepare();
+                    
+                }
+
                 final long commitTime = txService.commit(tx);
                 
 //log.error("COMMIT : changeLog="+(changeLog!=null)+", tx="+tx+", commitTime="+commitTime); // FIXME LOGGER
@@ -3741,7 +3765,13 @@ public class BigdataSail extends SailBase implements Sail {
                 }
 
                 newTx();
-                
+
+                if (changeLog != null) {
+                    
+                    changeLog.transactionBegin();
+                    
+                }
+
                 return commitTime;
             
             } catch(IOException ex) {

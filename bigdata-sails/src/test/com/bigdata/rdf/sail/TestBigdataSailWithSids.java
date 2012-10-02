@@ -83,10 +83,13 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
        
         suite.addTestSuite(TestTxCreate.class);
 
-        suite.addTestSuite(TestChangeSets.class);
-
         suite.addTestSuite(TestSids.class);
 
+        suite.addTestSuite(TestChangeSets.class);
+
+        // test suite for the history index.
+        suite.addTestSuite(TestHistoryIndex.class);
+        
 		suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacks.class);
 		suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacksTx.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestRollbacksTM.class);

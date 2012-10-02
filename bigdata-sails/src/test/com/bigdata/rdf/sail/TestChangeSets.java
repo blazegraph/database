@@ -39,10 +39,10 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
+import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.changesets.IChangeRecord.ChangeAction;
 import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -59,7 +59,7 @@ import com.bigdata.rdf.vocab.RDFSVocabulary;
  */
 public class TestChangeSets extends ProxyBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestChangeSets.class);
+    private static final Logger log = Logger.getLogger(TestChangeSets.class);
     
     public Properties getTriplesNoInference() {
         
