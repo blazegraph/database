@@ -256,13 +256,21 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
     }
     
     private byte[] key() {
-    	if (key == null) {
+
+        if (key == null) {
+        
             /*
-    		 * Build the SPO's key in SPOKeyOrder.SPO.
-    		 */
-    		key = SPOKeyOrder.SPO.encodeKey(new KeyBuilder(), spo);
-    	}
-    	return key;
+             * Build the SPO's key in SPOKeyOrder.SPO.
+             */
+            
+            final IKeyBuilder keyBuilder = new KeyBuilder(64/* initialCapacity */);
+            
+            key = SPOKeyOrder.SPO.encodeKey(keyBuilder, spo);
+            
+        }
+
+        return key;
+        
     }
 
     /**
