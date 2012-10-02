@@ -389,6 +389,12 @@ public class BigdataSail extends SailBase implements Sail {
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
+     *      RWStore transaction service and recycler)
+     */
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+
+    /**
      * Sesame has the notion of a "null" graph which we use for the quad store
      * mode. Any time you insert a statement into a quad store and the context
      * position is not specified, it is actually inserted into this "null"
@@ -1217,7 +1223,8 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
-//log.error("START CONNECTION : "+conn); // FIXME LOGGING
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-START-CONN : conn=" + this);
 
             if (!conn.isReadOnly()) {
 
@@ -2886,6 +2893,9 @@ public class BigdataSail extends SailBase implements Sail {
 
             assertWritableConn();
 
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-ROLLBACK-CONN: " + this);
+
             // discard buffered assertions and/or retractions.
             clearBuffers();
 
@@ -2932,7 +2942,9 @@ public class BigdataSail extends SailBase implements Sail {
             
             final long commitTime = database.commit();
             
-//log.error("COMMIT : changeLog="+(changeLog!=null)+", commitTime="+commitTime); // FIXME LOGGER
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-COMMIT-CONN : commitTime=" + commitTime
+                        + ", conn=" + this);
 
             if (changeLog != null) {
                 
@@ -3000,6 +3012,9 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-CLOSE-CONN: conn=" + this);
+
     		/*
              * Note: I have commented out the implicit [rollback]. It causes the
              * live indices to be discarded by the backing journal which is a
@@ -3697,7 +3712,8 @@ public class BigdataSail extends SailBase implements Sail {
                 // Attach that transaction view to this SailConnection.
                 attach(txView);
 
-//log.error("NEW TX: "+this); // FIXME LOGGING
+                if (txLog.isInfoEnabled())
+                    txLog.info("SAIL-NEW-TX : txId=" + tx + ", conn=" + this);
 
             } catch (Throwable t) {
 
@@ -3756,7 +3772,9 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final long commitTime = txService.commit(tx);
                 
-//log.error("COMMIT : changeLog="+(changeLog!=null)+", tx="+tx+", commitTime="+commitTime); // FIXME LOGGER
+                if (txLog.isInfoEnabled())
+                    txLog.info("SAIL-COMMIT-CONN : commitTime=" + commitTime
+                            + ", conn=" + this);
 
                 if (changeLog != null) {
                     
@@ -3790,6 +3808,9 @@ public class BigdataSail extends SailBase implements Sail {
          */
         @Override
         public synchronized void rollback() throws SailException {
+
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-ROLLBACK-CONN: " + this);
 
             /*
              * Note: DO NOT invoke super.rollback(). That will cause a
@@ -4005,7 +4026,10 @@ public class BigdataSail extends SailBase implements Sail {
         public synchronized void rollback() throws SailException {
 
             // NOP
-            
+
+            if (txLog.isInfoEnabled())
+                txLog.info("SAIL-ROLLBACK-CONN: " + this);
+
         }
         
         /**
