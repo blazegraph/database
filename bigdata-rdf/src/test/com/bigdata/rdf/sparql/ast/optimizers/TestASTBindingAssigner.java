@@ -321,4 +321,177 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 //        System.err.println(actual.toString());
     }
 
+    /**
+     * Given
+     * 
+     * <pre>
+     * SELECT ?p ?o where {?s ?p ?o. FILTER( ?o=CONST_URI) ) }
+     * </pre>
+     * 
+     * Verify that the AST is rewritten as:
+     * 
+     * <pre>
+     * SELECT ?p ?o where {?s ?p CONST_URI . FILTER( ?o=CONST_URI) ) }
+     * </pre>
+     * 
+     * where CONST_URI is a URI binding for <code>?o</code> given by the FILTER.
+     * <p>
+     * Note: For this unit test, a variable is replaced in more than one
+     * location in the AST.
+     * 
+     * TODO Variant where the roles of the variable and the constant within the
+     * FILTER are reversed.
+     */
+    public void test_astBindingAssigner_filter_eq_ConstURI() {
+
+        /*
+         * Note: DO NOT SHARE STRUCTURES IN THIS TEST.
+         */
+        
+//        final IV c12 = makeIV(store.getValueFactory().createLiteral(12));
+        final IV foo = makeIV(store.getValueFactory().createURI(":foo"));
+
+        final IBindingSet[] bsets = new IBindingSet[] { //
+        new ListBindingSet()//
+        };
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+            given.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+            
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.EQ(
+                    new VarNode("o"), new ConstantNode(foo))));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+//            projection.addProjectionExpression(new AssignmentNode(new VarNode(
+//                    "o"), new ConstantNode(new Constant((IVariable) Var
+//                    .var("o"), c12))));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(//
+                    new VarNode("s"), //
+                    new VarNode("p"),//
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("o"), foo)), //
+                    null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.EQ(
+                    new ConstantNode(
+                            new Constant((IVariable) Var.var("o"), foo)),
+                    new ConstantNode(foo))));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTBindingAssigner();
+
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+//        System.err.println(actual.toString());
+    }
+    
+    /**
+     * Given
+     * 
+     * <pre>
+     * SELECT ?p ?o where {?s ?p ?o. FILTER( ?o=CONST_LIT) ) }
+     * </pre>
+     * 
+     * Verify that the AST is not rewritten.
+     * 
+     * TODO Variant where the roles of the variable and the constant within the
+     * FILTER are reversed.
+     */
+    public void test_astBindingAssigner_filter_eq_ConstLit() {
+
+        /*
+         * Note: DO NOT SHARE STRUCTURES IN THIS TEST.
+         */
+        
+//        final IV c12 = makeIV(store.getValueFactory().createLiteral(12));
+        final IV foo = makeIV(store.getValueFactory().createLiteral("foo"));
+
+        final IBindingSet[] bsets = new IBindingSet[] { //
+        new ListBindingSet()//
+        };
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+            given.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+            
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.EQ(
+                    new VarNode("o"), new ConstantNode(foo))));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+//            projection.addProjectionExpression(new AssignmentNode(new VarNode(
+//                    "o"), new ConstantNode(new Constant((IVariable) Var
+//                    .var("o"), c12))));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(FunctionNode.EQ(
+                    new VarNode("o"), new ConstantNode(foo))));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTBindingAssigner();
+
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+//        System.err.println(actual.toString());
+    }
+
+
 }
