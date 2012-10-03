@@ -1668,12 +1668,6 @@ abstract public class WriteCache implements IWriteCache {
      * for the RW mode. Look into putting a thread pool to work on the scattered
      * writes. This could be part of a refactor to apply a thread pool to IOs
      * and related to prefetch and {@link Memoizer} behaviors.
-     * 
-     * FIXME To maximize IO rates we should attempt to elide/merge contiguous
-     * writes.  To do this can double-buffer in writeOnChannel.  This also
-     * provides an opportunity to write the full slot size of the RWStore that
-     * may have advantages, particularly for an SSD, since it may avoid a
-     * pre-write read to populate the write sector.
      */
     public static class FileChannelScatteredWriteCache extends WriteCache {
 
