@@ -4,11 +4,13 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Formatter;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
@@ -21,138 +23,244 @@ import com.bigdata.journal.ha.HAWriteMessage;
  * the closing and creation of new files.
  * 
  * @author Martyn Cutcher
- * 
  */
 public class ProcessLogWriter {
-	// current log file
-	File m_log = null;
-	
-	// current log file commit counter
-	long m_commitCounter = 0;
-	
-	// current output stream
-	ObjectOutputStream m_out = null;
-	
-	// process log directory
-	final File m_dir;
 
-	public ProcessLogWriter(final File dir) {
-		m_dir = dir;
-	}
-	
-	/**
-	 * 
-	 * @param msg
-	 * @param data
-	 * @throws IOException
-	 */
-	public void write(final HAWriteMessage msg,
-            final ByteBuffer data) throws IOException
-	{
-		if (msg.getSequence() == 0) { // new log required			
-			cycleFile(msg);
-		}
-		
-		if (m_out != null) {
-			
-			/*
-			 * Check if this really is a valid message for this file.
-			 * If it is not, then close the file and return immediately
-			 */
-			if (m_commitCounter != (msg.getCommitCounter()+1)) {
-				close();
-				
-				return;
-			}
-			
-			final byte[] array = data.array();
+    private static final Logger log = Logger.getLogger(ProcessLogWriter.class);
 
-			m_out.writeObject(msg);
-			assert msg.getSize() == array.length;
+    /** HA log directory. */
+    private final File m_dir;
 
-			m_out.write(data.array());
-		}
-	}
+    /**
+     * The root block of the leader at the start of the current write set.
+     */
+    private IRootBlockView m_rootBlock;
 
-	private void cycleFile(final HAWriteMessage msg) throws FileNotFoundException, IOException {
-		
-		/*
-		 * Close any open log
-		 */
-		close();
-		
-		/*
-		 * The commit counter that will be used to identify the file.
-		 * 
-		 * Note: We use commitCounter+1 so the file will be labeled by the
-		 * commit point that will be achieved when that log file is applied to a
-		 * journal whose current commit point is [commitCounter].
-		 */
-		m_commitCounter = msg.getCommitCounter() + 1;
+    /** Current write cache block sequence counter. */
+    private long m_sequence = 0;
 
-		/*
-		 * Format the name of the log file.
-		 * 
-		 * Note: The commit counter in the file name should be zero filled to 20
-		 * digits so we have the files in lexical order in the file system (for
-		 * convenience).
-		 */
-		final String logFile;
-		{
+    /** current log file. */
+    private File m_log = null;
 
-			final StringBuilder sb = new StringBuilder();
+    /** current output stream. */
+    private ObjectOutputStream m_out = null;
 
-			final Formatter f = new Formatter(sb);
+    public ProcessLogWriter(final File logDir) {
 
-			f.format("%020d.log", m_commitCounter);
+        m_dir = logDir;
 
-			logFile = sb.toString();
+    }
 
-		}
-		
-		m_log = new File(m_dir, logFile);
+    /**
+     * Open an HA log file for the write set starting with the given root block.
+     * 
+     * @param rootBlock
+     *            The root block.
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public void createLog(final IRootBlockView rootBlock)
+            throws FileNotFoundException, IOException {
 
-		m_out = new ObjectOutputStream(new FileOutputStream(m_log));
-	}
-	
-	/**
-	 * 
-	 * @throws IOException
-	 */
-	public void close() throws IOException {
-		try {
-			if (m_out != null) {
-				m_out.close();			
-			}
-		} finally {
-			m_out = null;
-			m_log = null;
-		}
-	}
-	
-	/**
-	 * When the HA leader commits it must flush the log
-	 */
-	public void flush() throws IOException {
-		if (m_out != null) {
-			m_out.flush();
-		}
-	}
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
 
-	/**
-	 * On various error conditions we may need to remove the log
-	 * 
-	 * @throws IOException
-	 */
-	public void remove() throws IOException {
-		try {
-			if (m_out != null) {
-				m_out.close();
-				m_log.delete();
-			}
-		} finally {
-			m_out = null;
-			m_log = null;
-		}
-	}
+        this.m_rootBlock = rootBlock;
+
+        m_sequence = 0L;
+
+        /*
+         * Format the name of the log file.
+         * 
+         * Note: The commit counter in the file name should be zero filled to 20
+         * digits so we have the files in lexical order in the file system (for
+         * convenience).
+         */
+        final String logFile;
+        {
+
+            final StringBuilder sb = new StringBuilder();
+
+            final Formatter f = new Formatter(sb);
+
+            /*
+             * Note: We use commitCounter+1 so the file will be labeled by the
+             * commit point that will be achieved when that log file is applied
+             * to a journal whose current commit point is [commitCounter].
+             */
+
+            final long commitCounter = rootBlock.getCommitCounter();
+
+            f.format("%020d.log", (commitCounter + 1));
+
+            logFile = sb.toString();
+
+        }
+
+        m_log = new File(m_dir, logFile);
+
+        // Must delete file if it exists.
+        if (m_log.exists() && !m_log.delete()) {
+
+            throw new IOException("Could not delete: file=" + m_log);
+            
+        }
+        
+        m_out = new ObjectOutputStream(new FileOutputStream(m_log));
+
+        writeRootBlock(rootBlock);
+
+    }
+
+    /**
+     * Write the final root block on the HA log and close the file. This "seals"
+     * the file, which now represents the entire write set associated with the
+     * commit point in the given root block.
+     * 
+     * @param rootBlock
+     *            The final root block for the write set.
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public void closeLog(final IRootBlockView rootBlock)
+            throws FileNotFoundException, IOException {
+
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
+
+        if (rootBlock.getCommitCounter() != this.m_rootBlock.getCommitCounter()) {
+
+            throw new IllegalStateException();
+
+        }
+
+        if (rootBlock.getLastCommitTime() != this.m_rootBlock
+                .getLastCommitTime()) {
+
+            throw new IllegalStateException();
+
+        }
+
+        if (rootBlock.getUUID() != this.m_rootBlock.getUUID()) {
+
+            throw new IllegalStateException();
+
+        }
+
+        writeRootBlock(rootBlock);
+
+        flush();
+
+        close();
+
+        reset();
+        
+    }
+
+    private void writeRootBlock(final IRootBlockView rootBlock)
+            throws IOException {
+
+        if (rootBlock == null)
+            throw new IllegalArgumentException();
+
+        m_out.write(rootBlock.asReadOnlyBuffer().array());
+
+        if (log.isDebugEnabled())
+            log.debug("wrote root block: " + rootBlock);
+
+    }
+
+    /**
+     * 
+     * @param msg
+     * @param data
+     */
+    public void write(final HAWriteMessage msg, final ByteBuffer data)
+            throws IOException {
+
+        if (m_out == null)
+            return;
+
+        /*
+         * Check if this really is a valid message for this file. If it is not,
+         * then close the file and return immediately
+         */
+        if (m_rootBlock.getCommitCounter() != msg.getCommitCounter())
+            return;
+
+        if (m_rootBlock.getLastCommitTime() != msg.getLastCommitTime())
+            return;
+
+        if (m_sequence != msg.getSequence())
+            return;
+
+        final byte[] array = data.array();
+
+        m_out.writeObject(msg);
+
+        assert msg.getSize() == array.length;
+
+        // TODO Efficient channel access and write - must flush first?
+        m_out.write(data.array());
+
+    }
+
+    /**
+     * Close the file (does not flush).
+     */
+    private void close() throws IOException {
+        try {
+            if (m_out != null) {
+                m_out.close();
+            }
+        } finally {
+            reset();
+        }
+    }
+
+    /**
+     * Clear internal fields.
+     */
+    private void reset() {
+        
+        m_log = null;
+        
+        m_out = null;
+        
+        m_rootBlock = null;
+
+        m_sequence = 0L;
+   
+    }
+
+    /**
+     * When the HA leader commits it must flush the log
+     */
+    private void flush() throws IOException {
+        if (m_out != null) {
+            m_out.flush();
+        }
+    }
+
+    /**
+     * On various error conditions we may need to remove the log
+     * 
+     * @throws IOException
+     */
+    public void remove() throws IOException {
+        try {
+            if (m_out != null) {
+                m_out.close();
+                m_log.delete();
+            }
+        } finally {
+            reset();
+        }
+    }
+
+    // FIXME write utility to dump one or more log files.
+    public static void main(final String[] args) {
+
+    }
+
 }
