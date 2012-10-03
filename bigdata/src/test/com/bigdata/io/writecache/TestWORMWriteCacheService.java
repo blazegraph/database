@@ -314,7 +314,15 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     return MyMockQuorumMember.this.getLastCommitCounter();
                     
                 }
-                
+
+                @Override
+                public void logWriteCacheBlock(final HAWriteMessage msg,
+                        final ByteBuffer data) throws IOException {
+
+                    MyMockQuorumMember.this.logWriteCacheBlock(msg, data);
+                    
+                }
+
             });
 
         }
@@ -387,6 +395,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
         private long lastCommitCounter = 0;
         private long lastCommitTime = 0;
         
+        @Override
+        public void logWriteCacheBlock(final HAWriteMessage msg,
+                final ByteBuffer data) throws IOException {
+            // NOP.
+        }
+
     } // MockQuorumMemberImpl
     
     /**

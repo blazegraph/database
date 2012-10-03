@@ -1,5 +1,9 @@
 package com.bigdata.journal.jini.ha;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -7,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
+import java.util.Formatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,12 +36,12 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
+import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
@@ -133,7 +138,7 @@ public class HAJournalServer extends AbstractServer {
      * Caching discovery client for the {@link HAGlue} services.
      */
     private HAJournalDiscoveryClient discoveryClient;
-    
+
     /**
      * The journal.
      */
@@ -170,6 +175,15 @@ public class HAJournalServer extends AbstractServer {
      * {@link HAJournal}.
      */
     private Server jettyServer;
+
+    /**
+     * Caching discovery client for the {@link HAGlue} services.
+     */
+    public HAJournalDiscoveryClient getDiscoveryClient() {
+
+        return discoveryClient;
+        
+    }
 
     public HAJournalServer(final String[] args, final LifeCycle lifeCycle) {
 
@@ -503,112 +517,189 @@ public class HAJournalServer extends AbstractServer {
     /**
      * Factory for the {@link QuorumService} implementation.
      * 
+     * @param logicalServiceZPath
+     * @param serviceId
      * @param remoteServiceImpl
      *            The object that implements the {@link Remote} interfaces
      *            supporting HA operations.
+     * @param store
+     *            The {@link HAJournal}.
      */
-    private QuorumServiceBase<HAGlue, AbstractJournal> newQuorumService(
+    private QuorumServiceBase<HAGlue, HAJournal> newQuorumService(
             final String logicalServiceZPath,
             final UUID serviceId, final HAGlue remoteServiceImpl,
-            final AbstractJournal store) {
+            final HAJournal store) {
 
-        return new QuorumServiceBase<HAGlue, AbstractJournal>(
-                logicalServiceZPath, serviceId, remoteServiceImpl, store) {
-
-            @Override
-            public void start(final Quorum<?,?> quorum) {
-                
-                super.start(quorum);
-
-                // Inform the Journal about the current token (if any).
-                journal.setQuorumToken(quorum.token());
-                
-            }
-            
-            @Override
-            public void quorumBreak() {
-
-                super.quorumBreak();
-                
-                // Inform the Journal that the quorum token is invalid.
-                journal.setQuorumToken(Quorum.NO_QUORUM);
-                
-            }
-
-            @Override
-            public void quorumMeet(final long token, final UUID leaderId) {
-
-                super.quorumMeet(token, leaderId);
-                
-                // Inform the journal that there is a new quorum token.
-                journal.setQuorumToken(token);
-
-            }
-            
-            /**
-             * Resolve an {@link HAGlue} object from its Service UUID.
-             */
-            @Override
-            public HAGlue getService(final UUID serviceId) {
-                
-                final ServiceItem serviceItem = discoveryClient
-                        .getServiceItem(serviceId);
-
-                if (serviceItem == null) {
-
-                    // Not found (per the API).
-                    throw new QuorumException("Service not found: uuid="
-                            + serviceId);
-
-                }
-
-                return (HAGlue) serviceItem.service;
-                
-            }
-
-            @Override
-            protected void handleReplicatedWrite(final HAWriteMessage msg,
-                    final ByteBuffer data) throws Exception {
-
-                if (haLog.isDebugEnabled())
-                    haLog.debug("msg=" + msg + ", buf=" + data);
-
-                /*
-                 * Note: the ByteBuffer is owned by the HAReceiveService. This
-                 * just wraps up the reference to the ByteBuffer with an
-                 * interface that is also used by the WriteCache to control
-                 * access to ByteBuffers allocated from the DirectBufferPool.
-                 * However, release() is a NOP on this implementation since the
-                 * ByteBuffer is owner by the HAReceiveService.
-                 */
-                final IBufferAccess b = new IBufferAccess() {
-
-                    @Override
-                    public void release(long timeout, TimeUnit unit)
-                            throws InterruptedException {
-                        // NOP
-                    }
-
-                    @Override
-                    public void release() throws InterruptedException {
-                        // NOP
-                    }
-
-                    @Override
-                    public ByteBuffer buffer() {
-                        return data;
-                    }
-                };
-
-                ((IHABufferStrategy) journal.getBufferStrategy())
-                        .writeRawBuffer(msg, b);
-
-            }
-
-        };
+        return new HAQuorumService<HAGlue, HAJournal>(logicalServiceZPath,
+                serviceId, remoteServiceImpl, store, this);
 
     }
 
+    /**
+     * Concrete {@link QuorumServiceBase} implementation for the
+     * {@link HAJournal}.
+     * 
+     * @param logicalServiceZPath
+     * @param serviceId
+     * @param remoteServiceImpl
+     *            The object that implements the {@link Remote} interfaces
+     *            supporting HA operations.
+     * @param store
+     *            The {@link HAJournal}.
+     */
+    static private class HAQuorumService<S extends HAGlue, L extends HAJournal>
+            extends QuorumServiceBase<S, L> {
+
+        private final L journal;
+        private final HAJournalServer server;
+        
+        public HAQuorumService(final String logicalServiceZPath,
+                final UUID serviceId, final S remoteServiceImpl, final L store,
+                final HAJournalServer server) {
+
+            super(logicalServiceZPath, serviceId, remoteServiceImpl, store);
+
+            this.journal = store;
+            
+            this.server = server;
+
+        }
+
+        @Override
+        public void start(final Quorum<?,?> quorum) {
+            
+            super.start(quorum);
+
+            // Inform the Journal about the current token (if any).
+            journal.setQuorumToken(quorum.token());
+            
+        }
+        
+        @Override
+        public void quorumBreak() {
+
+            super.quorumBreak();
+            
+            // Inform the Journal that the quorum token is invalid.
+            journal.setQuorumToken(Quorum.NO_QUORUM);
+            
+        }
+
+        @Override
+        public void quorumMeet(final long token, final UUID leaderId) {
+
+            super.quorumMeet(token, leaderId);
+            
+            // Inform the journal that there is a new quorum token.
+            journal.setQuorumToken(token);
+
+        }
+        
+        /**
+         * Resolve an {@link HAGlue} object from its Service UUID.
+         */
+        @Override
+        public S getService(final UUID serviceId) {
+            
+            final HAJournalDiscoveryClient discoveryClient = server
+                    .getDiscoveryClient();
+
+            final ServiceItem serviceItem = discoveryClient
+                    .getServiceItem(serviceId);
+
+            if (serviceItem == null) {
+
+                // Not found (per the API).
+                throw new QuorumException("Service not found: uuid="
+                        + serviceId);
+
+            }
+
+            return (S) serviceItem.service;
+            
+        }
+
+        @Override
+        protected void handleReplicatedWrite(final HAWriteMessage msg,
+                final ByteBuffer data) throws Exception {
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("msg=" + msg + ", buf=" + data);
+
+            /*
+             * Log the message and write cache block.
+             */
+            logWriteCacheBlock(msg, data);
+            
+            /*
+             * Note: the ByteBuffer is owned by the HAReceiveService. This
+             * just wraps up the reference to the ByteBuffer with an
+             * interface that is also used by the WriteCache to control
+             * access to ByteBuffers allocated from the DirectBufferPool.
+             * However, release() is a NOP on this implementation since the
+             * ByteBuffer is owner by the HAReceiveService.
+             */
+            final IBufferAccess b = new IBufferAccess() {
+
+                @Override
+                public void release(long timeout, TimeUnit unit)
+                        throws InterruptedException {
+                    // NOP
+                }
+
+                @Override
+                public void release() throws InterruptedException {
+                    // NOP
+                }
+
+                @Override
+                public ByteBuffer buffer() {
+                    return data;
+                }
+            };
+
+            ((IHABufferStrategy) journal.getBufferStrategy())
+                    .writeRawBuffer(msg, b);
+
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+        * Note: Logging MUST NOT start in the middle of a write set (all log files
+        * must be complete). The {@link HAWriteMessage#getSequence()} MUST be ZERO
+        * (0) when we open a log file.
+        * 
+        * TODO The WORM should not bother to log the write cache block since it can
+        * be obtained directly from the backing store. Abstract out an object to
+        * manage the log file for a commit counter and make it smart about the WORM
+        * versus the RWStore. The same object will need to handle the read back
+        * from the log file and in the case of the WORM should get the data block
+        * from the backing file. However, this object is not responsible for reply
+        * of log files. We'll have to locate a place for that logic next - probably
+        * in this class (QuorumServiceBase).
+        * 
+        * FIXME We need to get the root block on the log and integrate it into the
+        * commit protocol. Everyone in the pipeline needs to get the root block.
+        * 
+        * FIXME The class that handles the logging must not write a block twice,
+        * even if it gets transmitted twice.
+        */
+        public void logWriteCacheBlock(final HAWriteMessage msg,
+                final ByteBuffer data) throws IOException {
+
+        }
+
+       /**
+        * Process log to which the receiveService should write the messages to and
+        * <code>null</code> if we may not write on it.
+        * 
+        * FIXME We need to clear this any time the quorum breaks.
+        */
+       ProcessLogWriter haLogWriter = null;
+
+    }
+    
     /**
      * Setup and start the {@link NanoSparqlServer}.
      * <p>

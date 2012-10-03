@@ -52,7 +52,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
     private long commitCounter;
 
     /** The most recent commit time associated with this message */
-    private long commitTime;
+    private long lastCommitTime;
 
     /** The write sequence since last commit beginning at zero */
 	private long sequence;
@@ -75,8 +75,8 @@ public class HAWriteMessage extends HAWriteMessageBase {
     }
     
     /** The commit time associated with this message. */
-    public long getCommitTime() {
-        return commitTime;
+    public long getLastCommitTime() {
+        return lastCommitTime;
     }
 
     /**
@@ -114,7 +114,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
                 + "{size=" + getSize() //
                 + ",chksum=" + getChk() //
                 + ",commitCounter=" + commitCounter //
-                + ",commitTime=" + commitTime //
+                + ",commitTime=" + lastCommitTime //
                 + ",sequence=" + sequence //
                 + ",storeType=" + getStoreType() //
                 + ",quorumToken=" + getQuorumToken()//
@@ -166,7 +166,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
         
         this.commitCounter = commitCounter;
         
-        this.commitTime = commitTime;
+        this.lastCommitTime = commitTime;
         
         this.sequence = sequence;
         
@@ -197,7 +197,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
         final HAWriteMessage other = (HAWriteMessage) obj;
 
         return commitCounter == other.getCommitCounter()
-                && commitTime == other.getCommitTime() //
+                && lastCommitTime == other.getLastCommitTime() //
                 && sequence == other.getSequence()
                 && storeType == other.getStoreType()
                 && quorumToken == other.getQuorumToken()
@@ -219,7 +219,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
 		}
 		storeType = StoreTypeEnum.valueOf(in.readByte());
 		commitCounter = in.readLong();
-		commitTime = in.readLong();
+		lastCommitTime = in.readLong();
 		sequence = in.readLong();
 		quorumToken = in.readLong();
 		fileExtent = in.readLong();
@@ -231,7 +231,7 @@ public class HAWriteMessage extends HAWriteMessageBase {
 		out.write(VERSION0);
 		out.writeByte(storeType.getType());
 		out.writeLong(commitCounter);
-		out.writeLong(commitTime);
+		out.writeLong(lastCommitTime);
 		out.writeLong(sequence);
 		out.writeLong(quorumToken);
 		out.writeLong(fileExtent);

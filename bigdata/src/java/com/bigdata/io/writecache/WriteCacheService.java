@@ -618,11 +618,12 @@ abstract public class WriteCacheService implements IWriteCache {
                                     );
 
                             /*
-                             * FIXME The quorum leader must log the write cache
-                             * block. However, it must be logged exactly once
-                             * (if there is a retry, we do not want to re-log
-                             * the block!)
+                             * The quorum leader must log the write cache block.
+                             * 
+                             * Note: It will be logged exactly once (retry send
+                             * will not re-log the block).
                              */
+                            quorumMember.logWriteCacheBlock(msg, b.duplicate());
                             
                             remoteWriteFuture = quorumMember.replicate(msg, b);
 
