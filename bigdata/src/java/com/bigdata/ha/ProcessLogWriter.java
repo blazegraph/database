@@ -40,6 +40,12 @@ public class ProcessLogWriter {
 		m_dir = dir;
 	}
 	
+	/**
+	 * 
+	 * @param msg
+	 * @param data
+	 * @throws IOException
+	 */
 	public void write(final HAWriteMessage msg,
             final ByteBuffer data) throws IOException
 	{
@@ -49,6 +55,10 @@ public class ProcessLogWriter {
 		
 		if (m_out != null) {
 			
+			/*
+			 * Check if this really is a valid message for this file.
+			 * If it is not, then close the file and return immediately
+			 */
 			if (m_commitCounter != (msg.getCommitCounter()+1)) {
 				close();
 				
