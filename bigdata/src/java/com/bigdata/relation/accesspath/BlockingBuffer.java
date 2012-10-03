@@ -436,6 +436,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     }
 
     /**
+     * When <code>true</code>, this will issue some annoying warnings that can
+     * be used to identify slow consumers or fast producers.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/608"> LOG
+     *      BlockingBuffer not progressing at INFO or lower level </a>
+     */
+    private static final boolean producerConsumerWarnings = false;
+    
+    /**
      * Label for messages displaying the stack frame within which the
      * {@link BlockingBuffer} was allocated.
      * 
@@ -1074,7 +1083,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                             logTimeout += Math.min(maxLogTimeout, logTimeout);
 
-                            if(log.isInfoEnabled()) {
+                            if(producerConsumerWarnings && log.isInfoEnabled()) {
                             
                             final String msg = "blocked: ntries="
                                     + ntries
@@ -1904,6 +1913,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         
                         checkFuture();
 
+                    if(producerConsumerWarnings) {
+                        
                         final String msg = "Iterator is not progressing: ntries="
                                 + ntries
                                 + ", elapsed="
@@ -1938,6 +1949,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                             
                         }
                         
+                    }// if(producerConsumerWarnings)
+                    
                     }
 
                 }
