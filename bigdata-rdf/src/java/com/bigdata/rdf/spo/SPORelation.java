@@ -458,8 +458,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             if (historyService) {
 
-                final SPOKeyOrder keyOrder = triples ? SPOKeyOrder.PCSO
-                        : SPOKeyOrder.POS;
+                final SPOKeyOrder keyOrder = triples //
+                        ? SPOKeyOrder.POS//
+                        : SPOKeyOrder.PCSO//
+                ;
 
                 indexManager.registerIndex(getHistoryIndexMetadata(keyOrder));
 
