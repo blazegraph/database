@@ -114,4 +114,17 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      */
     long getLastCommitCounter();
 
+    /**
+     * Log the {@link HAWriteMessage} and the associated data (if necessary).
+     * The log file for the current write set will be deleted if the quorum is
+     * fully met at the next 2-phase commit.
+     * 
+     * @param msg
+     *            The {@link HAWriteMessage}.
+     * @param data
+     *            The {@link WriteCache} block.
+     */
+    void logWriteCacheBlock(final HAWriteMessage msg,
+            final ByteBuffer data) throws IOException;
+
 }

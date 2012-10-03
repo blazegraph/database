@@ -1005,6 +1005,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     abstract protected void handleReplicatedWrite(final HAWriteMessage msg,
             final ByteBuffer data) throws Exception;
 
+    @Override
+    abstract public void logWriteCacheBlock(final HAWriteMessage msg,
+            final ByteBuffer data) throws IOException;
+
     /**
      * A utility class that bundles together the Internet address and port at which
      * the downstream service will accept and relay cache blocks for the write

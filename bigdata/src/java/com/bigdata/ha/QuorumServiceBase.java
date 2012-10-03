@@ -28,11 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
-import java.util.Formatter;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -41,7 +38,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
@@ -126,6 +122,14 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
                 
             }
 
+            @Override
+            public void logWriteCacheBlock(final HAWriteMessage msg,
+                    final ByteBuffer data) throws IOException {
+
+                QuorumServiceBase.this.logWriteCacheBlock(msg, data);
+                
+            }
+            
         });
 
         addListener(this.commitImpl = new QuorumCommitImpl<S>(this));
@@ -224,93 +228,14 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Log the {@link HAWriteMessage} and the associated data onto the
      * appropriate log file.
      * <p>
-     * Note: Logging MUST NOT start in the middle of a write set (all log files
-     * must be complete). The {@link HAWriteMessage#getSequence()} MUST be ZERO
-     * (0) when we open a log file.
-     * 
-     * TODO The WORM should not bother to log the write cache block since it can
-     * be obtained directly from the backing store. Abstract out an object to
-     * manage the log file for a commit counter and make it smart about the WORM
-     * versus the RWStore. The same object will need to handle the read back
-     * from the log file and in the case of the WORM should get the data block
-     * from the backing file. However, this object is not responsible for reply
-     * of log files. We'll have to locate a place for that logic next - probably
-     * in this class (QuorumServiceBase).
-     * 
-     * FIXME NOTHING IS CALLING THIS CODE YET! Invoke from
-     * {@link #handleReplicatedWrite(HAWriteMessage, ByteBuffer)} and from
-     * {@link WriteCacheService}s WriteTask.call() method (on the leader).
+     * The default implementation is a NOP.
      */
     public void logWriteCacheBlock(final HAWriteMessage msg,
             final ByteBuffer data) throws IOException {
 
-//        final long currentCommitCounter = getLastCommitCounter();
-
-        getQuorum().assertQuorum(msg.getQuorumToken());
-
-        if (msg.getSequence() == 0L) {
-
-            if (processLog != null) {
-                processLog.close();
-                processLog = null;
-            }
-
-            /*
-             * The commit counter that will be used to identify the file.
-             * 
-             * Note: We use commitCounter+1 so the file will be labeled by the
-             * commit point that will be achieved when that log file is applied
-             * to a journal whose current commit point is [commitCounter].
-             */
-            final long commitCounter = msg.getCommitCounter() + 1;
-
-            /*
-             * Format the name of the log file.
-             * 
-             * Note: The commit counter in the file name should be zero filled
-             * to 20 digits so we have the files in lexical order in the file
-             * system (for convenience).
-             */
-            final String logFile;
-            {
-
-                final StringBuilder sb = new StringBuilder();
-                
-                final Formatter f = new Formatter(sb);
-                
-                f.format("%020d.log", commitCounter);
-                
-                logFile = sb.toString();
-                
-            }
-            
-            // Establish new log file.
-            processLog = new ObjectOutputStream(new FileOutputStream(new File(
-                    getHALogDir(), logFile)));
-           
-        }
-
-        /*
-         * FIXME We need to track whether or not we began the sequence at ZERO
-         * (0). If we did, then we can open a log and start writing for the
-         * current commitCounter. We do need to keep track of the commit counter
-         * associated with the log file so we can correctly refuse to log blocks
-         * on the log file that are associated with a different commit counter.
-         * We also need to manage the abort() and commit() transitions, ensuring
-         * that we truncate() the log for abort() (assuming it is for the same
-         * commit counter) and that we append the root block, force() and
-         * close() the log for commit.
-         */
+        // NOP
         
     }
-    
-    /**
-     * Process log to which the receiveService should write the messages to and
-     * <code>null</code> if we may not write on it.
-     * 
-     * FIXME We need to clear this any time the quorum breaks.
-     */
-    private ObjectOutputStream processLog = null;
 
     /*
      * QuorumCommit.
