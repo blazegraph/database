@@ -198,10 +198,17 @@ public class ProcessLogWriter {
 
         m_out.writeObject(msg);
 
-        assert msg.getSize() == array.length;
+        switch(m_rootBlock.getStoreType()) {
+        case RW: {
 
-        // TODO Efficient channel access and write - must flush first?
-        m_out.write(data.array());
+            assert msg.getSize() == array.length;
+
+            // TODO Efficient channel access and write - must flush first?
+            m_out.write(data.array());
+        }
+        case WORM:
+            break;
+        }
 
     }
 
