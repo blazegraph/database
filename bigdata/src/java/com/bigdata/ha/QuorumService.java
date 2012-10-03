@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.ha;
 
+import java.io.File;
+
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
 
@@ -63,5 +65,16 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      * block).
      */
     long getLastCommitTime();
+    
+    /**
+     * Return the lastCommitCounter for this service (based on its current root
+     * block).
+     */
+    long getLastCommitCounter();
 
+    /**
+     * Return the directory in which we are logging the write blocks.
+     */
+    File getHALogDir();
+    
 }

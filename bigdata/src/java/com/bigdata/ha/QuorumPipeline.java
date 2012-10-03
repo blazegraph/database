@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 
@@ -96,5 +97,21 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
 //     *             if the quorum is not highly available.
 //     */
 //    HAReceiveService<HAWriteMessage> getHAReceiveService();
+
+    /**
+     * Return the lastCommitTime for this service (based on its current root
+     * block). This supports the {@link HAWriteMessage} which requires this
+     * information as part of the metadata about replicated {@link WriteCache}
+     * blocks.
+     */
+    long getLastCommitTime();
+    
+    /**
+     * Return the lastCommitCounter for this service (based on its current root
+     * block). This supports the {@link HAWriteMessage} which requires this
+     * information as part of the metadata about replicated {@link WriteCache}
+     * blocks.
+     */
+    long getLastCommitCounter();
 
 }

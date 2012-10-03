@@ -90,6 +90,7 @@ import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.quorum.Quorum;
@@ -1507,8 +1508,22 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		return tmp.getFile();
 
-	}
+    }
 
+    /**
+     * The HA log directory.
+     * 
+     * @see HAJournal.Options#HA_LOG_DIR
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public File getHALogDir() {
+	    
+	    throw new UnsupportedOperationException();
+
+	}
+	
 	/**
 	 * Core implementation of immediate shutdown handles event reporting.
 	 */
@@ -2100,13 +2115,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Returns the current root block (immediate, non-blocking peek).
+     * <p>
+     * Note: The root block reference can be <code>null</code> until the journal
+     * has been initialized. Once it has been set, the root block will always be
+     * non-<code>null</code>. Since this method does not obtain the inner lock,
+     * it is possible for another thread to change the root block reference
+     * through a concurrent {@link #abort()} or {@link #commitNow(long)}. The
+     * {@link IRootBlockView} itself is an immutable data structure.
+     */
 	final public IRootBlockView getRootBlockView() {
 
-		final ReadLock lock = _fieldReadWriteLock.readLock();
-
-		lock.lock();
-
-		try {
+//		final ReadLock lock = _fieldReadWriteLock.readLock();
+//
+//		lock.lock();
+//
+//		try {
 
 			if (_rootBlock == null) {
 
@@ -2122,29 +2149,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			return _rootBlock;
 
-		} finally {
-
-			lock.unlock();
-
-		}
+//		} finally {
+//
+//			lock.unlock();
+//
+//		}
 
 	}
 
     final public long getLastCommitTime() {
 
-		final ReadLock lock = _fieldReadWriteLock.readLock();
-
-		lock.lock();
-
-		try {
+//		final ReadLock lock = _fieldReadWriteLock.readLock();
+//
+//		lock.lock();
+//
+//		try {
 
 			return _rootBlock.getLastCommitTime();
 
-		} finally {
-
-			lock.unlock();
-
-		}
+//		} finally {
+//
+//			lock.unlock();
+//
+//		}
 
 	}
 

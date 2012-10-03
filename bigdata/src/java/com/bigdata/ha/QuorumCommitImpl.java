@@ -381,10 +381,12 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
         {
             /*
-             * Run the operation on the leader using local method call in the
-             * caller's thread to avoid deadlock.
+             * Run the operation on the leader using a local method call
+             * (non-RMI) in the caller's thread to avoid deadlock.
              */
-            final Future<Void> f = member.getLeader(token).abort2Phase(token);
+            member.assertLeader(token);
+            final S leader = member.getService();
+            final Future<Void> f = leader.abort2Phase(token);
             remoteFutures.add(f);
 //            // Note: This runs synchronously (ignores timeout).
 //            f.run();

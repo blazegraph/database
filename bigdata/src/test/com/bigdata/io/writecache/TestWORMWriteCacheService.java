@@ -53,11 +53,9 @@ import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
-import com.bigdata.ha.pipeline.HAReceiveService;
-import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
@@ -67,10 +65,10 @@ import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.AbstractQuorumTestCase;
 import com.bigdata.quorum.MockQuorumFixture;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
 
@@ -303,6 +301,20 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
                 }
 
+                @Override
+                public long getLastCommitTime() {
+
+                    return MyMockQuorumMember.this.getLastCommitTime();
+                    
+                }
+            
+                @Override
+                public long getLastCommitCounter() {
+
+                    return MyMockQuorumMember.this.getLastCommitCounter();
+                    
+                }
+                
             });
 
         }
@@ -358,6 +370,23 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
         }
 
+        @Override
+        public long getLastCommitTime() {
+
+            return lastCommitTime;
+            
+        }
+    
+        @Override
+        public long getLastCommitCounter() {
+
+            return lastCommitCounter;
+            
+        }
+
+        private long lastCommitCounter = 0;
+        private long lastCommitTime = 0;
+        
     } // MockQuorumMemberImpl
     
     /**

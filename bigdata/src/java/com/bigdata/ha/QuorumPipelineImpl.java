@@ -24,6 +24,7 @@ import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListener;
 import com.bigdata.quorum.QuorumStateChangeListenerBase;
@@ -155,7 +156,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * follower. 
      */
     private IBufferAccess receiveBuffer;
-
+    
     /**
      * Cached metadata about the downstream service.
      */
@@ -790,6 +791,20 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         lock.lock();
 
         try {
+
+            if (receiveBuffer == null) {
+               
+                /*
+                 * The quorum broke and the receive buffer was cleared or
+                 * possibly we have become a leader.
+                 * 
+                 * TODO We should probably pass in the Quorum and then just
+                 * assert that the msg.getQuorumToken() is valid for the quorum.
+                 */
+
+                throw new QuorumException();
+            
+            }
         
             final PipelineState<S> downstream = pipelineStateRef.get();
 
@@ -797,12 +812,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 log.trace("Will receive "
                         + ((downstream != null) ? " and replicate" : "") + ": msg="
                         + msg);
-
+            
             final ByteBuffer b = getReceiveBuffer();
             
             final HAReceiveService<HAWriteMessage> receiveService = getHAReceiveService();
 
-            if (downstream == null) {
+         	if (downstream == null) {
 
                 /*
                  * This is the last service in the write pipeline, so just receive
@@ -921,7 +936,6 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             this.b = b;
             this.downstream = downstream;
             this.receiveService = receiveService;
-            
         }
 
         public Void call() throws Exception {
@@ -1048,6 +1062,5 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         }
 
     }
-
     
 }

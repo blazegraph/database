@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
@@ -37,11 +38,16 @@ import net.jini.export.Exporter;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
+import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.proxy.ThickFuture;
 
@@ -86,9 +92,70 @@ public class HAJournal extends Journal {
         String WRITE_PIPELINE_ADDR = HAJournal.class.getName()
                 + ".writePipelineAddr";
 
+        /**
+         * The required property whose value is the name of the directory in
+         * which write ahead log files will be created to support
+         * resynchronization services trying to join an HA quorum.
+         * <p>
+         * The directory should not contain any other files. It will be
+         * populated with files whose names correspond to commit counters. The
+         * commit counter is recorded in the root block at each commit. It is
+         * used to identify the write set for a given commit. A log file is
+         * written for each commit point. Each log files is normally deleted at
+         * the commit. However, if the quorum is not fully met at the commit,
+         * then the log files not be deleted. Instead, they will be used to
+         * resynchronize the other quorum members.
+         * <p>
+         * The log file name includes the value of the commit counter for the
+         * commit point that will be achieved when that log file is applied to a
+         * journal whose current commit point is [commitCounter-1]. The commit
+         * counter for a new journal (without any commit points) is ZERO (0).
+         * This the first log file will be labeled with the value ONE (1). The
+         * commit counter is written out with leading zeros in the log file name
+         * so the natural sort order of the log files should correspond to the
+         * ascending commit order.
+         * <p>
+         * The log files are a sequence of zero or more {@link HAWriteMessage}
+         * objects. For the {@link RWStore}, each {@link HAWriteMessage} is
+         * followed by the data from the corresponding {@link WriteCache} block.
+         * For the {@link WORMStrategy}, the {@link WriteCache} block is omitted
+         * since this data can be trivially reconstructed from the backing file.
+         * When the quorum prepares for a commit, the proposed root block is
+         * written onto the end of the log file.
+         * <p>
+         * The log files are deleted once the quorum is fully met (k out of k
+         * nodes have met in the quorum). It is possible for a quorum to form
+         * with only <code>(k+1)/2</code> nodes. When this happens, the nodes in
+         * the quorum will all write log files into the {@link #HA_LOG_DIR}.
+         * Those files will remain until the other nodes in the quorum
+         * synchronize and join the quorum. Once the quorum is fully met, the
+         * files in the log directory will be deleted.
+         * <p>
+         * If some or all log files are not present, then any node that is not
+         * synchronized with the quorum must be rebuilt from scratch rather than
+         * by incrementally applying logged write sets until it catches up and
+         * can join the quorum.
+         * 
+         * @see IRootBlockView#getCommitCounter()
+         * 
+         *      TODO We may need to also write a marker either on the head or
+         *      tail of the log file to indicate that the commit was applied.
+         *      Work this out when we work through the extension to the 2-phase
+         *      commit protocol that supports resynchronization.
+         */
+        String HA_LOG_DIR = HAJournal.class.getName() + ".haLogDir";
+        
     }
     
+    /**
+     * @see Options#WRITE_PIPELINE_ADDR
+     */
     private final InetSocketAddress writePipelineAddr;
+
+    /**
+     * @see Options#HA_LOG_DIR
+     */
+    private final File haLogDir;
     
     public HAJournal(final Properties properties) {
 
@@ -110,6 +177,17 @@ public class HAJournal extends Journal {
         writePipelineAddr = (InetSocketAddress) properties
                 .get(Options.WRITE_PIPELINE_ADDR);
 
+        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
+
+        haLogDir = new File(logDirStr);
+
+        if (!haLogDir.exists()) {
+
+            // Create the directory.
+            haLogDir.mkdirs();
+
+        }
+        
     }
 
     /**
@@ -170,6 +248,15 @@ public class HAJournal extends Journal {
             throw new RuntimeException(Options.WRITE_PIPELINE_ADDR
                     + " : required property not found.");
         
+        }
+
+        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
+
+        if (logDirStr == null) {
+
+            throw new IllegalArgumentException(Options.HA_LOG_DIR
+                    + " : must be specified");
+
         }
 
         return properties;

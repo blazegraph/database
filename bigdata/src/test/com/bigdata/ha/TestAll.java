@@ -62,9 +62,11 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("high availability");
 
+        suite.addTestSuite(TestHAWriteMessage.class);
+        
 //        if (s_includeHA)
         	suite.addTest(com.bigdata.ha.pipeline.TestAll.suite());
-
+        
         return suite;
 
     }

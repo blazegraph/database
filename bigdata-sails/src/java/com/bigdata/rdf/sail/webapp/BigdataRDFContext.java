@@ -939,9 +939,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                }
                 return null;
             } catch (Throwable t) {
+                log.error(t);
                 if (cxn != null && !cxn.isReadOnly()) {
                     /*
                      * Force rollback of the connection.
+                     * 
+                     * Note: It is possible that the commit has already been
+                     * processed, in which case this rollback() will be a NOP.
+                     * This can happen when there is an IO error when
+                     * communicating with the client, but the database has
+                     * already gone through a commit.
                      */
                     cxn.rollback();
                 }
@@ -1418,9 +1425,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                             lastOp = thisOp;
 
                             // Write out the LOAD operation.
-                            body.node("p")//
-                            .node("pre").text(thisOp.toString()).close()//
-                            .close();
+                            body.node("pre").text(thisOp.toString())//
+                                    .close();
 
                         }
                         
@@ -1451,10 +1457,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     pw.flush();
                     pw.close();
                     
-                    body.node("p").text("ABORT")//
+                    body.node("p").text("ABORT").close()//
                     .node("pre").text(e.getUpdate().toString()).close()//
                     .node("pre").text(w.toString()).close()//
-                    .text("totalElapsed=" + totalElapsedMillis
+                    .node("p").text("totalElapsed=" + totalElapsedMillis
                             + "ms, elapsed=" + elapsedMillis + "ms")
                     .close();
 
@@ -1488,16 +1494,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                                .close();
                     } else {
                     
-                        body.node("p")
-                                //
-                                .node("pre")
+                        body.node("pre")
                                 .text(e.getUpdate().toString())
                                 .close()
                                 //
+                                .node("p")
                                 .text("totalElapsed=" + totalElapsedMillis
                                         + "ms, elapsed=" + elapsedMillis + "ms")//
                                 .close();
-                    }
+                   }
                     
                     // horizontal line after each operation.
                     body.node("hr").close();

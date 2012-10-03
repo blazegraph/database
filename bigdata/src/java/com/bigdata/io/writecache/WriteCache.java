@@ -371,6 +371,22 @@ abstract public class WriteCache implements IWriteCache {
      */
 	private boolean m_closedForWrites = false;
 
+	/**
+	 * The sequence must be set when the cache is ready to be flushed.  In HA this
+	 * is sent down the pipeline to ensure correct synchronization when processing
+	 * logged messages.
+	 */
+	private long sequence = -1;
+
+	/**
+     * The sequence must be set when the cache is ready to be flushed.  In HA this
+     * is sent down the pipeline to ensure correct synchronization when processing
+     * logged messages.
+	 */
+    void setSequence(final long i) {
+        sequence = i;
+    }
+
     /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
      * direct {@link ByteBuffer} allocated from the {@link DirectBufferPool}.
@@ -1327,9 +1343,17 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @return cache A {@link WriteCache} to be replicated.
      */
-    public HAWriteMessage newHAWriteMessage(final long quorumToken) {
+    final public HAWriteMessage newHAWriteMessage(//
+            final long quorumToken,
+            final long lastCommitCounter,//
+            final long lastCommitTime//
+            ) {
 
-        return new HAWriteMessage(bytesWritten(), getWholeBufferChecksum(),
+        return new HAWriteMessage(
+           		lastCommitCounter,//
+           		lastCommitTime,//
+           		sequence, //
+           		bytesWritten(), getWholeBufferChecksum(),
                 prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
                 quorumToken, fileExtent.get(), firstOffset.get());
 
