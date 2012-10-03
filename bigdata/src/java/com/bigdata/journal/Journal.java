@@ -1010,6 +1010,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * IResourceManager
      */
 
+    @Override
     public File getTmpDir() {
         
         return tmpDir;
@@ -1020,6 +1021,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * The directory in which the journal's file is located -or-
      * <code>null</code> if the journal is not backed by a file.
      */
+    @Override
     public File getDataDir() {
         
         final File file = getFile();

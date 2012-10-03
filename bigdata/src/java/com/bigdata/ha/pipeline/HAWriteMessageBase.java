@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.journal.ha.HAWriteMessage;
+
 /**
  * Base class for RMI messages used to communicate metadata about a raw data
  * transfer occurring on a socket channel.
@@ -60,10 +62,14 @@ public class HAWriteMessageBase implements Externalizable {
      *            The Alder32 checksum of the bytes to be transfered.
      */
     public HAWriteMessageBase(final int sze, final int chk) {
+
         if (sze <= 0)
             throw new IllegalArgumentException();
-		this.sze = sze;
-		this.chk = chk;
+		
+        this.sze = sze;
+		
+        this.chk = chk;
+        
 	}
 	
     /**
@@ -71,12 +77,18 @@ public class HAWriteMessageBase implements Externalizable {
      */
 	public HAWriteMessageBase() {}
 
+	/** The #of bytes of data to be transfered. */
 	public int getSize() {
-		return sze;
+
+	    return sze;
+	    
 	}
-	
+
+	/** The Alder32 checksum of the bytes to be transfered. */
 	public int getChk() {
-		return chk;
+
+	    return chk;
+	    
 	}
 	
     public String toString() {
@@ -85,8 +97,40 @@ public class HAWriteMessageBase implements Externalizable {
         
     }
     
+    @Override
+    public boolean equals(final Object obj) {
+
+        if (this == obj)
+            return true;
+        
+        if (!(obj instanceof HAWriteMessageBase))
+            return false;
+        
+        final HAWriteMessageBase t = (HAWriteMessageBase) obj;
+
+        return sze == t.getSize() && chk == t.getChk();
+
+    }
+
+    @Override
+    public int hashCode() {
+
+        // checksum is a decent hash code if given otherwise the size.
+        return chk == 0 ? sze : chk;
+
+    }
+    
+    private static final transient short VERSION0 = 0x0;
+    
+    private static final transient short currentVersion = VERSION0;
+    
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
+
+        final short version = in.readShort();
+
+        if (version != VERSION0)
+            throw new RuntimeException("Bad version for serialization");
 
         sze = in.readInt();
         
@@ -96,6 +140,8 @@ public class HAWriteMessageBase implements Externalizable {
 
     public void writeExternal(final ObjectOutput out) throws IOException {
         
+        out.writeShort(currentVersion);
+    	
         out.writeInt(sze);
         
         out.writeInt(chk);

@@ -48,7 +48,16 @@ public class HAWriteMessage extends HAWriteMessageBase {
      */
     private static final long serialVersionUID = -2673171474897401979L;
 
-    /** The type of backing store (RW or WORM). */
+    /** The most recent commit counter associated with this message */
+    private long commitCounter;
+
+    /** The most recent commit time associated with this message */
+    private long commitTime;
+
+    /** The write sequence since last commit beginning at zero */
+	private long sequence;
+
+   /** The type of backing store (RW or WORM). */
     private StoreTypeEnum storeType;
 
     /** The quorum token for which this message is valid. */
@@ -60,10 +69,25 @@ public class HAWriteMessage extends HAWriteMessageBase {
     /** The file offset at which the data will be written (WORM only). */
     private long firstOffset;
 
-    // /** The write cache buffer sequence number (incremented for each buffer
-    // sent by the master). */
-    // private long sequenceId;
+    /** The commit counter associated with this message */
+    public long getCommitCounter() {
+        return commitCounter;
+    }
+    
+    /** The commit time associated with this message. */
+    public long getCommitTime() {
+        return commitTime;
+    }
 
+    /**
+     * The write cache buffer sequence number (reset to ZERO (0) for the first
+     * message after each commit and incremented for each buffer sent by the
+     * leader).
+     */
+    public long getSequence() {
+        return sequence;
+    }
+    
     /** The type of backing store (RW or WORM). */
     public StoreTypeEnum getStoreType() {
         return storeType;
@@ -86,11 +110,18 @@ public class HAWriteMessage extends HAWriteMessageBase {
     
     public String toString() {
 
-        return getClass().getName() + "{size=" + getSize() + ",chksum="
-                + getChk() + ",storeType=" + getStoreType() + ",quorumToken="
-                + getQuorumToken() + ",fileExtent=" + getFileExtent()
-                + ",firstOffset=" + getFirstOffset() + "}";
-        
+        return getClass().getName() //
+                + "{size=" + getSize() //
+                + ",chksum=" + getChk() //
+                + ",commitCounter=" + commitCounter //
+                + ",commitTime=" + commitTime //
+                + ",sequence=" + sequence //
+                + ",storeType=" + getStoreType() //
+                + ",quorumToken=" + getQuorumToken()//
+                + ",fileExtent=" + getFileExtent() //
+                + ",firstOffset=" + getFirstOffset() //
+                + "}";
+
     }
 
     /**
@@ -100,6 +131,16 @@ public class HAWriteMessage extends HAWriteMessageBase {
     }
 
     /**
+     * @param commitCounter
+     *            The commit counter for the current root block for the write
+     *            set which is being replicated by this message.
+     * @param commitTime
+     *            The commit time for the current root block for the write set
+     *            which is being replicated by this message.
+     * @param sequence
+     *            The write cache block sequence number. This is reset to ZERO
+     *            (0) for the first replicated write cache block in each write
+     *            set.
      * @param sze
      *            The #of bytes in the payload.
      * @param chk
@@ -113,7 +154,8 @@ public class HAWriteMessage extends HAWriteMessageBase {
      * @param firstOffset
      *            The file offset at which the data will be written (WORM only).
      */
-    public HAWriteMessage(final int sze, final int chk,
+    public HAWriteMessage(final long commitCounter, final long commitTime,
+            final long sequence, final int sze, final int chk,
             final StoreTypeEnum storeType, final long quorumToken,
             final long fileExtent, final long firstOffset) {
 
@@ -121,6 +163,12 @@ public class HAWriteMessage extends HAWriteMessageBase {
 
         if (storeType == null)
             throw new IllegalArgumentException();
+        
+        this.commitCounter = commitCounter;
+        
+        this.commitTime = commitTime;
+        
+        this.sequence = sequence;
         
         this.storeType = storeType;
         
@@ -134,30 +182,60 @@ public class HAWriteMessage extends HAWriteMessageBase {
 
     private static final byte VERSION0 = 0x0;
 
-    public void readExternal(final ObjectInput in) throws IOException,
-            ClassNotFoundException {
+    @Override
+    public boolean equals(final Object obj) {
+
+        if (this == obj)
+            return true;
         
-        super.readExternal(in);
-        final byte version = in.readByte();
-        switch (version) {
-        case VERSION0:
-            break;
-        default:
-            throw new IOException("Unknown version: " + version);
-        }
-        storeType = StoreTypeEnum.valueOf(in.readByte());
-        quorumToken = in.readLong();
-        fileExtent = in.readLong();
-        firstOffset = in.readLong();
+        if (!super.equals(obj))
+            return false;
+
+        if (!(obj instanceof HAWriteMessage))
+            return false;
+        
+        final HAWriteMessage other = (HAWriteMessage) obj;
+
+        return commitCounter == other.getCommitCounter()
+                && commitTime == other.getCommitTime() //
+                && sequence == other.getSequence()
+                && storeType == other.getStoreType()
+                && quorumToken == other.getQuorumToken()
+                && fileExtent == other.getFileExtent()
+                && firstOffset == other.getFirstOffset();
+
     }
 
-    public void writeExternal(final ObjectOutput out) throws IOException {
-        super.writeExternal(out);
-        out.write(VERSION0);
-        out.writeByte(storeType.getType());
-        out.writeLong(quorumToken);
-        out.writeLong(fileExtent);
-        out.writeLong(firstOffset);
-    }
+    public void readExternal(final ObjectInput in) throws IOException,
+			ClassNotFoundException {
+
+		super.readExternal(in);
+		final byte version = in.readByte();
+		switch (version) {
+		case VERSION0:
+			break;
+		default:
+			throw new IOException("Unknown version: " + version);
+		}
+		storeType = StoreTypeEnum.valueOf(in.readByte());
+		commitCounter = in.readLong();
+		commitTime = in.readLong();
+		sequence = in.readLong();
+		quorumToken = in.readLong();
+		fileExtent = in.readLong();
+		firstOffset = in.readLong();
+	}
+
+	public void writeExternal(final ObjectOutput out) throws IOException {
+		super.writeExternal(out);
+		out.write(VERSION0);
+		out.writeByte(storeType.getType());
+		out.writeLong(commitCounter);
+		out.writeLong(commitTime);
+		out.writeLong(sequence);
+		out.writeLong(quorumToken);
+		out.writeLong(fileExtent);
+		out.writeLong(firstOffset);
+	}
 
 }

@@ -64,8 +64,10 @@ import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.rawstore.Bytes;
@@ -485,6 +487,15 @@ abstract public class WriteCacheService implements IWriteCache {
         localWriteFuture = localWriteService.submit(newWriteTask());
 
     }
+    
+    /**
+     * Called from {@link IBufferStrategy#commit()} and {@link #reset()} to
+     * reset WriteCache sequence for HA synchronization.
+     */
+    public void resetSequence() {
+        cacheSequence = 0;
+    }
+    private volatile long cacheSequence = 0;
 
     protected Callable<Void> newWriteTask() {
 
@@ -556,6 +567,9 @@ abstract public class WriteCacheService implements IWriteCache {
                         /*
                          * Only process non-empty cache buffers.
                          */
+                    	
+                        // increment writeCache sequence
+                        cache.setSequence(cacheSequence++);
 
                         if (quorum != null && quorum.isHighlyAvailable()) {
 
@@ -589,14 +603,31 @@ abstract public class WriteCacheService implements IWriteCache {
                             // flip(limit=pos;pos=0)
                             b.flip();
                             assert b.remaining() > 0 : "Empty cache: " + cache; 
+           
                             // send to 1st follower.
                             @SuppressWarnings("unchecked")
                             final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
                                     .getMember();
+
                             assert quorumMember != null : "Not quorum member?";
-                            remoteWriteFuture = quorumMember.replicate(
-                                    cache.newHAWriteMessage(quorumToken), b);
+                            
+                            final HAWriteMessage msg = cache.newHAWriteMessage(
+                                    quorumToken,//
+                                    quorumMember.getLastCommitCounter(),//
+                                    quorumMember.getLastCommitTime()//
+                                    );
+
+                            /*
+                             * FIXME The quorum leader must log the write cache
+                             * block. However, it must be logged exactly once
+                             * (if there is a retry, we do not want to re-log
+                             * the block!)
+                             */
+                            
+                            remoteWriteFuture = quorumMember.replicate(msg, b);
+
                             counters.get().nsend++;
+                            
                         }
 
                         /*
@@ -614,8 +645,8 @@ abstract public class WriteCacheService implements IWriteCache {
                         if (remoteWriteFuture != null) {
                             try {
                                 remoteWriteFuture.get();
-                           } catch (ExecutionException ex) {
-                                retrySend(quorum, cache, ex);
+                            } catch (ExecutionException ex) {
+                                 retrySend(quorum, cache, ex);
                             }
                         }
 
@@ -799,11 +830,19 @@ abstract public class WriteCacheService implements IWriteCache {
                 b.flip();
                 
                 assert b.remaining() > 0 : "Empty cache: " + cache;
+
+                @SuppressWarnings("unchecked")
+                final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
+                        .getMember();
+
+                final HAWriteMessage msg = cache.newHAWriteMessage(//
+                        quorumToken,//
+                        quorumMember.getLastCommitCounter(),//
+                        quorumMember.getLastCommitTime()//
+                        );
                 
                 // send to 1st follower.
-                remoteWriteFuture = ((QuorumPipeline<HAPipelineGlue>) quorum
-                        .getMember()).replicate(cache
-                        .newHAWriteMessage(quorumToken), b);
+                remoteWriteFuture = quorumMember.replicate(msg, b);
                 
                 counters.get().nsend++;
 
@@ -852,7 +891,7 @@ abstract public class WriteCacheService implements IWriteCache {
             IReopenChannel<? extends Channel> opener, final long fileExtent)
             throws InterruptedException;
 
-    /**
+	/**
      * {@inheritDoc}
      * <p>
      * This implementation calls {@link IWriteCache#reset()} on all
@@ -942,6 +981,9 @@ abstract public class WriteCacheService implements IWriteCache {
                 c.nclean = buffers.length-1;
                 c.nreset++;
             }
+            
+            // reset cacheSequence for HA
+            cacheSequence = 0;
 
             /*
              * Restart the WriteTask

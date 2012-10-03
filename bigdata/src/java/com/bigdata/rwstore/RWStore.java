@@ -2578,6 +2578,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
 			try {
 				m_writeCache.flush(true);
+				m_writeCache.resetSequence();
 			} catch (InterruptedException e) {
 			    log.error(e, e);
 				throw new RuntimeException(e);
