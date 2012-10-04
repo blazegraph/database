@@ -421,56 +421,30 @@ public class HAJournalServer extends AbstractServer {
             @Override
             public void notify(final QuorumEvent e) {
                 if (log.isTraceEnabled())
-                    System.err.print("QuorumEvent: " + e);
-                switch(e.getEventType()) {
-                case CAST_VOTE:
-                    break;
-                case CONSENSUS:
-                    break;
-                case MEMBER_ADD:
-                    break;
-                case MEMBER_REMOVE:
-                    break;
-                case PIPELINE_ADD:
-                    break;
-                case PIPELINE_REMOVE:
-                    break;
-                case QUORUM_BROKE:
-                    break;
-                case QUORUM_MEET:
-                    if (jettyServer == null) {
-                        /*
-                         * The NSS will start on each service in the quorum.
-                         * However, only the leader will create the default KB
-                         * (if that option is configured).
-                         * 
-                         * Submit task since we can not do this in the event
-                         * thread.
-                         */
-                        journal.getExecutorService().submit(
-                                new Callable<Void>() {
-                                    @Override
-                                    public Void call() throws Exception {
-                                        if (jettyServer == null) {
-                                            try {
-                                                startNSS();
-                                            } catch (Exception e1) {
-                                                log.error(
-                                                        "Could not start NanoSparqlServer: "
-                                                                + e1, e1);
-                                            }
-                                        }
-                                        return null;
-                                    }
-                                });
-                    }
-                    break;
-                case SERVICE_JOIN:
-                    break;
-                case SERVICE_LEAVE:
-                    break;
-                case WITHDRAW_VOTE: 
-                }
+                    haLog.trace("QuorumEvent: " + e);
+//                switch(e.getEventType()) {
+//                case CAST_VOTE:
+//                    break;
+//                case CONSENSUS:
+//                    break;
+//                case MEMBER_ADD:
+//                    break;
+//                case MEMBER_REMOVE:
+//                    break;
+//                case PIPELINE_ADD:
+//                    break;
+//                case PIPELINE_REMOVE:
+//                    break;
+//                case QUORUM_BROKE:
+//                    break;
+//                case QUORUM_MEET:
+//                    break;
+//                case SERVICE_JOIN:
+//                    break;
+//                case SERVICE_LEAVE:
+//                    break;
+//                case WITHDRAW_VOTE: 
+//                }
             }
         });
 
@@ -608,12 +582,12 @@ public class HAJournalServer extends AbstractServer {
         public void quorumMeet(final long token, final UUID leaderId) {
 
             super.quorumMeet(token, leaderId);
-            
+
             // Inform the journal that there is a new quorum token.
             journal.setQuorumToken(token);
 
             if (HA_LOG_ENABLED) {
-                
+
                 if (isJoinedMember(token)) {
 
                     try {
@@ -633,18 +607,43 @@ public class HAJournalServer extends AbstractServer {
 
                     }
 
-                } else if(isPipelineMember()) {
-                    
+                } else if (isPipelineMember()) {
+
                     /*
                      * FIXME RESYNC : Start the resynchronization protocol.
                      */
 
-                    haLog.info("RESYNCH REQUIRED: " + server.getServiceName());
+                    haLog.warn("RESYNCH REQUIRED: " + server.getServiceName());
                     
                 }
 
             }
 
+            if (isJoinedMember(token) && server.jettyServer == null) {
+                /*
+                 * The NSS will start on each service in the quorum. However,
+                 * only the leader will create the default KB (if that option is
+                 * configured).
+                 * 
+                 * Submit task since we can not do this in the event thread.
+                 */
+                journal.getExecutorService().submit(new Callable<Void>() {
+                    @Override
+                    public Void call() throws Exception {
+                        if (server.jettyServer == null) {
+                            try {
+                                server.startNSS();
+                            } catch (Exception e1) {
+                                log.error("Could not start NanoSparqlServer: "
+                                        + e1, e1);
+                            }
+                        }
+                        return null;
+                    }
+                });
+
+            }
+            
         }
         
         /**
@@ -736,7 +735,8 @@ public class HAJournalServer extends AbstractServer {
          * {@inheritDoc}
          * <p>
          * Writes the root block onto the {@link ProcessLogWriter} and closes
-         * the log file.
+         * the log file. A new log is then opened, using the given root block as
+         * the starting point for that log file.
          */
         @Override
         public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
@@ -744,7 +744,11 @@ public class HAJournalServer extends AbstractServer {
             if (!HA_LOG_ENABLED)
                 return;
 
+            // Close off the old log file with the root block.
             journal.getHALogWriter().closeLog(rootBlock);
+            
+            // Open up a new log file with this root block.
+            journal.getHALogWriter().createLog(rootBlock);
             
         }
 

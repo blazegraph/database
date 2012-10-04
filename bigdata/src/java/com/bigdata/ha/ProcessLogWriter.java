@@ -30,7 +30,7 @@ public class ProcessLogWriter {
     /**
      * Logger for HA events.
      */
-    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
+    private static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
 
     /** HA log directory. */
     private final File m_dir;
@@ -71,7 +71,13 @@ public class ProcessLogWriter {
         if (rootBlock == null)
             throw new IllegalArgumentException();
 
-        this.m_rootBlock = rootBlock;
+        if (m_rootBlock != null) // may not be open.
+            throw new IllegalStateException();
+
+        if (haLog.isInfoEnabled())
+            haLog.info("rootBlock=" + rootBlock);
+
+        m_rootBlock = rootBlock;
 
         m_sequence = 0L;
 
@@ -139,6 +145,12 @@ public class ProcessLogWriter {
 
         if (rootBlock == null)
             throw new IllegalArgumentException();
+
+        if (m_rootBlock == null) // no root block associated with log.
+            throw new IllegalStateException();
+
+        if (haLog.isInfoEnabled())
+            haLog.info("rootBlock=" + rootBlock);
 
         final long expectedCommitCounter = this.m_rootBlock.getCommitCounter() + 1;
 
@@ -209,6 +221,9 @@ public class ProcessLogWriter {
 
         if (m_sequence != msg.getSequence())
             return;
+
+        if (haLog.isInfoEnabled())
+            haLog.info("msg=" + msg);
 
         m_out.writeObject(msg);
 
@@ -320,6 +335,9 @@ public class ProcessLogWriter {
      * Disable the current log file if one is open.
      */
     public void disable() throws IOException {
+        
+        if (haLog.isInfoEnabled())
+            haLog.info("");
 
         /*
          * Remove unless log file was already closed.
