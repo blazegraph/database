@@ -5072,7 +5072,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                         + localService.getServiceId());
 
                             ((IHABufferStrategy) _bufferStrategy)
-                                    .resetFromHARootBlock(_rootBlock);
+                                    .resetFromHARootBlock(rootBlock);
                             
                             /*
                              * Clear reference and reload from the store.
