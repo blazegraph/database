@@ -42,6 +42,8 @@ public class ProcessLogWriter {
     /** current log file. */
     private File m_log = null;
 
+    public static final String HA_LOG_EXT = ".ha-log";
+    
     /** current output stream. */
     private ObjectOutputStream m_out = null;
 
@@ -91,7 +93,7 @@ public class ProcessLogWriter {
 
             final long commitCounter = rootBlock.getCommitCounter();
 
-            f.format("%020d.log", (commitCounter + 1));
+            f.format("%020d" + HA_LOG_EXT, (commitCounter + 1));
 
             logFile = sb.toString();
 
@@ -102,8 +104,14 @@ public class ProcessLogWriter {
         // Must delete file if it exists.
         if (m_log.exists() && !m_log.delete()) {
 
-            throw new IOException("Could not delete: file=" + m_log);
-            
+            /*
+             * It is a problem if a file exists and we can not delete it. We
+             * need to be able to remove the file and replace it with a new file
+             * when we log the write set for this commit point.
+             */
+
+            throw new IOException("Could not delete: " + m_log);
+
         }
         
         m_out = new ObjectOutputStream(new FileOutputStream(m_log));
@@ -152,8 +160,6 @@ public class ProcessLogWriter {
         flush();
 
         close();
-
-        reset();
         
     }
 
@@ -244,9 +250,13 @@ public class ProcessLogWriter {
      * When the HA leader commits it must flush the log
      */
     private void flush() throws IOException {
+
         if (m_out != null) {
+        
             m_out.flush();
+            
         }
+        
     }
 
     /**
@@ -254,17 +264,55 @@ public class ProcessLogWriter {
      * 
      * @throws IOException
      */
-    public void remove() throws IOException {
+    private void remove() throws IOException {
+
         try {
+
             if (m_out != null) {
+
+                /*
+                 * Conditional remove iff file is open. Will not remove
+                 * something that has been closed.
+                 */
+
                 m_out.close();
-                m_log.delete();
+
+                if (m_log.exists() && !m_log.delete()) {
+
+                    /*
+                     * It is a problem if a file exists and we can not delete
+                     * it. We need to be able to remove the file and replace it
+                     * with a new file when we log the write set for this commit
+                     * point.
+                     */
+                    
+                    throw new IOException("Could not delete: " + m_log);
+
+                }
+                
             }
+
         } finally {
+
             reset();
+            
         }
+        
     }
 
+    /**
+     * Disable the current log file if one is open.
+     */
+    public void disable() throws IOException {
+
+        /*
+         * Remove unless log file was already closed.
+         */
+
+        remove();
+        
+    }
+    
     // FIXME write utility to dump one or more log files.
     public static void main(final String[] args) {
 
