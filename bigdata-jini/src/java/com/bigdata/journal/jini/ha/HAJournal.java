@@ -282,6 +282,13 @@ public class HAJournal extends Journal {
         
     }
 
+    @Override
+    public final File getHALogDir() {
+
+        return haLogDir;
+        
+    }
+    
     /**
      * Extended implementation supports RMI.
      */

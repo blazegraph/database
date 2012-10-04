@@ -1,9 +1,8 @@
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -11,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
-import java.util.Formatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +41,7 @@ import com.bigdata.io.IBufferAccess;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IHABufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
@@ -133,6 +132,12 @@ public class HAJournalServer extends AbstractServer {
         int DEFAULT_PORT = 8080;
         
     }
+
+    /**
+     * FIXME FLAG CONDITIONALLY ENABLES THE HA LOG AND RESYNC PROTOCOL. Disabled
+     * in committed code until we have this running properly.
+     */
+    private static final boolean HA_LOG_ENABLED = false;
     
     /**
      * Caching discovery client for the {@link HAGlue} services.
@@ -143,6 +148,12 @@ public class HAJournalServer extends AbstractServer {
      * The journal.
      */
     private HAJournal journal;
+    
+    /**
+     * Write ahead log for replicated writes used to resynchronize services that
+     * are not in the met quorum.
+     */
+    private ProcessLogWriter haLogWriter = null;
     
     private UUID serviceUUID;
     private HAGlue haGlueService;
@@ -370,6 +381,8 @@ public class HAJournalServer extends AbstractServer {
 
             this.journal = new HAJournal(properties, quorum);
             
+            this.haLogWriter = new ProcessLogWriter(journal.getHALogDir());
+            
         }
 
         haGlueService = journal.newHAGlue(serviceUUID);
@@ -582,6 +595,20 @@ public class HAJournalServer extends AbstractServer {
             
             // Inform the Journal that the quorum token is invalid.
             journal.setQuorumToken(Quorum.NO_QUORUM);
+
+            if(HA_LOG_ENABLED) {
+                
+                try {
+
+                    server.haLogWriter.disable();
+
+                } catch (IOException e) {
+
+                    haLog.error(e, e);
+
+                }
+                
+            }
             
         }
 
@@ -592,6 +619,39 @@ public class HAJournalServer extends AbstractServer {
             
             // Inform the journal that there is a new quorum token.
             journal.setQuorumToken(token);
+
+            if (HA_LOG_ENABLED) {
+                
+                if (isJoinedMember(token)) {
+
+                    try {
+
+                        server.haLogWriter
+                                .createLog(journal.getRootBlockView());
+
+                    } catch (IOException e) {
+
+                        /*
+                         * We can not remain in the quorum if we can not write
+                         * the HA Log file.
+                         */
+                        haLog.error("CAN NOT OPEN LOG: " + e, e);
+
+                        getActor().serviceLeave();
+
+                    }
+
+                } else if(isPipelineMember()) {
+                    
+                    /*
+                     * FIXME RESYNC : Start the resynchronization protocol.
+                     */
+
+                    haLog.info("RESYNCH REQUIRED: " + server.getServiceName());
+                    
+                }
+
+            }
 
         }
         
@@ -666,37 +726,84 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
-        * Note: Logging MUST NOT start in the middle of a write set (all log files
-        * must be complete). The {@link HAWriteMessage#getSequence()} MUST be ZERO
-        * (0) when we open a log file.
-        * 
-        * TODO The WORM should not bother to log the write cache block since it can
-        * be obtained directly from the backing store. Abstract out an object to
-        * manage the log file for a commit counter and make it smart about the WORM
-        * versus the RWStore. The same object will need to handle the read back
-        * from the log file and in the case of the WORM should get the data block
-        * from the backing file. However, this object is not responsible for reply
-        * of log files. We'll have to locate a place for that logic next - probably
-        * in this class (QuorumServiceBase).
-        * 
-        * FIXME We need to get the root block on the log and integrate it into the
-        * commit protocol. Everyone in the pipeline needs to get the root block.
-        * 
-        * FIXME The class that handles the logging must not write a block twice,
-        * even if it gets transmitted twice.
-        */
+         * Writes the {@link HAWriteMessage} and the data onto the
+         * {@link ProcessLogWriter}
+         */
+        @Override
         public void logWriteCacheBlock(final HAWriteMessage msg,
                 final ByteBuffer data) throws IOException {
 
+            if (!HA_LOG_ENABLED)
+                return;
+
+            server.haLogWriter.write(msg, data);
+            
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Writes the root block onto the {@link ProcessLogWriter} and closes
+         * the log file.
+         */
+        @Override
+        public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
+
+            if (!HA_LOG_ENABLED)
+                return;
+
+            server.haLogWriter.closeLog(rootBlock);
+            
         }
 
-       /**
-        * Process log to which the receiveService should write the messages to and
-        * <code>null</code> if we may not write on it.
-        * 
-        * FIXME We need to clear this any time the quorum breaks.
-        */
-       ProcessLogWriter haLogWriter = null;
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Destroys all HA log files in the HA log directory.
+         */
+        @Override
+        public void purgeHALogs() {
+
+            if (!HA_LOG_ENABLED)
+                return;
+
+            final File logDir = journal.getHALogDir();
+            
+            final File[] files = logDir.listFiles(new FilenameFilter() {
+                
+                @Override
+                public boolean accept(File dir, String name) {
+
+                    return name.endsWith(ProcessLogWriter.HA_LOG_EXT);
+                    
+                }
+            });
+
+            int ndeleted = 0;
+            long totalBytes = 0L;
+            
+            for (File file : files) {
+
+                final long len = file.length();
+                
+                if (!file.delete()) {
+
+                    haLog.warn("COULD NOT DELETE FILE: " + file);
+
+                    continue;
+                    
+                }
+                
+                ndeleted++;
+                
+                totalBytes += len;
+                
+            }
+            
+            haLog.info("PURGED LOGS: ndeleted=" + ndeleted + ", totalBytes="
+                    + totalBytes);
+
+        }
 
     }
     

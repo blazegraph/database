@@ -23,6 +23,7 @@ import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
@@ -1005,9 +1006,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     abstract protected void handleReplicatedWrite(final HAWriteMessage msg,
             final ByteBuffer data) throws Exception;
 
-    @Override
-    abstract public void logWriteCacheBlock(final HAWriteMessage msg,
-            final ByteBuffer data) throws IOException;
+//    @Override
+//    abstract public void logWriteCacheBlock(final HAWriteMessage msg,
+//            final ByteBuffer data) throws IOException;
+//
+//    @Override
+//    abstract public void logRootBlock(final IRootBlockView rootBlock)
+//            throws IOException;
 
     /**
      * A utility class that bundles together the Internet address and port at which
