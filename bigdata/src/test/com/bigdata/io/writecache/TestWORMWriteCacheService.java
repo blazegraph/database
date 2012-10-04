@@ -60,6 +60,7 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCache.FileChannelWriteCache;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
@@ -323,6 +324,21 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     
                 }
 
+                @Override
+                public void logRootBlock(final IRootBlockView rootBlock)
+                        throws IOException {
+
+                    MyMockQuorumMember.this.logRootBlock(rootBlock);
+
+                }
+
+                @Override
+                public void purgeHALogs() {
+                    
+                    MyMockQuorumMember.this.purgeHALogs();
+                    
+                }
+                
             });
 
         }
@@ -401,6 +417,21 @@ public class TestWORMWriteCacheService extends TestCase3 {
             // NOP.
         }
 
+        @Override
+        public void logRootBlock(final IRootBlockView rootBlock)
+                throws IOException {
+
+            // NOP
+
+        }
+
+        @Override
+        public void purgeHALogs() {
+            
+            // NOP
+            
+        }
+        
     } // MockQuorumMemberImpl
     
     /**

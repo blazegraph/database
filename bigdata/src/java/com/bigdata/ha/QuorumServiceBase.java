@@ -130,6 +130,21 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
                 
             }
             
+            @Override
+            public void logRootBlock(final IRootBlockView rootBlock)
+                    throws IOException {
+
+                QuorumServiceBase.this.logRootBlock(rootBlock);
+
+            }
+
+            @Override
+            public void purgeHALogs() {
+
+                QuorumServiceBase.this.purgeHALogs();
+
+            }
+
         });
 
         addListener(this.commitImpl = new QuorumCommitImpl<S>(this));
@@ -225,16 +240,40 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             ByteBuffer data) throws Exception;
  
     /**
-     * Log the {@link HAWriteMessage} and the associated data onto the
-     * appropriate log file.
+     * {@inheritDoc}
      * <p>
-     * The default implementation is a NOP.
+     * Note: The default implementation is a NOP.
      */
+    @Override
     public void logWriteCacheBlock(final HAWriteMessage msg,
             final ByteBuffer data) throws IOException {
 
         // NOP
         
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The default implementation is a NOP.
+     */
+    @Override
+    public void purgeHALogs() {
+        
+        // NOP
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The default implementation is a NOP.
+     */
+    @Override
+    public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
+
+        // NOP
+
     }
 
     /*

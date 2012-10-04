@@ -4765,18 +4765,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
                 
-                /*
-                 * We need to reset the backing store with the token for the new
-                 * quorum. There should not be any active writers since there
-                 * was no quorum. Thus, this should just cause the backing store
-                 * to become aware of the new quorum and enable writes.
-                 * 
-                 * Note: This is done using a local abort, not a 2-phase abort.
-                 * Each node in the quorum should handle this locally when it
-                 * sees the quorum meet event.
-                 */
+                if (localService.isJoinedMember(quorumToken)) {
 
-                _abort();
+                    /*
+                     * We need to reset the backing store with the token for the
+                     * new quorum. There should not be any active writers since
+                     * there was no quorum. Thus, this should just cause the
+                     * backing store to become aware of the new quorum and
+                     * enable writes.
+                     * 
+                     * Note: This is done using a local abort, not a 2-phase
+                     * abort. Each node in the quorum should handle this locally
+                     * when it sees the quorum meet event.
+                     * 
+                     * TODO This assumes that a service that is not joined with
+                     * the quorum will not go through an _abort(). Such a
+                     * service will have to go through the synchronization
+                     * protocol. If the service is in the pipeline when the
+                     * quorum meets, even through it is not joined, and votes
+                     * the same lastCommitTime, then it MIGHT see all necessary
+                     * replicated writes and if it does, then it could
+                     * synchronize immediately. There is basically a data race
+                     * here.
+                     */
+
+                    _abort();
+                    
+                }
 
             } else {
 
@@ -5077,12 +5092,59 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 						// reload the commit record from the new root block.
                         _commitRecord = _getCommitRecord();
 
-						prepareRequest.set(null/* discard */);
-
 		                if (txLog.isInfoEnabled())
 		                    txLog.info("COMMIT: commitTime=" + commitTime);
 
+                        try {
+
+                            /*
+                             * Write the root block on the HA log file, closing
+                             * out that file.
+                             */
+                            
+                            localService.logRootBlock(rootBlock);
+                            
+                        } catch (IOException e) {
+                            /*
+                             * We have already committed.
+                             * 
+                             * This HA log file will be unusable if we have to
+                             * replay the write set to resynchronize some other
+                             * service. However, it is still possible to obtain
+                             * the HA log file from some other service in the
+                             * qourum. If all else fails, the hypothetical
+                             * service can be rebuilt from scratch.
+                             */
+                            haLog.error("UNABLE TO SEAL HA LOG FILE WITH ROOT BLOCK: "
+                                    + getServiceId()
+                                    + ", rootBlock="
+                                    + rootBlock);
+                        }
+
+                        if (quorum.isQuorumFullyMet(rootBlock.getQuorumToken())) {
+
+                            /*
+                             * The HA log files are purged on each node any time
+                             * the quorum is fully met and goes through a commit
+                             * point.
+                             */
+
+                            localService.purgeHALogs();
+
+                        }
+
+					} catch(Throwable t) {
+					    
+                        haLog.error("ERROR IN 2-PHASE COMMIT: " + t
+                                + ", rootBlock=" + rootBlock, t);
+
+                        quorum.getActor().serviceLeave();
+
+                        throw new RuntimeException(t);
+                        
 					} finally {
+
+                        prepareRequest.set(null/* discard */);
 
 						_fieldReadWriteLock.writeLock().unlock();
 

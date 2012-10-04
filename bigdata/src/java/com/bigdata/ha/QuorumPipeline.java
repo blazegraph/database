@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 
@@ -127,4 +128,21 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
     void logWriteCacheBlock(final HAWriteMessage msg,
             final ByteBuffer data) throws IOException;
 
+    /**
+     * Log the root block for the commit point that closes the current write set
+     * onto the {@link ProcessLogWriter}.
+     * 
+     * @param rootBlock
+     *            The root block for the commit point that was just achieved.
+     */
+    void logRootBlock(final IRootBlockView rootBlock) throws IOException;
+
+    /**
+     * Purge the local HA log files. This should be invoked when the service
+     * goes through a commit point in which the quorum is fully met. At that
+     * moment, we no longer require these log files to resynchronize any
+     * service.
+     */
+    void purgeHALogs();
+    
 }
