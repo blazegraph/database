@@ -10,6 +10,7 @@ import java.util.Formatter;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAWriteMessage;
 
@@ -26,7 +27,10 @@ import com.bigdata.journal.ha.HAWriteMessage;
  */
 public class ProcessLogWriter {
 
-    private static final Logger log = Logger.getLogger(ProcessLogWriter.class);
+    /**
+     * Logger for HA events.
+     */
+    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
 
     /** HA log directory. */
     private final File m_dir;
@@ -136,22 +140,28 @@ public class ProcessLogWriter {
         if (rootBlock == null)
             throw new IllegalArgumentException();
 
-        if (rootBlock.getCommitCounter() != this.m_rootBlock.getCommitCounter()) {
+        final long expectedCommitCounter = this.m_rootBlock.getCommitCounter() + 1;
 
-            throw new IllegalStateException();
+        if (expectedCommitCounter != rootBlock.getCommitCounter()) {
 
-        }
-
-        if (rootBlock.getLastCommitTime() != this.m_rootBlock
-                .getLastCommitTime()) {
-
-            throw new IllegalStateException();
+            throw new IllegalStateException("CommitCounter: expected="
+                    + expectedCommitCounter + ", actual="
+                    + rootBlock.getCommitCounter());
 
         }
 
-        if (rootBlock.getUUID() != this.m_rootBlock.getUUID()) {
+//        if (rootBlock.getLastCommitTime() != this.m_rootBlock
+//                .getLastCommitTime()) {
+//
+//            throw new IllegalStateException();
+//
+//        }
 
-            throw new IllegalStateException();
+        if (!this.m_rootBlock.getUUID().equals(rootBlock.getUUID())) {
+
+            throw new IllegalStateException("Store UUID: expected="
+                    + (m_rootBlock.getUUID()) + ", actual="
+                    + rootBlock.getUUID());
 
         }
 
@@ -169,10 +179,10 @@ public class ProcessLogWriter {
         if (rootBlock == null)
             throw new IllegalArgumentException();
 
-        m_out.write(rootBlock.asReadOnlyBuffer().array());
+        m_out.write(BytesUtil.getBytes(rootBlock.asReadOnlyBuffer()));
 
-        if (log.isDebugEnabled())
-            log.debug("wrote root block: " + rootBlock);
+        if (haLog.isDebugEnabled())
+            haLog.debug("wrote root block: " + rootBlock);
 
     }
 
@@ -200,17 +210,23 @@ public class ProcessLogWriter {
         if (m_sequence != msg.getSequence())
             return;
 
-        final byte[] array = data.array();
-
         m_out.writeObject(msg);
 
         switch(m_rootBlock.getStoreType()) {
         case RW: {
 
+            /*
+             * FIXME Efficient channel access and write. I think that we are
+             * much better off reusing the WORMStategy without the WriteCache
+             * and pre-serializing the HAWriteMessage as a byte[]. That will
+             * give us efficient, proven writes and a place to put both root
+             * blocks.
+             */
+            final byte[] array = BytesUtil.getBytes(data);
+
             assert msg.getSize() == array.length;
 
-            // TODO Efficient channel access and write - must flush first?
-            m_out.write(data.array());
+            m_out.write(array);
         }
         case WORM:
             break;

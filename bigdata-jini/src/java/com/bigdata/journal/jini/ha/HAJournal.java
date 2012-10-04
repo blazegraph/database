@@ -37,6 +37,7 @@ import net.jini.export.Exporter;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
@@ -157,6 +158,25 @@ public class HAJournal extends Journal {
      */
     private final File haLogDir;
     
+    /**
+     * Write ahead log for replicated writes used to resynchronize services that
+     * are not in the met quorum.
+     * 
+     * @see Options#HA_LOG_DIR
+     * @see ProcessLogWriter
+     */
+    private final ProcessLogWriter haLogWriter;
+
+    /**
+     * The {@link ProcessLogWriter} for this {@link HAJournal} and never
+     * <code>null</code>.
+     */
+    ProcessLogWriter getHALogWriter() {
+
+        return haLogWriter;
+        
+    }
+    
     public HAJournal(final Properties properties) {
 
         this(properties, null);
@@ -187,7 +207,10 @@ public class HAJournal extends Journal {
             haLogDir.mkdirs();
 
         }
-        
+
+        // Set up the HA log writer.
+        haLogWriter = new ProcessLogWriter(haLogDir);
+
     }
 
     /**

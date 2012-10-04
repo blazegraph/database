@@ -149,12 +149,6 @@ public class HAJournalServer extends AbstractServer {
      */
     private HAJournal journal;
     
-    /**
-     * Write ahead log for replicated writes used to resynchronize services that
-     * are not in the met quorum.
-     */
-    private ProcessLogWriter haLogWriter = null;
-    
     private UUID serviceUUID;
     private HAGlue haGlueService;
     private ZookeeperClientConfig zkClientConfig;
@@ -381,8 +375,6 @@ public class HAJournalServer extends AbstractServer {
 
             this.journal = new HAJournal(properties, quorum);
             
-            this.haLogWriter = new ProcessLogWriter(journal.getHALogDir());
-            
         }
 
         haGlueService = journal.newHAGlue(serviceUUID);
@@ -600,7 +592,7 @@ public class HAJournalServer extends AbstractServer {
                 
                 try {
 
-                    server.haLogWriter.disable();
+                    journal.getHALogWriter().disable();
 
                 } catch (IOException e) {
 
@@ -626,8 +618,8 @@ public class HAJournalServer extends AbstractServer {
 
                     try {
 
-                        server.haLogWriter
-                                .createLog(journal.getRootBlockView());
+                        journal.getHALogWriter().createLog(
+                                journal.getRootBlockView());
 
                     } catch (IOException e) {
 
@@ -736,7 +728,7 @@ public class HAJournalServer extends AbstractServer {
             if (!HA_LOG_ENABLED)
                 return;
 
-            server.haLogWriter.write(msg, data);
+            journal.getHALogWriter().write(msg, data);
             
         }
         
@@ -752,7 +744,7 @@ public class HAJournalServer extends AbstractServer {
             if (!HA_LOG_ENABLED)
                 return;
 
-            server.haLogWriter.closeLog(rootBlock);
+            journal.getHALogWriter().closeLog(rootBlock);
             
         }
 
