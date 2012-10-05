@@ -1,18 +1,23 @@
 package com.bigdata.ha;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Formatter;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.RootBlockView;
+import com.bigdata.ha.msg.IHAWriteMessage;
 
 /**
  * Wrapper class to handle process log creation and output for HA.
@@ -48,8 +53,12 @@ public class ProcessLogWriter {
 
     public static final String HA_LOG_EXT = ".ha-log";
     
-    /** current output stream. */
-    private ObjectOutputStream m_out = null;
+    /** current output file channel. */
+    private RandomAccessFile m_raf = null;
+    private FileChannel m_channel = null;
+    final static int ROOTBLOCK_0 = 0;
+    final static int ROOTBLOCK_1 = RootBlockView.SIZEOF_ROOT_BLOCK;
+    final static int START_DATA = ROOTBLOCK_1 + RootBlockView.SIZEOF_ROOT_BLOCK;
 
     public ProcessLogWriter(final File logDir) {
 
@@ -124,10 +133,15 @@ public class ProcessLogWriter {
 
         }
         
-        m_out = new ObjectOutputStream(new FileOutputStream(m_log));
+        m_raf = new RandomAccessFile(m_log, "rw");
+        
+        m_channel = m_raf.getChannel();
+        m_channel.position(START_DATA);
 
-        writeRootBlock(rootBlock);
-
+        // On open write rootblock to 0 and 1
+        writeRootBlock(ROOTBLOCK_0, rootBlock);       
+        writeRootBlock(ROOTBLOCK_1, rootBlock);       
+ 
     }
 
     /**
@@ -177,24 +191,36 @@ public class ProcessLogWriter {
 
         }
 
-        writeRootBlock(rootBlock);
+        flush(); // current streamed data
 
-        flush();
-
+        writeRootBlock(rootBlock.isRootBlock0() ? ROOTBLOCK_0 : ROOTBLOCK_1, rootBlock);
+        
         close();
         
     }
 
-    private void writeRootBlock(final IRootBlockView rootBlock)
+    /**
+     * Writes the rootblock at the given offset, but preserves the raf offset
+     * for streamed output.
+     */
+    private void writeRootBlock(final int writePos, final IRootBlockView rootBlock)
             throws IOException {
 
         if (rootBlock == null)
             throw new IllegalArgumentException();
-
-        m_out.write(BytesUtil.getBytes(rootBlock.asReadOnlyBuffer()));
-
-        if (haLog.isDebugEnabled())
-            haLog.debug("wrote root block: " + rootBlock);
+        
+        final long saveSeek = m_channel.position();
+        
+        try {
+        	m_channel.position(writePos);
+	
+	        m_channel.write(rootBlock.asReadOnlyBuffer());
+	
+	        if (haLog.isDebugEnabled())
+	            haLog.debug("wrote root block: " + rootBlock);
+        } finally {
+        	m_channel.position(saveSeek);
+        }
 
     }
 
@@ -206,7 +232,7 @@ public class ProcessLogWriter {
     public void write(final IHAWriteMessage msg, final ByteBuffer data)
             throws IOException {
 
-        if (m_out == null)
+        if (m_channel == null)
             return;
 
         /*
@@ -224,24 +250,13 @@ public class ProcessLogWriter {
 
         if (haLog.isInfoEnabled())
             haLog.info("msg=" + msg);
-
-        m_out.writeObject(msg);
+        
+        // write serialized message object
+        m_channel.write(bufferObject(msg));
 
         switch(m_rootBlock.getStoreType()) {
         case RW: {
-
-            /*
-             * FIXME Efficient channel access and write. I think that we are
-             * much better off reusing the WORMStategy without the WriteCache
-             * and pre-serializing the HAWriteMessage as a byte[]. That will
-             * give us efficient, proven writes and a place to put both root
-             * blocks.
-             */
-            final byte[] array = BytesUtil.getBytes(data);
-
-            assert msg.getSize() == array.length;
-
-            m_out.write(array);
+            m_channel.write(data);
         }
         case WORM:
             break;
@@ -250,12 +265,26 @@ public class ProcessLogWriter {
     }
 
     /**
+     * Utility to return a ByteBuffer containing the external version of the object
+     */
+    private ByteBuffer bufferObject(final Object obj) throws IOException {
+        final ByteArrayOutputStream baout = new ByteArrayOutputStream();
+        final ObjectOutputStream objout = new ObjectOutputStream(baout);
+        
+        objout.writeObject(obj);
+        objout.flush();
+        objout.close();
+        
+		return ByteBuffer.wrap(baout.toByteArray());
+	}
+
+	/**
      * Close the file (does not flush).
      */
     private void close() throws IOException {
         try {
-            if (m_out != null) {
-                m_out.close();
+            if (m_channel != null) {
+                m_channel.close();
             }
         } finally {
             reset();
@@ -269,7 +298,9 @@ public class ProcessLogWriter {
         
         m_log = null;
         
-        m_out = null;
+        m_raf = null;
+        
+        m_channel = null;
         
         m_rootBlock = null;
 
@@ -282,9 +313,9 @@ public class ProcessLogWriter {
      */
     private void flush() throws IOException {
 
-        if (m_out != null) {
+        if (m_channel != null) {
         
-            m_out.flush();
+            m_channel.force(true);
             
         }
         
@@ -299,15 +330,15 @@ public class ProcessLogWriter {
 
         try {
 
-            if (m_out != null) {
+            if (m_channel != null) {
 
                 /*
                  * Conditional remove iff file is open. Will not remove
                  * something that has been closed.
                  */
 
-                m_out.close();
-
+                m_channel.close();
+ 
                 if (m_log.exists() && !m_log.delete()) {
 
                     /*
