@@ -21,16 +21,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.ha;
+package com.bigdata.ha.msg;
 
 import java.io.IOException;
 
 import junit.framework.TestCase;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.ha.HAWriteMessage;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.ha.HAWriteMessage;
 
 public class TestHAWriteMessage extends TestCase {
 
@@ -39,7 +40,7 @@ public class TestHAWriteMessage extends TestCase {
 	 */
     public void testSerialization() throws IOException, ClassNotFoundException {
 
-        final HAWriteMessage msg1 = new HAWriteMessage(
+        final IHAWriteMessage msg1 = new HAWriteMessage(
                 12L,// commitCounter
                 13L,// commitTime
                 14L,// sequence
@@ -53,7 +54,7 @@ public class TestHAWriteMessage extends TestCase {
 
         final byte[] ser1 = serialized(msg1);
 
-        final HAWriteMessage msg2 = (HAWriteMessage) SerializerUtil
+        final IHAWriteMessage msg2 = (IHAWriteMessage) SerializerUtil
                 .deserialize(ser1);
 
         assertTrue(msg1.equals(msg2));
@@ -72,7 +73,7 @@ public class TestHAWriteMessage extends TestCase {
 	/**
 	 * Utility to return byte[] serialization of the HAWriteMessage
 	 */
-    private byte[] serialized(final HAWriteMessage msg) {
+    private byte[] serialized(final IHAWriteMessage msg) {
 
 	    return SerializerUtil.serialize(msg);
 	}

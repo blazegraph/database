@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+wCopyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -33,7 +33,6 @@ import java.util.concurrent.Future;
 
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -50,14 +49,14 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * along the write pipeline. This method is only invoked by the quorum
      * leader. The payload is replicated to the first follower in the write
      * pipeline. That follower will accept the payload (and replicate it if
-     * necessary) using {@link #receiveAndReplicate(HAWriteMessage)}.
+     * necessary) using {@link #receiveAndReplicate(IHAWriteMessage)}.
      * 
      * @param msg
      *            The RMI metadata about the payload.
      * @param b
      *            The payload.
      */
-    Future<Void> replicate(HAWriteMessage msg, ByteBuffer b) throws IOException;
+    Future<Void> replicate(IHAWriteMessage msg, ByteBuffer b) throws IOException;
 
     /**
      * Return a {@link Future} for a task which will replicate an NIO buffer
@@ -67,7 +66,7 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * @param msg
      *            The RMI metadata about the payload.
      */
-    Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
+    Future<Void> receiveAndReplicate(IHAWriteMessage msg) throws IOException;
 
     /*
      * Note: Method removed since it does not appear necessary to let this
@@ -101,7 +100,7 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
 
     /**
      * Return the lastCommitTime for this service (based on its current root
-     * block). This supports the {@link HAWriteMessage} which requires this
+     * block). This supports the {@link IHAWriteMessage} which requires this
      * information as part of the metadata about replicated {@link WriteCache}
      * blocks.
      */
@@ -109,23 +108,23 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
     
     /**
      * Return the lastCommitCounter for this service (based on its current root
-     * block). This supports the {@link HAWriteMessage} which requires this
+     * block). This supports the {@link IHAWriteMessage} which requires this
      * information as part of the metadata about replicated {@link WriteCache}
      * blocks.
      */
     long getLastCommitCounter();
 
     /**
-     * Log the {@link HAWriteMessage} and the associated data (if necessary).
+     * Log the {@link IHAWriteMessage} and the associated data (if necessary).
      * The log file for the current write set will be deleted if the quorum is
      * fully met at the next 2-phase commit.
      * 
      * @param msg
-     *            The {@link HAWriteMessage}.
+     *            The {@link IHAWriteMessage}.
      * @param data
      *            The {@link WriteCache} block.
      */
-    void logWriteCacheBlock(final HAWriteMessage msg,
+    void logWriteCacheBlock(final IHAWriteMessage msg,
             final ByteBuffer data) throws IOException;
 
     /**

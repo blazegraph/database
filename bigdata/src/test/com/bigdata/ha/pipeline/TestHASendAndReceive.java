@@ -35,9 +35,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.ha.msg.HAWriteMessageBase;
+import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HASendService;
-import com.bigdata.ha.pipeline.HAWriteMessageBase;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.TestCase3;
@@ -120,7 +121,7 @@ public class TestHASendAndReceive extends TestCase3 {
     }
     
 	private HASendService sendService;
-	private HAReceiveService<HAWriteMessageBase> receiveService;
+	private HAReceiveService<IHAWriteMessageBase> receiveService;
 	private ChecksumUtility chk;
 	
 	protected void setUp() throws Exception {
@@ -140,7 +141,7 @@ public class TestHASendAndReceive extends TestCase3 {
 
 	    final InetSocketAddress addr = new InetSocketAddress(port);
 		
-		receiveService = new HAReceiveService<HAWriteMessageBase>(addr, null);
+		receiveService = new HAReceiveService<IHAWriteMessageBase>(addr, null);
 		receiveService.start();
 
         sendService = new HASendService();
@@ -210,7 +211,7 @@ public class TestHASendAndReceive extends TestCase3 {
        
         {
             final ByteBuffer tst1 = getRandomData(50);
-            final HAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
             final ByteBuffer rcv = ByteBuffer.allocate(2000);
             final Future<Void> futRec = receiveService.receiveData(msg1, rcv);
             final Future<Void> futSnd = sendService.send(tst1);
@@ -231,7 +232,7 @@ public class TestHASendAndReceive extends TestCase3 {
 
         {
             final ByteBuffer tst2 = getRandomData(100);
-            final HAWriteMessageBase msg2 = new HAWriteMessageBase(100, chk.checksum(tst2));
+            final IHAWriteMessageBase msg2 = new HAWriteMessageBase(100, chk.checksum(tst2));
             final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
             final Future<Void> futSnd = sendService.send(tst2);
             final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
@@ -266,7 +267,7 @@ public class TestHASendAndReceive extends TestCase3 {
         for (int i = 0; i < 100; i++) {
             final int sze = 10000 + r.nextInt(300000);
             final ByteBuffer tst = getRandomData(sze);
-            final HAWriteMessageBase msg = new HAWriteMessageBase(sze,  chk.checksum(tst));
+            final IHAWriteMessageBase msg = new HAWriteMessageBase(sze,  chk.checksum(tst));
             final ByteBuffer rcv = ByteBuffer.allocate(sze + r.nextInt(1024));
             // FutureTask return ensures remote ready for Socket data
             final Future<Void> futRec = receiveService.receiveData(msg, rcv);
@@ -305,7 +306,7 @@ public class TestHASendAndReceive extends TestCase3 {
             for (i = 0; i < 1000; i++) {
                 sze = 1 + r.nextInt(tst.capacity());
                 getRandomData(tst, sze);
-                final HAWriteMessageBase msg = new HAWriteMessageBase(sze, chk.checksum(tst));
+                final IHAWriteMessageBase msg = new HAWriteMessageBase(sze, chk.checksum(tst));
                 assertEquals(0,tst.position());
                 assertEquals(sze,tst.limit());
                 // FutureTask return ensures remote ready for Socket data

@@ -12,7 +12,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
  * Wrapper class to handle process log creation and output for HA.
@@ -203,7 +202,7 @@ public class ProcessLogWriter {
      * @param msg
      * @param data
      */
-    public void write(final HAWriteMessage msg, final ByteBuffer data)
+    public void write(final IHAWriteMessage msg, final ByteBuffer data)
             throws IOException {
 
         if (m_out == null)

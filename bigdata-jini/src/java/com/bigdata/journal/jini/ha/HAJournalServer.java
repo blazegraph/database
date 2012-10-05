@@ -34,6 +34,7 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
@@ -42,7 +43,6 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumEvent;
@@ -671,7 +671,7 @@ public class HAJournalServer extends AbstractServer {
         }
 
         @Override
-        protected void handleReplicatedWrite(final HAWriteMessage msg,
+        protected void handleReplicatedWrite(final IHAWriteMessage msg,
                 final ByteBuffer data) throws Exception {
 
             if (haLog.isDebugEnabled())
@@ -717,11 +717,11 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
-         * Writes the {@link HAWriteMessage} and the data onto the
+         * Writes the {@link IHAWriteMessage} and the data onto the
          * {@link ProcessLogWriter}
          */
         @Override
-        public void logWriteCacheBlock(final HAWriteMessage msg,
+        public void logWriteCacheBlock(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException {
 
             if (!HA_LOG_ENABLED)

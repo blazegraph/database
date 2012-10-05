@@ -32,6 +32,8 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHAReadRequest;
+import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -54,18 +56,15 @@ public interface HAReadGlue extends Remote {
      * because there is a checksum error when reading on the {@link IRawStore},
      * then that exception should be thrown back to the caller.
      * 
-     * @param storeId
-     *            The {@link UUID} identifying the {@link IRawStore} for which
-     *            the record was requested.
-     * @param addr
-     *            The address of the record.
+     * @param readMessage
+     *            The {@link IHAReadRequest}.
      * 
      * @return The {@link Future} of an operation which evaluated to the desired
      *         record.
      * 
      * @see QuorumRead#readFromQuorum(UUID, long)
      */
-    public Future<byte[]> readFromDisk(final long token, UUID storeId, long addr)
+    public Future<IHAReadResponse> readFromDisk(IHAReadRequest readMessage)
             throws IOException;
 
 }

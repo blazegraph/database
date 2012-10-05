@@ -13,7 +13,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.Quorum;
@@ -218,7 +218,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
             return ft;
         }
 
-        public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+        public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
                 throws IOException {
             throw new UnsupportedOperationException();
         }

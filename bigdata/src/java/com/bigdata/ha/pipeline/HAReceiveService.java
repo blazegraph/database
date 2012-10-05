@@ -40,6 +40,7 @@ import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.ha.pipeline.HASendService.IncSendTask;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -57,7 +58,7 @@ import com.bigdata.util.ChecksumError;
  * @author Martyn Cutcher
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
+public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
     private static final Logger log = Logger
             .getLogger(HAReceiveService.class);
@@ -116,7 +117,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
     private final Condition futureReady  = lock.newCondition();
     private final Condition messageReady = lock.newCondition();
     private RunState runState = RunState.Start;
-    private HAWriteMessageBase message;
+    private IHAWriteMessageBase message;
     private ByteBuffer localBuffer;
     private FutureTask<Void> readFuture;
     private FutureTask<Void> waitFuture;
@@ -331,8 +332,8 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
     /**
      * Loops accepting requests and scheduling readTasks. Note that a local
-     * caller must hand us a buffer and {@link HAWriteMessageBase} using
-     * {@link #receiveData(HAWriteMessageBase, ByteBuffer)} before we will accept
+     * caller must hand us a buffer and {@link IHAWriteMessageBase} using
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)} before we will accept
      * data on the {@link SocketChannel}.
      *
      * @throws IOException
@@ -513,7 +514,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
      *       <p>
      *       report the #of payloads.
      */
-    static private class ReadTask<M extends HAWriteMessageBase> implements
+    static private class ReadTask<M extends IHAWriteMessageBase> implements
             Callable<Void> {
 
         private final ServerSocketChannel server;
@@ -879,7 +880,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
      * @version $Id$
      * @param <M>
      */
-    public interface IHAReceiveCallback<M extends HAWriteMessageBase> {
+    public interface IHAReceiveCallback<M extends IHAWriteMessageBase> {
 
         /**
          * Hook invoked once a buffer has been received.

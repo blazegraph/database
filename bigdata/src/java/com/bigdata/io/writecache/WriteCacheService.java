@@ -58,6 +58,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
@@ -67,7 +68,6 @@ import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.rawstore.Bytes;
@@ -611,7 +611,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                             assert quorumMember != null : "Not quorum member?";
                             
-                            final HAWriteMessage msg = cache.newHAWriteMessage(
+                            final IHAWriteMessage msg = cache.newHAWriteMessage(
                                     quorumToken,//
                                     quorumMember.getLastCommitCounter(),//
                                     quorumMember.getLastCommitTime()//
@@ -836,7 +836,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
                         .getMember();
 
-                final HAWriteMessage msg = cache.newHAWriteMessage(//
+                final IHAWriteMessage msg = cache.newHAWriteMessage(//
                         quorumToken,//
                         quorumMember.getLastCommitCounter(),//
                         quorumMember.getLastCommitTime()//

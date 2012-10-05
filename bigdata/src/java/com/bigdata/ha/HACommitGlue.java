@@ -30,8 +30,10 @@ package com.bigdata.ha;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
+import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.journal.AbstractJournal;
 
 /**
@@ -50,30 +52,25 @@ public interface HACommitGlue extends Remote {
      * channel and acknowledge "yes" if ready to commit. If the node can not
      * prepare for any reason, then it must return "no".
      * 
-     * @param isRootBlock0
-     *            <code>true</code> if this is rootBlock0 for the leader.
-     * @param rootBlock
-     *            The new root block.
-     * @param timeout
-     *            How long to wait for the other services to prepare.
-     * @param unit
-     *            The unit for the timeout.
-
+     * @param prepareMessage
+     *            The message used to prepare for the commit.
+     *            
      * @return A {@link Future} which evaluates to a yes/no vote on whether the
      *         service is prepared to commit.
      */
-    Future<Boolean> prepare2Phase(boolean isRootBlock0, byte[] rootBlock,
-            long timeout, TimeUnit unit) throws IOException;
+    Future<Boolean> prepare2Phase(IHA2PhasePrepareMessage prepareMessage)
+            throws IOException;
 
     /**
      * Commit using the root block from the corresponding prepare message. It is
      * an error if a commit message is observed without the corresponding
      * prepare message.
      * 
-     * @param commitTime
-     *            The commit time that will be assigned to the new commit point.
+     * @param commitMessage
+     *            The commit message.
      */
-    Future<Void> commit2Phase(long commitTime) throws IOException;
+    Future<Void> commit2Phase(IHA2PhaseCommitMessage commitMessage)
+            throws IOException;
 
     /**
      * Discard the current write set using {@link AbstractJournal#abort()},
@@ -88,6 +85,7 @@ public interface HACommitGlue extends Remote {
      * @param token
      *            The token for the quorum for which this request was made.
      */
-    Future<Void> abort2Phase(long token) throws IOException;
+    Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage)
+            throws IOException;
 
 }

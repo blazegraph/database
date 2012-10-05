@@ -82,14 +82,24 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.msg.HAReadResponse;
+import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.ha.msg.HARootBlockResponse;
+import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHAReadRequest;
+import com.bigdata.ha.msg.IHAReadResponse;
+import com.bigdata.ha.msg.IHARootBlockRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -2809,7 +2819,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     // TODO Configure prepare timeout (Watch out for long GC pauses!)
                     final int nyes = quorumService.prepare2Phase(//
-                            !old.isRootBlock0(),//
+//                            !old.isRootBlock0(),//
                             newRootBlock,//
                             1000, // timeout
                             TimeUnit.MILLISECONDS//
@@ -4716,8 +4726,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     log.info("Fetching root block from leader.");
                     final ByteBuffer buf;
                     try {
-                        buf = ByteBuffer.wrap(leader
-                                .getRootBlock(null/* storeUUID */));
+                        final IRootBlockView tmp = leader.getRootBlock(
+                                new HARootBlockRequest(null/* storeUUID */))
+                                .getRootBlock();
+                        buf = tmp.asReadOnlyBuffer();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -4904,18 +4916,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * rootBlock1.
          */
         @Override
-        public Future<Boolean> prepare2Phase(final boolean isRootBlock0,
-                final byte[] tmp, final long timeout, final TimeUnit unit) {
+        public Future<Boolean> prepare2Phase(
+                final IHA2PhasePrepareMessage prepareMessage) {
 
-            if (tmp == null)
-                throw new IllegalStateException();
+            if (prepareMessage == null)
+                throw new IllegalArgumentException();
 
-            // construct view from the root block.
-            final IRootBlockView rootBlock = new RootBlockView(//
-                    isRootBlock0,//
-                    ByteBuffer.wrap(tmp), //
-                    new ChecksumUtility()//
-            );
+            final boolean isRootBlock0 = prepareMessage.isRootBlock0();
+
+            final long timeout = prepareMessage.getTimeout();
+
+            final TimeUnit unit = prepareMessage.getUnit();
+
+            final IRootBlockView rootBlock = prepareMessage.getRootBlock();
 
             if (haLog.isInfoEnabled())
                 haLog.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
@@ -5018,8 +5031,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
         @Override
-		public Future<Void> commit2Phase(final long commitTime) {
+        public Future<Void> commit2Phase(
+                final IHA2PhaseCommitMessage commitMessage) {
 
+            final long commitTime = commitMessage.getCommitTime();
+            
             if (haLog.isInfoEnabled())
                 haLog.info("commitTime=" + commitTime);
 
@@ -5167,8 +5183,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
         @Override
-        public Future<Void> abort2Phase(final long token) {
+        public Future<Void> abort2Phase(final IHA2PhaseAbortMessage abortMessage) {
 
+            final long token = abortMessage.getQuorumToken();
+            
             if (haLog.isInfoEnabled())
                 haLog.info("token=" + token);
 
@@ -5212,16 +5230,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * @todo Since these are rare events it may not be worthwhile to setup a
          *       separate low-level socket service to send/receive the data.
          */
-        public Future<byte[]> readFromDisk(final long token,
-                final UUID storeId, final long addr) {
+        public Future<IHAReadResponse> readFromDisk(
+                final IHAReadRequest msg) {
 
-            if (haLog.isInfoEnabled())
-                haLog.info("token=" + token);
+            final long token = msg.getQuorumToken();
+//            final UUID storeId = msg.getStoreUUID();
+            final long addr = msg.getAddr();
             
-            final FutureTask<byte[]> ft = new FutureTask<byte[]>(
-                    new Callable<byte[]>() {
+            if (haLog.isInfoEnabled())
+                haLog.info("token=" + token + ", addr=" + addr);
+
+            final FutureTask<IHAReadResponse> ft = new FutureTask<IHAReadResponse>(
+                    new Callable<IHAReadResponse>() {
 				
-			    public byte[] call() throws Exception {
+			    public IHAReadResponse call() throws Exception {
 
 		            if (haLog.isInfoEnabled())
 		                haLog.info("token=" + token);
@@ -5248,7 +5270,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
 					// cache.putIfAbsent(addr, b);
 
-					return a;
+					return new HAReadResponse(a);
 
 				}
 			});
@@ -5260,7 +5282,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
         @Override
-        public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
                 throws IOException {
 
             if (haLog.isDebugEnabled())
@@ -5291,22 +5313,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
         @Override
-        public byte[] getRootBlock(final UUID storeId) {
+        public IHARootBlockResponse getRootBlock(
+                final IHARootBlockRequest msg) {
 
             // storeId is optional (used in scale-out).
+            final UUID storeId = msg.getStoreUUID();
 //            if (storeId == null)
 //                throw new IllegalArgumentException();
 
             if (haLog.isInfoEnabled())
                 haLog.info("storeId=" + storeId);
 
-            if (getUUID().equals(storeId)) {
+            if (storeId != null && !getUUID().equals(storeId)) {
+
                 // A request for a different journal's root block.
                 throw new UnsupportedOperationException();
+                
             }
 
-            return BytesUtil.toArray(AbstractJournal.this.getRootBlockView()
-                    .asReadOnlyBuffer());
+            return new HARootBlockResponse(
+                    AbstractJournal.this.getRootBlockView());
 
         }
 

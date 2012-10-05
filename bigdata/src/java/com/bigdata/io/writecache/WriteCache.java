@@ -51,6 +51,8 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.ha.HAWriteMessage;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -58,7 +60,6 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
@@ -1343,7 +1344,7 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @return cache A {@link WriteCache} to be replicated.
      */
-    final public HAWriteMessage newHAWriteMessage(//
+    final public IHAWriteMessage newHAWriteMessage(//
             final long quorumToken,
             final long lastCommitCounter,//
             final long lastCommitTime//

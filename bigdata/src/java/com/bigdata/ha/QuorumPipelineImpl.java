@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.ha;
 
 import java.io.Externalizable;
@@ -23,8 +46,6 @@ import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListener;
@@ -150,7 +171,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     /**
      * The receive service (iff this is a follower in a met quorum).
      */
-    private HAReceiveService<HAWriteMessage> receiveService;
+    private HAReceiveService<IHAWriteMessage> receiveService;
 
     /**
      * The buffer used to relay the data. This is only allocated for a
@@ -246,7 +267,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * @return The buffer -or- <code>null</code> if the pipeline has been torn
      *         down or if this is the leader.
      */
-    private HAReceiveService<HAWriteMessage> getHAReceiveService() {
+    private HAReceiveService<IHAWriteMessage> getHAReceiveService() {
 
         if (!lock.isHeldByCurrentThread()) {
 
@@ -593,9 +614,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             final InetSocketAddress addrNext = downstreamId == null ? null
                     : member.getService(downstreamId).getWritePipelineAddr();
             // Setup the receive service.
-            receiveService = new HAReceiveService<HAWriteMessage>(addrSelf,
-                    addrNext, new IHAReceiveCallback<HAWriteMessage>() {
-                        public void callback(HAWriteMessage msg, ByteBuffer data)
+            receiveService = new HAReceiveService<IHAWriteMessage>(addrSelf,
+                    addrNext, new IHAReceiveCallback<IHAWriteMessage>() {
+                        public void callback(IHAWriteMessage msg, ByteBuffer data)
                                 throws Exception {
                             // delegate handling of write cache blocks.
                             handleReplicatedWrite(msg, data);
@@ -625,7 +646,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     /*
      * This is the leader, so send() the buffer.
      */
-    public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
+    public Future<Void> replicate(final IHAWriteMessage msg, final ByteBuffer b)
             throws IOException {
 
         final RunnableFuture<Void> ft;
@@ -719,12 +740,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     static private class SendBufferTask<S extends HAPipelineGlue> implements
             Callable<Void> {
 
-        private final HAWriteMessage msg;
+        private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HASendService sendService;
 
-        public SendBufferTask(final HAWriteMessage msg, final ByteBuffer b,
+        public SendBufferTask(final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream, final HASendService sendService) {
 
             this.msg = msg;
@@ -784,7 +805,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         
     }
     
-    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+    public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
             throws IOException {
 
         final RunnableFuture<Void> ft;
@@ -816,7 +837,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             
             final ByteBuffer b = getReceiveBuffer();
             
-            final HAReceiveService<HAWriteMessage> receiveService = getHAReceiveService();
+            final HAReceiveService<IHAWriteMessage> receiveService = getHAReceiveService();
 
          	if (downstream == null) {
 
@@ -924,14 +945,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private static class ReceiveAndReplicateTask<S extends HAPipelineGlue>
             implements Callable<Void> {
         
-        private final HAWriteMessage msg;
+        private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
-        private final HAReceiveService<HAWriteMessage> receiveService;
+        private final HAReceiveService<IHAWriteMessage> receiveService;
 
-        public ReceiveAndReplicateTask(final HAWriteMessage msg,
+        public ReceiveAndReplicateTask(final IHAWriteMessage msg,
                 final ByteBuffer b, final PipelineState<S> downstream,
-                final HAReceiveService<HAWriteMessage> receiveService) {
+                final HAReceiveService<IHAWriteMessage> receiveService) {
 
             this.msg = msg;
             this.b = b;
@@ -1003,7 +1024,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      *            
      * @throws Exception
      */
-    abstract protected void handleReplicatedWrite(final HAWriteMessage msg,
+    abstract protected void handleReplicatedWrite(final IHAWriteMessage msg,
             final ByteBuffer data) throws Exception;
 
 //    @Override

@@ -37,6 +37,7 @@ import net.jini.export.Exporter;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.io.writecache.WriteCache;
@@ -45,7 +46,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rwstore.RWStore;
@@ -116,8 +116,8 @@ public class HAJournal extends Journal {
          * so the natural sort order of the log files should correspond to the
          * ascending commit order.
          * <p>
-         * The log files are a sequence of zero or more {@link HAWriteMessage}
-         * objects. For the {@link RWStore}, each {@link HAWriteMessage} is
+         * The log files are a sequence of zero or more {@link IHAWriteMessage}
+         * objects. For the {@link RWStore}, each {@link IHAWriteMessage} is
          * followed by the data from the corresponding {@link WriteCache} block.
          * For the {@link WORMStrategy}, the {@link WriteCache} block is omitted
          * since this data can be trivially reconstructed from the backing file.

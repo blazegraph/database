@@ -56,7 +56,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1281,7 +1281,7 @@ public class MockQuorumFixture {
                 return ft;
             }
 
-            public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+            public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
                     throws IOException {
                 throw new UnsupportedOperationException();
             }

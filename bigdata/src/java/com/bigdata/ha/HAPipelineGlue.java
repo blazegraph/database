@@ -33,7 +33,6 @@ import java.rmi.Remote;
 import java.util.concurrent.Future;
 
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
  * A {@link Remote} interface supporting the write replication pipeline. The
@@ -119,6 +118,6 @@ public interface HAPipelineGlue extends Remote {
      * @return The {@link Future} which will become available once the buffer
      *         transfer is complete.
      */
-    Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
+    Future<Void> receiveAndReplicate(IHAWriteMessage msg) throws IOException;
 
 }

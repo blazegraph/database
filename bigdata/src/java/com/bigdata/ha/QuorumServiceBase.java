@@ -42,7 +42,6 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 
 /**
@@ -101,7 +100,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this) {
 
             @Override
-            protected void handleReplicatedWrite(final HAWriteMessage msg,
+            protected void handleReplicatedWrite(final IHAWriteMessage msg,
                     final ByteBuffer data) throws Exception {
 
                 QuorumServiceBase.this.handleReplicatedWrite(msg, data);
@@ -123,7 +122,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
 
             @Override
-            public void logWriteCacheBlock(final HAWriteMessage msg,
+            public void logWriteCacheBlock(final IHAWriteMessage msg,
                     final ByteBuffer data) throws IOException {
 
                 QuorumServiceBase.this.logWriteCacheBlock(msg, data);
@@ -207,7 +206,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 //    }
 
     @Override
-    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+    public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
             throws IOException {
         
         return pipelineImpl.receiveAndReplicate(msg);
@@ -215,7 +214,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
+    public Future<Void> replicate(final IHAWriteMessage msg, final ByteBuffer b)
             throws IOException {
     
         return pipelineImpl.replicate(msg, b);
@@ -234,9 +233,9 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * 
      * @throws Exception
      * 
-     * @see QuorumPipelineImpl#handleReplicatedWrite(HAWriteMessage, ByteBuffer)
+     * @see QuorumPipelineImpl#handleReplicatedWrite(IHAWriteMessage, ByteBuffer)
      */
-    abstract protected void handleReplicatedWrite(HAWriteMessage msg,
+    abstract protected void handleReplicatedWrite(IHAWriteMessage msg,
             ByteBuffer data) throws Exception;
  
     /**
@@ -245,7 +244,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Note: The default implementation is a NOP.
      */
     @Override
-    public void logWriteCacheBlock(final HAWriteMessage msg,
+    public void logWriteCacheBlock(final IHAWriteMessage msg,
             final ByteBuffer data) throws IOException {
 
         // NOP
@@ -297,12 +296,13 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public int prepare2Phase(final boolean isRootBlock0,
+    public int prepare2Phase(//final boolean isRootBlock0,
             final IRootBlockView rootBlock, final long timeout,
             final TimeUnit unit) throws InterruptedException, TimeoutException,
             IOException {
 
-        return commitImpl.prepare2Phase(isRootBlock0, rootBlock, timeout, unit);
+        return commitImpl.prepare2Phase(/* isRootBlock0, */rootBlock, timeout,
+                unit);
 
     }
 
