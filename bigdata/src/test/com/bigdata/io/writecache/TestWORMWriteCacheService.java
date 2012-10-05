@@ -51,9 +51,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;

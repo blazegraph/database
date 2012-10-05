@@ -56,7 +56,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.ha.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;

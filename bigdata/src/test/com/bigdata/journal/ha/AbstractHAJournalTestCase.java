@@ -44,9 +44,9 @@ import junit.framework.TestCase;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.Journal;

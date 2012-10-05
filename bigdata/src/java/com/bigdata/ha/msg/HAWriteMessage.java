@@ -25,13 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on May 18, 2010
  */
 
-package com.bigdata.ha;
+package com.bigdata.ha.msg;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.ha.msg.HAWriteMessageBase;
 import com.bigdata.journal.StoreTypeEnum;
 
 /**

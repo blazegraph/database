@@ -11,6 +11,7 @@ import java.util.Formatter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.IRootBlockView;
 
 /**

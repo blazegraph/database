@@ -36,6 +36,7 @@ import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.ValidationError;
 
 /**

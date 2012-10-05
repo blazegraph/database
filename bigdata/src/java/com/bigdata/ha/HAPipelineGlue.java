@@ -32,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.WriteExecutorService;
 
 /**

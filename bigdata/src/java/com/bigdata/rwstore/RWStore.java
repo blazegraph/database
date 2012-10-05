@@ -60,7 +60,7 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
-import com.bigdata.ha.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
