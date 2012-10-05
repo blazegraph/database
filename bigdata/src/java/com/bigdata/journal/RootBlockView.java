@@ -631,7 +631,7 @@ public class RootBlockView implements IRootBlockView {
         if( buf.remaining() != SIZEOF_ROOT_BLOCK ) {
             
             throw new IllegalArgumentException("Expecting " + SIZEOF_ROOT_BLOCK
-                    + " remaining, acutal=" + buf.remaining());
+                    + " remaining, actual=" + buf.remaining());
             
         }
 

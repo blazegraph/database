@@ -35,10 +35,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.rmi.RemoteException;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -1533,7 +1536,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	    throw new UnsupportedOperationException();
 
 	}
-	
+
+    /**
+     * The HA timeout in milliseconds for a 2-phase prepare.
+     * 
+     * @see HAJournal.Options#HA_PREPARE_TIMEOUT
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public long getHAPrepareTimeout() {
+        
+        throw new UnsupportedOperationException();
+
+    }
+
 	/**
 	 * Core implementation of immediate shutdown handles event reporting.
 	 */
@@ -2259,7 +2276,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     // HA mode
                     quorum.getClient().abort2Phase(quorumToken);
-                    
+
                 } catch (Throwable t) {
 
                     haLog.error(
@@ -2809,19 +2826,50 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 
                 /*
                  * HA mode.
+                 * 
+                 * Note: We need to make an atomic decision here regarding
+                 * whether a service is joined with the met quorum or not. This
+                 * information will be propagated through the HA 2-phase prepare
+                 * message so services will know how they must intepret the
+                 * 2-phase prepare(), commit(), and abort() requests. The atomic
+                 * decision is necessary in order to enforce a consistent role
+                 * on a services that is resynchronizing and which might vote to
+                 * join the quorum and enter the quorum asynchronously with
+                 * respect to this decision point.
+                 * 
+                 * TODO If necessary, we could also explicitly provide the zk
+                 * version metadata for the znode that is the parent of the
+                 * joined services. However, we would need an expanded interface
+                 * to get that metadata from zookeeper out of the Quorum..
                  */
                 
                 // Local HA service implementation (non-Remote).
                 final QuorumService<HAGlue> quorumService = quorum.getClient();
 
+                // The services joined with the met quorum, in their join order.
+                final UUID[] joinedServiceIds = getQuorum().getJoined();
+                
+                // The services in the write pipeline (in any order).
+                final Set<UUID> nonJoinedPipelineServiceIds = new LinkedHashSet<UUID>(
+                        Arrays.asList(getQuorum().getPipeline()));
+                
+                // Remove all services that are joined from this collection.
+                for(UUID joinedServiceId : joinedServiceIds) {
+
+                    nonJoinedPipelineServiceIds.remove(joinedServiceId);
+                    
+                }
+
                 boolean didVoteYes = false;
                 try {
 
-                    // TODO Configure prepare timeout (Watch out for long GC pauses!)
+                    // issue prepare request.
                     final int nyes = quorumService.prepare2Phase(//
+                            joinedServiceIds,//
+                            nonJoinedPipelineServiceIds,//
 //                            !old.isRootBlock0(),//
                             newRootBlock,//
-                            1000, // timeout
+                            quorumService.getPrepareTimeout(), // timeout
                             TimeUnit.MILLISECONDS//
                             );
 
@@ -2836,8 +2884,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     if (willCommit) {
 
                         didVoteYes = true;
-                        
-                        quorumService.commit2Phase(quorumToken, commitTime);
+
+                        quorumService.commit2Phase(
+                                joinedServiceIds,//
+                                nonJoinedPipelineServiceIds, quorumToken,
+                                commitTime);
 
                     } else {
 
@@ -2850,10 +2901,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         /*
                          * The quorum voted to commit, but something went wrong.
                          * 
-                         * FIXME At this point the quorum is probably
+                         * FIXME RESYNC : At this point the quorum is probably
                          * inconsistent in terms of their root blocks. Rather
                          * than attempting to send an abort() message to the
-                         * quorum, we probably should force the master to yield
+                         * quorum, we probably should force the leader to yield
                          * its role at which point the quorum will attempt to
                          * elect a new master and resynchronize.
                          */
@@ -4716,12 +4767,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     // Remote interface for the quorum leader.
                     final HAGlue leader = localService.getLeader(quorumToken);
 
-                    /*
+                    /**
                      * When the quorum meets for the first time, we need to take
                      * the root block from the leader and use it to replace both
                      * of our root blocks (the initial root blocks are
                      * identical). That will make the root blocks the same on
                      * all quorum members.
+                     * 
+                     * FIXME We should also verify the following:
+                     * 
+                     * <pre>
+                     * - the DirectBufferPool.INSTANCE has the same buffer
+                     * capacity (so there will be room for the write cache
+                     * data in the buffers on all nodes).
+                     * </pre>
                      */
                     log.info("Fetching root block from leader.");
                     final ByteBuffer buf;
@@ -4851,17 +4910,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     /**
      * Implementation hooks into the various low-level operations required to
      * support HA for the journal.
-     * 
-     * @todo Default to the loopback interface and a random open port?
-     * 
-     * @todo refactor into one implementation class per HA interface and then
-     *       use delegation to route the operations to the implementation
-     *       classes.
      */
 	protected class BasicHA implements HAGlue  {
 
-	    private final UUID serviceId;
-	    private final InetSocketAddress writePipelineAddr;
+        private final UUID serviceId;
+        private final InetSocketAddress writePipelineAddr;
 
         protected BasicHA(final UUID serviceId,
                 final InetSocketAddress writePipelineAddr) {
@@ -4879,7 +4932,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         /**
          * The most recent prepare request.
          */
-        private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
+        private final AtomicReference<IHA2PhasePrepareMessage> prepareRequest = new AtomicReference<IHA2PhasePrepareMessage>();
 
         @Override
         public UUID getServiceId() {
@@ -4910,11 +4963,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
         
-        /*
-         * @todo if the leader is synchronized with the followers then they
-         * should all agree on whether they should be writing rootBlock0 or
-         * rootBlock1.
-         */
         @Override
         public Future<Boolean> prepare2Phase(
                 final IHA2PhasePrepareMessage prepareMessage) {
@@ -4931,72 +4979,137 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             final IRootBlockView rootBlock = prepareMessage.getRootBlock();
 
             if (haLog.isInfoEnabled())
-                haLog.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
-                        + rootBlock + ", timeout=" + timeout + ", unit=" + unit);
+                haLog.info("isJoinedService="
+                        + prepareMessage.isJoinedService() + ", isRootBlock0="
+                        + isRootBlock0 + ", rootBlock=" + rootBlock
+                        + ", timeout=" + timeout + ", unit=" + unit);
 
-            if (rootBlock.getLastCommitTime() <= AbstractJournal.this
+            if (!rootBlock.getUUID().equals(
+                    AbstractJournal.this._rootBlock.getUUID())) {
+
+                /*
+                 * The root block has a different UUID. We can not accept this
+                 * condition.
+                 */
+
+                throw new IllegalStateException();
+
+            }
+
+            if (rootBlock.getLastCommitTime() <= AbstractJournal.this._rootBlock
                     .getLastCommitTime()) {
+
+                /*
+                 * The root block has a commit time that is LTE the most recent
+                 * commit on this Journal. We can not accept this condition.
+                 */
+
+                throw new IllegalStateException();
+
+            }
+
+            if (rootBlock.getCommitCounter() <= AbstractJournal.this._rootBlock
+                    .getCommitCounter()) {
+
+                /*
+                 * The root block has a commit counter that is LTE the most
+                 * recent commit counter on this Journal. We can not accept this
+                 * condition.
+                 */
 
                 throw new IllegalStateException();
                 
             }
 
-			quorum.assertQuorum(rootBlock.getQuorumToken());
+            // the quorum token from the leader is in the root block.
+            final long prepareToken = rootBlock.getQuorumToken();
+            
+			quorum.assertQuorum(prepareToken);
 
-			prepareRequest.set(rootBlock);
+			// Save off a reference to the prepare request.
+			prepareRequest.set(prepareMessage);
 
-			// the quorum token from the leader is in the root block.
-			final long prepareToken = rootBlock.getQuorumToken();
+			final QuorumService<HAGlue> quorumService = quorum.getClient();
+
+			// Note: as decided by the leader!
+			final boolean isJoined = prepareMessage.isJoinedService();
 			
 			// true the token is valid and this service is the quorum leader
-			final boolean isLeader = quorum.getClient().isLeader(prepareToken);
+			final boolean isLeader = quorumService.isLeader(prepareToken);
+
+            final FutureTask<Boolean> ft;
+
+            if (!isJoined) {
+
+                /*
+                 * A NOP task if this service is not joined with the met quorum.
+                 */
+
+                ft = new FutureTaskMon<Boolean>(new Runnable() {
+
+                    public void run() {
+
+                    };
+
+                }, true/* yes */);
+
+            } else {
+
+                /*
+                 * A task to flush and sync if the service is joined with the
+                 * met quorum.
+                 */
+
+                ft = new FutureTaskMon<Boolean>(new Runnable() {
+
+                    public void run() {
+
+                        final IRootBlockView rootBlock = prepareMessage.getRootBlock();
+
+                        if (haLog.isInfoEnabled())
+                            haLog.info("preparedRequest=" + rootBlock);
+
+                        if (rootBlock == null)
+                            throw new IllegalStateException();
+
+                        quorum.assertQuorum(prepareToken);
+
+                        /*
+                         * Call to ensure strategy does everything required for
+                         * itself before final root block commit. At a minimum
+                         * it must flush its write cache to the backing file
+                         * (issue the writes).
+                         */
+                        // _bufferStrategy.commit(); // lifted to before we
+                        // retrieve
+                        // RootBlock in commitNow
+                        /*
+                         * Force application data to stable storage _before_ we
+                         * update the root blocks. This option guarantees that
+                         * the application data is stable on the disk before the
+                         * atomic commit. Some operating systems and/or file
+                         * systems may otherwise choose an ordered write with
+                         * the consequence that the root blocks are laid down on
+                         * the disk before the application data and a hard
+                         * failure could result in the loss of application data
+                         * addressed by the new root blocks (data loss on
+                         * restart).
+                         * 
+                         * Note: We do not force the file metadata to disk. If
+                         * that is done, it will be done by a force() after we
+                         * write the root block on the disk.
+                         */
+                        if (doubleSync) {
+
+                            _bufferStrategy.force(false/* metadata */);
+
+                        }
+
+                    }
+                }, true/* vote=yes */);
+
+            }
 			
-			final FutureTask<Boolean> ft = new FutureTaskMon<Boolean>(new Runnable() {
-
-				public void run() {
-
-					final IRootBlockView rootBlock = prepareRequest.get();
-
-                    if (haLog.isInfoEnabled())
-                        haLog.info("preparedRequest=" + rootBlock);
-
-					if (rootBlock == null)
-						throw new IllegalStateException();
-
-					quorum.assertQuorum(prepareToken);
-
-					/*
-					 * Call to ensure strategy does everything required for
-					 * itself before final root block commit. At a minimum it
-					 * must flush its write cache to the backing file (issue the
-					 * writes).
-					 */
-					// _bufferStrategy.commit(); // lifted to before we retrieve
-					// RootBlock in commitNow
-					/*
-					 * Force application data to stable storage _before_ we
-					 * update the root blocks. This option guarantees that the
-					 * application data is stable on the disk before the atomic
-					 * commit. Some operating systems and/or file systems may
-					 * otherwise choose an ordered write with the consequence
-					 * that the root blocks are laid down on the disk before the
-					 * application data and a hard failure could result in the
-					 * loss of application data addressed by the new root blocks
-					 * (data loss on restart).
-					 * 
-					 * Note: We do not force the file metadata to disk. If that
-					 * is done, it will be done by a force() after we write the
-					 * root block on the disk.
-					 */
-					if (doubleSync) {
-
-						_bufferStrategy.force(false/* metadata */);
-
-					}
-
-				}
-			}, true/* vote=yes */);
-
 			if(isLeader) {
 
 	            /*
@@ -5046,7 +5159,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     if (haLog.isInfoEnabled())
                         haLog.info("commitTime=" + commitTime);
 
-		            final IRootBlockView rootBlock = prepareRequest.get();
+                    final IHA2PhasePrepareMessage prepareMessage = prepareRequest.get();
+
+                    if (prepareMessage == null)
+                        throw new IllegalStateException();
+
+                    final IRootBlockView rootBlock = prepareMessage
+                            .getRootBlock();
 
 					if (rootBlock == null)
 						throw new IllegalStateException();
@@ -5055,62 +5174,79 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 					try {
 
-						if (rootBlock.getLastCommitTime() != commitTime)
-							throw new IllegalStateException();
+                        if (rootBlock.getLastCommitTime() != commitTime) {
+                            /*
+                             * The commit time does not agree with the root
+                             * block from the prepare message.
+                             */
+                            throw new IllegalStateException();
+                        }
 
-						// verify that the qourum has not changed.
-						quorum.assertQuorum(rootBlock.getQuorumToken());
-
-						// write the root block on to the backing store.
-						_bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
-
-						// set the new root block.
-						_rootBlock = rootBlock;
+                        // verify that the qourum has not changed.
+                        quorum.assertQuorum(rootBlock.getQuorumToken());
 
                         final QuorumService<HAGlue> localService = quorum
                                 .getClient();
 
-                        final boolean follower = localService
-                                .isFollower(rootBlock.getQuorumToken());
-
-                        if (follower) {
+                        if (prepareMessage.isJoinedService()) {
 
                             /*
-                             * Ensure allocators are synced after commit. This
-                             * is only done for the followers. The leader has
-                             * been updating the in-memory allocators as it lays
-                             * down the writes. The followers have not be
-                             * updating the allocators.
+                             * Only the services that are joined go through the
+                             * commit protocol.
                              */
-                            
-                            if (haLog.isInfoEnabled())
-                                haLog.error("Reset from root block: serviceUUID="
-                                        + localService.getServiceId());
 
-                            ((IHABufferStrategy) _bufferStrategy)
-                                    .resetFromHARootBlock(rootBlock);
-                            
-                            /*
-                             * Clear reference and reload from the store.
-                             * 
-                             * The leader does not need to do this since it is
-                             * writing on the unisolated commit record index and
-                             * thus the new commit record is already visible in
-                             * the commit record index before the commit.
-                             * However, the follower needs to do this since it
-                             * will otherwise not see the new commit points.
-                             */
-                
-                            _commitRecordIndex = _getCommitRecordIndex();
+                            // write the root block on to the backing store.
+                            _bufferStrategy.writeRootBlock(rootBlock,
+                                    forceOnCommit);
 
-                        }
+                            // set the new root block.
+                            _rootBlock = rootBlock;
 
-						// reload the commit record from the new root block.
-                        _commitRecord = _getCommitRecord();
+                            final boolean follower = localService
+                                    .isFollower(rootBlock.getQuorumToken());
 
-		                if (txLog.isInfoEnabled())
-		                    txLog.info("COMMIT: commitTime=" + commitTime);
+                            if (follower) {
 
+                                /*
+                                 * Ensure allocators are synced after commit.
+                                 * This is only done for the followers. The
+                                 * leader has been updating the in-memory
+                                 * allocators as it lays down the writes. The
+                                 * followers have not be updating the
+                                 * allocators.
+                                 */
+
+                                if (haLog.isInfoEnabled())
+                                    haLog.error("Reset from root block: serviceUUID="
+                                            + localService.getServiceId());
+
+                                ((IHABufferStrategy) _bufferStrategy)
+                                        .resetFromHARootBlock(rootBlock);
+
+                                /*
+                                 * Clear reference and reload from the store.
+                                 * 
+                                 * The leader does not need to do this since it
+                                 * is writing on the unisolated commit record
+                                 * index and thus the new commit record is
+                                 * already visible in the commit record index
+                                 * before the commit. However, the follower
+                                 * needs to do this since it will otherwise not
+                                 * see the new commit points.
+                                 */
+
+                                _commitRecordIndex = _getCommitRecordIndex();
+
+                            }
+
+                            // reload the commit record from the new root block.
+                            _commitRecord = _getCommitRecord();
+
+                            if (txLog.isInfoEnabled())
+                                txLog.info("COMMIT: commitTime=" + commitTime);
+
+                        } // if(isJoinedService)
+						
                         try {
 
                             /*
@@ -5160,6 +5296,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         
 					} finally {
 
+					    // Discard the prepare request.
                         prepareRequest.set(null/* discard */);
 
 						_fieldReadWriteLock.writeLock().unlock();
@@ -5198,6 +5335,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     
                     quorum.assertQuorum(token);
 
+                    // Discard the prepare request.
                     prepareRequest.set(null/* discard */);
 
                     _abort();

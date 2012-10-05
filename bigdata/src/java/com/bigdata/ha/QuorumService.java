@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.File;
+import java.io.IOException;
 
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
@@ -77,4 +78,10 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      */
     File getHALogDir();
     
+    /**
+     * Return the configured timeout in milliseconds that the leader will await
+     * the other services to prepare for a 2-phase commit.
+     */
+    long getPrepareTimeout();
+
 }
