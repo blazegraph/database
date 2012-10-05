@@ -1,10 +1,34 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.ha;
 
 import java.io.IOException;
 import java.rmi.Remote;
-import java.util.UUID;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHARootBlockRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.service.IService;
@@ -59,15 +83,12 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      * are identical, so this may be used to create a new journal in a quorum by
      * replicating the root blocks of the quorum leader.
      * 
-     * @param storeId
-     *            The {@link UUID} of the journal whose root block will be
-     *            returned (optional, defaults to the current Journal). This
-     *            parameter is intended for scale-out if there is a need to
-     *            fetch the root block of a historical journal (versus the live
-     *            journal).
+     * @param msg
+     *            The message requesting the root block.
      * 
      * @return The root block.
      */
-    byte[] getRootBlock(UUID storeId) throws IOException;
+    IHARootBlockResponse getRootBlock(IHARootBlockRequest msg)
+            throws IOException;
 
 }

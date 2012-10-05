@@ -51,6 +51,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.io.DirectBufferPool;
@@ -62,7 +63,6 @@ import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCache.FileChannelWriteCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.AbstractQuorumTestCase;
 import com.bigdata.quorum.MockQuorumFixture;
@@ -179,7 +179,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             return addr;
         }
 
-        public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
                 throws IOException {
 
             return ((QuorumPipeline<HAPipelineGlue>) member)
@@ -269,7 +269,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this){
 
-                protected void handleReplicatedWrite(final HAWriteMessage msg,
+                protected void handleReplicatedWrite(final IHAWriteMessage msg,
                         final ByteBuffer data) throws Exception {
 
                     nreceived.incrementAndGet();
@@ -317,7 +317,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
-                public void logWriteCacheBlock(final HAWriteMessage msg,
+                public void logWriteCacheBlock(final IHAWriteMessage msg,
                         final ByteBuffer data) throws IOException {
 
                     MyMockQuorumMember.this.logWriteCacheBlock(msg, data);
@@ -379,7 +379,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 //        }
 
         @Override
-        public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
                 throws IOException {
             
             return pipelineImpl.receiveAndReplicate(msg);
@@ -387,7 +387,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public Future<Void> replicate(final HAWriteMessage msg,
+        public Future<Void> replicate(final IHAWriteMessage msg,
                 final ByteBuffer b) throws IOException {
 
             return pipelineImpl.replicate(msg, b);
@@ -412,7 +412,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         private long lastCommitTime = 0;
         
         @Override
-        public void logWriteCacheBlock(final HAWriteMessage msg,
+        public void logWriteCacheBlock(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException {
             // NOP.
         }

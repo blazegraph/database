@@ -31,6 +31,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.HAReadRequest;
+import com.bigdata.ha.msg.IHAReadRequest;
+import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListenerBase;
 import com.bigdata.rawstore.IRawStore;
@@ -145,15 +148,16 @@ public class QuorumReadImpl<S extends HAReadGlue> extends
         // The RMI interface for the service on which we will read.
         final S otherService = member.getService(otherId);
 
+        final IHAReadRequest msg = new HAReadRequest(token,
+                storeId, addr);
         /*
          * Read from that service. The request runs in the caller's thread.
          */
         try {
 
-            final Future<byte[]> rf = otherService.readFromDisk(token,
-                    storeId, addr);
+            final Future<IHAReadResponse> rf = otherService.readFromDisk(msg);
 
-            final byte[] a = rf.get();
+            final byte[] a = rf.get().getData();
 
             // Verify quorum is still valid.
             member.getQuorum().assertQuorum(token);

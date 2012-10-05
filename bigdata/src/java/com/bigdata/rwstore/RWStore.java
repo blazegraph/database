@@ -60,6 +60,7 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
@@ -77,7 +78,6 @@ import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
@@ -5021,7 +5021,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
     }
 
-    public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
+    public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
         /*

@@ -623,7 +623,7 @@ public class RootBlockView implements IRootBlockView {
      *                if the root block is not valid (bad magic, timestamps do
      *                not agree, etc).
      */
-    RootBlockView(final boolean rootBlock0, final ByteBuffer buf,
+    public RootBlockView(final boolean rootBlock0, final ByteBuffer buf,
             final ChecksumUtility checker) throws RootBlockException {
         
         if( buf == null ) throw new IllegalArgumentException();

@@ -30,8 +30,8 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -49,7 +49,7 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * @throws InterruptedException
      * @throws IOException
      */
-    void writeRawBuffer(HAWriteMessage msg, IBufferAccess b) throws IOException,
+    void writeRawBuffer(IHAWriteMessage msg, IBufferAccess b) throws IOException,
             InterruptedException;
 
     /**

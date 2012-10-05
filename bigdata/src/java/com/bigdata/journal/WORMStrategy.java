@@ -42,13 +42,13 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumRead;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
@@ -2306,7 +2306,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		// NOP
 	}
 
-    public void writeRawBuffer(final HAWriteMessage msg, final IBufferAccess b)
+    public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
         /*

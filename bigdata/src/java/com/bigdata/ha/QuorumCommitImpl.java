@@ -34,7 +34,12 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.ha.msg.HA2PhaseAbortMessage;
+import com.bigdata.ha.msg.HA2PhaseCommitMessage;
+import com.bigdata.ha.msg.HA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
@@ -112,7 +117,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
      * asynchronously on their side while the leader awaits their future's using
      * get().
      */
-    public int prepare2Phase(final boolean isRootBlock0,
+    public int prepare2Phase(//final boolean isRootBlock0,
             final IRootBlockView rootBlock, final long timeout,
             final TimeUnit unit) throws InterruptedException, TimeoutException,
             IOException {
@@ -123,10 +128,12 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         if (unit == null)
             throw new IllegalArgumentException();
         
+        final boolean isRootBlock0 = rootBlock.isRootBlock0();
+
         if (log.isInfoEnabled())
-            log.info("isRootBlock0=" + isRootBlock0 + ", rootBlock="
-                    + rootBlock + ", timeout=" + timeout + ", unit=" + unit);
-        
+            log.info("isRootBlock0=" + isRootBlock0 + "rootBlock=" + rootBlock
+                    + ", timeout=" + timeout + ", unit=" + unit);
+
         /*
          * The token of the quorum for which the leader issued this prepare
          * message.
@@ -164,7 +171,9 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         // Verify the quorum is valid.
         member.assertLeader(token);
         
-        final byte[] tmp = BytesUtil.toArray(rootBlock.asReadOnlyBuffer());
+//        final byte[] tmp = BytesUtil.toArray(rootBlock.asReadOnlyBuffer());
+        final IHA2PhasePrepareMessage msg = new HA2PhasePrepareMessage(
+                rootBlock, timeout, unit);
         
         for (int i = 1; i < joinedServiceIds.length; i++) {
             
@@ -173,8 +182,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             /*
              * Runnable which will execute this message on the remote service.
              */
-            final Future<Boolean> rf = getService(serviceId).prepare2Phase(
-                    isRootBlock0, tmp, timeout, unit);
+            final Future<Boolean> rf = getService(serviceId).prepare2Phase(msg);
 
             // add to list of futures we will check.
             remoteFutures.add(rf);
@@ -190,15 +198,14 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
 
         {
             /*
-             * Run the operation on the leader using local method call in the
-             * caller's thread to avoid deadlock.
+             * Run the operation on the leader using local method call (non-RMI)
+             * in the caller's thread to avoid deadlock.
              * 
              * Note: Because we are running this in the caller's thread on the
              * leader the timeout will be ignored for the leader.
              */
             final S leader = member.getService();
-            final Future<Boolean> f = leader.prepare2Phase(isRootBlock0, tmp,
-                    timeout, unit);
+            final Future<Boolean> f = leader.prepare2Phase(msg);
             remoteFutures.add(f);
 //            /*
 //             * Note: This runs synchronously in the caller's thread (it ignores
@@ -275,6 +282,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         
         member.assertLeader(token);
 
+        final IHA2PhaseCommitMessage msg = new HA2PhaseCommitMessage(commitTime);
+        
         for (int i = 1; i < joinedServiceIds.length; i++) {
             
             final UUID serviceId = joinedServiceIds[i];
@@ -282,8 +291,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             /*
              * Runnable which will execute this message on the remote service.
              */
-            final Future<Void> rf = getService(serviceId).commit2Phase(
-                    commitTime);
+            final Future<Void> rf = getService(serviceId).commit2Phase(msg);
 
             // add to list of futures we will check.
             remoteFutures.add(rf);
@@ -303,7 +311,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
              * caller's thread to avoid deadlock.
              */
             final S leader = member.getService();
-            final Future<Void> f = leader.commit2Phase(commitTime);
+            final Future<Void> f = leader.commit2Phase(msg);
             remoteFutures.add(f);
 //            // Note: This runs synchronously (ignores timeout).
 //            f.run();
@@ -380,6 +388,8 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         final UUID[] joinedServiceIds = getQuorum().getJoined();
 
         member.assertLeader(token);
+        
+        final IHA2PhaseAbortMessage msg = new HA2PhaseAbortMessage(token);
 
         for (int i = 1; i < joinedServiceIds.length; i++) {
 
@@ -388,7 +398,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             /*
              * Runnable which will execute this message on the remote service.
              */
-            final Future<Void> rf = getService(serviceId).abort2Phase(token);
+            final Future<Void> rf = getService(serviceId).abort2Phase(msg);
 
             // add to list of futures we will check.
             remoteFutures.add(rf);
@@ -409,7 +419,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
              */
             member.assertLeader(token);
             final S leader = member.getService();
-            final Future<Void> f = leader.abort2Phase(token);
+            final Future<Void> f = leader.abort2Phase(msg);
             remoteFutures.add(f);
 //            // Note: This runs synchronously (ignores timeout).
 //            f.run();

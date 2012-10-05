@@ -28,10 +28,15 @@ import java.net.InetSocketAddress;
 import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
+import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
+import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
+import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHAReadRequest;
+import com.bigdata.ha.msg.IHAReadResponse;
+import com.bigdata.ha.msg.IHARootBlockRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
  * Delegation pattern.
@@ -59,37 +64,39 @@ public class HAGlueDelegate implements HAGlue {
         return delegate.getServiceId();
     }
 
-    public Future<Boolean> prepare2Phase(boolean isRootBlock0,
-            byte[] rootBlock, long timeout, TimeUnit unit) throws IOException {
-        return delegate.prepare2Phase(isRootBlock0, rootBlock, timeout, unit);
+    public Future<Boolean> prepare2Phase(IHA2PhasePrepareMessage msg)
+            throws IOException {
+        return delegate.prepare2Phase(msg);
     }
 
-    public Future<byte[]> readFromDisk(long token, UUID storeId, long addr)
-            throws IOException {
-        return delegate.readFromDisk(token, storeId, addr);
+    public Future<IHAReadResponse> readFromDisk(
+            IHAReadRequest readMessage) throws IOException {
+        return delegate.readFromDisk(readMessage);
     }
 
     public InetSocketAddress getWritePipelineAddr() throws IOException {
         return delegate.getWritePipelineAddr();
     }
 
-    public byte[] getRootBlock(UUID storeId) throws IOException {
-        return delegate.getRootBlock(storeId);
+    public IHARootBlockResponse getRootBlock(IHARootBlockRequest msg) throws IOException {
+        return delegate.getRootBlock(msg);
     }
 
     public Future<Void> moveToEndOfPipeline() throws IOException {
         return delegate.moveToEndOfPipeline();
     }
 
-    public Future<Void> commit2Phase(long commitTime) throws IOException {
-        return delegate.commit2Phase(commitTime);
+    public Future<Void> commit2Phase(IHA2PhaseCommitMessage commitMessage)
+            throws IOException {
+        return delegate.commit2Phase(commitMessage);
     }
 
-    public Future<Void> abort2Phase(long token) throws IOException {
-        return delegate.abort2Phase(token);
+    public Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage)
+            throws IOException {
+        return delegate.abort2Phase(abortMessage);
     }
 
-    public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+    public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
             throws IOException {
         return delegate.receiveAndReplicate(msg);
     }

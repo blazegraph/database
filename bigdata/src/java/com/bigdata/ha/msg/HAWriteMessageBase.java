@@ -22,14 +22,15 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-package com.bigdata.ha.pipeline;
+package com.bigdata.ha.msg;
 
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.ha.pipeline.HAReceiveService;
+import com.bigdata.ha.pipeline.HASendService;
 
 /**
  * Base class for RMI messages used to communicate metadata about a raw data
@@ -41,8 +42,8 @@ import com.bigdata.journal.ha.HAWriteMessage;
  * @see HASendService
  * @see HAReceiveService
  */
-public class HAWriteMessageBase implements Externalizable {
-	
+public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
+
 	/**
      * 
      */
@@ -77,15 +78,21 @@ public class HAWriteMessageBase implements Externalizable {
      */
 	public HAWriteMessageBase() {}
 
-	/** The #of bytes of data to be transfered. */
-	public int getSize() {
+	/* (non-Javadoc)
+     * @see com.bigdata.ha.pipeline.IHAWriteMessageBase#getSize()
+     */
+	@Override
+    public int getSize() {
 
 	    return sze;
 	    
 	}
 
-	/** The Alder32 checksum of the bytes to be transfered. */
-	public int getChk() {
+	/* (non-Javadoc)
+     * @see com.bigdata.ha.pipeline.IHAWriteMessageBase#getChk()
+     */
+	@Override
+    public int getChk() {
 
 	    return chk;
 	    
@@ -103,10 +110,10 @@ public class HAWriteMessageBase implements Externalizable {
         if (this == obj)
             return true;
         
-        if (!(obj instanceof HAWriteMessageBase))
+        if (!(obj instanceof IHAWriteMessageBase))
             return false;
         
-        final HAWriteMessageBase t = (HAWriteMessageBase) obj;
+        final IHAWriteMessageBase t = (IHAWriteMessageBase) obj;
 
         return sze == t.getSize() && chk == t.getChk();
 

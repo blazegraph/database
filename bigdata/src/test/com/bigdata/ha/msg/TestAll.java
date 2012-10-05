@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 14, 2006
  */
 
-package com.bigdata.ha;
+package com.bigdata.ha.msg;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -35,11 +35,10 @@ import junit.framework.TestSuite;
  * Runs all tests for all journal implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestAll.java 6643 2012-10-03 15:13:47Z thompsonbry $
  */
 public class TestAll extends TestCase {
 
-//	public static boolean s_includeHA = false;
     /**
      * 
      */
@@ -60,12 +59,9 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("high availability");
+        final TestSuite suite = new TestSuite("HA messages");
 
-        suite.addTest(com.bigdata.ha.msg.TestAll.suite());
-        
-//        if (s_includeHA)
-        	suite.addTest(com.bigdata.ha.pipeline.TestAll.suite());
+        suite.addTestSuite(TestHAWriteMessage.class);
         
         return suite;
 

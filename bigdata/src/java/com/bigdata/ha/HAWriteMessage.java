@@ -25,13 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on May 18, 2010
  */
 
-package com.bigdata.journal.ha;
+package com.bigdata.ha;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.ha.pipeline.HAWriteMessageBase;
+import com.bigdata.ha.msg.HAWriteMessageBase;
 import com.bigdata.journal.StoreTypeEnum;
 
 /**
@@ -41,7 +41,8 @@ import com.bigdata.journal.StoreTypeEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class HAWriteMessage extends HAWriteMessageBase {
+public class HAWriteMessage extends HAWriteMessageBase implements
+        IHAWriteMessage {
 
     /**
      * 
@@ -69,41 +70,58 @@ public class HAWriteMessage extends HAWriteMessageBase {
     /** The file offset at which the data will be written (WORM only). */
     private long firstOffset;
 
-    /** The commit counter associated with this message */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getCommitCounter()
+     */
+    @Override
     public long getCommitCounter() {
         return commitCounter;
     }
     
-    /** The commit time associated with this message. */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getLastCommitTime()
+     */
+    @Override
     public long getLastCommitTime() {
         return lastCommitTime;
     }
 
-    /**
-     * The write cache buffer sequence number (reset to ZERO (0) for the first
-     * message after each commit and incremented for each buffer sent by the
-     * leader).
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getSequence()
      */
+    @Override
     public long getSequence() {
         return sequence;
     }
     
-    /** The type of backing store (RW or WORM). */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getStoreType()
+     */
+    @Override
     public StoreTypeEnum getStoreType() {
         return storeType;
     }
     
-    /** The quorum token for which this message is valid. */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getQuorumToken()
+     */
+    @Override
     public long getQuorumToken() {
         return quorumToken; 
     }
     
-    /** The length of the backing file on the disk. */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getFileExtent()
+     */
+    @Override
     public long getFileExtent() {
         return fileExtent; 
     }
     
-    /** The file offset at which the data will be written (WORM only). */
+    /* (non-Javadoc)
+     * @see com.bigdata.journal.ha.IHAWriteMessage#getFirstOffset()
+     */
+    @Override
     public long getFirstOffset() {
         return firstOffset; 
     }
@@ -191,10 +209,10 @@ public class HAWriteMessage extends HAWriteMessageBase {
         if (!super.equals(obj))
             return false;
 
-        if (!(obj instanceof HAWriteMessage))
+        if (!(obj instanceof IHAWriteMessage))
             return false;
         
-        final HAWriteMessage other = (HAWriteMessage) obj;
+        final IHAWriteMessage other = (IHAWriteMessage) obj;
 
         return commitCounter == other.getCommitCounter()
                 && lastCommitTime == other.getLastCommitTime() //

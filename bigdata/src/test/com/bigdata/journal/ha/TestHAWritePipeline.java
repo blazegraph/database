@@ -33,15 +33,13 @@ import java.util.UUID;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.msg.HAReadRequest;
+import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.journal.CommitRecordIndex;
-import com.bigdata.journal.ForceEnum;
-import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.ProxyTestCase;
-import com.bigdata.journal.RootBlockView;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Unit tests bootstrap 3 journals in a specified failover chain and demonstrate
@@ -261,15 +259,17 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
              * concerning the joinOrder.
              */
             q.assertQuorum(token);
-
+            
             for (int i = 1; i < joinOrder.length; i++) {
 
                 final UUID serviceId = joinOrder[i];
                 
                 final HAGlue remoteService = q.getClient().getService(serviceId);
+
+                final IHAReadRequest msg = new HAReadRequest(
+                        q.token(), store.getUUID(), addr);
                 
-                assertEquals(expected, remoteService.readFromDisk(q.token(),
-                        store.getUUID(), addr));
+                assertEquals(expected, remoteService.readFromDisk(msg));
 
             }
 

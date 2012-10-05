@@ -68,7 +68,7 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
      * @return A {@link Future} which evaluates to a yes/no vote on whether the
      *         service is prepared to commit.
      */
-    int prepare2Phase(boolean isRootBlock0, IRootBlockView rootBlock,
+    int prepare2Phase(IRootBlockView rootBlock,
             long timeout, TimeUnit unit) throws InterruptedException,
             TimeoutException, IOException;
 
