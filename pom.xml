@@ -361,7 +361,7 @@ mvn deploy:deploy-file \
            <groupId>com.bigdata</groupId>
            <artifactId>bigdata-ganglia</artifactId>
            <version>1.0.1</version>
-           <optional>true</optional>
+           <optional>false</optional>
        </dependency>
        <!-- 
 mvn deploy:deploy-file \
