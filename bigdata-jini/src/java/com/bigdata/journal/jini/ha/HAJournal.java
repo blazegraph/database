@@ -37,9 +37,9 @@ import net.jini.export.Exporter;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IRootBlockView;

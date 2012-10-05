@@ -13,7 +13,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.ha.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.Quorum;

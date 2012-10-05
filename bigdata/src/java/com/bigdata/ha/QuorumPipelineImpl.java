@@ -41,6 +41,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;

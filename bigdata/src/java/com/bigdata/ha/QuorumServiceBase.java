@@ -38,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;

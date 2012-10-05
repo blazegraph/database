@@ -35,8 +35,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;

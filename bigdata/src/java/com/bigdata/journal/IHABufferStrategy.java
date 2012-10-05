@@ -30,7 +30,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.ha.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.quorum.Quorum;
 

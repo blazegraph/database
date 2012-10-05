@@ -34,10 +34,10 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.ha.ProcessLogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;

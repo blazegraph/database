@@ -28,8 +28,6 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.ha.HAWriteMessage;
-import com.bigdata.ha.IHAWriteMessage;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.StoreTypeEnum;
 

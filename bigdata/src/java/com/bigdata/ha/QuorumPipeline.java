@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
