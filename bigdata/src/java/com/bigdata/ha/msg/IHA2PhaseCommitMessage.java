@@ -38,6 +38,18 @@ import com.bigdata.ha.HACommitGlue;
 public interface IHA2PhaseCommitMessage {
 
     /**
+     * <code>true</code> iff the service was recognized as being joined with the
+     * met quorum at the time that the prepare message was prepared.
+     * <p>
+     * Note: This is used to support atomic decisions about whether or not a
+     * service was joined with the met quorum at the time that the leader
+     * decided to commit. Services that are in the pipeline and resynchronizing
+     * will either be joined or not for the purposes of a given 2-phase commit
+     * based on this flag.
+     */
+    boolean isJoinedService();
+    
+    /**
      * The commit time that will be assigned to the new commit point.
      */
     long getCommitTime();

@@ -130,7 +130,7 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
 
     /**
      * Log the root block for the commit point that closes the current write set
-     * onto the {@link ProcessLogWriter}.
+     * onto the {@link HALogWriter}.
      * 
      * @param rootBlock
      *            The root block for the commit point that was just achieved.

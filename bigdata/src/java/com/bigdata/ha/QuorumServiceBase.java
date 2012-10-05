@@ -30,6 +30,7 @@ package com.bigdata.ha;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -289,21 +290,27 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public void commit2Phase(final long token, final long commitTime)
-            throws IOException, InterruptedException {
+    public void commit2Phase(
+            final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds, final long token,
+            final long commitTime) throws IOException, InterruptedException {
 
-        commitImpl.commit2Phase(token, commitTime);
+        commitImpl.commit2Phase(joinedServiceIds, nonJoinedPipelineServiceIds,
+                token, commitTime);
 
     }
 
     @Override
-    public int prepare2Phase(//final boolean isRootBlock0,
+    public int prepare2Phase(final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds,
+            //final boolean isRootBlock0,
             final IRootBlockView rootBlock, final long timeout,
             final TimeUnit unit) throws InterruptedException, TimeoutException,
             IOException {
 
-        return commitImpl.prepare2Phase(/* isRootBlock0, */rootBlock, timeout,
-                unit);
+        return commitImpl.prepare2Phase(joinedServiceIds,
+                nonJoinedPipelineServiceIds, /* isRootBlock0, */rootBlock,
+                timeout, unit);
 
     }
 
@@ -329,6 +336,13 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     final public File getHALogDir() {
 
         return getLocalService().getHALogDir();
+        
+    }
+    
+    @Override
+    public long getPrepareTimeout() {
+
+        return getLocalService().getHAPrepareTimeout();
         
     }
     

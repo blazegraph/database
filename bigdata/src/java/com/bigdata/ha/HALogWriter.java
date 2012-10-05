@@ -1,12 +1,8 @@
 package com.bigdata.ha;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -14,10 +10,13 @@ import java.util.Formatter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Wrapper class to handle process log creation and output for HA.
@@ -30,12 +29,49 @@ import com.bigdata.ha.msg.IHAWriteMessage;
  * 
  * @author Martyn Cutcher
  */
-public class ProcessLogWriter {
+public class HALogWriter {
 
     /**
      * Logger for HA events.
      */
     private static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
+
+    /*
+     * Note: All of this stuff is to be more or less compatible with the magic
+     * and version at the start of a Journal file. We use a different MAGIC
+     * value for the HA Log, but the same offset to the first and second root
+     * blocks. The data starts after the 2nd root block.
+     */
+    
+    static final int SIZE_MAGIC = Bytes.SIZEOF_INT;
+    static final int SIZE_VERSION = Bytes.SIZEOF_INT;
+    static final int SIZEOF_ROOT_BLOCK = RootBlockView.SIZEOF_ROOT_BLOCK;
+
+    /**
+     * Offset of the first root block in the file.
+     */
+    static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
+
+    /**
+     * Offset of the second root block in the file.
+     */
+    static final int OFFSET_ROOT_BLOCK1 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 1);
+
+    /**
+     * The size of the file header, including MAGIC, version, and both root
+     * blocks. The data starts at this offset.
+     */
+    static final int headerSize0 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
+
+    /**
+     * Magic value for HA Log (the root blocks have their own magic value).
+     */
+    static final int MAGIC = 0x83d9b735;
+
+    /**
+     * HA log version number (version 1).
+     */
+    static final int VERSION1 = 0x1;
 
     /** HA log directory. */
     private final File m_dir;
@@ -56,11 +92,11 @@ public class ProcessLogWriter {
     /** current output file channel. */
     private RandomAccessFile m_raf = null;
     private FileChannel m_channel = null;
-    final static int ROOTBLOCK_0 = 0;
-    final static int ROOTBLOCK_1 = RootBlockView.SIZEOF_ROOT_BLOCK;
-    final static int START_DATA = ROOTBLOCK_1 + RootBlockView.SIZEOF_ROOT_BLOCK;
 
-    public ProcessLogWriter(final File logDir) {
+    /** current write point on the channel. */
+    private long m_position = headerSize0;
+
+    public HALogWriter(final File logDir) {
 
         m_dir = logDir;
 
@@ -134,15 +170,47 @@ public class ProcessLogWriter {
         }
         
         m_raf = new RandomAccessFile(m_log, "rw");
-        
-        m_channel = m_raf.getChannel();
-        m_channel.position(START_DATA);
 
-        // On open write rootblock to 0 and 1
-        writeRootBlock(ROOTBLOCK_0, rootBlock);       
-        writeRootBlock(ROOTBLOCK_1, rootBlock);       
- 
+        m_channel = m_raf.getChannel();
+
+        /*
+         * Write the MAGIC and version on the file.
+         */
+        m_raf.seek(0);
+        m_raf.writeInt(MAGIC);
+        m_raf.writeInt(VERSION1);
+
+        /*
+         * Write root block to slots 0 and 1.
+         * 
+         * Initially, the same root block is in both slots. This is a valid, but
+         * logically empty, HA Log file.
+         * 
+         * When the HA Log file is properly sealed with a root block, that root
+         * block is written onto slot 1.
+         */
+
+        writeRootBlock(true/* isRootBlock0 */, rootBlock);
+        
+        writeRootBlock(false/* isRootBlock0 */, rootBlock);
+
     }
+
+    /**
+     * Hook for {@link FileChannelUtility#writeAll(IReopenChannel, ByteBuffer, long)}
+     */
+    private final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
+
+        @Override
+        public FileChannel reopenChannel() throws IOException {
+
+            if (m_channel == null)
+                throw new IOException("Closed");
+
+            return m_channel;
+
+        }
+    };
 
     /**
      * Write the final root block on the HA log and close the file. This "seals"
@@ -193,34 +261,30 @@ public class ProcessLogWriter {
 
         flush(); // current streamed data
 
-        writeRootBlock(rootBlock.isRootBlock0() ? ROOTBLOCK_0 : ROOTBLOCK_1, rootBlock);
-        
+        // The closing root block is always in slot 1.
+        writeRootBlock(false/* isRootBlock0 */, rootBlock);
+
         close();
-        
+
     }
 
     /**
-     * Writes the rootblock at the given offset, but preserves the raf offset
-     * for streamed output.
+     * Writes the root block at the given offset.
      */
-    private void writeRootBlock(final int writePos, final IRootBlockView rootBlock)
-            throws IOException {
+    private void writeRootBlock(final boolean isRootBlock0,
+            final IRootBlockView rootBlock) throws IOException {
 
         if (rootBlock == null)
             throw new IllegalArgumentException();
-        
-        final long saveSeek = m_channel.position();
-        
-        try {
-        	m_channel.position(writePos);
-	
-	        m_channel.write(rootBlock.asReadOnlyBuffer());
-	
-	        if (haLog.isDebugEnabled())
-	            haLog.debug("wrote root block: " + rootBlock);
-        } finally {
-        	m_channel.position(saveSeek);
-        }
+
+        final long position = isRootBlock0 ? OFFSET_ROOT_BLOCK0
+                : OFFSET_ROOT_BLOCK1;
+
+        FileChannelUtility.writeAll(reopener, rootBlock.asReadOnlyBuffer(),
+                position);
+
+        if (haLog.isDebugEnabled())
+            haLog.debug("wrote root block: " + rootBlock);
 
     }
 
@@ -250,33 +314,63 @@ public class ProcessLogWriter {
 
         if (haLog.isInfoEnabled())
             haLog.info("msg=" + msg);
-        
-        // write serialized message object
-        m_channel.write(bufferObject(msg));
 
+        if (m_position < headerSize0)
+            throw new AssertionError("position=" + m_position
+                    + ", but headerSize=" + headerSize0);
+
+        /*
+         * Write the HAWriteMessage onto the channel.
+         */
+        {
+            // serialized message object (pos=0; limit=nbytes)
+            final ByteBuffer tmp = bufferObject(msg);
+
+            final int nbytes = tmp.limit();
+
+            FileChannelUtility.writeAll(reopener, tmp, m_position);
+
+            m_position += nbytes;
+        }
+        
         switch(m_rootBlock.getStoreType()) {
         case RW: {
-            m_channel.write(data);
+            /*
+             * Write the WriteCache block on the channel.
+             */
+            final int nbytes = msg.getSize();
+            assert data.position() == 0;
+            assert data.limit() == nbytes;
+            // Note: duplicate() to avoid side effects on ByteBuffer!!!
+            FileChannelUtility.writeAll(reopener, data.duplicate(), m_position);
+            m_position += nbytes;
         }
-        case WORM:
+        case WORM: {
+            /*
+             * We will use the HA failover read API to recover the block from a
+             * node in the quorum when we need to replay the HA log.
+             */
             break;
+        }
+        default:
+            throw new AssertionError();
         }
 
     }
 
     /**
-     * Utility to return a ByteBuffer containing the external version of the object
+     * Utility to return a ByteBuffer containing the external version of the
+     * object.
+     * 
+     * @return The {@link ByteBuffer}. The position will be zero. The limit will
+     *         be the #of bytes in the serialized object.
      */
     private ByteBuffer bufferObject(final Object obj) throws IOException {
-        final ByteArrayOutputStream baout = new ByteArrayOutputStream();
-        final ObjectOutputStream objout = new ObjectOutputStream(baout);
-        
-        objout.writeObject(obj);
-        objout.flush();
-        objout.close();
-        
-		return ByteBuffer.wrap(baout.toByteArray());
-	}
+
+        // Note: pos=0; limit=capacity=length.
+        return ByteBuffer.wrap(SerializerUtil.serialize(obj));
+
+    }
 
 	/**
      * Close the file (does not flush).
@@ -301,6 +395,8 @@ public class ProcessLogWriter {
         m_raf = null;
         
         m_channel = null;
+        
+        m_position = headerSize0;
         
         m_rootBlock = null;
 
@@ -338,7 +434,7 @@ public class ProcessLogWriter {
                  */
 
                 m_channel.close();
- 
+
                 if (m_log.exists() && !m_log.delete()) {
 
                     /*
@@ -376,11 +472,6 @@ public class ProcessLogWriter {
 
         remove();
         
-    }
-    
-    // FIXME write utility to dump one or more log files.
-    public static void main(final String[] args) {
-
     }
 
 }

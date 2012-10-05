@@ -34,7 +34,7 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
-import com.bigdata.ha.ProcessLogWriter;
+import com.bigdata.ha.HALogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -452,7 +452,13 @@ public class HAJournalServer extends AbstractServer {
         quorum.start(newQuorumService(logicalServiceZPath, serviceUUID,
                 haGlueService, journal));
 
-        // TODO These methods could be moved into QuorumServiceImpl.start(Quorum)
+        /*
+         * Note: It appears that these methods CAN NOT moved into
+         * QuorumServiceImpl.start(Quorum). I suspect that this is because the
+         * quorum watcher would not be running at the moment that we start doing
+         * things with the actor, but I have not verified that rationale in
+         * depth.
+         */
         final QuorumActor<?,?> actor = quorum.getActor();
         actor.memberAdd();
         actor.pipelineAdd();
@@ -547,7 +553,17 @@ public class HAJournalServer extends AbstractServer {
         @Override
         public void start(final Quorum<?,?> quorum) {
             
+            if (haLog.isTraceEnabled())
+                log.trace("START");
+            
             super.start(quorum);
+
+            // TODO It appears to be a problem to do this here. Maybe because
+            // the watcher is not running yet?
+//            final QuorumActor<?, ?> actor = quorum.getActor();
+//            actor.memberAdd();
+//            actor.pipelineAdd();
+//            actor.castVote(journal.getLastCommitTime());
 
             // Inform the Journal about the current token (if any).
             journal.setQuorumToken(quorum.token());
@@ -718,7 +734,7 @@ public class HAJournalServer extends AbstractServer {
          * {@inheritDoc}
          * <p>
          * Writes the {@link IHAWriteMessage} and the data onto the
-         * {@link ProcessLogWriter}
+         * {@link HALogWriter}
          */
         @Override
         public void logWriteCacheBlock(final IHAWriteMessage msg,
@@ -734,9 +750,9 @@ public class HAJournalServer extends AbstractServer {
         /**
          * {@inheritDoc}
          * <p>
-         * Writes the root block onto the {@link ProcessLogWriter} and closes
-         * the log file. A new log is then opened, using the given root block as
-         * the starting point for that log file.
+         * Writes the root block onto the {@link HALogWriter} and closes the log
+         * file. A new log is then opened, using the given root block as the
+         * starting point for that log file.
          */
         @Override
         public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
@@ -770,7 +786,7 @@ public class HAJournalServer extends AbstractServer {
                 @Override
                 public boolean accept(File dir, String name) {
 
-                    return name.endsWith(ProcessLogWriter.HA_LOG_EXT);
+                    return name.endsWith(HALogWriter.HA_LOG_EXT);
                     
                 }
             });

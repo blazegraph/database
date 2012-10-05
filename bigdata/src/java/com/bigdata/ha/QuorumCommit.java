@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.IOException;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -56,6 +58,10 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
      * root block for use with the next {@link #commit2Phase(long, long) commit}
      * message.
      * 
+     * @param joinedServiceIds
+     *            The services joined with the met quorum, in their join order.
+     * @param nonJoinedPipelineServiceIds
+     *            The non-joined services in the write pipeline (in any order).
      * @param isRootBlock0
      *            if this is rootBlock0.
      * @param rootBlock
@@ -68,9 +74,11 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
      * @return A {@link Future} which evaluates to a yes/no vote on whether the
      *         service is prepared to commit.
      */
-    int prepare2Phase(IRootBlockView rootBlock,
-            long timeout, TimeUnit unit) throws InterruptedException,
-            TimeoutException, IOException;
+    int prepare2Phase(final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds,//
+            final IRootBlockView rootBlock, final long timeout,
+            final TimeUnit unit) throws InterruptedException, TimeoutException,
+            IOException;
 
     /**
      * Used by the leader to send a message to each joined service in the quorum
@@ -80,13 +88,19 @@ public interface QuorumCommit<S extends HACommitGlue> { //extends QuorumService<
      * the lastCommitTime on this message agree with the quorum token and
      * lastCommitTime in the root block from the last "prepare" message.
      * 
+     * @param joinedServiceIds
+     *            The services joined with the met quorum, in their join order.
+     * @param nonJoinedPipelineServiceIds
+     *            The non-joined services in the write pipeline (in any order).
      * @param token
      *            The quorum token used in the prepare message.
      * @param commitTime
      *            The commit time that assigned to the new commit point.
      */
-    void commit2Phase(long token, long commitTime) throws IOException,
-            InterruptedException;
+    void commit2Phase(
+            final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds, long token,
+            long commitTime) throws IOException, InterruptedException;
 
     /**
      * Used by the leader to send a message to each service joined with the

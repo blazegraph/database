@@ -1,7 +1,7 @@
 package com.bigdata.ha;
 
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -9,88 +9,227 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.RootBlockUtility;
+import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.util.ChecksumError;
+import com.bigdata.util.ChecksumUtility;
 
 /**
- * Given an HALog file can be used to replay the file and can provide a readable dump of the content.
+ * Given an HALog file can be used to replay the file and can provide a readable
+ * dump of the content.
  * 
- * When replaying, the current position is compared to the EOF to determine whether more data can be read.
+ * When replaying, the current position is compared to the EOF to determine
+ * whether more data can be read.
  * 
- * The called should call hasMoreBuffers() and if so read the next associated buffer and process with the
- * returned IHAMessage.
+ * The called should call hasMoreBuffers() and if so read the next associated
+ * buffer and process with the returned IHAMessage.
  * 
- * If hasMoreBuffers() is false, then the committing rootBlock should be used to commit the replayed 
- * transaction.
+ * If hasMoreBuffers() is false, then the committing rootBlock should be used to
+ * commit the replayed transaction.
  * 
  * @author Martyn Cutcher
- *
  */
 public class HALogReader {
 	
-	final RandomAccessFile m_raf;
-	final FileChannel m_channel;
-	final IRootBlockView m_openRootBlock;
-	final IRootBlockView m_commitRootBlock;
+    private static final Logger log = Logger.getLogger(HALogReader.class);
+    
+    private final File m_file;
+    private final RandomAccessFile m_raf;
+	private final FileChannel m_channel;
+	private final IRootBlockView m_openRootBlock;
+	private final IRootBlockView m_closeRootBlock;
+	private final StoreTypeEnum m_storeType;
+	private final int magic;
+	private final int version;
 	
-	public HALogReader(final File halog) throws IOException {
-		m_raf = new RandomAccessFile(halog, "r");
-		m_channel = m_raf.getChannel();
-		
-		/**
-		 * Must determine whether the file has consistent open and committed
-		 * rootBlocks, using the commitCounter to determine which rootBlock
-		 * is which.
-		 */
+	public HALogReader(final File file) throws IOException {
 
-		final IRootBlockView rb0 = readRootBlock(ProcessLogWriter.ROOTBLOCK_0, true);
-		final long cc0 = rb0.getCommitCounter();
-		final IRootBlockView rb1 = readRootBlock(ProcessLogWriter.ROOTBLOCK_1, false);
-		final long cc1 = rb0.getCommitCounter();
+	    m_file = file;
+	    
+		m_raf = new RandomAccessFile(file, "r");
+
+		m_channel = m_raf.getChannel();
+
+        try {
+            /**
+             * Must determine whether the file has consistent open and committed
+             * rootBlocks, using the commitCounter to determine which rootBlock
+             * is which.
+             * 
+             * Note: Both root block should exist (they are both written on
+             * startup). If they are identical, then the log is empty (the
+             * closing root block has not been written and the data in the log
+             * is useless).
+             * 
+             * The root block is slot 0 is always the root block for the
+             * previous commit point.
+             * 
+             * The root block in slot 1 is either identical to the root block in
+             * slot zero (in which case the log file is logically empty) or it
+             * is the root block that closes the write set in the HA Log file
+             * (and its commit counter must be exactly one more than the commit
+             * counter for the opening root block).
+             */
+            /*
+             * Read the MAGIC and VERSION.
+             */
+            m_raf.seek(0L);
+            try {
+                /*
+                 * Note: this next line will throw IOException if there is a
+                 * file lock contention.
+                 */
+                magic = m_raf.readInt();
+            } catch (IOException ex) {
+                throw new RuntimeException(
+                        "Can not read magic. Is file locked by another process?",
+                        ex);
+            }
+            if (magic != HALogWriter.MAGIC)
+                throw new RuntimeException("Bad journal magic: expected="
+                        + HALogWriter.MAGIC + ", actual=" + magic);
+            version = m_raf.readInt();
+            if (version != HALogWriter.VERSION1)
+                throw new RuntimeException("Bad journal version: expected="
+                        + HALogWriter.VERSION1 + ", actual=" + version);
+
+            final RootBlockUtility tmp = new RootBlockUtility(reopener, file,
+                    true/* validateChecksum */, false/* alternateRootBlock */,
+                    false/* ignoreBadRootBlock */);
+
+            m_openRootBlock = tmp.rootBlock0;
+
+            m_closeRootBlock = tmp.rootBlock1;
+
+            final long cc0 = m_openRootBlock.getCommitCounter();
+
+            final long cc1 = m_closeRootBlock.getCommitCounter();
+
+            if ((cc0 + 1) != cc1 && (cc0 != cc1)) {
+                /*
+                 * Counters are inconsistent with either an empty log file or a
+                 * single transaction scope.
+                 */
+                throw new IllegalStateException("Incompatible rootblocks: cc0="
+                        + cc0 + ", cc1=" + cc1);
+            }
+
+            m_channel.position(HALogWriter.headerSize0);
+        
+            m_storeType = m_openRootBlock.getStoreType();
+
+        } catch (Throwable t) {
+        
+            close();
+            
+            throw new RuntimeException(t);
+            
+        }
 		
-		if (cc0 == cc1) { // same rootblock - no committed block written
-			throw new IllegalArgumentException("Uncommitted log file");
-		} else if (cc0 == cc1+1) { // open - 1, commit - 0
-			m_openRootBlock = rb1;
-			m_commitRootBlock = rb0;
-		} else if (cc1 == cc1+1) { //open - 0, commit - 1
-			m_openRootBlock = rb0;
-			m_commitRootBlock = rb1;
-		} else { // counters inconsistent with single transaction scope
-			throw new IllegalStateException("Incompatible rootblocks for single transaction");
-		}
-		m_channel.position(ProcessLogWriter.START_DATA);
 	}
 	
-	private IRootBlockView readRootBlock(final int rootblockPos, final boolean rootBlock0) throws IOException {
-		final ByteBuffer dst = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-		
-		m_channel.read(dst);
-		
-		return new RootBlockView(rootBlock0, dst, null);
-	}
-	
-	public IRootBlockView getOpeningRootblock() {
-		return m_openRootBlock;
-	}
-	
-	public IRootBlockView getCommittingRootblock() {
-		return m_commitRootBlock;
+    /**
+     * Hook for {@link FileChannelUtility#readAll(FileChannel, ByteBuffer, long)}
+     */
+    private final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
+
+        @Override
+        public FileChannel reopenChannel() throws IOException {
+
+            if (m_channel == null)
+                throw new IOException("Closed");
+
+            return m_channel;
+
+        }
+    };
+
+    public void close() {
+
+        if (m_channel.isOpen()) {
+
+            try {
+                m_raf.close();
+            } catch (IOException e) {
+                log.error("Problem closing file: file=" + m_file + " : " + e, e);
+            }
+            
+        }
+
+    }
+
+    /**
+     * Return <code>true</code> if the root blocks in the log file have the same
+     * commit counter. Such log files are logically empty regardless of their
+     * length.
+     */
+    public boolean isEmpty() {
+
+        return m_openRootBlock.getCommitCounter()==m_closeRootBlock.getCommitCounter();
+        
+    }
+    
+    private void assertOpen() throws IOException {
+
+        if (!m_channel.isOpen())
+            throw new IOException("Closed: " + m_file);
+
+    }
+
+    /**
+     * The {@link IRootBlockView} for the committed state BEFORE the write set
+     * contained in the HA log file.
+     */
+	public IRootBlockView getOpeningRootBlock() {
+
+	    return m_openRootBlock;
+	    
 	}
 
 	/**
-	 * Checks whether we have reached the end of the file
+	 * The {@link IRootBlockView} for the committed state AFTER the write
+	 * set contained in the HA log file has been applied.
 	 */
+	public IRootBlockView getClosingRootBlock() {
+		
+	    return m_closeRootBlock;
+	    
+	}
+
+    /**
+     * Checks whether we have reached the end of the file.
+     */
 	public boolean hasMoreBuffers() throws IOException {
-		return m_channel.position() < m_channel.size();
+
+        assertOpen();
+
+        if(isEmpty()) {
+         
+            /*
+             * Ignore the file length if it is logically empty.
+             */
+            
+            return false;
+            
+        }
+        
+        return m_channel.position() < m_channel.size();
+	    
 	}
 	
 	/**
 	 * To stream from the Channel, we can use the associated RandomAccessFile
 	 * since the FilePointer for one is the same as the other.
 	 */
-	class RAFInputStream extends InputStream {
+	private class RAFInputStream extends InputStream {
 
 		@Override
 		public int read() throws IOException {
@@ -103,33 +242,229 @@ public class HALogReader {
 		}
 		
 	}
-	
-	/**
-	 * Attempts to read the next IHAWriteMessage and then the
-	 * expected buffer, that is read into the client buffer.  
-	 * The IHAWriteMessage is returned to the caller.
-	 */
-	public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer) throws IOException {
-		final ObjectInputStream objinstr = new ObjectInputStream(new RAFInputStream());
-		final IHAWriteMessage msg;
-		try {
-			msg = (IHAWriteMessage) objinstr.readObject();
-		} catch (ClassNotFoundException e) {
-			throw new IllegalStateException(e);
-		}
+
+    /**
+     * Attempts to read the next {@link IHAWriteMessage} and then the expected
+     * buffer, that is read into the client buffer. The {@link IHAWriteMessage}
+     * is returned to the caller.
+     * 
+     * @param clientBuffer
+     *            A buffer from the {@link DirectBufferPool#INSTANCE}.
+     * 
+     *            FIXME We need to pass in the backing store against which the
+     *            log would be resolved. This should be done using the
+     *            {@link HAReadGlue} API (failover reads). We should be able to
+     *            put together the [addr] from the
+     *            {@link IHAWriteMessage#getFirstOffset()} (the offset) plus the
+     *            {@link IHAWriteMessage#getSize()} (the byte length). There
+     *            might also be a checksum in the write cache block, in which
+     *            case we need to back that out of the data that we are trying
+     *            to read, but we still want to verify that checksum once we get
+     *            the data block from the quorum.
+     * 
+     *            FIXME Encapsulate as an iterator pattern where we pass in the
+     *            quorum token (if necessary), and the {@link QuorumServiceBase}
+     *            so we can resolve the nodes on which we can read the raw
+     *            records.
+     */
+    public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer)
+            throws IOException {
+
+        final ObjectInputStream objinstr = new ObjectInputStream(
+                new RAFInputStream());
+
+        final IHAWriteMessage msg;
+        try {
+
+            msg = (IHAWriteMessage) objinstr.readObject();
+
+        } catch (ClassNotFoundException e) {
+
+            throw new IllegalStateException(e);
+
+        }
+
+        switch (m_storeType) {
+        case RW: {
+
+            if (msg.getSize() > clientBuffer.capacity()) {
+
+                throw new IllegalStateException(
+                        "Client buffer is not large enough for logged buffer");
+
+            }
+
+            // Now setup client buffer to receive from the channel
+            final int nbytes = msg.getSize();
+            clientBuffer.position(0);
+            clientBuffer.limit(nbytes);
+
+            // Current position on channel.
+            final long pos = m_channel.position();
+
+            // Robustly read of write cache block at that position into the
+            // caller's buffer. (pos=limit=nbytes)
+            FileChannelUtility.readAll(reopener, clientBuffer, pos);
+
+            // Advance the file channel beyond the block we just read.
+            m_channel.position(pos + msg.getSize());
+            
+            // limit=pos; pos=0;
+            clientBuffer.flip(); // ready for reading
+
+            final int chksum = new ChecksumUtility().checksum(clientBuffer
+                    .duplicate());
+
+            if (chksum != msg.getChk())
+                throw new ChecksumError("Expected=" + msg.getChk()
+                        + ", actual=" + chksum);
+            
+            if (clientBuffer.remaining() != nbytes)
+                throw new AssertionError();
+
+            break;
+        }
+        case WORM: {
+            /*
+             * FIXME The WriteCache block needs to be recovered from the quorum
+             * using a failover read. 
+             */
+            throw new UnsupportedOperationException();
+//            break;
+        }
+        }
+
+        return msg;
 		
-		if (msg.getSize() > clientBuffer.capacity()) {
-			throw new IllegalStateException("Client buffer is not large enough for logged buffer");
-		}
-		
-		// Now setup client buffer to receive from the channel
-		clientBuffer.position(0);
-		clientBuffer.limit(msg.getSize());
-		
-		m_channel.read(clientBuffer);
-		clientBuffer.flip(); // ready for reading
-		
-		return msg;
 	}
 	
+    
+    /**
+     * Utility program will dump log files (or directories containing log files)
+     * provided as arguments.
+     * 
+     * @param args
+     *            Zero or more files or directories.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public static void main(final String[] args) throws IOException,
+            InterruptedException {
+
+        final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+
+        try {
+
+            for (String arg : args) {
+
+                final File file = new File(arg);
+
+                if (!file.exists()) {
+
+                    System.err.println("No such file: " + file);
+
+                    continue;
+
+                }
+
+                if (file.isDirectory()) {
+
+                    doDirectory(file, buf);
+                    
+                } else {
+
+                    doFile(file, buf);
+                    
+                }
+ 
+            }
+
+        } finally {
+
+            buf.release();
+
+        }
+
+    }
+
+    private static void doDirectory(final File dir, final IBufferAccess buf)
+            throws IOException {
+        
+        final File[] files = dir.listFiles(new FilenameFilter() {
+            
+            @Override
+            public boolean accept(File dir, String name) {
+
+                if (new File(dir, name).isDirectory()) {
+                 
+                    // Allow recursion through directories.
+                    return true;
+                    
+                }
+                
+                return name.endsWith(HALogWriter.HA_LOG_EXT);
+                
+            }
+        });
+
+        for (File file : files) {
+
+            if(file.isDirectory()) {
+             
+                doDirectory(file, buf);
+                
+            } else {
+            
+                doFile(file, buf);
+                
+            }
+
+        }
+        
+    }
+    
+    private static void doFile(final File file, final IBufferAccess buf)
+            throws IOException {
+
+        final HALogReader r = new HALogReader(file);
+
+        try {
+
+            final IRootBlockView openingRootBlock = r
+                    .getOpeningRootBlock();
+
+            final IRootBlockView closingRootBlock = r
+                    .getClosingRootBlock();
+
+            if (openingRootBlock.getCommitCounter() == closingRootBlock
+                    .getCommitCounter()) {
+
+                System.err.println("EMPTY LOG: " + file);
+
+            }
+
+            System.out.println("----------begin----------");
+            System.out.println("file=" + file);
+            System.out.println("openingRootBlock=" + openingRootBlock);
+            System.out.println("closingRootBlock=" + closingRootBlock);
+
+            while (r.hasMoreBuffers()) {
+
+                final IHAWriteMessage msg = r.processNextBuffer(buf
+                        .buffer());
+
+                System.out.println(msg.toString());
+
+            }
+            System.out.println("-----------end-----------");
+
+        } finally {
+
+            r.close();
+
+        }
+
+    }
+
 }

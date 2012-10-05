@@ -36,13 +36,15 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
 
     private static final long serialVersionUID = 1L;
     
+    private final boolean isJoinedService;
     private final boolean isRootBlock0;
     private final byte[] rootBlock;
     private final long timeout;
     private final TimeUnit unit;
 
-    public HA2PhasePrepareMessage(final IRootBlockView rootBlock,
-            final long timeout, final TimeUnit unit) {
+    public HA2PhasePrepareMessage(final boolean isJoinedService,
+            final IRootBlockView rootBlock, final long timeout,
+            final TimeUnit unit) {
         
         if (rootBlock == null)
             throw new IllegalArgumentException();
@@ -53,6 +55,8 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         if (unit == null)
             throw new IllegalArgumentException();
 
+        this.isJoinedService = isJoinedService;
+        
         this.isRootBlock0 = rootBlock.isRootBlock0();
         
         /*
@@ -68,6 +72,11 @@ public class HA2PhasePrepareMessage implements IHA2PhasePrepareMessage, Serializ
         
     }
 
+    @Override
+    public boolean isJoinedService() {
+        return isJoinedService;
+    }
+    
     @Override
     public boolean isRootBlock0() {
         return isRootBlock0;

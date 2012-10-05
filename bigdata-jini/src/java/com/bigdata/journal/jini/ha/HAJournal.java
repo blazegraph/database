@@ -37,7 +37,7 @@ import net.jini.export.Exporter;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.ProcessLogWriter;
+import com.bigdata.ha.HALogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
@@ -94,6 +94,21 @@ public class HAJournal extends Journal {
                 + ".writePipelineAddr";
 
         /**
+         * The timeout in milliseconds that the leader will await the followers
+         * to prepare for a 2-phase commit.
+         * <p>
+         * Note: The timeout must be set with a realistic expectation concerning
+         * the possibility of garbage collection. A long GC pause could
+         * otherwise cause the 2-phase commit to fail. With this in mind, a
+         * reasonable timeout is on the order of 10 seconds.
+         */
+        String HA_PREPARE_TIMEOUT = HAJournal.class.getName() + ".HAPrepareTimeout";
+
+        String DEFAULT_HA_PREPARE_TIMEOUT = "10000"; // milliseconds.
+        
+        long HA_MIN_PREPARE_TIMEOUT = 100; // milliseconds.
+        
+        /**
          * The required property whose value is the name of the directory in
          * which write ahead log files will be created to support
          * resynchronization services trying to join an HA quorum.
@@ -138,11 +153,6 @@ public class HAJournal extends Journal {
          * can join the quorum.
          * 
          * @see IRootBlockView#getCommitCounter()
-         * 
-         *      TODO We may need to also write a marker either on the head or
-         *      tail of the log file to indicate that the commit was applied.
-         *      Work this out when we work through the extension to the 2-phase
-         *      commit protocol that supports resynchronization.
          */
         String HA_LOG_DIR = HAJournal.class.getName() + ".haLogDir";
         
@@ -154,6 +164,11 @@ public class HAJournal extends Journal {
     private final InetSocketAddress writePipelineAddr;
 
     /**
+     * @see Options#HA_PREPARE_TIMEOUT
+     */
+    private final long haPrepareTimeout;
+    
+    /**
      * @see Options#HA_LOG_DIR
      */
     private final File haLogDir;
@@ -163,15 +178,15 @@ public class HAJournal extends Journal {
      * are not in the met quorum.
      * 
      * @see Options#HA_LOG_DIR
-     * @see ProcessLogWriter
+     * @see HALogWriter
      */
-    private final ProcessLogWriter haLogWriter;
+    private final HALogWriter haLogWriter;
 
     /**
-     * The {@link ProcessLogWriter} for this {@link HAJournal} and never
+     * The {@link HALogWriter} for this {@link HAJournal} and never
      * <code>null</code>.
      */
-    ProcessLogWriter getHALogWriter() {
+    HALogWriter getHALogWriter() {
 
         return haLogWriter;
         
@@ -197,6 +212,9 @@ public class HAJournal extends Journal {
         writePipelineAddr = (InetSocketAddress) properties
                 .get(Options.WRITE_PIPELINE_ADDR);
 
+        haPrepareTimeout = Long.valueOf(properties.getProperty(
+                Options.HA_PREPARE_TIMEOUT, Options.DEFAULT_HA_PREPARE_TIMEOUT));
+
         final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
 
         haLogDir = new File(logDirStr);
@@ -209,7 +227,7 @@ public class HAJournal extends Journal {
         }
 
         // Set up the HA log writer.
-        haLogWriter = new ProcessLogWriter(haLogDir);
+        haLogWriter = new HALogWriter(haLogDir);
 
     }
 
@@ -273,6 +291,16 @@ public class HAJournal extends Journal {
         
         }
 
+        final long prepareTimeout = Long.valueOf(properties
+                .getProperty(Options.HA_PREPARE_TIMEOUT,
+                        Options.DEFAULT_HA_PREPARE_TIMEOUT));
+
+        if (prepareTimeout < Options.HA_MIN_PREPARE_TIMEOUT) {
+            throw new RuntimeException(Options.HA_PREPARE_TIMEOUT + "="
+                    + prepareTimeout + " : must be GTE "
+                    + Options.HA_MIN_PREPARE_TIMEOUT);
+        }
+        
         final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
 
         if (logDirStr == null) {
@@ -289,7 +317,7 @@ public class HAJournal extends Journal {
     @Override
     protected HAGlue newHAGlue(final UUID serviceId) {
 
-        return new HAGlueService(serviceId, writePipelineAddr);
+        return new HAGlueService(serviceId);
 
     }
 
@@ -311,14 +339,20 @@ public class HAJournal extends Journal {
         return haLogDir;
         
     }
-    
+
+    @Override
+    public final long getHAPrepareTimeout() {
+
+        return haPrepareTimeout;
+        
+    }
+
     /**
      * Extended implementation supports RMI.
      */
     protected class HAGlueService extends BasicHA {
 
-        protected HAGlueService(final UUID serviceId,
-                final InetSocketAddress writePipelineAddr) {
+        protected HAGlueService(final UUID serviceId) {
 
             super(serviceId, writePipelineAddr);
 

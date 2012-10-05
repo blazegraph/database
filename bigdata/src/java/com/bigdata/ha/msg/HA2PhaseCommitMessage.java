@@ -25,19 +25,27 @@ package com.bigdata.ha.msg;
 
 import java.io.Serializable;
 
-
-public class HA2PhaseCommitMessage implements IHA2PhaseCommitMessage, Serializable {
+public class HA2PhaseCommitMessage implements IHA2PhaseCommitMessage,
+        Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private final boolean isJoinedService;
     private final long commitTime;
-    
-    public HA2PhaseCommitMessage(final long commitTime) {
 
+    public HA2PhaseCommitMessage(final boolean isJoinedService,
+            final long commitTime) {
+
+        this.isJoinedService = isJoinedService;
         this.commitTime = commitTime;
-        
+
     }
-    
+
+    @Override
+    public boolean isJoinedService() {
+        return isJoinedService;
+    }
+
     @Override
     public long getCommitTime() {
         return commitTime;

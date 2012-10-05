@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -116,11 +118,33 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
      * thread to avoid deadlock. The other services run the operation
      * asynchronously on their side while the leader awaits their future's using
      * get().
+     * <p>
+     * Note: The {@link IHA2PhasePrepareMessage} is sent to all services in
+     * write pipeline. This ensures that services that are not yet joined with
+     * the met quorum will still observe the root blocks. This is necessary in
+     * order for them to catch up with the met quorum. The 2-phase commit
+     * protocol is "aware" that not all messages are being sent to services
+     * whose votes count. Only services that are actually in the met quorum get
+     * a vote.
+     * <p>
+     * Note: This method is responsible for the atomic decision regarding
+     * whether a service will be considered to be "joined" with the met quorum
+     * for the 2-phase commit. A service that is synchronizing will either have
+     * already voted the appropriate lastCommitTime and entered the met quorum
+     * or it will not. That decision point is captured atomically when we obtain
+     * a snapshot of the joined services from the quorum state. The decision is
+     * propagated through the {@link IHA2PhasePrepareMessage} and that
+     * information is retained by the service together with the new root block
+     * from the prepare message. This metadata is used to decide how the service
+     * will handle the prepare, commit, and abort messages.
      */
-    public int prepare2Phase(//final boolean isRootBlock0,
-            final IRootBlockView rootBlock, final long timeout,
-            final TimeUnit unit) throws InterruptedException, TimeoutException,
-            IOException {
+    public int prepare2Phase(//
+            final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds,//
+            final IRootBlockView rootBlock,//
+            final long timeout, final TimeUnit unit//
+            )
+            throws InterruptedException, TimeoutException, IOException {
 
         if (rootBlock == null)
             throw new IllegalArgumentException();
@@ -149,95 +173,171 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         final long begin = System.nanoTime();
         final long nanos = unit.toNanos(timeout);
         long remaining = nanos;
-
-        int nyes = 0;
-
-        // // Copy the root block into a byte[].
-        // final byte[] data;
-        // {
-        // final ByteBuffer rb = rootBlock.asReadOnlyBuffer();
-        // data = new byte[rb.limit()];
-        // rb.get(data);
-        // }
-
-        final List<Future<Boolean>> remoteFutures = new LinkedList<Future<Boolean>>();
-
+        
         /*
-         * For services (other than the leader) in the quorum, submit the
-         * RunnableFutures to an Executor.
+         * The leader is a local service. The followers and other service in the
+         * pipeline (but not yet joined) are remote services.
          */
-        final UUID[] joinedServiceIds = getQuorum().getJoined();
+
+        // #of remote followers (joined services, excluding the leader).
+        final int nfollowers = (joinedServiceIds.length - 1);
+
+        // #of non-joined services in the pipeline.
+        final int nNonJoinedPipelineServices = nonJoinedPipelineServiceIds
+                .size();
+
+        // #of remote services (followers plus others in the pipeline).
+        final int remoteServiceCount = nfollowers + nNonJoinedPipelineServices;
+
+        // Random access list of futures.
+        final ArrayList<Future<Boolean>> remoteFutures = new ArrayList<Future<Boolean>>(
+                remoteServiceCount);
+
+        for (int i = 0; i <= remoteServiceCount; i++) {
+
+            // Pre-size to ensure sufficient room for set(i,foo).
+            remoteFutures.add(null);
         
-        // Verify the quorum is valid.
-        member.assertLeader(token);
+        }
         
-//        final byte[] tmp = BytesUtil.toArray(rootBlock.asReadOnlyBuffer());
-        final IHA2PhasePrepareMessage msg = new HA2PhasePrepareMessage(
-                rootBlock, timeout, unit);
-        
-        for (int i = 1; i < joinedServiceIds.length; i++) {
-            
-            final UUID serviceId = joinedServiceIds[i];
+        try {
+
+            // Verify the quorum is valid.
+            member.assertLeader(token);
+
+            {
+
+                // The message used for the services that are joined.
+                final IHA2PhasePrepareMessage msgForJoinedService = new HA2PhasePrepareMessage(
+                        true/* isJoinedService */, rootBlock, timeout, unit);
+
+                // First, message the joined services (met with the quorum).
+                int i = 1;
+                {
+
+                    for (; i < joinedServiceIds.length; i++) {
+
+                        final UUID serviceId = joinedServiceIds[i];
+
+                        /*
+                         * Runnable which will execute this message on the
+                         * remote service.
+                         */
+                        final Future<Boolean> rf = getService(serviceId)
+                                .prepare2Phase(msgForJoinedService);
+
+                        // add to list of futures we will check.
+                        remoteFutures.set(i, rf);
+
+                    }
+
+                }
+
+                // Next, message the pipeline services NOT met with the quorum.
+                {
+
+                    // message for non-joined services.
+                    final IHA2PhasePrepareMessage msg = new HA2PhasePrepareMessage(
+                            false/* isJoinedService */, rootBlock, timeout, unit);
+
+                    for (UUID serviceId : nonJoinedPipelineServiceIds) {
+
+                        /*
+                         * Runnable which will execute this message on the
+                         * remote service.
+                         */
+                        final Future<Boolean> rf = getService(serviceId)
+                                .prepare2Phase(msg);
+
+                        // add to list of futures we will check.
+                        remoteFutures.set(i, rf);
+
+                        i++;
+
+                    }
+                }
+
+                /*
+                 * Finally, run the operation on the leader using local method
+                 * call (non-RMI) in the caller's thread to avoid deadlock.
+                 * 
+                 * Note: Because we are running this in the caller's thread on
+                 * the leader the timeout will be ignored for the leader.
+                 * 
+                 * Note: The leader will do this operation synchronously in this
+                 * thread. This is why we add its future into the collection of
+                 * futures after we have issued the RMI requests to the other
+                 * services.
+                 */
+                {
+
+                    final S leader = member.getService();
+                    
+                    final Future<Boolean> f = leader
+                            .prepare2Phase(msgForJoinedService);
+                    
+                    remoteFutures.set(0/* index */, f);
+                    
+                }
+                
+            }
 
             /*
-             * Runnable which will execute this message on the remote service.
+             * Check futures for all services that were messaged.
              */
-            final Future<Boolean> rf = getService(serviceId).prepare2Phase(msg);
+            int nyes = 0;
+            assert remoteFutures.size() == remoteServiceCount + 1;
+            for (int i = 0; i <= remoteServiceCount; i++) {
+                final Future<Boolean> rf = remoteFutures.get(i);
+                if (rf == null)
+                    throw new AssertionError("null @ index=" + i);
+                boolean done = false;
+                try {
+                    remaining = nanos - (begin - System.nanoTime());
+                    final boolean vote = rf
+                            .get(remaining, TimeUnit.NANOSECONDS);
+                    if (i < joinedServiceIds.length) {
+                        // Only the leader and the followers get a vote.
+                        nyes += vote ? 1 : 0;
+                    } else {
+                        // non-joined pipeline service. vote does not count.
+                        if (!vote) {
+                            log.warn("Non-joined pipeline service will not prepare");
+                        }
+                    }
+                    done = true;
+                } catch (ExecutionException ex) {
+                    log.error(ex, ex);
+                } finally {
+                    if (!done) {
+                        // Cancel the request on the remote service (RMI).
+                        try {
+                            rf.cancel(true/* mayInterruptIfRunning */);
+                        } catch (Throwable t) {
+                            // ignored.
+                        }
+                    }
+                }
+            }
 
-            // add to list of futures we will check.
-            remoteFutures.add(rf);
+            final int k = getQuorum().replicationFactor();
 
-//            /*
-//             * Submit the runnable for execution by the leader's
-//             * ExecutorService. When the runnable runs it will execute the
-//             * message on the remote service using RMI.
-//             */
-//            member.getExecutor().execute(rf);
+            if (!getQuorum().isQuorum(nyes)) {
 
-        }
+                log.error("prepare rejected: nyes=" + nyes + " out of " + k);
 
-        {
+            }
+
+            return nyes;
+
+        } finally {
             /*
-             * Run the operation on the leader using local method call (non-RMI)
-             * in the caller's thread to avoid deadlock.
-             * 
-             * Note: Because we are running this in the caller's thread on the
-             * leader the timeout will be ignored for the leader.
+             * Ensure that all futures are cancelled.
              */
-            final S leader = member.getService();
-            final Future<Boolean> f = leader.prepare2Phase(msg);
-            remoteFutures.add(f);
-//            /*
-//             * Note: This runs synchronously in the caller's thread (it ignores
-//             * timeout).
-//             */
-//            f.run();
-//            try {
-//                remaining = nanos - (begin - System.nanoTime());
-//                nyes += f.get(remaining, TimeUnit.NANOSECONDS) ? 1 : 0;
-//            } catch (ExecutionException e) {
-//                // Cancel remote futures.
-//                cancelRemoteFutures(remoteFutures);
-//                // Error on the leader.
-//                throw new RuntimeException(e);
-//            } finally {
-//                f.cancel(true/* mayInterruptIfRunning */);
-//            }
-        }
-
-        /*
-         * Check the futures for the other services in the quorum.
-         */
-        for (Future<Boolean> rf : remoteFutures) {
-            boolean done = false;
-            try {
-                remaining = nanos - (begin - System.nanoTime());
-                nyes += rf.get(remaining, TimeUnit.NANOSECONDS) ? 1 : 0;
-                done = true;
-            } catch (ExecutionException ex) {
-                log.error(ex, ex);
-            } finally {
-                if (!done) {
+            for (Future<Boolean> rf : remoteFutures) {
+                if (rf == null) // ignore empty slots.
+                    continue;
+                if (!rf.isDone()) {
                     // Cancel the request on the remote service (RMI).
                     try {
                         rf.cancel(true/* mayInterruptIfRunning */);
@@ -248,20 +348,12 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
             }
         }
 
-        final int k = getQuorum().replicationFactor();
-
-        if (!getQuorum().isQuorum(nyes)) {
-
-            log.error("prepare rejected: nyes=" + nyes + " out of " + k);
-
-        }
-
-        return nyes;
-
     }
 
-    public void commit2Phase(final long token, final long commitTime)
-            throws IOException, InterruptedException {
+    public void commit2Phase(final UUID[] joinedServiceIds, //
+            final Set<UUID> nonJoinedPipelineServiceIds,//
+            final long token, final long commitTime) throws IOException,
+            InterruptedException {
 
         if (log.isInfoEnabled())
             log.info("token=" + token + ", commitTime=" + commitTime);
@@ -272,78 +364,113 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
          * services to commit concurrently with the leader's IO.
          */
 
-        final List<Future<Void>> remoteFutures = new LinkedList<Future<Void>>();
-
-        /*
-         * For services (other than the leader) in the quorum, submit the
-         * RunnableFutures to an Executor.
-         */
-        final UUID[] joinedServiceIds = getQuorum().getJoined();
-        
         member.assertLeader(token);
 
-        final IHA2PhaseCommitMessage msg = new HA2PhaseCommitMessage(commitTime);
+        final List<Future<Void>> remoteFutures = new LinkedList<Future<Void>>();
         
-        for (int i = 1; i < joinedServiceIds.length; i++) {
-            
-            final UUID serviceId = joinedServiceIds[i];
+        try {
+
+            final IHA2PhaseCommitMessage msgJoinedService = new HA2PhaseCommitMessage(
+                    true/* isJoinedService */, commitTime);
+
+            for (int i = 1; i < joinedServiceIds.length; i++) {
+
+                final UUID serviceId = joinedServiceIds[i];
+
+                /*
+                 * Runnable which will execute this message on the remote
+                 * service.
+                 */
+                final Future<Void> rf = getService(serviceId).commit2Phase(
+                        msgJoinedService);
+
+                // add to list of futures we will check.
+                remoteFutures.add(rf);
+
+            }
+
+            if (!nonJoinedPipelineServiceIds.isEmpty()) {
+
+                final IHA2PhaseCommitMessage msgNonJoinedService = new HA2PhaseCommitMessage(
+                        false/* isJoinedService */, commitTime);
+
+                for (UUID serviceId : nonJoinedPipelineServiceIds) {
+
+                    /*
+                     * Runnable which will execute this message on the remote
+                     * service.
+                     */
+                    final Future<Void> rf = getService(serviceId).commit2Phase(
+                            msgNonJoinedService);
+
+                    // add to list of futures we will check.
+                    remoteFutures.add(rf);
+
+                }
+
+            }
+
+            {
+                /*
+                 * Run the operation on the leader using local method call in
+                 * the caller's thread to avoid deadlock.
+                 */
+
+                final S leader = member.getService();
+
+                final Future<Void> f = leader.commit2Phase(msgJoinedService);
+
+                remoteFutures.add(f);
+
+            }
 
             /*
-             * Runnable which will execute this message on the remote service.
+             * Check the futures for the other services in the quorum.
              */
-            final Future<Void> rf = getService(serviceId).commit2Phase(msg);
+            final List<Throwable> causes = new LinkedList<Throwable>();
+            for (Future<Void> rf : remoteFutures) {
+                boolean done = false;
+                try {
+                    rf.get();
+                    done = true;
+                } catch (InterruptedException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } catch (ExecutionException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } finally {
+                    if (!done) {
+                        // Cancel the request on the remote service (RMI).
+                        try {
+                            rf.cancel(true/* mayInterruptIfRunning */);
+                        } catch (Throwable t) {
+                            // ignored.
+                        }
+                    }
+                }
+            }
 
-            // add to list of futures we will check.
-            remoteFutures.add(rf);
-
-//            /*
-//             * Submit the runnable for execution by the leader's
-//             * ExecutorService. When the runnable runs it will execute the
-//             * message on the remote service using RMI.
-//             */
-//            member.getExecutor().execute(rf);
-
-        }
-
-        {
             /*
-             * Run the operation on the leader using local method call in the
-             * caller's thread to avoid deadlock.
+             * If there were any errors, then throw an exception listing them.
+             * 
+             * TODO But only throw the exception if the errors were for a joined
+             * service. Otherwise just log.
              */
-            final S leader = member.getService();
-            final Future<Void> f = leader.commit2Phase(msg);
-            remoteFutures.add(f);
-//            // Note: This runs synchronously (ignores timeout).
-//            f.run();
-//            try {
-//                f.get();
-//            } catch (ExecutionException e) {
-//                // Cancel remote futures.
-//                cancelRemoteFutures(remoteFutures);
-//                // Error on the leader.
-//                throw new RuntimeException(e);
-//            } finally {
-//                f.cancel(true/* mayInterruptIfRunning */);
-//            }
-        }
+            if (!causes.isEmpty()) {
+                // Cancel remote futures.
+                cancelRemoteFutures(remoteFutures);
+                // Throw exception back to the leader.
+                throw new RuntimeException("remote errors: nfailures="
+                        + causes.size(), new ExecutionExceptions(causes));
+            }
 
-        /*
-         * Check the futures for the other services in the quorum.
-         */
-        final List<Throwable> causes = new LinkedList<Throwable>();
-        for (Future<Void> rf : remoteFutures) {
-            boolean done = false;
-            try {
-                rf.get();
-                done = true;
-            } catch (InterruptedException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } catch (ExecutionException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } finally {
-                if (!done) {
+        } finally {
+            /*
+             * Ensure that all futures are cancelled.
+             */
+            for (Future<Void> rf : remoteFutures) {
+                if (!rf.isDone()) {
                     // Cancel the request on the remote service (RMI).
                     try {
                         rf.cancel(true/* mayInterruptIfRunning */);
@@ -352,17 +479,6 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     }
                 }
             }
-        }
-
-        /*
-         * If there were any errors, then throw an exception listing them.
-         */
-        if (!causes.isEmpty()) {
-            // Cancel remote futures.
-            cancelRemoteFutures(remoteFutures);
-            // Throw exception back to the leader.
-            throw new RuntimeException("remote errors: nfailures="
-                    + causes.size(), new ExecutionExceptions(causes));
         }
 
     }
@@ -391,67 +507,81 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         
         final IHA2PhaseAbortMessage msg = new HA2PhaseAbortMessage(token);
 
-        for (int i = 1; i < joinedServiceIds.length; i++) {
+        try {
 
-            final UUID serviceId = joinedServiceIds[i];
+            for (int i = 1; i < joinedServiceIds.length; i++) {
+
+                final UUID serviceId = joinedServiceIds[i];
+
+                /*
+                 * Runnable which will execute this message on the remote
+                 * service.
+                 */
+                final Future<Void> rf = getService(serviceId).abort2Phase(msg);
+
+                // add to list of futures we will check.
+                remoteFutures.add(rf);
+
+            }
+
+            {
+                /*
+                 * Run the operation on the leader using a local method call
+                 * (non-RMI) in the caller's thread to avoid deadlock.
+                 */
+                member.assertLeader(token);
+                final S leader = member.getService();
+                final Future<Void> f = leader.abort2Phase(msg);
+                remoteFutures.add(f);
+            }
 
             /*
-             * Runnable which will execute this message on the remote service.
+             * Check the futures for the other services in the quorum.
              */
-            final Future<Void> rf = getService(serviceId).abort2Phase(msg);
+            final List<Throwable> causes = new LinkedList<Throwable>();
+            for (Future<Void> rf : remoteFutures) {
+                boolean done = false;
+                try {
+                    rf.get();
+                    done = true;
+                } catch (InterruptedException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } catch (ExecutionException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } finally {
+                    if (!done) {
+                        // Cancel the request on the remote service (RMI).
+                        try {
+                            rf.cancel(true/* mayInterruptIfRunning */);
+                        } catch (Throwable t) {
+                            // ignored.
+                        }
+                    }
+                }
+            }
 
-            // add to list of futures we will check.
-            remoteFutures.add(rf);
-
-//            /*
-//             * Submit the runnable for execution by the leader's
-//             * ExecutorService. When the runnable runs it will execute the
-//             * message on the remote service using RMI.
-//             */
-//            member.getExecutor().execute(rf);
-
-        }
-
-        {
             /*
-             * Run the operation on the leader using a local method call
-             * (non-RMI) in the caller's thread to avoid deadlock.
+             * If there were any errors, then throw an exception listing them.
+             * 
+             * TODO But only throw an exception for the joined services.
+             * Non-joined services, we just long an error.
              */
-            member.assertLeader(token);
-            final S leader = member.getService();
-            final Future<Void> f = leader.abort2Phase(msg);
-            remoteFutures.add(f);
-//            // Note: This runs synchronously (ignores timeout).
-//            f.run();
-//            try {
-//                f.get();
-//            } catch (ExecutionException e) {
-//                // Cancel remote futures.
-//                cancelRemoteFutures(remoteFutures);
-//                // Error on the leader.
-//                throw new RuntimeException(e);
-//            } finally {
-//                f.cancel(true/* mayInterruptIfRunning */);
-//            }
-        }
+            if (!causes.isEmpty()) {
+                // Cancel remote futures.
+                cancelRemoteFutures(remoteFutures);
+                // Throw exception back to the leader.
+                throw new RuntimeException("remote errors: nfailures="
+                        + causes.size(), new ExecutionExceptions(causes));
+            }
 
-        /*
-         * Check the futures for the other services in the quorum.
-         */
-        final List<Throwable> causes = new LinkedList<Throwable>();
-        for (Future<Void> rf : remoteFutures) {
-            boolean done = false;
-            try {
-                rf.get();
-                done = true;
-            } catch (InterruptedException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } catch (ExecutionException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } finally {
-                if (!done) {
+        } finally {
+            /*
+             * Ensure that all futures are cancelled.
+             */
+            for (Future<Void> rf : remoteFutures) {
+                if (!rf.isDone()) {
                     // Cancel the request on the remote service (RMI).
                     try {
                         rf.cancel(true/* mayInterruptIfRunning */);
@@ -460,17 +590,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     }
                 }
             }
-        }
 
-        /*
-         * If there were any errors, then throw an exception listing them.
-         */
-        if (!causes.isEmpty()) {
-            // Cancel remote futures.
-            cancelRemoteFutures(remoteFutures);
-            // Throw exception back to the leader.
-            throw new RuntimeException("remote errors: nfailures="
-                    + causes.size(), new ExecutionExceptions(causes));
         }
 
     }

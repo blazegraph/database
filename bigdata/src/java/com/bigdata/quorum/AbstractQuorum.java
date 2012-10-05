@@ -123,8 +123,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * 
      * @see #awaitEnoughJoinedToMeet()
      * 
-     * @todo make this configurable (settable). We might want to set it to the
-     *       <code>2 x tickTime</code> for zookeeper.
+     *      TODO Make this configurable (settable). We might want to set it to
+     *      the <code>2 x tickTime</code> for zookeeper.
      */
     private final long timeout = TimeUnit.SECONDS.toNanos(1);
 
