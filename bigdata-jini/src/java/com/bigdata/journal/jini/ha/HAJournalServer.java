@@ -69,7 +69,7 @@ import com.sun.jini.start.LifeCycle;
  */
 public class HAJournalServer extends AbstractServer {
 
-    private static final Logger log = Logger.getLogger(HAJournal.class);
+    private static final Logger log = Logger.getLogger(HAJournalServer.class);
 
     /**
      * Logger for HA events.
@@ -421,7 +421,7 @@ public class HAJournalServer extends AbstractServer {
             @Override
             public void notify(final QuorumEvent e) {
                 if (log.isTraceEnabled())
-                    haLog.trace("QuorumEvent: " + e);
+                    System.err.println("QuorumEvent: " + e); // TODO LOG @ TRACE
 //                switch(e.getEventType()) {
 //                case CAST_VOTE:
 //                    break;

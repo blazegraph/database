@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -507,11 +508,55 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 //            return modified;
 //        }
 
+        /**
+         * Return the zpath for the VOTES for the logical service to which this
+         * service belongs.
+         */
+        private String getVotesZPath() {
+
+            // TODO Extract constant.
+            return logicalServiceId + "/" + QUORUM + "/" + QUORUM_VOTES;
+            
+        }
+        
+        /**
+         * Return the zpath for the given last commit time for the logical
+         * service to which this service belongs.
+         * 
+         * @param lastCommitTime
+         *            The last commit time.
+         * 
+         * @return The zpath.
+         */
+//        * <p>
+//        * Note: The lastCommitTime znode name is formatted with 20 digits and
+//        * leading zeros in order to allow any possible last commit time values
+//        * while preserving the ability to order them by a lexical sort on the
+//        * zpaths or znode names.
+        private String getLastCommitTimeZPath(final long lastCommitTime) {
+            
+            final StringBuilder sb = new StringBuilder();
+
+            sb.append(getVotesZPath());
+
+            sb.append("/");
+            sb.append(lastCommitTime);
+//            final Formatter f = new Formatter(sb);
+//
+//            f.format("%020d", lastCommitTime);
+//            f.flush();
+//            f.close();
+
+            // zpath for the lastCommitTime.
+            final String lastCommitTimeZPath = sb.toString();
+            
+            return lastCommitTimeZPath;
+            
+        }
+        
         @Override
         protected void doCastVote(final long lastCommitTime) {
-            // zpath for the lastCommitTime.
-            final String lastCommitTimeZPath = logicalServiceId + "/" + QUORUM
-                    + "/" + QUORUM_VOTES + "/" + lastCommitTime;
+            final String lastCommitTimeZPath = getLastCommitTimeZPath(lastCommitTime);
             if (log.isInfoEnabled())
                 log.info("lastCommitTime=" + lastCommitTime
                         + ", lastCommitTimeZPath=" + lastCommitTimeZPath);
@@ -588,8 +633,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         @Override
         protected void doWithdrawVote() {
             // zpath for votes.
-            final String votesZPath = logicalServiceId + "/" + QUORUM + "/"
-                    + QUORUM_VOTES;
+            final String votesZPath = getVotesZPath();
             if (log.isInfoEnabled())
                 log.info("votesZPath=" + votesZPath);
             // get a valid zookeeper connection object.
@@ -602,9 +646,12 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 return;
             }
             // find all lastCommitTimes for which votes have been cast.
-            final List<String> lastCommitTimes;
+            final String[] lastCommitTimes;
             try {
-                lastCommitTimes = zk.getChildren(votesZPath, false/* watch */);
+                final List<String> tmp = zk
+                        .getChildren(votesZPath, false/* watch */);
+                lastCommitTimes = tmp.toArray(new String[tmp.size()]);
+                Arrays.sort(lastCommitTimes,VoteComparator.INSTANCE); // Note: ascending order!
             } catch (KeeperException e) {
                 throw new RuntimeException(e);
             } catch (InterruptedException e) {
@@ -880,11 +927,12 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 final QuorumTokenState newState = new QuorumTokenState(oldState
                         .lastValidToken(), Quorum.NO_QUORUM);
                 try {
+//    log.fatal("Setting quorum state: \noldState="+oldState+"\nnewState="+newState); 
                     zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
                             .serialize(newState), stat.getVersion());
                     // done.
                     if (log.isInfoEnabled())
-                        log.info("Cleared: serviceId=" + serviceId);
+                        log.info("Cleared token: serviceId=" + serviceId);
                     return;
                 } catch (BadVersionException e) {
                     /*
@@ -907,6 +955,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
         @Override
         protected void doSetToken(final long newToken) {
+            if (newToken == NO_QUORUM)
+                throw new IllegalArgumentException();
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -967,6 +1017,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                     // new local state object.
                     final QuorumTokenState newState = new QuorumTokenState(
                             newToken, newToken);
+//    log.fatal("Setting quorum state: \noldState="+oldState+"\nnewState="+newState);
                     // update data (verifying the version!)
                     zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
                             .serialize(newState), stat.getVersion());
@@ -1700,7 +1751,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
                 lock.lock();
                 try {
-                    if (state.token() == NO_QUORUM && token() != NO_QUORUM) {
+                    final long tok = token();
+                    if (state.token() == NO_QUORUM && tok != NO_QUORUM) {
                         clearToken();
                     } else if (lastValidToken() != state.lastValidToken()) {
                         final UUID[] joined = getJoined();
@@ -1711,6 +1763,10 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                             log.warn("Can not set token - not enough joined services: k="
                                     + k + ", joined=" + joined.length);
                         }
+                    } else {
+                        if (log.isInfoEnabled())
+                            log.info("Nothing to do: currentState=" + state
+                                    + ", token()=" + tok);
                     }
                 } finally {
                     lock.unlock();
@@ -1927,38 +1983,45 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 log.info("Starting with quorum that has already met in the past: "
                         + tokenState);
 
-            if (tokenState.token() != NO_QUORUM && !isQuorumMet()) {
-
-                try {
-
-                    /*
-                     * Replace the QuorumTokenState.
-                     * 
-                     * There is a durable QuorumTokenState, but it has a valid
-                     * token even though the quorum is not met. This can occur
-                     * on restart since it is quorum clients that are
-                     * responsible for managing the state in zookeeper. If all
-                     * clients were killed, then none of them will have had the
-                     * opportunity to update the QuorumTokenState in zookeeper
-                     * and it will falsely report a valid quorum. We fix that
-                     * now by replacing the data in the znode.
-                     */
-                    QuorumTokenState tmp = new QuorumTokenState(//
-                            tokenState.lastValidToken(),// lastValidToken
-                            Quorum.NO_QUORUM// currentToken
-                    );
-
-                    // update znode unless version is changed.
-                    zka.getZookeeper().setData(logicalServiceId + "/" + QUORUM,
-                            SerializerUtil.serialize(tmp), stat.getVersion());
-
-                } catch (BadVersionException ex) {
-                    // ignore.
-                    if (log.isInfoEnabled())
-                        log.info("Version no longer current: " + ex);
-                }
-
-            }
+            /*
+             * Note: This code can not run in AbstractQuorum.start(C) because
+             * the watcher has not yet had enough time to discover the current
+             * state of the quorum, therefore it is premature to force a quorum
+             * break.
+             */
+//            if (tokenState.token() != NO_QUORUM && !isQuorumMet()) {
+//
+//                try {
+//
+//                    /*
+//                     * Replace the QuorumTokenState.
+//                     * 
+//                     * There is a durable QuorumTokenState, but it has a valid
+//                     * token even though the quorum is not met. This can occur
+//                     * on restart since it is quorum clients that are
+//                     * responsible for managing the state in zookeeper. If all
+//                     * clients were killed, then none of them will have had the
+//                     * opportunity to update the QuorumTokenState in zookeeper
+//                     * and it will falsely report a valid quorum. We fix that
+//                     * now by replacing the data in the znode.
+//                     */
+//                    final QuorumTokenState tmp = new QuorumTokenState(//
+//                            tokenState.lastValidToken(),// lastValidToken
+//                            Quorum.NO_QUORUM// currentToken
+//                    );
+//
+//                    // update znode unless version is changed.
+//                    zka.getZookeeper().setData(logicalServiceId + "/" + QUORUM,
+//                            SerializerUtil.serialize(tmp), stat.getVersion());
+//
+//                } catch (BadVersionException ex) {
+//                    // ignore.
+//                    if (log.isInfoEnabled())
+//                        log.info("Version no longer current: " + ex);
+//                }
+//
+//            }
+            
             return tokenState.lastValidToken();
         } catch (NoNodeException e) {
             // This is Ok. The node just does not exist yet.
@@ -1989,12 +2052,11 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             final ZooKeeperAccessor zka, final List<ACL> acl)
             throws KeeperException, InterruptedException {
 
-        QuorumTokenState tokenState = new QuorumTokenState(//
-                Quorum.NO_QUORUM,// lastValidToken
-                Quorum.NO_QUORUM// currentToken
-        );
-
         try {
+            final QuorumTokenState tokenState = new QuorumTokenState(//
+                    Quorum.NO_QUORUM,// lastValidToken
+                    Quorum.NO_QUORUM// currentToken
+            );
             zka.getZookeeper().create(logicalServiceId + "/" + QUORUM,
                     SerializerUtil.serialize(tokenState), acl,
                     CreateMode.PERSISTENT);
@@ -2036,6 +2098,27 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
 //        return tokenState;
         
+    }
+
+    /**
+     * Compares string values representing <code>lastCommitTime</code> votes by
+     * decoding them to <code>long</code> values.
+     */
+    private static class VoteComparator implements Comparator<String> {
+
+        final static VoteComparator INSTANCE = new VoteComparator();
+
+        @Override
+        public int compare(final String arg0, final String arg1) {
+            final long v0 = Long.parseLong(arg0);
+            final long v1 = Long.parseLong(arg1);
+            if (v0 < v1)
+                return -1;
+            if (v0 > v1)
+                return 1;
+            return 0;
+        }
+
     }
 
 }
