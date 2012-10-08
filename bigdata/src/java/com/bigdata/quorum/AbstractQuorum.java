@@ -3119,7 +3119,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     + type
                     + ",lastValidToken="
                     + lastValidToken
-                    + ",token="
+                    + ",currentToken="
                     + token
                     + ",serviceId="
                     + serviceId

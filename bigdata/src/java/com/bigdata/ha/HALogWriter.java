@@ -149,6 +149,8 @@ public class HALogWriter {
             final long commitCounter = rootBlock.getCommitCounter();
 
             f.format("%020d" + HA_LOG_EXT, (commitCounter + 1));
+            f.flush();
+            f.close();
 
             logFile = sb.toString();
 
