@@ -110,10 +110,12 @@ public class TestTicket610 extends ProxyBigdataSailTestCase {
 	  				
 	  				final AbstractTripleStore store = cxn.getTripleStore();
 	  				
-	  				final StringBuilder sb = store.dumpStore(true, true, false);
-	  				System.err.println(sb);
+	  				if (log.isDebugEnabled()) {
+		  				final StringBuilder sb = store.dumpStore(true, true, false);
+		  				System.err.println(sb);
+	  				}
 	  				
-	  				assertTrue("missing the (<b> rdf:type owl:TransitiveProperty) inference", store.hasStatement(b, RDF.TYPE, OWL.TRANSITIVEPROPERTY));
+	  				assertFalse("should not have the (<b> rdf:type owl:TransitiveProperty) inference", store.hasStatement(b, RDF.TYPE, OWL.TRANSITIVEPROPERTY));
 	  				
 	  			} finally {
 	  				cxn.close();
