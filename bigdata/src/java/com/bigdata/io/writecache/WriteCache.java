@@ -1948,6 +1948,12 @@ abstract public class WriteCache implements IWriteCache {
                      * It is possible that the address will already have been removed due to 
                      * a concurrent reset of the WriteCache when taken from the WriteCacheService
                      * freelist for re-use.
+                     * 
+                     * The real problem with binary
+ Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * compatibility for HA is that the internal buffer must
+ Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * not be modified once we decide to flush() it to the
+ Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * disk and the write pipeline. ÊThat condition is
+ Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * guarded by [m_closedForWrites].
                      */
                     recordMap.remove(addr);
                 }
