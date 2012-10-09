@@ -211,7 +211,7 @@ public class FastClosure extends BaseClosure {
     
                     tmp.add(new RuleOwlTransitiveProperty1(db, vocab));
     
-                    tmp.add(new RuleOwlTransitiveProperty2(db, vocab));
+//                    tmp.add(new RuleOwlTransitiveProperty2(db, vocab));
                     
                 }
     
