@@ -1942,11 +1942,14 @@ abstract public class WriteCache implements IWriteCache {
                     }
                     /*
                      * Remove the entry.
+                     * 
+                     * A non-null value shouldn't be asserted.
+                     * 
+                     * It is possible that the address will already have been removed due to 
+                     * a concurrent reset of the WriteCache when taken from the WriteCacheService
+                     * freelist for re-use.
                      */
-                    if (recordMap.remove(addr) == null)
-                        throw new AssertionError(
-                                "Address already cleared: addr=" + addr
-                                        + ", latchedAddr=" + latchedAddr);
+                    recordMap.remove(addr);
                 }
             } // synchronized(tmp)
 
