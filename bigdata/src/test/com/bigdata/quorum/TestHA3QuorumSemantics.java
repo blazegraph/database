@@ -207,8 +207,12 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor2.memberAdd();
         fixture.awaitDeque();
         
-        assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 }, quorum0
-                .getMembers());
+        assertCondition(new Runnable() {
+            public void run() {
+                assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 },
+                        quorum0.getMembers());
+            }
+        });
 
         /*
          * Add each service in turn to the pipeline, verifying the changes in

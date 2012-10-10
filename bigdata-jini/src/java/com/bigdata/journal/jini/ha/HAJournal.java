@@ -24,24 +24,42 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
+import java.rmi.Remote;
+import java.rmi.server.ExportException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import net.jini.config.Configuration;
 import net.jini.export.Exporter;
+import net.jini.jeri.BasicILFactory;
+import net.jini.jeri.BasicJeriExporter;
+import net.jini.jeri.InvocationLayerFactory;
+import net.jini.jeri.tcp.TcpServerEndpoint;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HALogReader;
 import com.bigdata.ha.HALogWriter;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.msg.HALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
@@ -50,6 +68,9 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.service.proxy.ClientFuture;
+import com.bigdata.service.proxy.RemoteFuture;
+import com.bigdata.service.proxy.RemoteFutureImpl;
 import com.bigdata.service.proxy.ThickFuture;
 
 /**
@@ -82,16 +103,24 @@ import com.bigdata.service.proxy.ThickFuture;
  */
 public class HAJournal extends Journal {
 
-//    private static final Logger log = Logger.getLogger(HAJournal.class);
+    private static final Logger log = Logger.getLogger(HAJournal.class);
 
     public interface Options extends Journal.Options {
         
         /**
          * The address at which this journal exposes its write pipeline
-         * interface.
+         * interface (a socket level interface for receiving write cache blocks
+         * from another service in the met quorum).
          */
         String WRITE_PIPELINE_ADDR = HAJournal.class.getName()
                 + ".writePipelineAddr";
+
+//        /**
+//         * The address at which this journal exposes its resynchronization
+//         * interface (a socket level interface for receiving write cache blocks
+//         * from another service in the met quorum).
+//         */
+//        String RESYNCH_ADDR = HAJournal.class.getName() + ".resyncAddr";
 
         /**
          * The timeout in milliseconds that the leader will await the followers
@@ -109,9 +138,9 @@ public class HAJournal extends Journal {
         long HA_MIN_PREPARE_TIMEOUT = 100; // milliseconds.
         
         /**
-         * The required property whose value is the name of the directory in
-         * which write ahead log files will be created to support
-         * resynchronization services trying to join an HA quorum.
+         * The property whose value is the name of the directory in which write
+         * ahead log files will be created to support resynchronization services
+         * trying to join an HA quorum (default {@value #DEFAULT_HA_LOG_DIR}).
          * <p>
          * The directory should not contain any other files. It will be
          * populated with files whose names correspond to commit counters. The
@@ -155,6 +184,8 @@ public class HAJournal extends Journal {
          * @see IRootBlockView#getCommitCounter()
          */
         String HA_LOG_DIR = HAJournal.class.getName() + ".haLogDir";
+        
+        String DEFAULT_HA_LOG_DIR = "HALog";
         
     }
     
@@ -215,7 +246,8 @@ public class HAJournal extends Journal {
         haPrepareTimeout = Long.valueOf(properties.getProperty(
                 Options.HA_PREPARE_TIMEOUT, Options.DEFAULT_HA_PREPARE_TIMEOUT));
 
-        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
+        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR,
+                Options.DEFAULT_HA_LOG_DIR);
 
         haLogDir = new File(logDirStr);
 
@@ -301,15 +333,6 @@ public class HAJournal extends Journal {
                     + Options.HA_MIN_PREPARE_TIMEOUT);
         }
         
-        final String logDirStr = properties.getProperty(Options.HA_LOG_DIR);
-
-        if (logDirStr == null) {
-
-            throw new IllegalArgumentException(Options.HA_LOG_DIR
-                    + " : must be specified");
-
-        }
-
         return properties;
 
     }
@@ -347,6 +370,33 @@ public class HAJournal extends Journal {
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to expose this method to the {@link HAQuorumService}.
+     */
+    @Override
+    protected void installRootBlocksFromQuorum(
+            final QuorumService<HAGlue> localService,
+            final IRootBlockView rootBlock) {
+
+        super.installRootBlocksFromQuorum(localService, rootBlock);
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to expose this method to the {@link HAQuorumService}.
+     */
+    @Override
+    protected void doLocalCommit(final QuorumService<HAGlue> localService,
+            final IRootBlockView rootBlock) {
+
+        super.doLocalCommit(localService, rootBlock);
+
+    }
+    
     /**
      * Extended implementation supports RMI.
      */
@@ -405,6 +455,104 @@ public class HAJournal extends Journal {
         }
 
         @Override
+        public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                final IHALogRootBlocksRequest msg) throws IOException {
+
+            // The commit counter of the desired closing root block.
+            final long commitCounter = msg.getCommitCounter();
+
+            final File logFile = new File(haLogDir,
+                    HALogWriter.getHALogFileName(commitCounter));
+
+            if (!logFile.exists()) {
+
+                // No log for that commit point.
+                throw new FileNotFoundException(logFile.getName());
+
+            }
+
+            final HALogReader r = new HALogReader(logFile);
+
+            return new HALogRootBlocksResponse(r.getOpeningRootBlock(),
+                    r.getClosingRootBlock());
+
+        }
+
+        @Override
+        public Future<Void> sendHALogForWriteSet(final IHALogRequest req)
+                throws IOException {
+            
+            // The commit counter of the desired closing root block.
+            final long commitCounter = req.getCommitCounter();
+
+            final File logFile = new File(haLogDir,
+                    HALogWriter.getHALogFileName(commitCounter));
+
+            if (!logFile.exists()) {
+
+                // No log for that commit point.
+                throw new FileNotFoundException(logFile.getName());
+
+            }
+
+            final HALogReader r = new HALogReader(logFile);
+
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                    new SendHALogTask(req, r));
+
+            getExecutorService().submit(ft);
+            
+            return getProxy(ft, true/* asynch */);
+
+        }
+
+        private class SendHALogTask implements Callable<Void> {
+
+            private final IHALogRequest req;
+            private final HALogReader r;
+
+            public SendHALogTask(final IHALogRequest req, final HALogReader r) {
+
+                this.req = req;
+                this.r = r;
+
+            }
+
+            public Void call() throws Exception {
+
+                final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+
+                try {
+
+                    while (r.hasMoreBuffers()) {
+
+                        // get message and write cache buffer.
+                        final IHAWriteMessage msg = r.processNextBuffer(buf
+                                .buffer());
+
+                        // drop them into the write pipeline.
+                        final Future<Void> ft = ((IHABufferStrategy) HAJournal.this
+                                .getBufferStrategy()).sendHALogBuffer(req, msg,
+                                buf);
+
+                        // wait for message to make it through the pipeline.
+                        ft.get();
+                        
+                    }
+
+                    return null;
+
+                } finally {
+
+                    buf.release();
+
+                }
+
+            }
+
+        }
+
+        @Override
         public Future<Void> bounceZookeeperConnection() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
                 @SuppressWarnings("rawtypes")
@@ -436,36 +584,36 @@ public class HAJournal extends Journal {
 //          
         }
         
-//        /**
-//         * Note: The invocation layer factory is reused for each exported proxy (but
-//         * the exporter itself is paired 1:1 with the exported proxy).
-//         */
-//        final private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
-//        
-//        /**
-//         * Return an {@link Exporter} for a single object that implements one or
-//         * more {@link Remote} interfaces.
-//         * <p>
-//         * Note: This uses TCP Server sockets.
-//         * <p>
-//         * Note: This uses [port := 0], which means a random port is assigned.
-//         * <p>
-//         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
-//         * <code>false</code>).
-//         * 
-//         * @param enableDGC
-//         *            if distributed garbage collection should be used for the
-//         *            object to be exported.
-//         * 
-//         * @return The {@link Exporter}.
-//         */
-//        protected Exporter getExporter(final boolean enableDGC) {
-//            
-//            return new BasicJeriExporter(TcpServerEndpoint
-//                    .getInstance(0/* port */), invocationLayerFactory, enableDGC,
-//                    false/* keepAlive */);
-//            
-//        }
+        /**
+         * Note: The invocation layer factory is reused for each exported proxy (but
+         * the exporter itself is paired 1:1 with the exported proxy).
+         */
+        final private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
+        
+        /**
+         * Return an {@link Exporter} for a single object that implements one or
+         * more {@link Remote} interfaces.
+         * <p>
+         * Note: This uses TCP Server sockets.
+         * <p>
+         * Note: This uses [port := 0], which means a random port is assigned.
+         * <p>
+         * Note: The VM WILL NOT be kept alive by the exported proxy (keepAlive is
+         * <code>false</code>).
+         * 
+         * @param enableDGC
+         *            if distributed garbage collection should be used for the
+         *            object to be exported.
+         * 
+         * @return The {@link Exporter}.
+         */
+        protected Exporter getExporter(final boolean enableDGC) {
+            
+            return new BasicJeriExporter(TcpServerEndpoint
+                    .getInstance(0/* port */), invocationLayerFactory, enableDGC,
+                    false/* keepAlive */);
+            
+        }
 
         /**
          * Note that {@link Future}s generated by
@@ -484,57 +632,65 @@ public class HAJournal extends Journal {
         @Override
         protected <E> Future<E> getProxy(final Future<E> future) {
 
-            /*
-             * This was borrowed from a fix for a DGC thread leak on the
-             * clustered database. Returning a Future so the client can
-             * wait on the outcome is often less desirable than having
-             * the service compute the Future and then return a think
-             * future.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/433
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/437
-             */
-            return new ThickFuture<E>(future);
+            return getProxy(future, false/* asyncFuture */);
 
-//            /*
-//             * Setup the Exporter for the Future.
-//             * 
-//             * Note: Distributed garbage collection is enabled since the proxied
-//             * future CAN become locally weakly reachable sooner than the client can
-//             * get() the result. Distributed garbage collection handles this for us
-//             * and automatically unexports the proxied iterator once it is no longer
-//             * strongly referenced by the client.
-//             */
-//            final Exporter exporter = getExporter(true/* enableDGC */);
-//            
-//            // wrap the future in a proxyable object.
-//            final RemoteFuture<E> impl = new RemoteFutureImpl<E>(future);
-//
-//            /*
-//             * Export the proxy.
-//             */
-//            final RemoteFuture<E> proxy;
-//            try {
-//
-//                // export proxy.
-//                proxy = (RemoteFuture<E>) exporter.export(impl);
-//
-//                if (log.isInfoEnabled()) {
-//
-//                    log.info("Exported proxy: proxy=" + proxy + "("
-//                            + proxy.getClass() + ")");
-//
-//                }
-//
-//            } catch (ExportException ex) {
-//
-//                throw new RuntimeException("Export error: " + ex, ex);
-//
-//            }
-//
-//            // return proxy to caller.
-//            return new ClientFuture<E>(proxy);
+        }
+
+        protected <E> Future<E> getProxy(final Future<E> future,
+                final boolean asyncFuture) {
+
+            if (!asyncFuture) {
+                /*
+                 * This was borrowed from a fix for a DGC thread leak on the
+                 * clustered database. Returning a Future so the client can wait
+                 * on the outcome is often less desirable than having the
+                 * service compute the Future and then return a think future.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/433
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/437
+                 */
+                return new ThickFuture<E>(future);
+            }
+
+            /*
+             * Setup the Exporter for the Future.
+             * 
+             * Note: Distributed garbage collection is enabled since the proxied
+             * future CAN become locally weakly reachable sooner than the client
+             * can get() the result. Distributed garbage collection handles this
+             * for us and automatically unexports the proxied iterator once it
+             * is no longer strongly referenced by the client.
+             */
+            final Exporter exporter = getExporter(true/* enableDGC */);
+
+            // wrap the future in a proxyable object.
+            final RemoteFuture<E> impl = new RemoteFutureImpl<E>(future);
+
+            /*
+             * Export the proxy.
+             */
+            final RemoteFuture<E> proxy;
+            try {
+
+                // export proxy.
+                proxy = (RemoteFuture<E>) exporter.export(impl);
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("Exported proxy: proxy=" + proxy + "("
+                            + proxy.getClass() + ")");
+
+                }
+
+            } catch (ExportException ex) {
+
+                throw new RuntimeException("Export error: " + ex, ex);
+
+            }
+
+            // return proxy to caller.
+            return new ClientFuture<E>(proxy);
 
         }
 

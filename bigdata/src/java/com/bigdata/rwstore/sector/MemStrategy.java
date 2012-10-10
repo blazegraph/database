@@ -37,7 +37,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
@@ -111,6 +110,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 		m_rb0 = new RootBlockView(true, 0,
 	            0, 0, 0, 0, 0, 0,
 	            uuid,
+	            IRootBlockView.NO_BLOCK_SEQUENCE,//
 	            0, 0, 0,
 	            StoreTypeEnum.RW,
 	            createTime, 0, RootBlockView.currentVersion, checker);
@@ -118,6 +118,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 		m_rb1 = new RootBlockView(false, 0,
 	            0, 0, 0, 0, 0, 0,
 	            uuid,
+                IRootBlockView.NO_BLOCK_SEQUENCE,//
 	            0, 0, 0,
 	            StoreTypeEnum.RW,
 	            createTime, 0, RootBlockView.currentVersion, checker);	

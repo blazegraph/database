@@ -35,6 +35,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
@@ -64,11 +65,14 @@ public class RootBlockView implements IRootBlockView {
     static final transient short SIZEOF_OFFSET     = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_CHECKSUM   = Bytes.SIZEOF_INT;
     static final transient short SIZEOF_QTOKEN     = Bytes.SIZEOF_LONG;
+    static final transient short SIZEOF_BLOCKSEQ   = Bytes.SIZEOF_LONG;
+    
     /**
      * This is a chunk of reserved bytes from which new fields in the root block
      * are allocated from time to time.
      */
     static final transient short SIZEOF_UNUSED = 256 - (//
+            SIZEOF_BLOCKSEQ   + // block sequence since version 0x03.
             SIZEOF_QTOKEN     + // quorum token since version 0x02.
             SIZEOF_ADDR       + // metaBitsAddr since version 0x01.
             SIZEOF_ADDR       + // metaStartAddr since version 0x01.
@@ -94,7 +98,8 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_CLOSE_TIME = OFFSET_CREATE_TIME + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_UNUSED     = OFFSET_CLOSE_TIME  + SIZEOF_TIMESTAMP;
 //    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
-    static final transient short OFFSET_QTOKEN     = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_BLOCKSEQ   = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_QTOKEN     = OFFSET_BLOCKSEQ    + SIZEOF_BLOCKSEQ;
     static final transient short OFFSET_META_BITS  = OFFSET_QTOKEN      + SIZEOF_QTOKEN;
     static final transient short OFFSET_META_START = OFFSET_META_BITS   + SIZEOF_ADDR;
     static final transient short OFFSET_STORETYPE  = OFFSET_META_START  + SIZEOF_ADDR;
@@ -159,6 +164,10 @@ public class RootBlockView implements IRootBlockView {
      * commit point on the store, which is why it is not stored in the root
      * blocks.
      * 
+     * @see #getStoreType()
+     * @see #getMetaBitsAddr()
+     * @see #getMetaStartAddr()
+     * 
      * @todo allocation block sizes to allocate?
      */
     static final int VERSION1 = 0x1;
@@ -172,8 +181,23 @@ public class RootBlockView implements IRootBlockView {
      * <dd>The {@link Quorum} token associated with the commit point. The
      * default value before {@link #VERSION2} is {@link Quorum#NO_QUORUM}.</dd>
      * </dl>
+     * @see #getQuorumToken()
      */
     static final int VERSION2 = 0x2;
+
+    /**
+     * This version supports the HA journal.
+     * <p>
+     * The new fields for this version include:
+     * <dl>
+     * <dt>writeCacheSequence</dt>
+     * <dd>The sequence #of this {@link WriteCache} block within the current
+     * write set (origin ZERO(0)). This is used to ensure correct
+     * synchronization when processing logged messages in HA.</dd>
+     * </dl>
+     * @see #getBlockSequence()
+     */
+    static final int VERSION3 = 0x3;
 
     /**
      * The current version for new root blocks. While different kinds of backing
@@ -184,7 +208,7 @@ public class RootBlockView implements IRootBlockView {
      * readable). Finally, new root block images MUST be formed using the
      * {@link #currentVersion}.
      */
-    public static final int currentVersion = VERSION2;
+    public static final int currentVersion = VERSION3;
     
     /**
      * The buffer holding the backing data.
@@ -262,28 +286,6 @@ public class RootBlockView implements IRootBlockView {
     }
 
     /**
-     * @deprecated Let's keep just one ctor to create root blocks from state
-     *             parameters and one to create root blocks from a
-     *             {@link ByteBuffer}.
-     */
-    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
-            long firstCommitTime, long lastCommitTime, long commitCounter,
-            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
-            long quorumToken,
-            long createTime, long closeTime, ChecksumUtility checker) {
-
-        this(rootBlock0, offsetBits, nextOffset,
-                firstCommitTime, lastCommitTime, commitCounter,
-                commitRecordAddr, commitRecordIndexAddr, uuid,
-                quorumToken, //
-                0L, // metaStartAddr
-                0L, // metaBitsAddr
-                StoreTypeEnum.WORM, //
-                createTime, closeTime, currentVersion, checker);
-    
-    }
-
-    /**
      * Create a new read-only root block image with a unique timestamp. The
      * other fields are populated from the supplied parameters.
      * 
@@ -320,6 +322,9 @@ public class RootBlockView implements IRootBlockView {
      *            is first created).
      * @param uuid
      *            The unique journal identifier.
+     * @param blockSequence
+     *            The {@link WriteCache} block sequence number as of the commit
+     *            point (origin ZERO(0)).
      * @param quorumToken
      *            The current quorum token if this commit point is part of a
      *            {@link Quorum}.
@@ -353,7 +358,7 @@ public class RootBlockView implements IRootBlockView {
      *            used by the {@link ResourceManager} to indicate that a journal
      *            is no longer available for writing (because it has been
      *            superseded by another journal).
-     * @param version 
+     * @param version
      */
     public RootBlockView(//
             final boolean rootBlock0, final int offsetBits,
@@ -361,6 +366,7 @@ public class RootBlockView implements IRootBlockView {
             final long lastCommitTime, final long commitCounter,
             final long commitRecordAddr, final long commitRecordIndexAddr,
             final UUID uuid,
+            final long blockSequence, // VERSION3
             final long quorumToken, // VERSION2
             final long metaStartAddr, // VERSION1
             final long metaBitsAddr, // VERSION1
@@ -503,6 +509,12 @@ public class RootBlockView implements IRootBlockView {
             
         }
 
+        if (blockSequence < 0L) {
+
+            throw new IllegalArgumentException("blockSequence is negative.");
+
+        }
+
         /*
          * @todo Once we nail down the quorumToken assignment semantics (e.g.,
          * based on commitTime, commitCounter, pure non-negative sequences as
@@ -577,6 +589,7 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(createTime);
         buf.putLong(closeTime);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
+        buf.putLong(blockSequence); // VERSION3
         buf.putLong(quorumToken); // VERSION2
         buf.putLong(metaBitsAddr); // VERSION1
         buf.putLong(metaStartAddr); // VERSION1
@@ -792,6 +805,7 @@ public class RootBlockView implements IRootBlockView {
         case VERSION0:
         case VERSION1:
         case VERSION2:
+        case VERSION3:
             break;
         default:
             throw new RootBlockException("Unknown version: " + version);
@@ -910,6 +924,7 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitCounter=" + getCommitCounter());
         sb.append(", commitRecordAddr=" + am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
+        sb.append(", blockSequence=" + getBlockSequence());
         sb.append(", quorumToken=" + getQuorumToken());
         sb.append(", metaBitsAddr=" + getMetaBitsAddr());
         sb.append(", metaStartAddr=" + getMetaStartAddr());
@@ -976,6 +991,20 @@ public class RootBlockView implements IRootBlockView {
             return Quorum.NO_QUORUM;
         }
         return buf.getLong(OFFSET_QTOKEN);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The write cache block sequence was introduced in {@link #VERSION3}.
+     * The default value for that field before {@link #VERSION3} is
+     * {@value IRootBlockView#NO_BLOCK_SEQUENCE}.
+     */
+    public long getBlockSequence() {
+        if (getVersion() < VERSION3) {
+            return IRootBlockView.NO_BLOCK_SEQUENCE;
+        }
+        return buf.getLong(OFFSET_BLOCKSEQ);
     }
 
 }

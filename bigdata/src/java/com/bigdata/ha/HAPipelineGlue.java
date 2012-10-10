@@ -32,8 +32,14 @@ import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.HAWriteMessage;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.service.proxy.ThickFuture;
 
 /**
  * A {@link Remote} interface supporting the write replication pipeline. The
@@ -113,12 +119,61 @@ public interface HAPipelineGlue extends Remote {
      * pipeline. This method is never invoked on the master. It is only invoked
      * on the failover nodes, including the last node in the failover chain.
      * 
+     * @param req
+     *            A request for an HALog (optional). This is only non-null when
+     *            historical {@link WriteCache} blocks are being replayed down
+     *            the write pipeline in order to synchronize a service.
      * @param msg
      *            The metadata.
      * 
      * @return The {@link Future} which will become available once the buffer
      *         transfer is complete.
      */
-    Future<Void> receiveAndReplicate(IHAWriteMessage msg) throws IOException;
+    Future<Void> receiveAndReplicate(IHALogRequest req, IHAWriteMessage msg)
+            throws IOException;
+
+    /**
+     * Request the root blocks for the HA Log for the specified commit point.
+     * 
+     * @param msg
+     *            The request (specifies the desired HA Log by the commit
+     *            counter of the closing root block).
+     * 
+     * @return The requested root blocks.
+     */
+    IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+            IHALogRootBlocksRequest msg) throws IOException;
+
+    /**
+     * The recipient will send the {@link WriteCache} blocks for the specified
+     * write set on the write pipeline. These {@link WriteCache} blocks will be
+     * visible to ALL services in the write pipeline. It is important that all
+     * services <em>ignore</em> {@link WriteCache} blocks that are not in
+     * sequence for the current write set unless they have explicitly requested
+     * an HALog using this method.
+     * <p>
+     * Note: The {@link WriteCache} blocks are sent on the write pipeline.
+     * Therefore, a service MUST NOT request the write set from a service that
+     * is downstream from it in the write pipeline. It is always safe to request
+     * the data from the leader.
+     * <p>
+     * Note: The {@link HAWriteMessage} includes a quorum token. When historical
+     * {@link WriteCache} blocks are being replicated in response to this
+     * method, the will be replicated using the quorum token that was in effect
+     * for that write set. Implementations MUST NOT perform asserts on the
+     * quorum token until after they have determined that the message is for the
+     * <em>current</em> write set.
+     * <p>
+     * Note: DO NOT use a {@link ThickFuture} for the returned {@link Future}.
+     * That will defeat the ability of the requester to cancel the
+     * {@link Future}.
+     * 
+     * @param req
+     *            A request for an HALog.
+     *            
+     * @return A {@link Future} that may be used to cancel the remote process
+     *         sending the data through the write pipeline.
+     */
+    Future<Void> sendHALogForWriteSet(IHALogRequest msg) throws IOException;
 
 }

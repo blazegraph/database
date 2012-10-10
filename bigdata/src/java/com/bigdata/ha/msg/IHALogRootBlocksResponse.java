@@ -23,18 +23,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import com.bigdata.journal.IRootBlockView;
+
 /**
- * Interface for a response from a failover read on a remote service.
+ * Interface for a response requesting the opening and closing root blocks for
+ * an HA Log file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHAReadResponse extends IHAMessage {
+public interface IHALogRootBlocksResponse extends IHAMessage {
 
     /**
-     * The record read from the remote service.
+     * The root block that opens the HA Log file for the specified commit point.
      * 
-     * @return The record and never <code>null</code>.
+     * @return The root block and never <code>null</code>.
      */
-    byte[] getData();
+    IRootBlockView getOpenRootBlock();
+
+    /**
+     * The root block that closes the HA Log file for the specified commit
+     * point.
+     * 
+     * @return The root block and never <code>null</code>.
+     */
+    IRootBlockView getCloseRootBlock();
+
+//    /**
+//     * The #of write cache blocks that can be read from that file.
+//     */
+//    long getWriteBlockCount();
     
 }

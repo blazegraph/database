@@ -1305,74 +1305,108 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
          * Accept notice from {@link ZooKeeper} of a watch event trigger. The
          * {@link InternalQuorumWatcher} will be executed by an internal service
          * to handle the event.
+         * 
+         * @param watcher
+         *            The watcher.
+         * @param e
+         *            The {@link WatchedEvent}.
+         * @param synchronous
+         *            When <code>true</code>, the {@link WatchedEvent}will be
+         *            handled in the caller's thread (this is used during
+         *            startup to ensure that we observe our initial mock events
+         *            synchronously.)
          */
         protected void accept(final InternalQuorumWatcher watcher,
-                final WatchedEvent e) {
+                final WatchedEvent e, final boolean synchronous) {
+
+            final Runnable r = new HandleEventRunnable(watcher, e);
+
+            if (synchronous) {
+
+                r.run();
+
+                return;
+
+            }
 
             final ExecutorService watcherService = watcherServiceRef.get();
 
             if (watcherService != null) {
-                watcherService.execute(new Runnable() {
-                    /*
-                     * Handle event.
-                     */
-                    public void run() {
-                        try {
-                            if (log.isInfoEnabled())
-                                log.info(e.toString());
-                            switch (e.getState()) {
-                            case Disconnected:
-                                return;
-                            case SyncConnected:
-                                break;
-                            case Expired: {
-                                /*
-                                 * Handle an expired session before we get the
-                                 * ZooKeeper connection or we can wind up
-                                 * masquerading the Expired event.
-                                 */
-                                log.error(e);
-                                handleExpired();
-                            }
-                            }
-                            /*
-                             * Get known valid zookeeper connection.
-                             * 
-                             * Note: We want the event handler to use a single
-                             * ZooKeeper connection instance so an Expired
-                             * session will be thrown out rather than
-                             * potentially masked.
-                             */
-                            final ZooKeeper zk = getZookeeper();
-                            /*
-                             * Handle the event's semantics.
-                             */
-                            watcher.handleEvent(zk);
-                        } catch (SessionExpiredException e1) {
-                            /*
-                             * Handle Expired session thrown out of the watcher.
-                             */
-                            log.error(e, e1);
-                            handleExpired();
-                        } catch (KeeperException e1) {
-                            log.error(e, e1);
-                        } catch (InterruptedException e1) {
-                            /*
-                             * Note: This exception probably only occurs through
-                             * the shutdown of the ZKQuorumWatcher, which will
-                             * shutdown the service handling the event.
-                             */
-                            if (log.isInfoEnabled())
-                                log.info(e1);
-                        } catch (Throwable e1) {
-                            log.error(e, e1);
-                        }
-                    }
-                });
+
+                watcherService.execute(r);
+
             }
 
         } // accept(...)
 
+        /**
+         * Handle event.
+         */
+        private class HandleEventRunnable implements Runnable {
+            
+            private final InternalQuorumWatcher watcher;
+            private final WatchedEvent e;
+
+            HandleEventRunnable(final InternalQuorumWatcher watcher,
+                    final WatchedEvent e) {
+                this.watcher = watcher;
+                this.e = e;
+            }
+            
+            public void run() {
+                try {
+                    if (log.isInfoEnabled())
+                        log.info(e.toString());
+                    switch (e.getState()) {
+                    case Disconnected:
+                        return;
+                    case SyncConnected:
+                        break;
+                    case Expired: {
+                        /*
+                         * Handle an expired session before we get the
+                         * ZooKeeper connection or we can wind up
+                         * masquerading the Expired event.
+                         */
+                        log.error(e);
+                        handleExpired();
+                    }
+                    }
+                    /*
+                     * Get known valid zookeeper connection.
+                     * 
+                     * Note: We want the event handler to use a single
+                     * ZooKeeper connection instance so an Expired
+                     * session will be thrown out rather than
+                     * potentially masked.
+                     */
+                    final ZooKeeper zk = getZookeeper();
+                    /*
+                     * Handle the event's semantics.
+                     */
+                    watcher.handleEvent(zk);
+                } catch (SessionExpiredException e1) {
+                    /*
+                     * Handle Expired session thrown out of the watcher.
+                     */
+                    log.error(e, e1);
+                    handleExpired();
+                } catch (KeeperException e1) {
+                    log.error(e, e1);
+                } catch (InterruptedException e1) {
+                    /*
+                     * Note: This exception probably only occurs through
+                     * the shutdown of the ZKQuorumWatcher, which will
+                     * shutdown the service handling the event.
+                     */
+                    if (log.isInfoEnabled())
+                        log.info(e1);
+                } catch (Throwable e1) {
+                    log.error(e, e1);
+                }
+            }
+        }
+        
         /**
          * Handle an expired session by waiting for a new {@link ZooKeeper}
          * connection, setting up new watchers against the new session, and we
@@ -1414,6 +1448,40 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         private void setupWatchers(final ZooKeeper zk) throws KeeperException,
                 InterruptedException {
 
+            /*
+             * Notice the token state and its version before we pump the mock
+             * events.
+             */
+            final Stat stat = new Stat();
+            final QuorumTokenState tokenState;
+            {
+                QuorumTokenState tmp;
+                try {
+                    final byte[] data = zka.getZookeeper().getData(
+                            logicalServiceId + "/" + QUORUM, false/* watch */,
+                            stat);
+                    tmp = (QuorumTokenState) SerializerUtil.deserialize(data);
+                } catch (NoNodeException e) {
+                    // This is Ok. The node just does not exist yet.
+                    tmp = null;
+                } catch (KeeperException e) {
+                    // Anything else is a problem.
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                tokenState = tmp;
+            }
+
+            /*
+             * Pump mock events to get things started.
+             * 
+             * Note: These are now synchronous events. This let's us build up a
+             * coherent model synchronously within this method. That gives us
+             * enough information that we can make a decision about whether or
+             * not to clear the quorum token.
+             */
+
             new QuorumMemberWatcher(logicalServiceId + "/" + QUORUM + "/"
                     + QUORUM_MEMBER).start();
 
@@ -1428,6 +1496,118 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
             new QuorumTokenStateWatcher(logicalServiceId + "/" + QUORUM)
                     .start();
+
+            if (tokenState != null) {
+            
+                /*
+                 * Conditionally clear the token state if it is provable
+                 * based on the quorum reflection that we just assembled
+                 * that the quorum is not met.
+                 */
+                
+                conditionalClearQuorumToken(tokenState, stat);
+                
+            }
+
+        }
+
+        /**
+         * Conditionally clear the {@link QuorumTokenState} in zookeeper if the
+         * {@link #QUORUM} znode reports a valid token but the quorum is
+         * provably not met based on the #of joined services. This is invoked
+         * during {@link #setupWatchers(ZooKeeper)}.
+         * <p>
+         * Note: This code can not run until the watchers have had enough time
+         * to discover the current state of the quorum. For this reason, the
+         * various start() methods specify synchronous handling the mock
+         * {@link WatchedEvent}s. It is safe to handle those mock events in the
+         * caller's thread because it is NOT the zookeeper event thread. That
+         * also ensures that we have a valid reflection of the state in
+         * zookeeper by the time that this method is invoked, so we can make an
+         * informed decision about whether or not to clear the quorum token.
+         * 
+         * TODO I am still a bit uncertain that the initialization logic is
+         * correct. {@link AbstractQuorum#start(QuorumClient)} has already
+         * invoked
+         * {@link ZKQuorumImpl#getLastValidTokenFromQuorumState(QuorumClient)}
+         * before we enter our watcher initialization logic and then finally
+         * invoke this method to conditionally clear the quorum token. I think
+         * that the reflected quorum state will correctly update if we do wind
+         * up clearing the token through this mechanism.
+         * <p>
+         * In order to test this, we need to start 2 out of 3 services, let them
+         * meet in a quorum, and then start the third service. It MUST NOT clear
+         * the quorum state when it starts. Likewise, if we then abrubtly shut
+         * down all of those services (kill them so they do not have a chance to
+         * withdraw the durable {@link QuorumStateToken} from zookeeper) and
+         * then restart one service, it SHOULD use this logic to clear the token
+         * on startup since the quorum is not in fact met (we do not have a bare
+         * majority of services that are met). Even then, it is possible that
+         * the concurrent start of a bare majority of services could fail to
+         * clear the old token with the result that an exception is thrown when
+         * we attempt to set the new token when we observe a bare majority of
+         * services have joined.
+         */
+        private void conditionalClearQuorumToken(
+                final QuorumTokenState tokenState, final Stat stat) {
+
+            if (tokenState == null)
+                throw new IllegalArgumentException();
+
+            if (stat == null)
+                throw new IllegalArgumentException();
+
+            try {
+
+                final UUID[] joined = getJoined(); // the joined services.
+
+                if (tokenState.token() != NO_QUORUM && !isQuorum(joined.length)) {
+
+                    try {
+
+                        /*
+                         * Replace the QuorumTokenState.
+                         * 
+                         * There is a durable QuorumTokenState, but it has a
+                         * valid token even though the quorum is not met.
+                         * 
+                         * This can occur on restart since it is quorum clients
+                         * that are responsible for managing the state in
+                         * zookeeper. If all clients were killed, then none of
+                         * them will have had the opportunity to update the
+                         * QuorumTokenState in zookeeper and it will falsely
+                         * report a valid quorum. We fix that now by replacing
+                         * the data in the znode.
+                         * 
+                         * We only do this if we can prove that the znode
+                         * version has not changed since we obtain the
+                         * QuorumTokenState.
+                         */
+                 
+                        final QuorumTokenState tmp = new QuorumTokenState(//
+                                tokenState.lastValidToken(),// lastValidToken
+                                Quorum.NO_QUORUM// currentToken
+                        );
+
+                        // update znode unless version is changed.
+                        zka.getZookeeper().setData(
+                                logicalServiceId + "/" + QUORUM,
+                                SerializerUtil.serialize(tmp),
+                                stat.getVersion());
+
+                    } catch (BadVersionException ex) {
+                        // ignore.
+                        if (log.isInfoEnabled())
+                            log.info("Version no longer current: " + ex);
+                    }
+
+                }
+
+            } catch (KeeperException e) {
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
         }
 
@@ -1460,8 +1640,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
             final public void process(final WatchedEvent event) {
                 
-                accept(this, event);
-                
+                accept(this, event, false/* synchronous */);
+
                 if (log.isDebugEnabled())
                     log.debug("zpath=" + zpath + ", event=" + event);
 
@@ -1508,7 +1688,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             public void start() {
                 accept(this, new WatchedEvent(
                         Watcher.Event.EventType.NodeChildrenChanged,
-                        Watcher.Event.KeeperState.SyncConnected, zpath));
+                        Watcher.Event.KeeperState.SyncConnected, zpath),//
+                        true// synchronous
+                );
             }
             
             /**
@@ -1738,7 +1920,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             public void start() {
                 accept(this, new WatchedEvent(
                         Watcher.Event.EventType.NodeChildrenChanged,
-                        Watcher.Event.KeeperState.SyncConnected, zpath));
+                        Watcher.Event.KeeperState.SyncConnected, zpath),//
+                        true// synchronous
+                );
             }
             
             @Override
@@ -1754,7 +1938,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                     final long tok = token();
                     if (state.token() == NO_QUORUM && tok != NO_QUORUM) {
                         clearToken();
-                    } else if (lastValidToken() != state.lastValidToken()) {
+                    } else if (lastValidToken() != state.lastValidToken()
+                            || token() != state.token()) {
                         final UUID[] joined = getJoined();
                         final int k = replicationFactor();
                         if (isQuorum(joined.length)) {
@@ -1799,7 +1984,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 
                 accept(this, new WatchedEvent(
                         Watcher.Event.EventType.NodeChildrenChanged,
-                        Watcher.Event.KeeperState.SyncConnected, zpath));
+                        Watcher.Event.KeeperState.SyncConnected, zpath),//
+                        true// synchronous
+                );
 
                 /*
                  * Setup a watcher for any lastCommitTime thought to exist
@@ -1957,15 +2144,15 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
     } // ZkQuorumWatcher
 
+    /**
+     * Since the QourumTokenState exists, we need to initialize the
+     * lastValidToken from the QuorumTokenState in case the quorum has
+     * met in the past.
+     */
     @Override
     protected long getLastValidTokenFromQuorumState(final C client) {
 
-        super.getLastValidTokenFromQuorumState(client);
-        /*
-         * Since the QourumTokenState exists, we need to initialize the
-         * lastValidToken from the QuorumTokenState in case the quorum has
-         * met in the past.
-         */
+//        super.getLastValidTokenFromQuorumState(client);
         final String logicalServiceId = client.getLogicalServiceId();
         final byte[] data;
         try {
@@ -1982,45 +2169,6 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             if (log.isInfoEnabled())
                 log.info("Starting with quorum that has already met in the past: "
                         + tokenState);
-
-            /*
-             * Note: This code can not run in AbstractQuorum.start(C) because
-             * the watcher has not yet had enough time to discover the current
-             * state of the quorum, therefore it is premature to force a quorum
-             * break.
-             */
-//            if (tokenState.token() != NO_QUORUM && !isQuorumMet()) {
-//
-//                try {
-//
-//                    /*
-//                     * Replace the QuorumTokenState.
-//                     * 
-//                     * There is a durable QuorumTokenState, but it has a valid
-//                     * token even though the quorum is not met. This can occur
-//                     * on restart since it is quorum clients that are
-//                     * responsible for managing the state in zookeeper. If all
-//                     * clients were killed, then none of them will have had the
-//                     * opportunity to update the QuorumTokenState in zookeeper
-//                     * and it will falsely report a valid quorum. We fix that
-//                     * now by replacing the data in the znode.
-//                     */
-//                    final QuorumTokenState tmp = new QuorumTokenState(//
-//                            tokenState.lastValidToken(),// lastValidToken
-//                            Quorum.NO_QUORUM// currentToken
-//                    );
-//
-//                    // update znode unless version is changed.
-//                    zka.getZookeeper().setData(logicalServiceId + "/" + QUORUM,
-//                            SerializerUtil.serialize(tmp), stat.getVersion());
-//
-//                } catch (BadVersionException ex) {
-//                    // ignore.
-//                    if (log.isInfoEnabled())
-//                        log.info("Version no longer current: " + ex);
-//                }
-//
-//            }
             
             return tokenState.lastValidToken();
         } catch (NoNodeException e) {
@@ -2033,7 +2181,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             throw new RuntimeException(e);
         }
     }
-    
+        
     /**
      * Ensure that the zpaths for the {@link BigdataZooDefs#QUORUM} and its
      * various persistent children exist.

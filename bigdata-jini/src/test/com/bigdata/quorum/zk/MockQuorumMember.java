@@ -13,6 +13,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture;
@@ -218,11 +221,23 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
             return ft;
         }
 
-        public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
-                throws IOException {
+        @Override
+        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+                IHAWriteMessage msg) throws IOException {
             throw new UnsupportedOperationException();
         }
         
+        @Override
+        public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                IHALogRootBlocksRequest msg) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /**

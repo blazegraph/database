@@ -32,6 +32,9 @@ import java.util.concurrent.Future;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
@@ -97,9 +100,9 @@ public class HAGlueDelegate implements HAGlue {
         return delegate.abort2Phase(abortMessage);
     }
 
-    public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
-            throws IOException {
-        return delegate.receiveAndReplicate(msg);
+    public Future<Void> receiveAndReplicate(IHALogRequest req,
+            IHAWriteMessage msg) throws IOException {
+        return delegate.receiveAndReplicate(req, msg);
     }
 
     @Override
@@ -160,6 +163,18 @@ public class HAGlueDelegate implements HAGlue {
     @Override
     public long getReleaseTime() throws IOException {
         return delegate.getReleaseTime();
+    }
+
+    @Override
+    public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+            IHALogRootBlocksRequest msg) throws IOException {
+        return delegate.getHALogRootBlocksForWriteSet(msg);
+    }
+
+    @Override
+    public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+            throws IOException {
+        return delegate.sendHALogForWriteSet(msg);
     }
 
 }

@@ -96,6 +96,90 @@ public class HALogWriter {
     /** current write point on the channel. */
     private long m_position = headerSize0;
 
+    /**
+     * Return the commit counter that is expected for the writes that will be
+     * logged (the same commit counter that is on the opening root block).
+     */
+    public long getCommitCounter() {
+
+        assertOpen();
+        
+        return m_rootBlock.getCommitCounter();
+        
+    }
+    
+    /**
+     * Return the sequence number that is expected for the next write.
+     */
+    public long getSequence() {
+
+        assertOpen();
+
+        return m_sequence;
+        
+    }
+    
+    private void assertOpen() {
+
+        if (m_raf == null)
+            throw new IllegalStateException();
+        
+    }
+
+    /**
+     * Return the log file (if any).
+     */
+    public File getFile() {
+        
+        return m_log;
+        
+    }
+    
+    /**
+     * Return the local name of the HA Log file associated with the 
+     * @param commitCounter
+     * @return
+     */
+    public static String getHALogFileName(final long commitCounter) {
+
+        /*
+         * Format the name of the log file.
+         * 
+         * Note: The commit counter in the file name should be zero filled to 20
+         * digits so we have the files in lexical order in the file system (for
+         * convenience).
+         */
+        final String logFile;
+        {
+
+            final StringBuilder sb = new StringBuilder();
+
+            final Formatter f = new Formatter(sb);
+
+            f.format("%020d" + HA_LOG_EXT, commitCounter);
+            f.flush();
+            f.close();
+
+            logFile = sb.toString();
+
+        }
+
+        return logFile;
+
+    }
+
+    public String toString() {
+        
+        final IRootBlockView tmp = m_rootBlock;
+
+        final long seq = m_sequence;
+
+        return getClass().getName() + "{" + m_raf == null ? "closed"
+                : "commitCounter=" + tmp.getCommitCounter() + ",nextSequence="
+                        + seq + "}";
+
+    }
+
     public HALogWriter(final File logDir) {
 
         m_dir = logDir;
@@ -132,29 +216,15 @@ public class HALogWriter {
          * Note: The commit counter in the file name should be zero filled to 20
          * digits so we have the files in lexical order in the file system (for
          * convenience).
+         * 
+         * Note: We use commitCounter+1 so the file will be labeled by the
+         * commit point that will be achieved when that log file is applied to a
+         * journal whose current commit point is [commitCounter].
          */
-        final String logFile;
-        {
 
-            final StringBuilder sb = new StringBuilder();
+        final long commitCounter = rootBlock.getCommitCounter();
 
-            final Formatter f = new Formatter(sb);
-
-            /*
-             * Note: We use commitCounter+1 so the file will be labeled by the
-             * commit point that will be achieved when that log file is applied
-             * to a journal whose current commit point is [commitCounter].
-             */
-
-            final long commitCounter = rootBlock.getCommitCounter();
-
-            f.format("%020d" + HA_LOG_EXT, (commitCounter + 1));
-            f.flush();
-            f.close();
-
-            logFile = sb.toString();
-
-        }
+        final String logFile = getHALogFileName(commitCounter + 1);
 
         m_log = new File(m_dir, logFile);
 

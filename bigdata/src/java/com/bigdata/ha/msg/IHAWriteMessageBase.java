@@ -29,7 +29,7 @@ package com.bigdata.ha.msg;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHAWriteMessageBase {
+public interface IHAWriteMessageBase extends IHAMessage {
 
     /** The #of bytes of data to be transfered. */
     int getSize();

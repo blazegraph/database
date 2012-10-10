@@ -16,9 +16,11 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
@@ -247,25 +249,18 @@ public class HALogReader {
      * Attempts to read the next {@link IHAWriteMessage} and then the expected
      * buffer, that is read into the client buffer. The {@link IHAWriteMessage}
      * is returned to the caller.
+     * <p>
+     * Note: The caller's buffer will be filled in IFF the data is on the HALog.
+     * For some {@link IHABufferStrategy} implementations, that data is not
+     * present in the HALog. The caller's buffer will not be modified and the
+     * caller is responsible for getting the data from the
+     * {@link IHABufferStrategy} (e.g., for the {@link WORMStrategy}).
+     * <p>
+     * Note: IF the buffer is filled, then the limit will be the #of bytes ready
+     * to be transmitted and the position will be zero.
      * 
      * @param clientBuffer
      *            A buffer from the {@link DirectBufferPool#INSTANCE}.
-     * 
-     *            FIXME We need to pass in the backing store against which the
-     *            log would be resolved. This should be done using the
-     *            {@link HAReadGlue} API (failover reads). We should be able to
-     *            put together the [addr] from the
-     *            {@link IHAWriteMessage#getFirstOffset()} (the offset) plus the
-     *            {@link IHAWriteMessage#getSize()} (the byte length). There
-     *            might also be a checksum in the write cache block, in which
-     *            case we need to back that out of the data that we are trying
-     *            to read, but we still want to verify that checksum once we get
-     *            the data block from the quorum.
-     * 
-     *            FIXME Encapsulate as an iterator pattern where we pass in the
-     *            quorum token (if necessary), and the {@link QuorumServiceBase}
-     *            so we can resolve the nodes on which we can read the raw
-     *            records.
      */
     public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer)
             throws IOException {
@@ -326,12 +321,13 @@ public class HALogReader {
         }
         case WORM: {
             /*
-             * FIXME The WriteCache block needs to be recovered from the quorum
-             * using a failover read. 
+             * Note: The WriteCache block needs to be recovered from the
+             * WORMStrategy by the caller.
              */
-            throw new UnsupportedOperationException();
-//            break;
+            break;
         }
+        default:
+            throw new UnsupportedOperationException();
         }
 
         return msg;

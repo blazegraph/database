@@ -36,7 +36,7 @@ import com.bigdata.journal.IRootBlockView;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhasePrepareMessage {
+public interface IHA2PhasePrepareMessage extends IHAMessage {
 
     /**
      * <code>true</code> iff the service was recognized as being joined with the

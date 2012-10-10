@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha;
 
 import java.io.File;
-import java.io.IOException;
 
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
 
@@ -84,4 +84,19 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      */
     long getPrepareTimeout();
 
+    /**
+     * Install the root blocks from the quorum on the local service.
+     * <p>
+     * Note: The initial root blocks on a service are identical, so this root
+     * block will be installed as both root block ZERO (0) and root block ONE
+     * (1).
+     * 
+     * @param rootBlock
+     *            The root block.
+     * 
+     * @throws IllegalStateException
+     *             if the local service already has writes.
+     */
+    void installRootBlocksFromQuorum(final IRootBlockView rootBlock);
+    
 }

@@ -1796,7 +1796,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     final synchronized public void destroy() {
 
-        shutdownNow(true/*destroy*/);
+        shutdownNow(true/* destroy */);
         
     }
 

@@ -24,17 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 /**
- * Interface for a response from a failover read on a remote service.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * Message requesting that the data from an HA Log. The data will be sent over
+ * the write pipeline.
  */
-public interface IHAReadResponse extends IHAMessage {
+public interface IHALogRootBlocksRequest extends IHAMessage {
 
     /**
-     * The record read from the remote service.
-     * 
-     * @return The record and never <code>null</code>.
+     * The commit counter is used to identify the desired commit point (the
+     * commit counter of the closing root block).
      */
-    byte[] getData();
-    
+    long getCommitCounter();
+
 }

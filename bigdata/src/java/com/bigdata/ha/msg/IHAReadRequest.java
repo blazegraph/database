@@ -34,7 +34,7 @@ import com.bigdata.rawstore.IRawStore;
  * released or because there is a checksum error when reading on the
  * {@link IRawStore}, then that exception should be thrown back to the caller.
  */
-public interface IHAReadRequest {
+public interface IHAReadRequest extends IHAMessage {
 
     /**
      * The quorum token for which the read was issued.

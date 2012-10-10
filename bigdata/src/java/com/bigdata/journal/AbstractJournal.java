@@ -92,6 +92,9 @@ import com.bigdata.ha.msg.HARootBlockResponse;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
@@ -998,7 +1001,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				final long commitRecordIndexAddr = 0L;
 				final UUID uuid = UUID.randomUUID(); // Journal's UUID.
 				final long closedTime = 0L;
-                final StoreTypeEnum stenum = bufferMode.getStoreType();
+                final long blockSequence = IRootBlockView.NO_BLOCK_SEQUENCE;
+                final StoreTypeEnum storeType = bufferMode.getStoreType();
                 if (createTime == 0L) {
                     throw new IllegalArgumentException(
                             "Create time may not be zero.");
@@ -1006,19 +1010,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 final IRootBlockView rootBlock0 = new RootBlockView(true,
                         offsetBits, nextOffset, firstCommitTime,
                         lastCommitTime, commitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, uuid, quorumToken,
+                        commitRecordIndexAddr, uuid, //
+                        blockSequence,//
+                        quorumToken,//
                         0L, // metaStartAddr
                         0L, // metaStartBits
-                        stenum,//
+                        storeType,//
                         createTime, closedTime, RootBlockView.currentVersion,
                         checker);
                 final IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
                         lastCommitTime, commitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, uuid, quorumToken,
+                        commitRecordIndexAddr, uuid, //
+                        blockSequence,//
+                        quorumToken,//
                         0L, // metaStartAddr
                         0L, // metaStartBits
-                        stenum,//
+                        storeType,//
                         createTime, closedTime, RootBlockView.currentVersion,
                         checker);
                 
@@ -1491,27 +1499,38 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	// /**
-	// * Returns a {@link CounterSet} that it reflects the {@link Counter}s for
-	// * the currently open unisolated named indices as reported by
-	// * {@link Name2Addr#getIndexCounters()}.
-	// */
-	// public CounterSet getNamedIndexCounters() {
-	//
-	// if (log.isInfoEnabled())
-	// log.info("Refreshing index counter set.");
-	//
-	// /*
-	// * @todo probably does not need to be synchronized any more.
-	// */
-	// // synchronized (name2Addr) {
-	//
-	// return name2Addr.getIndexCounters();
-	//
-	// // }
-	//            
-	// }
-
+    /**
+     * Return the live index counters maintained by the unisolated
+     * {@link Name2Addr} index iff they are available. These counters are not
+     * available for a read-only journal. They are also not available if the
+     * journal has been concurrently shutdown (since the {@link Name2Addr}
+     * reference will have been cleared).
+     * <p>
+     * Note: This is exposed to the {@link Journal} which reports this
+     * information.
+     * 
+     * @return The live index counters and <code>null</code> iff they are not
+     *         available.
+     */
+    protected CounterSet getLiveIndexCounters() {
+        if (!isReadOnly()) {
+            /*
+             * These index counters are only available for the unisolated
+             * Name2Addr view. If this is a read-only journal, then we can not
+             * report out that information.
+             */
+            final Name2Addr tmp = _name2Addr;
+            if (tmp != null) {
+                /*
+                 * Only if the Name2Addr index exists at the moment that we look
+                 * (avoids problems with reporting during concurrent shutdown).
+                 */
+                return tmp.getIndexCounters();
+            }
+        }
+        return null;
+    }
+	
 	final public File getFile() {
 
 		final IBufferStrategy tmp = getBufferStrategy();
@@ -1797,6 +1816,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					old.getCommitRecordAddr(), //
 					old.getCommitRecordIndexAddr(), //
 					old.getUUID(), //
+					0L, // blockSequence (writes are discarded)
 					quorumToken, //
 					metaStartAddr, //
 					metaBitsAddr, //
@@ -2734,7 +2754,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 			final long nextOffset = _bufferStrategy.getNextOffset();
 
-			/*
+            final long blockSequence;
+            if (_bufferStrategy instanceof IHABufferStrategy) {
+                // always available for HA.
+                blockSequence = ((IHABufferStrategy) _bufferStrategy)
+                        .getBlockSequence();
+            } else {
+                blockSequence = old.getBlockSequence();
+            }
+
+            /*
 			 * Prepare the new root block.
 			 */
 			final IRootBlockView newRootBlock;
@@ -2775,7 +2804,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 newRootBlock = new RootBlockView(!old.isRootBlock0(), old
                         .getOffsetBits(), nextOffset, firstCommitTime,
                         lastCommitTime, newCommitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, old.getUUID(), quorumToken,
+                        commitRecordIndexAddr, old.getUUID(), //
+                        blockSequence, quorumToken,//
                         metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), 
                         old.getVersion(), checker);
@@ -4594,7 +4624,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * Access to this field is protected by the {@link #_fieldReadWriteLock} but
      * MUST also be coordinated as described above.
      * 
-     * FIXME Many methods need to be modified to (a) await a quorum if there is
+     * FIXME HA: Many methods need to be modified to (a) await a quorum if there is
      * none; and (b) handle a change in the quorum token. When a quorum breaks,
      * these operations can block until a new quorum meets. As long as the
      * master has not changed, the master's state remains valid and the other
@@ -4741,7 +4771,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  * We do not need to discard read-only tx since the committed
                  * state should remain valid even when a quorum is lost.
                  * 
-                 * FIXME QUORUM TX INTEGRATION (discard running read/write tx).
+                 * FIXME HA : QUORUM TX INTEGRATION (discard running read/write tx).
                  */
                 
                 // local abort (no quorum, so we can do 2-phase abort).
@@ -4764,76 +4794,24 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 if (_rootBlock.getCommitCounter() == 0
                         && localService.isFollower(quorumToken)) {
 
+                    /*
+                     * Take the root blocks from the quorum leader and use them.
+                     */
                     // Remote interface for the quorum leader.
                     final HAGlue leader = localService.getLeader(quorumToken);
 
-                    /**
-                     * When the quorum meets for the first time, we need to take
-                     * the root block from the leader and use it to replace both
-                     * of our root blocks (the initial root blocks are
-                     * identical). That will make the root blocks the same on
-                     * all quorum members.
-                     * 
-                     * FIXME We should also verify the following:
-                     * 
-                     * <pre>
-                     * - the DirectBufferPool.INSTANCE has the same buffer
-                     * capacity (so there will be room for the write cache
-                     * data in the buffers on all nodes).
-                     * </pre>
-                     */
                     log.info("Fetching root block from leader.");
-                    final ByteBuffer buf;
+                    final IRootBlockView tmp;
                     try {
-                        final IRootBlockView tmp = leader.getRootBlock(
+                        tmp = leader.getRootBlock(
                                 new HARootBlockRequest(null/* storeUUID */))
                                 .getRootBlock();
-                        buf = tmp.asReadOnlyBuffer();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
 
-                    final IRootBlockView rootBlock0 = new RootBlockView(
-                            true/* rootBlock0 */, buf, checker);
-
-                    final IRootBlockView rootBlock1 = new RootBlockView(
-                            false/* rootBlock0 */, buf, checker);
-
-                    /*
-                     * Verify that the root blocks are consistent with the
-                     * assumptions for this Journal.
-                     */
-                    {
+                    localService.installRootBlocksFromQuorum(tmp);
                     
-                        if (!_rootBlock.getStoreType().equals(
-                                rootBlock0.getStoreType())) {
-                            /*
-                             * The StoreType must agree.
-                             */
-                            throw new RuntimeException(
-                                    "Incompatible StoreType: expected="
-                                            + _rootBlock.getStoreType()
-                                            + ", actual="
-                                            + rootBlock0.getStoreType());
-                        }
-
-                    }
-
-                    log.info("Synchronizing root blocks with leader.");
-                    
-                    // write root block through to disk and sync.
-                    _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.Force);
-
-                    // write 2nd root block through to disk and sync.
-                    _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.Force);
-
-                    // Choose the "current" root block.
-                    _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0,
-                            rootBlock1);
-
-                    log.info("Synchronized root blocks with leader: rootBlock="
-                            + _rootBlock);
-
                 }
                 
                 if (localService.isJoinedMember(quorumToken)) {
@@ -4875,6 +4853,122 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             lock.unlock();
             
         }
+
+    }
+
+    /**
+     * Verify that the root blocks are consistent with the assumptions for this
+     * Journal.
+     * <p>
+     * Note: When the quorum meets for the first time, we need to take the root
+     * block from the leader and use it to replace both of our root blocks (the
+     * initial root blocks are identical). That will make the root blocks the
+     * same on all quorum members.
+     * 
+     * FIXME We should also verify the following:
+     * 
+     * <pre>
+     * - the DirectBufferPool.INSTANCE has the same buffer
+     * capacity (so there will be room for the write cache
+     * data in the buffers on all nodes).
+     * </pre>
+     */
+    protected void installRootBlocksFromQuorum(
+            final QuorumService<HAGlue> localService,
+            final IRootBlockView rootBlock) {
+
+        if (_rootBlock.getCommitCounter() != 0) {
+
+            throw new IllegalStateException();
+
+        }
+
+        final IRootBlockView rootBlock0 = rootBlock;
+
+        final IRootBlockView rootBlock1 = new RootBlockView(
+                false/* rootBlock0 */, rootBlock0.asReadOnlyBuffer(), checker);
+
+        // Check the root blocks before we install them.
+        {
+            if (!_rootBlock.getStoreType().equals(rootBlock0.getStoreType())) {
+                /*
+                 * The StoreType must agree.
+                 */
+                throw new RuntimeException("Incompatible StoreType: expected="
+                        + _rootBlock.getStoreType() + ", actual="
+                        + rootBlock0.getStoreType());
+            }
+
+        }
+        log.info("Synchronizing root blocks with quorum.");
+
+        // write root block through to disk and sync.
+        _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.Force);
+
+        // write 2nd root block through to disk and sync.
+        _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.Force);
+
+        // Choose the "current" root block.
+        _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0, rootBlock1);
+
+        log.info("Synchronized root blocks with qourum: rootBlock="
+                + _rootBlock);
+
+    }
+
+    /**
+     * Local commit protocol (HA).
+     */
+    protected void doLocalCommit(final QuorumService<HAGlue> localService,
+            final IRootBlockView rootBlock) {
+
+        // The timestamp for this commit point.
+        final long commitTime = rootBlock.getLastCommitTime();
+
+        // write the root block on to the backing store.
+        _bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
+
+        // set the new root block.
+        _rootBlock = rootBlock;
+
+        final boolean leader = localService
+                .isLeader(rootBlock.getQuorumToken());
+
+        if (!leader) {
+
+            /*
+             * Ensure allocators are synced after commit. This is only done for
+             * the followers. The leader has been updating the in-memory
+             * allocators as it lays down the writes. The followers have not be
+             * updating the allocators.
+             */
+
+            if (haLog.isInfoEnabled())
+                haLog.error("Reset from root block: serviceUUID="
+                        + localService.getServiceId());
+
+            ((IHABufferStrategy) _bufferStrategy)
+                    .resetFromHARootBlock(rootBlock);
+
+            /*
+             * Clear reference and reload from the store.
+             * 
+             * The leader does not need to do this since it is writing on the
+             * unisolated commit record index and thus the new commit record is
+             * already visible in the commit record index before the commit.
+             * However, the follower needs to do this since it will otherwise
+             * not see the new commit points.
+             */
+
+            _commitRecordIndex = _getCommitRecordIndex();
+
+        }
+
+        // reload the commit record from the new root block.
+        _commitRecord = _getCommitRecord();
+
+        if (txLog.isInfoEnabled())
+            txLog.info("COMMIT: commitTime=" + commitTime);
 
     }
 
@@ -5195,55 +5289,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                              * commit protocol.
                              */
 
-                            // write the root block on to the backing store.
-                            _bufferStrategy.writeRootBlock(rootBlock,
-                                    forceOnCommit);
-
-                            // set the new root block.
-                            _rootBlock = rootBlock;
-
-                            final boolean follower = localService
-                                    .isFollower(rootBlock.getQuorumToken());
-
-                            if (follower) {
-
-                                /*
-                                 * Ensure allocators are synced after commit.
-                                 * This is only done for the followers. The
-                                 * leader has been updating the in-memory
-                                 * allocators as it lays down the writes. The
-                                 * followers have not be updating the
-                                 * allocators.
-                                 */
-
-                                if (haLog.isInfoEnabled())
-                                    haLog.error("Reset from root block: serviceUUID="
-                                            + localService.getServiceId());
-
-                                ((IHABufferStrategy) _bufferStrategy)
-                                        .resetFromHARootBlock(rootBlock);
-
-                                /*
-                                 * Clear reference and reload from the store.
-                                 * 
-                                 * The leader does not need to do this since it
-                                 * is writing on the unisolated commit record
-                                 * index and thus the new commit record is
-                                 * already visible in the commit record index
-                                 * before the commit. However, the follower
-                                 * needs to do this since it will otherwise not
-                                 * see the new commit points.
-                                 */
-
-                                _commitRecordIndex = _getCommitRecordIndex();
-
-                            }
-
-                            // reload the commit record from the new root block.
-                            _commitRecord = _getCommitRecord();
-
-                            if (txLog.isInfoEnabled())
-                                txLog.info("COMMIT: commitTime=" + commitTime);
+                            AbstractJournal.this.doLocalCommit(localService,
+                                    rootBlock);
 
                         } // if(isJoinedService)
 						
@@ -5281,7 +5328,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                              * point.
                              */
 
-                            localService.purgeHALogs();
+                            localService.purgeHALogs(true/* includeCurrent */);
 
                         }
 
@@ -5420,35 +5467,62 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
         @Override
-        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
-                throws IOException {
+        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+                final IHAWriteMessage msg) throws IOException {
 
             if (haLog.isDebugEnabled())
-                haLog.debug("msg=" + msg);
-            
-            /*
-             * Adjust the size on the disk of the local store to that given in
-             * the message.
-             * 
-             * @todo Trap truncation vs extend?
-             */
-            try {
+                haLog.debug("req=" + req + ", msg=" + msg);
 
-                ((IHABufferStrategy) AbstractJournal.this._bufferStrategy)
-                        .setExtentForLocalStore(msg.getFileExtent());
-            
-            } catch (InterruptedException e) {
-            
-                throw new RuntimeException(e);
-                
-            }
+//            if (req == null) {
+//         
+//                /*
+//                 * Adjust the size on the disk of the local store to that given
+//                 * in the message.
+//                 * 
+//                 * Note: DO NOT do this for historical messages!
+//                 * 
+//                 * @todo Trap truncation vs extend?
+//                 */
+//
+//                try {
+//
+//                    ((IHABufferStrategy) AbstractJournal.this._bufferStrategy)
+//                            .setExtentForLocalStore(msg.getFileExtent());
+//
+//                } catch (InterruptedException e) {
+//
+//                    throw new RuntimeException(e);
+//
+//                }
+//
+//            }
 
             final Future<Void> ft = quorum.getClient()
-                    .receiveAndReplicate(msg);
+                    .receiveAndReplicate(req, msg);
 
             return getProxy(ft);
             
 		}
+
+        /*
+         * This is implemented by HAJournal, which is responsible for
+         * maintaining the HA Log files.
+         */
+        @Override
+        public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                IHALogRootBlocksRequest msg) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * This is implemented by HAJournal, which is responsible for
+         * maintaining the HA Log files.
+         */
+        @Override
+        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
 
         @Override
         public IHARootBlockResponse getRootBlock(

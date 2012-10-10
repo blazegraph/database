@@ -745,15 +745,18 @@ public class FileMetadata {
 				}
 				this.createTime = createTime;
 				this.closeTime = 0L;
+				final long blockSequence = IRootBlockView.NO_BLOCK_SEQUENCE;
 				final IRootBlockView rootBlock0 = new RootBlockView(true,
 						offsetBits, nextOffset, firstCommitTime,
 						lastCommitTime, commitCounter, commitRecordAddr,
-						commitRecordIndexAddr, uuid, quorumToken,//
+						commitRecordIndexAddr, uuid, //
+						blockSequence, quorumToken,//
 						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
 				final IRootBlockView rootBlock1 = new RootBlockView(false,
 						offsetBits, nextOffset, firstCommitTime,
 						lastCommitTime, commitCounter, commitRecordAddr,
-						commitRecordIndexAddr, uuid, quorumToken,//
+						commitRecordIndexAddr, uuid, //
+						blockSequence, quorumToken,//
 						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
 
 				if (!temporary) {

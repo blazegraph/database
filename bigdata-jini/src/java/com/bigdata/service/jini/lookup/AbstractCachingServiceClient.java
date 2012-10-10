@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini.lookup;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.rmi.Remote;
@@ -790,14 +791,46 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
                 // Fast termination (can have latency).
                 log.warn("will shutdownNow() service: " + serviceItem);
 
-                ((RemoteDestroyAdmin) admin).shutdownNow();
+                try {
+                    
+                    ((RemoteDestroyAdmin) admin).shutdownNow();
+                    
+                } catch (IOException ex) {
+                    
+                    /*
+                     * An RMI error here is not unusual. The service can
+                     * terminate quickly enough that the RMI operation is
+                     * interrupted and we never get a response.
+                     */
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Exception during RMI requesting shutdown: "
+                                + ex);
+                    
+                }
 
             } else {
 
                 // Normal termination (can have latency).
                 log.warn("will shutdown() service: " + serviceItem);
 
-                ((RemoteDestroyAdmin) admin).shutdown();
+                try {
+
+                    ((RemoteDestroyAdmin) admin).shutdown();
+                    
+                } catch (IOException ex) {
+                    
+                    /*
+                     * An RMI error here is not unusual. The service can
+                     * terminate quickly enough that the RMI operation is
+                     * interrupted and we never get a response.
+                     */
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Exception during RMI requesting shutdown: "
+                                + ex);
+                    
+                }
 
             }
 

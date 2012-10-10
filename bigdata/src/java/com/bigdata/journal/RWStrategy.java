@@ -30,12 +30,14 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.mdi.IResourceMetadata;
@@ -630,6 +632,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 
     }
 
+    @Override
+    public Future<Void> sendHALogBuffer(final IHALogRequest req,
+            final IHAWriteMessage msg, final IBufferAccess b)
+            throws IOException, InterruptedException {
+
+        return m_store.sendHALogBuffer(req, msg, b);
+
+    }
+
     public ByteBuffer readFromLocalStore(final long addr)
             throws InterruptedException {
 
@@ -778,5 +789,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 	public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 		m_store.resetFromHARootBlock(rootBlock);
 	}
+
+    @Override
+    public long getBlockSequence() {
+        return m_store.getBlockSequence();
+    }
 
 }

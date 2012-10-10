@@ -29,9 +29,12 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -53,6 +56,23 @@ public interface IHABufferStrategy extends IBufferStrategy {
             InterruptedException;
 
     /**
+     * Send an {@link IHAWriteMessage} and the associated raw buffer through the
+     * write pipeline.
+     * 
+     * @param msg
+     *            The {@link IHAWriteMessage}.
+     * @param b
+     *            The raw buffer.
+     * 
+     * @return The {@link Future} for that request.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    Future<Void> sendHALogBuffer(IHALogRequest req, IHAWriteMessage msg,
+            IBufferAccess b) throws IOException, InterruptedException;
+
+    /**
      * Read from the local store in support of failover reads on nodes in a
      * highly available {@link Quorum}.
      * 
@@ -72,6 +92,13 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * Called from {@link AbstractJournal} commit2Phase to ensure is able to
      * read committed data that has been streamed directly to the backing store.
      */
-    public void resetFromHARootBlock(final IRootBlockView rootBlock);
-    
+    void resetFromHARootBlock(final IRootBlockView rootBlock);
+
+    /**
+     * Return the #of {@link WriteCache} blocks that have been written out as
+     * part of the current write set. This value is origin ZERO (0) and is reset
+     * to ZERO (0) after each commit or abort.
+     */
+    long getBlockSequence();
+
 }

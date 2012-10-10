@@ -1,6 +1,7 @@
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -16,7 +17,13 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.core.lookup.ServiceID;
@@ -32,13 +39,19 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
 
+import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.HALogWriter;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.msg.HALogRequest;
+import com.bigdata.ha.msg.HALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IHABufferStrategy;
@@ -56,6 +69,7 @@ import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.sun.jini.start.LifeCycle;
@@ -134,7 +148,7 @@ public class HAJournalServer extends AbstractServer {
     }
 
     /**
-     * FIXME FLAG CONDITIONALLY ENABLES THE HA LOG AND RESYNC PROTOCOL. Disabled
+     * FIXME RESYNC : FLAG CONDITIONALLY ENABLES THE HA LOG AND RESYNC PROTOCOL. Disabled
      * in committed code until we have this running properly.
      */
     private static final boolean HA_LOG_ENABLED = false;
@@ -466,30 +480,33 @@ public class HAJournalServer extends AbstractServer {
 
         /*
          * Wait until the server is terminated.
-         * 
-         * TODO Since spurious wakeups are possible, this should be used in a loop
-         * with a condition variable.
          */
-        
-        synchronized (keepAlive) {
-            
-            try {
-                
-                keepAlive.wait();
-                
-            } catch (InterruptedException ex) {
-                
-                if (log.isInfoEnabled())
-                    log.info(ex.getLocalizedMessage());
 
+        synchronized (keepAlive) {
+
+            try {
+
+                while (keepAlive.get()) {
+                
+                    try {
+                    
+                        keepAlive.wait();
+
+                    } catch (InterruptedException ex) {
+
+                        if (log.isInfoEnabled())
+                            log.info(ex.getLocalizedMessage());
+
+                    }
+                }
             } finally {
-                
+
                 // terminate.
-                
+
                 shutdownNow(false/* destroy */);
-                
+
             }
-            
+
         }
         
         System.out.println("Service is down: class=" + getClass().getName()
@@ -497,7 +514,49 @@ public class HAJournalServer extends AbstractServer {
         
     }
 
-    final private Object keepAlive = new Object();
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to set {@link #keepAlive} to <code>false</code> and notify the
+     * {@link #keepAlive} monitor so {@link #run()} will terminate.
+     */
+    @Override
+    synchronized public void shutdownNow(final boolean destroy) {
+
+        if (keepAlive.compareAndSet(true/* expect */, false/* update */)) {
+
+            synchronized (keepAlive) {
+
+                keepAlive.notifyAll();
+                
+            }
+
+            try {
+
+                // Notify the quorum that we are leaving.
+                quorum.getActor().serviceLeave();
+
+                quorum.terminate();
+
+            } catch (Throwable t) {
+                
+                log.error(t,t);
+                
+            } finally {
+                
+                super.shutdownNow(destroy);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * {@link AtomicBoolean} serves as both a condition variable and the monitor
+     * on which we wait.
+     */
+    final private AtomicBoolean keepAlive = new AtomicBoolean(true);
 
     /**
      * Factory for the {@link QuorumService} implementation.
@@ -537,6 +596,17 @@ public class HAJournalServer extends AbstractServer {
 
         private final L journal;
         private final HAJournalServer server;
+
+        /**
+         * Lock to guard the HALogWriter.
+         */
+        private final Lock logLock = new ReentrantLock();
+        
+        /**
+         * Future for task responsible for resynchronizing a node with
+         * a met quorum.
+         */
+        private FutureTask<Void> resyncFuture = null;
         
         public HAQuorumService(final String logicalServiceZPath,
                 final UUID serviceId, final S remoteServiceImpl, final L store,
@@ -548,6 +618,33 @@ public class HAJournalServer extends AbstractServer {
             
             this.server = server;
 
+        }
+
+        /**
+         * Resolve an {@link HAGlue} object from its Service UUID.
+         */
+        @Override
+        public S getService(final UUID serviceId) {
+            
+            final HAJournalDiscoveryClient discoveryClient = server
+                    .getDiscoveryClient();
+
+            final ServiceItem serviceItem = discoveryClient
+                    .getServiceItem(serviceId);
+
+            if (serviceItem == null) {
+
+                // Not found (per the API).
+                throw new QuorumException("Service not found: uuid="
+                        + serviceId);
+
+            }
+
+            @SuppressWarnings("unchecked")
+            final S service = (S) serviceItem.service;
+
+            return service;
+            
         }
 
         @Override
@@ -623,16 +720,12 @@ public class HAJournalServer extends AbstractServer {
 
                     }
 
-                } else if (isPipelineMember()) {
+                } else {
 
-                    /*
-                     * FIXME RESYNC : Start the resynchronization protocol.
-                     */
+                    conditionalStartResync(token);
 
-                    haLog.warn("RESYNCH REQUIRED: " + server.getServiceName());
-                    
                 }
-
+                
             }
 
             if (isJoinedMember(token) && server.jettyServer == null) {
@@ -659,45 +752,569 @@ public class HAJournalServer extends AbstractServer {
                 });
 
             }
-            
+
         }
-        
-        /**
-         * Resolve an {@link HAGlue} object from its Service UUID.
-         */
+
         @Override
-        public S getService(final UUID serviceId) {
+        public void pipelineAdd() {
+
+            super.pipelineAdd();
+
+            final Quorum<?, ?> quorum = getQuorum();
+
+            final long token = quorum.token();
+
+//            if (quorum.isQuorumMet()) {
             
-            final HAJournalDiscoveryClient discoveryClient = server
-                    .getDiscoveryClient();
+            conditionalStartResync(token);
+                
+//            }
 
-            final ServiceItem serviceItem = discoveryClient
-                    .getServiceItem(serviceId);
+        }
 
-            if (serviceItem == null) {
+        /**
+         * Conditionally start resynchronization of this service with the met
+         * quorum.
+         * 
+         * @param token
+         */
+        private void conditionalStartResync(final long token) {
+            
+            if (isPipelineMember() && !isJoinedMember(token)
+                    && getQuorum().isQuorumMet()
+                    && (resyncFuture == null || resyncFuture.isDone())) {
 
-                // Not found (per the API).
-                throw new QuorumException("Service not found: uuid="
-                        + serviceId);
+                /*
+                 * Start the resynchronization protocol.
+                 */
+
+                if (resyncFuture != null) {
+
+                    // Cancel future if already running (paranoia).
+                    resyncFuture.cancel(true/* mayInterruptIfRunning */);
+
+                }
+
+                resyncFuture = new FutureTaskMon<Void>(new ResyncTask());
+
+                journal.getExecutorService().submit(resyncFuture);
+                
 
             }
 
-            return (S) serviceItem.service;
-            
         }
 
-        @Override
-        protected void handleReplicatedWrite(final IHAWriteMessage msg,
-                final ByteBuffer data) throws Exception {
+        /**
+         * This class handles the resynchronization of a node that is not at the
+         * same commit point as the met quorum. The task will replicate write
+         * sets (HA Log files) from the services in the met quorum, and apply
+         * those write sets (in pure commit sequence) in order to advance its
+         * own committed state to the same last commit time as the quorum
+         * leader. Once it catches up with the quorum, it still needs to
+         * replicate logged writes from a met services in the quorum until it
+         * atomically can log from the write pipeline rather than replicating a
+         * logged write. At that point, the service can vote its lastCommitTime
+         * and will join the met quorum.
+         * 
+         * TODO RESYNC : In fact, the service can always begin logging from the write
+         * pipeline as soon as it observes (or acquires) the root block and
+         * observes the seq=0 write cache block (or otherwise catches up with
+         * the write pipeline). However, it can not write those data onto the
+         * local journal until it is fully caught up. This optimization might
+         * allow the service to catch up slightly faster, but the code would be
+         * a bit more complex.
+         * 
+         * FIXME RESYNC : Examine how the service joins during the 2-phase
+         * commit and how it participates during the 2-phase prepare (and
+         * whether it needs to participate - if not, then rollback some of the
+         * changes to support non-joined services in the 2-phase commit to
+         * simplify the code).
+         */
+        private class ResyncTask implements Callable<Void> {
 
-            if (haLog.isDebugEnabled())
-                haLog.debug("msg=" + msg + ", buf=" + data);
+            private final long token;
+            private final S leader;
+            
+            public ResyncTask() {
+
+                // run while quorum is met.
+                token = getQuorum().token();
+
+                // The leader for that met quorum (RMI interface).
+                leader = getLeader(token);
+
+            }
+
+            @Override
+            public Void call() throws Exception {
+
+                try {
+
+                    doRun();
+
+                } catch (Throwable t) {
+
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                        log.info("Interrupted.");
+
+                    }
+
+                    log.error(t, t);
+
+                }
+
+                return null;
+
+            }
+
+            /**
+             * Replicate each write set for commit points GT the current commit
+             * point on this service. As each write set is replicated, is also
+             * applied and we advance to another commit point. This method loops
+             * until we have all write sets locally replicated and the service
+             * is able to begin accepting write cache blocks from the write
+             * pipeline rather than through the resynchronization protocol.
+             * <p>
+             * Note: This task will be interrupted when the service catches up
+             * and is able to log and write the write cache block from the write
+             * pipeline. At that point, we no longer need to replicate the write
+             * sets from the leader.
+             * 
+             * @throws Exception
+             */
+            private void doRun() throws Exception {
+
+                haLog.warn("RESYNCH: " + server.getServiceName());
+
+                while (true) {
+
+                    // The current commit point on the local store.
+                    final long commitCounter = journal.getRootBlockView()
+                            .getCommitCounter();
+
+                    // Replicate and apply the next write set
+                    replicateAndApplyWriteSet(commitCounter + 1);
+
+                }
+
+            }
+
+            /**
+             * Replicate the write set having the specified commit counter,
+             * applying each {@link WriteCache} block as it is received and
+             * eventually going through a local commit when we receiving the
+             * closing {@link IRootBlockView} for that write set.
+             * 
+             * @param commitCounter
+             *            The commit counter for the desired write set.
+             * 
+             * @throws IOException
+             * @throws FileNotFoundException
+             * @throws ExecutionException
+             * @throws InterruptedException
+             */
+            private void replicateAndApplyWriteSet(final long commitCounter)
+                    throws FileNotFoundException, IOException,
+                    InterruptedException, ExecutionException {
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("RESYNC: commitCounter=" + commitCounter);
+
+                final IHALogRootBlocksResponse resp;
+                try {
+                    
+                    // Request the root blocks for the write set.
+                    resp = leader
+                            .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
+                                    commitCounter));
+
+                } catch (FileNotFoundException ex) {
+
+                    /*
+                     * Oops. The leader does not have that log file.
+                     * 
+                     * TODO REBUILD : If we can not replicate ALL log files for
+                     * the commit points that we need to make up on this
+                     * service, then we can not incrementally resynchronize this
+                     * service and we will have to do a full rebuild of the
+                     * service instead.
+                     * 
+                     * TODO RESYNC : It is possible to go to another service in
+                     * the met quorum for the same log file, but it needs to be
+                     * a service that is UPSTREAM of this service.
+                     */
+
+                    // Abort the resynchronization effort.
+                    throw new RuntimeException(
+                            "HA Log not available: commitCounter="
+                                    + commitCounter, ex);
+
+                }
+
+                // root block when the quorum started that write set.
+                final IRootBlockView openRootBlock = resp.getOpenRootBlock();
+
+                // root block when the quorum committed that write set.
+                final IRootBlockView closeRootBlock = resp.getCloseRootBlock();
+
+                if (openRootBlock.getCommitCounter() != commitCounter - 1) {
+                    
+                    /*
+                     * The opening root block for the write set must have a
+                     * commit counter that is ONE less than the requested commit
+                     * point.
+                     */
+                    
+                    throw new AssertionError(
+                            "Should start at the previous commit point: requested commitCounter="
+                                    + commitCounter + ", openRootBlock="
+                                    + openRootBlock);
+                }
+                
+                if (openRootBlock.getCommitCounter() == closeRootBlock
+                        .getCommitCounter()) {
+                    
+                    /*
+                     * FIXME RESYNC : This is not an error condition. The quorum
+                     * is still writing on the HA Log file for the current write
+                     * set. However, we do not yet have code that will let us
+                     * read on a log file that is currently being written.
+                     */
+                    
+                    throw new AssertionError(
+                            "Write set is not closed: requested commitCounter="
+                                    + commitCounter);
+                
+                }
+                
+                /*
+                 * If the local journal is empty, then we need to replace both
+                 * of it's root blocks with the opening root block.
+                 */
+                if (journal.getRootBlockView().getCommitCounter() == 0) {
+
+                    // Install the initial root blocks.
+                    installRootBlocksFromQuorum(openRootBlock);
+
+                }
+                
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                // Make sure we have the correct HALogWriter open.
+                {//if (logWriter.getCommitCounter() != commitCounter) {
+
+                    logWriter.disable();
+
+                    logWriter.createLog(openRootBlock);
+
+                }
+
+                /*
+                 * We need to transfer and apply the write cache blocks from the
+                 * HA Log file on some service in the met quorum. This code
+                 * works with the leader because it is known to be upstream from
+                 * all other services in the write pipeline.
+                 * 
+                 * Note: Because we are multiplexing the write cache blocks on
+                 * the write pipeline, there is no advantage to gathering
+                 * different write sets from different nodes. A slight advantage
+                 * could be had by reading off of the immediate upstream node,
+                 * but understandability of the code is improved by the
+                 * assumption that we are always replicating these data from the
+                 * quorum leader.
+                 */
+
+                Future<Void> ft = null;
+                try {
+
+                    ft = leader.sendHALogForWriteSet(new HALogRequest(
+                            commitCounter));
+
+                    // Wait until all write cache blocks are received.
+                    ft.get();
+
+                } finally {
+
+                    if (ft != null) {
+
+                        ft.cancel(true/* mayInterruptIfRunning */);
+
+                        ft = null;
+
+                    }
+
+                }
+
+                // Local commit.
+                journal.doLocalCommit(
+                        (QuorumService<HAGlue>) HAQuorumService.this,
+                        closeRootBlock);
+                
+                // Close out the current HALog writer.
+                logWriter.closeLog(closeRootBlock);
+
+            }
+
+        }
+        
+        @Override
+        protected void handleReplicatedWrite(final IHALogRequest req,
+                final IHAWriteMessage msg, final ByteBuffer data)
+                throws Exception {
+
+            logLock.lock();
+            try {
+
+                if (haLog.isDebugEnabled())
+                    haLog.debug("msg=" + msg + ", buf=" + data);
+
+                // The current root block on this service.
+                final long commitCounter = journal.getRootBlockView()
+                        .getCommitCounter();
+
+                if (resyncFuture != null && !resyncFuture.isDone()) {
+
+                    setExtent(msg);
+                    handleResyncMessage(msg, data);
+
+                } else if (commitCounter == msg.getCommitCounter()
+                        && isJoinedMember(msg.getQuorumToken())) {
+
+                    /*
+                     * We are not resynchronizing this service. This is a
+                     * message for the current write set. The service is joined
+                     * with the quorum.
+                     */
+
+                    // write on the log and the local store.
+                    setExtent(msg);
+                    acceptHAWriteMessage(msg, data);
+
+                } else {
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring message: " + msg);
+                    
+                    /*
+                     * Drop the pipeline message. We can't log it yet.
+                     */
+                    
+                }
+
+            } finally {
+
+                logLock.unlock();
+
+            }
+
+        }
+        
+        /**
+         * Adjust the size on the disk of the local store to that given in the
+         * message.
+         * 
+         * Note: DO NOT do this for historical messages!
+         * 
+         * @throws IOException
+         * 
+         * @todo Trap truncation vs extend?
+         */
+        private void setExtent(final IHAWriteMessage msg) throws IOException {
+
+            try {
+
+                ((IHABufferStrategy) journal.getBufferStrategy())
+                        .setExtentForLocalStore(msg.getFileExtent());
+
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+        }
+
+        /**
+         * Handle a replicated write requested to resynchronize this service
+         * with the quorum. The {@link WriteCache} messages for HA Logs are
+         * delivered over the write pipeline, along with messages for the
+         * current write set. This method handles those that are for historical
+         * write sets (replayed from HA Log files) as well as those that are
+         * historical writes for the current write set (that is, messages that
+         * this service missed because it joined the write pipeline after the
+         * first write message for the current write set and was thus not able
+         * to log and/or apply the write message even if it did observe it).
+         * <p>
+         * Note: The quorum token associated with historical message needs to be
+         * ignored. The quorum could have broken and met again since, in which
+         * case any attempt to use that old token will cause a QuorumException.
+         * 
+         * @throws InterruptedException
+         * @throws IOException
+         * 
+         *             FIXME RESYNC : There is only one {@link HALogWriter}. It
+         *             can only have one file open. We need to explicitly
+         *             coordinate which log file is open when so we never
+         *             attempt to write a cache block on the write log file (or
+         *             one that is out of sequence). [Consider making those
+         *             things errors in the {@link HALogWriter} - it quietly
+         *             ignores this right now.]
+         */
+        private void handleResyncMessage(final IHAWriteMessage msg,
+                final ByteBuffer data) throws IOException, InterruptedException {
+
+            logLock.lock();
+
+            try {
+
+                /*
+                 * FIXME RESYNC : Review the transition conditions. [msg.seq+q ==
+                 * log.nextSeq] implies that we have observed and logged this
+                 * write block already. That is the duplicate write cache block
+                 * that let's us know that we are fully synchronized with the
+                 * quorum.
+                 * 
+                 * FIXME RESYNC : Review when (and where) we open and close log files.
+                 */
+
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                final long journalCommitCounter = journal.getRootBlockView()
+                        .getCommitCounter();
+
+                if (msg.getCommitCounter() == journalCommitCounter
+                        && msg.getSequence() + 1 == logWriter.getSequence()) {
+
+                    /*
+                     * We just received the last resync message that we need to
+                     * join the met quorum.
+                     */
+                    
+                    resyncTransitionToMetQuorum(msg,data);
+                    
+                    return;
+                    
+                }
+
+                /*
+                 * Log the message and write cache block.
+                 */
+
+                if (logWriter.getCommitCounter() != msg.getCommitCounter()) {
+
+                    if (haLog.isDebugEnabled())
+                        log.debug("Ignoring write cache block: msg=" + msg);
+
+                    return;
+
+                }
+                
+                logWriteCacheBlock(msg, data);
+                
+            } finally {
+
+                logLock.unlock();
+
+            }
+
+        }
+
+        /**
+         * Atomic transition to the met quorum, invoked when we receive the same
+         * sequence number for some {@link WriteCache} block in the current
+         * write set twice. This happens when we get it once from the explicit
+         * resynchronization task and once from the normal write pipeline
+         * writes. In both cases, the block is transmitted over the write
+         * pipeline. The double-presentation of the block is our signal that we
+         * are caught up with the normal write pipeline writes.
+         */
+        private void resyncTransitionToMetQuorum(final IHAWriteMessage msg,
+                final ByteBuffer data) throws IOException, InterruptedException {
+
+            final HALogWriter logWriter = journal.getHALogWriter();
+            
+            final IRootBlockView rootBlock = journal.getRootBlockView();
+
+            if (logWriter.getCommitCounter() != rootBlock.getCommitCounter()) {
+
+                throw new AssertionError("HALogWriter.commitCounter="
+                        + logWriter.getCommitCounter() + ", but rootBlock="
+                        + rootBlock);
+
+            }
+
+            if (msg.getCommitCounter() != rootBlock.getCommitCounter()
+                    || msg.getLastCommitTime() != rootBlock.getLastCommitTime()) {
+
+                throw new AssertionError("msg=" + msg + ", but rootBlock="
+                        + journal.getRootBlockView());
+
+            }
 
             /*
-             * Log the message and write cache block.
+             * Service is not joined but is caught up with the write
+             * pipeline and is ready to join.
              */
-            logWriteCacheBlock(msg, data);
-            
+
+            if (resyncFuture != null) {
+
+                // Caught up.
+                resyncFuture.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+            // Accept the message - log and apply.
+            acceptHAWriteMessage(msg, data);
+
+            // Vote our lastCommitTime.
+            getActor().castVote(rootBlock.getLastCommitTime());
+
+            log.warn("Service voted for lastCommitTime of quorum, is receiving pipeline writes, and should join the met quorum");
+
+            // /*
+            // * TODO RESYNC : If there is a fully met quorum, then we can purge
+            // * all HA logs *EXCEPT* the current one. However, in order
+            // * to have the same state on each node, we really need to
+            // * make this decision when a service observes the
+            // * SERVICE_JOIN event that results in a fully met quorum.
+            // * That state change will be globally visible. If we do
+            // this
+            // * here, then only the service that was resynchronizing
+            // will
+            // * wind up purging its logs.
+            // */
+            // if (getQuorum().isQuorumFullyMet()) {
+            //
+            // purgeHALogs(false/* includeCurrent */);
+            //
+            // }
+
+        }
+        
+        /**
+         * Verify commitCounter is appropriate, then log and apply.
+         */
+        private void acceptHAWriteMessage(final IHAWriteMessage msg,
+                final ByteBuffer data) throws IOException, InterruptedException {
+
+            if (HA_LOG_ENABLED) {
+
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                if (msg.getCommitCounter() != logWriter.getCommitCounter()) {
+
+                    throw new AssertionError();
+
+                }
+
+                /*
+                 * Log the message and write cache block.
+                 */
+                logWriteCacheBlock(msg, data);
+                
+            }
+
             /*
              * Note: the ByteBuffer is owned by the HAReceiveService. This
              * just wraps up the reference to the ByteBuffer with an
@@ -728,8 +1345,9 @@ public class HAJournalServer extends AbstractServer {
             ((IHABufferStrategy) journal.getBufferStrategy())
                     .writeRawBuffer(msg, b);
 
-        }
 
+        }
+        
         /**
          * {@inheritDoc}
          * <p>
@@ -743,7 +1361,17 @@ public class HAJournalServer extends AbstractServer {
             if (!HA_LOG_ENABLED)
                 return;
 
-            journal.getHALogWriter().write(msg, data);
+            logLock.lock();
+
+            try {
+
+                journal.getHALogWriter().write(msg, data);
+                
+            } finally {
+                
+                logLock.unlock();
+                
+            }
             
         }
         
@@ -760,63 +1388,98 @@ public class HAJournalServer extends AbstractServer {
             if (!HA_LOG_ENABLED)
                 return;
 
-            // Close off the old log file with the root block.
-            journal.getHALogWriter().closeLog(rootBlock);
-            
-            // Open up a new log file with this root block.
-            journal.getHALogWriter().createLog(rootBlock);
+            logLock.lock();
+
+            try {
+
+                // Close off the old log file with the root block.
+                journal.getHALogWriter().closeLog(rootBlock);
+                
+                // Open up a new log file with this root block.
+                journal.getHALogWriter().createLog(rootBlock);
+                
+            } finally {
+                
+                logLock.unlock();
+                
+            }
             
         }
 
         /**
          * {@inheritDoc}
          * <p>
-         * Destroys all HA log files in the HA log directory.
+         * Destroys the HA log files in the HA log directory.
          */
         @Override
-        public void purgeHALogs() {
+        public void purgeHALogs(final boolean includeCurrent) {
 
             if (!HA_LOG_ENABLED)
                 return;
 
-            final File logDir = journal.getHALogDir();
-            
-            final File[] files = logDir.listFiles(new FilenameFilter() {
-                
-                @Override
-                public boolean accept(File dir, String name) {
+            logLock.lock();
 
-                    return name.endsWith(HALogWriter.HA_LOG_EXT);
-                    
+            try {
+
+                final File logDir = journal.getHALogDir();
+
+                final File[] files = logDir.listFiles(new FilenameFilter() {
+
+                    @Override
+                    public boolean accept(final File dir, final String name) {
+
+                        return name.endsWith(HALogWriter.HA_LOG_EXT);
+
+                    }
+                });
+
+                int ndeleted = 0;
+                long totalBytes = 0L;
+
+                final File currentFile = journal.getHALogWriter().getFile();
+
+                for (File file : files) {
+
+                    final long len = file.length();
+
+                    final boolean delete = includeCurrent
+                            || currentFile != null
+                            && file.getName().equals(currentFile.getName());
+
+                    if (delete && !file.delete()) {
+
+                        haLog.warn("COULD NOT DELETE FILE: " + file);
+
+                        continue;
+
+                    }
+
+                    ndeleted++;
+
+                    totalBytes += len;
+
                 }
-            });
 
-            int ndeleted = 0;
-            long totalBytes = 0L;
-            
-            for (File file : files) {
+                haLog.info("PURGED LOGS: ndeleted=" + ndeleted
+                        + ", totalBytes=" + totalBytes);
 
-                final long len = file.length();
-                
-                if (!file.delete()) {
+            } finally {
 
-                    haLog.warn("COULD NOT DELETE FILE: " + file);
+                logLock.unlock();
 
-                    continue;
-                    
-                }
-                
-                ndeleted++;
-                
-                totalBytes += len;
-                
             }
-            
-            haLog.info("PURGED LOGS: ndeleted=" + ndeleted + ", totalBytes="
-                    + totalBytes);
 
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public void installRootBlocksFromQuorum(final IRootBlockView rootBlock) {
+
+            journal.installRootBlocksFromQuorum((QuorumService<HAGlue>) this,
+                    rootBlock);
+
+        }
+        
     }
     
     /**

@@ -894,6 +894,14 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         // transaction service
         transactionServiceClient.shutdownDiscoveredServices(
                 getExecutorService(), null/* filter */, immediateShutdown);
+
+        /*
+         * TODO The HAJournalServer is currently being shutdown because it
+         * presents an ITransactionService interface. It is good that it is
+         * being shutdown, since we want to shutdown all services in the
+         * federation, but it is inappropriate that it is being reported out as
+         * an ITransactionService rather than the preferred HAGlue interface.
+         */
         
     }
 

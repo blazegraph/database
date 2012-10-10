@@ -39,6 +39,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IResourceManager;
@@ -102,10 +103,11 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this) {
 
             @Override
-            protected void handleReplicatedWrite(final IHAWriteMessage msg,
-                    final ByteBuffer data) throws Exception {
+            protected void handleReplicatedWrite(final IHALogRequest req,
+                    final IHAWriteMessage msg, final ByteBuffer data)
+                    throws Exception {
 
-                QuorumServiceBase.this.handleReplicatedWrite(msg, data);
+                QuorumServiceBase.this.handleReplicatedWrite(req, msg, data);
 
             }
             
@@ -140,9 +142,9 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
 
             @Override
-            public void purgeHALogs() {
+            public void purgeHALogs(final boolean includeCurrent) {
 
-                QuorumServiceBase.this.purgeHALogs();
+                QuorumServiceBase.this.purgeHALogs(includeCurrent);
 
             }
 
@@ -208,19 +210,19 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 //    }
 
     @Override
-    public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
-            throws IOException {
+    public Future<Void> receiveAndReplicate(final IHALogRequest req,
+            final IHAWriteMessage msg) throws IOException {
         
-        return pipelineImpl.receiveAndReplicate(msg);
+        return pipelineImpl.receiveAndReplicate(req, msg);
         
     }
 
     @Override
-    public Future<Void> replicate(final IHAWriteMessage msg, final ByteBuffer b)
-            throws IOException {
-    
-        return pipelineImpl.replicate(msg, b);
-        
+    public Future<Void> replicate(final IHALogRequest req,
+            final IHAWriteMessage msg, final ByteBuffer b) throws IOException {
+
+        return pipelineImpl.replicate(req, msg, b);
+
     }
 
     /**
@@ -237,8 +239,8 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * 
      * @see QuorumPipelineImpl#handleReplicatedWrite(IHAWriteMessage, ByteBuffer)
      */
-    abstract protected void handleReplicatedWrite(IHAWriteMessage msg,
-            ByteBuffer data) throws Exception;
+    abstract protected void handleReplicatedWrite(IHALogRequest req,
+            IHAWriteMessage msg, ByteBuffer data) throws Exception;
  
     /**
      * {@inheritDoc}
@@ -259,7 +261,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Note: The default implementation is a NOP.
      */
     @Override
-    public void purgeHALogs() {
+    public void purgeHALogs(final boolean includeCurrent) {
         
         // NOP
         
