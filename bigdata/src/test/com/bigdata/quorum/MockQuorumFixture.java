@@ -56,6 +56,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.InnerCause;
@@ -1217,7 +1220,7 @@ public class MockQuorumFixture {
          * Mock service class.
          */
         class MockService extends ServiceBase implements HAPipelineGlue {
-
+            
             final InetSocketAddress addrSelf;
 
             public MockService() {
@@ -1281,7 +1284,20 @@ public class MockQuorumFixture {
                 return ft;
             }
 
-            public Future<Void> receiveAndReplicate(IHAWriteMessage msg)
+            @Override
+            public Future<Void> receiveAndReplicate(final IHALogRequest req,
+                    IHAWriteMessage msg) throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                    IHALogRootBlocksRequest msg) throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
                     throws IOException {
                 throw new UnsupportedOperationException();
             }

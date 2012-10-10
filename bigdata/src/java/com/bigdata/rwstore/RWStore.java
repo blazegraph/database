@@ -42,6 +42,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -60,6 +61,9 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.QuorumPipeline;
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -76,6 +80,7 @@ import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.quorum.Quorum;
@@ -2578,7 +2583,7 @@ public class RWStore implements IStore, IBufferedWriter {
 
 			try {
 				m_writeCache.flush(true);
-				m_writeCache.resetSequence();
+				lastBlockSequence = m_writeCache.resetSequence();
 			} catch (InterruptedException e) {
 			    log.error(e, e);
 				throw new RuntimeException(e);
@@ -5072,7 +5077,25 @@ public class RWStore implements IStore, IBufferedWriter {
 
     }
 
-	public int getMaxBlobSize() {
+    public Future<Void> sendHALogBuffer(final IHALogRequest req,
+            final IHAWriteMessage msg, final IBufferAccess buf)
+            throws IOException, InterruptedException {
+
+        final ByteBuffer b = buf.buffer();
+
+        assert b.remaining() > 0 : "Empty buffer: " + b;
+
+        @SuppressWarnings("unchecked")
+        final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) m_quorum
+                .getMember();
+
+        final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg, b);
+
+        return remoteWriteFuture;
+
+    }
+
+    public int getMaxBlobSize() {
 		return m_maxBlobAllocSize-4; // allow for checksum
 	}
 	
@@ -5513,6 +5536,17 @@ public class RWStore implements IStore, IBufferedWriter {
         return data;
 
     }
+
+    /**
+     * @see IHABufferStrategy#getBlockSequence()
+     */
+    public long getBlockSequence() {
+
+        return lastBlockSequence;
+
+    }
+
+    private long lastBlockSequence = 0;
 	
 	 //    /**
 //     * Only blacklist the addr if not already available, in other words

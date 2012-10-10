@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * Message requesting a root block for a store on a remote service.
  */
-public interface IHARootBlockRequest {
+public interface IHARootBlockRequest extends IHAMessage {
 
     /**
      * The {@link UUID} of the journal whose root block will be returned

@@ -20,21 +20,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.ha.msg;
 
+import java.io.Serializable;
+
 /**
- * Interface for a response from a failover read on a remote service.
+ * Base interface for HA messages.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHAReadResponse extends IHAMessage {
+public interface IHAMessage extends Serializable {
 
-    /**
-     * The record read from the remote service.
-     * 
-     * @return The record and never <code>null</code>.
-     */
-    byte[] getData();
-    
 }

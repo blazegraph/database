@@ -2492,7 +2492,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                  * However, out of order events could also result in overwriting
                  * a newer token with an older one, which is a Bad Thing.
                  */
-                if (lastValidToken == newToken) {
+                if (lastValidToken == newToken && token == newToken) {
                     // Already met.
                     return;
                 }
@@ -2982,6 +2982,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             sendEventNow(e);
             return;
         }
+        @SuppressWarnings("unused")
         final Executor executor = eventService;
         if (executor != null) {
             try {

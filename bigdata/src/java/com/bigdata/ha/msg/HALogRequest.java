@@ -23,18 +23,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
-/**
- * Interface for a response from a failover read on a remote service.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- */
-public interface IHAReadResponse extends IHAMessage {
+public class HALogRequest implements IHALogRequest {
 
     /**
-     * The record read from the remote service.
      * 
-     * @return The record and never <code>null</code>.
      */
-    byte[] getData();
-    
+    private static final long serialVersionUID = 1L;
+
+    private final long commitCounter;
+
+    /**
+     * 
+     * @param commitCounter
+     *            The commit counter used to identify the desired commit point
+     *            (the commit counter of the closing root block).
+     */
+    public HALogRequest(final long commitCounter) {
+
+        this.commitCounter = commitCounter;
+
+    }
+
+    @Override
+    public long getCommitCounter() {
+
+        return commitCounter;
+
+    }
+
 }

@@ -53,6 +53,9 @@ import com.bigdata.ha.HAGlueBase;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumPipelineImpl;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksRequest;
+import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
@@ -171,19 +174,22 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         }
 
+        @Override
         public UUID getServiceId() {
             return serviceId;
         }
         
+        @Override
         public InetSocketAddress getWritePipelineAddr() {
             return addr;
         }
 
-        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
-                throws IOException {
+        @Override
+        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+                final IHAWriteMessage msg) throws IOException {
 
             return ((QuorumPipeline<HAPipelineGlue>) member)
-                    .receiveAndReplicate(msg);
+                    .receiveAndReplicate(req, msg);
             
         }
 
@@ -191,6 +197,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          * Note: This is not being invoked due to the implementation of
          * {@link QuorumActor#reorganizePipeline} in {@link MockQuorumFixture}.
          */
+        @Override
         public RunnableFuture<Void> moveToEndOfPipeline() throws IOException {
 
             final FutureTask<Void> ft = new FutureTask<Void>(
@@ -234,6 +241,18 @@ public class TestWORMWriteCacheService extends TestCase3 {
             return ft;
 
         }
+
+        @Override
+        public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
+                IHALogRootBlocksRequest msg) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
         
     } // class MockHAPipelineGlue
 
@@ -269,8 +288,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this){
 
-                protected void handleReplicatedWrite(final IHAWriteMessage msg,
-                        final ByteBuffer data) throws Exception {
+                protected void handleReplicatedWrite(final IHALogRequest req,
+                        final IHAWriteMessage msg, final ByteBuffer data)
+                        throws Exception {
 
                     nreceived.incrementAndGet();
                     
@@ -333,9 +353,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
-                public void purgeHALogs() {
+                public void purgeHALogs(final boolean includeCurrent) {
                     
-                    MyMockQuorumMember.this.purgeHALogs();
+                    MyMockQuorumMember.this.purgeHALogs(includeCurrent);
                     
                 }
                 
@@ -379,18 +399,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
 //        }
 
         @Override
-        public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
-                throws IOException {
-            
-            return pipelineImpl.receiveAndReplicate(msg);
-            
+        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+                final IHAWriteMessage msg) throws IOException {
+
+            return pipelineImpl.receiveAndReplicate(req, msg);
+
         }
 
         @Override
-        public Future<Void> replicate(final IHAWriteMessage msg,
-                final ByteBuffer b) throws IOException {
+        public Future<Void> replicate(IHALogRequest req,
+                final IHAWriteMessage msg, final ByteBuffer b)
+                throws IOException {
 
-            return pipelineImpl.replicate(msg, b);
+            return pipelineImpl.replicate(req, msg, b);
             
         }
 
@@ -426,7 +447,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public void purgeHALogs() {
+        public void purgeHALogs(final boolean includeCurrent) {
             
             // NOP
             

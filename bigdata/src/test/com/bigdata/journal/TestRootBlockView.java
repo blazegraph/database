@@ -134,6 +134,7 @@ public class TestRootBlockView extends TestCase2 {
             final long commitRecordAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final long commitRecordIndexAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final UUID uuid = UUID.randomUUID();
+            final long blockSequence = r.nextBoolean()?IRootBlockView.NO_BLOCK_SEQUENCE:Math.abs(r.nextLong());
             final long quorum = r.nextBoolean()?Quorum.NO_QUORUM:Math.abs(r.nextLong());
             final long metaStartAddr = 0L;
             final long metaBitsAddr = 0L;
@@ -143,7 +144,8 @@ public class TestRootBlockView extends TestCase2 {
             
             RootBlockView rootBlock = new RootBlockView(rootBlock0, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, quorum,
+                    commitRecordAddr, commitRecordIndexAddr, uuid, 
+                    blockSequence, quorum,//
                     metaStartAddr, metaBitsAddr, storeType, createTime,
                     closeTime, RootBlockView.currentVersion, checker);
 
@@ -384,15 +386,13 @@ public class TestRootBlockView extends TestCase2 {
         //
         final UUID uuidOk = UUID.randomUUID();
         final UUID uuidBad = null;
-        /*
-         * @todo Once we nail down the quorumToken assignment semantics (e.g.,
-         * based on commitTime, commitCounter, pure non-negative sequences as
-         * assigned by zookeeper, etc) both the RootBlockView ctor this unit
-         * test should be modified to conform with the quorumToken validity
-         * constraints.
-         */
-        final long quorumOk = lastCommitTimeOk;
-        final long quorumOk2 = lastCommitTimeOk2;
+        //
+        final long blockSeqOk = IRootBlockView.NO_BLOCK_SEQUENCE;
+        final long blockSeqOk2 = 12;
+        final long blockSeqBad = -1;
+        //
+        final long quorumOk = commitCounterOkZero;
+        final long quorumOk2 = commitCounterOk2;
         final long quorumOk3 = Quorum.NO_QUORUM;
         final long quorumBad = -2;
         // @todo this must be paramterized for RW vs WORM.
@@ -416,37 +416,61 @@ public class TestRootBlockView extends TestCase2 {
         // legit.
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
                 lastCommitTimeOk, commitCounterOkZero, commitRecordAddrOkZero, commitRecordIndexOkZero,
-                uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
+                uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
                 RootBlockView.currentVersion, checkerOk);
         // legit (firstCommitTimeOk2,lastCommitTimeOk2).
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk2,
                 lastCommitTimeOk2, commitCounterOkZero, commitRecordAddrOkZero, commitRecordIndexOkZero,
-                uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
+                uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
                 RootBlockView.currentVersion, checkerOk);
         // legit (rootsAddr2, commitRecordIndex2)
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
                 lastCommitTimeOk, commitCounterOk2, commitRecordAddrOk2, commitRecordIndexOk2,
-                uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
+                uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk, closeTimeOk, 
                 RootBlockView.currentVersion, checkerOk);
         // legit (closeTime2)
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                 firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                commitRecordAddrOkZero, commitRecordIndexOkZero, 
+                uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                 closeTimeOk2, RootBlockView.currentVersion, checkerOk);
+        // legit (blockSequence)
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,
+                blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk,
+                createTimeOk, closeTimeOk2, RootBlockView.currentVersion,
+                checkerOk);
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,
+                blockSeqOk2, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk,
+                createTimeOk, closeTimeOk2, RootBlockView.currentVersion,
+                checkerOk);
         // legit (quorum)
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                 firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk2, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
-                closeTimeOk2, RootBlockView.currentVersion, checkerOk);
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,
+                blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk,
+                createTimeOk, closeTimeOk2, RootBlockView.currentVersion,
+                checkerOk);
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                 firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk3, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
-                closeTimeOk2, RootBlockView.currentVersion, checkerOk);
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,
+                blockSeqOk, quorumOk2, metaStartAddr, metaBitsAddr,
+                storeTypeOk, createTimeOk, closeTimeOk2,
+                RootBlockView.currentVersion, checkerOk);
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,
+                blockSeqOk, quorumOk3, metaStartAddr, metaBitsAddr,
+                storeTypeOk, createTimeOk, closeTimeOk2,
+                RootBlockView.currentVersion, checkerOk);
         // FIXME do legit (metaStartAddr, metaBitsAddr) tests here.
         // legit (storeTypeEnum)
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                 firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk,
+                commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk,
                 metaStartAddr, metaBitsAddr, storeTypeOk2, createTimeOk,
                 closeTimeOk2, RootBlockView.currentVersion, checkerOk);
 
@@ -454,7 +478,8 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsBad, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrBad, commitRecordIndexOk2, 
+                    uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -463,7 +488,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsBad2, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -474,7 +499,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetBad,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -485,7 +510,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeBad1, lastCommitTimeBad1, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
         } catch (IllegalArgumentException ex) {
             fail("Unexpected exception", ex);
@@ -493,7 +518,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeBad2, lastCommitTimeBad2, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -502,7 +527,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeBad3, lastCommitTimeBad3, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
         } catch (IllegalArgumentException ex) {
             fail("Unexpected exception", ex);
@@ -510,7 +535,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeBad4, lastCommitTimeBad4, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
         } catch (IllegalArgumentException ex) {
             fail("Unexpected exception", ex);
@@ -520,7 +545,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterBad,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk,blockSeqOk,  quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -529,7 +554,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterBad2,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -541,7 +566,7 @@ public class TestRootBlockView extends TestCase2 {
             // the commit record addr must be 0 if the commit counter is 0.
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOk2, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -551,7 +576,7 @@ public class TestRootBlockView extends TestCase2 {
             // the commit record index addr must be 0 if the commit counter is 0.
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -561,7 +586,7 @@ public class TestRootBlockView extends TestCase2 {
             // the commit record addr must be non-zero if the commit counter is non-zero.
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOk2,
-                    commitRecordAddrOkZero, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOk2, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -571,7 +596,7 @@ public class TestRootBlockView extends TestCase2 {
             // the commit record index addr must be non-zero if the commit counter is non-zero.
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOk2,
-                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -580,7 +605,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -589,7 +614,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOk2, commitRecordIndexBad, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOk2, commitRecordIndexBad, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -602,7 +627,7 @@ public class TestRootBlockView extends TestCase2 {
              */
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOk2, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -613,9 +638,22 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
+        }
+
+        // bad blockSequence
+        try {
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk,
+                    blockSeqBad, quorumOk, metaStartAddr, metaBitsAddr,
+                    storeTypeOk, createTimeBad, closeTimeOk,
+                    RootBlockView.currentVersion, checkerOk);
+           fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
         }
@@ -624,8 +662,10 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, quorumBad, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeBad,
-                    closeTimeOk, RootBlockView.currentVersion, checkerOk);
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk,
+                    blockSeqOk, quorumBad, metaStartAddr, metaBitsAddr,
+                    storeTypeOk, createTimeBad, closeTimeOk,
+                    RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
@@ -637,7 +677,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeBad, createTimeBad,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeBad, createTimeBad,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -648,7 +688,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeBad,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeBad,
                     closeTimeOk, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -659,7 +699,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrBad, commitRecordIndexOk2, uuidBad, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeBad, RootBlockView.currentVersion, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -670,7 +710,7 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOkZero,
-                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
+                    commitRecordAddrOkZero, commitRecordIndexOkZero, uuidOk, blockSeqOk, quorumOk, metaStartAddr, metaBitsAddr, storeTypeOk, createTimeOk,
                     closeTimeOk, RootBlockView.currentVersion, checkerBad);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {

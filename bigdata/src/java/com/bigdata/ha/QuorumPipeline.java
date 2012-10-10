@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
@@ -52,22 +53,32 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * pipeline. That follower will accept the payload (and replicate it if
      * necessary) using {@link #receiveAndReplicate(IHAWriteMessage)}.
      * 
+     * @param req
+     *            A request for an HALog (optional). This is only non-null when
+     *            historical {@link WriteCache} blocks are being replayed down
+     *            the write pipeline in order to synchronize a service.
      * @param msg
      *            The RMI metadata about the payload.
      * @param b
      *            The payload.
      */
-    Future<Void> replicate(IHAWriteMessage msg, ByteBuffer b) throws IOException;
+    Future<Void> replicate(IHALogRequest req, IHAWriteMessage msg, ByteBuffer b)
+            throws IOException;
 
     /**
      * Return a {@link Future} for a task which will replicate an NIO buffer
      * along the write pipeline. This method is invoked for any node except the
      * master, including the last node in the failover chain.
      * 
+     * @param req
+     *            A request for an HALog (optional). This is only non-null when
+     *            historical {@link WriteCache} blocks are being replayed down
+     *            the write pipeline in order to synchronize a service.
      * @param msg
      *            The RMI metadata about the payload.
      */
-    Future<Void> receiveAndReplicate(IHAWriteMessage msg) throws IOException;
+    Future<Void> receiveAndReplicate(IHALogRequest req, IHAWriteMessage msg)
+            throws IOException;
 
     /*
      * Note: Method removed since it does not appear necessary to let this
@@ -142,7 +153,11 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * goes through a commit point in which the quorum is fully met. At that
      * moment, we no longer require these log files to resynchronize any
      * service.
+     * 
+     * @param includeCurrent
+     *            When <code>true</code>, the current HA Log file will also be
+     *            purged.
      */
-    void purgeHALogs();
+    void purgeHALogs(boolean includeCurrent);
     
 }

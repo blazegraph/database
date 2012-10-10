@@ -58,6 +58,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.AbstractBufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.rawstore.Bytes;
@@ -379,11 +380,14 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	private long sequence = -1;
 
-	/**
-     * The sequence must be set when the cache is ready to be flushed.  In HA this
-     * is sent down the pipeline to ensure correct synchronization when processing
-     * logged messages.
-	 */
+    /**
+     * The sequence #of this {@link WriteCache} block within the current write
+     * set (origin ZERO(0)). This must be set when the cache is ready to be
+     * flushed. In HA this is sent down the pipeline to ensure correct
+     * synchronization when processing logged messages. This also winds up in
+     * the {@link IRootBlockView} as a summary of the #of {@link WriteCache}
+     * blocks transmitted during the write set for a specific commit point.
+     */
     void setSequence(final long i) {
         sequence = i;
     }
@@ -1943,6 +1947,20 @@ abstract public class WriteCache implements IWriteCache {
                     /*
                      * Remove the entry.
                      * 
+                     * Note: it is possible for there to be a concurrent reset()
+                     * on the buffer that is invoked between the moment when
+                     * WriteCacheService.clearWrite() obtains this WriteCache
+                     * and the moment when we acquire() the internal buffer. If
+                     * this situation occurs, then the code immediately above
+                     * will wind up writing a delete marker into the internal
+                     * buffer, but the record will no longer be in the
+                     * [recordMap]. The delete marker is semantically neutral
+                     * under this condition. The real problem with binary
+                     * compatibility for HA is that the internal buffer must
+                     * not be modified once we decide to flush() it to the
+                     * disk and the write pipeline.  That condition is
+                     * guarded by [m_closedForWrites].
+                     * 
                      * A non-null value shouldn't be asserted.
                      * 
                      * It is possible that the address will already have been removed due to 
@@ -1956,6 +1974,11 @@ abstract public class WriteCache implements IWriteCache {
  Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * guarded by [m_closedForWrites].
                      */
                     recordMap.remove(addr);
+//                    if (recordMap.remove(addr) == null) {
+//                        throw new AssertionError(
+//                                "Address already cleared: addr=" + addr
+//                                        + ", latchedAddr=" + latchedAddr);
+//                    }
                 }
             } // synchronized(tmp)
 

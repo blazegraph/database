@@ -965,14 +965,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
 			tmp.attach(super.getCounters());
 
-            if (!isReadOnly()) {
-                /*
-                 * These index counters are only available for the unisolated
-                 * Name2Addr view. If this is a read-only journal, then we can
-                 * not report out that information.
-                 */
-                tmp.makePath(IJournalCounters.indexManager).attach(
-                        _getName2Addr().getIndexCounters());
+			// Live index counters iff available.
+            {
+
+                final CounterSet liveIndexCounters = super
+                        .getLiveIndexCounters();
+
+                if (liveIndexCounters != null) {
+
+                    tmp.makePath(IJournalCounters.indexManager).attach(
+                            liveIndexCounters);
+
+                }
+
             }
 
 			tmp.makePath(IJournalCounters.concurrencyManager)

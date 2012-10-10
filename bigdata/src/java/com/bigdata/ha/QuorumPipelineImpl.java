@@ -31,16 +31,21 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.HAWriteMessageBase;
+import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
@@ -172,7 +177,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     /**
      * The receive service (iff this is a follower in a met quorum).
      */
-    private HAReceiveService<IHAWriteMessage> receiveService;
+    private HAReceiveService<HAMessageWrapper> receiveService;
 
     /**
      * The buffer used to relay the data. This is only allocated for a
@@ -268,7 +273,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * @return The buffer -or- <code>null</code> if the pipeline has been torn
      *         down or if this is the leader.
      */
-    private HAReceiveService<IHAWriteMessage> getHAReceiveService() {
+    private HAReceiveService<HAMessageWrapper> getHAReceiveService() {
 
         if (!lock.isHeldByCurrentThread()) {
 
@@ -594,6 +599,37 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     }
 
     /**
+     * Glue class wraps the {@link IHAWriteMessage} and the
+     * {@link IHALogRequest} message and exposes the requires {@link IHAMessage}
+     * interface to the {@link HAReceiveService}. This class is never persisted.
+     * It just let's us handshake with the {@link HAReceiveService} and get back
+     * out the original {@link IHAWriteMessage} as well as the optional
+     * {@link IHALogRequest} message.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class HAMessageWrapper extends HAWriteMessageBase {
+
+        private static final long serialVersionUID = 1L;
+
+        final IHALogRequest req;
+        final IHAWriteMessage msg;
+        
+        public HAMessageWrapper(final IHALogRequest req,
+                final IHAWriteMessage msg) {
+
+            // Use size and checksum from real IHAWriteMessage.
+            super(msg.getSize(),msg.getChk());
+            
+            this.req = req; // MAY be null;
+            this.msg = msg;
+            
+        }
+
+    }
+    
+    /**
      * Setup the service to receive pipeline writes and to relay them (if there
      * is a downstream service).
      */
@@ -615,12 +651,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             final InetSocketAddress addrNext = downstreamId == null ? null
                     : member.getService(downstreamId).getWritePipelineAddr();
             // Setup the receive service.
-            receiveService = new HAReceiveService<IHAWriteMessage>(addrSelf,
-                    addrNext, new IHAReceiveCallback<IHAWriteMessage>() {
-                        public void callback(IHAWriteMessage msg, ByteBuffer data)
-                                throws Exception {
+            receiveService = new HAReceiveService<HAMessageWrapper>(addrSelf,
+                    addrNext, new IHAReceiveCallback<HAMessageWrapper>() {
+                        public void callback(final HAMessageWrapper msg,
+                                final ByteBuffer data) throws Exception {
                             // delegate handling of write cache blocks.
-                            handleReplicatedWrite(msg, data);
+                            handleReplicatedWrite(msg.req, msg.msg, data);
                         }
                     });
             // Start the receive service - will not return until service is
@@ -647,8 +683,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     /*
      * This is the leader, so send() the buffer.
      */
-    public Future<Void> replicate(final IHAWriteMessage msg, final ByteBuffer b)
-            throws IOException {
+    @Override
+    public Future<Void> replicate(final IHALogRequest req,
+            final IHAWriteMessage msg, final ByteBuffer b) throws IOException {
 
         final RunnableFuture<Void> ft;
 
@@ -658,75 +695,25 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             if (log.isTraceEnabled())
                 log.trace("Leader will send: " + b.remaining() + " bytes");
 
-            member.assertLeader(msg.getQuorumToken());
+            // Note: disable assert if we allow non-leaders to replicate HALog
+            // messages (or just verify service joined with the quorum).
+            if (req == null) {
+                // Note: Do not test quorum token for historical writes.
+                member.assertLeader(msg.getQuorumToken());
+            }
 
             final PipelineState<S> downstream = pipelineStateRef.get();
 
             final HASendService sendService = getHASendService();
 
-            ft = new FutureTask<Void>(new SendBufferTask<S>(msg, b, downstream,
-                    sendService));
+            ft = new FutureTask<Void>(new SendBufferTask<S>(req, msg, b,
+                    downstream, sendService, sendLock));
 
         } finally {
 
             lock.unlock();
 
         }
-
-//        /*
-//         * This is the leader, so send() the buffer.
-//         */
-//
-//        ft = new FutureTask<Void>(new Callable<Void>() {
-//
-//            public Void call() throws Exception {
-//
-//                // Get Future for send() outcome on local service.
-//                final Future<Void> futSnd = getHASendService().send(b);
-//
-//                try {
-//
-//                    // Get Future for receive outcome on the remote service (RMI).
-//                    final Future<Void> futRec = downstream.service
-//                            .receiveAndReplicate(msg);
-//
-//                    try {
-//
-//                        /*
-//                         * Await the Futures, but spend more time waiting on the
-//                         * local Future and only check the remote Future every
-//                         * second. Timeouts are ignored during this loop.
-//                         */
-//                        while (!futSnd.isDone() && !futRec.isDone()) {
-//                            try {
-//                                futSnd.get(1L, TimeUnit.SECONDS);
-//                            } catch (TimeoutException ignore) {
-//                            }
-//                            try {
-//                                futRec.get(10L, TimeUnit.MILLISECONDS);
-//                            } catch (TimeoutException ignore) {
-//                            }
-//                        }
-//                        futSnd.get();
-//                        futRec.get();
-//
-//                    } finally {
-//                        if (!futRec.isDone()) {
-//                            // cancel remote Future unless done.
-//                            futRec.cancel(true/* mayInterruptIfRunning */);
-//                        }
-//                    }
-//
-//                } finally {
-//                    // cancel the local Future.
-//                    futSnd.cancel(true/* mayInterruptIfRunning */);
-//                }
-//
-//                // done
-//                return null;
-//            }
-//
-//        });
 
         // execute the FutureTask.
         member.getExecutor().execute(ft);
@@ -741,22 +728,51 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     static private class SendBufferTask<S extends HAPipelineGlue> implements
             Callable<Void> {
 
+        private final IHALogRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HASendService sendService;
+        private final Lock sendLock;
 
-        public SendBufferTask(final IHAWriteMessage msg, final ByteBuffer b,
-                final PipelineState<S> downstream, final HASendService sendService) {
+        public SendBufferTask(final IHALogRequest req,
+                final IHAWriteMessage msg, final ByteBuffer b,
+                final PipelineState<S> downstream,
+                final HASendService sendService, final Lock sendLock) {
 
+            this.req = req; // Note: MAY be null.
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
             this.sendService = sendService;
-            
+            this.sendLock = sendLock;
+
         }
 
         public Void call() throws Exception {
+
+            /*
+             * Lock ensures that we do not have more than one request on the
+             * write pipeline at a time.
+             */
+
+            sendLock.lock();
+            try {
+
+                doRunWithLock();
+                
+                return null;
+                
+            } finally {
+                
+                sendLock.unlock();
+                
+            }
+
+        }
+        
+        private void doRunWithLock() throws InterruptedException,
+                ExecutionException, IOException {
 
             // Get Future for send() outcome on local service.
             final Future<Void> futSnd = sendService.send(b);
@@ -765,7 +781,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
                 // Get Future for receive outcome on the remote service (RMI).
                 final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(msg);
+                        .receiveAndReplicate(req, msg);
 
                 try {
 
@@ -799,15 +815,19 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                 futSnd.cancel(true/* mayInterruptIfRunning */);
             }
 
-            // done
-            return null;
-
         }
         
     }
     
-    public Future<Void> receiveAndReplicate(final IHAWriteMessage msg)
-            throws IOException {
+    /**
+     * Lock used to ensure that at most one message is being sent along the
+     * write pipeline at a time.
+     */
+    private final Lock sendLock = new ReentrantLock();
+
+    @Override
+    public Future<Void> receiveAndReplicate(final IHALogRequest req,
+            final IHAWriteMessage msg) throws IOException {
 
         final RunnableFuture<Void> ft;
 
@@ -822,7 +842,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
                  * possibly we have become a leader.
                  * 
                  * TODO We should probably pass in the Quorum and then just
-                 * assert that the msg.getQuorumToken() is valid for the quorum.
+                 * assert that the msg.getQuorumToken() is valid for the quorum
+                 * (but we can't do that for historical messages).
                  */
 
                 throw new QuorumException();
@@ -838,7 +859,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             
             final ByteBuffer b = getReceiveBuffer();
             
-            final HAReceiveService<IHAWriteMessage> receiveService = getHAReceiveService();
+            final HAReceiveService<HAMessageWrapper> receiveService = getHAReceiveService();
 
          	if (downstream == null) {
 
@@ -852,7 +873,12 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
                 try {
 
-                    return receiveService.receiveData(msg, b);
+                    // wrap the messages together.
+                    final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
+                            req, msg);
+                    
+                    // receive.
+                    return receiveService.receiveData(wrappedMsg, b);
 
                 } catch (InterruptedException e) {
 
@@ -867,70 +893,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
              * not the last).
              */
 
-            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(msg, b,
-                    downstream, receiveService));
+            ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(req, msg,
+                    b, downstream, receiveService));
 
         } finally {
             
             lock.unlock();
             
         }
-
-//        final RunnableFuture<Void> ft = new FutureTask<Void>(
-//                new Callable<Void>() {
-//
-//                    public Void call() throws Exception {
-//
-//                        // Get Future for send() outcome on local service.
-//                        final Future<Void> futSnd = getHAReceiveService()
-//                                .receiveData(msg, b);
-//
-//                        try {
-//
-//                            // Get future for receive outcome on the remote
-//                            // service.
-//                            final Future<Void> futRec = downstream.service
-//                                    .receiveAndReplicate(msg);
-//
-//                            try {
-//
-//                                /*
-//                                 * Await the Futures, but spend more time
-//                                 * waiting on the local Future and only check
-//                                 * the remote Future every second. Timeouts are
-//                                 * ignored during this loop.
-//                                 */
-//                                while (!futSnd.isDone() && !futRec.isDone()) {
-//                                    try {
-//                                        futSnd.get(1L, TimeUnit.SECONDS);
-//                                    } catch (TimeoutException ignore) {
-//                                    }
-//                                    try {
-//                                        futRec.get(10L, TimeUnit.MILLISECONDS);
-//                                    } catch (TimeoutException ignore) {
-//                                    }
-//                                }
-//                                futSnd.get();
-//                                futRec.get();
-//
-//                            } finally {
-//                                if (!futRec.isDone()) {
-//                                    // cancel remote Future unless done.
-//                                    futRec
-//                                            .cancel(true/* mayInterruptIfRunning */);
-//                                }
-//                            }
-//
-//                        } finally {
-//                            // cancel the local Future.
-//                            futSnd.cancel(true/* mayInterruptIfRunning */);
-//                        }
-//
-//                        // done
-//                        return null;
-//                    }
-//
-//                });
 
         // execute the FutureTask.
         member.getExecutor().execute(ft);
@@ -946,15 +916,18 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private static class ReceiveAndReplicateTask<S extends HAPipelineGlue>
             implements Callable<Void> {
         
+        private final IHALogRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
-        private final HAReceiveService<IHAWriteMessage> receiveService;
+        private final HAReceiveService<HAMessageWrapper> receiveService;
 
-        public ReceiveAndReplicateTask(final IHAWriteMessage msg,
-                final ByteBuffer b, final PipelineState<S> downstream,
-                final HAReceiveService<IHAWriteMessage> receiveService) {
+        public ReceiveAndReplicateTask(final IHALogRequest req,
+                final IHAWriteMessage msg, final ByteBuffer b,
+                final PipelineState<S> downstream,
+                final HAReceiveService<HAMessageWrapper> receiveService) {
 
+            this.req = req; // Note: MAY be null.
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
@@ -963,15 +936,20 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         public Void call() throws Exception {
 
+            // wrap the messages together.
+            final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
+                    req, msg);
+
             // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = receiveService.receiveData(msg, b);
+            final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
+                    b);
 
             try {
 
                 // Get future for receive outcome on the remote
                 // service.
                 final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(msg);
+                        .receiveAndReplicate(req, msg);
 
                 try {
 
@@ -1025,16 +1003,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      *            
      * @throws Exception
      */
-    abstract protected void handleReplicatedWrite(final IHAWriteMessage msg,
-            final ByteBuffer data) throws Exception;
-
-//    @Override
-//    abstract public void logWriteCacheBlock(final HAWriteMessage msg,
-//            final ByteBuffer data) throws IOException;
-//
-//    @Override
-//    abstract public void logRootBlock(final IRootBlockView rootBlock)
-//            throws IOException;
+    abstract protected void handleReplicatedWrite(final IHALogRequest req,
+            final IHAWriteMessage msg, final ByteBuffer data) throws Exception;
 
     /**
      * A utility class that bundles together the Internet address and port at which

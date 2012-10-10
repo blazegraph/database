@@ -30,7 +30,7 @@ import com.bigdata.journal.IRootBlockView;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHARootBlockResponse {
+public interface IHARootBlockResponse extends IHAMessage {
 
     /**
      * The root block from the remote service.

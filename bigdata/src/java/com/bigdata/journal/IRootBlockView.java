@@ -30,6 +30,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -274,6 +275,19 @@ public interface IRootBlockView {
      */
     public long getQuorumToken();
 
+    /**
+     * Return the #of {@link WriteCache} blocks that have been written out as
+     * part of the current write set. This value is origin ZERO (0) and is reset
+     * to ZERO (0) after each commit or abort.
+     */
+    public long getBlockSequence();
+
+    /**
+     * The value used for {@link #getBlockSequence()} for both historical stores
+     * and for stores that do not support this concept.
+     */
+    long NO_BLOCK_SEQUENCE = 0L;
+    
     /**
      * A read-only buffer whose contents are the root block. The position,
      * limit, and mark will be independent for each {@link ByteBuffer} that is

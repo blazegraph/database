@@ -28,7 +28,7 @@ package com.bigdata.ha.msg;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHA2PhaseAbortMessage {
+public interface IHA2PhaseAbortMessage extends IHAMessage {
 
     /**
      * The token for the quorum for which this request was made.

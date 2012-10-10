@@ -31,6 +31,7 @@ import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -43,6 +44,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -1099,11 +1101,20 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         if (writeCacheService != null) {
 
             // Reset the write cache block counter.
-            writeCacheService.resetSequence();
+            lastBlockSequence = writeCacheService.resetSequence();
 
         }
 
     }
+
+    @Override
+    public long getBlockSequence() {
+
+        return lastBlockSequence;
+
+    }
+
+    private long lastBlockSequence = 0;
 
     /**
      * Resets the {@link WriteCacheService} (if enabled).
@@ -2351,6 +2362,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         } finally {
             readLock.unlock();
         }
+
+    }
+
+    @Override
+    public Future<Void> sendHALogBuffer(final IHALogRequest req,
+            final IHAWriteMessage msg, final IBufferAccess b)
+            throws IOException, InterruptedException {
+
+        throw new UnsupportedOperationException();
 
     }
 

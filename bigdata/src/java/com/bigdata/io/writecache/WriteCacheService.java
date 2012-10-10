@@ -66,6 +66,7 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.quorum.Quorum;
@@ -490,10 +491,20 @@ abstract public class WriteCacheService implements IWriteCache {
     
     /**
      * Called from {@link IBufferStrategy#commit()} and {@link #reset()} to
-     * reset WriteCache sequence for HA synchronization.
+     * reset WriteCache sequence for HA synchronization. The return value winds
+     * up propagated to the {@link IRootBlockView#getBlockSequence()} field in
+     * the {@link IRootBlockView}s.
+     * 
+     * @return The value of the counter before this method was called.
      */
-    public void resetSequence() {
+    public long resetSequence() {
+     
+        final long tmp = cacheSequence;
+        
         cacheSequence = 0;
+        
+        return tmp;
+        
     }
     private volatile long cacheSequence = 0;
 
@@ -573,22 +584,6 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         if (quorum != null && quorum.isHighlyAvailable()) {
 
-//                            final QuorumMember<?> client = (QuorumMember<?>) quorum
-//                                    .getClient();
-//
-//                            // Verify quorum still valid (protects against NPE on [client]).
-//                            quorum.assertQuorum(quorumToken);
-//                            
-//                            final UUID serviceId = client.getServiceId();
-//
-//                            // Get prior and next serviceIds in the pipeline.
-//                            final UUID[] priorAndNext = quorum
-//                                    .getPipelinePriorAndNext(serviceId);
-//
-//                            // The next serviceId in the pipeline (if any).
-//                            final UUID nextId = (priorAndNext == null ? null
-//                                    : priorAndNext[1]);
-
                             // Verify quorum still valid and we are the leader.
                             quorum.assertLeader(quorumToken);
 
@@ -625,7 +620,8 @@ abstract public class WriteCacheService implements IWriteCache {
                              */
                             quorumMember.logWriteCacheBlock(msg, b.duplicate());
                             
-                            remoteWriteFuture = quorumMember.replicate(msg, b);
+                            remoteWriteFuture = quorumMember.replicate(
+                                    null/* req */, msg, b);
 
                             counters.get().nsend++;
                             
@@ -843,8 +839,9 @@ abstract public class WriteCacheService implements IWriteCache {
                         );
                 
                 // send to 1st follower.
-                remoteWriteFuture = quorumMember.replicate(msg, b);
-                
+                remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
+                        b);
+
                 counters.get().nsend++;
 
                 try {
