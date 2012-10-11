@@ -999,15 +999,14 @@ public class HAJournalServer extends AbstractServer {
 
                 }
                 
-                final HALogWriter logWriter = journal.getHALogWriter();
-
                 // Make sure we have the correct HALogWriter open.
-                {//if (logWriter.getCommitCounter() != commitCounter) {
-
+                logLock.lock();
+                try {
+                    final HALogWriter logWriter = journal.getHALogWriter();
                     logWriter.disable();
-
                     logWriter.createLog(openRootBlock);
-
+                } finally {
+                    logLock.unlock();
                 }
 
                 /*
@@ -1050,9 +1049,15 @@ public class HAJournalServer extends AbstractServer {
                 journal.doLocalCommit(
                         (QuorumService<HAGlue>) HAQuorumService.this,
                         closeRootBlock);
-                
+
                 // Close out the current HALog writer.
-                logWriter.closeLog(closeRootBlock);
+                logLock.lock();
+                try {
+                    final HALogWriter logWriter = journal.getHALogWriter();
+                    logWriter.closeLog(closeRootBlock);
+                } finally {
+                    logLock.unlock();
+                }
 
             }
 
@@ -1210,7 +1215,8 @@ public class HAJournalServer extends AbstractServer {
 
                 }
                 
-                logWriteCacheBlock(msg, data);
+                // log and write cache block.
+                acceptHAWriteMessage(msg, data);
                 
             } finally {
 
@@ -1293,7 +1299,8 @@ public class HAJournalServer extends AbstractServer {
         }
         
         /**
-         * Verify commitCounter is appropriate, then log and apply.
+         * Verify commitCounter in the current log file and the message are
+         * consistent, then log and apply the {@link WriteCache} block.
          */
         private void acceptHAWriteMessage(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
@@ -1315,36 +1322,7 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
-            /*
-             * Note: the ByteBuffer is owned by the HAReceiveService. This
-             * just wraps up the reference to the ByteBuffer with an
-             * interface that is also used by the WriteCache to control
-             * access to ByteBuffers allocated from the DirectBufferPool.
-             * However, release() is a NOP on this implementation since the
-             * ByteBuffer is owner by the HAReceiveService.
-             */
-            final IBufferAccess b = new IBufferAccess() {
-
-                @Override
-                public void release(long timeout, TimeUnit unit)
-                        throws InterruptedException {
-                    // NOP
-                }
-
-                @Override
-                public void release() throws InterruptedException {
-                    // NOP
-                }
-
-                @Override
-                public ByteBuffer buffer() {
-                    return data;
-                }
-            };
-
-            ((IHABufferStrategy) journal.getBufferStrategy())
-                    .writeRawBuffer(msg, b);
-
+            writeWriteCacheBlock(msg,data);
 
         }
         
@@ -1372,6 +1350,45 @@ public class HAJournalServer extends AbstractServer {
                 logLock.unlock();
                 
             }
+            
+        }
+
+        /**
+         * Write the raw {@link WriteCache} block onto the backing store.
+         */
+        private void writeWriteCacheBlock(final IHAWriteMessage msg,
+                final ByteBuffer data) throws IOException, InterruptedException {
+
+            /*
+             * Note: the ByteBuffer is owned by the HAReceiveService. This just
+             * wraps up the reference to the ByteBuffer with an interface that
+             * is also used by the WriteCache to control access to ByteBuffers
+             * allocated from the DirectBufferPool. However, release() is a NOP
+             * on this implementation since the ByteBuffer is owner by the
+             * HAReceiveService.
+             */
+            
+            final IBufferAccess b = new IBufferAccess() {
+
+                @Override
+                public void release(long timeout, TimeUnit unit)
+                        throws InterruptedException {
+                    // NOP
+                }
+
+                @Override
+                public void release() throws InterruptedException {
+                    // NOP
+                }
+
+                @Override
+                public ByteBuffer buffer() {
+                    return data;
+                }
+            };
+
+            ((IHABufferStrategy) journal.getBufferStrategy())
+                    .writeRawBuffer(msg, b);
             
         }
         

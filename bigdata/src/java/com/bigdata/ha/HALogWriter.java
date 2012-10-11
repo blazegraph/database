@@ -82,7 +82,7 @@ public class HALogWriter {
     private IRootBlockView m_rootBlock;
 
     /** Current write cache block sequence counter. */
-    private long m_sequence = 0;
+    private long m_nextSequence = 0;
 
     /** current log file. */
     private File m_log = null;
@@ -115,7 +115,7 @@ public class HALogWriter {
 
         assertOpen();
 
-        return m_sequence;
+        return m_nextSequence;
         
     }
     
@@ -172,7 +172,7 @@ public class HALogWriter {
         
         final IRootBlockView tmp = m_rootBlock;
 
-        final long seq = m_sequence;
+        final long seq = m_nextSequence;
 
         return getClass().getName() + "{" + m_raf == null ? "closed"
                 : "commitCounter=" + tmp.getCommitCounter() + ",nextSequence="
@@ -208,7 +208,7 @@ public class HALogWriter {
 
         m_rootBlock = rootBlock;
 
-        m_sequence = 0L;
+        m_nextSequence = 0L;
 
         /*
          * Format the name of the log file.
@@ -368,24 +368,26 @@ public class HALogWriter {
     public void write(final IHAWriteMessage msg, final ByteBuffer data)
             throws IOException {
 
-        if (m_channel == null)
-            return;
+        assertOpen();
 
         /*
          * Check if this really is a valid message for this file. If it is not,
          * then close the file and return immediately
          */
         if (m_rootBlock.getCommitCounter() != msg.getCommitCounter())
-            return;
+            throw new IllegalStateException("lastCommitTime="
+                    + m_rootBlock.getLastCommitTime() + ", but msg=" + msg);
 
         if (m_rootBlock.getLastCommitTime() != msg.getLastCommitTime())
-            return;
+            throw new IllegalStateException("lastCommitTime="
+                    + m_rootBlock.getLastCommitTime() + ", but msg=" + msg);
 
-        if (m_sequence != msg.getSequence())
-            return;
+        if (m_nextSequence != msg.getSequence())
+            throw new IllegalStateException("nextSequence=" + m_nextSequence
+                    + ", but msg=" + msg);
 
         if (haLog.isInfoEnabled())
-            haLog.info("msg=" + msg);
+            haLog.info("msg=" + msg + ", position=" + m_position);
 
         if (m_position < headerSize0)
             throw new AssertionError("position=" + m_position
@@ -403,6 +405,9 @@ public class HALogWriter {
             FileChannelUtility.writeAll(reopener, tmp, m_position);
 
             m_position += nbytes;
+            
+            m_nextSequence++;
+            
         }
         
         switch(m_rootBlock.getStoreType()) {
@@ -472,7 +477,7 @@ public class HALogWriter {
         
         m_rootBlock = null;
 
-        m_sequence = 0L;
+        m_nextSequence = 0L;
    
     }
 
