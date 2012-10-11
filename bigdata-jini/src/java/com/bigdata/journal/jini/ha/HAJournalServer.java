@@ -916,6 +916,10 @@ public class HAJournalServer extends AbstractServer {
                  * Note: We need to discard any writes that might have been
                  * buffered before we start the resynchronization of the local
                  * store.
+                 * 
+                 * TODO This might not be necessary. We do a low-level abort
+                 * when we install the root blocks from the quorum leader before
+                 * we sync the first commit point.
                  */
 
                 journal.doLocalAbort();
@@ -1061,7 +1065,7 @@ public class HAJournalServer extends AbstractServer {
                 try {
 
                     ft = leader.sendHALogForWriteSet(new HALogRequest(
-                            commitCounter));
+                            server.serviceUUID, commitCounter));
 
                     // Wait until all write cache blocks are received.
                     ft.get();
@@ -1113,8 +1117,13 @@ public class HAJournalServer extends AbstractServer {
 
                 if (resyncFuture != null && !resyncFuture.isDone()) {
 
+                    /*
+                     * If we are resynchronizing, then pass ALL messages (both
+                     * live and historical) into handleResyncMessage().
+                     */
+                    
                     setExtent(msg);
-                    handleResyncMessage(msg, data);
+                    handleResyncMessage(req, msg, data);
 
                 } else if (commitCounter == msg.getCommitCounter()
                         && isJoinedMember(msg.getQuorumToken())) {
@@ -1190,30 +1199,18 @@ public class HAJournalServer extends AbstractServer {
          * 
          * @throws InterruptedException
          * @throws IOException
-         * 
-         *             FIXME RESYNC : There is only one {@link HALogWriter}. It
-         *             can only have one file open. We need to explicitly
-         *             coordinate which log file is open when so we never
-         *             attempt to write a cache block on the write log file (or
-         *             one that is out of sequence). [Consider making those
-         *             things errors in the {@link HALogWriter} - it quietly
-         *             ignores this right now.]
          */
-        private void handleResyncMessage(final IHAWriteMessage msg,
-                final ByteBuffer data) throws IOException, InterruptedException {
+        private void handleResyncMessage(final IHALogRequest req,
+                final IHAWriteMessage msg, final ByteBuffer data)
+                throws IOException, InterruptedException {
 
             logLock.lock();
 
             try {
 
                 /*
-                 * FIXME RESYNC : Review the transition conditions. [msg.seq+q ==
-                 * log.nextSeq] implies that we have observed and logged this
-                 * write block already. That is the duplicate write cache block
-                 * that let's us know that we are fully synchronized with the
-                 * quorum.
-                 * 
-                 * FIXME RESYNC : Review when (and where) we open and close log files.
+                 * TODO RESYNC : Review when (and where) we open and close log
+                 * files.
                  */
 
                 final HALogWriter logWriter = journal.getHALogWriter();
@@ -1221,35 +1218,63 @@ public class HAJournalServer extends AbstractServer {
                 final long journalCommitCounter = journal.getRootBlockView()
                         .getCommitCounter();
 
-                if (msg.getCommitCounter() == journalCommitCounter
-                        && msg.getSequence() + 1 == logWriter.getSequence()) {
+                if (req == null) {
+                    
+                    /*
+                     * Live message.
+                     */
+
+                    if (msg.getCommitCounter() == journalCommitCounter
+                            && msg.getSequence() + 1 == logWriter.getSequence()) {
+
+                        /*
+                         * We just received the last resync message that we need
+                         * to join the met quorum.
+                         */
+
+                        resyncTransitionToMetQuorum(msg, data);
+
+                        return;
+
+                    } else {
+
+                        /*
+                         * Drop live messages since we are not caught up.
+                         */
+
+                        if (haLog.isDebugEnabled())
+                            log.debug("Ignoring write cache block: msg=" + msg);
+
+                        return;
+
+                    }
+
+                } else {
 
                     /*
-                     * We just received the last resync message that we need to
-                     * join the met quorum.
+                     * A historical message (replay of an HALog file).
+                     * 
+                     * Note: We will see ALL messages. We can only log the
+                     * message if it is for our commit point.
                      */
-                    
-                    resyncTransitionToMetQuorum(msg,data);
-                    
-                    return;
-                    
+
+                    if (!server.serviceUUID.equals(req.getServiceId())) {
+
+                        /*
+                         * Not our request. Drop the message.
+                         */
+                        
+                        if (haLog.isDebugEnabled())
+                            log.debug("Ignoring write cache block: msg=" + msg);
+
+                        return;
+
+                    }
+
+                    // log and write cache block.
+                    acceptHAWriteMessage(msg, data);
+
                 }
-
-                /*
-                 * Log the message and write cache block.
-                 */
-
-                if (logWriter.getCommitCounter() != msg.getCommitCounter()) {
-
-                    if (haLog.isDebugEnabled())
-                        log.debug("Ignoring write cache block: msg=" + msg);
-
-                    return;
-
-                }
-                
-                // log and write cache block.
-                acceptHAWriteMessage(msg, data);
                 
             } finally {
 

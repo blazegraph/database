@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 public class HALogRequest implements IHALogRequest {
 
     /**
@@ -30,16 +32,19 @@ public class HALogRequest implements IHALogRequest {
      */
     private static final long serialVersionUID = 1L;
 
+    private final UUID serviceId;
     private final long commitCounter;
 
     /**
-     * 
+     * @param serviceId
+     *            The {@link UUID} of the service that made the request.
      * @param commitCounter
      *            The commit counter used to identify the desired commit point
      *            (the commit counter of the closing root block).
      */
-    public HALogRequest(final long commitCounter) {
+    public HALogRequest(final UUID serviceId, final long commitCounter) {
 
+        this.serviceId = serviceId;
         this.commitCounter = commitCounter;
 
     }
@@ -51,10 +56,18 @@ public class HALogRequest implements IHALogRequest {
 
     }
 
+    @Override
+    public UUID getServiceId() {
+
+        return serviceId;
+        
+    }
+
     public String toString() {
 
-        return getClass() + "{commitCounter=" + getCommitCounter() + "}";
-        
+        return getClass() + "{serviceId=" + getServiceId() + ", commitCounter="
+                + getCommitCounter() + "}";
+
     }
     
 }

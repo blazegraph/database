@@ -4790,8 +4790,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 // This quorum member.
                 final QuorumService<HAGlue> localService = quorum.getClient();
-                
-                if (_rootBlock.getCommitCounter() == 0
+
+                if (localService.isJoinedMember(quorumToken)
+                        && _rootBlock.getCommitCounter() == 0
                         && localService.isFollower(quorumToken)) {
 
                     /*
@@ -4810,35 +4811,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         throw new RuntimeException(e);
                     }
 
+                    // Installs the root blocks and does a local abort.
                     localService.installRootBlocksFromQuorum(tmp);
-                    
-                }
-                
-                if (localService.isJoinedMember(quorumToken)) {
 
-                    /*
-                     * We need to reset the backing store with the token for the
-                     * new quorum. There should not be any active writers since
-                     * there was no quorum. Thus, this should just cause the
-                     * backing store to become aware of the new quorum and
-                     * enable writes.
-                     * 
-                     * Note: This is done using a local abort, not a 2-phase
-                     * abort. Each node in the quorum should handle this locally
-                     * when it sees the quorum meet event.
-                     * 
-                     * TODO This assumes that a service that is not joined with
-                     * the quorum will not go through an _abort(). Such a
-                     * service will have to go through the synchronization
-                     * protocol. If the service is in the pipeline when the
-                     * quorum meets, even through it is not joined, and votes
-                     * the same lastCommitTime, then it MIGHT see all necessary
-                     * replicated writes and if it does, then it could
-                     * synchronize immediately. There is basically a data race
-                     * here.
-                     */
+                } else {
 
-                    _abort();
+                    // The leader also needs to do a local abort.
+                    doLocalAbort();
                     
                 }
 
@@ -4914,6 +4893,27 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         log.info("Synchronized root blocks with qourum: rootBlock="
                 + _rootBlock);
 
+        /*
+         * We need to reset the backing store with the token for the new quorum.
+         * There should not be any active writers since there was no quorum.
+         * Thus, this should just cause the backing store to become aware of the
+         * new quorum and enable writes.
+         * 
+         * Note: This is done using a local abort, not a 2-phase abort. Each
+         * node in the quorum should handle this locally when it sees the quorum
+         * meet event.
+         * 
+         * TODO This assumes that a service that is not joined with the quorum
+         * will not go through an _abort(). Such a service will have to go
+         * through the synchronization protocol. If the service is in the
+         * pipeline when the quorum meets, even through it is not joined, and
+         * votes the same lastCommitTime, then it MIGHT see all necessary
+         * replicated writes and if it does, then it could synchronize
+         * immediately. There is basically a data race here.
+         */
+
+        _abort();
+    
     }
 
     /**
