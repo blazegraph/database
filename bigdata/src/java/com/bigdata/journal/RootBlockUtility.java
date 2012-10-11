@@ -163,6 +163,26 @@ public class RootBlockUtility {
      * Note: For historical compatibility, <code>rootBlock1</code> is chosen if
      * both root blocks have the same {@link IRootBlockView#getCommitCounter()}.
      * 
+     * @return The chosen root block.
+     * 
+     * @throws RuntimeException
+     *             if no root block satisfies the criteria.
+     */
+    public IRootBlockView chooseRootBlock() {
+
+        return chooseRootBlock(rootBlock0, rootBlock1,
+                false/* alternateRootBlock */, false/* ignoreBadRootBlock */);
+
+    }
+
+    /**
+     * Return the chosen root block. The root block having the greater
+     * {@link IRootBlockView#getCommitCounter() commit counter} is chosen by
+     * default.
+     * <p>
+     * Note: For historical compatibility, <code>rootBlock1</code> is chosen if
+     * both root blocks have the same {@link IRootBlockView#getCommitCounter()}.
+     * 
      * @param rootBlock0
      *            Root block 0 (may be <code>null</code> if this root block is
      *            bad).

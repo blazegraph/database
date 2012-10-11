@@ -333,8 +333,18 @@ public class HALogWriter {
 
         flush(); // current streamed data
 
-        // The closing root block is always in slot 1.
-        writeRootBlock(false/* isRootBlock0 */, rootBlock);
+        /*
+         * The closing root block is written into which ever slot corresponds to
+         * its whether that root block is root block zero. Both root blocks are
+         * identical up to this point, so we can write the closing root block
+         * into either slot. HALogReader will use the commit counters to figure
+         * out which root block is the opening root block and which root block
+         * is the closing root block.
+         */
+        writeRootBlock(rootBlock.isRootBlock0(), rootBlock);
+        
+//        // The closing root block is always in slot 1.
+//        writeRootBlock(false/* isRootBlock0 */, rootBlock);
 
         close();
 
@@ -375,8 +385,8 @@ public class HALogWriter {
          * then close the file and return immediately
          */
         if (m_rootBlock.getCommitCounter() != msg.getCommitCounter())
-            throw new IllegalStateException("lastCommitTime="
-                    + m_rootBlock.getLastCommitTime() + ", but msg=" + msg);
+            throw new IllegalStateException("commitCounter="
+                    + m_rootBlock.getCommitCounter() + ", but msg=" + msg);
 
         if (m_rootBlock.getLastCommitTime() != msg.getLastCommitTime())
             throw new IllegalStateException("lastCommitTime="

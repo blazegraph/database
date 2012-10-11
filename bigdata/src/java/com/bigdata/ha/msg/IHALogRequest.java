@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 /**
  * Message requesting the root blocks and other metadata for an HA Log file.
  */
@@ -34,4 +36,8 @@ public interface IHALogRequest extends IHAMessage {
      */
     long getCommitCounter();
 
+    /**
+     * The UUID of the service that issued this request.
+     */
+    UUID getServiceId();
 }

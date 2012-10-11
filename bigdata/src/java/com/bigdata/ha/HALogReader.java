@@ -71,14 +71,8 @@ public class HALogReader {
              * closing root block has not been written and the data in the log
              * is useless).
              * 
-             * The root block is slot 0 is always the root block for the
-             * previous commit point.
-             * 
-             * The root block in slot 1 is either identical to the root block in
-             * slot zero (in which case the log file is logically empty) or it
-             * is the root block that closes the write set in the HA Log file
-             * (and its commit counter must be exactly one more than the commit
-             * counter for the opening root block).
+             * We figure out which root block is the opening root block based on
+             * standard logic.
              */
             /*
              * Read the MAGIC and VERSION.
@@ -107,9 +101,10 @@ public class HALogReader {
                     true/* validateChecksum */, false/* alternateRootBlock */,
                     false/* ignoreBadRootBlock */);
 
-            m_openRootBlock = tmp.rootBlock0;
+            m_closeRootBlock = tmp.chooseRootBlock();
 
-            m_closeRootBlock = tmp.rootBlock1;
+            m_openRootBlock = tmp.rootBlock0 == m_closeRootBlock ? tmp.rootBlock1
+                    : tmp.rootBlock0;
 
             final long cc0 = m_openRootBlock.getCommitCounter();
 
