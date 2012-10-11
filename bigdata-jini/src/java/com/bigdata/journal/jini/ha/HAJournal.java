@@ -398,6 +398,18 @@ public class HAJournal extends Journal {
     }
     
     /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to expose this method to the {@link HAQuorumService}.
+     */
+    @Override
+    protected void doLocalAbort() {
+
+        super.doLocalAbort();
+
+    }
+    
+    /**
      * Extended implementation supports RMI.
      */
     protected class HAGlueService extends BasicHA {
@@ -473,8 +485,13 @@ public class HAJournal extends Journal {
 
             final HALogReader r = new HALogReader(logFile);
 
-            return new HALogRootBlocksResponse(r.getOpeningRootBlock(),
-                    r.getClosingRootBlock());
+            final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
+                    r.getOpeningRootBlock(), r.getClosingRootBlock());
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("msg=" + msg + ", resp=" + resp);
+
+            return resp;
 
         }
 
@@ -482,6 +499,9 @@ public class HAJournal extends Journal {
         public Future<Void> sendHALogForWriteSet(final IHALogRequest req)
                 throws IOException {
             
+            if (haLog.isDebugEnabled())
+                haLog.debug("req=" + req);
+
             // The commit counter of the desired closing root block.
             final long commitCounter = req.getCommitCounter();
 
@@ -529,6 +549,9 @@ public class HAJournal extends Journal {
                         // get message and write cache buffer.
                         final IHAWriteMessage msg = r.processNextBuffer(buf
                                 .buffer());
+
+                        if (haLog.isDebugEnabled())
+                            haLog.debug("req=" + req + ", msg=" + msg);
 
                         // drop them into the write pipeline.
                         final Future<Void> ft = ((IHABufferStrategy) HAJournal.this

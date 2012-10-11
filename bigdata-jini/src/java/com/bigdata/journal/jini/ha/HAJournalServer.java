@@ -476,7 +476,32 @@ public class HAJournalServer extends AbstractServer {
         final QuorumActor<?,?> actor = quorum.getActor();
         actor.memberAdd();
         actor.pipelineAdd();
-        actor.castVote(journal.getLastCommitTime());
+//        try {
+//            quorum.awaitQuorum(1000, TimeUnit.MILLISECONDS);
+//        } catch (AsynchronousQuorumCloseException e1) {
+//            // Shutdown.
+//            return;
+//        } catch (InterruptedException e1) {
+//            // Shutdown.
+//            return;
+//        } catch (TimeoutException e1) {
+//            // Quorum is not already met.
+//        }
+        if (!quorum.isQuorumMet()) {
+            /*
+             * FIXME RESYNC : There needs to be an atomic decision whether to
+             * cast a vote and then join or to start synchronizing. We need to
+             * synchronize if a quorum is already met. We need to cast our vote
+             * iff a quorum has not met. However, I can not see any (easy) way
+             * to make this operation atomic. Maybe the leader simply needs to
+             * verify the actual lastCommitTime of each service when the quorum
+             * meets, or maybe a service can only join the quorum if it can
+             * verify that the leader has the same lastCommitTime for its
+             * current root block. Once writes start, we need to be
+             * resynchronizing rather than joining the quorum.
+             */
+            actor.castVote(journal.getLastCommitTime());
+        }
 
         /*
          * Wait until the server is terminated.
@@ -887,6 +912,14 @@ public class HAJournalServer extends AbstractServer {
 
                 haLog.warn("RESYNCH: " + server.getServiceName());
 
+                /*
+                 * Note: We need to discard any writes that might have been
+                 * buffered before we start the resynchronization of the local
+                 * store.
+                 */
+
+                journal.doLocalAbort();
+                
                 while (true) {
 
                     // The current commit point on the local store.

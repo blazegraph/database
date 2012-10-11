@@ -4919,56 +4919,76 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     /**
      * Local commit protocol (HA).
      */
+    protected void doLocalAbort() {
+
+        _abort();
+        
+    }
+    
+    /**
+     * Local commit protocol (HA).
+     */
     protected void doLocalCommit(final QuorumService<HAGlue> localService,
             final IRootBlockView rootBlock) {
 
-        // The timestamp for this commit point.
-        final long commitTime = rootBlock.getLastCommitTime();
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
 
-        // write the root block on to the backing store.
-        _bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
+        lock.lock();
 
-        // set the new root block.
-        _rootBlock = rootBlock;
+        try {
 
-        final boolean leader = localService
-                .isLeader(rootBlock.getQuorumToken());
+            // The timestamp for this commit point.
+            final long commitTime = rootBlock.getLastCommitTime();
 
-        if (!leader) {
+            // write the root block on to the backing store.
+            _bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
 
-            /*
-             * Ensure allocators are synced after commit. This is only done for
-             * the followers. The leader has been updating the in-memory
-             * allocators as it lays down the writes. The followers have not be
-             * updating the allocators.
-             */
+            // set the new root block.
+            _rootBlock = rootBlock;
 
-            if (haLog.isInfoEnabled())
-                haLog.error("Reset from root block: serviceUUID="
-                        + localService.getServiceId());
+            final boolean leader = localService.isLeader(rootBlock
+                    .getQuorumToken());
 
-            ((IHABufferStrategy) _bufferStrategy)
-                    .resetFromHARootBlock(rootBlock);
+            if (!leader) {
 
-            /*
-             * Clear reference and reload from the store.
-             * 
-             * The leader does not need to do this since it is writing on the
-             * unisolated commit record index and thus the new commit record is
-             * already visible in the commit record index before the commit.
-             * However, the follower needs to do this since it will otherwise
-             * not see the new commit points.
-             */
+                /*
+                 * Ensure allocators are synced after commit. This is only done
+                 * for the followers. The leader has been updating the in-memory
+                 * allocators as it lays down the writes. The followers have not
+                 * be updating the allocators.
+                 */
 
-            _commitRecordIndex = _getCommitRecordIndex();
+                if (haLog.isInfoEnabled())
+                    haLog.error("Reset from root block: serviceUUID="
+                            + localService.getServiceId());
 
+                ((IHABufferStrategy) _bufferStrategy)
+                        .resetFromHARootBlock(rootBlock);
+
+                /*
+                 * Clear reference and reload from the store.
+                 * 
+                 * The leader does not need to do this since it is writing on
+                 * the unisolated commit record index and thus the new commit
+                 * record is already visible in the commit record index before
+                 * the commit. However, the follower needs to do this since it
+                 * will otherwise not see the new commit points.
+                 */
+
+                _commitRecordIndex = _getCommitRecordIndex();
+
+            }
+
+            // reload the commit record from the new root block.
+            _commitRecord = _getCommitRecord();
+
+            if (txLog.isInfoEnabled())
+                txLog.info("COMMIT: commitTime=" + commitTime);
+
+        } finally {
+
+            lock.unlock();
         }
-
-        // reload the commit record from the new root block.
-        _commitRecord = _getCommitRecord();
-
-        if (txLog.isInfoEnabled())
-            txLog.info("COMMIT: commitTime=" + commitTime);
 
     }
 

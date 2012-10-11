@@ -51,4 +51,10 @@ public class HALogRequest implements IHALogRequest {
 
     }
 
+    public String toString() {
+
+        return getClass() + "{commitCounter=" + getCommitCounter() + "}";
+        
+    }
+    
 }

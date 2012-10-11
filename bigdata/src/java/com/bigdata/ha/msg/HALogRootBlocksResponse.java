@@ -78,4 +78,11 @@ public class HALogRootBlocksResponse implements IHALogRootBlocksResponse {
 
     }
 
+    public String toString() {
+
+        return getClass() + "{openRootBlock=" + getOpenRootBlock()
+                + ", closeRootBlock=" + getCloseRootBlock() + "}";
+
+    }
+
 }
