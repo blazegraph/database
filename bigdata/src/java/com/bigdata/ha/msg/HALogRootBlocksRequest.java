@@ -51,4 +51,10 @@ public class HALogRootBlocksRequest implements IHALogRootBlocksRequest {
         
     }
 
+    public String toString() {
+
+        return getClass() + "{commitCounter=" + getCommitCounter() + "}";
+        
+    }
+
 }
