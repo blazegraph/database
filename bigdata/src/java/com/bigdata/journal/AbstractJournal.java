@@ -2158,7 +2158,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	public boolean isHighlyAvailable() {
 
-		return getQuorum().isHighlyAvailable();
+        return quorum == null ? false : quorum.isHighlyAvailable();
 
 	}
 
