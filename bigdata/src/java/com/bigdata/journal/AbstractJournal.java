@@ -4623,67 +4623,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * <p>
      * Access to this field is protected by the {@link #_fieldReadWriteLock} but
      * MUST also be coordinated as described above.
-     * 
-     * FIXME HA: Many methods need to be modified to (a) await a quorum if there is
-     * none; and (b) handle a change in the quorum token. When a quorum breaks,
-     * these operations can block until a new quorum meets. As long as the
-     * master has not changed, the master's state remains valid and the other
-     * nodes can be brought into synchronization (they are synchronized if they
-     * are at the same message count for the write pipeline). If the master
-     * fails, then the new master will not have the same buffered write set and
-     * the outstanding operations (both unisolated and read/write tx) must about
-     * so we can resume from a known good commit point (this is true even if the
-     * secondaries remain active since (a) we do not have a strong guarantee
-     * that the new master is at the same message count on the write pipeline as
-     * the old master; and (b) transaction write sets are buffered within the
-     * JVM and/or disk on the master and are not available to the secondaries on
-     * failover.
-     * 
-     * @see #read(long)
-     * @see #write(ByteBuffer)
-     * @see #write(ByteBuffer, long)
-     * @see #delete(long)
-     * @see #closeForWrites(long) However, some methods probably should be
-     *      allowed to proceed without a quorum (or a node must be permitted to
-     *      disconnect permanently from a quorum). E.g.:
-     * 
-     * @see #close()
-     * @see #destroy() Another interesting question is whether we have to be in
-     *      a quorum to create a new journal. I would say, "yes" for a data
-     *      service. The atomic cutover to a new journal should only be taken by
-     *      a quorum.
-     *      <p>
-     *      Probably you need to be in a quorum to create an HA journal (outside
-     *      of a data service) as well. That would appear to be necessary in
-     *      order to create the same initial root blocks on each node. In that
-     *      case we have a bootstrapping problem for new HA journals. Either
-     *      they must have a quorum before hand and go through a coordinated
-     *      "commit" protocol for the journal create or they should be created
-     *      first, then negotiate the quorum membership and who is the master
-     *      and then resynchronize before the journal comes on line.
-     * 
-     * @todo maintain readOnly flag based on whether or not the QuorumService
-     *       was the leader the last time the quorum met and whether the token
-     *       is still valid. use a lightweight test for a valid token to avoid
-     *       lock contention.
-     * 
-     * @todo readers should not block and await a quorum unless we are willing
-     *       to handle the case where this QuorumService is not joined with the
-     *       met quorum either by reading on the quorum or by throwing an
-     *       exception back to the application.
-     * 
-     * @todo In HA mode, the followers are read-only. However, that is a
-     *       high-level constraint on application writes. For synchronization,
-     *       we need to be able to write on the journal even when it is not
-     *       joined with the quorum. The WriteCacheService will refuse to relay
-     *       writes if the service is not the leader of a met quorum.
-     *       <p>
-     *       For example, it would be appropriate to impose the constraint on
-     *       which nodes can be read or written at a load balancer at the SAIL
-     *       layer.
-     * 
-     *       if (quorum.isHighlyAvailable() && quorum.isQuorumMet() &&
-     *       quorum.getClient().isFollower(quorumToken)) { return true; }
      */
 	private volatile long quorumToken = Quorum.NO_QUORUM;
 
