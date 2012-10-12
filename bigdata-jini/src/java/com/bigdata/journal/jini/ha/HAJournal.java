@@ -64,7 +64,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rwstore.RWStore;

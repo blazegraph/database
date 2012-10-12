@@ -505,6 +505,21 @@ public class HAJournalServer extends AbstractServer {
         }
 
         /*
+         * The NSS will start on each service in the quorum. However,
+         * only the leader will create the default KB (if that option is
+         * configured).
+         */
+        try {
+
+            startNSS();
+            
+        } catch (Exception e1) {
+            
+            log.error("Could not start NanoSparqlServer: " + e1, e1);
+            
+        }
+
+        /*
          * Wait until the server is terminated.
          */
 
@@ -752,31 +767,6 @@ public class HAJournalServer extends AbstractServer {
 
                 }
                 
-            }
-
-            if (isJoinedMember(token) && server.jettyServer == null) {
-                /*
-                 * The NSS will start on each service in the quorum. However,
-                 * only the leader will create the default KB (if that option is
-                 * configured).
-                 * 
-                 * Submit task since we can not do this in the event thread.
-                 */
-                journal.getExecutorService().submit(new Callable<Void>() {
-                    @Override
-                    public Void call() throws Exception {
-                        if (server.jettyServer == null) {
-                            try {
-                                server.startNSS();
-                            } catch (Exception e1) {
-                                log.error("Could not start NanoSparqlServer: "
-                                        + e1, e1);
-                            }
-                        }
-                        return null;
-                    }
-                });
-
             }
 
         }
@@ -1695,6 +1685,27 @@ public class HAJournalServer extends AbstractServer {
         }
         
     }
+
+//    /**
+//     * Conditionally create the default KB instance.
+//     * 
+//     * @see NSSConfigurationOptions
+//     * 
+//     * @throws Exception
+//     */
+//    private void conditionalCreateDefaultKB() throws Exception {
+//        
+//        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//        final String namespace = (String) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.NAMESPACE, String.class,
+//                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+//
+//        final boolean create = (Boolean) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.CREATE, Boolean.TYPE,
+//                NSSConfigurationOptions.DEFAULT_CREATE);
+//
+//    }
     
     /**
      * Setup and start the {@link NanoSparqlServer}.
@@ -1734,8 +1745,15 @@ public class HAJournalServer extends AbstractServer {
             initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
                     queryPoolThreadSize.toString());
 
+            // Note: Create will be handled by the QuorumListener (above).
             initParams.put(ConfigParams.CREATE, Boolean.toString(create));
 
+        }
+        
+        if (jettyServer != null && jettyServer.isRunning()) {
+        
+            throw new RuntimeException("Already running");
+            
         }
 
         // Setup the embedded jetty server for NSS webapp.
