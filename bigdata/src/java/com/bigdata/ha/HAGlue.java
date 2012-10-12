@@ -91,4 +91,9 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
     IHARootBlockResponse getRootBlock(IHARootBlockRequest msg)
             throws IOException;
 
+    /**
+     * The port that the NanoSparqlServer is running on.
+     */
+    int getNSSPort() throws IOException;
+    
 }

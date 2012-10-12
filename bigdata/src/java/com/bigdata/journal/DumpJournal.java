@@ -30,7 +30,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Iterator;
@@ -268,17 +268,29 @@ public class DumpJournal {
 
                     final DumpJournal dumpJournal = new DumpJournal(journal);
 
-                    dumpJournal.dumpJournal(System.out, namespaces,
-                            dumpHistory, dumpPages, dumpIndices, showTuples);
+                    final PrintWriter out = new PrintWriter(System.out, true/* autoFlush */);
 
-                    for(Long addr : addrs) {
-                        
-                        System.out.println("addr=" + addr + ", offset="
-                                + journal.getOffset(addr) + ", length="
-                                + journal.getByteCount(addr));
+                    try {
 
-                        // Best effort attempt to dump the record.
-                        System.out.println(dumpJournal.dumpRawRecord(addr));
+                        dumpJournal.dumpJournal(out, namespaces, dumpHistory,
+                                dumpPages, dumpIndices, showTuples);
+
+                        for (Long addr : addrs) {
+
+                            out.println("addr=" + addr + ", offset="
+                                    + journal.getOffset(addr) + ", length="
+                                    + journal.getByteCount(addr));
+
+                            // Best effort attempt to dump the record.
+                            out.println(dumpJournal.dumpRawRecord(addr));
+
+                        }
+
+                        out.flush();
+
+                    } finally {
+
+                        out.close();
 
                     }
                     
@@ -319,9 +331,20 @@ public class DumpJournal {
     public void dumpJournal(final boolean dumpHistory, final boolean dumpPages,
             final boolean dumpIndices, final boolean showTuples) {
 
-        dumpJournal(System.out, null/* namespaces */, dumpHistory, dumpPages,
-                dumpIndices, showTuples);
-        
+        final PrintWriter w = new PrintWriter(System.out, true/* autoFlush */);
+
+        try {
+
+            dumpJournal(w, null/* namespaces */, dumpHistory, dumpPages,
+                    dumpIndices, showTuples);
+
+            w.flush();
+            
+        } finally {
+
+            w.close();
+        }
+
     }
     
     /**
@@ -342,7 +365,7 @@ public class DumpJournal {
      * @param showTuples
      *            Dump the records in the indices.
      */
-    public void dumpJournal(final PrintStream out, final List<String> namespaces,
+    public void dumpJournal(final PrintWriter out, final List<String> namespaces,
             final boolean dumpHistory, final boolean dumpPages,
             final boolean dumpIndices, final boolean showTuples) {
 
@@ -575,7 +598,7 @@ public class DumpJournal {
 
     }
     
-    public void dumpGlobalRowStore(final PrintStream out) {
+    public void dumpGlobalRowStore(final PrintWriter out) {
         
         final SparseRowStore grs = journal.getGlobalRowStore(journal
                 .getLastCommitTime());
@@ -618,7 +641,7 @@ public class DumpJournal {
      * @param journal
      * @param commitRecord
      */
-    private void dumpNamedIndicesMetadata(final PrintStream out,
+    private void dumpNamedIndicesMetadata(final PrintWriter out,
             final List<String> namespaces, final ICommitRecord commitRecord,
             final boolean dumpPages, final boolean dumpIndices,
             final boolean showTuples) {

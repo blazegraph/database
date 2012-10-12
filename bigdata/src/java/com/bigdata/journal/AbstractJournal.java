@@ -5062,6 +5062,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
         }
 
+        @Override
+        public int getNSSPort() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
         /**
          * Return a proxy object for a {@link Future} suitable for use in an RMI
          * environment (the default implementation returns its argument).

@@ -178,7 +178,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         return localService;
         
     }
-
+    
     @Override
     public Executor getExecutor() {
 

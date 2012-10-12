@@ -26,6 +26,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
+import net.jini.config.ConfigurationException;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
@@ -56,6 +57,7 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITx;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumEvent;
@@ -64,7 +66,6 @@ import com.bigdata.quorum.QuorumListener;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.service.DataService;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
@@ -656,7 +657,7 @@ public class HAJournalServer extends AbstractServer {
 
             final ServiceItem serviceItem = discoveryClient
                     .getServiceItem(serviceId);
-
+            
             if (serviceItem == null) {
 
                 // Not found (per the API).
@@ -830,6 +831,122 @@ public class HAJournalServer extends AbstractServer {
         }
 
         /**
+         * Rebuild the backing store from scratch.
+         * <p>
+         * If we can not replicate ALL log files for the commit points that we
+         * need to make up on this service, then we can not incrementally
+         * resynchronize this service and we will have to do a full rebuild of
+         * the service instead.
+         * <p>
+         * A rebuild begins by pinning the history on the quorum by asserting a
+         * read lock (a read-only tx against then current last commit time).
+         * This prevents the history from being recycled, but does not prevent
+         * concurrent writes on the existing backing store extent, or extension
+         * of the backing store.
+         * <p>
+         * While holding that read lock, we need to make a copy of the bytes in
+         * the backing store. This copy can be streamed. It must start at the
+         * first valid offset beyond the root blocks since we do not want to
+         * update the root blocks until we have caught up with and replayed the
+         * existing HA Log files. If the file is extended, we do not need to
+         * copy the extension. Note that the streamed copy does not represent
+         * any coherent commit point. However, once we apply ALL of the HA Log
+         * files up to the last commit time that we pinned with a read lock,
+         * then the local backing file will be binary consistent with that
+         * commit point and we apply both the starting and ending root block for
+         * that commit point, and finally release the read lock.
+         * <p>
+         * At this point, we are still not up to date. However, the HALog files
+         * required to bring us up to date should exist and we can enter the
+         * normal resynchronization logic.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * 
+         *         TODO We are not actually binary consistent (even if we are
+         *         data consistent) until we have either (A) joined the met
+         *         quourm; or (B) replayed the HA Logs up to commitCounter+1 for
+         *         the commitCounter on the leader as of the moment that we
+         *         finished streaming the leader's backing file to this node.
+         * 
+         *         Blow off the root blocks (zero commit counters). Then install
+         *         when known synched to specific commit point and enter
+         *         resync.+
+         * 
+         *         TODO We need the ability to conditionally apply the root
+         *         blocks when advancing through the HA Log files up to the read
+         *         lock.
+         */
+        private class RebuildTask implements Callable<Void> {
+
+            private final long token;
+            private final S leader;
+            
+            public RebuildTask() {
+
+                // run while quorum is met.
+                token = getQuorum().token();
+
+                // The leader for that met quorum (RMI interface).
+                leader = getLeader(token);
+
+            }
+
+            @Override
+            public Void call() throws Exception {
+
+                final long readLock = leader.newTx(ITx.READ_COMMITTED);
+                
+                try {
+
+                    doRun(readLock);
+
+                } catch (Throwable t) {
+
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                        log.info("Interrupted.");
+
+                    }
+
+                    log.error(t, t);
+
+                } finally {
+                    
+                    // release the read lock.
+                    leader.abort(readLock);
+                    
+                }
+
+                return null;
+
+            }
+            
+            private void doRun(final long readLock) throws Exception {
+
+                haLog.warn("REBUILD: " + server.getServiceName());
+                
+                /*
+                 * Note: We need to discard any writes that might have been
+                 * buffered before we start the resynchronization of the local
+                 * store.
+                 */
+
+                journal.doLocalAbort();
+
+                /*
+                 * FIXME REBUILD : Implement logic to copy all data from
+                 * the leader's journal (except the root block) and then
+                 * apply the HA Log files up to the commit point pinned
+                 * by the readLock.
+                 */
+                throw new UnsupportedOperationException();
+
+            }
+            
+        } // class RebuildTask
+        
+        /**
          * This class handles the resynchronization of a node that is not at the
          * same commit point as the met quorum. The task will replicate write
          * sets (HA Log files) from the services in the met quorum, and apply
@@ -971,21 +1088,38 @@ public class HAJournalServer extends AbstractServer {
                     /*
                      * Oops. The leader does not have that log file.
                      * 
-                     * TODO REBUILD : If we can not replicate ALL log files for
-                     * the commit points that we need to make up on this
-                     * service, then we can not incrementally resynchronize this
-                     * service and we will have to do a full rebuild of the
-                     * service instead.
+                     * We will have to rebuild the service from scratch since we
+                     * do not have the necessary HA Log files to synchronize
+                     * with the existing quorum.
                      * 
                      * TODO RESYNC : It is possible to go to another service in
                      * the met quorum for the same log file, but it needs to be
                      * a service that is UPSTREAM of this service.
                      */
 
-                    // Abort the resynchronization effort.
-                    throw new RuntimeException(
-                            "HA Log not available: commitCounter="
-                                    + commitCounter, ex);
+                    final String msg = "HA Log not available: commitCounter="
+                            + commitCounter;
+
+                    log.error(msg);
+
+                    final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                            new RebuildTask());
+
+                    try {
+
+                        // Run service rebuild task.
+                        journal.getExecutorService().submit(ft);
+
+                        ft.get();
+
+                    } finally {
+                        
+                        ft.cancel(true/* mayInterruptIfRunning */);
+                        
+                    }
+
+                    // Re-enter the resync protocol.
+                    return;
 
                 }
 
@@ -1554,6 +1688,11 @@ public class HAJournalServer extends AbstractServer {
                     rootBlock);
 
         }
+
+        @Override
+        public File getServiceDir() {
+            return server.getServiceDir();
+        }
         
     }
     
@@ -1680,10 +1819,13 @@ public class HAJournalServer extends AbstractServer {
     }
     
     /**
-     * Adds jini administration interfaces to the basic {@link DataService}.
+     * Adds jini administration interfaces to the basic {@link HAGlue} interface
+     * exposed by the {@link HAJournal}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @see HAJournal.HAGlueService
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      */
     public static class AdministrableHAGlueService extends HAGlueDelegate
             implements RemoteAdministrable, RemoteDestroyAdmin {
@@ -1874,6 +2016,27 @@ public class HAJournalServer extends AbstractServer {
 //            return s;
 //
 //        }
+
+        @Override
+        public int getNSSPort() {
+
+            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+
+            try {
+
+                final Integer port = (Integer) server.config.getEntry(
+                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
+                        NSSConfigurationOptions.DEFAULT_PORT);
+
+                return port;
+
+            } catch (ConfigurationException e) {
+
+                throw new RuntimeException(e);
+                
+            }
+
+        }
 
     }
 

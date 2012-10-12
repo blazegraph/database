@@ -21,28 +21,19 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Jun 1, 2010
+ */
 package com.bigdata.service.jini;
 
 import java.rmi.Remote;
 
-import net.jini.admin.Administrable;
+import com.sun.jini.admin.StorageLocationAdmin;
 
 /**
  * Extends {@link Remote} for RMI compatibility.
- * 
- * @todo There are other jini interfaces that we do not yet implement. Note: You
- *       need to extend Remote in order for these APIs to be exported!
- * 
- * <pre>
- * public interface RemoteJoinAdmin extends Remote, JoinAdmin {
- * 
- * }
- * 
- * public interface RemoteDiscoveryAdmin extends Remote, DiscoveryAdmin {
- * 
- * }
- * </pre>
  */
-public interface RemoteAdministrable extends Remote, Administrable {
+public interface RemoteStorageLocationAdmin extends Remote,
+        StorageLocationAdmin {
 
 }

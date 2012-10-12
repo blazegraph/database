@@ -324,6 +324,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
     
     /**
+     * Return the service directory.
+     * 
+     * @see ConfigurationOptions#SERVICE_DIR
+     */
+    public File getServiceDir() {
+        
+        return serviceDir;
+        
+    }
+    
+    /**
      * <code>true</code> iff this is a persistent service (one that you can
      * shutdown and restart).
      */
