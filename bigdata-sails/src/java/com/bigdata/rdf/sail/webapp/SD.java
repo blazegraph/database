@@ -36,8 +36,8 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -636,11 +636,12 @@ public class SD {
 
             final IIndexManager indexManager = tripleStore.getIndexManager();
 
-            if (indexManager instanceof Journal) {
+            // TODO FEDERATION HA
+            if (indexManager instanceof AbstractJournal) {
 
-                final Journal jnl = (Journal) indexManager;
+                final AbstractJournal jnl = (AbstractJournal) indexManager;
 
-                if (jnl.getQuorum() != null) {
+                if (jnl.isHighlyAvailable()) {
 
                     g.add(aService, SD.feature, HighlyAvailable);
 

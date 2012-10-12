@@ -74,6 +74,13 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
     long getLastCommitCounter();
 
     /**
+     * Return the service directory. This directory has various metadata about
+     * the service process, but it might not contain either the data or the HA
+     * log files.
+     */
+    File getServiceDir();
+
+    /**
      * Return the directory in which we are logging the write blocks.
      */
     File getHALogDir();
@@ -98,5 +105,5 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      *             if the local service already has writes.
      */
     void installRootBlocksFromQuorum(final IRootBlockView rootBlock);
-    
+
 }

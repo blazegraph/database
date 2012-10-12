@@ -82,6 +82,14 @@ public interface IService extends Remote {
      */
     String getServiceName() throws IOException;
 
+//    /**
+//     * Return the service directory.
+//     * 
+//     * @throws IOException
+//     *             since you can use this method with RMI.
+//     */
+//    File getServiceDirectory() throws IOException;
+
     /**
      * Destroy the service. If the service is running, it is shutdown
      * immediately and then destroyed. This method has the same signature as

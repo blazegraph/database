@@ -177,4 +177,9 @@ public class HAGlueDelegate implements HAGlue {
         return delegate.sendHALogForWriteSet(msg);
     }
 
+    @Override
+    public int getNSSPort() throws IOException {
+        return delegate.getNSSPort();
+    }
+
 }

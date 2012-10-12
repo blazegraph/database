@@ -469,6 +469,11 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
             public void installRootBlocksFromQuorum(IRootBlockView rootBlock) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public File getServiceDir() {
+                throw new UnsupportedOperationException();
+            }
         };
 
     }
