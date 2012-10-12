@@ -385,12 +385,6 @@ public class StatusServlet extends BigdataRDFServlet {
                  * 4. dumpZoo (into pre element).
                  * 
                  * 5. listServices (into pre element).
-                 * 
-                 * TODO Simpler REST request to decide if this node is a leader,
-                 * a follower, synchronizing, or rebuilding (these states should
-                 * be reported through the admin api and/or by updating the
-                 * Entry[] for the service; this last could be done by the
-                 * quorum listener in the HAJournalServer).
                  */
 
                 final AbstractJournal journal = (AbstractJournal) getIndexManager();
