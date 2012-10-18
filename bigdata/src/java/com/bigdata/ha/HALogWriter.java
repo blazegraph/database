@@ -137,7 +137,7 @@ public class HALogWriter {
      */
     public File getFile() {
         
-        return m_state.m_log;
+        return m_state == null ? null : m_state.m_log;
         
     }
     
