@@ -30,9 +30,6 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
 
-import com.bigdata.ha.HALogReader;
-import com.bigdata.ha.HALogWriter;
-import com.bigdata.ha.IHALogReader;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.IRootBlockView;
