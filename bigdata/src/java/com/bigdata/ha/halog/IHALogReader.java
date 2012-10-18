@@ -32,6 +32,9 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.WORMStrategy;
 
+/**
+ * Interface for reading on an HA Log.
+ */
 public interface IHALogReader {
 	
 	/**
