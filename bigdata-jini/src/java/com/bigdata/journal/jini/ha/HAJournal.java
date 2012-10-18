@@ -28,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Properties;
@@ -545,17 +546,36 @@ public class HAJournal extends Journal {
                 try {
 
                     while (r.hasMoreBuffers()) {
-
+                    	
+                    	// IHABufferStrategy
+                    	final IHABufferStrategy strategy = (IHABufferStrategy) HAJournal.this
+                        .getBufferStrategy();
+                    	
+                    	final boolean isWorm = strategy.getBufferMode() == BufferMode.DiskWORM ;
+                    	
                         // get message and write cache buffer.
-                        final IHAWriteMessage msg = r.processNextBuffer(buf
-                                .buffer());
+                    	// only pass in buffer if not WORM
+                        final IHAWriteMessage msg = r.processNextBuffer(isWorm ? null : buf.buffer());
+                        
+                        if (isWorm) {
+                        	// read direct from store
+                        	final ByteBuffer clientBuffer = buf.buffer();
+            				final int nbytes = msg.getSize();
+            				clientBuffer.position(0);
+            				clientBuffer.limit(nbytes);
+            
+            				final long address = strategy.toAddr(nbytes, msg
+            						.getFirstOffset());
+            				final ByteBuffer src = strategy.read(address);
+            
+            				clientBuffer.put(src);
+                        }
 
                         if (haLog.isDebugEnabled())
                             haLog.debug("req=" + req + ", msg=" + msg);
 
                         // drop them into the write pipeline.
-                        final Future<Void> ft = ((IHABufferStrategy) HAJournal.this
-                                .getBufferStrategy()).sendHALogBuffer(req, msg,
+                        final Future<Void> ft = strategy.sendHALogBuffer(req, msg,
                                 buf);
 
                         // wait for message to make it through the pipeline.

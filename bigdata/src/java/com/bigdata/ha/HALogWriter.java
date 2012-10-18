@@ -7,6 +7,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Formatter;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
@@ -15,7 +17,9 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -83,18 +87,20 @@ public class HALogWriter {
 
     /** Current write cache block sequence counter. */
     private long m_nextSequence = 0;
+    
+    /** current log file. */
+   private FileState m_state = null;
 
     /** current log file. */
     private File m_log = null;
 
     public static final String HA_LOG_EXT = ".ha-log";
     
-    /** current output file channel. */
-    private RandomAccessFile m_raf = null;
-    private FileChannel m_channel = null;
-
     /** current write point on the channel. */
     private long m_position = headerSize0;
+    
+    /** number of open readers **/
+    private int m_readers = 0;
 
     /**
      * Return the commit counter that is expected for the writes that will be
@@ -121,7 +127,7 @@ public class HALogWriter {
     
     private void assertOpen() {
 
-        if (m_raf == null)
+        if (m_state == null)
             throw new IllegalStateException();
         
     }
@@ -131,7 +137,7 @@ public class HALogWriter {
      */
     public File getFile() {
         
-        return m_log;
+        return m_state.m_log;
         
     }
     
@@ -174,7 +180,7 @@ public class HALogWriter {
 
         final long seq = m_nextSequence;
 
-        return getClass().getName() + "{" + m_raf == null ? "closed"
+        return getClass().getName() + "{" + m_state == null ? "closed"
                 : "commitCounter=" + tmp.getCommitCounter() + ",nextSequence="
                         + seq + "}";
 
@@ -226,10 +232,10 @@ public class HALogWriter {
 
         final String logFile = getHALogFileName(commitCounter + 1);
 
-        m_log = new File(m_dir, logFile);
+        final File log = new File(m_dir, logFile);
 
         // Must delete file if it exists.
-        if (m_log.exists() && !m_log.delete()) {
+        if (log.exists() && !log.delete()) {
 
             /*
              * It is a problem if a file exists and we can not delete it. We
@@ -241,16 +247,14 @@ public class HALogWriter {
 
         }
         
-        m_raf = new RandomAccessFile(m_log, "rw");
-
-        m_channel = m_raf.getChannel();
-
+        m_state = new FileState(log, rootBlock.getStoreType());
+        
         /*
          * Write the MAGIC and version on the file.
          */
-        m_raf.seek(0);
-        m_raf.writeInt(MAGIC);
-        m_raf.writeInt(VERSION1);
+        m_state.m_raf.seek(0);
+        m_state.m_raf.writeInt(MAGIC);
+        m_state.m_raf.writeInt(VERSION1);
 
         /*
          * Write root block to slots 0 and 1.
@@ -276,10 +280,10 @@ public class HALogWriter {
         @Override
         public FileChannel reopenChannel() throws IOException {
 
-            if (m_channel == null)
+            if (m_state.m_channel == null)
                 throw new IOException("Closed");
 
-            return m_channel;
+            return m_state.m_channel;
 
         }
     };
@@ -346,6 +350,8 @@ public class HALogWriter {
 //        // The closing root block is always in slot 1.
 //        writeRootBlock(false/* isRootBlock0 */, rootBlock);
 
+        m_state.committed();
+        
         close();
 
     }
@@ -442,7 +448,9 @@ public class HALogWriter {
         default:
             throw new AssertionError();
         }
-
+        
+        // let any readers know a new record is ready
+        m_state.addRecord();
     }
 
     /**
@@ -464,8 +472,8 @@ public class HALogWriter {
      */
     private void close() throws IOException {
         try {
-            if (m_channel != null) {
-                m_channel.close();
+            if (m_state != null) {
+            	m_state.close();
             }
         } finally {
             reset();
@@ -477,11 +485,7 @@ public class HALogWriter {
      */
     private void reset() {
         
-        m_log = null;
-        
-        m_raf = null;
-        
-        m_channel = null;
+        m_state = null;
         
         m_position = headerSize0;
         
@@ -496,9 +500,9 @@ public class HALogWriter {
      */
     private void flush() throws IOException {
 
-        if (m_channel != null) {
+        if (m_state != null) {
         
-            m_channel.force(true);
+        	m_state.m_channel.force(true);
             
         }
         
@@ -513,14 +517,14 @@ public class HALogWriter {
 
         try {
 
-            if (m_channel != null) {
+            if (m_state != null) {
 
                 /*
                  * Conditional remove iff file is open. Will not remove
                  * something that has been closed.
                  */
 
-                m_channel.close();
+            	m_state.m_channel.close();
 
                 if (m_log.exists() && !m_log.delete()) {
 
@@ -561,4 +565,170 @@ public class HALogWriter {
         
     }
 
+    public IHALogReader getReader() {
+    	
+    	if (m_state == null)
+    		return null;
+    	
+    	return new OpenHALogReader(m_state);
+    }
+    
+    /**
+     * The FileState class encapsulates the file objects shared
+     * by the Writer and Readers.
+     */
+    static class FileState {
+    	final StoreTypeEnum m_storeType;
+    	final File m_log;
+    	final FileChannel m_channel;
+    	final RandomAccessFile m_raf;
+    	final Semaphore m_entries = new Semaphore(0);
+       	int m_records = 0;
+       	boolean m_committed = false;
+           	
+    	final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
+
+    		@Override
+    		public FileChannel reopenChannel() throws IOException {
+
+    			if (m_channel == null)
+    				throw new IOException("Closed");
+
+    			return m_channel;
+
+    		}
+    	};
+
+    	int m_accessors = 0;
+    	
+    	FileState(final File file, StoreTypeEnum storeType) throws FileNotFoundException {
+    		m_log = file;
+    		m_storeType = storeType;
+    	    m_raf = new RandomAccessFile(m_log, "rw");
+            m_channel = m_raf.getChannel();
+            m_accessors = 1; // the writer is a reader also
+    	}
+
+		public void close() throws IOException {
+			if (--m_accessors == 0)
+				m_channel.close();
+        }
+		
+		public void addRecord() {
+			synchronized(this) {
+				m_records++;
+				this.notifyAll();
+			}
+		}
+		
+		public int recordCount() {
+			synchronized(this) {
+				return m_records;
+			}
+		}
+		
+		public void committed() {
+			synchronized(this) {
+				m_committed = true;
+				this.notifyAll();
+			}
+		}
+		
+		public boolean isCommitted() {
+			synchronized(this) {
+				return m_committed;
+			}
+		}
+
+		public boolean isEmpty() {
+			return m_committed && m_records == 0;
+		}
+
+		/**
+		 * 
+		 * @param record - the next sequence required
+		 */
+		public void waitOnStateChange(final int record) {
+			synchronized (this) {
+				if (m_records >= record) {
+					return;
+				}
+				
+				try {
+					wait();
+				} catch (InterruptedException e) {
+					// okay;
+				}
+			}
+			
+		}
+		
+    }
+    
+    static class OpenHALogReader implements IHALogReader {
+    	final FileState m_state;
+    	int m_record = 0;
+    	long m_position = headerSize0; // initial position
+    	
+    	OpenHALogReader(FileState state) {
+    		m_state = state;
+    		m_state.m_accessors++;
+    	}
+
+		@Override
+		public IRootBlockView getClosingRootBlock() throws IOException {
+			final RootBlockUtility tmp = new RootBlockUtility(m_state.reopener, m_state.m_log,
+					true/* validateChecksum */, false/* alternateRootBlock */,
+					false/* ignoreBadRootBlock */);
+
+			return tmp.chooseRootBlock();
+		}
+
+		@Override
+		public boolean hasMoreBuffers() throws IOException {
+			if (m_state.isCommitted() && m_state.recordCount() <= m_record)
+				return false;
+			
+			if (m_state.recordCount() > m_record)
+				return true;
+			
+			m_state.waitOnStateChange(m_record+1);
+			
+			return hasMoreBuffers();
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return m_state.isEmpty();
+		}
+
+		@Override
+		public IHAWriteMessage processNextBuffer(ByteBuffer clientBuffer)
+				throws IOException {
+			
+			final IHAWriteMessage msg;
+			
+			synchronized (m_state) {
+				final long savePosition = m_state.m_channel.position();
+				m_state.m_channel.position(m_position);
+				
+				msg = HALogReader.processNextBuffer(m_state.m_raf, m_state.reopener, m_state.m_storeType, clientBuffer);
+				
+				m_position = m_state.m_channel.position();
+				m_state.m_channel.position(savePosition);
+			}
+			
+			m_record++;
+			
+			return msg;
+		}
+
+		@Override
+		public void close() throws IOException {
+			if (m_state != null) {
+				m_state.close();
+			}			
+		}
+    	
+    }
 }
