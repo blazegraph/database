@@ -200,7 +200,7 @@ public class HALogWriter {
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public void createLog(final IRootBlockView rootBlock)
+    public synchronized void createLog(final IRootBlockView rootBlock)
             throws FileNotFoundException, IOException {
 
         if (rootBlock == null)
@@ -483,7 +483,7 @@ public class HALogWriter {
     /**
      * Clear internal fields.
      */
-    private void reset() {
+    private synchronized void reset() {
         
         m_state = null;
         
@@ -565,7 +565,7 @@ public class HALogWriter {
         
     }
 
-    public IHALogReader getReader() {
+    public synchronized IHALogReader getReader() {
     	
     	if (m_state == null)
     		return null;

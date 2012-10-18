@@ -551,26 +551,10 @@ public class HAJournal extends Journal {
                     	final IHABufferStrategy strategy = (IHABufferStrategy) HAJournal.this
                         .getBufferStrategy();
                     	
-                    	final boolean isWorm = strategy.getBufferMode() == BufferMode.DiskWORM ;
-                    	
                         // get message and write cache buffer.
-                    	// only pass in buffer if not WORM
-                        final IHAWriteMessage msg = r.processNextBuffer(isWorm ? null : buf.buffer());
+                    	// the buffer will be ignored if it is a WORM strategy
+                        final IHAWriteMessage msg = r.processNextBuffer(buf.buffer());
                         
-                        if (isWorm) {
-                        	// read direct from store
-                        	final ByteBuffer clientBuffer = buf.buffer();
-            				final int nbytes = msg.getSize();
-            				clientBuffer.position(0);
-            				clientBuffer.limit(nbytes);
-            
-            				final long address = strategy.toAddr(nbytes, msg
-            						.getFirstOffset());
-            				final ByteBuffer src = strategy.read(address);
-            
-            				clientBuffer.put(src);
-                        }
-
                         if (haLog.isDebugEnabled())
                             haLog.debug("req=" + req + ", msg=" + msg);
 

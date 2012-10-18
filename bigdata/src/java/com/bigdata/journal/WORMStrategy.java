@@ -43,6 +43,8 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumRead;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -2367,12 +2369,31 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     @Override
     public Future<Void> sendHALogBuffer(final IHALogRequest req,
-            final IHAWriteMessage msg, final IBufferAccess b)
-            throws IOException, InterruptedException {
+			final IHAWriteMessage msg, final IBufferAccess b)
+			throws IOException, InterruptedException {
 
-        throw new UnsupportedOperationException();
+		// read direct from store
+		final ByteBuffer clientBuffer = b.buffer();
+		final int nbytes = msg.getSize();
+		clientBuffer.position(0);
+		clientBuffer.limit(nbytes);
 
-    }
+		final long address = toAddr(nbytes, msg.getFirstOffset());
+		final ByteBuffer src = read(address);
+
+		clientBuffer.put(src);
+
+		assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
+
+		@SuppressWarnings("unchecked")
+		final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
+				.getMember();
+
+		final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg,
+				clientBuffer);
+
+		return remoteWriteFuture;
+	}
 
     public void setExtentForLocalStore(final long extent) throws IOException,
             InterruptedException {

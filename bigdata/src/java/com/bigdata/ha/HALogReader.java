@@ -338,13 +338,12 @@ public class HALogReader implements IHALogReader {
 			break;
 		}
 		case WORM: {
-			if (clientBuffer != null) {
-				throw new IllegalArgumentException(
-						"No buffer content is available of the strategy is WORM");
-			}
 			/*
 			 * Note: The WriteCache block needs to be recovered from the
-			 * WORMStrategy by the caller.
+			 * WORMStrategy by the caller.  The clientBuffer, if supplied,
+			 * is ignored and untouched.
+			 * 
+			 * It is permissible for the argument to be null.
 			 */
 
 			// final int nbytes = msg.getSize();
