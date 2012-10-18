@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.ha;
+package com.bigdata.ha.halog;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -189,11 +189,6 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-	/**
-	 * Return <code>true</code> if the root blocks in the log file have the same
-	 * commit counter. Such log files are logically empty regardless of their
-	 * length.
-	 */
 	public boolean isEmpty() {
 
 		return m_openRootBlock.getCommitCounter() == m_closeRootBlock
@@ -218,19 +213,12 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-	/**
-	 * The {@link IRootBlockView} for the committed state AFTER the write set
-	 * contained in the HA log file has been applied.
-	 */
 	public IRootBlockView getClosingRootBlock() {
 
 		return m_closeRootBlock;
 
 	}
 
-	/**
-	 * Checks whether we have reached the end of the file.
-	 */
 	public boolean hasMoreBuffers() throws IOException {
 
 		assertOpen();
@@ -272,23 +260,6 @@ public class HALogReader implements IHALogReader {
 
 	}
 
-	/**
-	 * Attempts to read the next {@link IHAWriteMessage} and then the expected
-	 * buffer, that is read into the client buffer. The {@link IHAWriteMessage}
-	 * is returned to the caller.
-	 * <p>
-	 * Note: The caller's buffer will be filled in IFF the data is on the HALog.
-	 * For some {@link IHABufferStrategy} implementations, that data is not
-	 * present in the HALog. The caller's buffer will not be modified and the
-	 * caller is responsible for getting the data from the
-	 * {@link IHABufferStrategy} (e.g., for the {@link WORMStrategy}).
-	 * <p>
-	 * Note: IF the buffer is filled, then the limit will be the #of bytes ready
-	 * to be transmitted and the position will be zero.
-	 * 
-	 * @param clientBuffer
-	 *            A buffer from the {@link DirectBufferPool#INSTANCE}.
-	 */
 	public IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer)
 			throws IOException {
 
