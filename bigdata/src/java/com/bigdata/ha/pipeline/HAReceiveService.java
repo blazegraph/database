@@ -402,7 +402,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                 try {
                 	readFuture.get();
                 } catch (Exception e) {
-                	log.warn(e);
+                	log.warn(e,e);
                 }
                 
                 lock.lockInterruptibly();
