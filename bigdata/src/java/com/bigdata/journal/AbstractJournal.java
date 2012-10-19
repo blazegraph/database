@@ -4922,7 +4922,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             _commitRecord = _getCommitRecord();
 
             if (txLog.isInfoEnabled())
-                txLog.info("COMMIT: commitTime=" + commitTime);
+                txLog.info("COMMIT: commitCounter="
+                        + rootBlock.getCommitCounter() + ", commitTime="
+                        + commitTime);
 
         } finally {
 

@@ -82,8 +82,14 @@ public class CreateKBTask implements Callable<Void> {
 
                 final long token;
                 try {
-                    log.warn("Awaiting quorum.");
-                    token = quorum.awaitQuorum();
+                    long tmp = quorum.token();
+                    if (tmp == Quorum.NO_QUORUM) {
+                        // Only log if we are going to wait.
+                        log.warn("Awaiting quorum.");
+                        tmp = quorum.awaitQuorum();
+                    }
+                    token = tmp;
+                    assert token != Quorum.NO_QUORUM;
                 } catch (AsynchronousQuorumCloseException e1) {
                     throw new RuntimeException(e1);
                 } catch (InterruptedException e1) {

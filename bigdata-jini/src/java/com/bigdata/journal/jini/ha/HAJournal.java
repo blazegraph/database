@@ -50,6 +50,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
@@ -505,17 +506,12 @@ public class HAJournal extends Journal {
             // The commit counter of the desired closing root block.
             final long commitCounter = req.getCommitCounter();
 
-            final File logFile = new File(haLogDir,
-                    HALogWriter.getHALogFileName(commitCounter));
-
-            if (!logFile.exists()) {
-
-                // No log for that commit point.
-                throw new FileNotFoundException(logFile.getName());
-
-            }
-
-            final HALogReader r = new HALogReader(logFile);
+            /*
+             * Note: The choice of the "live" versus a historical "closed" log
+             * file needs to be an atomic decision and thus MUST be made by the
+             * HALogManager.
+             */
+            final IHALogReader r = getHALogWriter().getReader(commitCounter);
 
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
                     new SendHALogTask(req, r));
@@ -526,12 +522,17 @@ public class HAJournal extends Journal {
 
         }
 
+        /**
+         * Class sends the {@link IHAWriteMessage}s and {@link WriteCache}
+         * buffer contents along the write pipeline for the requested HALog
+         * file.
+         */
         private class SendHALogTask implements Callable<Void> {
 
             private final IHALogRequest req;
-            private final HALogReader r;
+            private final IHALogReader r;
 
-            public SendHALogTask(final IHALogRequest req, final HALogReader r) {
+            public SendHALogTask(final IHALogRequest req, final IHALogReader r) {
 
                 this.req = req;
                 this.r = r;
@@ -542,6 +543,7 @@ public class HAJournal extends Journal {
 
                 final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
 
+                long nsent = 0;
                 try {
 
                     while (r.hasMoreBuffers()) {
@@ -564,7 +566,12 @@ public class HAJournal extends Journal {
                         // wait for message to make it through the pipeline.
                         ft.get();
                         
+                        nsent++;
+                        
                     }
+
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("req=" + req + ", nsent=" + nsent);
 
                     return null;
 

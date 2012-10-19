@@ -30,11 +30,11 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Formatter;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.util.log.Log;
 
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
@@ -104,7 +104,7 @@ public class HALogWriter {
 	static final int VERSION1 = 0x1;
 
 	/** HA log directory. */
-	private final File m_dir;
+	private final File m_haLogDir;
 
 	/**
 	 * The root block of the leader at the start of the current write set.
@@ -165,7 +165,7 @@ public class HALogWriter {
 		final Lock lock = m_stateLock.readLock();
 		lock.lock();
 		try {
-			return m_state == null ? null : m_state.m_log;
+			return m_state == null ? null : m_state.m_haLogFile;
 		} finally {
 			lock.unlock();
 		}
@@ -220,7 +220,7 @@ public class HALogWriter {
 
 	public HALogWriter(final File logDir) {
 
-		m_dir = logDir;
+		m_haLogDir = logDir;
 
 	}
 
@@ -264,7 +264,7 @@ public class HALogWriter {
 
 		final String logFile = getHALogFileName(commitCounter + 1);
 
-		final File log = new File(m_dir, logFile);
+		final File log = new File(m_haLogDir, logFile);
 
 		// Must delete file if it exists.
 		if (log.exists() && !log.delete()) {
@@ -588,7 +588,7 @@ public class HALogWriter {
 
 				m_state.m_channel.close();
 
-				if (m_state.m_log.exists() && !m_state.m_log.delete()) {
+				if (m_state.m_haLogFile.exists() && !m_state.m_haLogFile.delete()) {
 
 					/*
 					 * It is a problem if a file exists and we can not delete
@@ -597,7 +597,7 @@ public class HALogWriter {
 					 * point.
 					 */
 
-					throw new IOException("Could not delete: " + m_state.m_log);
+					throw new IOException("Could not delete: " + m_state.m_haLogFile);
 
 				}
 
@@ -628,6 +628,15 @@ public class HALogWriter {
 
 	}
 
+    /**
+     * FIXME This method is only used by the unit tests. They need to modified
+     * to use {@link #getReader(long)} instead.
+     * 
+     * @deprecated Use {@link #getReader(long)}. That code can make an atomic
+     *             decision about whether the current HALog is being request or
+     *             a historical HALog. It is not possible for the caller to make
+     *             this decision from the outside.
+     */
 	public IHALogReader getReader() {
 
 		final Lock lock = m_stateLock.readLock();
@@ -642,13 +651,77 @@ public class HALogWriter {
 		}
 	}
 
+    /**
+     * Return the {@link IHALogReader} for the specified commit counter. If the
+     * request identifies the HALog that is currently being written, then an
+     * {@link IHALogReader} will be returned that will "see" newly written
+     * entries on the HALog. If the request identifies a historical HALog that
+     * has been closed and which exists, then a reader will be returned for that
+     * HALog file. Otherwise, an exception is thrown.
+     * 
+     * @param commitCounter
+     *            The commit counter associated with the commit point at the
+     *            close of the write set (the commit counter that is in the file
+     *            name).
+     * 
+     * @return The {@link IHALogReader}.
+     * 
+     * @throws IOException
+     *             if the commitCounter identifies an HALog file that does not
+     *             exist or can not be read.
+     */
+    public IHALogReader getReader(final long commitCounter)
+            throws IOException {
+
+        final File logFile = new File(m_haLogDir,
+                HALogWriter.getHALogFileName(commitCounter));
+
+        final Lock lock = m_stateLock.readLock();
+        lock.lock();
+        try {
+            
+            if (!logFile.exists()) {
+
+                // No log for that commit point.
+                throw new FileNotFoundException(logFile.getName());
+
+            }
+
+            if (m_state != null
+                    && m_rootBlock.getCommitCounter() + 1 == commitCounter) {
+
+                /*
+                 * This is the live HALog file.
+                 */
+
+                if (haLog.isDebugEnabled())
+                    haLog.debug("Opening live HALog: file="
+                            + m_state.m_haLogFile);
+                
+                return new OpenHALogReader(m_state);
+                
+            }
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("Opening historical HALog: file=" + logFile);
+
+            return new HALogReader(logFile);
+            
+        } finally {
+
+            lock.unlock();
+            
+        }
+
+    }
+	
 	/**
 	 * The FileState class encapsulates the file objects shared by the Writer
 	 * and Readers.
 	 */
 	static class FileState {
 		final StoreTypeEnum m_storeType;
-		final File m_log;
+		final File m_haLogFile;
 		final FileChannel m_channel;
 		final RandomAccessFile m_raf;
 		int m_records = 0;
@@ -671,9 +744,9 @@ public class HALogWriter {
 
 		FileState(final File file, StoreTypeEnum storeType)
 				throws FileNotFoundException {
-			m_log = file;
+			m_haLogFile = file;
 			m_storeType = storeType;
-			m_raf = new RandomAccessFile(m_log, "rw");
+			m_raf = new RandomAccessFile(m_haLogFile, "rw");
 			m_channel = m_raf.getChannel();
 			m_accessors = 1; // the writer is a reader also
 		}
@@ -750,7 +823,7 @@ public class HALogWriter {
 		@Override
 		public IRootBlockView getClosingRootBlock() throws IOException {
 			final RootBlockUtility tmp = new RootBlockUtility(m_state.reopener,
-					m_state.m_log, true/* validateChecksum */,
+					m_state.m_haLogFile, true/* validateChecksum */,
 					false/* alternateRootBlock */, false/* ignoreBadRootBlock */);
 
 			return tmp.chooseRootBlock();

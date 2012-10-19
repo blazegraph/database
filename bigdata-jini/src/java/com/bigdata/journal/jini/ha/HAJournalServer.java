@@ -994,6 +994,10 @@ public class HAJournalServer extends AbstractServer {
 
                     log.error(t, t);
 
+                } finally {
+                    
+                    haLog.warn("RESYNCH: exit.");
+
                 }
 
                 return null;
@@ -1063,7 +1067,8 @@ public class HAJournalServer extends AbstractServer {
                     InterruptedException, ExecutionException {
 
                 if (haLog.isInfoEnabled())
-                    haLog.info("RESYNC: commitCounter=" + commitCounter);
+                    haLog.info("RESYNC: now replicating commitCounter="
+                            + commitCounter);
 
                 final IHALogRootBlocksResponse resp;
                 try {
@@ -1116,8 +1121,8 @@ public class HAJournalServer extends AbstractServer {
                 // root block when the quorum started that write set.
                 final IRootBlockView openRootBlock = resp.getOpenRootBlock();
 
-                // root block when the quorum committed that write set.
-                final IRootBlockView closeRootBlock = resp.getCloseRootBlock();
+//                // root block when the quorum committed that write set.
+//                final IRootBlockView closeRootBlock = resp.getCloseRootBlock();
 
                 if (openRootBlock.getCommitCounter() != commitCounter - 1) {
                     
@@ -1133,21 +1138,21 @@ public class HAJournalServer extends AbstractServer {
                                     + openRootBlock);
                 }
                 
-                if (openRootBlock.getCommitCounter() == closeRootBlock
-                        .getCommitCounter()) {
-                    
-                    /*
-                     * FIXME RESYNC : This is not an error condition. The quorum
-                     * is still writing on the HA Log file for the current write
-                     * set. However, we do not yet have code that will let us
-                     * read on a log file that is currently being written.
-                     */
-                    
-                    throw new AssertionError(
-                            "Write set is not closed: requested commitCounter="
-                                    + commitCounter);
-                
-                }
+//                if (openRootBlock.getCommitCounter() == closeRootBlock
+//                        .getCommitCounter()) {
+//                    
+//                    /*
+//                     * FIXME RESYNC : This is not an error condition. The quorum
+//                     * is still writing on the HA Log file for the current write
+//                     * set. However, we do not yet have code that will let us
+//                     * read on a log file that is currently being written.
+//                     */
+//                    
+//                    throw new AssertionError(
+//                            "Write set is not closed: requested commitCounter="
+//                                    + commitCounter);
+//                
+//                }
                 
                 /*
                  * If the local journal is empty, then we need to replace both
@@ -1206,6 +1211,52 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
+                /*
+                 * Figure out the closing root block. If this HALog file was
+                 * active when we started reading from it, then the open and
+                 * close root blocks would have been identical in the [resp] and
+                 * we will need to grab the root blocks again now that it has
+                 * been closed.
+                 */
+                final IRootBlockView closeRootBlock;
+                {
+
+                    // root block when the quorum committed that write set.
+                    IRootBlockView tmp = resp.getCloseRootBlock();
+
+                    if (openRootBlock.getCommitCounter() == tmp
+                            .getCommitCounter()) {
+
+                        /*
+                         * The open and close commit counters were the same when
+                         * we first requested them, so we need to re-request the
+                         * close commit counter now that we are done reading on
+                         * the file.
+                         */
+                        
+                        // Re-request the root blocks for the write set.
+                        final IHALogRootBlocksResponse resp2 = leader
+                                .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
+                                        commitCounter));
+                        
+                        tmp = resp2.getCloseRootBlock();
+
+                    }
+
+                    closeRootBlock = tmp;
+
+                    if (closeRootBlock.getCommitCounter() != commitCounter) {
+
+                        throw new AssertionError(
+                                "Wrong commitCounter for closing root block: expected commitCounter="
+                                        + commitCounter
+                                        + ", but closeRootBlock="
+                                        + closeRootBlock);
+
+                    }
+                    
+                }
+
                 // Local commit.
                 journal.doLocalCommit(
                         (QuorumService<HAGlue>) HAQuorumService.this,
@@ -1219,6 +1270,10 @@ public class HAJournalServer extends AbstractServer {
                 } finally {
                     logLock.unlock();
                 }
+
+                if (haLog.isInfoEnabled())
+                    haLog.info("RESYNC: caught up to commitCounter="
+                            + commitCounter);
 
             }
 
