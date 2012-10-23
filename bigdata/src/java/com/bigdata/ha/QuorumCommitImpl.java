@@ -56,7 +56,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
         QuorumStateChangeListenerBase implements QuorumCommit<S>,
         QuorumStateChangeListener {
 
-    static protected transient final Logger log = Logger
+    static private transient final Logger log = Logger
             .getLogger(QuorumCommitImpl.class);
 
     protected final QuorumMember<S> member;

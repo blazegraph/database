@@ -1121,9 +1121,6 @@ public class HAJournalServer extends AbstractServer {
                 // root block when the quorum started that write set.
                 final IRootBlockView openRootBlock = resp.getOpenRootBlock();
 
-//                // root block when the quorum committed that write set.
-//                final IRootBlockView closeRootBlock = resp.getCloseRootBlock();
-
                 if (openRootBlock.getCommitCounter() != commitCounter - 1) {
                     
                     /*
@@ -1137,22 +1134,6 @@ public class HAJournalServer extends AbstractServer {
                                     + commitCounter + ", openRootBlock="
                                     + openRootBlock);
                 }
-                
-//                if (openRootBlock.getCommitCounter() == closeRootBlock
-//                        .getCommitCounter()) {
-//                    
-//                    /*
-//                     * FIXME RESYNC : This is not an error condition. The quorum
-//                     * is still writing on the HA Log file for the current write
-//                     * set. However, we do not yet have code that will let us
-//                     * read on a log file that is currently being written.
-//                     */
-//                    
-//                    throw new AssertionError(
-//                            "Write set is not closed: requested commitCounter="
-//                                    + commitCounter);
-//                
-//                }
                 
                 /*
                  * If the local journal is empty, then we need to replace both
@@ -1323,7 +1304,15 @@ public class HAJournalServer extends AbstractServer {
                         log.info("Ignoring message: " + msg);
                     
                     /*
-                     * Drop the pipeline message. We can't log it yet.
+                     * Drop the pipeline message.
+                     * 
+                     * Note: There are two cases here.
+                     * 
+                     * (A) It is a historical message that is being ignored on
+                     * this node;
+                     * 
+                     * (B) It is a live message, but this node is not caught up
+                     * and therefore can not log the message yet.
                      */
                     
                 }
@@ -1339,12 +1328,12 @@ public class HAJournalServer extends AbstractServer {
         /**
          * Adjust the size on the disk of the local store to that given in the
          * message.
-         * 
-         * Note: DO NOT do this for historical messages!
-         * 
-         * @throws IOException
-         * 
-         * @todo Trap truncation vs extend?
+         * <p>
+         * Note: When historical messages are being replayed, the caller needs
+         * to decide whether the message should applied to the local store. If
+         * so, then the extent needs to be updated. If not, then the message
+         * should be ignored (it will already have been replicated to the next
+         * follower).
          */
         private void setExtent(final IHAWriteMessage msg) throws IOException {
 

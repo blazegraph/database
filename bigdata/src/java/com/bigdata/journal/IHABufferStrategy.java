@@ -62,7 +62,8 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * @param msg
      *            The {@link IHAWriteMessage}.
      * @param b
-     *            The raw buffer.
+     *            The raw buffer. Bytes from position to limit will be sent.
+     *            remaining() must equal {@link IHAWriteMessage#getSize()}.
      * 
      * @return The {@link Future} for that request.
      * 

@@ -100,7 +100,7 @@ import com.bigdata.util.ChecksumUtility;
  */
 public class TestWORMWriteCacheService extends TestCase3 {
 
-    protected static final Logger log = Logger.getLogger
+    private static final Logger log = Logger.getLogger
     ( TestWORMWriteCacheService.class
       );
 
@@ -294,9 +294,10 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
                     nreceived.incrementAndGet();
                     
-                    if (log.isTraceEnabled())
-                        log.trace("nreceived=" + nreceived + ", message=" + msg
-                                + ", data=" + data);
+                    if (TestWORMWriteCacheService.log.isTraceEnabled())
+                        TestWORMWriteCacheService.log.trace("nreceived="
+                                + nreceived + ", message=" + msg + ", data="
+                                + data);
 
                     final ChecksumUtility chk = ChecksumUtility.threadChk.get();
 

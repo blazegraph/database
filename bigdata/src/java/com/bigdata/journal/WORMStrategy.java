@@ -1389,44 +1389,16 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * Note: Strip off the checksum from the end of the record and validate
          * it.
          */
-        final Lock readLock = extensionLock.readLock();
-        readLock.lock();
-        try {
+        {
+            final long beginDisk = System.nanoTime();
 
             // Allocate a new buffer of the exact capacity.
             final ByteBuffer dst = ByteBuffer.allocate(nbytes);
 
             // Read through to the disk.
-            final long beginDisk = System.nanoTime();
+            readRaw(nbytes, offset, dst);
 
-            try {
-
-                // the offset into the disk file.
-                final long pos = headerSize + offset;
-
-                // read on the disk.
-                final int ndiskRead = FileChannelUtility.readAll(opener, dst,
-                        pos);
-
-                // update performance counters.
-                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
-                        .get().acquire();
-                try {
-                    c.ndiskRead += ndiskRead;
-                } finally {
-                    c.release();
-                }
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-            // flip for reading.
-            dst.flip();
-
-            if(useChecksums) {
+            if (useChecksums) {
 
                 // extract the checksum.
                 final int chk = dst.getInt(nbytes - 4);
@@ -1461,15 +1433,66 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
             // return the buffer.
             return dst;
-
-        } finally {
-
-            readLock.unlock();
-            
+  
         }
 
     }
-    
+
+    /**
+     * Read on the backing file.
+     * 
+     * @param nbytes
+     *            The #of bytes to read.
+     * @param offset
+     *            The offset of the first byte (relative to the start of the
+     *            data region).
+     * @param dst
+     *            Where to put the data. Bytes will be written at position until
+     *            limit.
+     * @return The caller's buffer, prepared for reading.
+     */
+    private ByteBuffer readRaw(final int nbytes, final long offset,
+            final ByteBuffer dst) {
+
+        final Lock readLock = extensionLock.readLock();
+        readLock.lock();
+        try {
+
+            try {
+
+                // the offset into the disk file.
+                final long pos = headerSize + offset;
+
+                // read on the disk.
+                final int ndiskRead = FileChannelUtility.readAll(opener, dst,
+                        pos);
+
+                // update performance counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.ndiskRead += ndiskRead;
+                } finally {
+                    c.release();
+                }
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            // flip for reading.
+            dst.flip();
+
+            return dst;
+        } finally {
+
+            readLock.unlock();
+        }
+
+    }
+
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
@@ -2378,11 +2401,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		clientBuffer.position(0);
 		clientBuffer.limit(nbytes);
 
-		final long address = toAddr(nbytes, msg.getFirstOffset());
-		final ByteBuffer src = read(address);
-
-		clientBuffer.put(src);
-
+        readRaw(nbytes, msg.getFirstOffset(), clientBuffer);
+		
 		assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
 
 		@SuppressWarnings("unchecked")

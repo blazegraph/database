@@ -48,7 +48,7 @@ import com.bigdata.rawstore.IRawStore;
 public class QuorumReadImpl<S extends HAReadGlue> extends
         QuorumStateChangeListenerBase implements QuorumRead<S> {
 
-    static protected transient final Logger log = Logger
+    static private transient final Logger log = Logger
             .getLogger(QuorumReadImpl.class);
 
     protected final QuorumMember<S> member;
