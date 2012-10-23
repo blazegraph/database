@@ -4898,7 +4898,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                  */
 
                 if (haLog.isInfoEnabled())
-                    haLog.error("Reset from root block: serviceUUID="
+                    haLog.info("Reset from root block: serviceUUID="
                             + localService.getServiceId());
 
                 ((IHABufferStrategy) _bufferStrategy)

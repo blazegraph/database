@@ -153,7 +153,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         QuorumStateChangeListenerBase implements QuorumPipeline<S>,
         QuorumStateChangeListener {
 
-    static protected transient final Logger log = Logger
+    static private transient final Logger log = Logger
             .getLogger(QuorumPipelineImpl.class);
 
     /**
@@ -171,7 +171,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      */
     private final ReentrantLock lock = new ReentrantLock();
 
-    /** send service for the leader. */
+    /** send service (iff this is the leader). */
     private HASendService sendService;
 
     /**
@@ -404,14 +404,16 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      */
     public void pipelineChange(final UUID oldDownStreamId,
             final UUID newDownStreamId) {
-        if (log.isInfoEnabled())
-            log.info("");
         super.pipelineChange(oldDownStreamId, newDownStreamId);
         lock.lock();
         try {
             // The address of the next service in the pipeline.
             final InetSocketAddress addrNext = newDownStreamId == null ? null
                     : getAddrNext(newDownStreamId);
+            if (log.isInfoEnabled())
+                log.info("oldDownStreamId=" + oldDownStreamId
+                        + ",newDownStreamId=" + newDownStreamId + ", addrNext="
+                        + addrNext);
             if (sendService != null) {
                 // Terminate the existing connection.
                 sendService.terminate();

@@ -5039,20 +5039,6 @@ public class RWStore implements IStore, IBufferedWriter {
                 true/* useChecksums */, true/* bufferHasData */, m_reopener,
                 msg.getFileExtent());
 
-        /*
-         * FIXME We need to update the allocators either here based on that
-         * RecordMap. Expose it via a read-only interface and then mock up the
-         * bits in the appropriate allocators.
-         * 
-         * Determining FixedAllocators from sequentially allocated addesses is
-         * not straightforward.  However, if we can assume that allocations are
-         * made sequentially, and we know the slot size of the allocation, then it
-         * may be possible to infer the FixedAllocation requirements and therefore
-         * any rw-native address.
-         * 
-         * 
-         */
-
 		/*
 		 * Setup buffer for writing. We receive the buffer with pos=0, Ê
 		 * limit=#ofbyteswritten. However, flush() expects pos=limit, will
