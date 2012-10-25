@@ -210,6 +210,8 @@ public class HASendService {
             tmp.shutdownNow();
             // clear address.
             addr.set(null);
+            if (log.isInfoEnabled())
+                log.info(toString());
         }
     }
 

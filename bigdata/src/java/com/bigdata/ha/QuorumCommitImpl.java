@@ -307,6 +307,13 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
                     }
                     done = true;
                 } catch (ExecutionException ex) {
+                    /*
+                     * TODO prepare2Phase() is throwing exceptions if
+                     * preconditions are violated. Unless if is a joined
+                     * service, it probably should just vote "no" instead. We do
+                     * not need to log @ ERROR when a precondition for a
+                     * non-joined service has been violated.
+                     */
                     log.error(ex, ex);
                 } finally {
                     if (!done) {
