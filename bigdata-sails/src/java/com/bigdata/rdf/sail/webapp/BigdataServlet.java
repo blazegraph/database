@@ -214,18 +214,37 @@ abstract public class BigdataServlet extends HttpServlet {
             
         }
         
-        if (quorum.isQuorumMet()) {
-            
+        final long quorumToken = quorum.token();
+
+        if (!quorum.isQuorumMet()) {
+
             /*
-             * There is a quorum. The quorum is met.
+             * The quorum is not met.
+             */
+            
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Quorum is not met.");
+            
+        }
+
+        if (quorum.getClient().isJoinedMember(quorumToken)) {
+
+            /*
+             * There is a quorum. The quorum is met. This service is part of the
+             * met quorum.
              */
  
             return true;
 
         }
         
+        /*
+         * The quorum is met, but this service is not joined with the met
+         * quorum.
+         */
+        
         buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                "Quorum is not met.");
+                "Service is not joined with met quorum.");
         
         return false;
         

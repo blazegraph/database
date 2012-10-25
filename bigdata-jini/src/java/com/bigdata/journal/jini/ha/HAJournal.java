@@ -513,11 +513,14 @@ public class HAJournal extends Journal {
              */
             final IHALogReader r = getHALogWriter().getReader(commitCounter);
 
+            // Task sends an HALog file along the pipeline.
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
                     new SendHALogTask(req, r));
 
+            // Run task.
             getExecutorService().submit(ft);
             
+            // Return *ASYNCHRONOUS* proxy (interruptable).
             return getProxy(ft, true/* asynch */);
 
         }
@@ -552,8 +555,7 @@ public class HAJournal extends Journal {
                     	final IHABufferStrategy strategy = (IHABufferStrategy) HAJournal.this
                         .getBufferStrategy();
                     	
-                        // get message and write cache buffer.
-                    	// the buffer will be ignored if it is a WORM strategy
+                        // get message and fill write cache buffer (unless WORM).
                         final IHAWriteMessage msg = r.processNextBuffer(buf.buffer());
                         
                         if (haLog.isDebugEnabled())
