@@ -36,6 +36,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -308,6 +309,25 @@ public class DeleteServlet extends BigdataRDFServlet {
 
             }
 
+            /*
+             * Allow the caller to specify the default contexts.
+             */
+            final Resource[] defaultContext;
+            {
+                final String[] s = req.getParameterValues("context-uri");
+                if (s != null && s.length > 0) {
+                    try {
+                    	defaultContext = EncodeDecodeValue.decodeResources(s);
+                    } catch (IllegalArgumentException ex) {
+                        buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                                ex.getLocalizedMessage());
+                        return;
+                    }
+                } else {
+                    defaultContext = new Resource[0];
+                }
+            }
+            
             final RDFParser rdfParser = rdfParserFactory.getParser();
 
             final AtomicLong nmodified = new AtomicLong(0L);
@@ -329,7 +349,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                 rdfParser.setRDFHandler(new RemoveStatementHandler(conn
-                        .getSailConnection(), nmodified));
+                        .getSailConnection(), nmodified, defaultContext));
 
                 /*
                  * Run the parser, which will cause statements to be deleted.
@@ -373,29 +393,36 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
+        private final Resource[] defaultContext;
         
         public RemoveStatementHandler(final BigdataSailConnection conn,
-                final AtomicLong nmodified) {
-
+                final AtomicLong nmodified, final Resource... defaultContext) {
             this.conn = conn;
-            
             this.nmodified = nmodified;
-            
+            final boolean quads = conn.getTripleStore().isQuads();
+            if (quads && defaultContext != null) {
+                // The context may only be specified for quads.
+                this.defaultContext = defaultContext; //new Resource[] { defaultContext };
+            } else {
+                this.defaultContext = new Resource[0];
+            }
         }
 
         public void handleStatement(final Statement stmt)
                 throws RDFHandlerException {
 
+        	final Resource[] c = (Resource[]) 
+        			(stmt.getContext() == null 
+        			?  defaultContext
+                    : new Resource[] { stmt.getContext() }); 
+        	
             try {
 
-                final Resource context = stmt.getContext();
-            	
                 conn.removeStatements(//
                         stmt.getSubject(), //
                         stmt.getPredicate(), //
                         stmt.getObject(), //
-                        (Resource[]) (context == null ? nullArray
-                                : new Resource[] { context })//
+                        c
                         );
 
             } catch (SailException e) {
@@ -404,7 +431,12 @@ public class DeleteServlet extends BigdataRDFServlet {
 
             }
 
-            nmodified.incrementAndGet();
+            if (c.length >= 2) {
+            	// removed from more than one context
+            	nmodified.addAndGet(c.length);
+            } else {
+            	nmodified.incrementAndGet();
+            }
 
         }
 
@@ -423,12 +455,13 @@ public class DeleteServlet extends BigdataRDFServlet {
         final Resource s;
         final URI p;
         final Value o;
-        final Resource c;
+        final Resource[] c;
         try {
             s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
             p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
-            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+//            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+        	c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
@@ -450,9 +483,23 @@ public class DeleteServlet extends BigdataRDFServlet {
                             namespace);
 
                     // Remove all statements matching that access path.
-                    final long nmodified = conn.getSailConnection()
-                            .getBigdataSail().getDatabase()
-                            .removeStatements(s, p, o, c);
+//                    final long nmodified = conn.getSailConnection()
+//                            .getBigdataSail().getDatabase()
+//                            .removeStatements(s, p, o, c);
+                    
+                    // Remove all statements matching that access path.
+                    long nmodified = 0;
+                    if (c != null && c.length > 0) {
+	                    for (Resource r : c) {
+	                    	nmodified += conn.getSailConnection()
+	                              .getBigdataSail().getDatabase()
+	                              .removeStatements(s, p, o, r);
+	                    }
+                    } else {
+                    	nmodified += conn.getSailConnection()
+                              .getBigdataSail().getDatabase()
+                              .removeStatements(s, p, o, null);
+                    }
                     
                     // Commit the mutation.
                     conn.commit();
@@ -490,6 +537,6 @@ public class DeleteServlet extends BigdataRDFServlet {
 
     }
 
-    static private transient final Resource[] nullArray = new Resource[]{};
+//    static private transient final Resource[] nullArray = new Resource[]{};
     
 }

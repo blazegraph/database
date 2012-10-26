@@ -43,7 +43,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
@@ -54,6 +57,7 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -341,6 +345,38 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
         t.root("data").attr("rangeCount", rangeCount)
                 .attr("milliseconds", elapsed).close();
+
+        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+
+    }
+    
+    /**
+     * Report the contexts back to the user agent.
+     * 
+     * @param resp
+     *            The response.
+     * @param it
+     *            The iteration of contexts.
+     * @param elapsed
+     *            The elapsed time (milliseconds).
+     * 
+     * @throws IOException
+     */
+    protected void reportContexts(final HttpServletResponse resp,
+            final RepositoryResult<Resource> contexts, final long elapsed) 
+            		throws IOException, RepositoryException {
+
+        final StringWriter w = new StringWriter();
+        
+        final XMLBuilder t = new XMLBuilder(w);
+
+        final Node root = t.root("contexts");
+        while (contexts.hasNext()) {
+        	root.node("context")
+        		.attr("uri", EncodeDecodeValue.encodeValue(contexts.next()))
+        		.close();
+        }
+        root.close();
 
         buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 

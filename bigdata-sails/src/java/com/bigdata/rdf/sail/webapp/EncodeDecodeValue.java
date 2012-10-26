@@ -417,5 +417,29 @@ public class EncodeDecodeValue {
         }
         throw new AssertionError();
     }
+    
+    public static Resource[] decodeResources(final String[] strings) {
+    	if (strings == null || strings.length == 0)
+    		return null;
+    	
+    	final Resource[] resources = new Resource[strings.length];
+    	for (int i = 0; i < strings.length; i++) {
+    		resources[i] = decodeResource(strings[i]);
+    	}
+    	
+    	return resources;
+    }
+    
+    public static String[] encodeValues(final Value[] values) {
+    	if (values == null || values.length == 0)
+    		return null;
+    	
+    	final String[] strings = new String[values.length];
+    	for (int i = 0; i < values.length; i++) {
+    		strings[i] = encodeValue(values[i]);
+    	}
+    	
+    	return strings;
+    }
 
 }

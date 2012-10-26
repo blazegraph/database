@@ -3,9 +3,12 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
@@ -331,7 +334,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
             
             final AddOp add = new AddOp(new File(packagePath
                     + "insert_triples_with_defaultContext.ttl").toURI().toString());
-            add.setContext("http://example.org");
+            add.setContext(new URIImpl("http://example.org"));
             assertEquals(7, m_repo.add(add));
             
         }
@@ -820,6 +823,23 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
     }
     
     /**
+     * Test the CONTEXTS method.
+     */
+    public void test_CONTEXTS() throws Exception {
+
+    	if (testMode != TestMode.quads)
+    		return;
+
+        doInsertbyURL("POST", packagePath
+                + "test_estcard.trig");
+        
+        final Collection<Resource> contexts = m_repo.getContexts();
+        
+        assertEquals(3, contexts.size());
+        
+    }
+
+    /**
      * Select everything in the kb using a POST.
      */
     public void test_DELETE_withQuery() throws Exception {
@@ -856,8 +876,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 null,// p
-                null,// o
-                null // c
+                null
         );
 
         assertEquals(7, mutationResult);
@@ -876,8 +895,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 new URIImpl("http://www.bigdata.com/Mike"),// s
                 null,// p
-                null,// o
-                null // c
+                null
         );
 
         assertEquals(3, mutationResult);
@@ -896,8 +914,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 new URIImpl("http://www.w3.org/2000/01/rdf-schema#label"),// p
-                null,// o
-                null // c
+                null// o
         );
 
         assertEquals(2, mutationResult);
@@ -916,8 +933,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 null,// p
-                new URIImpl("http://xmlns.com/foaf/0.1/Person"),// o
-                null // c
+                new URIImpl("http://xmlns.com/foaf/0.1/Person")// o
         );
 
         assertEquals(3, mutationResult);
@@ -936,8 +952,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 null,// p
-                new URIImpl("http://www.bigdata.com/Bryan"),// o
-                null // c
+                new URIImpl("http://www.bigdata.com/Bryan")// o
         );
 
         assertEquals(1, mutationResult);
@@ -956,8 +971,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 RDF.TYPE,// p
-                new URIImpl("http://xmlns.com/foaf/0.1/Person"),// o
-                null // c
+                new URIImpl("http://xmlns.com/foaf/0.1/Person")// o
         );
 
         assertEquals(3, mutationResult);
@@ -976,8 +990,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 RDFS.LABEL,// p
-                new LiteralImpl("Bryan"),// o
-                null // c
+                new LiteralImpl("Bryan")// o
         );
 
         assertEquals(1, mutationResult);
@@ -996,8 +1009,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 //                requestPath,//
                 null,// s
                 null,// p
-                new URIImpl("http://xmlns.com/foaf/0.1/XXX"),// o
-                null // c
+                new URIImpl("http://xmlns.com/foaf/0.1/XXX")// o
         );
 
         assertEquals(0, mutationResult);
