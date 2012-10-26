@@ -226,6 +226,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // RemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestNanoSparqlClient.class);
 
+        // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
+        suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+
         // SPARQL UPDATE test suite.
         switch(testMode) {
         case triples:

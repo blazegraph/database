@@ -596,7 +596,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             final URI s,//
             final URI p,//
             final Value o,//
-            final URI c//
+            final URI... c//
             ) throws Exception {
     	
 //        HttpURLConnection conn = null;
@@ -1053,7 +1053,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final AddOp add = new AddOp(wireData, rdfFormat);
         if (defaultContext != null)
-        	add.setContext(defaultContext.stringValue());
+        	add.setContext(defaultContext);
         return m_repo.add(add);
 
     }

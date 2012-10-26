@@ -170,22 +170,41 @@ public class InsertServlet extends BigdataRDFServlet {
 
         }
 
+//        /*
+//         * Allow the caller to specify the default context.
+//         */
+//        final Resource defaultContext;
+//        {
+//            final String s = req.getParameter("context-uri");
+//            if (s != null) {
+//                try {
+//                    defaultContext = new URIImpl(s);
+//                } catch (IllegalArgumentException ex) {
+//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+//                            ex.getLocalizedMessage());
+//                    return;
+//                }
+//            } else {
+//                defaultContext = null;
+//            }
+//        }
+        
         /*
-         * Allow the caller to specify the default context.
+         * Allow the caller to specify the default contexts.
          */
-        final Resource defaultContext;
+        final Resource[] defaultContext;
         {
-            final String s = req.getParameter("context-uri");
-            if (s != null) {
+            final String[] s = req.getParameterValues("context-uri");
+            if (s != null && s.length > 0) {
                 try {
-                    defaultContext = new URIImpl(s);
+                	defaultContext = EncodeDecodeValue.decodeResources(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
             } else {
-                defaultContext = null;
+                defaultContext = new Resource[0];
             }
         }
 
@@ -300,22 +319,41 @@ public class InsertServlet extends BigdataRDFServlet {
             
         }
 
+//        /*
+//         * Allow the caller to specify the default context.
+//         */
+//        final Resource defaultContext;
+//        {
+//            final String s = req.getParameter("context-uri");
+//            if (s != null) {
+//                try {
+//                    defaultContext = new URIImpl(s);
+//                } catch (IllegalArgumentException ex) {
+//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+//                            ex.getLocalizedMessage());
+//                    return;
+//                }
+//            } else {
+//                defaultContext = null;
+//            }
+//        }
+
         /*
-         * Allow the caller to specify the default context.
+         * Allow the caller to specify the default contexts.
          */
-        final Resource defaultContext;
+        final Resource[] defaultContext;
         {
-            final String s = req.getParameter("context-uri");
-            if (s != null) {
+            final String[] s = req.getParameterValues("context-uri");
+            if (s != null && s.length > 0) {
                 try {
-                    defaultContext = new URIImpl(s);
+                	defaultContext = EncodeDecodeValue.decodeResources(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
             } else {
-                defaultContext = null;
+                defaultContext = new Resource[0];
             }
         }
 
@@ -333,8 +371,12 @@ public class InsertServlet extends BigdataRDFServlet {
 
                     // Use the default context if one was given and otherwise
                     // the URI from which the data are being read.
-                    final Resource defactoContext = defaultContext == null ? new URIImpl(
-                            url.toExternalForm()) : defaultContext;
+//                    final Resource defactoContext = defaultContext == null ? new URIImpl(
+//                            url.toExternalForm()) : defaultContext;
+                	final Resource[] defactoContext = 
+                			defaultContext.length == 0 
+                			? new Resource[] { new URIImpl(url.toExternalForm()) } 
+                			: defaultContext;
                     
                     URLConnection hconn = null;
                     try {
@@ -461,32 +503,43 @@ public class InsertServlet extends BigdataRDFServlet {
 
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
-        private final Resource[] defaultContexts;
+        private final Resource[] defaultContext;
 
+        /**
+         * 
+         * @param conn
+         * @param nmodified
+         * @param defaultContexts
+         * 			Only used if the statements themselves do not have a context.
+         */
         public AddStatementHandler(final BigdataSailConnection conn,
-                final AtomicLong nmodified, final Resource defaultContext) {
+                final AtomicLong nmodified, final Resource... defaultContext) {
             this.conn = conn;
             this.nmodified = nmodified;
             final boolean quads = conn.getTripleStore().isQuads();
             if (quads && defaultContext != null) {
-                // The default context may only be specified for quads.
-                this.defaultContexts = new Resource[] { defaultContext };
+                // The context may only be specified for quads.
+                this.defaultContext = defaultContext; //new Resource[] { defaultContext };
             } else {
-                this.defaultContexts = new Resource[0];
+                this.defaultContext = new Resource[0];
             }
         }
 
         public void handleStatement(final Statement stmt)
                 throws RDFHandlerException {
 
+        	final Resource[] c = (Resource[]) 
+        			(stmt.getContext() == null 
+        			?  defaultContext
+                    : new Resource[] { stmt.getContext() }); 
+        	
             try {
 
                 conn.addStatement(//
                         stmt.getSubject(), //
                         stmt.getPredicate(), //
                         stmt.getObject(), //
-                        (Resource[]) (stmt.getContext() == null ?  defaultContexts
-                                : new Resource[] { stmt.getContext() })//
+                        c
                         );
 
             } catch (SailException e) {
@@ -495,7 +548,12 @@ public class InsertServlet extends BigdataRDFServlet {
 
             }
 
-            nmodified.incrementAndGet();
+            if (c.length >= 2) {
+            	// added to more than one context
+            	nmodified.addAndGet(c.length);
+            } else {
+            	nmodified.incrementAndGet();
+            }
 
         }
 

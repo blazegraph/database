@@ -154,24 +154,43 @@ public class UpdateServlet extends BigdataRDFServlet {
         }
 
         /*
-         * Allow the caller to specify the default context.
+         * Allow the caller to specify the default context for insert.
          */
-        final Resource defaultContext;
+        final Resource[] defaultContextInsert;
         {
-            final String s = req.getParameter("context-uri");
-            if (s != null) {
+            final String[] s = req.getParameterValues("context-uri-insert");
+            if (s != null && s.length > 0) {
                 try {
-                    defaultContext = new URIImpl(s);
+                    defaultContextInsert = EncodeDecodeValue.decodeResources(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
             } else {
-                defaultContext = null;
+                defaultContextInsert = null;
             }
         }
 
+        /*
+         * Allow the caller to specify the default context for delete.
+         */
+        final Resource[] defaultContextDelete;
+        {
+            final String[] s = req.getParameterValues("context-uri-delete");
+            if (s != null && s.length > 0) {
+                try {
+                	defaultContextDelete = EncodeDecodeValue.decodeResources(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+            	defaultContextDelete = null;
+            }
+        }
+        
         if (log.isInfoEnabled())
             log.info("update with query: " + queryStr);
 
@@ -235,7 +254,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                         rdfParser.setRDFHandler(new RemoveStatementHandler(conn
-                                .getSailConnection(), nmodified));
+                                .getSailConnection(), nmodified, defaultContextDelete));
 
                         // Wrap as Future.
                         final FutureTask<Void> ft = new FutureTask<Void>(
@@ -273,7 +292,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                         rdfParser.setRDFHandler(new AddStatementHandler(conn
-                                .getSailConnection(), nmodified, defaultContext));
+                                .getSailConnection(), nmodified, defaultContextInsert));
 
                         /*
                          * Run the parser, which will cause statements to be
@@ -387,21 +406,40 @@ public class UpdateServlet extends BigdataRDFServlet {
         final String baseURI = req.getRequestURL().toString();
      
         /*
-         * Allow the caller to specify the default context.
+         * Allow the caller to specify the default context for insert.
          */
-        final Resource defaultContext;
+        final Resource[] defaultContextInsert;
         {
-            final String s = req.getParameter("context-uri");
-            if (s != null) {
+            final String[] s = req.getParameterValues("context-uri-insert");
+            if (s != null && s.length > 0) {
                 try {
-                    defaultContext = new URIImpl(s);
+                    defaultContextInsert = EncodeDecodeValue.decodeResources(s);
                 } catch (IllegalArgumentException ex) {
                     buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
             } else {
-                defaultContext = null;
+                defaultContextInsert = null;
+            }
+        }
+
+        /*
+         * Allow the caller to specify the default context for delete.
+         */
+        final Resource[] defaultContextDelete;
+        {
+            final String[] s = req.getParameterValues("context-uri-delete");
+            if (s != null && s.length > 0) {
+                try {
+                	defaultContextDelete = EncodeDecodeValue.decodeResources(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+            	defaultContextDelete = null;
             }
         }
 
@@ -424,7 +462,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		        	final InputStream is = remove.getInputStream();
 		        	
 		        	final RDFHandler handler = new RemoveStatementHandler(
-		        			conn.getSailConnection(), nmodified);
+		        			conn.getSailConnection(), nmodified, defaultContextDelete);
 		        	
 		        	processData(conn, contentType, is, handler, baseURI);
 		        	
@@ -437,7 +475,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		        	final InputStream is = add.getInputStream();
 		        	
 		        	final RDFHandler handler = new AddStatementHandler(
-		        			conn.getSailConnection(), nmodified, defaultContext);
+		        			conn.getSailConnection(), nmodified, defaultContextInsert);
 		        	
 		        	processData(conn, contentType, is, handler, baseURI);
 		        	

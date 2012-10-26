@@ -48,6 +48,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -113,6 +114,12 @@ public class QueryServlet extends BigdataRDFServlet {
     static final transient String ATTR_ESTCARD = "ESTCARD";
     
     /**
+     * The name of the URL query parameter that indicates an request
+     * to return all contexts in the database.
+     */
+    static final transient String ATTR_CONTEXTS = "CONTEXTS";
+    
+    /**
      * The name of the URL query parameter that indicates a shards report
      * request (scale-out only).
      */
@@ -169,6 +176,10 @@ public class QueryServlet extends BigdataRDFServlet {
         } else if (req.getParameter(ATTR_ESTCARD) != null) {
             
             doEstCard(req, resp);
+            
+        } else if (req.getParameter(ATTR_CONTEXTS) != null) {
+            
+            doContexts(req, resp);
             
         } else if (req.getParameter(ATTR_SHARDS) != null) {
             
@@ -1035,12 +1046,12 @@ public class QueryServlet extends BigdataRDFServlet {
         final Resource s;
         final URI p;
         final Value o;
-        final Resource c;
+        final Resource[] c;
         try {
             s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
             p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
-            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+            c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
             buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
@@ -1064,14 +1075,88 @@ public class QueryServlet extends BigdataRDFServlet {
                             namespace, timestamp);
 
                     // Range count all statements matching that access path.
-                    final long rangeCount = conn.getSailConnection()
-                            .getBigdataSail().getDatabase()
-                            .getAccessPath(s, p, o, c)
-                            .rangeCount(false/* exact */);
+                    long rangeCount = 0;
+                    if (c != null && c.length > 0) {
+	                    for (Resource r : c) {
+	                    	rangeCount += conn.getSailConnection()
+	                                .getBigdataSail().getDatabase()
+	                                .getAccessPath(s, p, o, r)
+	                                .rangeCount(false/* exact */);
+	                    }
+                    } else {
+                    	rangeCount += conn.getSailConnection()
+                                .getBigdataSail().getDatabase()
+                                .getAccessPath(s, p, o, null)
+                                .rangeCount(false/* exact */);
+                    }
                     
                     final long elapsed = System.currentTimeMillis() - begin;
                     
                     reportRangeCount(resp, rangeCount, elapsed);
+
+                } catch(Throwable t) {
+                    
+                    if(conn != null)
+                        conn.rollback();
+                    
+                    throw new RuntimeException(t);
+                    
+                } finally {
+
+                    if (conn != null)
+                        conn.close();
+
+                }
+
+            } catch (Throwable t) {
+
+                throw BigdataRDFServlet.launderThrowable(t, resp, "");
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+	/**
+	 * Report on the contexts in use in the quads database.
+	 * @param req
+	 * @param resp
+	 */
+    private void doContexts(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        if (!isReadable(req, resp)) {
+            // HA Quorum in use, but quorum is not met.
+            return;
+        }
+        
+        final long begin = System.currentTimeMillis();
+        
+        final String namespace = getNamespace(req);
+
+        try {
+
+            try {
+
+                BigdataSailRepositoryConnection conn = null;
+                try {
+
+                    final long timestamp = getTimestamp(req);
+
+                    conn = getBigdataRDFContext().getQueryConnection(
+                            namespace, timestamp);
+
+                    final RepositoryResult<Resource> it = conn.getContextIDs();
+                    
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    reportContexts(resp, it, elapsed);
 
                 } catch(Throwable t) {
                     
