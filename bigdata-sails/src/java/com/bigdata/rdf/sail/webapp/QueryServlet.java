@@ -1086,7 +1086,7 @@ public class QueryServlet extends BigdataRDFServlet {
                     } else {
                     	rangeCount += conn.getSailConnection()
                                 .getBigdataSail().getDatabase()
-                                .getAccessPath(s, p, o, null)
+                                .getAccessPath(s, p, o, (Resource) null)
                                 .rangeCount(false/* exact */);
                     }
                     
