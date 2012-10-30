@@ -1043,17 +1043,19 @@ public class HAJournalServer extends AbstractServer {
 
                 haLog.warn("RESYNCH: " + server.getServiceName());
 
-//                /*
-//                 * Note: We need to discard any writes that might have been
-//                 * buffered before we start the resynchronization of the local
-//                 * store.
-//                 * 
-//                 * TODO This might not be necessary. We do a low-level abort
-//                 * when we install the root blocks from the quorum leader before
-//                 * we sync the first commit point.
-//                 */
-//
-//                journal.doLocalAbort();
+                /*
+                 * Note: We need to discard any writes that might have been
+                 * buffered before we start the resynchronization of the local
+                 * store. Otherwise they could wind up flushed through by the
+                 * RWStore (for example, when handling a file extension).
+                 * 
+                 * Note: This is necessary. We do a low-level abort when we
+                 * install the root blocks from the quorum leader before we sync
+                 * the first commit point, but we do not do the low-level abort
+                 * if we already have the correct root blocks in place.
+                 */
+
+                journal.doLocalAbort();
 
                 // Until joined with the met quorum.
                 while (!getQuorum().getMember().isJoinedMember(token)) {
@@ -1449,6 +1451,26 @@ public class HAJournalServer extends AbstractServer {
                 final long commitCounter = journal.getRootBlockView()
                         .getCommitCounter();
 
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                if (msg.getCommitCounter() == logWriter.getCommitCounter()
+                        && msg.getSequence() == (logWriter.getSequence() - 1)) {
+
+                    /*
+                     * Duplicate message. This can occur due retrySend().
+                     * retrySend() is used to make the pipeline robust if a
+                     * service (other than the leader) drops out and we need to
+                     * change the connections between the services in the write
+                     * pipeline in order to get the message through.
+                     */
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring message (dup): " + msg);
+
+                    return;
+
+                }
+
                 if (resyncFuture != null && !resyncFuture.isDone()) {
 
                     /*
@@ -1456,7 +1478,6 @@ public class HAJournalServer extends AbstractServer {
                      * live and historical) into handleResyncMessage().
                      */
                     
-                    setExtent(msg);
                     handleResyncMessage(req, msg, data);
 
                 } else if (commitCounter == msg.getCommitCounter()
@@ -1469,7 +1490,6 @@ public class HAJournalServer extends AbstractServer {
                      */
 
                     // write on the log and the local store.
-                    setExtent(msg);
                     acceptHAWriteMessage(msg, data);
 
                 } else {
@@ -1722,6 +1742,7 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
+            setExtent(msg);
             writeWriteCacheBlock(msg,data);
 
         }

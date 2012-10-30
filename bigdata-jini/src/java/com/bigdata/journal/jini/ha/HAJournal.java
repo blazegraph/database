@@ -565,8 +565,12 @@ public class HAJournal extends Journal {
                         final Future<Void> ft = strategy.sendHALogBuffer(req, msg,
                                 buf);
 
-                        // wait for message to make it through the pipeline.
-                        ft.get();
+                        try {
+                            // wait for message to make it through the pipeline.
+                            ft.get();
+                        } finally {
+                            ft.cancel(true/* mayInterruptIfRunning */);
+                        }
                         
                         nsent++;
                         

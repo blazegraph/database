@@ -107,6 +107,14 @@ public interface QuorumStateChangeListener {
      *            iff this service <em>is</em> the last service in the pipeline.
      */
     void pipelineChange(UUID oldDownStreamId, UUID newDownStreamId);
+    
+    /**
+     * Invoked when the upstream service in the write pipeline has been removed.
+     * This hook provides an opportunity for the service to close out its
+     * connection with the old upstream service and to prepare to establish a
+     * new connection with the new downstream service.
+     */
+    void pipelineUpstreamChange();
 
 //    void castVote(long lastCommitTime);
 //    void withdrawVote(long lastCommitTime);

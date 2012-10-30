@@ -52,10 +52,12 @@ import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumStateChangeListener;
 import com.bigdata.quorum.QuorumStateChangeListenerBase;
+import com.bigdata.util.InnerCause;
 
 /**
  * {@link QuorumPipeline} implementation.
@@ -413,21 +415,53 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
             if (log.isInfoEnabled())
                 log.info("oldDownStreamId=" + oldDownStreamId
                         + ",newDownStreamId=" + newDownStreamId + ", addrNext="
-                        + addrNext);
+                        + addrNext + ", sendService=" + sendService
+                        + ", receiveService=" + receiveService);
             if (sendService != null) {
-                // Terminate the existing connection.
+                /*
+                 * Terminate the existing connection (we were the first service
+                 * in the pipeline).
+                 */
                 sendService.terminate();
                 if (addrNext != null) {
+                    if (log.isDebugEnabled())
+                        log.debug("sendService.start(): addrNext=" + addrNext);
                     sendService.start(addrNext);
                 }
             } else if (receiveService != null) {
                 /*
-                 * Reconfigure the receive service to change how it is relaying.
+                 * Reconfigure the receive service to change how it is relaying
+                 * (we were relaying, so the receiveService was running but not
+                 * the sendService).
                  */
+                if (log.isDebugEnabled())
+                    log.debug("receiveService.changeDownStream(): addrNext="
+                            + addrNext);
                 receiveService.changeDownStream(addrNext);
             }
             // populate and/or clear the cache.
             cachePipelineState(newDownStreamId);
+            if (log.isDebugEnabled())
+                log.debug("pipelineChange - done.");
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void pipelineUpstreamChange() {
+        super.pipelineUpstreamChange();
+        lock.lock();
+        try {
+            if (receiveService != null) {
+                /*
+                 * Make sure that the receiveService closes out its client
+                 * connection with the old upstream service.
+                 */
+                if (log.isInfoEnabled())
+                    log.info("receiveService=" + receiveService);
+                receiveService.changeUpStream();
+            }
         } finally {
             lock.unlock();
         }
@@ -694,22 +728,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
         lock.lock();
         try {
 
-            if (log.isTraceEnabled())
-                log.trace("Leader will send: " + b.remaining() + " bytes");
-
-            // Note: disable assert if we allow non-leaders to replicate HALog
-            // messages (or just verify service joined with the quorum).
-            if (req == null) {
-                // Note: Do not test quorum token for historical writes.
-                member.assertLeader(msg.getQuorumToken());
-            }
-
-            final PipelineState<S> downstream = pipelineStateRef.get();
-
-            final HASendService sendService = getHASendService();
-
-            ft = new FutureTask<Void>(new SendBufferTask<S>(req, msg, b,
-                    downstream, sendService, sendLock));
+            ft = new FutureTask<Void>(new RobustReplicateTask(req, msg, b));
 
         } finally {
 
@@ -717,13 +736,274 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         }
 
-        // execute the FutureTask.
+        // Submit Future for execution (outside of the lock).
         member.getExecutor().execute(ft);
 
+        // Return Future. Caller must wait on the Future.
         return ft;
 
     }
 
+    /**
+     * Task robustly replicates an {@link IHAWriteMessage} and the associated
+     * payload. 
+     */
+    private class RobustReplicateTask implements Callable<Void> {
+
+        /**
+         * An historical message is indicated when the {@link IHALogRequest} is
+         * non-<code>null</code>.
+         */
+        private final IHALogRequest req;
+        
+        /**
+         * The {@link IHAWriteMessage}.
+         */
+        private final IHAWriteMessage msg;
+        
+        /**
+         * The associated payload.
+         */
+        private final ByteBuffer b;
+
+        /**
+         * The token for the leader.
+         */
+        private final long quorumToken;
+
+        /**
+         * The #of times the leader in a highly available quorum will attempt to
+         * retransmit the current write cache block if there is an error when
+         * sending that write cache block to the downstream node.
+         */
+        static protected final int RETRY_COUNT = 3;
+
+        /**
+         * The timeout for a sleep before the next retry. This timeout is designed
+         * to allow some asynchronous processes to reconnect the
+         * {@link HASendService} and the {@link HAReceiveService}s in write pipeline
+         * such that a retransmit can succeed after a service has left the pipeline.
+         */
+        static protected final int RETRY_SLEEP = 50;
+
+        public RobustReplicateTask(final IHALogRequest req, final IHAWriteMessage msg,
+                final ByteBuffer b) {
+            
+            // Note: [req] MAY be null.
+
+            if (msg == null)
+                throw new IllegalArgumentException();
+            
+            if (b == null)
+                throw new IllegalArgumentException();
+
+            this.req = req;
+
+            this.msg = msg;
+            
+            this.b = b;
+
+            if (b.remaining() == 0) {
+             
+                // Empty buffer.
+                
+                throw new IllegalStateException("Empty buffer: req=" + req
+                        + ", msg=" + msg + ", buffer=" + b);
+                
+            }
+
+            if (req == null) {
+            
+                /*
+                 * Live message.
+                 * 
+                 * Use the quorum token on the message. It was put there by the
+                 * WriteCacheService. This allows us to ensure that the qourum
+                 * token remains valid for all messages replicated by the
+                 * leader.
+                 */
+
+                quorumToken = msg.getQuorumToken();
+
+            } else {
+                
+                /*
+                 * Historical message.
+                 */
+
+                // Use the current quorum token.
+                quorumToken = member.getQuorum().token();
+                
+            }
+            
+        }
+        
+        public Void call() throws Exception {
+
+            try {
+
+                innerReplicate(0/* retryCount */);
+                
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                 
+                    throw (InterruptedException) t;
+                    
+                }
+                
+                // Log initial error.
+                log.error(t, t);
+
+                if (!retrySend()) {
+
+                    // Rethrow the original exception.
+                    throw new RuntimeException(
+                            "Giving up. Could not send after " + RETRY_COUNT
+                                    + " attempts : " + t, t);
+
+                }
+                
+            }
+
+            return null;
+            
+        }
+
+        /**
+         * Replicate from the leader to the first follower. Each non-final
+         * follower will receiveAndReplicate the write cache buffer. The last
+         * follower will receive the buffer.
+         * 
+         * @param retryCount
+         *            The #of attempts and ZERO (0) if this is the first
+         *            attempt.
+         *            
+         * @throws Exception
+         */
+        private void innerReplicate(final int retryCount) throws Exception {
+
+            lock.lockInterruptibly();
+
+            try {
+
+                if (log.isTraceEnabled())
+                    log.trace("Leader will send: " + b.remaining()
+                            + " bytes, retryCount=" + retryCount + ", req="
+                            + req + ", msg=" + msg);
+
+                /*
+                 * Note: disable assert if we allow non-leaders to replicate
+                 * HALog messages (or just verify service joined with the
+                 * quorum).
+                 */
+                
+                if (req == null) {
+
+                    // // Note: Do not test quorum token for historical writes.
+                    // member.assertLeader(msg.getQuorumToken());
+
+                    /*
+                     * This service must be the leader.
+                     * 
+                     * Note: The [quorumToken] is from the message IFF this is a
+                     * live message and is otherwise the current quorum token.
+                     */
+                    member.assertLeader(quorumToken);
+
+                }
+
+                final PipelineState<S> downstream = pipelineStateRef.get();
+
+                final HASendService sendService = getHASendService();
+
+                final ByteBuffer b = this.b.duplicate();
+
+                new SendBufferTask<S>(req, msg, b, downstream, sendService,
+                        sendLock).call();
+
+                return;
+
+            } finally {
+
+                lock.unlock();
+
+            }
+
+        }
+
+        /**
+         * Robust retransmit of the current cache block. This method is designed to
+         * handle several kinds of recoverable errors, including:
+         * <ul>
+         * <li>downstream service leaves the pipeline</li>
+         * <li>intermittent failure sending the RMI message</li>
+         * <li>intermittent failure sending the payload</li>
+         * </ul>
+         * The basic pattern is that it will retry the operation a few times to see
+         * if there is a repeatable error. Each time it attempts the operation it
+         * will discover the current downstream serviceId and verify that the quorum
+         * is still valid. Each error (including the first) is logged. If the
+         * operation fails, the original error is rethrown. If the operation
+         * succeeds, then the cache block was successfully transmitted to the
+         * current downstream service and this method returns without error.
+         * 
+         * @throws InterruptedException 
+         */
+        private boolean retrySend() throws InterruptedException {
+
+            // we already tried once.
+            int tryCount = 1;
+
+            // now try some more times.
+            for (; tryCount < RETRY_COUNT; tryCount++) {
+
+                // Sleep before each retry (including the first).
+                Thread.sleep(RETRY_SLEEP/* ms */);
+
+                try {
+
+                    // send to 1st follower.
+                    innerReplicate(tryCount);
+
+                    // Success.
+                    return true;
+                    
+                } catch (Exception ex) {
+                    
+                    // log and retry.
+                    log.error("retry=" + tryCount + " : " + ex, ex);
+                    
+                    continue;
+                    
+                }
+
+            }
+
+            // Send was not successful.
+            return false;
+            
+        } // retrySend()
+
+    } // class RobustReplicateTask
+    
+    /**
+     * The logic needs to support the asynchronous termination of the
+     * {@link Future} that is responsible for replicating the {@link WriteCache}
+     * block, which is why the API exposes the means to inform the caller about
+     * that {@link Future}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface IRetrySendCallback {
+        /**
+         * 
+         * @param remoteFuture
+         */
+        void notifyRemoteFuture(final Future<Void> remoteFuture);
+    }
+    
     /**
      * Task to send() a buffer to the follower.
      */

@@ -8,15 +8,24 @@ Contact:
      Greensboro, NC 27410
      licenses@bigdata.com
 
-This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program; if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  */
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
 package com.bigdata.ha.pipeline;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -40,6 +49,7 @@ import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.ha.pipeline.HASendService.IncSendTask;
 import com.bigdata.io.writecache.WriteCache;
@@ -83,7 +93,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      * always allocated, but it will be running iff this service will relay the
      * data to a downstream service.
      */
-    private final HASendService downstream;
+    private final HASendService sendService;
    
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
    
@@ -113,13 +123,72 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     /*
      * The lock and the things which it guards.
      */
+    
+    /**
+     * The {@link Lock}.
+     */
     private final Lock lock = new ReentrantLock();
-    private final Condition futureReady  = lock.newCondition();
+    
+    /**
+     * {@link Condition} signaled when the {@link #waitFuture} is ready.
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)} awaits this
+     * {@link Condition}. Once signaled, it returns the {@link #waitFuture} to
+     * the caller and clears {@link #waitFuture} to <code>null</code>.
+     * <p>
+     * The {@link Condition}s {@link #messageReady} and {@link #futureRead}
+     * respectively manage the hand off of the message (to the {@link ReadTask})
+     * and the {@link #waitFuture} (to the thread calling
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)}.
+     */
+    private final Condition futureReady = lock.newCondition();
+    
+    /**
+     * {@link Condition} signaled when a new {@link IHAWriteMessage} has been
+     * set on {@link #message} by
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)}.
+     */
     private final Condition messageReady = lock.newCondition();
+    
+    /**
+     * {@link RunState} for the {@link HAReceiveService}. This is used to manage
+     * startup and termination state transitions.
+     */
     private RunState runState = RunState.Start;
-    private IHAWriteMessageBase message;
+    
+    /**
+     * The current {@link IHAWriteMessageBase}. This message provides metadata
+     * about the expected buffer transfer. This field is set by
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)}.
+     */
+    private M message;
+    
+    /**
+     * The current receive buffer. This buffer is populated with data based on
+     * the expected {@link IHAWriteMessage#getSize()}. The data is verified by
+     * comparing the checksum of the buffer to the expected checksum as
+     * specified by {@link IHAWriteMessage#getChk()}.
+     */
     private ByteBuffer localBuffer;
+    
+    /**
+     * {@link Future} for the current buffer transfer used to await the
+     * termination of that transfer by the {@link ReadTask}.
+     * <p>
+     * Note: The {@link #readFuture} is cleared to <code>null</code> as soon as
+     * the buffer transfer is complete.
+     */
     private FutureTask<Void> readFuture;
+    
+    /**
+     * {@link Future} for the current buffer transfer used to await the
+     * termination of that transfer by the thread that calls
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)}.
+     * <p>
+     * Note: The {@link #waitFuture} is cleared to <code>null</code> as soon as
+     * it is returned to the caller. This can occur before the buffer transfer
+     * is complete. Therefore, {@link ReadTask} MUST NOT wait on the
+     * {@link #waitFuture}.
+     */
     private FutureTask<Void> waitFuture;
 
     /**
@@ -127,21 +196,47 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      * transfer will be relayed as it is received (optional and may be
      * <code>null</code>).
      * <p>
-     * Note: This is volatile for visibility in {@link #toString()}, which does
-     * not obtain the {@link #lock}.
+     * Note: This an {@link AtomicReference} for visibility in
+     * {@link #toString()}, which does not obtain the {@link #lock}. The
+     * {@link AtomicReference} also make changes in the downstream service
+     * address visible inside of {@link ReadTask}.
      */
-    private volatile InetSocketAddress addrNext;
+    private final AtomicReference<InetSocketAddress> addrNextRef;
 
+    /*
+     * Note: toString() implementation is non-blocking.
+     */
     public String toString() {
 
         return super.toString() + "{addrSelf=" + addrSelf + ", addrNext="
-                + addrNext + "}";
+                + addrNextRef.get() + "}";
 
     }
 
+    /** The Internet socket address at which this service will listen (immutable) */
+    public InetSocketAddress getAddrSelf() {
+
+        return addrSelf;
+        
+    }
+    
+    /**
+     * The Internet socket address to which this service will relay messages
+     * (dynamic and MAY be <code>null</code>).
+     * 
+     * @see #changeDownStream(InetSocketAddress)
+     */
+    public InetSocketAddress getAddrNext() {
+
+        return addrNextRef.get();
+        
+    }
+    
     /**
      * Create a new service instance - you MUST {@link Thread#start()} the
      * service.
+     * <p>
+     * Note: <i>addrNext</i> can be changed dynamically.
      * 
      * @param addrSelf
      *            The Internet socket address at which this service will listen.
@@ -149,6 +244,8 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      *            The Internet socket address of a downstream service to which
      *            each data transfer will be relayed as it is received
      *            (optional).
+     * 
+     * @see #changeDownStream(InetSocketAddress)
      */
     public HAReceiveService(final InetSocketAddress addrSelf,
             final InetSocketAddress addrNext) {
@@ -173,20 +270,25 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     public HAReceiveService(final InetSocketAddress addrSelf,
             final InetSocketAddress addrNext,
             final IHAReceiveCallback<M> callback) {
-
+        
         if (addrSelf == null)
-         throw new IllegalArgumentException();
+            throw new IllegalArgumentException();
 
         this.addrSelf = addrSelf;
 
-        this.addrNext = addrNext;
+        this.addrNextRef = new AtomicReference<InetSocketAddress>(addrNext);
         
         this.callback = callback;
 
         // Note: Always allocate since the addrNext can change.
-        this.downstream = new HASendService();
+        this.sendService = new HASendService();
 
+        // Thread will not prevent JVM exit.
         setDaemon(true);
+
+        // Give the thread a useful name.
+        setName(HAReceiveService.class.getName() + "@" + hashCode()
+                + "{addrSelf=" + addrSelf + "}");
 
         if (log.isInfoEnabled())
             log.info("Created: " + this);
@@ -225,8 +327,8 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             lock.unlock();
         }
 
-        if (downstream != null)
-            downstream.terminate();
+        if (sendService != null)
+            sendService.terminate();
 
         executor.shutdownNow();
 
@@ -266,22 +368,22 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     }
    
     public void start() {
-    	super.start();
-    	lock.lock();
-    	try {
+        super.start();
+        lock.lock();
+        try {
             // Wait for state change from Start
             while (runState == RunState.Start) {
-            	try {
-					futureReady.await();
-				} catch (InterruptedException e) {
-					// let's go around again
-				}
+                try {
+                    futureReady.await();
+                } catch (InterruptedException e) {
+                    // let's go around again
+                }
             }
         } finally {
             lock.unlock();
         }
     }
-    
+
     public void run() {
         lock.lock();
         try {
@@ -298,7 +400,30 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
              * Open a non-blocking server socket channel and start listening.
              */
             server = ServerSocketChannel.open();
-            server.socket().bind(addrSelf);
+            {
+                /*
+                 * Robustly attempt to bind the address and port where this
+                 * service will listen.
+                 * 
+                 * Note: The retry is here because the port is not freed up
+                 * immediately when we close the existing socket connection
+                 */
+                boolean didBind = false;
+                for (int i = 0; i < 3; i++) {
+                    try {
+                        server.socket().bind(addrSelf);
+                        didBind = true;
+                        break;
+                    } catch (BindException ex) {
+                        log.warn("Sleeping to retry: " + ex);
+                        Thread.sleep(100/* ms */);
+                        continue;
+                    }
+                }
+                if (!didBind) {
+                    server.socket().bind(addrSelf);
+                }
+            }
             server.configureBlocking(false);
             if(log.isInfoEnabled())
                 log.info("Listening on: " + addrSelf);
@@ -331,11 +456,21 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     }
 
     /**
-     * Loops accepting requests and scheduling readTasks. Note that a local
-     * caller must hand us a buffer and {@link IHAWriteMessageBase} using
-     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)} before we will accept
-     * data on the {@link SocketChannel}.
-     *
+     * The client socket connection that was obtained when we accepted the
+     * upstream reader.
+     * <p>
+     * Note: The {@link Client} connection is reused across {@link ReadTask}s.
+     * <p>
+     * Note: Exposed to {@link #changeUpStream()}.
+     */
+    private final AtomicReference<Client> clientRef = new AtomicReference<Client>(null);
+    
+    /**
+     * Loops accepting requests and scheduling {@link ReadTask}s. Note that a
+     * local caller must hand us a buffer and {@link IHAWriteMessageBase} using
+     * {@link #receiveData(IHAWriteMessageBase, ByteBuffer)} before we will
+     * accept data on the {@link SocketChannel}.
+     * 
      * @throws IOException
      * @throws ExecutionException
      * @throws InterruptedException
@@ -343,8 +478,6 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
     private void runNoBlock(final ServerSocketChannel server) throws IOException,
             InterruptedException, ExecutionException {
 
-        final AtomicReference<Client> clientRef = new AtomicReference<Client>();
-        
         try {
 
             while (true) {
@@ -369,12 +502,16 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                         messageReady.await();
                     }
                     
-                    // setup task.
-                    waitFuture = new FutureTask<Void>(new ReadTask(server, clientRef,
-                            message, localBuffer, downstream, addrNext, callback));
-                    readFuture = waitFuture;
-                    message = null;
-                    
+                    // Setup task to read buffer for that message.
+                    readFuture = waitFuture = new FutureTask<Void>(
+                            new ReadTask<M>(server, clientRef, message,
+                                    localBuffer, sendService, addrNextRef,
+                                    callback));
+
+                    // Message cleared once ReadTask started.
+                    message = null; 
+
+                    // [waitFuture] is available for receiveData().
                     futureReady.signal();
 
                 } finally {
@@ -398,18 +535,22 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                  * Note: We might have to wait for the Future to avoid having
                  * more than one ReadTask at a time, but we should log and
                  * ignore any exception and restart the loop.
+                 * 
+                 * The loop needs to keep running. The thread that called
+                 * receiveData() will return the [waitFuture] and will notice
+                 * any exception through that Future.
                  */
                 try {
-                	readFuture.get();
+                    readFuture.get();
                 } catch (Exception e) {
-                	log.warn(e,e);
+                    log.warn(e, e);
                 }
-                
+
                 lock.lockInterruptibly();
                 try {
-                	readFuture = null;
+                    readFuture = null;
                 } finally {
-                	lock.unlock();
+                    lock.unlock();
                 }
 
             } // while(true)
@@ -425,31 +566,37 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
     /**
      * Class encapsulates the connection state for the socket channel used to
-     * read on the upstream client.
+     * receive from on the upstream {@link HASendService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     static private class Client {
 
-        final SocketChannel client;
-        final Selector clientSelector;
-        final SelectionKey clientKey;
+        private final SocketChannel client;
+        private final Selector clientSelector;
+        private final SelectionKey clientKey;
 
-        final HASendService downstream;
+//        /** Used to replicate the message to the downstream service (if any). */
+//        private final HASendService downstream;
         
         /**
          * Gets the client connection and open the channel in a non-blocking
          * mode so we will read whatever is available and loop until all data
          * has been read.
          */
-        public Client(final ServerSocketChannel server,
-                final HASendService downstream, final InetSocketAddress addrNext)
-                throws IOException {
+        public Client(//
+                final ServerSocketChannel server //
+//                , final HASendService downstream //
+//                , final InetSocketAddress addrNext//
+        ) throws IOException {
 
             try {
                 
+                /*
+                 * Note: This binds a port for a specific upstream HASendService
+                 * that will be talking to this HAReceiveService.
+                 */
                 client = server.accept();
                 client.configureBlocking(false);
 
@@ -459,14 +606,14 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                 clientKey = client.register(clientSelector,
                         SelectionKey.OP_READ);
 
-                this.downstream = downstream;
-                
-                // Prepare downstream (if any) for incremental transfers
-                if (addrNext != null) {
-
-                    downstream.start(addrNext);
-                    
-                }
+//                this.downstream = downstream;
+//                
+//                // Prepare downstream (if any) for incremental transfers
+//                if (addrNext != null) {
+//
+//                    downstream.start(addrNext);
+//                    
+//                }
 
             } catch (IOException ex) {
                 
@@ -483,13 +630,13 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             try {
                 client.close();
             } finally {
-                try {
+//                try {
                     clientSelector.close();
-                } finally {
-                    if (downstream != null) {
-                        downstream.terminate();
-                    }
-                }
+//                } finally {
+//                    if (downstream != null) {
+//                        downstream.terminate();
+//                    }
+//                }
             }
         }
 
@@ -504,9 +651,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id: HAReceiveService.java 2826 2010-05-17 11:46:23Z
-     *          martyncutcher $
-     * 
+     *          
      * @todo report counters
      *       <p>
      *       report the #of chunks per payload so we can decide if the private
@@ -528,13 +673,13 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         /**
          * Used to transfer received data to the downstream service (if any).
          */
-        private final HASendService downstream;
+        private final HASendService sendService;
 
         /**
          * The address of the downstream service -or- <code>null</code> iff
          * there is no downstream service.
          */
-        private final InetSocketAddress addrNext;
+        private final AtomicReference<InetSocketAddress> addrNextRef;
         
         /**
          * Optional callback.
@@ -567,16 +712,20 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
          *            The {@link HASendService} used to relay data to the
          *            downstream node.
          * @param addrNext
-         *            The address of the downstream node (optional and
-         *            <code>null</code> if this is the last node in the relay
-         *            chain).
+         *            An {@link AtomicReference} for address of the downstream
+         *            node. The value within that {@link AtomicReference} may be
+         *            updated by
+         *            {@link HAReceiveService#changeDownStream(InetSocketAddress)}
+         *            . That value will be <code>null</code> if this is the last
+         *            node in the write pipeline at the time the value is
+         *            observed.
          * @param callback
          *            An optional callback.
          */
         public ReadTask(final ServerSocketChannel server,
                 final AtomicReference<Client> clientRef, final M message,
                 final ByteBuffer localBuffer, final HASendService downstream,
-                final InetSocketAddress addrNext,
+                final AtomicReference<InetSocketAddress> addrNextRef,
                 final IHAReceiveCallback<M> callback) {
 
             if (server == null)
@@ -594,8 +743,8 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             this.clientRef = clientRef;
             this.message = message;
             this.localBuffer = localBuffer;
-            this.downstream = downstream;
-            this.addrNext = addrNext;
+            this.sendService = downstream;
+            this.addrNextRef = addrNextRef;
             this.callback = callback;
         }
 
@@ -697,13 +846,41 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 //                    SelectionKey.OP_READ);
 
             Client client = clientRef.get();
+
+//            if (client != null) {
+//
+//                /*
+//                 * Note: We need to know when the client connection is no longer
+//                 * valid. The code here does not appear to do the trick.
+//                 * changeUpStream() is handling this instead.
+//                 * 
+//                 * We need to decide whether the client is no longer valid
+//                 * (either because the upstream HASendService has changed (our
+//                 * predecessor in the pipeline might have died) or because it
+//                 * has closed is socket connection to this HAReceiveService).
+//                 * 
+//                 * Either way, we need to establish a client connection using
+//                 * awaitAccept().
+//                 */
+//                if (!client.client.isConnected()) {
+//                    log.warn("Closing old client connection.");
+//                    clientRef.set(client = null);
+//                }
+//
+//            }
+            
             if (client == null) {
 
+                /*
+                 * Accept and the initialize a connection from the upstream
+                 * HASendService.
+                 */
+                
                 // Accept a client connection (blocks)
                 awaitAccept();
 
                 // New client connection.
-                client = new Client(server, downstream, addrNext);
+                client = new Client(server);//, sendService, addrNext);
 
                 // save off reference.
                 clientRef.set(client);
@@ -715,36 +892,56 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
              * begin transferring data from the stream to the writeCache.
              */
             final long begin = System.currentTimeMillis();
-            int rem = message.getSize(); // #of bytes remaining (to be received).
-            while (rem > 0) {
+
+            // #of bytes remaining (to be received).
+            int rem = message.getSize();
+
+            // End of stream flag.
+            boolean EOS = false;
+            
+            while (rem > 0 && !EOS) {
 
                 // block up to the timeout.
                 final int nkeys = client.clientSelector.select(10000/* ms */);
+            
                 if (nkeys == 0) {
+                
                     // Nothing available.
                     final long elapsed = System.currentTimeMillis() - begin;
+                    
                     if (elapsed > 10000) {
                         // Issue warning if we have been blocked for a while.
                         log.warn("Blocked: awaiting " + rem + " out of "
                                 + message.getSize() + " bytes.");
                     }
+                    
                 }
+
                 final Set<SelectionKey> keys = client.clientSelector
                         .selectedKeys();
+                
                 final Iterator<SelectionKey> iter = keys.iterator();
+                
                 while (iter.hasNext()) {
+                
                     iter.next();
                     iter.remove();
 
                     final int rdlen = client.client.read(localBuffer);
+
                     if (log.isTraceEnabled())
-                        log.trace("Read " + rdlen + " bytes of " + (rdlen > 0 ? rem - rdlen : rem) + " bytes remaining.");
+                        log.trace("Read " + rdlen + " bytes of "
+                                + (rdlen > 0 ? rem - rdlen : rem)
+                                + " bytes remaining.");
 
                     if (rdlen > 0)
                         updateChk(rdlen);
 
-                    if (rdlen == -1)
+                    if (rdlen == -1) {
+                        // The stream is closed?
+                        EOS = true;
                         break;
+                    }
 
                     rem -= rdlen;
 
@@ -766,25 +963,42 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                      * The rdlen is checked for non zero to avoid an
                      * IllegalArgumentException. 
                      */
+                    // dereference.
+                    final InetSocketAddress addrNext = addrNextRef.get();
                     if (rdlen != 0 && addrNext != null) {
                         if (log.isTraceEnabled())
-                            log
-                                    .trace("Incremental send of " + rdlen
-                                            + " bytes");
+                            log.trace("Incremental send of " + rdlen + " bytes");
                         final ByteBuffer out = localBuffer.asReadOnlyBuffer();
                         out.position(localBuffer.position() - rdlen);
                         out.limit(localBuffer.position());
+                        synchronized (sendService) {
+                            /*
+                             * Note: Code block is synchronized on [downstream]
+                             * to make the decision to start the HASendService
+                             * that relays to [addrNext] atomic. The
+                             * HASendService uses [synchronized] for its public
+                             * methods so we can coordinate this lock with its
+                             * synchronization API.
+                             */
+                            if (!sendService.isRunning()) {
+                                /*
+                                 * Prepare send service for incremental
+                                 * transfers to the specified address.
+                                 */
+                                sendService.start(addrNext);
+                            }
+                        }
                         // Send and await Future.
-                        downstream.send(out).get();
+                        sendService.send(out).get();
                     }
                 }
 
             } // while( rem > 0 )
 
-            assert localBuffer.position() == message.getSize() : "localBuffer.pos="
-                    + localBuffer.position()
-                    + ", message.size="
-                    + message.getSize();
+            if (localBuffer.position() != message.getSize())
+                throw new IOException("Receive length error: localBuffer.pos="
+                        + localBuffer.position() + ", message.size="
+                        + message.getSize());
 
             // prepare for reading.
             localBuffer.flip();
@@ -818,11 +1032,12 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      *            benefit from NIO efficiencies. This method will own the buffer
      *            until the returned {@link Future} is done.
      * 
-     * @return A future which you can await. The future will become available
-     *         when the data has been transferred into the buffer, at which
-     *         point the position will be ZERO (0) and the limit will be the #of
-     *         bytes received into the buffer. If the data transfer fails or is
-     *         interrupted, the future will report the exception.
+     * @return A {@link Future} which you can await. The {@link Future} will
+     *         become available when the data has been transferred into the
+     *         buffer, at which point the position will be ZERO (0) and the
+     *         limit will be the #of bytes received into the buffer. If the data
+     *         transfer fails or is interrupted, the {@link Future} will report
+     *         the exception.
      * 
      * @throws InterruptedException
      */
@@ -877,7 +1092,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
      * Hook to notice receive events.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * 
      * @param <M>
      */
     public interface IHAReceiveCallback<M extends IHAWriteMessageBase> {
@@ -901,14 +1116,14 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
     /**
      * Change the address to which the payloads are being relayed. This
-     * terminates the embedded {@link HASendService} and then
-     * {@link HASendService#start(InetSocketAddress)}s it with the new address
-     * (if any).
+     * terminates the embedded {@link HASendService}. The {@link HASendService}
+     * will be restarted with the new {@link InetSocketAddress} (if any) by the
+     * {@link ReadTask}.
      * <p>
-     * The {@link ReadTask} will throw out an exception when if there was a
-     * downstream target when the {@link IncSendTask} is interrupted. Since the
-     * {@link ReadTask} lacks the context to issue the appropriate RMI to the
-     * downstream task, the exception must be caught hand handled by the
+     * Note: The {@link ReadTask} will throw out an exception when if there was
+     * a downstream target when the {@link IncSendTask} is interrupted. Since
+     * the {@link ReadTask} lacks the context to issue the appropriate RMI to
+     * the downstream task, the exception must be caught and handled by the
      * {@link WriteCacheService}. It can simply rediscover the new downstream
      * service and then re-submit both the RMI and the {@link WriteCache} block.
      * 
@@ -921,6 +1136,10 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         lock.lock();
         try {
 
+            if (log.isInfoEnabled())
+                log.info("addrNext(old)=" + this.addrNextRef.get()
+                        + ", addrNext(new)=" + addrNext);
+
             if (readFuture != null) {
 
                 // Interrupt the current receive operation.
@@ -928,15 +1147,25 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
 
             }
 
-            // Terminate existing HASendService (if any).
-            downstream.terminate();
+            synchronized (sendService) {
 
-            // Save the new addr.
-            this.addrNext = addrNext;
+                if (sendService.isRunning()) {
+                
+                    // Terminate HASendService (iff running).
+                    sendService.terminate();
+                    
+                }
+                
+            }
+
+            /*
+             * Save the new addr.
+             */
+            this.addrNextRef.set(addrNext);
 
             /*
              * Note: Do not start the service here. It will be started by the
-             * next ReadTask, which will have the new value of addrNext.
+             * next ReadTask, which will have the then current value of addrNext.
              */
 //            if (addrNext != null) {
 //
@@ -952,6 +1181,60 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         }
 
     }
-    
-}
 
+    /**
+     * Method must be invoked when the upstream service is changed. The method
+     * is responsible for interrupting the current {@link RunTask} (if any) and
+     * closing the client socket connection that was used to receive data from
+     * the upstream service. A new connection will be accepted by the next
+     * {@link RunTask}.
+     */
+    public void changeUpStream() {
+
+        lock.lock();
+        try {
+
+            if (log.isInfoEnabled())
+                log.info("");
+
+            if (readFuture != null) {
+
+                // Interrupt the current receive operation.
+                readFuture.cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+            /*
+             * Explicitly close the client socket channel.
+             */
+            {
+            
+                final Client oldClient = clientRef.getAndSet(null);
+
+                if (oldClient != null) {
+
+                    log.warn("Cleared Client reference.");
+                    
+                    try {
+                    
+                        oldClient.client.close();
+                        
+                    } catch (IOException e) {
+                        
+                        log.warn(e, e);
+                        
+                    }
+
+                }
+                
+            }
+            
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
+}

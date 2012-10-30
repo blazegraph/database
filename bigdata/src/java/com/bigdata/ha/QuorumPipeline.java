@@ -37,6 +37,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumMember;
 
 /**
  * A non-remote interface for a member service in a {@link Quorum} defining
@@ -53,6 +54,12 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * leader. The payload is replicated to the first follower in the write
      * pipeline. That follower will accept the payload (and replicate it if
      * necessary) using {@link #receiveAndReplicate(IHAWriteMessage)}.
+     * <p>
+     * Note: The implementation of this method should be robust to changes in
+     * the write pipeline. Specifically, if a follower leaves the write
+     * pipeline, it should attempt to retransmit the message and the payload
+     * while allowing time for the write pipeline to be reconfigured in response
+     * to the related {@link QuorumMember} events.
      * 
      * @param req
      *            A request for an HALog (optional). This is only non-null when
@@ -61,7 +68,9 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * @param msg
      *            The RMI metadata about the payload.
      * @param b
-     *            The payload.
+     *            The payload. The bytes from the position to the limit will be
+     *            transmitted (note that the #of bytes remaining in the buffer
+     *            MUST agree with {@link IHAWriteMessage#getSize()}).
      */
     Future<Void> replicate(IHALogRequest req, IHAWriteMessage msg, ByteBuffer b)
             throws IOException;

@@ -69,6 +69,9 @@ import org.apache.log4j.Logger;
  * unsuccessful send gives us a strong indication of success or failure for the
  * data transfer which is independent of the RMI message and makes it trivial to
  * re-synchronize the {@link HASendService} since it is basically stateless.
+ * <p>
+ * Note: This class exposes its synchronization mechanism to
+ * {@link HAReceiveService}.
  * 
  * @see HAReceiveService
  * 
@@ -82,7 +85,7 @@ public class HASendService {
     /**
      * The Internet socket address of the receiving service.
      */
-    private final AtomicReference<InetSocketAddress> addr = new AtomicReference<InetSocketAddress>();
+    private final AtomicReference<InetSocketAddress> addrNext = new AtomicReference<InetSocketAddress>();
 
     /**
      * A single threaded executor on which {@link SendTask}s will be executed.
@@ -95,9 +98,12 @@ public class HASendService {
      */
 	final private AtomicReference<SocketChannel> socketChannel = new AtomicReference<SocketChannel>();
 
+	/*
+	 * Note: toString() must be thread-safe.
+	 */
     public String toString() {
 
-        return super.toString() + "{addr=" + addr + "}";
+        return super.toString() + "{addrNext=" + addrNext + "}";
         
     }
 
@@ -109,9 +115,9 @@ public class HASendService {
      * 
      * @see #start(InetSocketAddress)
      */
-    public InetSocketAddress getAddr() {
+    public InetSocketAddress getAddrNext() {
         
-        return addr.get();
+        return addrNext.get();
         
     }
     
@@ -139,13 +145,35 @@ public class HASendService {
     }
 
     /**
+     * Return <code>true</code> iff running at the moment this method is
+     * evaluated.
+     */
+    boolean isRunning() {
+
+        return executorRef.get() != null;
+
+    }
+
+//    /**
+//     * Return the address of the receiving service (may be <code>null</code>).
+//     */
+//    InetSocketAddress getAddrNext() {
+//
+//        return addr.get();
+//
+//    }
+    
+    /**
      * Starts a thread which will transfer data to a service listening at the
      * specified {@link InetSocketAddress}. A {@link SocketChannel} will be
      * opened to the specified the connection to the socket specified in the
      * constructor and start the thread pool on which the payloads will be send.
+     * <p>
+     * Note: This class exposes its synchronization mechanism to
+     * {@link HAReceiveService}.
      * 
-     * @param addr
-     *            The Internet socket address of the receiving service.
+     * @param addrNext
+     *            The Internet socket address of the downstream service.
      * 
      * @see #terminate()
      * 
@@ -154,44 +182,53 @@ public class HASendService {
      * @throws IllegalStateException
      *             if this service is already running.
      */
-//    * @throws IOException
-//    *             if the {@link SocketChannel} can not be opened.
-    synchronized public void start(final InetSocketAddress addr)
-//            throws IOException 
-            {
+    synchronized public void start(final InetSocketAddress addrNext) {
 
-        if (addr == null)
+        if (log.isDebugEnabled())
+            log.debug(toString() + " : starting.");
+
+        if (addrNext == null)
             throw new IllegalArgumentException();
-        
-        // already running?
-        if (executorRef.get() != null)
-            throw new IllegalStateException();
-        
-        if (log.isInfoEnabled())
-            log.info(toString());
 
-        this.addr.set(addr);
+        if (executorRef.get() != null) {
+
+            // already running.
+            log.error("Already running.");
+
+            throw new IllegalStateException("Already running.");
+
+        }
+
+        this.addrNext.set(addrNext);
 
         /*
          * Note: leave null until send() so we can lazily connect to the
          * downstream service.
          */
-        this.socketChannel.set(null);//openChannel(addr)
+        this.socketChannel.set(null);// openChannel(addr)
 
         this.executorRef.set(Executors.newSingleThreadExecutor());
-        
+
+        if (log.isInfoEnabled())
+            log.info(toString() + " : running.");
+
     }
 
     /**
      * Immediate shutdown. Any transfer in process will be interrupted. It is
      * safe to invoke this method whether or not the service is running.
+     * <p>
+     * Note: This class exposes its synchronization mechanism to
+     * {@link HAReceiveService}.
      */
     synchronized public void terminate() {
-        if (log.isInfoEnabled())
-            log.info(toString());
+        if (log.isDebugEnabled())
+            log.debug(toString() + " : stopping.");
         final ExecutorService tmp = executorRef.getAndSet(null);
         if (tmp == null) {
             // Not running.
+            if (log.isInfoEnabled())
+                log.info("Service was not running.");
             return;
         }
         try {
@@ -209,16 +246,18 @@ public class HASendService {
             // shutdown executor.
             tmp.shutdownNow();
             // clear address.
-            addr.set(null);
+            addrNext.set(null);
             if (log.isInfoEnabled())
-                log.info(toString());
+                log.info(toString() + " : stopped.");
         }
     }
 
     /**
      * Send the bytes {@link ByteBuffer#remaining()} in the buffer to the
-     * configured {@link InetSocketAddress}. This operation DOES NOT have a side
-     * effect on the position, limit or mark for the buffer.
+     * configured {@link InetSocketAddress}.
+     * <p>
+     * Note: This operation DOES NOT have a side effect on the position, limit
+     * or mark for the buffer.
      * <p>
      * Note: In order to use efficient NIO operations this MUST be a direct
      * {@link ByteBuffer}.
@@ -240,8 +279,8 @@ public class HASendService {
      *       could not be opened.
      */
 	public Future<Void> send(final ByteBuffer buffer) {
-
-        if (buffer == null)
+     
+	    if (buffer == null)
             throw new IllegalArgumentException();
 
         if (buffer.remaining() == 0)
@@ -251,7 +290,7 @@ public class HASendService {
         final ExecutorService tmp = executorRef.get();
         
         if (tmp == null)
-            throw new IllegalStateException();
+            throw new IllegalStateException("Service is not running.");
 
         if (log.isTraceEnabled())
             log.trace("Will send " + buffer.remaining() + " bytes");
@@ -271,7 +310,7 @@ public class HASendService {
                     /*
                      * Open the SocketChannel.
                      * 
-                     * @todo we may have to retry or play with the timeout for
+                     * TODO we may have to retry or play with the timeout for
                      * the socket connect request since the downstream node may
                      * see its pipelineAdd() after the upstream node sees its
                      * pipelineChange() event. For example, given a pipeline
@@ -295,7 +334,7 @@ public class HASendService {
                      * has seen the pipelineChange() event.
                      */
                     
-                    socketChannel.set(sc = openChannel(addr.get()));
+                    socketChannel.set(sc = openChannel(addrNext.get()));
                     
                 } catch (IOException e) {
 
@@ -415,7 +454,8 @@ public class HASendService {
                     nwritten += nbytes;
 
                     if (log.isTraceEnabled())
-                        log.trace("Sent " + nbytes + " bytes with " + nwritten + " of out " + remaining + " written so far");
+                        log.trace("Sent " + nbytes + " bytes with " + nwritten
+                                + " of out " + remaining + " written so far");
 
                 }
 
