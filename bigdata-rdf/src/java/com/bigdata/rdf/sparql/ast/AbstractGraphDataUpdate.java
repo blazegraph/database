@@ -125,10 +125,40 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
             sb.append("\n");
             
             sb.append(s);
+
+            int i = 0;
             
             for(ISPO spo : data) {
             
+                if (i >= 10) {
+                    
+                    /**
+                     * Truncate the description.
+                     * 
+                     * Note: People sometimes push a LOT of data through with a
+                     * DeleteData or InsertData operation. This truncates the
+                     * description to avoid problems with log files or the echo
+                     * of the update operations in a request by the NSS.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/613
+                     *      (SPARQL UPDATE response inlines large DELETE or
+                     *      INSERT triple graphs)
+                     * 
+                     * @see https
+                     *      ://sourceforge.net/projects/bigdata/forums/forum
+                     *      /676946/topic/6092294/index/page/1
+                     */
+                    
+                    sb.append("... out of " + data.length + " statements\n");
+
+                    // Break out of the loop.
+                    break;
+                    
+                }
+                
                 sb.append(spo.toString());
+                
+                i++;
                 
             }
             
