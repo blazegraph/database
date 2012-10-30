@@ -37,41 +37,56 @@ import java.util.UUID;
  */
 public class QuorumStateChangeListenerBase implements QuorumStateChangeListener {
 
+    @Override
     public void memberAdd() {
     }
 
+    @Override
     public void memberRemove() {
     }
 
+    @Override
     public void pipelineAdd() {
     }
 
+    @Override
     public void pipelineRemove() {
     }
 
+    @Override
     public void pipelineElectedLeader() {
-        
     }
     
+    @Override
     public void pipelineChange(final UUID oldDownStreamId,
             final UUID newDownStreamId) {
     }
 
+    @Override
+    public void pipelineUpstreamChange() {
+    }
+
+    @Override
     public void consensus(final long lastCommitTime) {
     }
 
+    @Override
     public void lostConsensus() {
     }
 
+    @Override
     public void quorumBreak() {
     }
 
+    @Override
     public void serviceJoin() {
     }
 
+    @Override
     public void serviceLeave() {
     }
 
+    @Override
     public void quorumMeet(long token, UUID leaderId) {
     }
 

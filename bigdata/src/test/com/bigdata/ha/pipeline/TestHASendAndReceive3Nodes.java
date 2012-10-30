@@ -61,20 +61,20 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	 */
 	private Random r = new Random();
 
-	/**
-	 * Returns random data that will fit in N bytes. N is chosen randomly in
-	 * 1:256.
-	 * 
-	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
-	 *         random length and having random contents.
-	 */
-	public ByteBuffer getRandomData() {
-
-		final int nbytes = r.nextInt(256) + 1;
-
-		return getRandomData(nbytes);
-
-	}
+//	/**
+//	 * Returns random data that will fit in N bytes. N is chosen randomly in
+//	 * 1:256.
+//	 * 
+//	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
+//	 *         random length and having random contents.
+//	 */
+//	public ByteBuffer getRandomData() {
+//
+//		final int nbytes = r.nextInt(256) + 1;
+//
+//		return getRandomData(nbytes);
+//
+//	}
 
 	/**
 	 * Returns random data that will fit in <i>nbytes</i>.
@@ -82,7 +82,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
 	 *         having random contents.
 	 */
-	public ByteBuffer getRandomData(final int nbytes) {
+	private ByteBuffer getRandomData(final int nbytes) {
 
 		final byte[] bytes = new byte[nbytes];
 
@@ -98,7 +98,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
 	 *         having random contents.
 	 */
-	public ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
+	private ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
 
 		final byte[] a = new byte[nbytes];
 
@@ -124,48 +124,97 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 	}
 
-	private HASendService sendService;
-	private HAReceiveService<IHAWriteMessageBase> receiveService1;
-	private HAReceiveService<IHAWriteMessageBase> receiveService2;
+	/** The leader. */
+	private HASendService sendServiceA;
+	
+	/** The first follower. */
+	private HAReceiveService<IHAWriteMessageBase> receiveServiceB;
 
+	/** The second follower (and the end of the pipeline). */
+	private HAReceiveService<IHAWriteMessageBase> receiveServiceC;
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Sets up an HA3 pipeline [A,B,C].
+     */
+    @Override
 	protected void setUp() throws Exception {
 
-		final InetSocketAddress receiveAddr2 = new InetSocketAddress(getPort(0));
+        /*
+         * Setup C at the end of the pipeline.
+         */
+        {
+            
+            final InetSocketAddress receiveAddrC = new InetSocketAddress(
+                    getPort(0));
 
-		receiveService2 = new HAReceiveService<IHAWriteMessageBase>(receiveAddr2, null/* downstream */);
-		receiveService2.start();
+            receiveServiceC = new HAReceiveService<IHAWriteMessageBase>(
+                    receiveAddrC, null/* downstream */);
+            
+            receiveServiceC.start();
+            
+        }
 
-		final InetSocketAddress receiveAddr1 = new InetSocketAddress(getPort(0));
+        /*
+         * Setup B. B is in the middle of the pipeline. It will receive from A
+         * and replicate to C.
+         */
+		{
+		    
+		    final InetSocketAddress receiveAddrB = new InetSocketAddress(getPort(0));
+            
+		    receiveServiceB = new HAReceiveService<IHAWriteMessageBase>(
+                    receiveAddrB, receiveServiceC.getAddrSelf());
+            
+		    receiveServiceB.start();
+		    
+		}
 
-		receiveService1 = new HAReceiveService<IHAWriteMessageBase>(receiveAddr1, receiveAddr2);
-		receiveService1.start();
+        /*
+         * Setup A. A is the leader. It will send messages to B, which will then
+         * replicate them to C.
+         */
+        {
 
-		sendService = new HASendService();
-        sendService.start(receiveAddr1);
+            sendServiceA = new HASendService();
+            
+            sendServiceA.start(receiveServiceB.getAddrSelf());
+            
+        }
 
 		if (log.isInfoEnabled()) {
-			log.info("receiveService1: addr=" + receiveAddr1);
-			log.info("receiveService2: addr=" + receiveAddr2);
-		}
+            
+		    log.info("sendService: addrNext=" + sendServiceA.getAddrNext());
+            
+		    log.info("receiveService1: addrSelf="
+                    + receiveServiceB.getAddrSelf() + ", addrNext="
+                    + receiveServiceB.getAddrNext());
+            
+            log.info("receiveService2: addrSelf="
+                    + receiveServiceC.getAddrSelf() + ", addrNext="
+                    + receiveServiceC.getAddrNext());
+        }
 
 	}
 
+	@Override
 	protected void tearDown() throws Exception {
 
-		if (receiveService1 != null) {
-			receiveService1.terminate();
-			receiveService2 = null;
+		if (receiveServiceB != null) {
+			receiveServiceB.terminate();
+			receiveServiceB = null;
 		}
 
-		if (receiveService2 != null) {
-			receiveService2.terminate();
-			receiveService2 = null;
+		if (receiveServiceC != null) {
+			receiveServiceC.terminate();
+			receiveServiceC = null;
 		}
 
-		if (sendService != null) {
+		if (sendServiceA != null) {
 //            sendService.closeIncSend();
-            sendService.terminate();
-            sendService = null;
+            sendServiceA.terminate();
+            sendServiceA = null;
 		}
 		
 		chk = null;
@@ -202,30 +251,35 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 	}
 
-	public void testSimpleExchange() throws InterruptedException, ExecutionException
+    public void testSimpleExchange() throws InterruptedException,
+            ExecutionException, TimeoutException {
 
-	{
+        final long timeout = 5000; // ms
 		final ByteBuffer tst1 = getRandomData(50);
 		final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
-		final Future<Void> futRec1 = receiveService1.receiveData(msg1, rcv1);
-		final Future<Void> futRec2 = receiveService2.receiveData(msg1, rcv2);
-		final Future<Void> futSnd = sendService.send(tst1);
-		while (!futSnd.isDone() && !futRec2.isDone()) {
-			try {
-				futSnd.get(10L, TimeUnit.MILLISECONDS);
-			} catch (TimeoutException ignore) {
-			}
-			try {
-				futRec2.get(10L, TimeUnit.MILLISECONDS);
-			} catch (TimeoutException ignore) {
-			}
-		}
-		futSnd.get();
-		futRec1.get();
-		futRec2.get();
+		final Future<Void> futRec1 = receiveServiceB.receiveData(msg1, rcv1);
+		final Future<Void> futRec2 = receiveServiceC.receiveData(msg1, rcv2);
+		final Future<Void> futSnd = sendServiceA.send(tst1);
+//		while (!futSnd.isDone() && !futRec2.isDone()) {
+//			try {
+//				futSnd.get(10L, TimeUnit.MILLISECONDS);
+//			} catch (TimeoutException ignore) {
+//			}
+//            try {
+//                futRec1.get(10L, TimeUnit.MILLISECONDS);
+//            } catch (TimeoutException ignore) {
+//            }
+//			try {
+//				futRec2.get(10L, TimeUnit.MILLISECONDS);
+//			} catch (TimeoutException ignore) {
+//			}
+//		}
+		futSnd.get(timeout,TimeUnit.MILLISECONDS);
+		futRec1.get(timeout,TimeUnit.MILLISECONDS);
+		futRec2.get(timeout,TimeUnit.MILLISECONDS);
 		assertEquals(tst1, rcv1);
 		assertEquals(rcv1, rcv2);
 	}
@@ -238,9 +292,9 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
-		final Future<Void> futRec1 = receiveService1.receiveData(msg1, rcv1);
-		final Future<Void> futRec2 = receiveService2.receiveData(msg1, rcv2);
-		final Future<Void> futSnd = sendService.send(tst1);
+		final Future<Void> futRec1 = receiveServiceB.receiveData(msg1, rcv1);
+		final Future<Void> futRec2 = receiveServiceC.receiveData(msg1, rcv2);
+		final Future<Void> futSnd = sendServiceA.send(tst1);
 		while (!futSnd.isDone() && !futRec2.isDone()) {
 			try {
 				futSnd.get(10L, TimeUnit.MILLISECONDS);
@@ -267,14 +321,260 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	}
 
     /**
-     * This test has been observed to deadlock CI and is disabled until we
-     * finish debugging the HA pipeline and quorums. See
-     * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/280>
-     * https://sourceforge.net/apps/trac/bigdata/ticket/280
-     * </a>.
+     * Unit test verifies that we can reconfigure the downstream target in an
+     * HA3 setting.
+     * <p>
+     * The test begins with 3 services [A,B,C] in the pipeline. Service A writes
+     * a message to ensure that the communications channels have been setup and
+     * we verify that the message is received by B and C.
+     * <p>
+     * We then remove (C) from the pipeline, leaving [A,B]. Another message is
+     * written on A and we verify that it is received by B.
+     * <p>
+     * We then add C to the pipeline, which gives us [A,B,C]. Another message is
+     * written on A and we verify that the message is received by both B and C.
+     * <p>
+     * Finally, we remove B from the pipeline, leaving [A,C]. Another message is
+     * written on A and we verify that the message is received by C.
      * 
-     * FIXME When I ramp up the stress test for three nodes to 1000 passes I get
-     * one of the following exceptions repeatedly:
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * @throws IOException
+     * @throws TimeoutException 
+     */
+    public void testPipelineChange() throws InterruptedException,
+            ExecutionException, IOException, TimeoutException {
+
+        final int msgSize = 50;
+        final long timeout = 5000; // milliseconds.
+        final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
+        final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
+
+        /*
+         * Pipeline is [A,B,C]. Write on A. Verify received by {B,C}.
+         */
+        if(true){
+            log.info("Pipeline: [A,B,C]");
+            final ByteBuffer tst1 = getRandomData(msgSize);
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
+                    chk.checksum(tst1));
+            final Future<Void> futRec1 = receiveServiceB
+                    .receiveData(msg1, rcv1);
+            final Future<Void> futRec2 = receiveServiceC
+                    .receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendServiceA.send(tst1);
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec1.get(timeout,TimeUnit.MILLISECONDS);
+            futRec2.get(timeout,TimeUnit.MILLISECONDS);
+            assertEquals(tst1, rcv1);
+            assertEquals(tst1, rcv2);
+        }
+        
+        /*
+         * Remove C from the pipeline, leaving [A,B]. Write on A. Verify
+         * received by B.
+         * 
+         * Note: We do NOT terminate the HAReceiveService for C. It just will
+         * not receive any messages from B.
+         */
+        if(true){
+            log.info("Pipeline: [A,B] (C removed)");
+            receiveServiceB.changeDownStream(null/* addrNext */);
+            receiveServiceC.changeUpStream(); // close upstream socket.
+            
+            final ByteBuffer tst1 = getRandomData(msgSize);
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
+                    chk.checksum(tst1));
+            final Future<Void> futRec1 = receiveServiceB
+                    .receiveData(msg1, rcv1);
+//            final Future<Void> futRec2 = receiveService2
+//                    .receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendServiceA.send(tst1);
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec1.get(timeout,TimeUnit.MILLISECONDS);
+//            futRec2.get();
+            assertEquals(tst1, rcv1);
+//            assertEquals(rcv1, rcv2);
+        }
+
+        /*
+         * Restore C to the pipeline, leaving [A,B,C]. Write on A. Verify
+         * received by [B,C].
+         */
+        if(true){
+            log.info("Pipeline: [A,B,C] (C restored).");
+//            if(false) {
+//                final InetSocketAddress receiveAddrC = receiveServiceC
+//                        .getAddrSelf();
+//                receiveServiceC.terminate();
+//                receiveServiceC = new HAReceiveService<IHAWriteMessageBase>(
+//                        receiveAddrC, null/* downstream */);
+//
+//                receiveServiceC.start();
+//            }
+//            if(false) {
+//                final InetSocketAddress receiveAddrB = receiveServiceB
+//                        .getAddrSelf();
+//                receiveServiceB.terminate();
+//                receiveServiceB = new HAReceiveService<IHAWriteMessageBase>(
+//                        receiveAddrB, receiveServiceC.getAddrSelf());
+//
+//                receiveServiceB.start();
+//            } else {
+                receiveServiceB.changeDownStream(receiveServiceC.getAddrSelf());
+//            }
+//            if(true) {
+//                sendServiceA.terminate();
+////                sendServiceA = new HASendService();
+//                sendServiceA.start(receiveServiceB.getAddrSelf());
+//            }
+
+            final ByteBuffer tst1 = getRandomData(msgSize);
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
+                    chk.checksum(tst1));
+            final Future<Void> futRec1 = receiveServiceB
+                    .receiveData(msg1, rcv1);
+            final Future<Void> futRec2 = receiveServiceC
+                    .receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendServiceA.send(tst1);
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec1.get(timeout,TimeUnit.MILLISECONDS);
+            futRec2.get(timeout,TimeUnit.MILLISECONDS);
+            assertEquals(tst1, rcv1);
+            assertEquals(rcv1, rcv2);
+        }
+
+        /*
+         * Remove B from the pipeline, leaving [A,C]. Write on A. Verify
+         * received by C.
+         * 
+         * Note: We do NOT terminate the HAReceiveService for B. It just will
+         * not receive any messages from A.
+         * 
+         * Note: For this case, we need to stop the HASendService on A and then
+         * re-start() it with the address for C.
+         */
+        if (true) {
+            log.info("Pipeline: [A,C] (B removed)");
+            sendServiceA.terminate();
+            sendServiceA.start(receiveServiceC.getAddrSelf());
+            receiveServiceB.changeUpStream();
+            receiveServiceB.changeDownStream(null/* addrNext */);
+            receiveServiceC.changeUpStream();
+            
+            final ByteBuffer tst1 = getRandomData(msgSize);
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
+                    chk.checksum(tst1));
+//            final Future<Void> futRec1 = receiveService1
+//                    .receiveData(msg1, rcv1);
+            final Future<Void> futRec2 = receiveServiceC
+                    .receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendServiceA.send(tst1);
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+//            futRec1.get();
+            futRec2.get(timeout,TimeUnit.MILLISECONDS);
+//            assertEquals(tst1, rcv1);
+            assertEquals(tst1, rcv2);
+        }
+
+        /*
+         * Add (B) back into the pipeline.
+         */
+        if (true) {
+            log.info("Pipeline: [A,C,B] (B added)");
+            receiveServiceC.changeDownStream(receiveServiceB.getAddrSelf());
+            
+            final ByteBuffer tst1 = getRandomData(msgSize);
+            final IHAWriteMessageBase msg1 = new HAWriteMessageBase(msgSize,
+                    chk.checksum(tst1));
+            final Future<Void> futRec1 = receiveServiceB
+                    .receiveData(msg1, rcv1);
+            final Future<Void> futRec2 = receiveServiceC
+                    .receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendServiceA.send(tst1);
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec1.get(timeout,TimeUnit.MILLISECONDS);
+            futRec2.get(timeout,TimeUnit.MILLISECONDS);
+            assertEquals(tst1, rcv1);
+            assertEquals(tst1, rcv2);
+        }
+
+        /*
+         * Note: For these cases we need to start an HASendService for (C) and
+         * an HAReceiveService for (A).
+         */
+        HASendService sendServiceC = null;
+        HAReceiveService<IHAWriteMessageBase> receiveServiceA = null;
+        try {
+            /*
+             * Fail (A).
+             */
+            if (true) {
+                log.info("Pipeline: [C,B] (A removed - leader fails)");
+                sendServiceA.terminate();
+                sendServiceC = new HASendService();
+                sendServiceC.start(receiveServiceB.getAddrSelf());
+                receiveServiceC.terminate();
+                receiveServiceB.changeUpStream();
+
+                final ByteBuffer tst1 = getRandomData(msgSize);
+                final IHAWriteMessageBase msg1 = new HAWriteMessageBase(
+                        msgSize, chk.checksum(tst1));
+                final Future<Void> futRec1 = receiveServiceB.receiveData(msg1,
+                        rcv1);
+//                final Future<Void> futRec2 = receiveServiceC.receiveData(msg1,
+//                        rcv2);
+                final Future<Void> futSnd = sendServiceC.send(tst1);
+                futSnd.get(timeout, TimeUnit.MILLISECONDS);
+                futRec1.get(timeout, TimeUnit.MILLISECONDS);
+//                futRec2.get(timeout, TimeUnit.MILLISECONDS);
+                assertEquals(tst1, rcv1);
+//                assertEquals(tst1, rcv2);
+            }
+            if(true) {
+                log.info("Pipeline: [C,B,A] (A added)");
+                final InetSocketAddress receiveAddrA = new InetSocketAddress(
+                        getPort(0));
+                receiveServiceA = new HAReceiveService<IHAWriteMessageBase>(
+                        receiveAddrA, null/* downstream */);
+                receiveServiceA.start();
+                receiveServiceB.changeDownStream(receiveServiceA.getAddrSelf());
+
+                final ByteBuffer tst1 = getRandomData(msgSize);
+                final IHAWriteMessageBase msg1 = new HAWriteMessageBase(
+                        msgSize, chk.checksum(tst1));
+                final Future<Void> futRec1 = receiveServiceB.receiveData(msg1,
+                        rcv1);
+                final Future<Void> futRec2 = receiveServiceA.receiveData(msg1,
+                        rcv2);
+                final Future<Void> futSnd = sendServiceC.send(tst1);
+                futSnd.get(timeout, TimeUnit.MILLISECONDS);
+                futRec1.get(timeout, TimeUnit.MILLISECONDS);
+                futRec2.get(timeout, TimeUnit.MILLISECONDS);
+                assertEquals(tst1, rcv1);
+                assertEquals(tst1, rcv2);
+            }
+        } finally {
+            if (sendServiceC != null) {
+                sendServiceC.terminate();
+                sendServiceC = null;
+            }
+            if (receiveServiceA != null) {
+                receiveServiceA.terminate();
+            }
+        }
+        
+    }
+
+    /**
+     * <em>Note: This appears to work now.</em> This test has been observed to
+     * deadlock CI and is disabled until we finish debugging the HA pipeline and
+     * quorums. See <a
+     * href="https://sourceforge.net/apps/trac/bigdata/ticket/280>
+     * https://sourceforge.net/apps/trac/bigdata/ticket/280 </a>.
+     * <p>
+     * When I ramp up the stress test for three nodes to 1000 passes I get one
+     * of the following exceptions repeatedly:
      * <p>
      * (a) trying to reopen the downstream client socket either in the SendTask;
      * 
@@ -316,16 +616,6 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
      */
     public void testStressDirectBuffers() throws InterruptedException {
 
-//        if(true) {
-//            /*
-//             * FIXME HA Test is disabled.
-//             * 
-//             * See https://sourceforge.net/apps/trac/bigdata/ticket/280
-//             */
-//            log.warn("This test has been observed to deadlock CI and is disabled for the moment.");
-//            return;
-//        }
-        
 		IBufferAccess tstdb = null, rcv1db = null, rcv2db = null;
 		int i = -1, sze = -1;
 		try {
@@ -344,9 +634,9 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 				assertEquals(0, tst.position());
 				assertEquals(sze, tst.limit());
 				// FutureTask return ensures remote ready for Socket data
-				final Future<Void> futRec1 = receiveService1.receiveData(msg, rcv1);
-				final Future<Void> futRec2 = receiveService2.receiveData(msg, rcv2);
-				final Future<Void> futSnd = sendService.send(tst);
+				final Future<Void> futRec1 = receiveServiceB.receiveData(msg, rcv1);
+				final Future<Void> futRec2 = receiveServiceC.receiveData(msg, rcv2);
+				final Future<Void> futSnd = sendServiceA.send(tst);
 				while (!futSnd.isDone() && !futRec1.isDone() && !futRec2.isDone()) {
 					try {
 						futSnd.get(10L, TimeUnit.MILLISECONDS);

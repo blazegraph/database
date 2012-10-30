@@ -34,7 +34,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -382,13 +381,6 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     /**
-     * The #of times the leader in a highly available quorum will attempt to
-     * retransmit the current write cache block if there is an error when
-     * sending that write cache block to the downstream node.
-     */
-    protected final int RETRY_COUNT = 3;
-
-    /**
      * Allocates N buffers from the {@link DirectBufferPool}.
      * 
      * @param nbuffers
@@ -523,7 +515,7 @@ abstract public class WriteCacheService implements IWriteCache {
      *         Thompson</a>
      */
     private class WriteTask implements Callable<Void> {
-
+        
         /**
          * Note: If there is an error in this thread then it needs to be
          * propagated to the threads write()ing on the cache or awaiting flush()
@@ -582,6 +574,8 @@ abstract public class WriteCacheService implements IWriteCache {
                         // increment writeCache sequence
                         cache.setSequence(cacheSequence++);
 
+                        final IHAWriteMessage msg;
+                        
                         if (quorum != null && quorum.isHighlyAvailable()) {
 
                             // Verify quorum still valid and we are the leader.
@@ -606,7 +600,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                             assert quorumMember != null : "Not quorum member?";
                             
-                            final IHAWriteMessage msg = cache.newHAWriteMessage(
+                            msg = cache.newHAWriteMessage(
                                     quorumToken,//
                                     quorumMember.getLastCommitCounter(),//
                                     quorumMember.getLastCommitTime()//
@@ -615,8 +609,10 @@ abstract public class WriteCacheService implements IWriteCache {
                             /*
                              * The quorum leader must log the write cache block.
                              * 
-                             * Note: It will be logged exactly once (retry send
-                             * will not re-log the block).
+                             * TODO When adding support for asynchronous
+                             * replication we will have to ensure that the
+                             * followers log the write cache blocks exactly
+                             * once. They currently do this in HAJournalService.
                              */
                             quorumMember.logWriteCacheBlock(msg, b.duplicate());
                             
@@ -624,6 +620,10 @@ abstract public class WriteCacheService implements IWriteCache {
                                     null/* req */, msg, b);
 
                             counters.get().nsend++;
+                            
+                        } else {
+                            
+                            msg = null;
                             
                         }
 
@@ -640,11 +640,23 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         // Wait for the downstream IOs to finish.
                         if (remoteWriteFuture != null) {
-                            try {
+//                            try {
                                 remoteWriteFuture.get();
-                            } catch (ExecutionException ex) {
-                                 retrySend(quorum, cache, ex);
-                            }
+//                            } catch (ExecutionException ex) {
+//                                /*
+//                                 * If there is a problem with the write
+//                                 * pipeline, then try to retransmit the message
+//                                 * and write cache block from the leader. This
+//                                 * handles things such as a service in the
+//                                 * middle that drops out in the middle of some
+//                                 * write set. We can still reach a commit point
+//                                 * when this happens, even if the service is on
+//                                 * of the quorum members (as opposed to just a
+//                                 * service monitoring the pipeline).
+//                                 */
+//                                RetrySendUtil.retrySend(quorumToken, quorum,
+//                                        msg, cache, callback, ex);
+//                            }
                         }
 
                     }
@@ -753,113 +765,6 @@ abstract public class WriteCacheService implements IWriteCache {
             } // while(true)
 
         } // call()
-
-        /**
-         * Robust retransmit of the current cache block. This method is designed
-         * to handle several kinds of recoverable errors, including:
-         * <ul>
-         * <li>downstream service leaves the pipeline</li>
-         * <li>intermittent failure sending the RMI message</li>
-         * <li>intermittent failure sending the payload</li>
-         * </ul>
-         * The basic pattern is that it will retry the operation a few times to
-         * see if there is a repeatable error. Each time it attempts the
-         * operation it will discover the current downstream serviceId and
-         * verify that the quorum is still valid. Each error (including the
-         * first) is logged. If the operation fails, the original error is
-         * rethrown. If the operation succeeds, then the cache block was
-         * successfully transmitted to the current downstream service and this
-         * method returns without error.
-         * 
-         * @param cache
-         *            The cache block.
-         * @param t
-         *            The thrown exception.
-         */
-//        * @param nextIdBefore
-//        *            The {@link UUID} of the downstream service the first time
-//        *            we attempted to send the cache block downstream.
-        private void retrySend(
-                final Quorum<HAPipelineGlue, QuorumMember<HAPipelineGlue>> quorum,
-                final WriteCache cache, final Throwable t) throws Throwable {
-
-            // Log the caller's error.
-            log.error(t,t);
-            
-            // we already tried once.
-            int tryCount = 1;
-            
-            // now try some more times.
-            for (; tryCount < RETRY_COUNT; tryCount++) {
-
-//                // Get prior and next serviceIds in the pipeline.
-//                final UUID[] priorAndNext = quorum
-//                        .getPipelinePriorAndNext(serviceId);
-//
-//                // The next serviceId in the pipeline (if any).
-//                final UUID nextId = (priorAndNext == null ? null
-//                        : priorAndNext[1]);
-//
-//                if (nextIdBefore.equals(nextId)) {
-//
-//                    /*
-//                     * The downstream service has not changed.
-//                     */
-//                    log.error("The downstream service is unchanged : retry="
-//                            + tryCount);
-//
-//                }
-
-                // Verify quorum still valid and we are the leader.
-                quorum.assertLeader(quorumToken);
-
-                /*
-                 * Replicate from the leader to the first follower. Each
-                 * non-final follower will receiveAndReplicate the write cache
-                 * buffer. The last follower will receive the buffer.
-                 */
-
-                // duplicate the write cache's buffer.
-                final ByteBuffer b = cache.peek().duplicate();
-                // final ByteBuffer b = ByteBuffer.allocate(0);
-                
-                // flip(limit=pos;pos=0)
-                b.flip();
-                
-                assert b.remaining() > 0 : "Empty cache: " + cache;
-
-                @SuppressWarnings("unchecked")
-                final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
-                        .getMember();
-
-                final IHAWriteMessage msg = cache.newHAWriteMessage(//
-                        quorumToken,//
-                        quorumMember.getLastCommitCounter(),//
-                        quorumMember.getLastCommitTime()//
-                        );
-                
-                // send to 1st follower.
-                remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
-                        b);
-
-                counters.get().nsend++;
-
-                try {
-                    // wait on the future.
-                    remoteWriteFuture.get();
-                } catch (ExecutionException ex) {
-                    // log and retry.
-                    log.error("retry=" + tryCount + " : " + ex, ex);
-                    continue;
-                }
-                
-            }
-
-            // Rethrow the original exception.
-            throw new RuntimeException("Giving up. Could not send after "
-                    + tryCount + " attempts : " + t, t);
-
-        }
         
     } // class WriteTask
 

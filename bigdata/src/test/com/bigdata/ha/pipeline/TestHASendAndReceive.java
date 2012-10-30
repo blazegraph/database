@@ -55,22 +55,22 @@ public class TestHASendAndReceive extends TestCase3 {
 	/**
 	 * A random number generated - the seed is NOT fixed.
 	 */
-	protected final Random r = new Random();
+	private final Random r = new Random();
 
-	/**
-	 * Returns random data that will fit in N bytes. N is chosen randomly in
-	 * 1:256.
-	 * 
-	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
-	 *         random length and having random contents.
-	 */
-	public ByteBuffer getRandomData() {
-
-		final int nbytes = r.nextInt(256) + 1;
-
-		return getRandomData(nbytes);
-
-	}
+//	/**
+//	 * Returns random data that will fit in N bytes. N is chosen randomly in
+//	 * 1:256.
+//	 * 
+//	 * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
+//	 *         random length and having random contents.
+//	 */
+//	public ByteBuffer getRandomData() {
+//
+//		final int nbytes = r.nextInt(256) + 1;
+//
+//		return getRandomData(nbytes);
+//
+//	}
 
     /**
      * Returns random data that will fit in <i>nbytes</i>.
@@ -78,7 +78,7 @@ public class TestHASendAndReceive extends TestCase3 {
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
      *         having random contents.
      */
-    public ByteBuffer getRandomData(final int nbytes) {
+    private ByteBuffer getRandomData(final int nbytes) {
 
         final byte[] bytes = new byte[nbytes];
 
@@ -94,7 +94,7 @@ public class TestHASendAndReceive extends TestCase3 {
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
      *         having random contents.
      */
-    public ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
+    private ByteBuffer getRandomData(final ByteBuffer b, final int nbytes) {
 
         final byte[] a = new byte[nbytes];
 
@@ -206,27 +206,29 @@ public class TestHASendAndReceive extends TestCase3 {
      * 
      * @throws ExecutionException
      * @throws InterruptedException
+     * @throws TimeoutException 
      */
-    public void testSimpleExchange() throws InterruptedException, ExecutionException {
-       
+    public void testSimpleExchange() throws InterruptedException, ExecutionException, TimeoutException {
+
+        final long timeout = 5000;// ms
         {
             final ByteBuffer tst1 = getRandomData(50);
             final IHAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
             final ByteBuffer rcv = ByteBuffer.allocate(2000);
             final Future<Void> futRec = receiveService.receiveData(msg1, rcv);
             final Future<Void> futSnd = sendService.send(tst1);
-            while (!futSnd.isDone() && !futRec.isDone()) {
-                try {
-                    futSnd.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignore) {
-                }
-                try {
-                    futRec.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignore) {
-                }
-            }
-            futSnd.get();
-            futRec.get();
+//            while (!futSnd.isDone() && !futRec.isDone()) {
+//                try {
+//                    futSnd.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignore) {
+//                }
+//                try {
+//                    futRec.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignore) {
+//                }
+//            }
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst1, rcv);
         }
 
@@ -236,18 +238,18 @@ public class TestHASendAndReceive extends TestCase3 {
             final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
             final Future<Void> futSnd = sendService.send(tst2);
             final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
-            while (!futSnd.isDone() && !futRec.isDone()) {
-                try {
-                    futSnd.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignore) {
-                }
-                try {
-                    futRec.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignore) {
-                }
-            }
-            futSnd.get();
-            futRec.get();
+//            while (!futSnd.isDone() && !futRec.isDone()) {
+//                try {
+//                    futSnd.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignore) {
+//                }
+//                try {
+//                    futRec.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignore) {
+//                }
+//            }
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst2, rcv2);
         }
 
@@ -264,6 +266,7 @@ public class TestHASendAndReceive extends TestCase3 {
     public void testStress() throws TimeoutException, InterruptedException,
             ExecutionException {
 
+        final long timeout = 5000; // ms
         for (int i = 0; i < 100; i++) {
             final int sze = 10000 + r.nextInt(300000);
             final ByteBuffer tst = getRandomData(sze);
@@ -272,18 +275,18 @@ public class TestHASendAndReceive extends TestCase3 {
             // FutureTask return ensures remote ready for Socket data
             final Future<Void> futRec = receiveService.receiveData(msg, rcv);
             final Future<Void> futSnd = sendService.send(tst);
-            while (!futSnd.isDone() && !futRec.isDone()) {
-                try {
-                    futSnd.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignored) {
-                }
-                try {
-                    futRec.get(10L, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ignored) {
-                }
-            }
-            futSnd.get();
-            futRec.get();
+//            while (!futSnd.isDone() && !futRec.isDone()) {
+//                try {
+//                    futSnd.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignored) {
+//                }
+//                try {
+//                    futRec.get(10L, TimeUnit.MILLISECONDS);
+//                } catch (TimeoutException ignored) {
+//                }
+//            }
+            futSnd.get(timeout,TimeUnit.MILLISECONDS);
+            futRec.get(timeout,TimeUnit.MILLISECONDS);
             assertEquals(tst, rcv); // make sure buffer has been transmitted
         }
     }
@@ -296,6 +299,7 @@ public class TestHASendAndReceive extends TestCase3 {
      */
     public void testStressDirectBuffers() throws InterruptedException {
 
+        final long timeout = 5000; // ms
         IBufferAccess tstdb = null, rcvdb = null;
         int i = -1, sze = -1;
         try {
@@ -312,18 +316,18 @@ public class TestHASendAndReceive extends TestCase3 {
                 // FutureTask return ensures remote ready for Socket data
                 final Future<Void> futRec = receiveService.receiveData(msg, rcv);
                 final Future<Void> futSnd = sendService.send(tst);
-                while (!futSnd.isDone() && !futRec.isDone()) {
-                    try {
-                        futSnd.get(10L, TimeUnit.MILLISECONDS);
-                    } catch (TimeoutException ignored) {
-                    }
-                    try {
-                        futRec.get(10L, TimeUnit.MILLISECONDS);
-                    } catch (TimeoutException ignored) {
-                    }
-                }
-                futSnd.get();
-                futRec.get();
+//                while (!futSnd.isDone() && !futRec.isDone()) {
+//                    try {
+//                        futSnd.get(10L, TimeUnit.MILLISECONDS);
+//                    } catch (TimeoutException ignored) {
+//                    }
+//                    try {
+//                        futRec.get(10L, TimeUnit.MILLISECONDS);
+//                    } catch (TimeoutException ignored) {
+//                    }
+//                }
+                futSnd.get(timeout,TimeUnit.MILLISECONDS);
+                futRec.get(timeout,TimeUnit.MILLISECONDS);
                 // make sure buffer has been transmitted
                 assertEquals(tst, rcv);
                 if (log.isInfoEnabled() && (i<10 || i % 10 == 0))

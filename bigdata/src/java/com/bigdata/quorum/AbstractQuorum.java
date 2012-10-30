@@ -2219,9 +2219,17 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             try {
                 /*
                  * Look for the service before/after the one being removed from
-                 * the pipeline. If the service *before* the one being removed
-                 * is our client, then we will notify it that its downstream
-                 * service has changed.
+                 * the pipeline.
+                 * 
+                 * If the service that was remove is out clinet, then we notify
+                 * it that it was removed from the pipeline.
+                 * 
+                 * If the service *before* the one being removed is our client,
+                 * then we will notify it that its downstream service has
+                 * changed.
+                 * 
+                 * If the service *after* the one being removed is our client,
+                 * then we will notify it that its upstream service has changed.
                  */
                 final UUID[] priorNext = getPipelinePriorAndNext(serviceId);
                 if (pipeline.remove(serviceId)) {
@@ -2254,6 +2262,22 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                 client.pipelineChange(
                                         serviceId/* oldDownStream */,
                                         priorNext[1]/* newDownStream */);
+                            } catch (Throwable t) {
+                                launderThrowable(t);
+                            }
+                        }
+                        if (priorNext != null && priorNext[0] != null
+                                && clientId.equals(priorNext[1])) {
+                            /*
+                             * Notify the client that its upstream service was
+                             * removed from the write pipeline but it is NOT the
+                             * first service in the write pipeline. The client
+                             * will need to handle this event by closing the
+                             * client socket connection to the old upstream
+                             * service.
+                             */
+                            try {
+                                client.pipelineUpstreamChange();
                             } catch (Throwable t) {
                                 launderThrowable(t);
                             }

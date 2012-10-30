@@ -84,6 +84,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     }
 
+    @Override
     public boolean isMember() {
         final UUID[] a = getQuorum().getMembers();
         for(UUID t : a) {
@@ -93,6 +94,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return false;
     }
 
+    @Override
     public boolean isPipelineMember() {
         final UUID[] a = getQuorum().getPipeline();
         for(UUID t : a) {
@@ -102,6 +104,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return false;
     }
 
+    @Override
     public boolean isJoinedMember(final long token) {
         final UUID[] a = getQuorum().getJoined();
         for(UUID t : a) {
@@ -123,6 +126,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      *       Right now this is only used by unit tests. Maybe the method should
      *       go away?
      */
+    @Override
     public boolean isLeader(final long token) {
         if (!getServiceId().equals(getQuorum().getLeaderId())) {
             // Not the leader.
@@ -144,6 +148,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      *       Right now this is only used by unit tests. Maybe the method should
      *       go away?
      */
+    @Override
     public boolean isFollower(final long token) {
         final UUID serviceId = getServiceId();
         final UUID[] joined = getQuorum().getJoined();
@@ -173,6 +178,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      *       Right now this is only used by unit tests. Maybe the method should
      *       go away?
      */
+    @Override
     public boolean isLastInChain(final long token) {
         final UUID serviceId = getServiceId();
         final UUID[] pipeline = getQuorum().getPipeline();
@@ -185,6 +191,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return false;
     }
 
+    @Override
     public UUID getDownstreamServiceId() {
         final UUID serviceId = getServiceId();
         final UUID[] pipeline = getQuorum().getPipeline();
@@ -266,72 +273,91 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         
     }
     
+    @Override
     public void memberAdd() {
         for (QuorumStateChangeListener l : listeners) {
             l.memberAdd();
         }
     }
 
+    @Override
     public void memberRemove() {
         for (QuorumStateChangeListener l : listeners) {
             l.memberRemove();
         }
     }
 
+    @Override
     public void pipelineAdd() {
         for (QuorumStateChangeListener l : listeners) {
             l.pipelineAdd();
         }
     }
 
+    @Override
     public void pipelineRemove() {
         for (QuorumStateChangeListener l : listeners) {
             l.pipelineRemove();
         }
     }
 
+    @Override
     public void pipelineElectedLeader() {
         for (QuorumStateChangeListener l : listeners) {
             l.pipelineElectedLeader();
         }
     }
 
+    @Override
 	public void pipelineChange(final UUID oldDownStreamId, final UUID newDownStreamId) {
         for (QuorumStateChangeListener l : listeners) {
             l.pipelineChange(oldDownStreamId, newDownStreamId);
         }
 	}
 
+    @Override
+    public void pipelineUpstreamChange() {
+        for (QuorumStateChangeListener l : listeners) {
+            l.pipelineUpstreamChange();
+        }
+    }
+
+    @Override
     public void consensus(final long lastCommitTime) {
         for (QuorumStateChangeListener l : listeners) {
             l.consensus(lastCommitTime);
         }
     }
 
+    @Override
     public void lostConsensus() {
         for (QuorumStateChangeListener l : listeners) {
             l.lostConsensus();
         }
     }
 
+    @Override
     public void serviceJoin() {
         for (QuorumStateChangeListener l : listeners) {
             l.serviceJoin();
         }
     }
 
+    @Override
     public void serviceLeave() {
         for (QuorumStateChangeListener l : listeners) {
             l.serviceLeave();
         }
     }
 
+    @Override
     public void quorumBreak() {
         for (QuorumStateChangeListener l : listeners) {
             l.quorumBreak();
         }
     }
 
+    @Override
     public void quorumMeet(final long token, final UUID leaderId) {
         for (QuorumStateChangeListener l : listeners) {
             l.quorumMeet(token, leaderId);
