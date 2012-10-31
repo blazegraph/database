@@ -22,8 +22,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -44,7 +42,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -55,21 +52,16 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.ha.HAGlue;
-import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
-import com.bigdata.zookeeper.DumpZookeeper;
 
 /**
  * A status page for the service.
@@ -333,7 +325,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 
 //                final XMLBuilder.Node section = current.node("pre");
                 // flush writer before writing on PrintStream.
-                w.flush();
+                doc.getWriter().flush();
                 
                 // dump onto the response.
                 final PrintWriter out = new PrintWriter(resp.getOutputStream(),
@@ -371,211 +363,8 @@ public class StatusServlet extends BigdataRDFServlet {
                     && ((AbstractJournal) getIndexManager())
                             .isHighlyAvailable()) {
 
-                /*
-                 * Show the interesting things about the quorum.
-                 * 
-                 * 1. QuorumState
-                 * 
-                 * 2. Who is the leader, who is a follower.
-                 * 
-                 * 3. What is the SPARQL end point for each leader and follower
-                 * (where will this be published? HAGlue? HAJournalServer admin
-                 * interface?)
-                 * 
-                 * 4. dumpZoo (into pre element).
-                 * 
-                 * 5. listServices (into pre element).
-                 */
-
-                final AbstractJournal journal = (AbstractJournal) getIndexManager();
-
-                final ZKQuorumImpl<HAGlue, QuorumService<HAGlue>> quorum = (ZKQuorumImpl<HAGlue, QuorumService<HAGlue>>) journal
-                        .getQuorum();
-                
-                // The current token.
-                final long quorumToken = quorum.token();
-
-                // The last valid token.
-                final long lastValidToken = quorum.lastValidToken();
-
-                final int njoined = quorum.getJoined().length;
-                
-                final QuorumService<HAGlue> quorumService = quorum.getClient();
-
-                current.node("h1", "High Availability");
-                
-                // The quorum state.
-                {
-
-                    final XMLBuilder.Node p = current.node("p");
-
-                    p.text("The quorum is "
-                            + (quorum.isQuorumMet() ? "" : "not") + " met.")
-                            .node("br").close();
-                    
-                    p.text("" + njoined + " out of "
-                            + quorum.replicationFactor()
-                            + " services are joined.").node("br").close();
-                    
-                    p.text("quorumToken=" + quorumToken + ", lastValidToken="
-                            + lastValidToken).node("br").close();
-
-                    p.text("logicalServiceId="
-                            + quorumService.getLogicalServiceId()).node("br")
-                            .close();
-
-                    /*
-                     * Report on the Service.
-                     */
-                    {
-                        final File serviceDir = quorumService.getServiceDir();
-                        p.text("ServiceDir: path=" + serviceDir).node("br")
-                                .close();
-                    }
-                    
-                    /*
-                     * Report on the Journal.
-                     */
-                    {
-                        final File file = journal.getFile();
-                        if (file != null) {
-                            p.text("DataDir: path=" + file.getParent())
-                                    .node("br").close();
-                        }
-                    }
-
-                    /*
-                     * Report #of files and bytes in the HALog directory.
-                     */
-                    {
-                        final File haLogDir = quorumService.getHALogDir();
-                        final File[] a = haLogDir
-                                .listFiles(new FilenameFilter() {
-                                    @Override
-                                    public boolean accept(File dir, String name) {
-                                        return name
-                                                .endsWith(HALogWriter.HA_LOG_EXT);
-                                    }
-                                });
-                        int nfiles = 0;
-                        long nbytes = 0L;
-                        for (File file : a) {
-                            nbytes += file.length();
-                            nfiles++;
-                        }
-                        p.text("HALogDir: nfiles=" + nfiles + ", nbytes="
-                                + nbytes + ", path=" + haLogDir).node("br")
-                                .close();
-                    }
-                    p.close();
-
-                    current.node("pre", quorum.toString());
-
-                }
-
-                /*
-                 * Display the NSS port, host, and leader/follower/not-joined
-                 * status for each service in the quorum.
-                 */
-                current.node("h2", "Quorum Services");
-                {
-                    final XMLBuilder.Node p = current.node("p");
-                    
-                    final UUID[] joined = quorum.getJoined();
-
-                    final UUID[] pipeline = quorum.getPipeline();
-
-                    for (UUID serviceId : quorum.getMembers()) {
-
-                        final HAGlue remoteService;
-                        try {
-
-                            remoteService = quorumService.getService(serviceId);
-
-                        } catch (RuntimeException ex) {
-
-                            /*
-                             * Ignore. Might not be an HAGlue instance.
-                             */
-
-                            continue;
-
-                        }
-
-                        /*
-                         * Note: This is not actually reporting the interface
-                         * that the port is exposed to.
-                         */
-
-                        final String hostname = remoteService.getHostname();
-
-                        final int nssPort = remoteService.getNSSPort();
-
-                        final boolean isLeader = serviceId.equals(quorum
-                                .getLeaderId());
-
-                        final boolean isFollower = indexOf(serviceId, joined) > 0;
-
-                        final int pipelineIndex = indexOf(serviceId, pipeline);
-                        
-                        p.text(hostname
-                                + " : nssPort="
-                                + nssPort
-                                + " : "
-                                + (isLeader ? "leader"
-                                        : (isFollower ? "follower"
-                                                : " is not joined"))
-                                + ", pipelineOrder="
-                                + (pipelineIndex == -1 ? " is not in pipeline"
-                                        : pipelineIndex)).node("br").close();
-
-                    }
-
-                    p.close();
-                    
-                }
-
-                // DumpZookeeper
-                {
-                    
-                    current.node("h2", "Zookeeper");
-
-                    // final XMLBuilder.Node section = current.node("pre");
-                    // flush writer before writing on PrintStream.
-                    w.flush();
-
-                    // dump onto the response.
-                    final PrintWriter out = new PrintWriter(
-                            resp.getOutputStream(), true/* autoFlush */);
-
-                    out.print("<pre>\n");
-
-                    try {
-
-                        final DumpZookeeper dump = new DumpZookeeper(
-                                quorum.getZookeeper());
-
-                        dump.dump(out, true/* showDatatrue */,
-                                quorumService.getLogicalServiceId()/* zpath */,
-                                0/* depth */);
-
-                    } catch (InterruptedException e) {
-
-                        e.printStackTrace(out);
-
-                    } catch (KeeperException e) {
-
-                        e.printStackTrace(out);
-
-                    }
-
-                    // flush PrintWriter before resuming writes on Writer.
-                    out.flush();
-
-                    // close section.
-                    out.print("\n</pre>");
-
-                }
+                new HAStatusServletUtil(getIndexManager())
+                        .showQuorum(req, resp, current);
 
             }
             
@@ -1038,34 +827,4 @@ public class StatusServlet extends BigdataRDFServlet {
         });
     }
 
-    /**
-     * Return the index of the given {@link UUID} in the array of {@link UUID}s.
-     * 
-     * @param x
-     *            The {@link UUID}
-     * @param a
-     *            The array of {@link UUID}s.
-     *            
-     * @return The index of the {@link UUID} in the array -or- <code>-1</code>
-     *         if the {@link UUID} does not appear in the array.
-     */
-    static private int indexOf(final UUID x, final UUID[] a) {
-
-        if (x == null)
-            throw new IllegalArgumentException();
-
-        for (int i = 0; i < a.length; i++) {
-
-            if (x.equals(a[i])) {
-
-                return i;
-
-            }
-
-        }
-
-        return -1;
-
-    }
-    
 }

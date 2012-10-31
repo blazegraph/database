@@ -1239,7 +1239,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // buffer the response here.
                 baos = new ByteArrayOutputStream();
 
-                listener = new SparqlUpdateResponseWriter(resp, os, charset,
+                listener = new SparqlUpdateResponseWriter(resp, baos, charset,
                         false/* reportLoadProgress */, false/* flushEachEvent */);
 
             }

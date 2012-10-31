@@ -91,7 +91,7 @@ public class HAJournalServer extends AbstractServer {
     /**
      * Logger for HA events.
      */
-    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
+    private static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
 
     /**
      * Configuration options for the {@link HAJournalServer}.
@@ -583,7 +583,13 @@ public class HAJournalServer extends AbstractServer {
     @Override
     synchronized public void shutdownNow(final boolean destroy) {
 
-        if (keepAlive.compareAndSet(true/* expect */, false/* update */)) {
+        /*
+         * Note: keepAlive will be null if this code is invoked from within the
+         * constructor on the base class (AbstractServer).
+         */
+
+        if (keepAlive != null
+                && keepAlive.compareAndSet(true/* expect */, false/* update */)) {
 
             synchronized (keepAlive) {
 
@@ -1451,23 +1457,27 @@ public class HAJournalServer extends AbstractServer {
                 final long commitCounter = journal.getRootBlockView()
                         .getCommitCounter();
 
-                final HALogWriter logWriter = journal.getHALogWriter();
+                if (HA_LOG_ENABLED) {
 
-                if (msg.getCommitCounter() == logWriter.getCommitCounter()
-                        && msg.getSequence() == (logWriter.getSequence() - 1)) {
+                    final HALogWriter logWriter = journal.getHALogWriter();
 
-                    /*
-                     * Duplicate message. This can occur due retrySend().
-                     * retrySend() is used to make the pipeline robust if a
-                     * service (other than the leader) drops out and we need to
-                     * change the connections between the services in the write
-                     * pipeline in order to get the message through.
-                     */
-                    
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring message (dup): " + msg);
+                    if (msg.getCommitCounter() == logWriter.getCommitCounter()
+                            && msg.getSequence() == (logWriter.getSequence() - 1)) {
 
-                    return;
+                        /*
+                         * Duplicate message. This can occur due retrySend().
+                         * retrySend() is used to make the pipeline robust if a
+                         * service (other than the leader) drops out and we need
+                         * to change the connections between the services in the
+                         * write pipeline in order to get the message through.
+                         */
+
+                        if (log.isInfoEnabled())
+                            log.info("Ignoring message (dup): " + msg);
+
+                        return;
+
+                    }
 
                 }
 
