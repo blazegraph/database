@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
@@ -38,6 +39,7 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
 import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.mdi.IResourceMetadata;
@@ -639,6 +641,30 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 
         return m_store.sendHALogBuffer(req, msg, b);
 
+    }
+
+    @Override
+    public Future<Void> sendRawBuffer(final IHARebuildRequest req,
+            // long commitCounter, long commitTime,
+            final long sequence, final long quorumToken, final long fileExtent,
+            final long offset, final int nbytes, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        return m_store.sendRawBuffer(req, /* commitCounter, commitTime, */
+                sequence, quorumToken, fileExtent, offset, nbytes, b);
+        
+    }
+
+    @Override
+    public Object snapshotAllocators() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void computeDigest(Object snapshot, MessageDigest digest) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
     }
 
     public ByteBuffer readFromLocalStore(final long addr)

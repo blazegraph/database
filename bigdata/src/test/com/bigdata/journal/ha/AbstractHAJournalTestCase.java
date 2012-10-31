@@ -46,7 +46,7 @@ import com.bigdata.LRUNexus;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
-import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractJournalTestCase;
@@ -447,7 +447,7 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
              * WriteCache and let that lay it down onto the disk.
              */
             @Override
-            protected void handleReplicatedWrite(IHALogRequest req,
+            protected void handleReplicatedWrite(IHASyncRequest req,
                     IHAWriteMessage msg, ByteBuffer data) throws Exception {
 
                 

@@ -34,6 +34,7 @@ public class HALogRequest implements IHALogRequest {
 
     private final UUID serviceId;
     private final long commitCounter;
+    private final boolean incremental;
 
     /**
      * @param serviceId
@@ -42,10 +43,12 @@ public class HALogRequest implements IHALogRequest {
      *            The commit counter used to identify the desired commit point
      *            (the commit counter of the closing root block).
      */
-    public HALogRequest(final UUID serviceId, final long commitCounter) {
+    public HALogRequest(final UUID serviceId, final long commitCounter,
+            final boolean incremental) {
 
         this.serviceId = serviceId;
         this.commitCounter = commitCounter;
+        this.incremental = incremental;
 
     }
 
@@ -66,8 +69,15 @@ public class HALogRequest implements IHALogRequest {
     public String toString() {
 
         return getClass() + "{serviceId=" + getServiceId() + ", commitCounter="
-                + getCommitCounter() + "}";
+                + getCommitCounter() + ", incremental=" + isIncremental() + "}";
 
+    }
+
+    @Override
+    public boolean isIncremental() {
+
+        return incremental;
+        
     }
     
 }

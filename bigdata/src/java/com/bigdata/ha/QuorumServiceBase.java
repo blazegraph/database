@@ -39,7 +39,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IResourceManager;
@@ -103,7 +103,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
         addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this) {
 
             @Override
-            protected void handleReplicatedWrite(final IHALogRequest req,
+            protected void handleReplicatedWrite(final IHASyncRequest req,
                     final IHAWriteMessage msg, final ByteBuffer data)
                     throws Exception {
 
@@ -210,7 +210,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 //    }
 
     @Override
-    public Future<Void> receiveAndReplicate(final IHALogRequest req,
+    public Future<Void> receiveAndReplicate(final IHASyncRequest req,
             final IHAWriteMessage msg) throws IOException {
         
         return pipelineImpl.receiveAndReplicate(req, msg);
@@ -218,7 +218,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     }
 
     @Override
-    public Future<Void> replicate(final IHALogRequest req,
+    public Future<Void> replicate(final IHASyncRequest req,
             final IHAWriteMessage msg, final ByteBuffer b) throws IOException {
 
         return pipelineImpl.replicate(req, msg, b);
@@ -229,6 +229,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Core implementation handles the message and payload when received on a
      * service.
      * 
+     * @param req
+     *            The synchronization request (optional). When non-
+     *            <code>null</code> the message and payload are historical data.
+     *            When <code>null</code> they are live data.
      * @param msg
      *            Metadata about a buffer containing data replicated to this
      *            node.
@@ -237,9 +241,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * 
      * @throws Exception
      * 
-     * @see QuorumPipelineImpl#handleReplicatedWrite(IHAWriteMessage, ByteBuffer)
+     * @see QuorumPipelineImpl#handleReplicatedWrite(IHAWriteMessage,
+     *      ByteBuffer)
      */
-    abstract protected void handleReplicatedWrite(IHALogRequest req,
+    abstract protected void handleReplicatedWrite(IHASyncRequest req,
             IHAWriteMessage msg, ByteBuffer data) throws Exception;
  
     /**

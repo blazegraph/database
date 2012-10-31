@@ -56,6 +56,8 @@ import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
@@ -185,7 +187,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+        public Future<Void> receiveAndReplicate(final IHASyncRequest req,
                 final IHAWriteMessage msg) throws IOException {
 
             return ((QuorumPipeline<HAPipelineGlue>) member)
@@ -254,6 +256,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             throw new UnsupportedOperationException();
         }
         
+        @Override
+        public Future<Void> sendHAStore(IHARebuildRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
     } // class MockHAPipelineGlue
 
     /**
@@ -288,7 +296,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             addListener(this.pipelineImpl = new QuorumPipelineImpl<S>(this){
 
-                protected void handleReplicatedWrite(final IHALogRequest req,
+                protected void handleReplicatedWrite(final IHASyncRequest req,
                         final IHAWriteMessage msg, final ByteBuffer data)
                         throws Exception {
 
@@ -400,7 +408,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 //        }
 
         @Override
-        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+        public Future<Void> receiveAndReplicate(final IHASyncRequest req,
                 final IHAWriteMessage msg) throws IOException {
 
             return pipelineImpl.receiveAndReplicate(req, msg);
@@ -408,7 +416,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public Future<Void> replicate(IHALogRequest req,
+        public Future<Void> replicate(IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer b)
                 throws IOException {
 

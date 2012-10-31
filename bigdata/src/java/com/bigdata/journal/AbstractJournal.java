@@ -98,8 +98,10 @@ import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
@@ -1297,14 +1299,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
 	/**
-	 * The delegate that implements the {@link BufferMode}.
+	 * Return the delegate that implements the {@link BufferMode}.
 	 * <p>
 	 * Note: this method MUST NOT check to see whether the journal is open since
 	 * we need to use it if we want to invoke
 	 * {@link IBufferStrategy#deleteResources()} and we can only invoke that
 	 * method once the journal is closed.
 	 */
-	final public IBufferStrategy getBufferStrategy() {
+	public IBufferStrategy getBufferStrategy() {
 
 		return _bufferStrategy;
 
@@ -5540,7 +5542,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Delegated to HAQuorumService.
          */
         @Override
-        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+        public Future<Void> receiveAndReplicate(final IHASyncRequest req,
                 final IHAWriteMessage msg) throws IOException {
 
             if (haLog.isDebugEnabled())
@@ -5569,6 +5571,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         @Override
         public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * This is implemented by HAJournal.
+         */
+        @Override
+        public Future<Void> sendHAStore(IHARebuildRequest msg)
                 throws IOException {
             throw new UnsupportedOperationException();
         }

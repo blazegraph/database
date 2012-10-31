@@ -219,7 +219,7 @@ public class HAStatusServletUtil {
                                 : (isFollower ? "follower"
                                         : " is not joined"))
                         + ", pipelineOrder="
-                        + (pipelineIndex == -1 ? " is not in pipeline"
+                        + (pipelineIndex == -1 ? "N/A"
                                 : pipelineIndex)).node("br").close();
 
             }

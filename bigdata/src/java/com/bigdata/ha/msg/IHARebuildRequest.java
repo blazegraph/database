@@ -24,14 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.ha.msg;
 
 /**
- * Message requesting the root blocks and other metadata for an HA Log file.
+ * Message requesting raw blocks from the backing file for a store.
  */
-public interface IHALogRequest extends IHASyncRequest {
-
-    /**
-     * The commit counter is used to identify the desired commit point (the
-     * commit counter of the closing root block).
-     */
-    long getCommitCounter();
+public interface IHARebuildRequest extends IHASyncRequest {
 
 }

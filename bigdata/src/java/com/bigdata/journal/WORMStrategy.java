@@ -29,6 +29,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -46,7 +47,9 @@ import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -2145,6 +2148,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
     }
 
+    @Override
     public void truncate(final long newExtent) {
 
         final long newUserExtent = newExtent - headerSize;
@@ -2273,6 +2277,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo why is this synchronized? the operation should be safe. maybe
      * against a concurrent close?
      */
+    @Override
     synchronized public long transferTo(final RandomAccessFile out)
             throws IOException {
         
@@ -2302,6 +2307,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * Note: The file is NOT closed and re-opened in a read-only mode in order
      * to avoid causing difficulties for concurrent readers.
      */
+    @Override
     public void closeForWrites() {
 
         // sets the [readOnly] flag.
@@ -2338,10 +2344,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * This implementation can not release storage allocations and invocations
      * of this method are ignored.
      */
+    @Override
 	public void delete(long addr) {
 		// NOP
 	}
 
+    @Override
     public void writeRawBuffer(final IHAWriteMessage msg, final IBufferAccess b)
             throws IOException, InterruptedException {
 
@@ -2415,6 +2423,40 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		return remoteWriteFuture;
 	}
 
+    @Override
+    public Future<Void> sendRawBuffer(final IHARebuildRequest req,
+//            final long commitCounter, final long commitTime,
+            final long sequence, final long quorumToken, final long fileExtent,
+            final long offset, final int nbytes, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        // read direct from store
+        final ByteBuffer clientBuffer = b;
+        clientBuffer.position(0);
+        clientBuffer.limit(nbytes);
+
+        readRaw(nbytes, offset, clientBuffer);
+        
+        assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
+
+        @SuppressWarnings("unchecked")
+        final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) quorum
+                .getMember();
+
+        final int chk = ChecksumUtility.threadChk.get().checksum(b);
+        
+        final IHAWriteMessage msg = new HAWriteMessage(-1L/* commitCounter */,
+                -1L/* commitTime */, sequence, nbytes, chk, StoreTypeEnum.WORM,
+                quorumToken, fileExtent, offset/* firstOffset */);
+
+        final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg,
+                clientBuffer);
+
+        return remoteWriteFuture;
+
+    }
+    
+    @Override
     public void setExtentForLocalStore(final long extent) throws IOException,
             InterruptedException {
 
@@ -2422,10 +2464,23 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
+    @Override
     public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 
         nextOffset.set(rootBlock.getNextOffset());
         
+    }
+
+    @Override
+    public Object snapshotAllocators() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void computeDigest(Object snapshot, MessageDigest digest) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
     }
 
 }

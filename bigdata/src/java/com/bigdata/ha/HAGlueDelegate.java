@@ -37,8 +37,10 @@ import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHAReadRequest;
 import com.bigdata.ha.msg.IHAReadResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.ValidationError;
 
@@ -100,8 +102,8 @@ public class HAGlueDelegate implements HAGlue {
         return delegate.abort2Phase(abortMessage);
     }
 
-    public Future<Void> receiveAndReplicate(IHALogRequest req,
-            IHAWriteMessage msg) throws IOException {
+    public Future<Void> receiveAndReplicate(final IHASyncRequest req,
+            final IHAWriteMessage msg) throws IOException {
         return delegate.receiveAndReplicate(req, msg);
     }
 
@@ -180,6 +182,11 @@ public class HAGlueDelegate implements HAGlue {
     @Override
     public int getNSSPort() throws IOException {
         return delegate.getNSSPort();
+    }
+
+    @Override
+    public Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException {
+        return delegate.sendHAStore(msg);
     }
 
 }

@@ -23,15 +23,46 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
-/**
- * Message requesting the root blocks and other metadata for an HA Log file.
- */
-public interface IHALogRequest extends IHASyncRequest {
+import java.util.UUID;
+
+public class HARebuildRequest implements IHARebuildRequest {
 
     /**
-     * The commit counter is used to identify the desired commit point (the
-     * commit counter of the closing root block).
+     * 
      */
-    long getCommitCounter();
+    private static final long serialVersionUID = 1L;
 
+    private final UUID serviceId;
+
+    /**
+     * @param serviceId
+     *            The {@link UUID} of the service that made the request.
+     */
+    public HARebuildRequest(final UUID serviceId) {
+
+        this.serviceId = serviceId;
+
+    }
+
+    @Override
+    public UUID getServiceId() {
+
+        return serviceId;
+        
+    }
+
+    public String toString() {
+
+        return getClass() + "{serviceId=" + getServiceId() + ", incremental="
+                + isIncremental() + "}";
+
+    }
+
+    @Override
+    final public boolean isIncremental() {
+
+        return false;
+        
+    }
+    
 }
