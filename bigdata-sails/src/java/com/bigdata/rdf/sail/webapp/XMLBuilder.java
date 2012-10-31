@@ -96,6 +96,15 @@ public class XMLBuilder {
 //	    
 //	}
 
+	/**
+	 * Return the backing {@link Writer}.
+	 */
+	public Writer getWriter() {
+	    
+	    return m_writer;
+	    
+	}
+	
 	public XMLBuilder(final Writer w) throws IOException {
 
 		this(true/* xml */, null/* encoding */, w/* writer */);
@@ -184,6 +193,15 @@ public class XMLBuilder {
                             + ")");
 		
 		}
+		
+        /**
+         * Return the {@link XMLBuilder} to which this {@link Node} belongs.
+         */
+        public XMLBuilder getBuilder() {
+
+            return XMLBuilder.this;
+            
+        }
 		
         /**
          * Add an attribute value to an open element head.
