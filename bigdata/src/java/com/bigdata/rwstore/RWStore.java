@@ -63,7 +63,9 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
+import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -83,6 +85,7 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
@@ -5078,6 +5081,97 @@ public class RWStore implements IStore, IBufferedWriter {
         final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg, b);
 
         return remoteWriteFuture;
+
+    }
+
+    /**
+     * @see IHABufferStrategy#sendRawBuffer(IHARebuildRequest, long,
+     *      long, long, long, int, ByteBuffer)
+     */
+    public Future<Void> sendRawBuffer(final IHARebuildRequest req,
+//            final long commitCounter, final long commitTime,
+            final long sequence, final long quorumToken, final long fileExtent,
+            final long offset, final int nbytes, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        // read direct from store
+        final ByteBuffer clientBuffer = b;
+        clientBuffer.position(0);
+        clientBuffer.limit(nbytes);
+
+        readRaw(nbytes, offset, clientBuffer);
+        
+        assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
+
+        @SuppressWarnings("unchecked")
+        final QuorumPipeline<HAPipelineGlue> quorumMember = (QuorumPipeline<HAPipelineGlue>) m_quorum
+                .getMember();
+
+        final int chk = ChecksumUtility.threadChk.get().checksum(b);
+        
+        final IHAWriteMessage msg = new HAWriteMessage(-1L/* commitCounter */,
+                -1L/* commitTime */, sequence, nbytes, chk, StoreTypeEnum.RW,
+                quorumToken, fileExtent, offset/* firstOffset */);
+
+        final Future<Void> remoteWriteFuture = quorumMember.replicate(req, msg,
+                clientBuffer);
+
+        return remoteWriteFuture;
+
+    }
+    
+    /**
+     * Read on the backing file.
+     * 
+     * @param nbytes
+     *            The #of bytes to read.
+     * @param offset
+     *            The offset of the first byte (relative to the start of the
+     *            data region).
+     * @param dst
+     *            Where to put the data. Bytes will be written at position until
+     *            limit.
+     * @return The caller's buffer, prepared for reading.
+     */
+    private ByteBuffer readRaw(final int nbytes, final long offset,
+            final ByteBuffer dst) {
+
+        final Lock readLock = m_extensionLock.readLock();
+        readLock.lock();
+        try {
+
+            try {
+
+                // the offset into the disk file.
+                final long pos = FileMetadata.headerSize0 + offset;
+
+                // read on the disk.
+                final int ndiskRead = FileChannelUtility.readAll(m_reopener,
+                        dst, pos);
+
+                // update performance counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.ndiskRead += ndiskRead;
+                } finally {
+                    c.release();
+                }
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            // flip for reading.
+            dst.flip();
+
+            return dst;
+        } finally {
+
+            readLock.unlock();
+        }
 
     }
 

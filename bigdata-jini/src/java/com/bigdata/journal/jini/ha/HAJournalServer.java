@@ -49,9 +49,12 @@ import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
+import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
@@ -950,11 +953,53 @@ public class HAJournalServer extends AbstractServer {
                 journal.doLocalAbort();
 
                 /*
-                 * FIXME REBUILD : Implement logic to copy all data from
-                 * the leader's journal (except the root block) and then
-                 * apply the HA Log files up to the commit point pinned
-                 * by the readLock.
+                 * Make a note of the root block that is in effect when we being
+                 * the rebuild procedure. Once we have replicated the backing
+                 * store from the leader, we will need to replay all HALog files
+                 * starting with commitCounter+1 for this root block. Once we
+                 * catch up, we can atomically join and lay down the root blocks
+                 * from the leader for the most recent commit point.
                  */
+                final IHARootBlockResponse rootBlockAtStartOfRebuild = leader
+                        .getRootBlock(new HARootBlockRequest(null/* storeUUID */));
+
+                /*
+                 * Replicate the backing store of the leader.
+                 * 
+                 * Note: We are holding a read lock, so committed allocations
+                 * will not be overwritten. However, the replicated backing file
+                 * will not be logically consistent until we apply all HALog
+                 * files since the commit point noted above.
+                 * 
+                 * Note: This remoteFuture MUST be cancelled if the RebuildTask
+                 * is interrupted.
+                 */
+                final Future<Void> remoteFuture = leader
+                        .sendHAStore(new HARebuildRequest(getServiceId()));
+
+                try {
+
+                    // Wait for the raw store to be replicated.
+                    remoteFuture.get();
+                    
+                } finally {
+
+                    // Ensure remoteFuture is cancelled.
+                    remoteFuture.cancel(true/* mayInterruptIfRunning */);
+                    
+                }
+ 
+                /*
+                 * FIXME REBUILD: Apply all HALogs (request each log, and
+                 * apply as received, but DO NOT lay down root blocks or
+                 * go through commit points).
+                 */
+                
+                /*
+                 * FIXME REBUILD: Atomic transition to live and lay down
+                 * the root blocks.
+                 */
+                
                 throw new UnsupportedOperationException();
 
             }
@@ -1208,8 +1253,10 @@ public class HAJournalServer extends AbstractServer {
                 Future<Void> ft = null;
                 try {
 
-                    ft = leader.sendHALogForWriteSet(new HALogRequest(
-                            server.serviceUUID, closingCommitCounter));
+                    ft = leader
+                            .sendHALogForWriteSet(new HALogRequest(
+                                    server.serviceUUID, closingCommitCounter,
+                                    true/* incremental */));
 
                     try {
                     
@@ -1443,7 +1490,7 @@ public class HAJournalServer extends AbstractServer {
         } // class ResyncTask
 
         @Override
-        protected void handleReplicatedWrite(final IHALogRequest req,
+        protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
 
@@ -1457,6 +1504,40 @@ public class HAJournalServer extends AbstractServer {
                 final long commitCounter = journal.getRootBlockView()
                         .getCommitCounter();
 
+                if (req != null && !req.isIncremental()) {
+
+                    /*
+                     * This message and payload are part of a ground up service
+                     * rebuild (disaster recovery from the quorum) rather than
+                     * an incremental resynchronization.
+                     * 
+                     * Note: HALog blocks during rebuild are written onto the
+                     * appropriate HALog file using the same rules that apply to
+                     * resynchronization. We also capture the root blocks for
+                     * those replicate HALog files. However, during a REBUILD,
+                     * we DO NOT go through a local commit for the replicated
+                     * HALog files until the service is fully synchronized. This
+                     * prevents the service from having root blocks that are
+                     * "non-empty" when the file state is not fully consistent
+                     * with the leader.
+                     * 
+                     * Note: Replicaed backing store write blocks MUST be
+                     * written directly onto the backing FileChannel after
+                     * correcting the offset (which is relative to the root
+                     * block). Even for the RWStore, the replicated backing
+                     * store blocks represent a contiguous extent on the file
+                     * NOT scattered writes.
+                     * 
+                     * FIXME REBUILD : Handle replicated HALog write blocks
+                     * 
+                     * FIXME REBUILD : Handle replicated backing store write
+                     * blocks.
+                     */
+
+                    throw new UnsupportedOperationException();
+
+                }
+                
                 if (HA_LOG_ENABLED) {
 
                     final HALogWriter logWriter = journal.getHALogWriter();
@@ -1465,11 +1546,12 @@ public class HAJournalServer extends AbstractServer {
                             && msg.getSequence() == (logWriter.getSequence() - 1)) {
 
                         /*
-                         * Duplicate message. This can occur due retrySend().
-                         * retrySend() is used to make the pipeline robust if a
-                         * service (other than the leader) drops out and we need
-                         * to change the connections between the services in the
-                         * write pipeline in order to get the message through.
+                         * Duplicate message. This can occur due retrySend() in
+                         * QuorumPipelineImpl#replicate(). retrySend() is used
+                         * to make the pipeline robust if a service (other than
+                         * the leader) drops out and we need to change the
+                         * connections between the services in the write
+                         * pipeline in order to get the message through.
                          */
 
                         if (log.isInfoEnabled())
@@ -1488,7 +1570,7 @@ public class HAJournalServer extends AbstractServer {
                      * live and historical) into handleResyncMessage().
                      */
                     
-                    handleResyncMessage(req, msg, data);
+                    handleResyncMessage((IHALogRequest) req, msg, data);
 
                 } else if (commitCounter == msg.getCommitCounter()
                         && isJoinedMember(msg.getQuorumToken())) {

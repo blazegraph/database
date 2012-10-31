@@ -29,9 +29,11 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.concurrent.Future;
 
 import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
@@ -59,6 +61,8 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * Send an {@link IHAWriteMessage} and the associated raw buffer through the
      * write pipeline.
      * 
+     * @param req
+     *            The {@link IHALogRequest} for some HALog file.
      * @param msg
      *            The {@link IHAWriteMessage}.
      * @param b
@@ -72,6 +76,42 @@ public interface IHABufferStrategy extends IBufferStrategy {
      */
     Future<Void> sendHALogBuffer(IHALogRequest req, IHAWriteMessage msg,
             IBufferAccess b) throws IOException, InterruptedException;
+
+    /**
+     * Send an {@link IHAWriteMessage} and the associated raw buffer through the
+     * write pipeline.
+     * 
+     * @param req
+     *            The {@link IHARebuildRequest} to replicate the backing file to
+     *            the requesting service.
+     * @param sequence
+     *            The sequence of this {@link IHAWriteMessage} (origin ZERO
+     *            (0)).
+     * @param quorumToken
+     *            The quorum token of the leader, which must remain valid across
+     *            the rebuild protocol.
+     * @param fileExtent
+     *            The file extent as of the moment that the leader begins to
+     *            replicate the existing backing file.
+     * @param offset
+     *            The starting offset (relative to the root blocks).
+     * @param nbytes
+     *            The #of bytes to be sent.
+     * @param b
+     *            The raw buffer. The buffer will be cleared and filled with the
+     *            specified data, then sent down the write pipeline.
+     * 
+     * @return The {@link Future} for that request.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    Future<Void> sendRawBuffer(IHARebuildRequest req, 
+            //long commitCounter,
+            //long commitTime, 
+            long sequence, long quorumToken, long fileExtent,
+            long offset, int nbytes, ByteBuffer b) throws IOException,
+            InterruptedException;
 
     /**
      * Read from the local store in support of failover reads on nodes in a
@@ -101,5 +141,21 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * to ZERO (0) after each commit or abort.
      */
     long getBlockSequence();
+
+    /**
+     * Snapshot the allocators in preparation for computing a digest of the
+     * committed allocations.
+     * 
+     * @return The snapshot in a format that is backing store specific.
+     */
+    Object snapshotAllocators();
+
+    /**
+     * Compute the digest using the snapshot.
+     * 
+     * @param snapshot
+     *            The allocator snapshot.
+     */
+    void computeDigest(Object snapshot, MessageDigest digest);
 
 }

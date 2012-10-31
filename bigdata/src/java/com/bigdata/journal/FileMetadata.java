@@ -210,7 +210,7 @@ public class FileMetadata {
 	 * blocks. This is used as an offset when computing the index of a record in
 	 * the journal.
 	 */
-	static final int headerSize0 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
+	public static final int headerSize0 = SIZE_MAGIC + SIZE_VERSION + (SIZEOF_ROOT_BLOCK * 2);
 
 	/**
 	 * Depending on the mode, this will be either a direct buffer, a mapped

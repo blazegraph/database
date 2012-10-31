@@ -23,15 +23,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha.msg;
 
+import java.util.UUID;
+
 /**
- * Message requesting the root blocks and other metadata for an HA Log file.
+ * An abstract message for either re-synchronizing (incremental catch up) or
+ * re-building (ground up rebuild).
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public interface IHALogRequest extends IHASyncRequest {
+public interface IHASyncRequest extends IHAMessage {
 
     /**
-     * The commit counter is used to identify the desired commit point (the
-     * commit counter of the closing root block).
+     * When <code>true</code> the request is part of an incremental
+     * re-synchronization. When <code>false</code> the request is part of
+     * a total re-build.
      */
-    long getCommitCounter();
+    boolean isIncremental();
+    
+    /**
+     * The UUID of the service that issued this request.
+     */
+    UUID getServiceId();
 
 }

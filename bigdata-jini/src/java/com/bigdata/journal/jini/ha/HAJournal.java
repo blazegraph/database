@@ -28,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
 import java.util.Properties;
@@ -55,13 +56,16 @@ import com.bigdata.ha.msg.HALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.journal.WORMStrategy;
@@ -221,6 +225,18 @@ public class HAJournal extends Journal {
     HALogWriter getHALogWriter() {
 
         return haLogWriter;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to strengthen the return type.
+     */
+    @Override
+    public IHABufferStrategy getBufferStrategy() {
+        
+        return (IHABufferStrategy) super.getBufferStrategy();
         
     }
     
@@ -550,11 +566,11 @@ public class HAJournal extends Journal {
                 try {
 
                     while (r.hasMoreBuffers()) {
-                    	
-                    	// IHABufferStrategy
-                    	final IHABufferStrategy strategy = (IHABufferStrategy) HAJournal.this
-                        .getBufferStrategy();
-                    	
+
+                        // IHABufferStrategy
+                        final IHABufferStrategy strategy = HAJournal.this
+                                .getBufferStrategy();
+
                         // get message and fill write cache buffer (unless WORM).
                         final IHAWriteMessage msg = r.processNextBuffer(buf.buffer());
                         
@@ -591,6 +607,153 @@ public class HAJournal extends Journal {
 
         }
 
+        /*
+         * FIXME REBUILD: Take a read lock and send everything from the backing
+         * file, but do not include the root blocks. The first buffer can be
+         * short (to exclude the root blocks). That will put the rest of the
+         * buffers on a 1MB boundary which will provide more efficient IOs.
+         */
+        @Override
+        public Future<Void> sendHAStore(final IHARebuildRequest req)
+                throws IOException {
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("req=" + req);
+
+            // Task sends an HALog file along the pipeline.
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                    new SendStoreTask(req));
+
+            // Run task.
+            getExecutorService().submit(ft);
+
+            // Return *ASYNCHRONOUS* proxy (interruptable).
+            return getProxy(ft, true/* asynch */);
+
+        }
+
+        /**
+         * Class sends the backing file along the write pipeline.
+         */
+        private class SendStoreTask implements Callable<Void> {
+            
+            private final IHARebuildRequest req;
+            
+            public SendStoreTask(final IHARebuildRequest req) {
+                
+                if(req == null)
+                    throw new IllegalArgumentException();
+                
+                this.req = req;
+                
+            }
+            
+            public Void call() throws Exception {
+                
+                // The quorum token (must remain valid through this operation).
+                final long quorumToken = getQuorumToken();
+                
+                // Grab a read lock.
+                final long txId = newTx(ITx.READ_COMMITTED);
+                IBufferAccess buf = null;
+                try {
+
+                    try {
+                        // Acquire a buffer.
+                        buf = DirectBufferPool.INSTANCE.acquire();
+                    } catch (InterruptedException ex) {
+                        // Wrap and re-throw.
+                        throw new IOException(ex);
+                    }
+                    
+                    // The backing ByteBuffer.
+                    final ByteBuffer b = buf.buffer();
+
+                    // The capacity of that buffer (typically 1MB).
+                    final int bufferCapacity = b.capacity();
+
+                    // The size of the root blocks (which we skip).
+                    final int headerSize = FileMetadata.headerSize0;
+
+                    /*
+                     * The size of the file at the moment we begin. We will not
+                     * replicate data on new extensions of the file. Those data will
+                     * be captured by HALog files that are replayed by the service
+                     * that is doing the rebuild.
+                     */
+                    final long fileExtent = getBufferStrategy().getExtent();
+
+                    // The #of bytes to be transmitted.
+                    final long totalBytes = fileExtent - headerSize;
+                    
+                    // The #of bytes remaining.
+                    long remaining = totalBytes;
+                    
+                    // The offset (relative to the root blocks).
+                    long offset = 0L;
+                    
+                    long sequence = 0L;
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Sending store file: nbytes=" + totalBytes);
+
+                    while (remaining > 0) {
+
+                        int nbytes = (int) Math.min((long) bufferCapacity,
+                                remaining);
+                        
+                        if (sequence == 0L && nbytes == bufferCapacity
+                                && remaining > bufferCapacity) {
+                            
+                            /*
+                             * Adjust the first block so the remainder will be
+                             * aligned on the bufferCapacity boundaries (IO
+                             * efficiency).
+                             */
+                            nbytes -= headerSize;
+
+                        }
+
+                        if (log.isDebugEnabled())
+                            log.debug("Sending block: sequence=" + sequence
+                                    + ", offset=" + offset + ", nbytes=" + nbytes);
+
+                        getBufferStrategy().sendRawBuffer(req, sequence,
+                                quorumToken, fileExtent, offset, nbytes, b);
+
+                        remaining -= nbytes;
+
+                        sequence++;
+                        
+                    }
+
+                    if (log.isInfoEnabled())
+                        log.info("Sent store file: #blocks=" + sequence
+                                + ", #bytes=" + (fileExtent - headerSize));
+
+                    // Done.
+                    return null;
+
+                } finally {
+                    
+                    if (buf != null) {
+                        try {
+                            // Release the direct buffer.
+                            buf.release();
+                        } catch (InterruptedException e) {
+                            log.warn(e);
+                        }
+                    }
+                    
+                    // Release the read lock.
+                    abort(txId);
+
+                }
+
+            }
+
+        } // class SendStoreTask
+        
         @Override
         public Future<Void> bounceZookeeperConnection() {
             final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {

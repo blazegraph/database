@@ -79,14 +79,16 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
 
     /**
-     * Return a root block for the persistence store. The initial root blocks
-     * are identical, so this may be used to create a new journal in a quorum by
-     * replicating the root blocks of the quorum leader.
+     * Return the then current root block for the persistence store.
+     * <p>
+     * Note: The initial root blocks are identical, so this may be used to
+     * create a new journal in a quorum by replicating the root blocks of the
+     * quorum leader.
      * 
      * @param msg
-     *            The message requesting the root block.
+     *            The message requesting the then current root block.
      * 
-     * @return The root block.
+     * @return The then current root block.
      */
     IHARootBlockResponse getRootBlock(IHARootBlockRequest msg)
             throws IOException;

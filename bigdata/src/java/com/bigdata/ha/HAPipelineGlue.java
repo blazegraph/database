@@ -36,6 +36,8 @@ import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.WriteExecutorService;
@@ -129,7 +131,7 @@ public interface HAPipelineGlue extends Remote {
      * @return The {@link Future} which will become available once the buffer
      *         transfer is complete.
      */
-    Future<Void> receiveAndReplicate(IHALogRequest req, IHAWriteMessage msg)
+    Future<Void> receiveAndReplicate(IHASyncRequest req, IHAWriteMessage msg)
             throws IOException;
 
     /**
@@ -176,4 +178,50 @@ public interface HAPipelineGlue extends Remote {
      */
     Future<Void> sendHALogForWriteSet(IHALogRequest msg) throws IOException;
 
+    /**
+     * Send the raw blocks for the requested backing store across the write
+     * pipeline.
+     * <p>
+     * Note: This method supports disaster recovery of a service from a met
+     * quorum. This procedure can only be used when a met quorum exists.
+     * <p>
+     * Note: DO NOT use a {@link ThickFuture} for the returned {@link Future}.
+     * That will defeat the ability of the requester to cancel the
+     * {@link Future}.
+     * 
+     * @param req
+     *            A request to replicate a backing store.
+     * 
+     * @return A {@link Future} that may be used to cancel the remote process
+     *         sending the data through the write pipeline.
+     */
+    Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException;
+
+    /**
+     * TODO Method to compute a digest for the committed allocations on a
+     * backing store as of the commit point on which the specified transaction
+     * is reading. This may be used to verify that the backing stores are
+     * logically consistent even when they may have some discarded writes that
+     * are not present on all stores (from aborted write sets).
+     * <p>
+     * The caller can get the root blocks for the commit counter associated with
+     * the txId (if we can the readsOnCommitTime).
+     * <p>
+     * The RWStore needs to snapshot the allocators while holding the allocation
+     * lock and that snapshot MUST be for the same commit point. Therefore, this
+     * operation needs to be submitted by the leader in code that can guarantee
+     * that the leader does not go through a commit point. The snapshots should
+     * be stored at the nodes, not shipped to the leader. The leader therefore
+     * needs to know when each snapshot is ready so it can exit the critical
+     * code and permit additional writes (releasing the allocLock or the
+     * semaphore on the journal).
+     * 
+     * <pre>
+     * IHAStoreChecksumRequest {storeUUID, txid (of readLock)}
+     * 
+     * IHAStoreCheckSumResponse {MD5Digest}
+     * </pre>
+     */
+//    Future<IHASnapshotDigestResponse> computeSnapshotDigest(IHASnapshotDigestRequest req) throws IOException;
+    
 }

@@ -16,12 +16,14 @@ import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -222,7 +224,7 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
         }
 
         @Override
-        public Future<Void> receiveAndReplicate(final IHALogRequest req,
+        public Future<Void> receiveAndReplicate(final IHASyncRequest req,
                 IHAWriteMessage msg) throws IOException {
             throw new UnsupportedOperationException();
         }
@@ -238,6 +240,13 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
                 throws IOException {
             throw new UnsupportedOperationException();
         }
+    
+        @Override
+        public Future<Void> sendHAStore(IHARebuildRequest msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
     }
 
     /**

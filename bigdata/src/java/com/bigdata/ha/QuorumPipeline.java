@@ -32,7 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
 import com.bigdata.ha.halog.HALogWriter;
-import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.IRootBlockView;
@@ -62,9 +62,9 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * to the related {@link QuorumMember} events.
      * 
      * @param req
-     *            A request for an HALog (optional). This is only non-null when
-     *            historical {@link WriteCache} blocks are being replayed down
-     *            the write pipeline in order to synchronize a service.
+     *            A synchronization request (optional). This is only non-null
+     *            when historical {@link WriteCache} blocks are being replayed
+     *            down the write pipeline in order to synchronize a service.
      * @param msg
      *            The RMI metadata about the payload.
      * @param b
@@ -72,7 +72,7 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      *            transmitted (note that the #of bytes remaining in the buffer
      *            MUST agree with {@link IHAWriteMessage#getSize()}).
      */
-    Future<Void> replicate(IHALogRequest req, IHAWriteMessage msg, ByteBuffer b)
+    Future<Void> replicate(IHASyncRequest req, IHAWriteMessage msg, ByteBuffer b)
             throws IOException;
 
     /**
@@ -81,13 +81,13 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * master, including the last node in the failover chain.
      * 
      * @param req
-     *            A request for an HALog (optional). This is only non-null when
-     *            historical {@link WriteCache} blocks are being replayed down
-     *            the write pipeline in order to synchronize a service.
+     *            A synchronization request (optional). This is only non-null
+     *            when historical {@link WriteCache} blocks are being replayed
+     *            down the write pipeline in order to synchronize a service.
      * @param msg
      *            The RMI metadata about the payload.
      */
-    Future<Void> receiveAndReplicate(IHALogRequest req, IHAWriteMessage msg)
+    Future<Void> receiveAndReplicate(IHASyncRequest req, IHAWriteMessage msg)
             throws IOException;
 
     /*

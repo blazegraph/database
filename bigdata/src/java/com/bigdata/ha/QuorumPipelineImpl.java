@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.ha.msg.HAWriteMessageBase;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHAMessage;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
@@ -649,10 +650,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
         private static final long serialVersionUID = 1L;
 
-        final IHALogRequest req;
+        final IHASyncRequest req;
         final IHAWriteMessage msg;
         
-        public HAMessageWrapper(final IHALogRequest req,
+        public HAMessageWrapper(final IHASyncRequest req,
                 final IHAWriteMessage msg) {
 
             // Use size and checksum from real IHAWriteMessage.
@@ -720,7 +721,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * This is the leader, so send() the buffer.
      */
     @Override
-    public Future<Void> replicate(final IHALogRequest req,
+    public Future<Void> replicate(final IHASyncRequest req,
             final IHAWriteMessage msg, final ByteBuffer b) throws IOException {
 
         final RunnableFuture<Void> ft;
@@ -751,10 +752,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private class RobustReplicateTask implements Callable<Void> {
 
         /**
-         * An historical message is indicated when the {@link IHALogRequest} is
+         * An historical message is indicated when the {@link IHASyncRequest} is
          * non-<code>null</code>.
          */
-        private final IHALogRequest req;
+        private final IHASyncRequest req;
         
         /**
          * The {@link IHAWriteMessage}.
@@ -786,8 +787,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
          */
         static protected final int RETRY_SLEEP = 50;
 
-        public RobustReplicateTask(final IHALogRequest req, final IHAWriteMessage msg,
-                final ByteBuffer b) {
+        public RobustReplicateTask(final IHASyncRequest req,
+                final IHAWriteMessage msg, final ByteBuffer b) {
             
             // Note: [req] MAY be null.
 
@@ -930,7 +931,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
 
             }
 
-        }
+        } // call()
 
         /**
          * Robust retransmit of the current cache block. This method is designed to
@@ -1010,14 +1011,14 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     static private class SendBufferTask<S extends HAPipelineGlue> implements
             Callable<Void> {
 
-        private final IHALogRequest req;
+        private final IHASyncRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HASendService sendService;
         private final Lock sendLock;
 
-        public SendBufferTask(final IHALogRequest req,
+        public SendBufferTask(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
                 final HASendService sendService, final Lock sendLock) {
@@ -1108,7 +1109,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private final Lock sendLock = new ReentrantLock();
 
     @Override
-    public Future<Void> receiveAndReplicate(final IHALogRequest req,
+    public Future<Void> receiveAndReplicate(final IHASyncRequest req,
             final IHAWriteMessage msg) throws IOException {
 
         final RunnableFuture<Void> ft;
@@ -1198,13 +1199,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
     private static class ReceiveAndReplicateTask<S extends HAPipelineGlue>
             implements Callable<Void> {
         
-        private final IHALogRequest req;
+        private final IHASyncRequest req;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HAReceiveService<HAMessageWrapper> receiveService;
 
-        public ReceiveAndReplicateTask(final IHALogRequest req,
+        public ReceiveAndReplicateTask(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
                 final HAReceiveService<HAMessageWrapper> receiveService) {
@@ -1277,15 +1278,19 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> extends
      * Core implementation handles the message and payload when received on a
      * service.
      * 
+     * @param req
+     *            The synchronization request (optional). When non-
+     *            <code>null</code> the msg and payload are historical data.
+     *            When <code>null</code> they are live data.
      * @param msg
      *            Metadata about a buffer containing data replicated to this
      *            node.
      * @param data
      *            The buffer containing the data.
-     *            
+     * 
      * @throws Exception
      */
-    abstract protected void handleReplicatedWrite(final IHALogRequest req,
+    abstract protected void handleReplicatedWrite(final IHASyncRequest req,
             final IHAWriteMessage msg, final ByteBuffer data) throws Exception;
 
     /**
