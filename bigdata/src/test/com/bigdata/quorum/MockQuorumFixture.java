@@ -733,8 +733,9 @@ public class MockQuorumFixture {
             final MockQuorumWatcher watcher = (MockQuorumWatcher) getWatcher();
             // start the watcher task.
             watcherService.execute(new WatcherTask(watcher));
+            
             // add our watcher as a listener to the fixture's inner quorum.
-            fixture.listeners.add(watcher);
+            fixture.addWatcher(watcher);
             // Save UUID -> QuorumMember mapping on the fixture.
             fixture.known.put(client.getServiceId(), client);
         }
@@ -744,8 +745,9 @@ public class MockQuorumFixture {
             super.terminate();
             // Stop the service accepting events for the watcher.
             watcherService.shutdownNow();
-            // remove our watcher as a listener for the fixture's inner quorum.
-            fixture.listeners.remove(watcher);
+            
+            // remove our watcher as a listener for the fixture's inner quorum.   
+            fixture.removeWatcher(watcher);
         }
 
         /**
@@ -1341,7 +1343,27 @@ public class MockQuorumFixture {
 
     }
 
-    public String toString() {
+    public void removeWatcher(MockQuorumWatcher watcher) {
+        globalSynchronousLock.lock();
+        try {
+        	listeners.remove(watcher);
+        	eventDone.signalAll();
+        } finally {
+        	globalSynchronousLock.unlock();
+        }
+	}
+
+	public void addWatcher(MockQuorumWatcher watcher) {
+        globalSynchronousLock.lock();
+        try {
+            listeners.add(watcher);
+        	eventDone.signalAll();
+        } finally {
+        	globalSynchronousLock.unlock();
+        }
+	}
+
+	public String toString() {
         /*
          * Note: This must run w/o the lock to avoid deadlocks so there may be
          * visibility problems when accessing non-volatile member fields and the
