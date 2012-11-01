@@ -2474,6 +2474,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             "Subquery has queryType=" + subquery.getQueryType());
                 }
                 continue;
+            } else if (child instanceof UnionNode) {
+                @SuppressWarnings("unchecked")
+                final UnionNode unionNode = (UnionNode) child;
+                left = convertUnion(left, unionNode, doneSet, ctx);
+                continue;
             } else if (child instanceof GraphPatternGroup<?>) {
                 /*
                  * Sub-groups, OPTIONAL groups, and UNION.
