@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -644,7 +645,11 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     	
     	private final AST2BOpContext context;
     	
+        private final StaticAnalysis sa;
+    	
     	private final IJoinNode[] ancestry;
+    	
+    	private final Set<IVariable<?>> ancestryVars;
     	
         private final List<StatementPatternNode> spNodes;
 
@@ -750,14 +755,22 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             
             this.context = context;
             
+            this.sa = new StaticAnalysis(queryRoot, context);
+            
             this.ancestry = ancestry;
+            
+            this.ancestryVars = new LinkedHashSet<IVariable<?>>();
             
             this.spNodes = spNodes;
             
             this.arity = spNodes.size();
             
+            if (log.isDebugEnabled()) {
+            	log.debug("arity: " + arity);
+            }
+            
             this.optimistic = optimistic;
-        
+            
             calc();
             
             if (log.isDebugEnabled()) {
@@ -787,6 +800,10 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 used[i] = false;  // not yet evaluated
             }
 
+            if (arity == 0) {
+            	return;
+            }
+            
             if (arity == 1) {
                 order[0] = 0;
                 return;
@@ -800,37 +817,31 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             }
             */
             
-            final Set<IVariable<?>> runFirstVars = new HashSet<IVariable<?>>();
-            
-            int startIndex = 0;
+//            int startIndex = 0;
             
             /*
              * DEAD CODE.  See ASTSearchOptimizer, which lifts the full text
              * search into a ServiceNode.  This is captured by the ancestry
              * code just below.
              */
-            if (false) {
-            	
-            for (int i = 0; i < arity; i++) {
-                final StatementPatternNode pred = spNodes.get(i);
-//            	final IAccessPathExpander expander = pred.getAccessPathExpander();
-                final TermNode p = pred.p();
-                if (p != null && p.isConstant() && p.getValue() != null && p.getValue().equals(BD.SEARCH)) {
-                    if (log.isDebugEnabled()) log.debug("found a run first, tail " + i);
-//                    final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
-//                    while (it.hasNext()) {
-//                    	runFirstVars.add(it.next());
+//            for (int i = 0; i < arity; i++) {
+//                final StatementPatternNode pred = spNodes.get(i);
+////            	final IAccessPathExpander expander = pred.getAccessPathExpander();
+//                final TermNode p = pred.p();
+//                if (p != null && p.isConstant() && p.getValue() != null && p.getValue().equals(BD.SEARCH)) {
+//                    if (log.isDebugEnabled()) log.debug("found a run first, tail " + i);
+////                    final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+////                    while (it.hasNext()) {
+////                    	runFirstVars.add(it.next());
+////                    }
+//                    final TermNode s = pred.s();
+//                    if (s != null && s.isVariable()) {
+//                    	runFirstVars.add((IVariable<?>) s.getValueExpression());
 //                    }
-                    final TermNode s = pred.s();
-                    if (s != null && s.isVariable()) {
-                    	runFirstVars.add((IVariable<?>) s.getValueExpression());
-                    }
-                    order[startIndex++] = i;
-                    used[i] = true;
-                }
-            }
-            
-            }
+//                    order[startIndex++] = i;
+//                    used[i] = true;
+//                }
+//            }
             
             /*
              * Seems like the easiest way to handle the ancestry is the exact
@@ -839,28 +850,24 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
              * give preferential treatment to the predicates that can join
              * on those variables.
              */
-            final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
             for (IJoinNode join : ancestry) {
             	if (log.isDebugEnabled()) {
             		log.debug("considering join node from ancestry: " + join);
             	}
-//            	final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables((BOp) join);
-//        		while (it.hasNext()) {
-//        			runFirstVars.add(it.next());
-//        		}
-            	sa.getDefinitelyProducedBindings(join, runFirstVars, false/* recursive */);
+            	sa.getDefinitelyProducedBindings(join, ancestryVars, false/* recursive */);
             }
             if (log.isDebugEnabled()) {
-            	log.debug("bindings from ancestry: " + Arrays.toString(runFirstVars.toArray()));
+            	log.debug("bindings from ancestry: " + Arrays.toString(ancestryVars.toArray()));
             }
             
-            // if there are no more tails left after the expanders, we're done
-            if (startIndex == arity) {
-            	return;
-            }
+            // LEFTOVER FROM THE OLD DAYS (see above)
+//            // if there are no more tails left after the expanders, we're done
+//            if (startIndex == arity) {
+//            	return;
+//            }
             
-            // if there is only one tail left after the expanders
-            if (startIndex == arity-1) {
+            // if there is only one tail
+            if (arity == 1) {
                 if (log.isDebugEnabled()) log.debug("one tail left");
                 for (int i = 0; i < arity; i++) {
                     // only check unused tails
@@ -873,60 +880,41 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 }            
             }
             
+            /*
+             * See if there is a best tail to run first.  The "run first"
+             * query hint gets priority, then the tails that share variables
+             * with the ancestry.
+             */
             int preferredFirstTail = -1;
-            long minCardinality = Long.MAX_VALUE;
-            // give preferential treatment to a tail that shares variables with the
-            // runFirst expanders. collect all of them up and then choose the one
-            // that has the lowest cardinality
+            
             for (int i = 0; i < arity; i++) {
                 // only check unused tails
                 if (used[i]) {
                     continue;
                 }
-                final StatementPatternNode pred = spNodes.get(i);
                 
                 /*
                  * We need the optimizer to play nice with the run first hint.
+                 * Choose the first "run first" tail we see.
                  */
-                if (pred.getProperty(QueryHints.RUN_FIRST, false)) {
+                if (spNodes.get(i).getProperty(QueryHints.RUN_FIRST, false)) {
                 	preferredFirstTail = i;
                 	break;
                 }
-                
-                if (log.isDebugEnabled()) {
-                	log.debug("considering pred against ancestry: " + pred);
-                }
-                // only test the required joins
-                if (pred.isOptional()) {
-                	continue;
-                }
-                final Set<IVariable<?>> vars = sa.getDefinitelyProducedBindings(
-                		pred, new LinkedHashSet<IVariable<?>>(), false/* recursive */);
-//                Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
-        		final Iterator<IVariable<?>> it = vars.iterator();
-                while (it.hasNext()) {
-                	if (runFirstVars.contains(it.next())) {
-//                		preferredFirstTail = i;
-                		/*
-                		 * We have a shared var with either the run first
-                		 * predicates or with the ancestry.
-                		 */
-                		final long tailCardinality = cardinality(i);
-                		if (tailCardinality < minCardinality) {
-                			preferredFirstTail = i;
-                			minCardinality = tailCardinality; 
-                		}
-                	}
-                }
-//                if (preferredFirstTail != -1)
-//                	break;
             }
+            
+            /*
+             * If there was no "run first" query hint, then go to the ancestry.
+             */
+            if (preferredFirstTail == -1)
+            	preferredFirstTail = getNextTailThatSharesVarsWithAncestry();
+            
             if (log.isDebugEnabled()) {
             	log.debug("preferred first tail: " + preferredFirstTail);
             }
             
-            // if there are only two tails left after the expanders
-            if (startIndex == arity-2) {
+            // special case if there are only two tails
+            if (arity == 2) {
                 if (log.isDebugEnabled()) log.debug("two tails left");
                 int t1 = -1;
                 int t2 = -1;
@@ -958,19 +946,24 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
              * There will be (tails-1) joins, we just need to figure out what
              * they should be.
              */
-            Join join = preferredFirstTail == -1 ? getFirstJoin() : getFirstJoin(preferredFirstTail);
+            Join join;
+            if (preferredFirstTail == -1)
+            	join = getFirstJoin();
+            else
+            	join = getFirstJoin(preferredFirstTail);
+            
             int t1 = ((Tail) join.getD1()).getTail();
             int t2 = ((Tail) join.getD2()).getTail();
             if (preferredFirstTail == -1) {
-    	        order[startIndex] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
-    	        order[startIndex+1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
+    	        order[0] = cardinality(t1) <= cardinality(t2) ? t1 : t2;
+    	        order[1] = cardinality(t1) <= cardinality(t2) ? t2 : t1;
             } else {
-            	order[startIndex] = t1;
-            	order[startIndex+1] = t2;
+            	order[0] = t1;
+            	order[1] = t2;
             }
-            used[order[startIndex]] = true;
-            used[order[startIndex+1]] = true;
-            for (int i = startIndex+2; i < arity; i++) {
+            used[order[0]] = true;
+            used[order[1]] = true;
+            for (int i = 2; i < arity; i++) {
                 join = getNextJoin(join);
                 order[i] = ((Tail) join.getD2()).getTail();
                 used[order[i]] = true;
@@ -1051,7 +1044,6 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 log.debug("evaluating first join");
             }
             
-            
             long minJoinCardinality = Long.MAX_VALUE;
             long minOtherTailCardinality = Long.MAX_VALUE;
             Tail minT2 = null;
@@ -1127,7 +1119,25 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     }
                 }
             }
-            // if we are at the "no shared variables" tails, order by range count
+            
+            /*
+             * If we are at the "no shared variables" tails, the first thing
+             * we do is look to the ancestry for the next tail.
+             */
+            if (minJoinCardinality == NO_SHARED_VARS) {
+            	final int i = getNextTailThatSharesVarsWithAncestry();
+            	if (i >= 0) {
+            		final long tailCardinality = cardinality(i);
+            		minJoinCardinality = tailCardinality;
+                    minTail = new Tail(i, rangeCount(i), getVars(i));
+                    if(log.isDebugEnabled()) log.debug("found a new min: " + tailCardinality);
+            	}
+            }
+            
+            /*
+             * If we are still at the "no shared variables" state, then simply
+             * order by range count and choose the min.
+             */
             if (minJoinCardinality == NO_SHARED_VARS) {
                 minJoinCardinality = Long.MAX_VALUE;
                 for (int i = 0; i < arity; i++) {
@@ -1144,6 +1154,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     }
                 }            
             }
+            
             // the join variables is the union of the join dimensions' variables
             Set<String> vars = new HashSet<String>();
             vars.addAll(d1.getVars());
@@ -1376,6 +1387,68 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 }
             }
             return false;
+        }
+        
+        /**
+         * Check to see if the specified tail shares any variables with the
+         * ancestry.
+         */
+        protected boolean sharesVarsWithAncestry(final int tail) {
+        	
+            final Set<IVariable<?>> tailVars = sa.getDefinitelyProducedBindings(
+            		spNodes.get(tail), new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+
+            return !Collections.disjoint(ancestryVars, tailVars);
+            
+        }
+        
+        /**
+         * Get the next tail (unused, non-optional) that shares a var with the
+         * ancestry.  If there are many, choose the one with the lowest
+         * cardinality.  Return -1 if none are found.
+         */
+        protected int getNextTailThatSharesVarsWithAncestry() {
+
+        	int nextTail = -1;
+            long minCardinality = Long.MAX_VALUE;
+            
+            // give preferential treatment to a tail that shares variables with the
+            // ancestry. collect all of them up and then choose the one
+            // that has the lowest cardinality
+            for (int i = 0; i < arity; i++) {
+                // only check unused tails
+                if (used[i]) {
+                    continue;
+                }
+                
+                if (log.isDebugEnabled()) {
+                	log.debug("considering tail: " + spNodes.get(i));
+                }
+                
+                // only test the required joins
+                if (spNodes.get(i).isOptional()) {
+                	continue;
+                }
+                
+                if (log.isDebugEnabled()) {
+                	log.debug("vars: " + Arrays.toString(getVars(i).toArray()));
+                }
+                
+                if (sharesVarsWithAncestry(i)) {
+            		/*
+            		 * We have a shared var with the ancestry.
+            		 */
+            		final long tailCardinality = cardinality(i);
+            		if (tailCardinality < minCardinality) {
+            			nextTail = i;
+            			minCardinality = tailCardinality; 
+            		}
+                }
+                
+            }
+            
+            return nextTail;
+
         }
         
         /**
