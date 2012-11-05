@@ -280,8 +280,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public BooleanQuery prepareBooleanQuery(QueryLanguage ql, String query,
 			String baseURI) throws RepositoryException, MalformedQueryException {
 		
-		throw new UnsupportedOperationException("baseURI not supported");
+        if (baseURI != null)
+            throw new UnsupportedOperationException("baseURI not supported");
 		
+        return prepareBooleanQuery(ql, query);
+        
 	}
 
 	@Override
@@ -384,7 +387,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public GraphQuery prepareGraphQuery(QueryLanguage ql, String query,
 			String baseURI) throws RepositoryException, MalformedQueryException {
 
-		throw new UnsupportedOperationException("baseURI not supported");
+        if (baseURI != null)
+            throw new UnsupportedOperationException("baseURI not supported.");
+
+        return prepareGraphQuery(ql, query);    
 		
 	}
 
@@ -400,8 +406,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public Query prepareQuery(QueryLanguage ql, String query, String baseURI)
 			throws RepositoryException, MalformedQueryException {
 
-		throw new UnsupportedOperationException("baseURI not supported");
-		
+        if (baseURI != null)
+            throw new UnsupportedOperationException("baseURI not supported");
+
+        return prepareQuery(ql, query);
+
 	}
 
 	@Override
@@ -504,8 +513,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public TupleQuery prepareTupleQuery(QueryLanguage ql, String query,
 			String baseURI) throws RepositoryException, MalformedQueryException {
 
-		throw new UnsupportedOperationException("baseURI not supported");
-		
+        if (baseURI != null)
+            throw new UnsupportedOperationException("baseURI not supported.");
+
+        return prepareTupleQuery(ql, query);	
 	}
 
 	@Override
@@ -933,8 +944,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	public Update prepareUpdate(QueryLanguage ql, String query, String baseURI)
 			throws RepositoryException, MalformedQueryException {
 
-		throw new UnsupportedOperationException("baseURI not supported");
-		
+	    if (baseURI != null)
+            throw new UnsupportedOperationException("baseURI not supported");
+        
+        return prepareUpdate(ql, query);
+
 	}
 	
 	@Override
