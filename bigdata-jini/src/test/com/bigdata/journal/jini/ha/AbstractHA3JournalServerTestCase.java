@@ -61,8 +61,6 @@ import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
-import sun.security.jca.ServiceId;
-
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.RunState;
 import com.bigdata.jini.start.IServiceListener;
@@ -1149,7 +1147,7 @@ public class AbstractHA3JournalServerTestCase extends
             private final String TEST_SERVICE_DIR = "test.serviceDir";
             
             /**
-             * Used to override the {@link ServiceId} in the deployed
+             * Used to override the {@link ServiceID} in the deployed
              * configuration.
              */
             private final String TEST_SERVICE_ID = "test.serviceId";
