@@ -30,12 +30,10 @@ package com.bigdata.quorum.zk;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooDefs.Ids;
 
-import com.bigdata.quorum.AbstractQuorumTestCase;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.zookeeper.AbstractZooTestCase;
@@ -132,17 +130,17 @@ abstract public class AbstractZkQuorumTestCase extends AbstractZooTestCase {
         super.tearDown();
     }
 
-    protected void assertCondition(final Runnable cond, final long timeout,
-            final TimeUnit units) {
-
-        AbstractQuorumTestCase.assertCondition(cond, timeout, units);
-
-    }
-
-    protected void assertCondition(final Runnable cond) {
-
-        AbstractQuorumTestCase.assertCondition(cond, 5, TimeUnit.SECONDS);
-
-    }
+//    protected void assertCondition(final Runnable cond, final long timeout,
+//            final TimeUnit units) {
+//
+//        AbstractQuorumTestCase.assertCondition(cond, timeout, units);
+//
+//    }
+//
+//    protected void assertCondition(final Runnable cond) {
+//
+//        AbstractQuorumTestCase.assertCondition(cond, 5, TimeUnit.SECONDS);
+//
+//    }
 
 }

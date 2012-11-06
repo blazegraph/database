@@ -37,8 +37,20 @@ import com.bigdata.jini.start.process.ProcessHelper;
  */
 public interface IServiceListener {
 
-    public void add(ProcessHelper service);
+    /**
+     * Message indicates that a child process is being started.
+     * 
+     * @param h
+     *            The {@link ProcessHelper} for that child process.
+     */
+    public void add(ProcessHelper h);
 
-    public void remove(ProcessHelper service);
+    /**
+     * Message indicates that the corresponding child process has died.
+     * 
+     * @param h
+     *            The {@link ProcessHelper} for that child process.
+     */
+    public void remove(ProcessHelper h);
 
 }

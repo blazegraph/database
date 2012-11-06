@@ -913,9 +913,6 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
 
     /**
      * Mock implementation used by some unit tests.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static private class ServiceListener implements IServiceListener {
 

@@ -33,8 +33,6 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQL11SyntaxTest;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
@@ -100,7 +98,9 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         suite.addTestSuite(TestMultiGraphs.class);
         
         suite.addTestSuite(TestInlineValues.class);
-        
+
+        suite.addTestSuite(TestConcurrentKBCreate.class);
+
         suite.addTestSuite(TestTxCreate.class);
         
         suite.addTestSuite(TestChangeSets.class);

@@ -26,12 +26,20 @@ package com.bigdata.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.rmi.RemoteException;
+import java.security.DigestException;
+import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHADigestRequest;
+import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
+import com.bigdata.ha.msg.IHALogDigestRequest;
+import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
@@ -185,8 +193,31 @@ public class HAGlueDelegate implements HAGlue {
     }
 
     @Override
+    public RunState getRunState() throws IOException {
+        return delegate.getRunState();
+    }
+
+    @Override
     public Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException {
         return delegate.sendHAStore(msg);
+    }
+
+    @Override
+    public IHADigestResponse computeDigest(final IHADigestRequest req)
+            throws IOException, NoSuchAlgorithmException, DigestException {
+        return delegate.computeDigest(req);
+    }
+
+    @Override
+    public IHALogDigestResponse computeHALogDigest(final IHALogDigestRequest req)
+            throws IOException, NoSuchAlgorithmException, DigestException {
+        return delegate.computeHALogDigest(req);
+    }
+
+    @Override
+    public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
+            throws IOException, TimeoutException, InterruptedException {
+        return delegate.globalWriteLock(req);
     }
 
 }

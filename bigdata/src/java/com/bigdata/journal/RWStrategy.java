@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -662,9 +663,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
     }
 
     @Override
-    public void computeDigest(Object snapshot, MessageDigest digest) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+    public void computeDigest(final Object snapshot, final MessageDigest digest)
+            throws DigestException, IOException {
+
+        m_store.computeDigest(snapshot, digest);
+
     }
 
     public ByteBuffer readFromLocalStore(final long addr)

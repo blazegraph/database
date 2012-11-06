@@ -31,12 +31,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -1209,7 +1206,7 @@ public class RemoteRepository {
         
         final StringBuilder urlString = new StringBuilder(opts.serviceURL);
 
-        addQueryParams(urlString, opts.requestParams);
+        ConnectOptions.addQueryParams(urlString, opts.requestParams);
 
         if (log.isDebugEnabled()) {
             log.debug("*** Request ***");
@@ -1353,33 +1350,6 @@ public class RemoteRepository {
 
         return response;
         
-    }
-
-    /**
-     * Add any URL query parameters.
-     */
-    private void addQueryParams(final StringBuilder urlString,
-            final Map<String, String[]> requestParams)
-            throws UnsupportedEncodingException {
-        if (requestParams == null)
-            return;
-        boolean first = true;
-        for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
-            urlString.append(first ? "?" : "&");
-            first = false;
-            final String name = e.getKey();
-            final String[] vals = e.getValue();
-            if (vals == null) {
-                urlString.append(URLEncoder.encode(name, UTF8));
-            } else {
-                for (String val : vals) {
-                    urlString.append(URLEncoder.encode(name, UTF8));
-                    urlString.append("=");
-                    urlString.append(URLEncoder.encode(val, UTF8));
-                }
-            }
-        } // next Map.Entry
-
     }
 
     protected static String getResponseBody(final HttpResponse response)

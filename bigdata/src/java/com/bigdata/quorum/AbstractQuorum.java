@@ -1681,10 +1681,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
 
         private void conditionalClearToken() throws InterruptedException {
-            if (token == NO_QUORUM) {
+            final long oldValue = token;
+            if (oldValue == NO_QUORUM) {
                 return;
             }
-            final long oldValue = token;
             doClearToken();
             while (token == oldValue && client != null) {
                 quorumChange.await();

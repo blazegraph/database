@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -13,9 +13,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.InnerCause;
 
 /**
  * Task creates a KB for the given namespace iff no such KB exists.
@@ -46,7 +47,16 @@ public class CreateKBTask implements Callable<Void> {
             
         } catch (Throwable t) {
 
-            log.error(t, t);
+            if (InnerCause.isInnerCause(t, AsynchronousQuorumCloseException.class)) {
+
+                // The quorum is closed, so we stopped trying.
+                log.warn(t);
+
+            } else {
+
+                log.error(t, t);
+
+            }
 
             throw new Exception(t);
             

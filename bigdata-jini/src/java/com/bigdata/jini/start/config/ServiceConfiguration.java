@@ -680,7 +680,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * 
          * @see ProcessBuilder#environment()
          */
-        protected void setUpEnvironment(Map<String, String> env) {
+        protected void setUpEnvironment(final Map<String, String> env) {
             
             // NOP
             
@@ -766,7 +766,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * successfully.
          * <p>
          * Note: <strong>This DOES NOT provide direct confirmation that the
-         * service is running in a non-error and available for answering
+         * service is running in a non-error mode and available for answering
          * requests.</strong> You SHOULD override this method if you have a
          * service specific means of obtaining such confirmation.
          * 
@@ -779,9 +779,9 @@ abstract public class ServiceConfiguration implements Serializable {
                 final long timeout, final TimeUnit unit) throws Exception {
 
             try {
+                
                 final int exitValue = processHelper.exitValue(timeout, unit);
                 
-
                 throw new IOException("exitValue=" + exitValue);
 
             } catch (TimeoutException ex) {

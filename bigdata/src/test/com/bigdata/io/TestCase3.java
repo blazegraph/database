@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.TestHelper;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
@@ -174,5 +176,78 @@ public class TestCase3 extends TestCase2 {
 	    return BytesUtil.getBytes(buf);
 
 	}
+
+    
+    /**
+     * Wait up to a timeout until some condition succeeds.
+     * 
+     * @param cond
+     *            The condition, which must throw an
+     *            {@link AssertionFailedError} if it does not succeed.
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     * 
+     * @throws AssertionFailedError
+     *             if the condition does not succeed within the timeout.
+     */
+    static public void assertCondition(final Runnable cond,
+            final long timeout, final TimeUnit units) {
+        final long begin = System.nanoTime();
+        final long nanos = units.toNanos(timeout);
+        long remaining = nanos;
+        // remaining = nanos - (now - begin) [aka elapsed]
+        remaining = nanos - (System.nanoTime() - begin);
+        while (true) {
+            try {
+                // try the condition
+                cond.run();
+                // success.
+                return;
+            } catch (final AssertionFailedError e) {
+                remaining = nanos - (System.nanoTime() - begin);
+                if (remaining < 0) {
+                    // Timeout - rethrow the failed assertion.
+                    throw e;
+                }
+                // Sleep up to 10ms or the remaining nanos, which ever is less.
+                final int millis = (int) Math.min(
+                        TimeUnit.NANOSECONDS.toMillis(remaining), 10);
+                if (millis > 0) {
+                    // sleep and retry.
+                    try {
+                        Thread.sleep(millis);
+                    } catch (InterruptedException e1) {
+                        // propagate the interrupt.
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    remaining = nanos - (System.nanoTime() - begin);
+                    if (remaining < 0) {
+                        // Timeout - rethrow the failed assertion.
+                        throw e;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Waits up to 5 seconds for the condition to succeed.
+     * 
+     * @param cond
+     *            The condition, which must throw an
+     *            {@link AssertionFailedError} if it does not succeed.
+     * 
+     * @throws AssertionFailedError
+     *             if the condition does not succeed within the timeout.
+     * 
+     * @see #assertCondition(Runnable, long, TimeUnit)
+     */
+    static public void assertCondition(final Runnable cond) {
+        
+        assertCondition(cond, 5, TimeUnit.SECONDS);
+        
+    }
 
 }

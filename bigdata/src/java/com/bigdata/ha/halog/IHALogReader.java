@@ -25,6 +25,8 @@ package com.bigdata.ha.halog;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.DigestException;
+import java.security.MessageDigest;
 
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -80,5 +82,12 @@ public interface IHALogReader {
 	 *            A buffer from the {@link DirectBufferPool#INSTANCE}.
 	 */
 	IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer) throws IOException;
+
+    /**
+     * Compute the digest. If the {@link IHALogReader} is backed by the live
+     * HALog, then only the digest of the then current extent will be computed.
+     */
+    void computeDigest(MessageDigest digest) throws DigestException,
+            IOException;
 
 }

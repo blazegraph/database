@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.rmi.RemoteException;
+import java.security.DigestException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -48,6 +50,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -87,12 +90,18 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HAReadResponse;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HARootBlockResponse;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
+import com.bigdata.ha.msg.IHADigestRequest;
+import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
+import com.bigdata.ha.msg.IHALogDigestRequest;
+import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
@@ -4693,7 +4702,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             throw new AssertionError();
             
         }
-        
+
         /*
          * Both a meet and a break require an exclusive write lock.
          */
@@ -5016,6 +5025,38 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             throw new UnsupportedOperationException();
             
+        }
+
+        @Override
+        public RunState getRunState() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        @Override
+        public IHADigestResponse computeDigest(final IHADigestRequest req)
+                throws IOException, NoSuchAlgorithmException, DigestException {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        @Override
+        public IHALogDigestResponse computeHALogDigest(
+                final IHALogDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        @Override
+        public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
+                throws IOException, TimeoutException, InterruptedException {
+
+            throw new UnsupportedOperationException();
+
         }
 
         /**

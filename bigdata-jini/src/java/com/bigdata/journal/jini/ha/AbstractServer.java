@@ -44,6 +44,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -75,6 +77,7 @@ import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.RunState;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
@@ -124,12 +127,19 @@ import com.sun.jini.start.ServiceStarter;
  * the Jini service browser. Note that all persistent data associated with that
  * service is also destroyed!
  * 
- * TODO This class was cloned from the com.bigdata.service.jini package.
+ * <p>
+ * Note: This class was cloned from the com.bigdata.service.jini package.
  * Zookeeper support was stripped out and the class was made to align with a
  * write replication pipeline for {@link HAJournal} rather than with a
  * federation of bigdata services. However, {@link HAGlue} now extends
  * {@link IService} and we are using zookeeper, so maybe we can line these base
- * classes up again?
+ * classes up again? The timing of service destroy and service shutdown has been
+ * modified. The {@link ServiceID} is now properly taken from the file if it was
+ * set there (the original code might or might not have been correct in this
+ * regard). This needs to be reconciled with the federation. The federation uses
+ * ephemeral sequential to create the logical service identifiers. Here they are
+ * being assigned manually. This is basically the "flex" versus "static" issue
+ * and would also need to be reconciled.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -301,6 +311,17 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * {@link NonActivatableServiceDescriptor}.
      */
     private LifeCycle lifeCycle;
+
+    /**
+     * The {@link RunState} for the server.
+     */
+    final private AtomicReference<RunState> runState;
+
+    /**
+     * {@link AtomicBoolean} serves as both a condition variable and the monitor
+     * on which we wait.
+     */
+    final private AtomicBoolean keepAlive = new AtomicBoolean(true);
 
     /**
      * The exported proxy for the service implementation object.
@@ -525,6 +546,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     protected AbstractServer(final String[] args, final LifeCycle lifeCycle) {
         
+        runState = new AtomicReference<RunState>(RunState.Start);
+        
         // Show the copyright banner during startup.
         Banner.banner();
 
@@ -572,7 +595,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             // convert Entry[] to a mutable list.
             entries = new LinkedList<Entry>(
                     Arrays.asList((Entry[]) jiniClientConfig.entries));
-
+            
             if (log.isInfoEnabled())
                 log.info(jiniClientConfig.toString());
 
@@ -600,6 +623,32 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             // The file on which the ServiceID will be written.
             serviceIdFile = new File(serviceDir, "service.id");
 
+            if (serviceIdFile.exists()) {
+
+                try {
+
+                    // Read from file, set on class.
+                    this.serviceID = readServiceId(serviceIdFile);
+
+                    if (log.isInfoEnabled())
+                        log.info("Existing service instance: serviceID="
+                                + serviceID);
+
+                } catch (IOException ex) {
+
+                    fatal("Could not read serviceID from existing file: "
+                            + serviceIdFile + ": " + this, ex);
+                    throw new AssertionError();// keeps compiler happy.
+
+                }
+
+            } else {
+
+                if (log.isInfoEnabled())
+                    log.info("New service instance.");
+
+            }
+
             // The lock file.
             lockFile = new File(serviceDir, ".lock");
 
@@ -621,8 +670,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 String serviceName = null;
                 
                 String hostname = null;
-                
-                UUID serviceUUID = null;
+
+                /*
+                 * If the ServiceID was read from the serviceId file, then we
+                 * want to use that ServiceID and not whatever was in the
+                 * Configuration.
+                 */
+                UUID serviceUUID = this.serviceID == null ? null : JiniUtil
+                        .serviceID2UUID(this.serviceID);
                 
                 for (Entry e : entries) {
 
@@ -692,7 +747,33 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 // if serviceUUID assigned then set ServiceID from it now.
                 if (serviceUUID != null) {
 
-                    // set serviceID.
+                    if (this.serviceID != null) {
+
+                        // Convert ServiceID read from Configuration.
+                        final ServiceID tmp = JiniUtil
+                                .uuid2ServiceID(serviceUUID);
+
+                        if (!this.serviceID.equals(tmp)) {
+
+                            /*
+                             * This is a paranoia check on the Configuration and
+                             * the serviceIdFile. The ServiceID should never
+                             * change so these values should remain in
+                             * agreement.
+                             */
+
+                            throw new ConfigurationException(
+                                    "ServiceID in Configuration does not agree with the value in "
+                                            + serviceIdFile
+                                            + " : Configuration=" + tmp
+                                            + ", but expected ="
+                                            + this.serviceID);
+
+                        }
+                        
+                    }
+
+                    // Set serviceID.
                     this.serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
 
                     if (!serviceIdFile.exists()) {
@@ -758,48 +839,6 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                             new BasicILFactory())
                     );
 
-            if (serviceIdFile.exists()) {
-
-                try {
-
-                    final ServiceID serviceIDFromFile = readServiceId(serviceIdFile);
-
-                    if (this.serviceID == null) {
-
-                        // set field on class.
-                        this.serviceID = serviceIDFromFile;
-
-                    } else if (!this.serviceID.equals(serviceIDFromFile)) {
-
-                        /*
-                         * This is a paranoia check on the Configuration and the
-                         * serviceIdFile. The ServiceID should never change so
-                         * these values should remain in agreement.
-                         */
-
-                        throw new ConfigurationException(
-                                "ServiceID in Configuration does not agree with the value in "
-                                        + serviceIdFile + " : Configuration="
-                                        + this.serviceID + ", serviceIdFile="
-                                        + serviceIDFromFile);
-
-                    }
-
-                } catch (IOException ex) {
-
-                    fatal("Could not read serviceID from existing file: "
-                            + serviceIdFile + ": " + this, ex);
-                    throw new AssertionError();// keeps compiler happy.
-
-                }
-
-            } else {
-
-                if (log.isInfoEnabled())
-                    log.info("New service instance.");
-
-            }
-
         } catch (ConfigurationException ex) {
 
             fatal("Configuration error: " + this, ex);
@@ -813,8 +852,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          * Note: This is setup before we start any async threads, including
          * service discovery.
          */
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
-                
+        Runtime.getRuntime().addShutdownHook(
+                new ShutdownThread(false/* destroy */, this));
+
         try {
 
             /*
@@ -1399,233 +1439,272 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      *            When <code>true</code> the persistent state associated with
      *            the service is also destroyed.
      */
-    synchronized public void shutdownNow(final boolean destroy) {
-     
-        if (shuttingDown) {
-            
-            // break recursion.
-            return;
-            
-        }
-        
-        shuttingDown = true;
-        
-        /*
-         * Unexport the proxy, making the service no longer available.
-         * 
-         * Note: If you do not do this then the client can still make requests
-         * even after you have terminated the join manager and the service is no
-         * longer visible in the service browser.
-         */
-        try {
-        
-            if (log.isInfoEnabled())
-                log.info("Unexporting the service proxy.");
+    final protected void shutdownNow(final boolean destroy) {
 
-            unexport(true/* force */);
-
-        } catch (Throwable ex) {
-
-            log.error("Problem unexporting service: " + this, ex);
-
-            /* Ignore */
-
-        }
-
-        if (destroy && impl != null && impl instanceof IService) {
-
-            final IService tmp = (IService) impl;
+        // Atomically change RunState.
+        if (!runState.compareAndSet(RunState.Start, RunState.ShuttingDown)
+                && !runState.compareAndSet(RunState.Running,
+                        RunState.ShuttingDown)) {
 
             /*
-             * Delegate to the service to destroy its persistent state.
-             */
-
-            try {
-
-                tmp.destroy();
-
-            } catch (Throwable ex) {
-
-                log.error("Problem with service destroy: " + this, ex);
-
-                // ignore.
-
-            }
-
-        }
-        
-        /*
-         * Invoke the service's own logic to shutdown its processing.
-         */
-        if (impl != null && impl instanceof IServiceShutdown) {
-
-            try {
-                
-                final IServiceShutdown tmp = (IServiceShutdown) impl;
-
-                if (tmp != null && tmp.isOpen()) {
-
-                    /*
-                     * Note: The test on isOpen() for the service is deliberate.
-                     * The service implementations invoke server.shutdownNow()
-                     * from their shutdown() and shutdownNow() methods in order
-                     * to terminate the jini facets of the service. Therefore we
-                     * test in service.isOpen() here in order to avoid a
-                     * recursive invocation of service.shutdownNow().
-                     */
-
-                    tmp.shutdownNow();
-                    
-                }
-                
-            } catch(Throwable ex) {
-                
-                log.error("Problem with service shutdown: " + this, ex);
-                
-                // ignore.
-                
-            } 
-            
-        }
-        
-        // discard reference to the service implementation object.
-        impl = null;
-        
-        /*
-         * Terminate manager threads.
-         */
-        
-        try {
-
-            terminate();
-        
-        } catch (Throwable ex) {
-            
-            log.error("Could not terminate async threads (jini, zookeeper): "
-                    + this, ex);
-            
-            // ignore.
-
-        }
-
-        /*
-         * Hand-shaking with the NonActivableServiceDescriptor.
-         */
-        if (lifeCycle != null) {
-            
-            try {
-
-                lifeCycle.unregister(this);
-
-            } catch (Throwable ex) {
-
-                log.error("Could not unregister lifeCycle: " + this, ex);
-
-                // ignore.
-
-            } finally {
-
-                lifeCycle = null;
-
-            }
-
-        }
-        
-        if(destroy) {
-
-            // Delete any files that we recognize in the service directory.
-            recursiveDelete(serviceDir);
-
-            /*
-             * Delete files created by this class.
-             */
-            
-            // delete the serviceId file.
-            if (serviceIdFile.exists() && !serviceIdFile.delete()) {
-
-                log.warn("Could not delete: " + serviceIdFile);
-
-            }
-
-            // delete the pid file.
-            if (pidFile.exists() && !pidFile.delete()) {
-
-                log.warn("Could not delete: " + pidFile);
-
-            }
-
-        }
-        
-        // release the file lock.
-        if (lockFileRAF != null && lockFileRAF.getChannel().isOpen()) {
-
-            /*
-             * If there is a file lock then close the backing channel.
-             */
-
-            try {
-
-                lockFileRAF.close();
-
-            } catch (IOException ex) {
-
-                // log and ignore.
-                log.warn(this, ex);
-
-            }
-            
-        }
-
-        if (destroy && lockFile.exists()) {
-
-            /*
-             * Note: This will succeed if no one has a lock on the file. You can
-             * not delete the file while you are holding the lock. If another
-             * process gets the file lock after we release it (immediately
-             * above) but before we delete the lock file here, then the delete
-             * will fail and the service directory delete will also fail.
+             * Break recursion. Already shutting down or already shutdown.
              */
  
-            if(!lockFile.delete()) {
-                
+            return;
+
+        }
+
+        beforeShutdownHook(destroy);
+        
+        try {
+            
+            /*
+             * Unexport the proxy, making the service no longer available.
+             * 
+             * Note: If you do not do this then the client can still make
+             * requests even after you have terminated the join manager and the
+             * service is no longer visible in the service browser.
+             */
+            try {
+
+                if (log.isInfoEnabled())
+                    log.info("Unexporting the service proxy.");
+
+                unexport(true/* force */);
+
+            } catch (Throwable ex) {
+
+                log.error("Problem unexporting service: " + this, ex);
+
+                /* Ignore */
+
+            }
+
+            if (destroy && impl != null && impl instanceof IService) {
+
+                final IService tmp = (IService) impl;
+
+                /*
+                 * Delegate to the service to destroy its persistent state.
+                 */
+
+                try {
+
+                    tmp.destroy();
+
+                } catch (Throwable ex) {
+
+                    log.error("Problem with service destroy: " + this, ex);
+
+                    // ignore.
+
+                }
+
+            }
+
+            /*
+             * Invoke the service's own logic to shutdown its processing.
+             */
+            if (impl != null && impl instanceof IServiceShutdown) {
+
+                try {
+
+                    final IServiceShutdown tmp = (IServiceShutdown) impl;
+
+                    if (tmp != null && tmp.isOpen()) {
+
+                        /*
+                         * Note: The test on isOpen() for the service is
+                         * deliberate. The service implementations invoke
+                         * server.shutdownNow() from their shutdown() and
+                         * shutdownNow() methods in order to terminate the jini
+                         * facets of the service. Therefore we test in
+                         * service.isOpen() here in order to avoid a recursive
+                         * invocation of service.shutdownNow().
+                         */
+
+                        tmp.shutdownNow();
+
+                    }
+
+                } catch (Throwable ex) {
+
+                    log.error("Problem with service shutdown: " + this, ex);
+
+                    // ignore.
+
+                }
+
+            }
+
+            // discard reference to the service implementation object.
+            impl = null;
+
+            /*
+             * Terminate manager threads.
+             */
+
+            try {
+
+                terminate();
+
+            } catch (Throwable ex) {
+
+                log.error(
+                        "Could not terminate async threads (jini, zookeeper): "
+                                + this, ex);
+
+                // ignore.
+
+            }
+
+            /*
+             * Hand-shaking with the NonActivableServiceDescriptor.
+             */
+            if (lifeCycle != null) {
+
+                try {
+
+                    lifeCycle.unregister(this);
+
+                } catch (Throwable ex) {
+
+                    log.error("Could not unregister lifeCycle: " + this, ex);
+
+                    // ignore.
+
+                } finally {
+
+                    lifeCycle = null;
+
+                }
+
+            }
+
+            if (destroy) {
+
+                // Delete any files that we recognize in the service directory.
+                recursiveDelete(serviceDir);
+
+                /*
+                 * Delete files created by this class.
+                 */
+
+                // delete the serviceId file.
+                if (serviceIdFile.exists() && !serviceIdFile.delete()) {
+
+                    log.warn("Could not delete: " + serviceIdFile);
+
+                }
+
+                // delete the pid file.
+                if (pidFile.exists() && !pidFile.delete()) {
+
+                    log.warn("Could not delete: " + pidFile);
+
+                }
+
+            }
+
+            // release the file lock.
+            if (lockFileRAF != null && lockFileRAF.getChannel().isOpen()) {
+
+                /*
+                 * If there is a file lock then close the backing channel.
+                 */
+
+                try {
+
+                    lockFileRAF.close();
+
+                } catch (IOException ex) {
+
+                    // log and ignore.
+                    log.warn(this, ex);
+
+                }
+
+            }
+
+            if (destroy && lockFile.exists()) {
+
+                /*
+                 * Note: This will succeed if no one has a lock on the file. You
+                 * can not delete the file while you are holding the lock. If
+                 * another process gets the file lock after we release it
+                 * (immediately above) but before we delete the lock file here,
+                 * then the delete will fail and the service directory delete
+                 * will also fail.
+                 */
+
+                if (!lockFile.delete()) {
+
+                    log.warn("Could not delete: " + serviceDir);
+
+                }
+
+            }
+
+            // delete the service directory after we have released the lock.
+            if (destroy && serviceDir.exists() && !serviceDir.delete()) {
+
                 log.warn("Could not delete: " + serviceDir);
-                
+
+            }
+
+            /*
+             * Note: keepAlive will be null if this code is invoked from within
+             * the constructor on the base class (AbstractServer).
+             */
+
+            if (keepAlive != null
+                    && keepAlive
+                            .compareAndSet(true/* expect */, false/* update */)) {
+
+                // wake up so that run() will exit.
+                synchronized (keepAlive) {
+
+                    keepAlive.notifyAll();
+
+                }
+
             }
             
-        }
-        
-        // delete the service directory after we have released the lock.
-        if (destroy && serviceDir.exists() && !serviceDir.delete()) {
+        } finally {
 
-            log.warn("Could not delete: " + serviceDir);
-
-        }
-
-        // wake up so that run() will exit.
-        synchronized(keepAlive) {
-            
-            keepAlive.notify();
+            runState.set(RunState.Shutdown);
             
         }
-        
+
     }
-    private volatile boolean shuttingDown = false;
 
     /**
-     * Return <code>true</code> iff the service is shutting down.
+     * Hook invoked at the start of the shutdown procedure.
+     * 
+     * @param destroy
+     *            <code>true</code> iff the service will be destroyed.
      */
-    public boolean isShuttingDown() {
+    protected void beforeShutdownHook(final boolean destroy) {
 
-        return shuttingDown;
+        // NOP
         
+    }
+
+    /**
+     * Return the current {@link RunState}.
+     */
+    public RunState getRunState() {
+
+        return runState.get();
+
     }
 
     /**
      * Terminates service management threads.
      * <p>
-     * Subclasses which start additional service managment threads SHOULD extend
-     * this method to terminate those threads. The implementation should be
-     * <strong>synchronized</strong>, should conditionally terminate each
+     * Subclasses which start additional service management threads SHOULD
+     * extend this method to terminate those threads. The implementation should
+     * be <strong>synchronized</strong>, should conditionally terminate each
      * thread, and should trap, log, and ignore all errors.
      */
     synchronized protected void terminate() {
@@ -1715,40 +1794,50 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
         }
         
-        /*
-         * Wait until the server is terminated.
-         * 
-         * TODO Since spurious wakeups are possible, this should be used in a loop
-         * with a condition variable.
-         */
-        
-        synchronized (keepAlive) {
-            
-            try {
-                
-                keepAlive.wait();
-                
-            } catch (InterruptedException ex) {
-                
-                if (log.isInfoEnabled())
-                    log.info(ex.getLocalizedMessage());
+        startUpHook();
 
-            } finally {
-                
-                // terminate.
-                
-                shutdownNow(false/* destroy */);
-                
+        if (runState.compareAndSet(RunState.Start, RunState.Running)) {
+
+            System.out.println("Service is running: class="
+                    + getClass().getName() + ", name=" + getServiceName());
+
+            /*
+             * Wait until the server is terminated.
+             */
+
+            synchronized (keepAlive) {
+
+                while (keepAlive.get()) {
+
+                    try {
+
+                        keepAlive.wait();
+
+                    } catch (InterruptedException ex) {
+
+                        if (log.isInfoEnabled())
+                            log.info(ex.getLocalizedMessage());
+
+                    }
+                }
+
             }
-            
+
         }
-        
+
         System.out.println("Service is down: class=" + getClass().getName()
-                + ", name=" + serviceName);
-        
+                + ", name=" + getServiceName());
+
     }
 
-    final private Object keepAlive = new Object();
+    /**
+     * Hook invoked in {@link #run()}.
+     */
+    protected void startUpHook() {
+
+        // NOP
+
+    }
 
     /**
      * Runs {@link AbstractServer#shutdownNow()} and terminates all asynchronous
@@ -1756,59 +1845,65 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
-    static class ShutdownThread extends Thread {
+    private static class ShutdownThread extends Thread {
+
+        private final boolean destroy;
+        private final AbstractServer server;
         
-        final AbstractServer server;
-        
-        public ShutdownThread(final AbstractServer server) {
-            
+        public ShutdownThread(final boolean destroy, final AbstractServer server) {
+
             super("shutdownThread");
             
             if (server == null)
                 throw new IllegalArgumentException();
+
+            this.destroy = destroy;
             
             this.server = server;
             
             setDaemon(true);
             
         }
-        
+
         public void run() {
-            
+
+            // format log message.
+            final String msg = server.toString();
+
+            log.warn("Will " + (destroy ? "destroy" : "shutdown")
+                    + " service: " + msg);
+
             try {
 
-                if (log.isInfoEnabled())
-                    log.info("Running shutdown.");
+                // Wait long enough for the RMI request to end.
+                Thread.sleep(250/* ms */);
 
-                /*
-                 * Note: This is the "server" shutdown. It will delegate to the
-                 * service shutdown protocol as well as handle unexport of the
-                 * service and termination of jini processing.
-                 */
-                
-                server.shutdownNow(false/* destroy */);
-                
-            } catch (Exception ex) {
+            } catch (InterruptedException e) {
 
-                log.error("While shutting down service: " + this, ex);
+                // Propagate interrupt.
+                Thread.currentThread().interrupt();
+
+                return;
+            }
+
+            try {
+
+                server.shutdownNow(destroy);
+
+                log.warn("Service " + (destroy ? "destroyed" : "shutdown")
+                        + ": " + msg);
+
+            } catch (Throwable t) {
+
+                log.error("Problem "
+                        + (destroy ? "destroying" : "shutting down")
+                        + " service: " + msg, t);
 
             }
 
         }
-        
-    }
 
-    /**
-     * Contract is to shutdown the services and <em>destroy</em> its persistent
-     * state. This implementation calls {@link #shutdownNow(boolean)} with
-     * <code>destroy := true</code>.
-     */
-    final synchronized public void destroy() {
-
-        shutdownNow(true/* destroy */);
-        
     }
 
     /**
@@ -1864,39 +1959,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         };
         
     }
-    
+
     /**
-     * Runs {@link #destroy()} and logs start and end events.
+     * Unless the service is already shutting down (or shutdown), this method
+     * runs thread which will destroy the service (asynchronous).
+     * <p>
+     * Note: By running this is a thread, we avoid closing the service end point
+     * during the method call.
      */
-    public void runDestroy() {
+    protected void runShutdown(final boolean destroy) {
 
-        final Thread t = new Thread("destroyService") {
-
-            public void run() {
-
-                // format log message.
-                final String msg = AbstractServer.this.toString();
-
-                log.warn("Will destroy service: " + msg);
-
-                try {
-
-                    AbstractServer.this.destroy();
-
-                    log.warn("Service destroyed: " + msg);
-
-                } catch (Throwable t) {
-
-                    log.error("Problem destroying service: " + msg, t);
-
-                }
-
-            }
-
-        };
-
+        final Thread t = new ShutdownThread(destroy, this);
+        
         t.setDaemon(true);
-
+        
         t.start();
 
     }

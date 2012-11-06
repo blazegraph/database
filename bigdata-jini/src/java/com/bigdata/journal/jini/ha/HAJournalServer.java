@@ -22,7 +22,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -46,6 +45,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
@@ -53,7 +53,6 @@ import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
-import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
@@ -62,7 +61,6 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ITx;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumEvent;
@@ -158,7 +156,7 @@ public class HAJournalServer extends AbstractServer {
      * FIXME RESYNC : FLAG CONDITIONALLY ENABLES THE HA LOG AND RESYNC PROTOCOL. Disabled
      * in committed code until we have this running properly.
      */
-    private static final boolean HA_LOG_ENABLED = false;
+    private static final boolean HA_LOG_ENABLED = true;
     
     /**
      * Caching discovery client for the {@link HAGlue} services.
@@ -216,7 +214,7 @@ public class HAJournalServer extends AbstractServer {
      * interface does not expose any {@link Remote} methods to write on the
      * {@link HAJournal}.
      */
-    private Server jettyServer;
+    private volatile Server jettyServer;
 
     /**
      * Caching discovery client for the {@link HAGlue} services.
@@ -244,23 +242,6 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
-        try {
-            
-            if (jettyServer != null) {
-
-                // Shut down the NanoSparqlServer.
-                jettyServer.stop();
-                
-                jettyServer = null;
-                
-            }
-
-        } catch (Exception e) {
-        
-            log.error(e);
-            
-        }
-        
         super.terminate();
     
     }
@@ -303,7 +284,7 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
-       // Setup discovery for HAGlue clients.
+        // Setup discovery for HAGlue clients.
         discoveryClient = new HAJournalDiscoveryClient(
                 getServiceDiscoveryManager(),
                 null/* serviceDiscoveryListener */, cacheMissTimeout);
@@ -430,58 +411,17 @@ public class HAJournalServer extends AbstractServer {
      * {@link ServiceItem} is registered.
      */
     @Override
-    public void run() {
+    protected void startUpHook() {
 
         if (log.isInfoEnabled())
-            log.info("Started server.");
+            log.info("Starting server.");
 
-        /*
-         * Name the thread for the class of server that it is running.
-         * 
-         * Note: This is generally the thread that ran main(). The thread does
-         * not really do any work - it just waits until the server is terminated
-         * and then returns to the caller where main() will exit.
-         */
-        try {
-
-            Thread.currentThread().setName(getClass().getName());
-            
-        } catch(SecurityException ex) {
-            
-            // ignore.
-            log.warn("Could not set thread name: " + ex);
-            
-        }
-        
         quorum.addListener(new QuorumListener() {
 
             @Override
             public void notify(final QuorumEvent e) {
                 if (log.isTraceEnabled())
                     System.err.println("QuorumEvent: " + e); // TODO LOG @ TRACE
-//                switch(e.getEventType()) {
-//                case CAST_VOTE:
-//                    break;
-//                case CONSENSUS:
-//                    break;
-//                case MEMBER_ADD:
-//                    break;
-//                case MEMBER_REMOVE:
-//                    break;
-//                case PIPELINE_ADD:
-//                    break;
-//                case PIPELINE_REMOVE:
-//                    break;
-//                case QUORUM_BROKE:
-//                    break;
-//                case QUORUM_MEET:
-//                    break;
-//                case SERVICE_JOIN:
-//                    break;
-//                case SERVICE_LEAVE:
-//                    break;
-//                case WITHDRAW_VOTE: 
-//                }
             }
         });
 
@@ -534,72 +474,50 @@ public class HAJournalServer extends AbstractServer {
         try {
 
             startNSS();
-            
+
         } catch (Exception e1) {
-            
+
             log.error("Could not start NanoSparqlServer: " + e1, e1);
-            
-        }
-
-        /*
-         * Wait until the server is terminated.
-         */
-
-        synchronized (keepAlive) {
-
-            try {
-
-                while (keepAlive.get()) {
-                
-                    try {
-                    
-                        keepAlive.wait();
-
-                    } catch (InterruptedException ex) {
-
-                        if (log.isInfoEnabled())
-                            log.info(ex.getLocalizedMessage());
-
-                    }
-                }
-            } finally {
-
-                // terminate.
-
-                shutdownNow(false/* destroy */);
-
-            }
 
         }
-        
-        System.out.println("Service is down: class=" + getClass().getName()
-                + ", name=" + getServiceName());
-        
+
     }
 
     /**
      * {@inheritDoc}
      * <p>
-     * Extended to set {@link #keepAlive} to <code>false</code> and notify the
-     * {@link #keepAlive} monitor so {@link #run()} will terminate.
+     * Extended to tear down the {@link NanoSparqlServer}, the {@link Quorum},
+     * and the {@link HAJournal}.
      */
     @Override
-    synchronized public void shutdownNow(final boolean destroy) {
+    protected void beforeShutdownHook(final boolean destroy) {
 
-        /*
-         * Note: keepAlive will be null if this code is invoked from within the
-         * constructor on the base class (AbstractServer).
-         */
+        if (log.isInfoEnabled())
+            log.info("destroy=" + destroy);
 
-        if (keepAlive != null
-                && keepAlive.compareAndSet(true/* expect */, false/* update */)) {
+        if (jettyServer != null) {
 
-            synchronized (keepAlive) {
+            try {
 
-                keepAlive.notifyAll();
-                
+                // Shutdown the embedded NSS.
+                jettyServer.stop();
+
+                // Wait for it to terminate.
+                jettyServer.join();
+
+                // Clear reference.
+                jettyServer = null;
+
+            } catch (Exception e) {
+
+                log.error(e, e);
+
             }
 
+        }
+
+        if (quorum != null) {
+            
             try {
 
                 // Notify the quorum that we are leaving.
@@ -608,24 +526,28 @@ public class HAJournalServer extends AbstractServer {
                 quorum.terminate();
 
             } catch (Throwable t) {
-                
-                log.error(t,t);
-                
-            } finally {
-                
-                super.shutdownNow(destroy);
+
+                log.error(t, t);
+
+            }
+            
+        }
+        
+        if (journal != null) {
+
+            if (destroy) {
+
+                journal.destroy();
+
+            } else {
+
+                journal.close();
 
             }
 
         }
 
     }
-
-    /**
-     * {@link AtomicBoolean} serves as both a condition variable and the monitor
-     * on which we wait.
-     */
-    final private AtomicBoolean keepAlive = new AtomicBoolean(true);
 
     /**
      * Factory for the {@link QuorumService} implementation.
@@ -651,14 +573,6 @@ public class HAJournalServer extends AbstractServer {
     /**
      * Concrete {@link QuorumServiceBase} implementation for the
      * {@link HAJournal}.
-     * 
-     * @param logicalServiceZPath
-     * @param serviceId
-     * @param remoteServiceImpl
-     *            The object that implements the {@link Remote} interfaces
-     *            supporting HA operations.
-     * @param store
-     *            The {@link HAJournal}.
      */
     static private class HAQuorumService<S extends HAGlue, L extends HAJournal>
             extends QuorumServiceBase<S, L> {
@@ -676,7 +590,16 @@ public class HAJournalServer extends AbstractServer {
          * a met quorum.
          */
         private FutureTask<Void> resyncFuture = null;
-        
+
+        /**
+         * @param logicalServiceZPath
+         * @param serviceId
+         * @param remoteServiceImpl
+         *            The object that implements the {@link Remote} interfaces
+         *            supporting HA operations.
+         * @param store
+         *            The {@link HAJournal}.
+         */
         public HAQuorumService(final String logicalServiceZPath,
                 final UUID serviceId, final S remoteServiceImpl, final L store,
                 final HAJournalServer server) {
@@ -890,10 +813,6 @@ public class HAJournalServer extends AbstractServer {
          *         Blow off the root blocks (zero commit counters). Then install
          *         when known synched to specific commit point and enter
          *         resync.+
-         * 
-         *         TODO We need the ability to conditionally apply the root
-         *         blocks when advancing through the HA Log files up to the read
-         *         lock.
          */
         private class RebuildTask implements Callable<Void> {
 
@@ -913,11 +832,12 @@ public class HAJournalServer extends AbstractServer {
             @Override
             public Void call() throws Exception {
 
-                final long readLock = leader.newTx(ITx.READ_COMMITTED);
+//                final long readLock = leader.newTx(ITx.READ_COMMITTED);
                 
                 try {
 
-                    doRun(readLock);
+//                    doRun(readLock);
+                    doRun();
 
                 } catch (Throwable t) {
 
@@ -931,8 +851,8 @@ public class HAJournalServer extends AbstractServer {
 
                 } finally {
                     
-                    // release the read lock.
-                    leader.abort(readLock);
+//                    // release the read lock.
+//                    leader.abort(readLock);
                     
                 }
 
@@ -940,7 +860,7 @@ public class HAJournalServer extends AbstractServer {
 
             }
             
-            private void doRun(final long readLock) throws Exception {
+            private void doRun(/*final long readLock*/) throws Exception {
 
                 haLog.warn("REBUILD: " + server.getServiceName());
                 
@@ -960,8 +880,10 @@ public class HAJournalServer extends AbstractServer {
                  * catch up, we can atomically join and lay down the root blocks
                  * from the leader for the most recent commit point.
                  */
-                final IHARootBlockResponse rootBlockAtStartOfRebuild = leader
-                        .getRootBlock(new HARootBlockRequest(null/* storeUUID */));
+                final IRootBlockView rootBlockAtStartOfRebuild = leader
+                        .getRootBlock(
+                                new HARootBlockRequest(null/* storeUUID */))
+                        .getRootBlock();
 
                 /*
                  * Replicate the backing store of the leader.
@@ -990,17 +912,38 @@ public class HAJournalServer extends AbstractServer {
                 }
  
                 /*
-                 * FIXME REBUILD: Apply all HALogs (request each log, and
-                 * apply as received, but DO NOT lay down root blocks or
-                 * go through commit points).
+                 * FIXME REBUILD: Apply all HALogs (request each log starting
+                 * with the commit point identified above, and apply as
+                 * received, but DO NOT lay down root blocks or go through
+                 * commit points). [Refactor this code from the RESYNC task.]
+                 * 
+                 * Note: The quorum WILL be maintaining HALog files since (a)
+                 * they are maintained for every active write set; and (b) the
+                 * quorum is not fully met since this service is not joined with
+                 * the met quorum.
                  */
-                
-                /*
-                 * FIXME REBUILD: Atomic transition to live and lay down
-                 * the root blocks.
-                 */
-                
-                throw new UnsupportedOperationException();
+                {
+                    
+                    // The last commit point that has been captured.
+                    long commitCounter = rootBlockAtStartOfRebuild
+                            .getCommitCounter();
+
+                    // Until joined with the met quorum.
+                    while (!getQuorum().getMember().isJoinedMember(token)) {
+
+                        // Abort if the quorum breaks.
+                        getQuorum().assertQuorum(token);
+
+                        // Replicate and apply the next write set
+                        replicateAndApplyWriteSet(leader, token,
+                                commitCounter + 1, false/* incremental */);
+
+                        // Replicate the next write set.
+                        commitCounter++;
+
+                    }
+
+                }
 
             }
             
@@ -1032,6 +975,7 @@ public class HAJournalServer extends AbstractServer {
              * The quorum token in effect when we began the resync.
              */
             private final long token;
+
             /**
              * The quorum leader. This is fixed until the quorum breaks or the
              * resync ends.
@@ -1119,60 +1063,78 @@ public class HAJournalServer extends AbstractServer {
                             .getCommitCounter();
 
                     // Replicate and apply the next write set
-                    replicateAndApplyWriteSet(commitCounter + 1);
+                    replicateAndApplyWriteSet(leader, token, commitCounter + 1,
+                            true/* incremental */);
 
                 }
 
             }
 
-            /**
-             * Replicate the write set having the specified commit counter,
-             * applying each {@link WriteCache} block as it is received and
-             * eventually going through a local commit when we receiving the
-             * closing {@link IRootBlockView} for that write set.
-             * 
-             * @param closingCommitCounter
-             *            The commit counter for the <em>closing</em> root block
-             *            of the write set to be replicated.
-             * 
-             * @throws IOException
-             * @throws FileNotFoundException
-             * @throws ExecutionException
-             * @throws InterruptedException
-             */
-            private void replicateAndApplyWriteSet(
-                    final long closingCommitCounter)
-                    throws FileNotFoundException, IOException,
-                    InterruptedException, ExecutionException {
+        } // class ResyncTask
 
-                if (haLog.isInfoEnabled())
-                    haLog.info("RESYNC: now replicating commitCounter="
-                            + closingCommitCounter);
+        /**
+         * Replicate the write set having the specified commit counter, applying
+         * each {@link WriteCache} block as it is received and eventually going
+         * through a local commit when we receiving the closing
+         * {@link IRootBlockView} for that write set.
+         * 
+         * @param leader
+         *            The quorum leader.
+         * @param quorumToken
+         *            The quorum token that must remain valid throughout this
+         *            operation.
+         * @param closingCommitCounter
+         *            The commit counter for the <em>closing</em> root block of
+         *            the write set to be replicated.
+         * @param incremental
+         *            When <code>true</code> this is an incremental
+         *            re-synchronization based on replicated HALog files. When
+         *            <code>false</code>, this is a ground up rebuild (disaster
+         *            recovery). For the ground up rebuild we DO NOT go through
+         *            a local commit with each HALog file that we replicate and
+         *            apply.
+         * 
+         * @throws IOException
+         * @throws FileNotFoundException
+         * @throws ExecutionException
+         * @throws InterruptedException
+         */
+        private void replicateAndApplyWriteSet(final S leader,
+                final long quorumToken, final long closingCommitCounter,
+                final boolean incremental) throws FileNotFoundException,
+                IOException,
+                InterruptedException, ExecutionException {
 
-                final IHALogRootBlocksResponse resp;
-                try {
-                    
-                    // Request the root blocks for the write set.
-                    resp = leader
-                            .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
-                                    closingCommitCounter));
+            if (haLog.isInfoEnabled())
+                haLog.info("RESYNC: commitCounter=" + closingCommitCounter
+                        + ", incremental=" + incremental);
 
-                } catch (FileNotFoundException ex) {
+            final IHALogRootBlocksResponse resp;
+            try {
+                
+                // Request the root blocks for the write set.
+                resp = leader
+                        .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
+                                closingCommitCounter));
 
-                    /*
-                     * Oops. The leader does not have that log file.
-                     * 
-                     * We will have to rebuild the service from scratch since we
-                     * do not have the necessary HA Log files to synchronize
-                     * with the existing quorum.
-                     * 
-                     * TODO RESYNC : It is possible to go to another service in
-                     * the met quorum for the same log file, but it needs to be
-                     * a service that is UPSTREAM of this service.
-                     */
+            } catch (FileNotFoundException ex) {
 
-                    final String msg = "HA Log not available: commitCounter="
-                            + closingCommitCounter;
+                /*
+                 * Oops. The leader does not have that log file.
+                 * 
+                 * We will have to rebuild the service from scratch since we
+                 * do not have the necessary HA Log files to synchronize
+                 * with the existing quorum.
+                 * 
+                 * TODO RESYNC : It is possible to go to another service in
+                 * the met quorum for the same log file, but it needs to be
+                 * a service that is UPSTREAM of this service.
+                 */
+
+                final String msg = "HA Log not available: commitCounter="
+                        + closingCommitCounter;
+
+                if (incremental) {
 
                     log.error(msg);
 
@@ -1187,307 +1149,356 @@ public class HAJournalServer extends AbstractServer {
                         ft.get();
 
                     } finally {
-                        
+
                         ft.cancel(true/* mayInterruptIfRunning */);
-                        
+
                     }
 
                     // Re-enter the resync protocol.
                     return;
 
-                }
-
-                // root block when the quorum started that write set.
-                final IRootBlockView openRootBlock = resp.getOpenRootBlock();
-
-                if (openRootBlock.getCommitCounter() != closingCommitCounter - 1) {
+                } else {
                     
                     /*
-                     * The opening root block for the write set must have a
-                     * commit counter that is ONE less than the requested commit
-                     * point.
+                     * If we are already doing a rebuild (versus resync) then it
+                     * is a fatal error if we can not locate the necessary HALog
+                     * files.
+                     * 
+                     * Note: This could be caused by a bug or if someone deleted
+                     * the necessary HALog file on the leader. Either way,
+                     * manual intervention is required.
                      */
                     
-                    throw new AssertionError(
-                            "Should start at the previous commit point: requested commitCounter="
-                                    + closingCommitCounter + ", openRootBlock="
-                                    + openRootBlock);
+                    log.fatal(msg);
+ 
+                    // Shutdown.
+                    server.shutdownNow(false/* destroy */);
+
+                    // Rethrow the exception.
+                    throw new IOException(ex);
+                    
                 }
+
+            }
+
+            // root block when the quorum started that write set.
+            final IRootBlockView openRootBlock = resp.getOpenRootBlock();
+
+            if (openRootBlock.getCommitCounter() != closingCommitCounter - 1) {
                 
                 /*
-                 * If the local journal is empty, then we need to replace both
-                 * of it's root blocks with the opening root block.
+                 * The opening root block for the write set must have a
+                 * commit counter that is ONE less than the requested commit
+                 * point.
                  */
-                if (journal.getRootBlockView().getCommitCounter() == 0) {
+                
+                throw new AssertionError(
+                        "Should start at the previous commit point: requested commitCounter="
+                                + closingCommitCounter + ", openRootBlock="
+                                + openRootBlock);
+            }
+            
+            /*
+             * If the local journal is empty, then we need to replace both
+             * of it's root blocks with the opening root block.
+             */
+            if (journal.getRootBlockView().getCommitCounter() == 0
+                    && incremental) {
 
-                    // Install the initial root blocks.
-                    installRootBlocksFromQuorum(openRootBlock);
+                // Install the initial root blocks.
+                installRootBlocksFromQuorum(openRootBlock);
 
-                }
+            }
 
-                // Make sure we have the correct HALogWriter open.
-                logLock.lock();
+            // Make sure we have the correct HALogWriter open.
+            logLock.lock();
+            try {
+                final HALogWriter logWriter = journal.getHALogWriter();
+                logWriter.disable();
+                logWriter.createLog(openRootBlock);
+            } finally {
+                logLock.unlock();
+            }
+
+            /*
+             * We need to transfer and apply the write cache blocks from the
+             * HA Log file on some service in the met quorum. This code
+             * works with the leader because it is known to be upstream from
+             * all other services in the write pipeline.
+             * 
+             * Note: Because we are multiplexing the write cache blocks on
+             * the write pipeline, there is no advantage to gathering
+             * different write sets from different nodes. A slight advantage
+             * could be had by reading off of the immediate upstream node,
+             * but understandability of the code is improved by the
+             * assumption that we are always replicating these data from the
+             * quorum leader.
+             */
+
+            Future<Void> ft = null;
+            try {
+
+                ft = leader
+                        .sendHALogForWriteSet(new HALogRequest(
+                                server.serviceUUID, closingCommitCounter,
+                                true/* incremental */));
+
                 try {
-                    final HALogWriter logWriter = journal.getHALogWriter();
-                    logWriter.disable();
-                    logWriter.createLog(openRootBlock);
-                } finally {
-                    logLock.unlock();
-                }
-
-                /*
-                 * We need to transfer and apply the write cache blocks from the
-                 * HA Log file on some service in the met quorum. This code
-                 * works with the leader because it is known to be upstream from
-                 * all other services in the write pipeline.
-                 * 
-                 * Note: Because we are multiplexing the write cache blocks on
-                 * the write pipeline, there is no advantage to gathering
-                 * different write sets from different nodes. A slight advantage
-                 * could be had by reading off of the immediate upstream node,
-                 * but understandability of the code is improved by the
-                 * assumption that we are always replicating these data from the
-                 * quorum leader.
-                 */
-
-                Future<Void> ft = null;
-                try {
-
-                    ft = leader
-                            .sendHALogForWriteSet(new HALogRequest(
-                                    server.serviceUUID, closingCommitCounter,
-                                    true/* incremental */));
-
-                    try {
+                
+                    /*
+                     * Wait up to one second
+                     * 
+                     * TODO Lift out timeout (configure).
+                     */
                     
-                        /*
-                         * Wait up to one second
-                         * 
-                         * TODO Lift out timeout (configure).
-                         */
-                        
-                        ft.get(1000, TimeUnit.MILLISECONDS);
-                        
-                    } catch (TimeoutException ex) {
-
-                        /*
-                         * Nothing was received before the timeout. Attempt to
-                         * join with the met quorum.
-                         */
-                        
-                        if (conditionalJoinWithMetQuorum(closingCommitCounter - 1)) {
-
-                            /*
-                             * We are caught up and have joined the met quorum.
-                             * 
-                             * Note: Future will be canceled in finally clause.
-                             */
-                         
-                            return;
-                            
-                        }
-
-                    }
+                    ft.get(1000, TimeUnit.MILLISECONDS);
+                    
+                } catch (TimeoutException ex) {
 
                     /*
-                     * Wait until all write cache blocks are received.
+                     * Nothing was received before the timeout. Attempt to
+                     * join with the met quorum.
                      */
-                    if (log.isDebugEnabled())
-                        log.debug("WAITING ON SEND HALOG FUTURE");
-
-                    ft.get();
-
-                } finally {
-
                     
-                    if (ft != null) {
+                    if (conditionalJoinWithMetQuorum(leader, quorumToken,
+                            closingCommitCounter - 1, incremental)) {
 
-                        if (log.isDebugEnabled())
-                            log.debug("HALOG FUTURE: isDone=" + ft.isDone());
-
-                        ft.cancel(true/* mayInterruptIfRunning */);
-
-                        ft = null;
-
+                        /*
+                         * We are caught up and have joined the met quorum.
+                         * 
+                         * Note: Future will be canceled in finally clause.
+                         */
+                     
+                        return;
+                        
                     }
 
                 }
 
                 /*
-                 * Figure out the closing root block. If this HALog file was
-                 * active when we started reading from it, then the open and
-                 * close root blocks would have been identical in the [resp] and
-                 * we will need to grab the root blocks again now that it has
-                 * been closed.
+                 * Wait until all write cache blocks are received.
                  */
-                final IRootBlockView closeRootBlock;
-                {
+                if (log.isDebugEnabled())
+                    log.debug("WAITING ON SEND HALOG FUTURE");
 
-                    // root block when the quorum committed that write set.
-                    IRootBlockView tmp = resp.getCloseRootBlock();
+                ft.get();
 
-                    if (openRootBlock.getCommitCounter() == tmp
-                            .getCommitCounter()) {
+            } finally {
 
-                        /*
-                         * The open and close commit counters were the same when
-                         * we first requested them, so we need to re-request the
-                         * close commit counter now that we are done reading on
-                         * the file.
-                         */
-                        
-                        // Re-request the root blocks for the write set.
-                        final IHALogRootBlocksResponse resp2 = leader
-                                .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
-                                        closingCommitCounter));
-                        
-                        tmp = resp2.getCloseRootBlock();
+                
+                if (ft != null) {
 
-                    }
+                    if (log.isDebugEnabled())
+                        log.debug("HALOG FUTURE: isDone=" + ft.isDone());
 
-                    closeRootBlock = tmp;
+                    ft.cancel(true/* mayInterruptIfRunning */);
 
-                    if (closeRootBlock.getCommitCounter() != closingCommitCounter) {
+                    ft = null;
 
-                        throw new AssertionError(
-                                "Wrong commitCounter for closing root block: expected commitCounter="
-                                        + closingCommitCounter
-                                        + ", but closeRootBlock="
-                                        + closeRootBlock);
-
-                    }
-                    
                 }
+
+            }
+
+            /*
+             * Figure out the closing root block. If this HALog file was
+             * active when we started reading from it, then the open and
+             * close root blocks would have been identical in the [resp] and
+             * we will need to grab the root blocks again now that it has
+             * been closed.
+             */
+            final IRootBlockView closeRootBlock;
+            {
+
+                // root block when the quorum committed that write set.
+                IRootBlockView tmp = resp.getCloseRootBlock();
+
+                if (openRootBlock.getCommitCounter() == tmp
+                        .getCommitCounter()) {
+
+                    /*
+                     * The open and close commit counters were the same when
+                     * we first requested them, so we need to re-request the
+                     * close commit counter now that we are done reading on
+                     * the file.
+                     */
+                    
+                    // Re-request the root blocks for the write set.
+                    final IHALogRootBlocksResponse resp2 = leader
+                            .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
+                                    closingCommitCounter));
+                    
+                    tmp = resp2.getCloseRootBlock();
+
+                }
+
+                closeRootBlock = tmp;
+
+                if (closeRootBlock.getCommitCounter() != closingCommitCounter) {
+
+                    throw new AssertionError(
+                            "Wrong commitCounter for closing root block: expected commitCounter="
+                                    + closingCommitCounter
+                                    + ", but closeRootBlock="
+                                    + closeRootBlock);
+
+                }
+                
+            }
+
+            if (incremental) {
 
                 // Local commit.
                 journal.doLocalCommit(
                         (QuorumService<HAGlue>) HAQuorumService.this,
                         closeRootBlock);
 
-                // Close out the current HALog writer.
-                logLock.lock();
-                try {
-                    final HALogWriter logWriter = journal.getHALogWriter();
-                    logWriter.closeLog(closeRootBlock);
-                } finally {
-                    logLock.unlock();
-                }
+            }
 
-                if (haLog.isInfoEnabled())
-                    haLog.info("RESYNC: caught up to commitCounter="
-                            + closingCommitCounter);
+            // Close out the current HALog writer.
+            logLock.lock();
+            try {
+                final HALogWriter logWriter = journal.getHALogWriter();
+                logWriter.closeLog(closeRootBlock);
+            } finally {
+                logLock.unlock();
+            }
+
+            if (haLog.isInfoEnabled())
+                haLog.info("RESYNC: caught up to commitCounter="
+                        + closingCommitCounter);
+
+        }
+
+        /**
+         * Conditional join of a service attempting to synchronize with the met
+         * quorum. If the current commit point that is being replicated (as
+         * indicated by the <i>commitCounter</i>) is thought to be the most
+         * current root block on the leader AND we have not received any writes
+         * on the HALog, then we assume that the leader is quiescent (no write
+         * activity) and we attempt to join the qourum.
+         * 
+         * @param leader
+         *            The quorum leader.
+         * @param openingCommitCounter
+         *            The commit counter for the <em>opening</em> root block of
+         *            the write set that is currently being replicated.
+         * @param incremental
+         *            When <code>true</code> this is an incremental
+         *            re-synchronization based on replicated HALog files. When
+         *            <code>false</code>, this is a ground up rebuild (disaster
+         *            recovery). For the ground up rebuild we DO NOT go through
+         *            a local commit with each HALog file that we replicate and
+         *            apply.
+         * 
+         * @return <code>true</code> iff we were able to join the met quorum.
+         */
+        private boolean conditionalJoinWithMetQuorum(final S leader,
+                final long quorumToken, final long openingCommitCounter,
+                final boolean incremental) throws IOException {
+
+            // Get the current root block from the quorum leader.
+            final IRootBlockView currentRootBlockOnLeader = leader
+                    .getRootBlock(new HARootBlockRequest(null/* storeId */))
+                    .getRootBlock();
+
+            final boolean sameCommitCounter = currentRootBlockOnLeader
+                    .getCommitCounter() == openingCommitCounter;
+
+            if (haLog.isDebugEnabled())
+                haLog.debug("sameCommitCounter=" + sameCommitCounter
+                        + ", openingCommitCounter=" + openingCommitCounter
+                        + ", currentRootBlockOnLeader="
+                        + currentRootBlockOnLeader + ", incremental="
+                        + incremental);
+
+            if (!sameCommitCounter) {
+
+                /*
+                 * We can not join. We are not at the same commit point as
+                 * the quorum leader.
+                 */
+
+                return false;
 
             }
 
-            /**
-             * Conditional join of a service attempting to synchronize with the
-             * met quorum. If the current commit point that is being replicated
-             * (as indicated by the <i>commitCounter</i>) is thought to be the
-             * most current root block on the leader AND we have not received
-             * any writes on the HALog, then we assume that the leader is
-             * quiescent (no write activity) and we attempt to join the qourum.
+            /*
+             * This is the same commit point that we are trying to replicate
+             * right now. Check the HALog. If we have not observed any write
+             * cache blocks, then we can attempt to join the met quorum.
              * 
-             * @param openingCommitCounter
-             *            The commit counter for the <em>opening</em> root block
-             *            of the write set that is currently being replicated.
-             * 
-             * @return <code>true</code> iff we were able to join the met
-             *         quorum.
+             * Note: We can not accept replicated writes while we are
+             * holding the logLock (the lock is required to accept
+             * replicated writes).
              */
-            private boolean conditionalJoinWithMetQuorum(
-                    final long openingCommitCounter) throws IOException {
+            logLock.lock();
 
-                // Get the current root block from the quorum leader.
-                final IRootBlockView currentRootBlockOnLeader = leader
-                        .getRootBlock(new HARootBlockRequest(null/* storeId */))
-                        .getRootBlock();
+            try {
 
-                final boolean sameCommitCounter = currentRootBlockOnLeader
-                        .getCommitCounter() == openingCommitCounter;
+                if(!incremental) {
+                 
+                    /*
+                     * FIXME REBUILD : When this is a ground up service rebuild,
+                     * we need to lay down both root blocks atomically when we
+                     * are ready to join the met quorum (or perhaps at the next
+                     * commit point after we join the met quorum).
+                     */
+                    
+                    throw new UnsupportedOperationException();
+                    
+                }
+                
+                final HALogWriter logWriter = journal.getHALogWriter();
 
                 if (haLog.isDebugEnabled())
-                    haLog.debug("sameCommitCounter=" + sameCommitCounter
-                            + ", openingCommitCounter=" + openingCommitCounter
-                            + ", currentRootBlockOnLeader="
-                            + currentRootBlockOnLeader);
-                
-                if (!sameCommitCounter) {
+                    haLog.debug("HALog.commitCounter="
+                            + logWriter.getCommitCounter()
+                            + ", HALog.getSequence="
+                            + logWriter.getSequence());
 
-                    /*
-                     * We can not join. We are not at the same commit point as
-                     * the quorum leader.
-                     */
+                if (logWriter.getCommitCounter() != openingCommitCounter
+                        || logWriter.getSequence() != 0L) {
 
                     return false;
 
                 }
-
-                /*
-                 * This is the same commit point that we are trying to replicate
-                 * right now. Check the HALog. If we have not observed any write
-                 * cache blocks, then we can attempt to join the met quorum.
-                 * 
-                 * Note: We can not accept replicated writes while we are
-                 * holding the logLock (the lock is required to accept
-                 * replicated writes).
-                 */
-                logLock.lock();
-
-                try {
-
-                    final HALogWriter logWriter = journal.getHALogWriter();
-
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("HALog.commitCounter="
-                                + logWriter.getCommitCounter()
-                                + ", HALog.getSequence="
-                                + logWriter.getSequence());
-
-                    if (logWriter.getCommitCounter() != openingCommitCounter
-                            || logWriter.getSequence() != 0L) {
-
-                        return false;
-
-                    }
-                    
-                    if (haLog.isInfoEnabled())
-                        haLog.info("Will attempt to join met quorum.");
-
-                    // The vote cast by the leader.
-                    final long lastCommitTimeOfQuorumLeader = getQuorum()
-                            .getCastVote(leader.getServiceId());
-
-                    // Verify that the quorum is valid.
-                    getQuorum().assertQuorum(token);
-
-                    // Cast that vote.
-                    getActor().castVote(lastCommitTimeOfQuorumLeader);
-
-                    // Verify that the quorum is valid.
-                    getQuorum().assertQuorum(token);
-
-                    // Attempt to join the met quorum.
-                    getActor().serviceJoin();
-
-                    // Verify that the quorum is valid.
-                    getQuorum().assertQuorum(token);
-
-                    haLog.warn("RESYNC : joined met quorum. commitCounter="
-                            + openingCommitCounter + ", lastCommitTimeOfLeader="
-                            + lastCommitTimeOfQuorumLeader + ", nextBlockSeq="
-                            + logWriter.getSequence());
-
-                    return true;
-
-                } finally {
-
-                    logLock.unlock();
-
-                }
                 
-            }
+                if (haLog.isInfoEnabled())
+                    haLog.info("Will attempt to join met quorum.");
 
-        } // class ResyncTask
+                // The vote cast by the leader.
+                final long lastCommitTimeOfQuorumLeader = getQuorum()
+                        .getCastVote(leader.getServiceId());
+
+                // Verify that the quorum is valid.
+                getQuorum().assertQuorum(quorumToken);
+
+                // Cast that vote.
+                getActor().castVote(lastCommitTimeOfQuorumLeader);
+
+                // Verify that the quorum is valid.
+                getQuorum().assertQuorum(quorumToken);
+
+                // Attempt to join the met quorum.
+                getActor().serviceJoin();
+
+                // Verify that the quorum is valid.
+                getQuorum().assertQuorum(quorumToken);
+
+                haLog.warn("RESYNC : joined met quorum. commitCounter="
+                        + openingCommitCounter + ", lastCommitTimeOfLeader="
+                        + lastCommitTimeOfQuorumLeader + ", nextBlockSeq="
+                        + logWriter.getSequence());
+
+                return true;
+
+            } finally {
+
+                logLock.unlock();
+
+            }
+            
+        }
 
         @Override
         protected void handleReplicatedWrite(final IHASyncRequest req,
@@ -2153,15 +2164,15 @@ public class HAJournalServer extends AbstractServer {
         // Wait for the HAJournalServer to terminate.
         server.run();
         
-        try {
-            final Server tmp = server.jettyServer;
-            if (tmp != null) {
-                // Wait for the jetty server to terminate.
-                tmp.join();
-            }
-        } catch (InterruptedException e) {
-            log.warn(e);
-        }
+//        try {
+//            final Server tmp = server.jettyServer;
+//            if (tmp != null) {
+//                // Wait for the jetty server to terminate.
+//                tmp.join();
+//            }
+//        } catch (InterruptedException e) {
+//            log.warn(e);
+//        }
 
         System.exit(0);
 
@@ -2295,57 +2306,24 @@ public class HAJournalServer extends AbstractServer {
          */
 
         @Override
-        synchronized public void destroy() {
+        public void destroy() {
 
-            if (!server.isShuttingDown()) {
-
-                /*
-                 * Run thread which will destroy the service (asynchronous).
-                 * 
-                 * Note: By running this is a thread, we avoid closing the
-                 * service end point during the method call.
-                 * 
-                 * TODO We also need to destroy the persistent state (dataDir,
-                 * serviceDir), the zk state for this service, and ensure that
-                 * the proxy is unexported from any discovered registrars (that
-                 * is probably being done). [unit tests for the admin methods.]
-                 */
-
-                server.runDestroy();
-
-//            } else if (isOpen()) {
-//
-//                /*
-//                 * The server is already shutting down, so invoke our super
-//                 * class behavior to destroy the persistent state.
-//                 */
-//
-//                super.destroy();
-
-            }
+            server.runShutdown(true/* destroy */);
 
         }
 
         @Override
-        synchronized public void shutdown() {
+        public void shutdown() {
 
-//            // normal service shutdown (blocks).
-//            super.shutdown();
-
-            // jini service and server shutdown.
-            server.shutdownNow(false/* destroy */);
+            server.runShutdown(false/* destroy */);
 
         }
 
         @Override
-        synchronized public void shutdownNow() {
-            
-//            // immediate service shutdown (blocks).
-//            super.shutdownNow();
+        public void shutdownNow() {
 
-            // jini service and server shutdown.
-            server.shutdownNow(false/* destroy */);
-            
+            server.runShutdown(false/* destroy */);
+
         }
 
 //        /**
@@ -2387,6 +2365,13 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
+        @Override
+        public RunState getRunState() {
+            
+            return server.getRunState();
+            
+        }
+        
     }
 
 }

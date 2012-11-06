@@ -183,6 +183,27 @@ abstract public class BigdataServlet extends HttpServlet {
             return true;
 
         }
+
+        /*
+         * Note: This is a summary of what we need to look at to proxy a
+         * request.
+         * 
+         * Note: We need to proxy PUT, POST, DELETE requests to the quorum
+         * leader.
+         * 
+         * Note: If an NSS service is NOT joined with a met quorum, but there is
+         * a met quorum, then we should just proxy the request to the met
+         * quorum. This includes both reads and writes.
+         */
+        
+//        req.getMethod();
+//        final Enumeration<String> names = req.getHeaderNames();
+//        while(names.hasMoreElements()) {
+//            req.getHeaders(names.nextElement());
+//        }
+//        req.getInputStream();
+
+        // Note: Response also has status code plus everything above.
         
         buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                 "Not quorum leader.");

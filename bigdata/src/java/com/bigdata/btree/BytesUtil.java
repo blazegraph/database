@@ -1455,37 +1455,47 @@ public class BytesUtil {
 	 */
 	static public byte[] toArray(final ByteBuffer b) {
 
-		return toArray(b, false/* forceCopy */);
+        return toArray(b, false/* forceCopy */, null/* dst */);
 
 	}
 
-	/**
-	 * Return a byte[] having the data in the {@link ByteBuffer} from the
-	 * {@link ByteBuffer#position()} to the {@link ByteBuffer#limit()}. The
-	 * position, limit, and mark are not affected by this operation.
-	 * <p>
-	 * Under certain circumstances it is possible and may be desirable to return
-	 * the backing {@link ByteBuffer#array}. This behavior is enabled by
-	 * <code>forceCopy := false</code>.
-	 * <p>
-	 * It is possible to return the backing byte[] when the {@link ByteBuffer}
-	 * has a backing array, the array offset is ZERO (0), and the
-	 * {@link ByteBuffer#limit()} is equal to the {@link ByteBuffer#capacity()}
-	 * then the backing array is returned. Otherwise, a new byte[] must be
-	 * allocated, and the data are copied into that byte[], which may then be
-	 * returned.
-	 * 
-	 * @param b
-	 *            The {@link ByteBuffer}.
-	 * @param forceCopy
-	 *            When <code>false</code>, the backing array will be returned if
-	 *            possible.
-	 * 
-	 * @return The byte[].
-	 */
-	static public byte[] toArray(final ByteBuffer b, final boolean forceCopy) {
+    /**
+     * Return a byte[] having the data in the {@link ByteBuffer} from the
+     * {@link ByteBuffer#position()} to the {@link ByteBuffer#limit()}. The
+     * position, limit, and mark are not affected by this operation.
+     * <p>
+     * Under certain circumstances it is possible and may be desirable to return
+     * the backing {@link ByteBuffer#array}. This behavior is enabled by
+     * <code>forceCopy := false</code>.
+     * <p>
+     * It is possible to return the backing byte[] when the {@link ByteBuffer}
+     * has a backing array, the array offset is ZERO (0), and the
+     * {@link ByteBuffer#limit()} is equal to the {@link ByteBuffer#capacity()}
+     * then the backing array is returned. Otherwise, a new byte[] must be
+     * allocated, and the data are copied into that byte[], which may then be
+     * returned.
+     * 
+     * @param b
+     *            The {@link ByteBuffer}.
+     * @param forceCopy
+     *            When <code>false</code>, the backing array will be returned if
+     *            possible.
+     * @param dst
+     *            A byte[] provided by the caller (optional). When non-
+     *            <code>null</code> and having a length GTE
+     *            {@link ByteBuffer#remaining()}, this array will be preferred
+     *            to a newly allocated array.
+     * 
+     * @return The byte[] having the data. When <i>dst</i> is non-
+     *         <code>null</code> this MAY be the caller's array. When it is the
+     *         caller's array, it MAY be larger than the #of bytes actually
+     *         read.
+     */
+    static public byte[] toArray(final ByteBuffer b, final boolean forceCopy,
+            final byte[] dst) {
 
-		if (b.hasArray() && b.arrayOffset() == 0 && b.position() == 0) {
+        if (!forceCopy && b.hasArray() && b.arrayOffset() == 0
+                && b.position() == 0) {
 
 			// && b.limit() == b.capacity()
 
@@ -1507,9 +1517,10 @@ public class BytesUtil {
 
 		final int len = tmp.remaining();
 
-		final byte[] a = new byte[len];
+        final byte[] a = dst != null && dst.length >= len ? dst : new byte[len];
 
-		tmp.get(a);
+        // Transfer only the available bytes.
+        tmp.get(a, 0, len);
 
 		return a;
 

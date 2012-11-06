@@ -31,19 +31,20 @@ import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.security.DigestException;
+import java.security.MessageDigest;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.WORMStrategy;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
@@ -486,5 +487,102 @@ public class HALogReader implements IHALogReader {
 		}
 
 	}
+
+    @Override
+    public void computeDigest(final MessageDigest digest)
+            throws DigestException, IOException {
+
+        computeDigest(reopener, digest);
+        
+    }
+    
+    static void computeDigest(final IReopenChannel<FileChannel> reopener,
+            final MessageDigest digest) throws DigestException, IOException {
+
+        IBufferAccess buf = null;
+        try {
+
+            try {
+                // Acquire a buffer.
+                buf = DirectBufferPool.INSTANCE.acquire();
+            } catch (InterruptedException ex) {
+                // Wrap and re-throw.
+                throw new IOException(ex);
+            }
+
+            // The backing ByteBuffer.
+            final ByteBuffer b = buf.buffer();
+
+            // A byte[] with the same capacity as that ByteBuffer.
+            final byte[] a = new byte[b.capacity()];
+
+            // The capacity of that buffer (typically 1MB).
+            final int bufferCapacity = b.capacity();
+
+            // The size of the file at the moment we begin.
+            final long fileExtent = reopener.reopenChannel().size();
+
+            // The #of bytes whose digest will be computed.
+            final long totalBytes = fileExtent;
+
+            // The #of bytes remaining.
+            long remaining = totalBytes;
+
+            // The offset.
+            long offset = 0L;
+
+            // The block sequence.
+            long sequence = 0L;
+
+            if (log.isInfoEnabled())
+                log.info("Computing digest: nbytes=" + totalBytes);
+
+            while (remaining > 0) {
+
+                final int nbytes = (int) Math.min((long) bufferCapacity,
+                        remaining);
+
+                if (log.isDebugEnabled())
+                    log.debug("Computing digest: sequence=" + sequence
+                            + ", offset=" + offset + ", nbytes=" + nbytes);
+
+                // Setup for read.
+                b.position(0);
+                b.limit(nbytes);
+
+                // read block
+                FileChannelUtility.readAll(reopener, b, offset);
+
+                // Copy data into our byte[].
+                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
+
+                // update digest
+                digest.digest(c, 0/* off */, nbytes/* len */);
+
+                remaining -= nbytes;
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Computed digest: #blocks=" + sequence + ", #bytes="
+                        + totalBytes);
+
+            // Done.
+            return;
+
+        } finally {
+
+            if (buf != null) {
+                try {
+                    // Release the direct buffer.
+                    buf.release();
+                } catch (InterruptedException e) {
+                    log.warn(e);
+                }
+            }
+
+        }
+
+    }
 
 }

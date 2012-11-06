@@ -51,10 +51,14 @@ public class BigdataStatics {
      * easy to track down why a child process dies during service start. If you
      * want to see more output from the child process, then you should set the
      * log level for the {@link ProcessHelper} class to INFO.
+     * <p>
+     * Note: This needs to be more than the length of the {@link Banner} output
+     * in order for anything related to the process behavior to be echoed on
+     * {@link System#out}.
      * 
      * @see ProcessHelper
      */
-    public static int echoProcessStartupLineCount = 20;
+    public static int echoProcessStartupLineCount = 100;//Integer.MAX_VALUE;//100
 
     /**
      * Global switch controlling whether true thread local buffers or striped

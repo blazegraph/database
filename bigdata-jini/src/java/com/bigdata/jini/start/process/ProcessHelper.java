@@ -1,3 +1,26 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.jini.start.process;
 
 import java.io.BufferedReader;
@@ -281,7 +304,7 @@ public class ProcessHelper {
 
         // save the listener reference.
         this.listener = listener;
-    
+
         log.warn("command: " + processBuilder.command());
 //        log.warn("environment: "+builder.environment());
         
@@ -293,6 +316,29 @@ public class ProcessHelper {
 
         // start the process (it may take a bit to be really running).
         this.process = processBuilder.start();
+
+//        /*
+//         * Setup a thread that will tear down the child process if this process
+//         * is shutdown politely (SIGINT versus SIGKILL).
+//         * 
+//         * TODO This could result in a lot of threads. It would be better to
+//         * have a single thread and a concurrent weak value hash map of the
+//         * child processes (or a strong hash map with tracking of the child life
+//         * cycle events). The thread could then wipe out those children. (In
+//         * fact, the SMS may already be doing this but it really should be
+//         * encapsulated here.)
+//         */
+//        {
+//            final Process p = this.process;
+//            final Thread t = new Thread() {
+//                @Override
+//                public void run() {
+//                    p.destroy();
+//                }
+//            };
+//            t.setDaemon(true);
+//            Runtime.getRuntime().addShutdownHook(t);
+//        }
 
         // add to queue of running (or at any rate, started) processes.
         listener.add(ProcessHelper.this);
@@ -389,12 +435,21 @@ public class ProcessHelper {
              * Note: when the process is killed, readLine() will return since
              * the stream will be closed.
              */
+            boolean truncated = false;
             while ((s = is.readLine()) != null) {
 
                 if (nlines++ < BigdataStatics.echoProcessStartupLineCount) {
 
                     System.out.println(name + " : " + s);
 
+                } else if (!truncated) {
+
+                    System.out.println(name + " : output truncated after "
+                            + BigdataStatics.echoProcessStartupLineCount
+                            + " lines");
+
+                    truncated = true;
+                    
                 }
                 
                 if (log.isInfoEnabled())
@@ -551,7 +606,7 @@ public class ProcessHelper {
 
     /**
      * Return a {@link String} containing commands to set the environment for
-     * the processs.
+     * the process.
      */
     static public String getEnvironment(final ProcessBuilder processBuilder) {
         
@@ -559,7 +614,11 @@ public class ProcessHelper {
         
         for(Map.Entry<String,String> entry : processBuilder.environment().entrySet()) {
 
-            sb.append("set ");
+            if(!SystemUtil.isWindows()) {
+                sb.append("export ");
+            } else {
+                sb.append("set ");
+            }
             sb.append(entry.getKey());
             sb.append("=");
 //            sb.append("\"");

@@ -203,9 +203,6 @@ public class ServiceStarter {
 
     /**
      * A NOP impl.
-     *  
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class ServiceListener implements IServiceListener {
 
