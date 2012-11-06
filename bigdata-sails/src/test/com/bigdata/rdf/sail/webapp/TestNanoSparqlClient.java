@@ -551,24 +551,9 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
+  
+        final long rangeCount = m_repo.size();
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s
-//                null,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(7, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = m_repo.rangeCount(
-        		null,// s
-                null,// p
-                null,// o
-                null // c
-        );
         assertEquals(7, rangeCount);
         
     }
@@ -578,23 +563,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                new URIImpl("http://www.bigdata.com/Mike"),// s
-//                null,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(3, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-        final long rangeCount = m_repo.rangeCount(
-        		new URIImpl("http://www.bigdata.com/Mike"),// s
-        		null,// p
-                null,// o
-                null // c
-        );
+        final long rangeCount = m_repo.rangeCount(new URIImpl(
+                "http://www.bigdata.com/Mike"),// s
+                null,// p
+                null// o
+                );
+
         assertEquals(3, rangeCount);
         
     }
@@ -604,22 +578,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s
-//                RDF.TYPE,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(3, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = m_repo.rangeCount(
                 null,// s
                 RDF.TYPE,// p
-                null,// o
-                null // c
+                null// o
+//                null // c
         );
         assertEquals(3, rangeCount);
         
@@ -629,24 +592,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
-        
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s
-//                RDFS.LABEL,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(2, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+                
         final long rangeCount = m_repo.rangeCount(
                 null,// s
                 RDFS.LABEL,// p
-                null,// o
-                null // c
+                null// o
+//                null // c
         );
+
         assertEquals(2, rangeCount);
         
     }
@@ -655,24 +608,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
-        
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s
-//                null,// p
-//                new LiteralImpl("Mike"),// o
-//                null // c
-//        );
-//
-//        assertEquals(1, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+  
         final long rangeCount = m_repo.rangeCount(
                 null,// s
                 null,// p
-                new LiteralImpl("Mike"),// o
-                null // c
+                new LiteralImpl("Mike")// o
+                // null // c
         );
+        
         assertEquals(1, rangeCount);
         
     }
@@ -681,24 +624,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
-        
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                new URIImpl("http://www.bigdata.com/Mike"),// s,
-//                RDF.TYPE,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(1, rangeCountResult.rangeCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
+
         final long rangeCount = m_repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 RDF.TYPE,// p
-                null,// o
-                null // c
+                null//,// o
+//                null // c
         );
+
         assertEquals(1, rangeCount);
         
     }
@@ -714,22 +647,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s,
-//                null,// p
-//                null,// o
-//                null // c
-//        );
-//
-//        assertEquals(7, rangeCountResult.rangeCount);
-
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
-                null,// o
-                null // c
+                null// o
+//                null // c
         );
         assertEquals(7, rangeCount);
         
@@ -743,23 +665,13 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s,
-//                null,// p
-//                null,// o
-//                new URIImpl("http://www.bigdata.com/")// c
-//        );
-//
-//        assertEquals(3, rangeCountResult.rangeCount);
-
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
                 null,// o
                 new URIImpl("http://www.bigdata.com/")// c
         );
+
         assertEquals(3, rangeCount);
         
     }
@@ -772,23 +684,13 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                null,// s,
-//                null,// p
-//                null,// o
-//                new URIImpl("http://www.bigdata.com/c1")// c
-//        );
-//
-//        assertEquals(2, rangeCountResult.rangeCount);
-
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = m_repo.rangeCount(
                 null,// s,
                 null,// p
                 null,// o
                 new URIImpl("http://www.bigdata.com/c1")// c
         );
+        
         assertEquals(2, rangeCount);
         
     }
@@ -800,24 +702,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
-        
-//        final RangeCountResult rangeCountResult = doRangeCount(//
-//                requestPath,//
-//                new URIImpl("http://www.bigdata.com/Mike"),// s,
-//                null,// p
-//                null,// o
-//                new URIImpl("http://www.bigdata.com/c1")// c
-//        );
-//
-//        assertEquals(1, rangeCountResult.rangeCount);
 
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final long rangeCount = m_repo.rangeCount(
                 new URIImpl("http://www.bigdata.com/Mike"),// s,
                 null,// p
                 null,// o
                 new URIImpl("http://www.bigdata.com/c1")// c
         );
+        
         assertEquals(1, rangeCount);
         
     }
