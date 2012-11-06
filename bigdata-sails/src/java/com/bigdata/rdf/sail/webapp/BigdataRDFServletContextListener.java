@@ -55,6 +55,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DefaultClientDelegate;
 import com.bigdata.service.IBigdataClient;

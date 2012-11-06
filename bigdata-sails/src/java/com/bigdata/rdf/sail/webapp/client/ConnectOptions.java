@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -166,6 +168,33 @@ public class ConnectOptions {
 
         return (requestParams != null && requestParams.containsKey(name)) ? requestParams
                 .get(name)[0] : null;
+
+    }
+
+    /**
+     * Add any URL query parameters.
+     */
+    static public void addQueryParams(final StringBuilder urlString,
+            final Map<String, String[]> requestParams)
+            throws UnsupportedEncodingException {
+        if (requestParams == null)
+            return;
+        boolean first = true;
+        for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
+            urlString.append(first ? "?" : "&");
+            first = false;
+            final String name = e.getKey();
+            final String[] vals = e.getValue();
+            if (vals == null) {
+                urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
+            } else {
+                for (String val : vals) {
+                    urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
+                    urlString.append("=");
+                    urlString.append(URLEncoder.encode(val, RemoteRepository.UTF8));
+                }
+            }
+        } // next Map.Entry
 
     }
 

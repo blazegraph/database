@@ -34,6 +34,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
+import java.security.DigestException;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -67,6 +69,7 @@ import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
@@ -5099,7 +5102,7 @@ public class RWStore implements IStore, IBufferedWriter {
         clientBuffer.position(0);
         clientBuffer.limit(nbytes);
 
-        readRaw(nbytes, offset, clientBuffer);
+        readRaw(/*nbytes,*/ offset, clientBuffer);
         
         assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
 
@@ -5121,20 +5124,20 @@ public class RWStore implements IStore, IBufferedWriter {
     }
     
     /**
-     * Read on the backing file.
+     * Read on the backing file. {@link ByteBuffer#remaining()} bytes will be
+     * read into the caller's buffer, starting at the specified offset in the
+     * backing file.
      * 
-     * @param nbytes
-     *            The #of bytes to read.
      * @param offset
      *            The offset of the first byte (relative to the start of the
      *            data region).
      * @param dst
      *            Where to put the data. Bytes will be written at position until
      *            limit.
+     * 
      * @return The caller's buffer, prepared for reading.
      */
-    private ByteBuffer readRaw(final int nbytes, final long offset,
-            final ByteBuffer dst) {
+    private ByteBuffer readRaw(final long offset, final ByteBuffer dst) {
 
         final Lock readLock = m_extensionLock.readLock();
         readLock.lock();
@@ -5652,4 +5655,102 @@ public class RWStore implements IStore, IBufferedWriter {
 //
 //       ;
 //    }
+
+    /**
+     * @see IHABufferStrategy#computeDigest(Object, MessageDigest)
+     */
+    public void computeDigest(final Object snapshot, final MessageDigest digest)
+            throws DigestException, IOException {
+
+        if (snapshot != null)
+            throw new UnsupportedOperationException();
+
+        IBufferAccess buf = null;
+        try {
+
+            try {
+                // Acquire a buffer.
+                buf = DirectBufferPool.INSTANCE.acquire();
+            } catch (InterruptedException ex) {
+                // Wrap and re-throw.
+                throw new IOException(ex);
+            }
+
+            // The backing ByteBuffer.
+            final ByteBuffer b = buf.buffer();
+
+            // A byte[] with the same capacity as that ByteBuffer.
+            final byte[] a = new byte[b.capacity()];
+            
+            // The capacity of that buffer (typically 1MB).
+            final int bufferCapacity = b.capacity();
+
+            // The size of the file at the moment we begin.
+            final long fileExtent = getStoreFile().length();
+
+            // The #of bytes whose digest will be computed.
+            final long totalBytes = fileExtent;
+
+            // The #of bytes remaining.
+            long remaining = totalBytes;
+
+            // The offset of the current block.
+            long offset = 0L;
+
+            // The block sequence.
+            long sequence = 0L;
+            
+            if (log.isInfoEnabled())
+                log.info("Computing digest: nbytes=" + totalBytes);
+
+            while (remaining > 0) {
+
+                final int nbytes = (int) Math.min((long) bufferCapacity,
+                        remaining);
+
+                if (log.isDebugEnabled())
+                    log.debug("Computing digest: sequence=" + sequence
+                            + ", offset=" + offset + ", nbytes=" + nbytes);
+
+                // Setup for read.
+                b.position(0);
+                b.limit(nbytes);
+
+                // read block
+                readRaw(/*nbytes,*/ offset, b);
+
+                // Copy data into our byte[].
+                final byte[] c = BytesUtil.toArray(b, false/* forceCopy */, a);
+
+                // update digest
+                digest.digest(c, 0/* off */, nbytes/* len */);
+
+                remaining -= nbytes;
+
+                sequence++;
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Computed digest: #blocks=" + sequence + ", #bytes="
+                        + totalBytes);
+
+            // Done.
+            return;
+
+        } finally {
+
+            if (buf != null) {
+                try {
+                    // Release the direct buffer.
+                    buf.release();
+                } catch (InterruptedException e) {
+                    log.warn(e);
+                }
+            }
+
+        }
+
+    }
+
 }

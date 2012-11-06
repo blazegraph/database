@@ -197,31 +197,33 @@ public interface HAPipelineGlue extends Remote {
      */
     Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException;
 
-    /**
-     * TODO Method to compute a digest for the committed allocations on a
-     * backing store as of the commit point on which the specified transaction
-     * is reading. This may be used to verify that the backing stores are
-     * logically consistent even when they may have some discarded writes that
-     * are not present on all stores (from aborted write sets).
-     * <p>
-     * The caller can get the root blocks for the commit counter associated with
-     * the txId (if we can the readsOnCommitTime).
-     * <p>
-     * The RWStore needs to snapshot the allocators while holding the allocation
-     * lock and that snapshot MUST be for the same commit point. Therefore, this
-     * operation needs to be submitted by the leader in code that can guarantee
-     * that the leader does not go through a commit point. The snapshots should
-     * be stored at the nodes, not shipped to the leader. The leader therefore
-     * needs to know when each snapshot is ready so it can exit the critical
-     * code and permit additional writes (releasing the allocLock or the
-     * semaphore on the journal).
-     * 
-     * <pre>
-     * IHAStoreChecksumRequest {storeUUID, txid (of readLock)}
-     * 
-     * IHAStoreCheckSumResponse {MD5Digest}
-     * </pre>
-     */
+//    /**
+//     * There is something for this on HAGlue right now.
+//     *
+//     * TODO Method to compute a digest for the committed allocations on a
+//     * backing store as of the commit point on which the specified transaction
+//     * is reading. This may be used to verify that the backing stores are
+//     * logically consistent even when they may have some discarded writes that
+//     * are not present on all stores (from aborted write sets).
+//     * <p>
+//     * The caller can get the root blocks for the commit counter associated with
+//     * the txId (if we can the readsOnCommitTime).
+//     * <p>
+//     * The RWStore needs to snapshot the allocators while holding the allocation
+//     * lock and that snapshot MUST be for the same commit point. Therefore, this
+//     * operation needs to be submitted by the leader in code that can guarantee
+//     * that the leader does not go through a commit point. The snapshots should
+//     * be stored at the nodes, not shipped to the leader. The leader therefore
+//     * needs to know when each snapshot is ready so it can exit the critical
+//     * code and permit additional writes (releasing the allocLock or the
+//     * semaphore on the journal).
+//     * 
+//     * <pre>
+//     * IHAStoreChecksumRequest {storeUUID, txid (of readLock)}
+//     * 
+//     * IHAStoreCheckSumResponse {MD5Digest}
+//     * </pre>
+//     */
 //    Future<IHASnapshotDigestResponse> computeSnapshotDigest(IHASnapshotDigestRequest req) throws IOException;
     
 }

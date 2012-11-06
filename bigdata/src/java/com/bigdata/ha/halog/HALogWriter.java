@@ -29,12 +29,13 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.security.DigestException;
+import java.security.MessageDigest;
 import java.util.Formatter;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.log.Log;
 
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.FileChannelUtility;
@@ -875,6 +876,14 @@ public class HALogWriter {
 				m_state.close();
 			}
 		}
+
+        @Override
+        public void computeDigest(MessageDigest digest) throws DigestException,
+                IOException {
+
+            HALogReader.computeDigest(m_state.reopener, digest);
+            
+        }
 
 	}
 }

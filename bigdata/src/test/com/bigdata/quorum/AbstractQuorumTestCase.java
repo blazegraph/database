@@ -34,8 +34,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
-import junit.framework.TestCase2;
 
+import com.bigdata.io.TestCase3;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
@@ -46,7 +46,7 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractQuorumTestCase extends TestCase2 {
+abstract public class AbstractQuorumTestCase extends TestCase3 {
 
     public AbstractQuorumTestCase() {
         
@@ -177,62 +177,65 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
      */
     static public void assertCondition(final Runnable cond,
             final long timeout, final TimeUnit units) {
-        final long begin = System.nanoTime();
-        final long nanos = units.toNanos(timeout);
-        long remaining = nanos;
-        // remaining = nanos - (now - begin) [aka elapsed]
-        remaining = nanos - (System.nanoTime() - begin);
-        while (true) {
-            try {
-                // try the condition
-                cond.run();
-                // success.
-                return;
-            } catch (final AssertionFailedError e) {
-                remaining = nanos - (System.nanoTime() - begin);
-                if (remaining < 0) {
-                    // Timeout - rethrow the failed assertion.
-                    throw e;
-                }
-                // Sleep up to 10ms or the remaining nanos, which ever is less.
-                final int millis = (int) Math.min(
-                        TimeUnit.NANOSECONDS.toMillis(remaining), 10);
-                if (millis > 0) {
-                    // sleep and retry.
-                    try {
-                        Thread.sleep(millis);
-                    } catch (InterruptedException e1) {
-                        // propagate the interrupt.
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                    remaining = nanos - (System.nanoTime() - begin);
-                    if (remaining < 0) {
-                        // Timeout - rethrow the failed assertion.
-                        throw e;
-                    }
-                }
-            }
-        }
+
+        TestCase3.assertCondition(cond, timeout, units);
+        
+//        final long begin = System.nanoTime();
+//        final long nanos = units.toNanos(timeout);
+//        long remaining = nanos;
+//        // remaining = nanos - (now - begin) [aka elapsed]
+//        remaining = nanos - (System.nanoTime() - begin);
+//        while (true) {
+//            try {
+//                // try the condition
+//                cond.run();
+//                // success.
+//                return;
+//            } catch (final AssertionFailedError e) {
+//                remaining = nanos - (System.nanoTime() - begin);
+//                if (remaining < 0) {
+//                    // Timeout - rethrow the failed assertion.
+//                    throw e;
+//                }
+//                // Sleep up to 10ms or the remaining nanos, which ever is less.
+//                final int millis = (int) Math.min(
+//                        TimeUnit.NANOSECONDS.toMillis(remaining), 10);
+//                if (millis > 0) {
+//                    // sleep and retry.
+//                    try {
+//                        Thread.sleep(millis);
+//                    } catch (InterruptedException e1) {
+//                        // propagate the interrupt.
+//                        Thread.currentThread().interrupt();
+//                        return;
+//                    }
+//                    remaining = nanos - (System.nanoTime() - begin);
+//                    if (remaining < 0) {
+//                        // Timeout - rethrow the failed assertion.
+//                        throw e;
+//                    }
+//                }
+//            }
+//        }
     }
 
-    /**
-     * Waits up to 5 seconds for the condition to succeed.
-     * 
-     * @param cond
-     *            The condition, which must throw an
-     *            {@link AssertionFailedError} if it does not succeed.
-     * 
-     * @throws AssertionFailedError
-     *             if the condition does not succeed within the timeout.
-     * 
-     * @see #assertCondition(Runnable, long, TimeUnit)
-     */
-    static public void assertCondition(final Runnable cond) {
-        
-        assertCondition(cond, 5, TimeUnit.SECONDS);
-        
-    }
+//    /**
+//     * Waits up to 5 seconds for the condition to succeed.
+//     * 
+//     * @param cond
+//     *            The condition, which must throw an
+//     *            {@link AssertionFailedError} if it does not succeed.
+//     * 
+//     * @throws AssertionFailedError
+//     *             if the condition does not succeed within the timeout.
+//     * 
+//     * @see #assertCondition(Runnable, long, TimeUnit)
+//     */
+//    static public void assertCondition(final Runnable cond) {
+//        
+//        assertCondition(cond, 5, TimeUnit.SECONDS);
+//        
+//    }
 
     /**
      * Helper method provides nice rendering of a votes snapshot.

@@ -23,14 +23,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.ha;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.rmi.Remote;
+import java.security.DigestException;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
+import com.bigdata.ha.msg.IHADigestRequest;
+import com.bigdata.ha.msg.IHADigestResponse;
+import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
+import com.bigdata.ha.msg.IHALogDigestRequest;
+import com.bigdata.ha.msg.IHALogDigestResponse;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionService;
+import com.bigdata.journal.Journal;
 import com.bigdata.service.IService;
 
 /**
@@ -56,7 +66,7 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      * 
      * @todo Move to an HAAdminGlue interface?
      */
-
+    
     /**
      * This method may be issued to force the service to close and then reopen
      * its zookeeper connection. This is a drastic action which will cause all
@@ -98,4 +108,64 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      */
     int getNSSPort() throws IOException;
     
+    /**
+     * The {@link RunState} of the service.
+     */
+    RunState getRunState() throws IOException;
+
+    /**
+     * Compute the digest of the backing store - <strong>THIS METHOD IS ONLY FOR
+     * DIAGNOSTIC PURPOSES.</strong>
+     * <p>
+     * The digest is useless if there are concurrent writes since it can not be
+     * meaningfully compared with the digest of another store unless both stores
+     * are known to be stable.
+     */
+    IHADigestResponse computeDigest(IHADigestRequest req) throws IOException,
+            NoSuchAlgorithmException, DigestException;
+
+    /**
+     * Compute the digest of a HALog file - <strong>THIS METHOD IS ONLY FOR
+     * DIAGNOSTIC PURPOSES.</strong>
+     * <p>
+     * The digest is useless if there are concurrent writes since it can not be
+     * meaningfully compared with the digest of another store unless both stores
+     * are known to be stable.
+     * 
+     * @throws FileNotFoundException
+     *             if the HALog for the specified commit point does not exist.
+     */
+    IHALogDigestResponse computeHALogDigest(IHALogDigestRequest req) throws IOException,
+            NoSuchAlgorithmException, DigestException;
+
+    /**
+     * Obtain a global write lock on the leader. The lock only blocks writers.
+     * Readers may continue to execute without delay.
+     * <p>
+     * You can not obtain a coherent backup of the {@link Journal} while there
+     * are concurrent write operations. This method may be used to coordinate
+     * full backups of the {@link Journal} by suspending low level writes on the
+     * backing file.
+     * <p>
+     * This method will block until the lock is held, the lock request is
+     * interrupted, or the lock request timeout expires.
+     * 
+     * @param req
+     *            The request.
+     * 
+     * @return A {@link Future} for the lock. The lock may be released by
+     *         canceling the {@link Future}. The lock is acquired before this
+     *         method returns and is held while the {@link Future} is running.
+     *         If the {@link Future#isDone()} then the lock is no longer held.
+     * 
+     * @throws IOException
+     *             if there is an RMI problem.
+     * @throws TimeoutException
+     *             if a timeout expires while awaiting the global lock.
+     * @throws InterruptedException
+     *             if interrupted while awaiting the lock.
+     */
+    Future<Void> globalWriteLock(IHAGlobalWriteLockRequest req)
+            throws IOException, TimeoutException, InterruptedException;
+
 }

@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.concurrent.Future;
 
@@ -151,11 +152,18 @@ public interface IHABufferStrategy extends IBufferStrategy {
     Object snapshotAllocators();
 
     /**
-     * Compute the digest using the snapshot.
+     * Compute the digest.
+     * <p>
+     * Note: The digest is not reliable unless you either use a snapshot or
+     * suspend writes (on the quorum) while it is computed.
      * 
      * @param snapshot
-     *            The allocator snapshot.
+     *            The allocator snapshot (optional). When given, the digest is
+     *            computed only for the snapshot. When <code>null</code> it is
+     *            computed for the entire file.
+     * @throws DigestException
      */
-    void computeDigest(Object snapshot, MessageDigest digest);
+    void computeDigest(Object snapshot, MessageDigest digest)
+            throws DigestException, IOException;
 
 }

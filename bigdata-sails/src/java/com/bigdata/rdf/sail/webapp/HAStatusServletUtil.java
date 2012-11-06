@@ -178,7 +178,8 @@ public class HAStatusServletUtil {
 
             final UUID[] pipeline = quorum.getPipeline();
 
-            for (UUID serviceId : quorum.getMembers()) {
+            // In pipeline order.
+            for (UUID serviceId : pipeline) {
 
                 final HAGlue remoteService;
                 try {
@@ -196,8 +197,9 @@ public class HAStatusServletUtil {
                 }
 
                 /*
-                 * Note: This is not actually reporting the interface
-                 * that the port is exposed to.
+                 * TODO When there are multiple ethernet interfaces, is not
+                 * necessarily reporting the interface(s) that the port is
+                 * exposed to.
                  */
 
                 final String hostname = remoteService.getHostname();
@@ -211,10 +213,13 @@ public class HAStatusServletUtil {
 
                 final int pipelineIndex = indexOf(serviceId, pipeline);
                 
-                p.text(hostname
-                        + " : nssPort="
-                        + nssPort
-                        + " : "
+                final String nssUrl = "http://" + hostname + ":" + nssPort;
+                
+                // hyper link to NSS service.
+                p.node("a").attr("href", nssUrl).text(nssUrl).close();
+
+                // plus the other metadata.
+                p.text(" : "
                         + (isLeader ? "leader"
                                 : (isFollower ? "follower"
                                         : " is not joined"))
