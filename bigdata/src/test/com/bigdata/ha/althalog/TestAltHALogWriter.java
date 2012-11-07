@@ -1,3 +1,27 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 package com.bigdata.ha.althalog;
 
 import java.io.File;
@@ -28,14 +52,22 @@ public class TestAltHALogWriter extends TestCase {
 	// final File m_logdir = new File("/Volumes/SSDData/tmp/halogdir");
 
 	protected void setUp() {
-		m_logdir.mkdirs();
+		try {
+			m_logdir.mkdirs();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	protected void tearDown() {
 		// clear directory
 		final File[] files = m_logdir.listFiles();
 		for (int i = 0; i < files.length; i++) {
-			files[i].delete();
+			try {
+				files[i].delete();
+			} catch (Exception e) {
+				// ignore
+			}
 		}
 	}
 
@@ -51,6 +83,7 @@ public class TestAltHALogWriter extends TestCase {
 	 * storeTypeEnum, // VERSION1 final long createTime, final long closeTime,
 	 * final int version, final ChecksumUtility checker)
 	 */
+	@SuppressWarnings("deprecation")
 	private IRootBlockView openRBV(final StoreTypeEnum st) {
 		return new RootBlockView(
 				//
@@ -66,6 +99,7 @@ public class TestAltHALogWriter extends TestCase {
 				ChecksumUtility.getCHK());
 	}
 
+	@SuppressWarnings("deprecation")
 	private static IRootBlockView closeRBV(final IRootBlockView rbv) {
 		return new RootBlockView(
 				//
@@ -95,6 +129,7 @@ public class TestAltHALogWriter extends TestCase {
 	/**
 	 * Simple writelog test, open file, write data and commit.
 	 */
+	@SuppressWarnings("deprecation")
 	public void testSimpleRWWriter() throws FileNotFoundException, IOException {
 
 		final ChecksumUtility checker = ChecksumUtility.getCHK();
@@ -104,7 +139,7 @@ public class TestAltHALogWriter extends TestCase {
 
 		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
 
-		final HALogWriter writer = manager.createLog(rbv).getWriter();
+		final IHALogWriter writer = manager.createLog(rbv).getWriter();
 
 		int sequence = 0;
 
@@ -130,6 +165,7 @@ public class TestAltHALogWriter extends TestCase {
 	/**
 	 * Simple WriteReader, no concurrency, confirms non-delayed responses.
 	 */
+	@SuppressWarnings("deprecation")
 	public void testSimpleRWWriterReader() throws FileNotFoundException,
 			IOException {
 
@@ -141,7 +177,7 @@ public class TestAltHALogWriter extends TestCase {
 		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
 
 		final HALogFile logfile = manager.createLog(rbv);
-		final HALogWriter writer = logfile.getWriter();
+		final IHALogWriter writer = logfile.getWriter();
 
 		int sequence = 0;
 
@@ -169,6 +205,12 @@ public class TestAltHALogWriter extends TestCase {
 		// the writer should have closed the file, so the reader should return
 		// immediately to report no more buffers
 		assertFalse(reader.hasMoreBuffers());
+		
+		assertTrue(logfile.isOpen());
+
+		reader.close();
+		
+		assertFalse(logfile.isOpen());
 
 		// for sanity, let's run through the standard reader
 		try {
@@ -176,6 +218,46 @@ public class TestAltHALogWriter extends TestCase {
 		} catch (InterruptedException e) {
 			// NOP
 		}
+	}
+	
+	@SuppressWarnings("deprecation")
+	public void testDisableLogFile() throws IOException {
+		final ChecksumUtility checker = ChecksumUtility.getCHK();
+
+		final HALogManager manager = new HALogManager(m_logdir);
+		final IRootBlockView rbv = openRBV(StoreTypeEnum.RW);
+
+		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
+
+		final IHALogWriter writer = manager.createLog(rbv).getWriter();
+
+		int sequence = 0;
+
+		final ByteBuffer data = randomData(2000);
+
+		IHAWriteMessage msg = new HAWriteMessage(rbv.getCommitCounter(), rbv
+				.getFirstCommitTime(), sequence, data.limit(), checker
+				.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
+				1000, 0);
+
+		writer.write(msg, data);
+
+		// disable current writer
+		manager.disable();
+		
+		try {
+			IHAWriteMessage msg2 = new HAWriteMessage(rbv.getCommitCounter(), rbv
+					.getFirstCommitTime(), sequence+1, data.limit(), checker
+					.checksum(data), rbv.getStoreType(), rbv.getQuorumToken(),
+					1000, 0);
+	
+			writer.write(msg2, data);
+			fail("The file should have been disabled!");
+		} catch (IllegalStateException ise) {
+			// expected since it was disabled
+		}
+
+		
 	}
 
 	/**
@@ -188,7 +270,7 @@ public class TestAltHALogWriter extends TestCase {
 
 		private final HALogManager manager;
 		private IRootBlockView rbv;
-		private HALogWriter writer;
+		private IHALogWriter writer;
 		private ChecksumUtility checker;
 		private int count;
 
@@ -237,7 +319,7 @@ public class TestAltHALogWriter extends TestCase {
 
 	}
 
-	class ReaderRun implements Runnable {
+	static class ReaderRun implements Runnable {
 
 		final HALogManager manager;
 		final AtomicInteger reads;
@@ -284,6 +366,11 @@ public class TestAltHALogWriter extends TestCase {
 				e.printStackTrace();
 			} finally {
 				openReaders.decrementAndGet();
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 
@@ -293,6 +380,7 @@ public class TestAltHALogWriter extends TestCase {
 	 * While a writer thread writes a number of HALogs, readers are opened to
 	 * process them.
 	 */
+	@SuppressWarnings("deprecation")
 	public void testStressConcurrentRWWriterReader() throws FileNotFoundException,
 			IOException {
 		// establish halogdir
@@ -303,7 +391,7 @@ public class TestAltHALogWriter extends TestCase {
 
 		assertTrue(rbv.getStoreType() == StoreTypeEnum.RW);
 
-		final int recordWrites = 10000;
+		final int recordWrites = 5000;
 
 		Thread wthread = new Thread(
 				new SimpleWriter(rbv, manager, checker, recordWrites));
@@ -318,8 +406,12 @@ public class TestAltHALogWriter extends TestCase {
 
 		// now keep on opening readers for "current file" while writer continues
 		while (wthread.isAlive()) {
-			Thread rthread = new Thread(new ReaderRun(manager, reads, openReaders));
-			rthread.start();
+			// Prevent too many readers starting up that can result in too much
+			//	contention.
+			if (openReaders.get() < 20) {
+				Thread rthread = new Thread(new ReaderRun(manager, reads, openReaders));
+				rthread.start();
+			}
 			
 			try {
 				// keep starting readers, there may be multiple readers over a single file
@@ -327,15 +419,6 @@ public class TestAltHALogWriter extends TestCase {
 			} catch (InterruptedException e) {
 				break;
 			}
-
-			// Previously we just cycled around with new readers, but only one at a time
-//			while (rthread.isAlive()) {
-//				try {
-//					Thread.sleep(10);
-//				} catch (InterruptedException e) {
-//					break;
-//				}
-//			}
 		}
 		
 		while (openReaders.get() > 0)

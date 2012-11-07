@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -25,6 +25,8 @@ package com.bigdata.ha.althalog;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.DigestException;
+import java.security.MessageDigest;
 
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -34,6 +36,8 @@ import com.bigdata.journal.WORMStrategy;
 
 /**
  * Interface for reading on an HA Log.
+ * 
+ * Readers can be requested of any HALogFile.
  */
 public interface IHALogReader {
 	
@@ -50,6 +54,12 @@ public interface IHALogReader {
 	 * length.
 	 */
 	boolean isEmpty();
+	
+	/**
+	 * The {@link IRootBlockView} for the committed state BEFORE the write set
+	 * contained in the HA log file has been applied.
+	 */
+	IRootBlockView getOpeningRootBlock();
 	
 	/**
 	 * The {@link IRootBlockView} for the committed state AFTER the write set
@@ -80,5 +90,8 @@ public interface IHALogReader {
 	 *            A buffer from the {@link DirectBufferPool#INSTANCE}.
 	 */
 	IHAWriteMessage processNextBuffer(final ByteBuffer clientBuffer) throws IOException;
+
+	void computeDigest(MessageDigest digest) throws DigestException,
+			IOException;
 
 }
