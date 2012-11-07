@@ -58,7 +58,7 @@ public class BigdataStatics {
      * 
      * @see ProcessHelper
      */
-    public static int echoProcessStartupLineCount = 100;//Integer.MAX_VALUE;//100
+    public static int echoProcessStartupLineCount = 30;//Integer.MAX_VALUE;//100
 
     /**
      * Global switch controlling whether true thread local buffers or striped

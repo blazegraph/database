@@ -159,11 +159,11 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
             if (leader == serverA) {
 
-                serverB.bounceZookeeperConnection();
+                serverB.bounceZookeeperConnection().get();
 
             } else {
 
-                serverA.bounceZookeeperConnection();
+                serverA.bounceZookeeperConnection().get();
 
             }
 
@@ -231,13 +231,13 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
-            leader.bounceZookeeperConnection();
+            leader.bounceZookeeperConnection().get();
 
             final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
                     TimeUnit.MILLISECONDS);
 
             /*
-             * Bouncing the connection broke the quorun, so verify that the
+             * Bouncing the connection broke the quorum, so verify that the
              * quorum token was advanced.
              */
             assertEquals(token1 + 1, token2);
@@ -278,7 +278,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         HAGlue serverA = startA();
         HAGlue serverB = startB();
         
-        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
 
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
@@ -325,7 +326,11 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             // The leader should not have changed.
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-            assertTrue(leader == leader2);
+            if (leader != leader2) {
+             
+                fail("Expected leader=" + leader + ", but was " + leader2);
+                
+            }
             
             /*
              * Verify we can read on the KB on both nodes.

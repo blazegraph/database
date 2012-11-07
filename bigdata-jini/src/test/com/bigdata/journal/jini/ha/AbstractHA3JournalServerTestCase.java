@@ -157,6 +157,11 @@ public class AbstractHA3JournalServerTestCase extends
             if (processHelper != this.processHelper)
                 throw new AssertionError();
 
+            /*
+             * Note: Do not clear the [processHelper] field.
+             */
+
+            // Mark the process as known dead.
             dead = true;
 
         }
@@ -524,36 +529,46 @@ public class AbstractHA3JournalServerTestCase extends
         });
 
         try {
-            
+
             assertCondition(new Runnable() {
                 public void run() {
                     // Wait for the process death.
                     assertTrue(serviceListener.isDead());
                 }
-            });
+            }, 10/* timeout */, TimeUnit.SECONDS);
 
-        } catch (AssertionFailedError err) {
+        } catch (junit.framework.AssertionFailedError err) {
         
             /*
              * If we do not observe a normal process death, then attempt to kill
              * the child process.
              */
 
-            log.error("Forcing kill of child process.");
-            
             try {
 
-                serviceListener.getProcessHelper()
-                        .kill(true/* immediateShutdown */);
-                
+                final ProcessHelper processHelper = serviceListener
+                        .getProcessHelper();
+
+                if (processHelper != null) {
+
+                    log.error("Forcing kill of child process.");
+
+                    processHelper.kill(true/* immediateShutdown */);
+
+                } else {
+
+                    log.error("Child process not correctly terminated.");
+                    
+                }
+
             } catch (InterruptedException e) {
                 
                 // Ignore.
                 
             }
 
-            throw err;
-            
+            fail("Process did not die by itself: " + haGlue, err);
+
         }
         
     }

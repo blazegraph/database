@@ -63,6 +63,7 @@ import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumWatcher;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 
@@ -1393,16 +1394,21 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                     handleExpired();
                 } catch (KeeperException e1) {
                     log.error(e, e1);
-                } catch (InterruptedException e1) {
-                    /*
-                     * Note: This exception probably only occurs through
-                     * the shutdown of the ZKQuorumWatcher, which will
-                     * shutdown the service handling the event.
-                     */
-                    if (log.isInfoEnabled())
-                        log.info(e1);
+//                } catch (InterruptedException e1) {
+//                    if (log.isInfoEnabled())
+//                        log.info(e1);
                 } catch (Throwable e1) {
-                    log.error(e, e1);
+                    if (InnerCause.isInnerCause(e1, InterruptedException.class)) {
+                        /*
+                         * Note: This exception probably only occurs through the
+                         * shutdown of the ZKQuorumWatcher, which will shutdown
+                         * the service handling the event.
+                         */
+                        if (log.isInfoEnabled())
+                            log.info(e1);
+                    } else {
+                        log.error(e, e1);
+                    }
                 }
             }
         }
