@@ -1499,4 +1499,35 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    /**
+     * Wait until the quorum meets at the successor of the given token.
+     * 
+     * @param token
+     *            A token.
+     */
+    protected long awaitNextQuorumMeet(final long token) {
+
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    final long token2 = quorum.awaitQuorum(100/* ms */,
+                            TimeUnit.MILLISECONDS);
+                    if (token + 1 == token2) {
+                        // Success.
+                        return;
+                    }
+                    // Fail unless we meet at the next token.
+                    assertEquals(token + 1, token2);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, 10, TimeUnit.SECONDS);
+
+        quorum.assertQuorum(token+1);
+        
+        return token + 1;
+        
+    }
+
 }

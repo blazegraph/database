@@ -167,8 +167,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
             }
 
-            final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
-                    TimeUnit.MILLISECONDS);
+            // Wait for the quorum to break and then meet again.
+            final long token2 = awaitNextQuorumMeet(token1);
 
             /*
              * Bouncing the connection broke the quorun, so verify that the
@@ -233,8 +233,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
             leader.bounceZookeeperConnection().get();
 
-            final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
-                    TimeUnit.MILLISECONDS);
+            // Wait for the quorum to break and then meet again.
+            final long token2 = awaitNextQuorumMeet(token1);
 
             /*
              * Bouncing the connection broke the quorum, so verify that the
@@ -309,13 +309,14 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             }
 
             /*
+             * Wait for the quorum to break and then meet again.
+             * 
              * FIXME This is failing because the other service did not withdraw
              * its vote (for lastCommitTime=0L) and the service that is
              * restarted is voting for the lastCommitTime associated with the KB
              * create commit point.
              */
-            final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
-                    TimeUnit.MILLISECONDS);
+            final long token2 = awaitNextQuorumMeet(token1);
 
             /*
              * Bouncing the connection broke the quorun, so verify that the
@@ -394,13 +395,14 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             }
 
             /*
+             * Wait for the quorum to break and then meet again.
+             * 
              * FIXME This is failing because the other service did not withdraw
              * its vote (for lastCommitTime=0L) and the service that is
              * restarted is voting for the lastCommitTime associated with the KB
              * create commit point.
              */
-            final long token2 = quorum.awaitQuorum(awaitQuorumTimeout,
-                    TimeUnit.MILLISECONDS);
+            final long token2 = awaitNextQuorumMeet(token1);
 
             /*
              * Bouncing the connection broke the quorun, so verify that the
