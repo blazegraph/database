@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.ha.HAGlue;
@@ -157,6 +158,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
+            final UUID leaderId1 = leader.getServiceId();
+            
             if (leader == serverA) {
 
                 serverB.bounceZookeeperConnection().get();
@@ -179,7 +182,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             // The leader should not have changed (we bounced the follower).
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-            assertTrue(leader == leader2);
+            final UUID leaderId2 = leader2.getServiceId();
+
+            assertFalse(leaderId1.equals(leaderId2));
             
             /*
              * Verify we can read on the KB on both nodes.
@@ -211,8 +216,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         
         HAGlue serverA = startA();
         HAGlue serverB = startB();
-        
-        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
+
+        final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
 
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
@@ -231,6 +237,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
+            final UUID leaderId1 = leader.getServiceId();
+            
             leader.bounceZookeeperConnection().get();
 
             // Wait for the quorum to break and then meet again.
@@ -245,7 +253,9 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             // The leader should have changed.
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-            assertFalse(leader == leader2);
+            final UUID leaderId2 = leader2.getServiceId();
+
+            assertFalse(leaderId1.equals(leaderId2));
             
             /*
              * Verify we can read on the KB on both nodes.
@@ -295,31 +305,33 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
          * on all services.
          */
         {
- 
+
             final HAGlue leader = quorum.getClient().getLeader(token1);
-        
-            if (leader == serverA) {
+
+            final UUID leaderId1 = leader.getServiceId();
+
+            if (leaderId1.equals(serverA.getServiceId())) {
 
                 serverB = restartB();
-                
-            } else {
-                
+
+            } else if (leaderId1.equals(serverB.getServiceId())) {
+
                 serverA = restartA();
-                
+
+            } else {
+
+                throw new AssertionError("leader=" + leader + ", serverA="
+                        + serverA + ", serverB=" + serverB);
+
             }
 
             /*
              * Wait for the quorum to break and then meet again.
-             * 
-             * FIXME This is failing because the other service did not withdraw
-             * its vote (for lastCommitTime=0L) and the service that is
-             * restarted is voting for the lastCommitTime associated with the KB
-             * create commit point.
              */
             final long token2 = awaitNextQuorumMeet(token1);
 
             /*
-             * Bouncing the connection broke the quorun, so verify that the
+             * Bouncing the connection broke the quorum, so verify that the
              * quorum token was advanced.
              */
             assertEquals(token1 + 1, token2);
@@ -327,10 +339,13 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             // The leader should not have changed.
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-            if (leader != leader2) {
-             
-                fail("Expected leader=" + leader + ", but was " + leader2);
-                
+            final UUID leaderId2 = leader2.getServiceId();
+
+            if (!leaderId1.equals(leaderId2)) {
+
+                fail("Expected leaderId=" + leaderId1 + ", but was "
+                        + leaderId2);
+
             }
             
             /*
@@ -384,23 +399,25 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             final HAGlue leader = quorum.getClient().getLeader(token1);
         
-            if (leader == serverA) {
-            
+            final UUID leaderId1 = leader.getServiceId();
+
+            if (leaderId1.equals(serverA.getServiceId())) {
+
                 serverA = restartA();
-                
-            } else {
-                
+
+            } else if (leaderId1.equals(serverB.getServiceId())) {
+
                 serverB = restartB();
-                
+
+            } else {
+
+                throw new AssertionError("leader=" + leader + ", serverA="
+                        + serverA + ", serverB=" + serverB);
+
             }
 
             /*
              * Wait for the quorum to break and then meet again.
-             * 
-             * FIXME This is failing because the other service did not withdraw
-             * its vote (for lastCommitTime=0L) and the service that is
-             * restarted is voting for the lastCommitTime associated with the KB
-             * create commit point.
              */
             final long token2 = awaitNextQuorumMeet(token1);
 
@@ -413,7 +430,14 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             // The leader should have changed.
             final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-            assertFalse(leader == leader2);
+            final UUID leaderId2 = leader2.getServiceId();
+
+            if (leaderId1.equals(leaderId2)) {
+
+                fail("Expected leaderId=" + leaderId1 + ", but was "
+                        + leaderId2);
+
+            }
             
             /*
              * Verify we can read on the KB on both nodes.

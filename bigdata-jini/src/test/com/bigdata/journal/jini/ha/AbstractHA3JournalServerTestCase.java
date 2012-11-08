@@ -703,6 +703,11 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    /**
+     * Task to start an {@link HAJournalServer} in a new JVM.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
     abstract private class StartServerTask implements Callable<HAGlue> {
 
         private final String name;
