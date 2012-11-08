@@ -32,7 +32,6 @@ import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -163,6 +162,7 @@ import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
@@ -172,6 +172,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PropertyUtil;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
@@ -1523,32 +1524,46 @@ abstract public class AbstractTripleStore extends
     @Override
     public void create() {
 
+        if (log.isInfoEnabled())
+            log.info(toString());
+
         assertWritable();
-        
-        final Properties tmp = getProperties();
-        
-        // set property that will let the contained relations locate their container.
-        tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
-
-        if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
-                Options.DEFAULT_TEXT_INDEX))) {
-
-            /*
-             * If the text index is enabled for a new kb instance, then disable
-             * the fieldId component of the full text index key since it is not
-             * used by the RDF database and will just waste space in the index.
-             * 
-             * Note: Also see below where this is set on the global row store.
-             */
-            tmp.setProperty(FullTextIndex.Options.FIELDS_ENABLED, "false");
-            
-        }
        
         final IResourceLock resourceLock = acquireExclusiveLock();
 
         try {
 
-            super.create();
+            final Properties tmp = PropertyUtil.flatCopy(getProperties());
+            
+            // set property that will let the contained relations locate their container.
+            tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
+
+            if (Boolean.valueOf(tmp.getProperty(Options.TEXT_INDEX,
+                    Options.DEFAULT_TEXT_INDEX))) {
+
+                /*
+                 * If the text index is enabled for a new kb instance, then disable
+                 * the fieldId component of the full text index key since it is not
+                 * used by the RDF database and will just waste space in the index.
+                 * 
+                 * Note: Also see below where this is set on the global row store.
+                 */
+                tmp.setProperty(FullTextIndex.Options.FIELDS_ENABLED, "false");
+                
+            }
+           
+            /**
+             * We must not write the properties onto the global row store until
+             * they have been fully initialized.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/617">
+             *      Concurrent KB create fails with "No axioms defined?" </a>
+             */
+//            super.create();
+
+            final String SPO_NAMESPACE = getNamespace() + "."
+                    + SPORelation.NAME_SPO_RELATION;
 
             final String LEXICON_NAMESPACE = lexicon ? getNamespace() + "."
                     + LexiconRelation.NAME_LEXICON_RELATION : null;
@@ -1581,9 +1596,10 @@ abstract public class AbstractTripleStore extends
 
                 }
                 
-                lexiconRelation = new LexiconRelation(getIndexManager(),
-                        LEXICON_NAMESPACE,
-                        getTimestamp(), tmp);
+                lexiconRelation = new LexiconRelation(this/* container */,
+                        getIndexManager(), LEXICON_NAMESPACE, getTimestamp(),
+                        new Properties(tmp)// Note: Must wrap properties!
+                );
 
                 lexiconRelation.create();//assignedSplits);
                 
@@ -1591,8 +1607,10 @@ abstract public class AbstractTripleStore extends
 
             }
 
-            spoRelation = new SPORelation(getIndexManager(), getNamespace()
-                    + "." + SPORelation.NAME_SPO_RELATION, getTimestamp(), tmp);
+            spoRelation = new SPORelation(this/* container */,
+                    getIndexManager(), SPO_NAMESPACE, getTimestamp(),
+                    new Properties(tmp)// Note: must wrap properties!
+            );
 
             spoRelation.create();//assignedSplits);
 
@@ -1628,51 +1646,89 @@ abstract public class AbstractTripleStore extends
 
                 }
 
-                /*
-                 * Update the global row store to set the axioms and the
-                 * vocabulary objects.
-                 */
-                {
-
-                    final Map<String, Object> map = new HashMap<String, Object>();
-
-                    // primary key.
-                    map.put(RelationSchema.NAMESPACE, getNamespace());
-
-                    // axioms.
-                    map.put(TripleStoreSchema.AXIOMS, axioms);
-//                    setProperty(TripleStoreSchema.AXIOMS,axioms);
-
-                    // vocabulary.
-                    map.put(TripleStoreSchema.VOCABULARY, vocabRef.get());
-//                    setProperty(TripleStoreSchema.VOCABULARY,vocab);
-
-                    if (lexiconRelation.isTextIndex()) {
-                        /*
-                         * Per the logic and commentary at the top of create(),
-                         * disable this option on the global row store.
-                         */
-                        map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
-                    }
-                    
-                    // Write the map on the row store.
-                    getIndexManager().getGlobalRowStore().write(
-                            RelationSchema.INSTANCE, map);
-
-                }
-
             }
         
-            /*
-             * Note: A commit is required in order for a read-committed view to
-             * have access to the registered indices.
+            /**
+             * Write on the global row store. We atomically set all
+             * properties, including the axioms and the vocabulary objects.
              * 
-             * @todo have the caller do this? It does not really belong here
-             * since you can not make a large operation atomic if you do a
-             * commit here.
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/617">
+             *      Concurrent KB create fails with "No axioms defined?"
+             *      </a>
              */
+            {
 
-            commit();
+                /*
+                 * Convert the Properties to a Map.
+                 */
+                final Map<String, Object> map = GlobalRowStoreUtil.convert(tmp);
+
+                // primary key.
+                map.put(RelationSchema.NAMESPACE, getNamespace());
+
+                if (axioms != null) {
+                    // axioms.
+                    map.put(TripleStoreSchema.AXIOMS, axioms);
+                    // setProperty(TripleStoreSchema.AXIOMS,axioms);
+                }
+
+                if (vocabRef.get() != null) {
+                    // vocabulary.
+                    map.put(TripleStoreSchema.VOCABULARY, vocabRef.get());
+                    // setProperty(TripleStoreSchema.VOCABULARY,vocab);
+                }
+
+                /*
+                 * Note: This will now be false automatically since the [map] is
+                 * based on the Properties object [tmp] and we have already set
+                 * this property to [false] in tmp.
+                 */
+//                if (lexiconRelation.isTextIndex()) {
+//                    /*
+//                     * Per the logic and commentary at the top of create(),
+//                     * disable this option on the global row store.
+//                     */
+//                    map.put(FullTextIndex.Options.FIELDS_ENABLED, "false");
+//                }
+                
+                // Write the map on the row store.
+                final Map<String, Object> afterMap = getIndexManager()
+                        .getGlobalRowStore()
+                        .write(RelationSchema.INSTANCE, map);
+
+                if(log.isDebugEnabled()) {
+                    
+                    log.debug("Properties after write: " + afterMap);
+                    
+                }
+
+                /*
+                 * Note: A commit is required in order for a read-committed view
+                 * to have access to the registered indices.
+                 * 
+                 * @todo have the caller do this? It does not really belong here
+                 * since you can not make a large operation atomic if you do a
+                 * commit here.
+                 */
+
+                commit();
+
+                /*
+                 * Add this instance to the locator cache, but NOT before we
+                 * have committed the changes to the global row store.
+                 * 
+                 * Note: Normally, the instances are created by the locator
+                 * cache itself. In general the only time the application
+                 * creates an instance directly is when it is going to attempt
+                 * to create the relation. This takes advantage of that pattern
+                 * to notify the locator that it should cache this instance.
+                 */
+
+                ((DefaultResourceLocator) getIndexManager()
+                        .getResourceLocator()).putInstance(this);
+
+            }
 
         } catch (Throwable t) {
             if (!InnerCause.isInnerCause(t, InterruptedException.class)) {

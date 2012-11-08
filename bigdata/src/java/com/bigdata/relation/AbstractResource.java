@@ -28,8 +28,6 @@
 
 package com.bigdata.relation;
 
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -69,6 +67,7 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.GlobalRowStoreUtil;
 
 /**
  * Base class for locatable resources.
@@ -369,13 +368,26 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         
     }
     
-    /**
-     * 
-     */
     protected AbstractResource(final IIndexManager indexManager,
             final String namespace, final Long timestamp,
             final Properties properties) {
 
+        this(null/* container */, indexManager, namespace, timestamp,
+                properties);
+
+    }
+
+    /**
+     * Alternative version used when a resource exists within some container.
+     * The additional <i>container</i> argument provides access to the container
+     * before the container has been written to the global row store.
+     */
+    protected AbstractResource(final ILocatableResource container,
+            final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
+
+        // Note: [container] MAY be null.
+        
         if (indexManager == null)
             throw new IllegalArgumentException();
 
@@ -388,6 +400,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         if (properties == null)
             throw new IllegalArgumentException();
 
+        // Note: Non-null if this resource exists in some container
+        this.container = container;
+        
         // Note: Bound before we lookup property values!
         this.indexManager = indexManager;
 
@@ -640,30 +655,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         /*
          * Convert the Properties to a Map.
          */
-        final Map<String, Object> map = new HashMap<String, Object>();
-        {
-
-            final Enumeration<? extends Object> e = properties.propertyNames();
-
-            while (e.hasMoreElements()) {
-
-                final Object key = e.nextElement();
-
-//                if (!(key instanceof String)) {
-//
-//                    log.warn("Will not store non-String key: " + key);
-//
-//                    continue;
-//
-//                }
-
-                final String name = (String) key;
-
-                map.put(name, properties.getProperty(name));
-
-            }
-
-        }
+        final Map<String, Object> map = GlobalRowStoreUtil.convert(properties);
     
         // Write the map on the row store.
         final Map<String, Object> afterMap = indexManager.getGlobalRowStore()
@@ -679,7 +671,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * Add this instance to the locator cache.
          * 
          * Note: Normally, the instances are created by the locator cache
-         * itself. In general the only the the application creates an instance
+         * itself. In general the only time the application creates an instance
          * directly is when it is going to attempt to create the relation. This
          * takes advantage of that pattern to notify the locator that it should
          * cache this instance.
