@@ -37,6 +37,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.relation.AbstractRelation;
 
 /**
  * Helper class.
@@ -131,7 +132,16 @@ public class GlobalRowStoreHelper {
 
                 }
 
-                ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+                /**
+                 * The live view of the global row store must be wrapped by an
+                 * UnisolatedReadWriteIndex on a Journal.
+                 * 
+                 * @see http://sourceforge.net/apps/trac/bigdata/ticket/616 (Row
+                 *      store read/update not isolated on Journal)
+                 */
+                ndx = AbstractRelation.getIndex(indexManager,
+                        GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+//                ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
 
                 if (ndx == null) {
 
@@ -160,8 +170,20 @@ public class GlobalRowStoreHelper {
         if (log.isInfoEnabled())
             log.info(TimestampUtility.toString(timestamp));
 
-        final IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+        final IIndex ndx;
+        
+        /**
+         * The live view of the global row store must be wrapped by an
+         * UnisolatedReadWriteIndex on a Journal.
+         * 
+         * @see http://sourceforge.net/apps/trac/bigdata/ticket/616 (Row store
+         *      read/update not isolated on Journal)
+         */
+        ndx = AbstractRelation.getIndex(indexManager, GLOBAL_ROW_STORE_INDEX,
                 TimestampUtility.asHistoricalRead(timestamp));
+        
+//        ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
+//                TimestampUtility.asHistoricalRead(timestamp));
 
         if (ndx == null) {
 
