@@ -34,6 +34,7 @@ import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -49,7 +50,9 @@ import javax.xml.parsers.SAXParserFactory;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -61,6 +64,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
@@ -1207,12 +1211,29 @@ public class RemoteRepository {
         final StringBuilder urlString = new StringBuilder(opts.serviceURL);
 
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
+        
+    	/*
+    	 * URL is too long.  Reset the URL to just the service endpoint
+    	 * and use application/x-www-form-urlencoded entity instead.  Only in
+    	 * cases where there is not already a request entity (SPARQL query and
+    	 * SPARQL update).
+    	 */
+        if (urlString.length() > 1000 && 
+        		opts.method.equals("POST") && opts.entity == null) {
+        	
+        	urlString.setLength(0);
+        	urlString.append(opts.serviceURL);
+
+        	opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+        	
+        }
 
         if (log.isDebugEnabled()) {
             log.debug("*** Request ***");
             log.debug(sparqlEndpointURL);
             log.debug(opts.method);
             log.debug("query=" + opts.getRequestParam("query"));
+            log.debug(urlString.toString());
         }
 
         HttpUriRequest request = null;

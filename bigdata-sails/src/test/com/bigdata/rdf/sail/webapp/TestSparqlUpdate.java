@@ -61,6 +61,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -1792,5 +1793,34 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //        assertTrue(msg, hasStatement(book1, DC.DATE, null, true, bookStore2));
 //        assertTrue(msg, hasStatement(book1, DC.TITLE, null, true, bookStore2));
 //    }
+    
+    public void testReallyLongQueryString()
+            throws Exception
+        {
+    		final Literal l = getReallyLongLiteral(1000);
+    	
+            log.debug("executing test testInsertEmptyWhere");
+            final StringBuilder update = new StringBuilder();
+            update.append(getNamespaceDeclarations());
+            update.append("INSERT { <" + bob + "> rdfs:label " + l + " . } WHERE { }");
+
+            assertFalse(hasStatement(bob, RDFS.LABEL, l, true));
+
+            m_repo.prepareUpdate(update.toString()).evaluate();
+
+            assertTrue(hasStatement(bob, RDFS.LABEL, l, true));
+        }
+
+    private Literal getReallyLongLiteral(final int length) {
+    	
+    	final StringBuilder sb = new StringBuilder();
+    	for (int i = 0; i < length; i++) {
+    		sb.append('a');
+    	}
+    	return new LiteralImpl(sb.toString());
+    	
+    }
+    
+
 
 }
