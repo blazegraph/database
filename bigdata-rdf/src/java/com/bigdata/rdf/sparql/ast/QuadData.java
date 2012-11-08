@@ -30,9 +30,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.StatementPattern.Scope;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.spo.ISPO;
@@ -172,9 +169,38 @@ public class QuadData extends AbstractStatementContainer<IStatementContainer>
         
         sb.append("\n").append(s).append("QUADS {");
 
-        for (IStatementContainer v : this) {
+        int i = 0;
 
+        for (IStatementContainer v : this) {
+            
+            if (i >= 10) {
+                
+                /**
+                 * Truncate the description.
+                 * 
+                 * Note: People sometimes push a LOT of data through with a
+                 * DeleteInsertWhere operation. This truncates the description
+                 * to avoid problems with log files or the echo of the update
+                 * operations in a request by the NSS.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/613
+                 *      (SPARQL UPDATE response inlines large DELETE or INSERT
+                 *      triple graphs)
+                 * 
+                 * @see https ://sourceforge.net/projects/bigdata/forums/forum
+                 *      /676946/topic/6092294/index/page/1
+                 */
+                
+                sb.append("... out of " + arity() + " elements\n");
+
+                // Break out of the loop.
+                break;
+                
+            }
+            
             sb.append(v.toString(indent + 1));
+            
+            i++;
 
         }
 
