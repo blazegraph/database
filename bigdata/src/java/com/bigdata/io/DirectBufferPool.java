@@ -399,7 +399,8 @@ public class DirectBufferPool {
     }
     
     /**
-     * The capacity of the buffer as specified to the ctor.
+     * The maximum capacity in buffers of the {@link DirectBufferPool} as
+     * specified to the constructor.
      */
     public int getPoolCapacity() {
 
@@ -428,8 +429,8 @@ public class DirectBufferPool {
     }
 
     /**
-     * The capacity of the {@link ByteBuffer}s managed by this pool as
-     * specified to the ctor.
+     * The capacity in bytes of the {@link ByteBuffer}s managed by this pool as
+     * specified to the constructor.
      */
     public int getBufferCapacity() {
 
@@ -905,6 +906,22 @@ public class DirectBufferPool {
 
     /**
      * Return the {@link CounterSet} for the {@link DirectBufferPool}.
+     * <dl>
+     * <dt>poolSize</dt>
+     * <dd>The approximate number of direct {@link ByteBuffer}s currently
+     * managed by the pool.</dd>
+     * <dt>poolCapacity</dt>
+     * <dd>The maximum number of direct {@link ByteBuffer}s that may be
+     * allocated by the pool.</dd>
+     * <dt>bufferCapacity</dt>
+     * <dd>The capacity in bytes of each direct {@link ByteBuffer} associated
+     * with a given pool.</dd>
+     * <dt>acquired</dt>
+     * <dd>The number of direct {@link ByteBuffer}s currently acquired by the
+     * application.</dd>
+     * <dt>bytesUsed</dt>
+     * <dd>The number of bytes managed by the pool.</dd>
+     * </dl>
      * 
      * @return The counters.
      */
