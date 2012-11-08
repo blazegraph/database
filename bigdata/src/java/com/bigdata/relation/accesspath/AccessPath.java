@@ -1571,7 +1571,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
                 cost += new IndexSegmentCostModel(diskCostModel).rangeScan(
                         (int) sourceRangeCount, stats.getBranchingFactor(),
                         bytesPerLeaf, DirectBufferPool.INSTANCE
-                                .getPoolCapacity());
+                                .getBufferCapacity());
 
             } else {
 
