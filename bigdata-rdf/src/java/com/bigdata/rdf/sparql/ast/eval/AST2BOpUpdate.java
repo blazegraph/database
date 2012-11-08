@@ -560,9 +560,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * 
 				 * Note: The semantics of DELETE + INSERT are that the WHERE
 				 * clause is executed once. The solutions to that need to be fed
-				 * once through the DELETE clause. After the DELETE clauss has
+				 * once through the DELETE clause. After the DELETE clause has
 				 * been processed for all solutions to the WHERE clause, the
-				 * INSERT clause is then processed. So, we need to materalize
+				 * INSERT clause is then processed. So, we need to materialize
 				 * the WHERE clause results when both the DELETE clause and the
 				 * INSERT clause are present.
 				 * 
