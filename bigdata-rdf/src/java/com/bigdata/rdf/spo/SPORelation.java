@@ -229,7 +229,16 @@ public class SPORelation extends AbstractRelation<ISPO> {
             final String namespace, final Long timestamp,
             final Properties properties) {
 
-        super(indexManager, namespace, timestamp, properties);
+        this(null/* container */, indexManager, namespace, timestamp,
+                properties);
+
+    }
+
+    public SPORelation(final AbstractTripleStore container,
+            final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
+
+        super(container, indexManager, namespace, timestamp, properties);
         
         /*
          * Reads off the property for the inference engine that tells us whether

@@ -96,6 +96,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * INFO : 41212 2012-11-06 08:38:41,875 :    ... 23 more
  * </pre>
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/617">
+ *      Concurrent KB create fails with "No axioms defined?" </a>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {

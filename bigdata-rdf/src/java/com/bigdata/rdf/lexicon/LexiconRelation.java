@@ -287,10 +287,19 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final String namespace, final Long timestamp,
             final Properties properties) {
 
-        super(indexManager, namespace, timestamp, properties);
+        this(null/* container */, indexManager, namespace, timestamp,
+                properties);
+
+    }
+
+    public LexiconRelation(final AbstractTripleStore container,
+            final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
+
+        super(container, indexManager, namespace, timestamp, properties);
 
         {
-
+            
             this.textIndex = Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.TEXT_INDEX,
                     AbstractTripleStore.Options.DEFAULT_TEXT_INDEX));

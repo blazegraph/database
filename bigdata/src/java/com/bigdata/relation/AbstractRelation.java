@@ -47,6 +47,7 @@ import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IKeyOrder;
@@ -69,7 +70,21 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
             final String namespace, final Long timestamp,
             final Properties properties) {
 
-        super(indexManager, namespace, timestamp, properties);
+        this(null/* container */, indexManager, namespace, timestamp,
+                properties);
+
+    }
+
+    /**
+     * Alternative version used when a resource exists within some container.
+     * The additional <i>container</i> argument provides access to the container
+     * before the container has been written to the global row store.
+     */
+    protected AbstractRelation(final ILocatableResource container,
+            final IIndexManager indexManager, final String namespace,
+            final Long timestamp, final Properties properties) {
+
+        super(container, indexManager, namespace, timestamp, properties);
 
     }
 
