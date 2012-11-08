@@ -1193,35 +1193,47 @@ public class HAJournal extends Journal {
         
         @Override
         public Future<Void> bounceZookeeperConnection() {
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(new Runnable() {
-                @SuppressWarnings("rawtypes")
-                public void run() {
 
-                    if (haLog.isInfoEnabled())
-                        haLog.info("");
+            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+                    new BounceZookeeperConnectionTask(), null/* result */);
 
-                    if (getQuorum() instanceof ZKQuorumImpl) {
-
-                        try {
-
-                            // Close the current connection (if any).
-                            ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
-                            
-                        } catch (InterruptedException e) {
-                            
-                            // Propagate the interrupt.
-                            Thread.currentThread().interrupt();
-                            
-                        }
-                        
-                    }
-                }
-            }, null);
             ft.run();
+            
             return getProxy(ft);
 
         }
-        
+
+        private class BounceZookeeperConnectionTask implements Runnable {
+
+            @SuppressWarnings("rawtypes")
+            public void run() {
+
+                if (getQuorum() instanceof ZKQuorumImpl) {
+
+                    try {
+
+                        haLog.warn("BOUNCING ZOOKEEPER CONNECTION.");
+
+                        // Close the current connection (if any).
+                        ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
+
+                        // Obtain a new connection.
+                        ((ZKQuorumImpl) getQuorum()).getZookeeper();
+
+                        haLog.warn("RECONNECTED TO ZOOKEEPER.");
+
+                    } catch (InterruptedException e) {
+
+                        // Propagate the interrupt.
+                        Thread.currentThread().interrupt();
+
+                    }
+
+                }
+            }
+
+        }
+
         /**
          * Note: The invocation layer factory is reused for each exported proxy (but
          * the exporter itself is paired 1:1 with the exported proxy).

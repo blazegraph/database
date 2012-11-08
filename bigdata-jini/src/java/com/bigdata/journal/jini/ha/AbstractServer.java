@@ -1698,6 +1698,24 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         return runState.get();
 
     }
+    
+    /**
+     * Return <code>true</code> iff the {@link RunState} is
+     * {@link RunState#Start} -or- {@link RunState#Running}.
+     * 
+     * @return <code>true</code> if the service is starting or running and
+     *         otherwise <code>false</code>.
+     */
+    public boolean isRunning() {
+
+        switch (runState.get()) {
+        case Running:
+        case Start:
+            return true;
+        }
+        return false;
+        
+    }
 
     /**
      * Terminates service management threads.
