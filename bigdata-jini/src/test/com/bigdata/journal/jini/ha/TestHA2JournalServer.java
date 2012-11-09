@@ -349,6 +349,12 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             }
             
             /*
+             * Verify that the votes were recast for the then current
+             * lastCommitTime.
+             */
+            assertVotesRecast(token2, 0L/* oldConsensusVote */);
+
+            /*
              * Verify we can read on the KB on both nodes.
              * 
              * Note: It is important to test the reads for the first commit on
@@ -422,7 +428,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             final long token2 = awaitNextQuorumMeet(token1);
 
             /*
-             * Bouncing the connection broke the quorun, so verify that the
+             * Bouncing the connection broke the quorum, so verify that the
              * quorum token was advanced.
              */
             assertEquals(token1 + 1, token2);
@@ -438,7 +444,13 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
                         + leaderId2);
 
             }
-            
+
+            /*
+             * Verify that the votes were recast for the then current
+             * lastCommitTime.
+             */
+            assertVotesRecast(token2, 0L/* oldConsensusVote */);
+   
             /*
              * Verify we can read on the KB on both nodes.
              * 
@@ -460,7 +472,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         }
         
     }
-    
+
     /**
      * TODO 2 services start. Quorum meets. Write enough data to force a file
      * extension then abort(). Restart services. The quorum should meet. Write

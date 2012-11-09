@@ -42,10 +42,19 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
  * of THREE (3) and a fully met {@link Quorum}.
  * 
- * TODO Consider breaking this down into HA3 tests in which all services start
- * initially and HA2+1 tests in which only 2 services start initially and the
- * third is then optionally started by the test fixture. Or just make it trivial
- * for the test fixture to start each of the named services.
+ * FIXME We need unit tests where we fail (shutdown) the service in at the head
+ * of the pipeline (the leader), the 2nd position, and the last position. We
+ * need to make sure that the quorum remains (when failing a follower) and that
+ * it re-meets (when failing a leader). We also need to extend these tests to
+ * verify that the service that was failed can be restarted. And we need to have
+ * versions of these tests that bounce the service rather than shutting it down
+ * and then restarting it.
+ * 
+ * FIXME We need unit tests that focus on resynchronization (writes were missed
+ * during a service shutdown or bounce and hence the service must synchronize
+ * when it comes back up).
+ * 
+ * FIXME We need unit tests that focus on rebuild (disaster recovery).
  * 
  * TODO We can do an explicit service restart or we can tell a service to bounce
  * its zk connection. Both will force a service leave and pipeline leave. The

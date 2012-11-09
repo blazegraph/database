@@ -35,6 +35,7 @@ import java.io.StringWriter;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +64,7 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.RunState;
+import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.JavaServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
@@ -1535,4 +1537,53 @@ public class AbstractHA3JournalServerTestCase extends
         
     }
 
+    /**
+     * Verify that the votes for the old consensus timestamp were withdrawn and
+     * that the services are now all voting for the current lastCommitTime as
+     * reported by the quorum leader (by querying its root blocks).
+     * 
+     * @param token
+     *            The current quorum token.
+     * @param oldConsensusVote
+     *            The old vote.
+     * 
+     * @return The timestamp for the new consensus vote
+     * 
+     * @throws IOException
+     * @throws AssertionFailedError
+     */
+    protected void assertVotesRecast(final long token,
+            final long oldConsensusVote) throws IOException {
+
+        // Snapshot of the current votes.
+        final Map<Long, UUID[]> votes = quorum.getVotes();
+
+        final UUID[] votesForOldConsensus = votes.get(oldConsensusVote);
+
+        // Nobody should be voting for the old consensus.
+        if (votesForOldConsensus != null && votesForOldConsensus.length != 0) {
+         
+            fail("Votes exist for old consensus: "
+                    + Arrays.toString(votesForOldConsensus));
+            
+        }
+
+        final long lastCommitTime = quorum.getClient().getLeader(token)
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getLastCommitTime();
+
+        // The joined services.
+        final UUID[] joined = quorum.getJoined();
+
+        // Quorum is still valid.
+        quorum.assertQuorum(token);
+
+        final UUID[] votesForLastCommitTime = votes.get(lastCommitTime);
+
+        assertNotNull(votesForLastCommitTime);
+
+        assertEquals(joined.length, votesForLastCommitTime.length);
+
+    }
+    
 }
