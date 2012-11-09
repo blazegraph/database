@@ -129,7 +129,13 @@ public class UpdateServlet extends BigdataRDFServlet {
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
-        final RDFFormat requestBodyFormat = RDFFormat.forMIMEType(contentType);
+        /**
+         * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+         * UpdateServlet fails to parse MIMEType when doing conneg. </a>
+         */
+
+        final RDFFormat requestBodyFormat = RDFFormat.forMIMEType(new MiniMime(
+                contentType).getMimeType());
 
         if (requestBodyFormat == null) {
 
@@ -453,40 +459,42 @@ public class UpdateServlet extends BigdataRDFServlet {
 		    try {
 		
 		        conn = getBigdataRDFContext()
-		                .getUnisolatedConnection(namespace);
-		
-		        if (remove != null) {
-		        	
-		        	final String contentType = remove.getContentType();
-		        	
-		        	final InputStream is = remove.getInputStream();
-		        	
-		        	final RDFHandler handler = new RemoveStatementHandler(
-		        			conn.getSailConnection(), nmodified, defaultContextDelete);
-		        	
-		        	processData(conn, contentType, is, handler, baseURI);
-		        	
-		        }
-		        
-		        if (add != null) {
-		        	
-		        	final String contentType = add.getContentType();
-		        	
-		        	final InputStream is = add.getInputStream();
-		        	
-		        	final RDFHandler handler = new AddStatementHandler(
-		        			conn.getSailConnection(), nmodified, defaultContextInsert);
-		        	
-		        	processData(conn, contentType, is, handler, baseURI);
-		        	
-		        }
-		        
-		        conn.commit();
+                        .getUnisolatedConnection(namespace);
 
-		        final long elapsed = System.currentTimeMillis() - begin;
-		        
+                if (remove != null) {
+
+                    final String contentType = remove.getContentType();
+
+                    final InputStream is = remove.getInputStream();
+
+                    final RDFHandler handler = new RemoveStatementHandler(
+                            conn.getSailConnection(), nmodified,
+                            defaultContextDelete);
+
+                    processData(conn, contentType, is, handler, baseURI);
+
+                }
+
+                if (add != null) {
+
+                    final String contentType = add.getContentType();
+
+                    final InputStream is = add.getInputStream();
+
+                    final RDFHandler handler = new AddStatementHandler(
+                            conn.getSailConnection(), nmodified,
+                            defaultContextInsert);
+
+                    processData(conn, contentType, is, handler, baseURI);
+
+                }
+
+                conn.commit();
+
+                final long elapsed = System.currentTimeMillis() - begin;
+
                 reportModifiedCount(resp, nmodified.get(), elapsed);
-		        
+
 		    } catch (Throwable t) {
 		    	
 		    	if (conn != null)
@@ -517,8 +525,16 @@ public class UpdateServlet extends BigdataRDFServlet {
     		final String baseURI) 
     			throws Exception {
     
-	    final RDFFormat format = RDFFormat.forMIMEType(contentType);
-		
+        /**
+         * Note: The request was already validated.
+         * 
+         * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+         * UpdateServlet fails to parse MIMEType when doing conneg. </a>
+         */
+
+        final RDFFormat format = RDFFormat
+                .forMIMEType(new MiniMime(contentType).getMimeType());
+
         final RDFParserFactory rdfParserFactory = RDFParserRegistry
                 .getInstance().get(format);
 
@@ -559,8 +575,9 @@ public class UpdateServlet extends BigdataRDFServlet {
 	        
 	    }
 	
-	    final RDFFormat format = RDFFormat.forMIMEType(contentType);
-	
+        final RDFFormat format = RDFFormat
+                .forMIMEType(new MiniMime(contentType).getMimeType());
+
 	    if (format == null) {
 	
 	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,

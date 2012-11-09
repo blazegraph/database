@@ -281,11 +281,15 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         try {
 
-            /*
+            /**
              * There is a request body, so let's try and parse it.
+             * 
+             * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+             * UpdateServlet fails to parse MIMEType when doing conneg. </a>
              */
 
-            final RDFFormat format = RDFFormat.forMIMEType(contentType);
+            final RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
+                    contentType).getMimeType());
 
             if (format == null) {
 

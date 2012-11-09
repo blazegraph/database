@@ -143,7 +143,13 @@ public class InsertServlet extends BigdataRDFServlet {
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
-        final RDFFormat format = RDFFormat.forMIMEType(contentType);
+        /**
+         * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+         * UpdateServlet fails to parse MIMEType when doing conneg. </a>
+         */
+
+        final RDFFormat format = RDFFormat
+                .forMIMEType(new MiniMime(contentType).getMimeType());
 
         if (format == null) {
 
@@ -389,26 +395,40 @@ public class InsertServlet extends BigdataRDFServlet {
                         hconn.setDoOutput(false);
                         hconn.setReadTimeout(0);// no timeout? http param?
 
-                        /*
+                        /**
                          * There is a request body, so let's try and parse it.
+                         * 
+                         * <a href=
+                         * "https://sourceforge.net/apps/trac/bigdata/ticket/620"
+                         * > UpdateServlet fails to parse MIMEType when doing
+                         * conneg. </a>
                          */
 
                         final String contentType = hconn.getContentType();
+                        
+                        RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
+                                contentType).getMimeType());
 
-                        RDFFormat format = RDFFormat.forMIMEType(contentType);
-                        
-                        if(format == null) {
-                            // Try to get the RDFFormat from the URL's file path.
-                            format = RDFFormat.forFileName(url.getFile());
-                        }
-                        
                         if (format == null) {
-                        	buildResponse(resp, HTTP_BADREQUEST,
+
+                            /*
+                             * Try to get the RDFFormat from the URL's file
+                             * path.
+                             */
+       
+                            format = RDFFormat.forFileName(url.getFile());
+                            
+                        }
+
+                        if (format == null) {
+
+                            buildResponse(resp, HTTP_BADREQUEST,
                                     MIME_TEXT_PLAIN,
                                     "Content-Type not recognized as RDF: "
                                             + contentType);
-                        	
-                        	return;
+
+                            return;
+
                         }
 
                         final RDFParserFactory rdfParserFactory = RDFParserRegistry

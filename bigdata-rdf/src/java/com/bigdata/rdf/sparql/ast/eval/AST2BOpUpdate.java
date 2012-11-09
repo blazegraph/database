@@ -41,7 +41,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
@@ -97,6 +96,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
+import com.bigdata.rdf.sail.webapp.MiniMime;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.AddGraph;
@@ -1393,8 +1393,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             // The file path.
             final String n = sourceURL.getFile();
 
-            // Attempt to obtain the format from the Content-Type.
-            RDFFormat format = RDFFormat.forMIMEType(contentType);
+            /**
+             * Attempt to obtain the format from the Content-Type.
+             * 
+             * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/620">
+             * UpdateServlet fails to parse MIMEType when doing conneg. </a>
+             */
+            RDFFormat format = RDFFormat.forMIMEType(new MiniMime(contentType)
+                    .getMimeType());
 
             if (format == null) {
 
