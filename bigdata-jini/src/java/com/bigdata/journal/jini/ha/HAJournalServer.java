@@ -169,8 +169,12 @@ public class HAJournalServer extends AbstractServer {
     private HAJournal journal;
     
     private UUID serviceUUID;
-    private HAGlue haGlueService;
+
     private ZookeeperClientConfig zkClientConfig;
+    
+    private ZooKeeperAccessor zka;
+    
+    private HAGlue haGlueService;
     
     /**
      * The znode name for the logical service.
@@ -346,8 +350,7 @@ public class HAJournalServer extends AbstractServer {
                 final String zoohosts = zkClientConfig.servers;
                 final int sessionTimeout = zkClientConfig.sessionTimeout;
 
-                final ZooKeeperAccessor zka = new ZooKeeperAccessor(zoohosts,
-                        sessionTimeout);
+                zka = new ZooKeeperAccessor(zoohosts, sessionTimeout);
 
                 if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
 
@@ -430,41 +433,13 @@ public class HAJournalServer extends AbstractServer {
                 haGlueService, journal));
 
         /*
-         * Note: It appears that these methods CAN NOT moved into
-         * QuorumServiceImpl.start(Quorum). I suspect that this is because the
-         * quorum watcher would not be running at the moment that we start doing
-         * things with the actor, but I have not verified that rationale in
-         * depth.
+         * Note: This CAN NOT moved into QuorumServiceImpl.start(Quorum). I
+         * suspect that this is because the quorum watcher would not be running
+         * at the moment that we start doing things with the actor, but I have
+         * not verified that rationale in depth.
          */
-        final QuorumActor<?,?> actor = quorum.getActor();
-        actor.memberAdd();
-        actor.pipelineAdd();
-//        try {
-//            quorum.awaitQuorum(1000, TimeUnit.MILLISECONDS);
-//        } catch (AsynchronousQuorumCloseException e1) {
-//            // Shutdown.
-//            return;
-//        } catch (InterruptedException e1) {
-//            // Shutdown.
-//            return;
-//        } catch (TimeoutException e1) {
-//            // Quorum is not already met.
-//        }
-        if (!quorum.isQuorumMet()) {
-            /*
-             * FIXME RESYNC : There needs to be an atomic decision whether to
-             * cast a vote and then join or to start synchronizing. We need to
-             * synchronize if a quorum is already met. We need to cast our vote
-             * iff a quorum has not met. However, I can not see any (easy) way
-             * to make this operation atomic. Maybe the leader simply needs to
-             * verify the actual lastCommitTime of each service when the quorum
-             * meets, or maybe a service can only join the quorum if it can
-             * verify that the leader has the same lastCommitTime for its
-             * current root block. Once writes start, we need to be
-             * resynchronizing rather than joining the quorum.
-             */
-            actor.castVote(journal.getLastCommitTime());
-        }
+        doConditionalCastVote(this/* server */,
+                (Quorum<HAGlue, QuorumService<HAGlue>>) quorum, journal);
 
         /*
          * The NSS will start on each service in the quorum. However,
@@ -478,6 +453,112 @@ public class HAJournalServer extends AbstractServer {
         } catch (Exception e1) {
 
             log.error("Could not start NanoSparqlServer: " + e1, e1);
+
+        }
+
+    }
+    
+    /**
+     * Attempt to add the service as a member, add the service to the pipeline,
+     * and conditionally cast a vote for the last commit time. If the service is
+     * already a quorum member or already in the pipeline, then those are NOPs.
+     * If the quorum is already met, then the service DOES NOT cast a vote for
+     * its lastCommitTime - it will need to resynchronize instead.
+     * 
+     * FIXME RESYNC : There needs to be an atomic decision whether to cast a
+     * vote and then join or to start synchronizing. We need to synchronize if a
+     * quorum is already met. We need to cast our vote iff a quorum has not met.
+     * However, I can not see any (easy) way to make this operation atomic.
+     * Maybe the leader simply needs to verify the actual lastCommitTime of each
+     * service when the quorum meets, or maybe a service can only join the
+     * quorum if it can verify that the leader has the same lastCommitTime for
+     * its current root block. Once writes start, we need to be resynchronizing
+     * rather than joining the quorum.
+     */
+    static private void doConditionalCastVote(
+            final HAJournalServer server,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum,
+            final HAJournal journal) {
+
+        try {
+        final QuorumActor<?, ?> actor = quorum.getActor();
+        
+        if(!server.isRunning())
+            return;
+        
+        // ensure member.
+        actor.memberAdd();
+
+        if(!server.isRunning())
+            return;
+
+        // ensure in pipeline.
+        actor.pipelineAdd();
+
+        if (!quorum.isQuorumMet()) {
+
+            /*
+             * Cast a vote for our lastCommitTime.
+             * 
+             * Note: If the quorum is already met, then we MUST NOT cast a vote
+             * for our lastCommitTime since we can not join the met quorum
+             * without attempting to synchronize.
+             */
+
+            if(!server.isRunning())
+                return;
+
+            actor.castVote(journal.getLastCommitTime());
+
+//            final long token;
+//            try {
+//                
+//                // Block for a bit and see if the quorum meets.
+//                token = quorum.awaitQuorum(1000, TimeUnit.MILLISECONDS);
+//
+//                // The quorum is met.
+//                if (!quorum.getClient().isJoinedMember(token)) {
+//
+//                    /*
+//                     * If we are not joined with the met quorum, then we will
+//                     * need to withdraw our vote and synchronize.
+//                     */
+//                    
+//                }
+//
+//            } catch (AsynchronousQuorumCloseException e) {
+//                
+//                // Shutdown. Rethrow exception.
+//                throw e;
+//                
+//            } catch (InterruptedException e) {
+//                
+//                // Shutdown. Propagate interrupt.
+//                Thread.currentThread().interrupt();
+//                
+//            } catch (TimeoutException e) {
+//                
+//                /*
+//                 * We were able to cast a vote for our lastCommitTime and the
+//                 * quorum did not meet.
+//                 */
+//                
+//                return;
+//                
+//            }
+
+        }
+        
+        } catch(Throwable t) {
+
+            /*
+             * Log and ignore any problems. Problems could include the shutdown
+             * of the service, loss of zookeeper, etc.
+             */
+ 
+            log.error(t,t);
+            
+            return;
 
         }
 
@@ -520,10 +601,31 @@ public class HAJournalServer extends AbstractServer {
             
             try {
 
-                // Notify the quorum that we are leaving.
-                quorum.getActor().serviceLeave();
+//                // Notify the quorum that we are leaving.
+//                quorum.getActor().serviceLeave();
 
+                /*
+                 * Terminate the watchers and threads that are monitoring and
+                 * maintaining our reflection of the global quorum state.
+                 */
                 quorum.terminate();
+
+                /*
+                 * Close our zookeeper connection, invalidating all ephemeral
+                 * znodes for this service.
+                 * 
+                 * Note: This provides a decisive mechanism for removing this
+                 * service from the joined services, the pipeline, withdrawing
+                 * its vote, and removing it as a quorum member.
+                 */
+                if (haLog.isInfoEnabled())
+                    haLog.warn("FORCING UNCURABLE ZOOKEEPER DISCONNECT");
+                
+                if (zka != null) {
+
+                    zka.close();
+                    
+                }
 
             } catch (Throwable t) {
 
@@ -680,7 +782,21 @@ public class HAJournalServer extends AbstractServer {
                 }
                 
             }
-            
+
+//            if (server.isRunning()) {
+//                /*
+//                 * Attempt to cast a vote for our lastCommitTime.
+//                 * 
+//                 * FIXME BOUNCE : May need to trigger when we re-connect with
+//                 * zookeeper if this event was triggered by a zk session
+//                 * expiration.
+//                 */
+//                doConditionalCastVote(server,
+//                        (Quorum<HAGlue, QuorumService<HAGlue>>) this
+//                                .getQuorum(),
+//                        journal);
+//            }
+
         }
 
         @Override
@@ -714,6 +830,16 @@ public class HAJournalServer extends AbstractServer {
 
                 } else {
 
+                    /*
+                     * The quorum met, but we are not in the met quorum.
+                     * 
+                     * Note: We need to synchronize in order to join an already
+                     * met quorum. We can not just vote our lastCommitTime. We
+                     * need to go through the synchronization protocol in order
+                     * to make sure that we actually have the same durable state
+                     * as the met quorum.
+                     */
+
                     conditionalStartResync(token);
 
                 }
@@ -731,11 +857,7 @@ public class HAJournalServer extends AbstractServer {
 
             final long token = quorum.token();
 
-//            if (quorum.isQuorumMet()) {
-            
             conditionalStartResync(token);
-                
-//            }
 
         }
 
@@ -2240,7 +2362,7 @@ public class HAJournalServer extends AbstractServer {
          * one-time best effort attempt to resolve the host name from the
          * {@link InetAddress}.
          */
-        protected void setupLoggingContext() {
+        private void setupLoggingContext() {
 
             try {
 
