@@ -944,7 +944,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<? extends Channel> opener,
                 final Quorum quorum) throws InterruptedException {
 
-            super(writeCacheBufferCount, useChecksums, extent, opener, quorum);
+            super(writeCacheBufferCount, 0/* maxDirtyListSize */,
+                    false/* prefixWrites */, 100/* compactionThreshold */,
+                    useChecksums, extent, opener, quorum);
 
         }
 
@@ -2366,6 +2368,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 useChecksums, true/* bufferHasData */, opener,
                 msg.getFileExtent());
         
+        // Ensure that replicated buffers are not compacted.
+        writeCache.closeForWrites();
+
         final long firstOffset = msg.getFirstOffset();
         
         if (firstOffset < getHeaderSize())

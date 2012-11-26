@@ -410,6 +410,7 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(0L, file.length());
                     
                     // write to the backing file.
+                    writeCache.closeForWrites();
                     writeCache.flush(force);
 
                     // verify read back of cache still good.
@@ -465,6 +466,7 @@ public class TestWriteCache extends TestCase3 {
                             .wrap(new byte[] { 1 }), no_checksum));
 
                     // write on the disk.
+                    writeCache.closeForWrites();
                     writeCache.flush(force);
 
                     // verify read back of cache for other records still fails.
@@ -781,6 +783,7 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(0L, file.length());
                     
                     // write to the backing file.
+                    writeCache.closeForWrites();
                     writeCache.flush(force);
 
                     // verify read back of cache still good.
@@ -843,6 +846,7 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
 
                     // write on the disk.
+                    writeCache.closeForWrites();
                     writeCache.flush(force);
 
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
@@ -1129,6 +1133,7 @@ public class TestWriteCache extends TestCase3 {
             /*
              * Flush to disk and reset the cache
              */
+            writeCache.closeForWrites();
             writeCache.flush(true);
             writeCache.reset(); // clear cache
             /*
@@ -1150,6 +1155,7 @@ public class TestWriteCache extends TestCase3 {
             	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf));
                 assertEquals(v.buf, writeCache.read(v.addr));     // expected, actual       
             }
+            writeCache.closeForWrites();
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
             	AllocView v = allocs.get(i);
@@ -1169,6 +1175,7 @@ public class TestWriteCache extends TestCase3 {
             	AllocView v = allocs.get(i);
             	if (!writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
+                writeCache.closeForWrites();
             		writeCache.flush(false);
             		writeCache.reset();
             		assertTrue(writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf)));
@@ -1177,6 +1184,7 @@ public class TestWriteCache extends TestCase3 {
             /*
              * Now flush and check if we can read in all records
              */
+            writeCache.closeForWrites();
             writeCache.flush(true);
             for (int i = 0; i < 10000; i++) {
             	AllocView v = allocs.get(i);
@@ -1194,6 +1202,7 @@ public class TestWriteCache extends TestCase3 {
             	v.buf.reset();
             	if (!writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
+                writeCache.closeForWrites();
             		writeCache.flush(false);
             		writeCache.reset();
             		assertTrue(writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf)));
@@ -1202,6 +1211,7 @@ public class TestWriteCache extends TestCase3 {
             /*
              * Now flush and check if we can read in all records
              */
+            writeCache.closeForWrites();
             writeCache.flush(true);
             for (int i = 0; i < 10000; i++) {
             	AllocView v = allocs.get(i);

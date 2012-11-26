@@ -162,8 +162,12 @@ public class TestWriteCacheServiceLifetime extends TestCase3 {
 
 		final long fileExtent = config.opener.reopenChannel().size();
 
-		config.service = new WriteCacheService(5, true,
-                fileExtent, config.opener, config.quorum) {
+        final boolean prefixWrites = rw;
+        final int compactionThreshold = 30;
+        config.service = new WriteCacheService(5/* nbuffers */,
+                0/* maxDirtyListSize */, prefixWrites, compactionThreshold,
+                true/* useChecksums */, fileExtent, config.opener,
+                config.quorum) {
 
             @Override
             public WriteCache newWriteCache(final IBufferAccess buf,

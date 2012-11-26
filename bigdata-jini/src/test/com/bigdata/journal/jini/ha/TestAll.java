@@ -84,6 +84,9 @@ public class TestAll extends TestCase {
         // Basic tests for a single HAJournalServer (quorum does not meet)
         suite.addTestSuite(TestHAJournalServer.class);
 
+        // HA2 test suite (k=3, but only 2 services are running).
+        suite.addTestSuite(TestHA2JournalServer.class);
+
         // HA3 test suite.
         suite.addTestSuite(TestHA3JournalServer.class);
 
