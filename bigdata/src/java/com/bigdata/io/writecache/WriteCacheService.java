@@ -758,7 +758,16 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 boolean didCompact = false;
                 boolean didWrite = false;
-                if (!cache.isEmpty()) {
+
+                /*
+                 * Note: When using a large number of write cache buffers and a
+                 * bulk data load, it is not uncommon for all records to be
+                 * recycled by the time we take something from the dirtyList, in
+                 * which case the cache will be (logically) empty.
+                 */
+                final boolean wasEmpty = cache.isEmpty();
+
+                if (!wasEmpty) {
 
                     final int percentEmpty = cache.potentialCompaction();
                     
@@ -766,8 +775,7 @@ abstract public class WriteCacheService implements IWriteCache {
                             && percentEmpty >= compactionThreshold) {
 
                         if (log.isDebugEnabled())
-                            log.debug("PotentialCompaction, reduction of: "
-                                    + percentEmpty + "%");
+                            log.debug("percentEmpty=" + percentEmpty + "%");
 
                         // Attempt to compact cache block.
                         if (compactCache(cache)) {
@@ -779,6 +787,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                             // Write cache block if did not compact.
                             writeCacheBlock(cache);
+                            
                             didWrite = true;
                             
                         }
@@ -789,13 +798,14 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         // Write cache block.
                         writeCacheBlock(cache);
+
                         didWrite = true;
 
                     }
 
                 }
 
-                // Now written, remove from dirtyList.
+                // Now written/compacted, remove from dirtyList.
                 if (dirtyList.take() != cache)
                     throw new AssertionError();
                 counters.get().ndirty--;
@@ -815,7 +825,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 addClean(cache, false/* addFirst */);
 
-                if(log.isInfoEnabled()) {
+                if (log.isInfoEnabled()) {
                     final WriteCacheServiceCounters tmp = counters.get();
                     final long nhit = tmp.nhit.get();
                     final long ntests = nhit + tmp.nmiss.get();
@@ -827,9 +837,10 @@ abstract public class WriteCacheService implements IWriteCache {
                             + ",ndirty=" + tmp.ndirty + ",maxDirty="
                             + tmp.maxdirty + ",nflush=" + tmp.nflush
                             + ",nwrite=" + tmp.nwrite + ",hitRate=" + hitRate
-                            + ", didCompact=" + didCompact + ", didWrite="
-                            + didWrite + ", ncompact=" + c.ncompact
-                            + ", nwriteOnDisk=" + c.nwriteOnDisk);
+                            + ", empty=" + wasEmpty + ", didCompact="
+                            + didCompact + ", didWrite=" + didWrite
+                            + ", ncompact=" + c.ncompact + ", nwriteOnDisk="
+                            + c.nwriteOnDisk);
                 }
 
             } // while(true)
