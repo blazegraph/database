@@ -1261,7 +1261,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         for (int i = 0; i < 500; i++) {
         
-            System.out.println("TEST " + i);
+            if (log.isInfoEnabled())
+                log.info("TEST " + i);
 
             test_writeCacheService_HA_WORM_1record_1buffer_k3_size3_reorganizePipeline();
             
@@ -1743,7 +1744,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         if(skipHATest()) return;
 
-        final int nbuffers = 6;
+        final int nbuffers = 2;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
         final boolean isHighlyAvailable = true;
@@ -1836,7 +1837,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         if(skipHATest()) return;
 
-        final int nbuffers = 6;
+        final int nbuffers = 2;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -1983,9 +1984,26 @@ public class TestWORMWriteCacheService extends TestCase3 {
             opener = new ReopenFileChannel(file, "rw");
             
             final long fileExtent = opener.reopenChannel().size();
+
+            final int maxDirtyListSize = 0; // use default by default.
             
-            writeCacheService = new WriteCacheService(nbuffers, useChecksums,
-                    fileExtent, opener, quorum) {
+            final boolean prefixWrites;
+            final int compactionThreshold;
+            switch (storeType) {
+            case WORM:
+                prefixWrites = false;
+                compactionThreshold = 100;
+                break;
+            case RW:
+                prefixWrites = true;
+                compactionThreshold = 30;
+                break;
+            default:
+                throw new AssertionError();
+            }
+            writeCacheService = new WriteCacheService(nbuffers,
+                    maxDirtyListSize, prefixWrites, compactionThreshold,
+                    useChecksums, fileExtent, opener, quorum) {
 
                 @Override
                 public WriteCache newWriteCache(final IBufferAccess buf,

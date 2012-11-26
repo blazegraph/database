@@ -439,8 +439,20 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 	/**
 	 * The #of buffers that will be used by the {@link WriteCacheService}.
+	 * 
+	 * @see com.bigdata.journal.Options#WRITE_CACHE_BUFFER_COUNT
 	 */
 	private final int m_writeCacheBufferCount;
+
+	/**
+	 * @see com.bigdata.journal.Options#WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+	 */
+    private final int m_maxDirtyListSize;
+
+    /**
+     * @see com.bigdata.journal.Options#WRITE_CACHE_COMPACTION_THRESHOLD
+     */
+	private final int m_compactionThreshold;
 	
     /**
      * Note: This is not final because we replace the {@link WriteCacheService}
@@ -522,7 +534,7 @@ public class RWStore implements IStore, IBufferedWriter {
 //    * the same txReleaseTime.
 //	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
     private final long m_minReleaseAge;
-
+    
     /**
      * The #of open transactions (read-only or read-write).
      * 
@@ -710,10 +722,27 @@ public class RWStore implements IStore, IBufferedWriter {
 
 		m_writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
 		
-		if(log.isInfoEnabled())
-		    log.info("RWStore using writeCacheService with buffers: " + m_writeCacheBufferCount);
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+                    + "=" + m_writeCacheBufferCount);
 
-		// m_writeCache = newWriteCache();
+        this.m_maxDirtyListSize = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE,
+                com.bigdata.journal.Options.DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE));
+
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE + "="
+                    + m_maxDirtyListSize);
+
+        this.m_compactionThreshold = Double.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.WRITE_CACHE_COMPACTION_THRESHOLD,
+                com.bigdata.journal.Options.DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD)).intValue();
+
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.WRITE_CACHE_COMPACTION_THRESHOLD + "="
+                    + m_compactionThreshold);
+
+        // m_writeCache = newWriteCache();
 
 		try {
             if (m_rb.getNextOffset() == 0) { // if zero then new file
@@ -879,8 +908,16 @@ public class RWStore implements IStore, IBufferedWriter {
      */
     private RWWriteCacheService newWriteCache() {
         try {
+
+            final boolean highlyAvailable = m_quorum != null
+                    && m_quorum.isHighlyAvailable();
+
+            final boolean prefixWrites = highlyAvailable;
+
             return new RWWriteCacheService(m_writeCacheBufferCount,
-            		convertAddr(m_fileSize), m_reopener, m_quorum) {
+                    m_maxDirtyListSize, prefixWrites, m_compactionThreshold,
+
+                    convertAddr(m_fileSize), m_reopener, m_quorum) {
                 
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
@@ -5044,7 +5081,10 @@ public class RWStore implements IStore, IBufferedWriter {
         final WriteCache writeCache = m_writeCache.newWriteCache(b,
                 true/* useChecksums */, true/* bufferHasData */, m_reopener,
                 msg.getFileExtent());
-
+        
+        // Ensure that replicated buffers are not compacted.
+        writeCache.closeForWrites();
+        
 		/*
 		 * Setup buffer for writing. We receive the buffer with pos=0, Ê
 		 * limit=#ofbyteswritten. However, flush() expects pos=limit, will

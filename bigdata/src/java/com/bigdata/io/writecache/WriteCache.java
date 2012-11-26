@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -43,6 +44,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
@@ -114,7 +116,7 @@ abstract public class WriteCache implements IWriteCache {
     private final boolean useChecksum;
 
     /**
-     * <code>true</code> iff per-record checksums are being maintained.
+     * <code>true</code> iff the buffer contents directly contain the recordMap data.
      */
     private final boolean prefixWrites;
 
@@ -122,6 +124,8 @@ abstract public class WriteCache implements IWriteCache {
      * The size of the header for a prefix write.
      */
     static final int SIZEOF_PREFIX_WRITE_METADATA = 8/* offset */+ 4/* size */+ 4/* latchedAddr */;
+    static final int PREFIX_OFFSET_POS = 0;
+    static final int PREFIX_SIZE_POS = 8;
     
     /**
      * The buffer used to absorb writes that are destined for some channel.
@@ -135,7 +139,7 @@ abstract public class WriteCache implements IWriteCache {
      * The read lock allows concurrent {@link #acquire()}s and permits both
      * reads and writes on the acquired buffer, while the write lock prevents
      * {@link #acquire()} during critical sections such as
-     * {@link #flush(boolean, long, TimeUnit)}, {@link #reset()}, and
+     * {@link #flush(boolean, long, TimeUnit)}, {@link #reset()},
      * {@link #close()}.
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -253,6 +257,15 @@ abstract public class WriteCache implements IWriteCache {
     // }
 
     /**
+     * Lock used to make
+     * {@link #transferTo(WriteCache, WriteCache, ConcurrentMap)} mutex with
+     * {@link WriteCacheService#clearWrite(long, int)} for a specific
+     * {@link WriteCache} instance.
+     */
+    // Note: Exposed to WriteCacheService.clearWrite().
+    final /*private*/ ReentrantLock transferLock = new ReentrantLock();
+    
+    /**
      * The metadata associated with a record in the {@link WriteCache}.
      */
     public static class RecordMetadata {
@@ -283,7 +296,8 @@ abstract public class WriteCache implements IWriteCache {
          */
         public final int latchedAddr;
         
-        public RecordMetadata(final long fileOffset, final int bufferOffset, final int recordLength, final int latchedAddr) {
+        public RecordMetadata(final long fileOffset, final int bufferOffset,
+                final int recordLength, final int latchedAddr) {
 
             this.fileOffset = fileOffset;
 
@@ -297,12 +311,12 @@ abstract public class WriteCache implements IWriteCache {
 
         public String toString() {
 
-            return getClass().getSimpleName() + "{fileOffset=" + fileOffset + ",off=" + bufferOffset + ",len="
-                    + recordLength + "}";
+            return getClass().getSimpleName() + "{fileOffset=" + fileOffset
+                    + ",off=" + bufferOffset + ",len=" + recordLength + "}";
 
         }
 
-    }
+    } // class RecordMetadata
 
     /**
      * An index into the write cache used for read through on the cache. The
@@ -310,7 +324,7 @@ abstract public class WriteCache implements IWriteCache {
      * record. The values describe the position in buffer where that record is
      * found and the length of the record.
      */
-    final private ConcurrentMap<Long, RecordMetadata> recordMap;
+    final private ConcurrentMap<Long/* fileOffset */, RecordMetadata> recordMap;
 
     /**
      * The offset of the first record written onto the {@link WriteCache}. This
@@ -371,14 +385,14 @@ abstract public class WriteCache implements IWriteCache {
      * fixes a problem in the HA Pipeline where deletes could append to the buffer resulting
      * in a reported buffer length in the HAMessage greater than the data sent.
      */
-	private boolean m_closedForWrites = false;
+    private volatile boolean m_closedForWrites = false;
 
-	/**
-	 * The sequence must be set when the cache is ready to be flushed.  In HA this
-	 * is sent down the pipeline to ensure correct synchronization when processing
-	 * logged messages.
-	 */
-	private long sequence = -1;
+    /**
+     * The sequence must be set when the cache is ready to be flushed.  In HA this
+     * is sent down the pipeline to ensure correct synchronization when processing
+     * logged messages.
+     */
+    private long sequence = -1;
 
     /**
      * The sequence #of this {@link WriteCache} block within the current write
@@ -542,6 +556,7 @@ abstract public class WriteCache implements IWriteCache {
                 + ",releaseBuffer=" + releaseBuffer//
                 + ",bytesWritten=" + bytesWritten()//
                 + ",bytesRemaining=" + remaining()//
+                + ",bytesRemoved=" + m_removed//
                 + "}";
 
     }
@@ -671,10 +686,38 @@ abstract public class WriteCache implements IWriteCache {
      *             (i.e., if <code>isHighlyAvailable := false</code> was
      *             specified to the constructor).
      */
-    public int getWholeBufferChecksum() {
+    // package private : exposed to WriteTask.call().
+    int getWholeBufferChecksum(final ByteBuffer checksumBuffer) {
 
         if (checker == null)
             throw new UnsupportedOperationException();
+        
+        if (prefixWrites) {
+            /*
+             * Recalculate whole buffer checksum.
+             * 
+             * Note: When using prefix writes, we mark deleted records by
+             * flipping the sign on the fileOffset in the pre-record header.
+             * This means that we can not use an incrementally computed
+             * checksum.
+             */
+
+            final ByteBuffer b = peek().duplicate();
+            // flip(limit=pos;pos=0)
+            b.flip();
+
+            assert checksumBuffer.capacity() == b.capacity() : "b.capacity="
+                    + b.capacity() + ", checksumBuffer.capacity="
+                    + checksumBuffer.capacity();
+
+            checksumBuffer.limit(checksumBuffer.capacity());
+            checksumBuffer.position(0);
+            checksumBuffer.put(b);
+            checksumBuffer.flip();
+
+            checker.reset();
+            checker.checksum(checksumBuffer);
+        }
 
         return checker.getChecksum();
 
@@ -714,6 +757,8 @@ abstract public class WriteCache implements IWriteCache {
 
         // Note: The offset MAY be zero. This allows for stores without any
         // header block.
+
+        assert !m_closedForWrites;
 
         if (m_written) { // should be clean, NO WAY should this be written to!
             log.error("Writing to CLEAN cache: " + hashCode());
@@ -786,7 +831,7 @@ abstract public class WriteCache implements IWriteCache {
                 // TODO: Note that the checker must be invalidated if a RWCache
                 // "deletes" an entry
                 // by zeroing an address.
-                if (checker != null) {
+                if (checker != null && !prefixWrites) {
                     // update the checksum (no side-effects on [data])
                     final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
                     chkBuf.position(spos);
@@ -797,7 +842,7 @@ abstract public class WriteCache implements IWriteCache {
                 // write checksum - if any
                 if (writeChecksum && useChecksum) {
                     tmp.putInt(chk);
-                    if (checker != null) {
+                    if (checker != null && !prefixWrites) {
                         // update the running checksum to include this too.
                         checker.update(chk);
                     }
@@ -843,6 +888,48 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     /**
+     * This method supports
+     * {@link #transferTo(WriteCache, WriteCache, ConcurrentMap)} and provides a
+     * low-level code path for copying records into <i>this</i> buffer from the
+     * buffer specified by the caller.
+     * <p>
+     * Note: This method is only invoked by transferTo(). We need to check its
+     * assumptions in more depth regarding synchronization before invoking from
+     * any other context.
+     */
+    private boolean writeRaw(final long offset, final ByteBuffer bb,
+            final int latchedAddr) throws IllegalStateException,
+            InterruptedException {
+
+        assert !m_closedForWrites;
+
+        final int len = bb.limit() - bb.position();
+        
+        assert len <= remaining();
+        
+        final ByteBuffer tmp = acquire();
+        try {
+            final int pos;
+            final int prefix = (prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0);
+            final int datalen = len - prefix;
+            synchronized (tmp) {
+                pos = tmp.position();
+                tmp.put(bb);
+            }
+            final RecordMetadata old = recordMap.put(Long.valueOf(offset),
+                    new RecordMetadata(offset, pos + prefix, datalen,
+                            latchedAddr));
+            if (old != null) {
+                throw new IllegalStateException("Write already found at "
+                        + offset);
+            }
+            return true;
+        } finally {
+            release();
+        }
+    }
+
+    /**
      * {@inheritDoc}
      * 
      * @throws IllegalStateException
@@ -852,6 +939,7 @@ abstract public class WriteCache implements IWriteCache {
 
         final WriteCacheCounters counters = this.counters.get();
 
+        // takes readLock returning buffer
         final ByteBuffer tmp = acquire();
 
         try {
@@ -1013,6 +1101,8 @@ abstract public class WriteCache implements IWriteCache {
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit unit) throws IOException, TimeoutException,
             InterruptedException {
+
+        assert m_closedForWrites;
 
         // start time
         final long begin = System.nanoTime();
@@ -1339,6 +1429,8 @@ abstract public class WriteCache implements IWriteCache {
         m_written = false;
         
         m_closedForWrites = false;
+        
+        m_removed = 0;
 
     }
 
@@ -1351,14 +1443,15 @@ abstract public class WriteCache implements IWriteCache {
     final public IHAWriteMessage newHAWriteMessage(//
             final long quorumToken,
             final long lastCommitCounter,//
-            final long lastCommitTime//
+            final long lastCommitTime,//
+            final ByteBuffer tmp
             ) {
 
         return new HAWriteMessage(
-           		lastCommitCounter,//
-           		lastCommitTime,//
-           		sequence, //
-           		bytesWritten(), getWholeBufferChecksum(),
+                lastCommitCounter,//
+                lastCommitTime,//
+                sequence, //
+                bytesWritten(), getWholeBufferChecksum(tmp),
                 prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
                 quorumToken, fileExtent.get(), firstOffset.get());
 
@@ -1369,6 +1462,18 @@ abstract public class WriteCache implements IWriteCache {
      */
     protected final AtomicReference<WriteCacheCounters> counters = new AtomicReference<WriteCacheCounters>(
             new WriteCacheCounters());
+
+    /**
+     * Stores the number of bytes removed from this {@link WriteCache}.
+     * <p>
+     * This can be used to determine whether the {@link WriteCache} should be
+     * flushed to disk or compacted to an aggregation buffer, avoiding writes
+     * and maximizing the chance of a read cache hit.
+     * <p>
+     * Note: <code>volatile</code> since not guarded by any lock.
+     */
+    // package private : exposed to canCompact() in subclass.
+    volatile int m_removed;
 
     /**
      * Sets the performance counters to be used by the write cache. A service
@@ -1672,7 +1777,9 @@ abstract public class WriteCache implements IWriteCache {
      * FIXME Once the file system cache fills up the throughput is much lower
      * for the RW mode. Look into putting a thread pool to work on the scattered
      * writes. This could be part of a refactor to apply a thread pool to IOs
-     * and related to prefetch and {@link Memoizer} behaviors.
+     * and related to prefetch and {@link Memoizer} behaviors. [Now that we are
+     * compacting {@link WriteCache} buffers we could also do a fully ordered
+     * write in {@link WriteCacheService#flush(boolean, long, TimeUnit)} .
      */
     public static class FileChannelScatteredWriteCache extends WriteCache {
 
@@ -1710,6 +1817,14 @@ abstract public class WriteCache implements IWriteCache {
         }
 
         /**
+         * The scattered write cache supports compaction.
+         */
+        @Override
+        final boolean canCompact() {
+            return true;
+        }
+
+        /**
          * Called by WriteCacheService to process a direct write for large
          * blocks and also to flush data from dirty caches.
          */
@@ -1725,7 +1840,7 @@ abstract public class WriteCache implements IWriteCache {
             if (m_written) {
                 log.warn("DUPLICATE writeOnChannel for : " + this.hashCode());
             } else {
-            	// Can be empty if reset!
+                // Can be empty if reset!
                 // assert !this.isEmpty();
 
                 m_written = true;
@@ -1804,7 +1919,7 @@ abstract public class WriteCache implements IWriteCache {
             final int limit = buf.limit(); // end position.
             int pos = buf.position(); // start position
 //            buf.limit(sp);
-            int nwrite = 0;
+//            int nwrite = 0;
             while (pos < limit) {
                 buf.position(pos);
                 final long addr = buf.getLong(); // 8 bytes
@@ -1813,18 +1928,23 @@ abstract public class WriteCache implements IWriteCache {
                 }
                 final int sze = buf.getInt(); // 4 bytes.
                 final int latchedAddr = buf.getInt(); // 4 bytes.
-                if (sze == 0 /* deleted */) {
+                if (sze == 0 /* old style deleted */) {
                     /*
                      * Should only happen if a previous write was already made
                      * to the buffer but the allocation has since been freed.
                      */
                     recordMap.remove(addr);
                     removeAddress(latchedAddr);
-                } else {
+                } else if (addr < 0 /* new style deleted */) {
+                    if (recordMap.get(addr) != null) {
+                        // Should have been removed already.
+                        throw new AssertionError();
+                    }
+                } else if (sze > 0) {
                     recordMap.put(addr, new RecordMetadata(addr, pos + SIZEOF_PREFIX_WRITE_METADATA, sze, latchedAddr));
                     addAddress(latchedAddr, sze);
                 }
-                nwrite++;
+//                nwrite++;
                 pos += SIZEOF_PREFIX_WRITE_METADATA + sze; // skip header (addr + sze) and data
             }
         }
@@ -1846,8 +1966,8 @@ abstract public class WriteCache implements IWriteCache {
          *            The latched address.
          */
         protected void removeAddress(int latchedAddr) {}
-        
-    } // class FileChannelScatteredWriteCache
+
+   } // class FileChannelScatteredWriteCache
 
     /**
      * To support deletion we will remove any entries for the provided address.
@@ -1894,16 +2014,13 @@ abstract public class WriteCache implements IWriteCache {
      * @throws InterruptedException
      * @throws IllegalStateException
      */
-    /* public */void clearAddrMap(final long addr, final int latchedAddr)
+    /* public */boolean clearAddrMap(final long addr, final int latchedAddr)
             throws IllegalStateException, InterruptedException {
 
-        if (!prefixWrites) {
-            /*
-             * We will not record a deleted record.  We are not in HA mode.
-             */
-            recordMap.remove(addr);
-            return;
-        }
+        // Note: Invoked from unit test w/o lock.
+//        if (!transferLock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
+
         /*
          * Note: acquire() is mutex with the writeLock. clearAddrMap() will take
          * the writeLock in order to ensure that this operation is atomic with
@@ -1911,76 +2028,38 @@ abstract public class WriteCache implements IWriteCache {
          */
         final ByteBuffer tmp = acquire();
         try {
+
             if (m_closedForWrites) {
                 /*
                  * Neither the buffer nor the record map may be modified. The
                  * WriteCacheService is in the process of writing this buffer to
                  * the disk and replicating it to the downstream nodes (HA).
+                 * 
+                 * The record exists, but we can not remove it. Return false.
                  */
-                return;
+                return false;
             }
-            /*
-             * Note: We must synchronize before having a side effect on position
-             * (which includes depending on remaining()). Also see write(...)
-             * which is synchronized on the buffer during critical sections
-             * which have a side effect on the buffer position. Finally, note
-             * that we do not always have enough room in the buffer to record
-             * the delete entry. If there is not enough room, then we can not
-             * remove it from the recordMap (at least for HA).
-             */
-            synchronized (tmp) {
-                if (tmp.remaining() >= SIZEOF_PREFIX_WRITE_METADATA) {
-                    /*
-                     * Add the delete entry to the buffer.
-                     */
-                    final int spos = tmp.position();
-                    tmp.putLong(addr);
-                    tmp.putInt(0); // wipe out size.
-                    tmp.putInt(latchedAddr);
-                    if (checker != null) {
-                        // update the checksum (no side-effects on [data])
-                        final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
-                        chkBuf.position(spos);
-                        chkBuf.limit(tmp.position());
-                        checker.update(chkBuf);
-                    }
-                    /*
-                     * Remove the entry.
-                     * 
-                     * Note: it is possible for there to be a concurrent reset()
-                     * on the buffer that is invoked between the moment when
-                     * WriteCacheService.clearWrite() obtains this WriteCache
-                     * and the moment when we acquire() the internal buffer. If
-                     * this situation occurs, then the code immediately above
-                     * will wind up writing a delete marker into the internal
-                     * buffer, but the record will no longer be in the
-                     * [recordMap]. The delete marker is semantically neutral
-                     * under this condition. The real problem with binary
-                     * compatibility for HA is that the internal buffer must
-                     * not be modified once we decide to flush() it to the
-                     * disk and the write pipeline.  That condition is
-                     * guarded by [m_closedForWrites].
-                     * 
-                     * A non-null value shouldn't be asserted.
-                     * 
-                     * It is possible that the address will already have been removed due to 
-                     * a concurrent reset of the WriteCache when taken from the WriteCacheService
-                     * freelist for re-use.
-                     * 
-                     * The real problem with binary
- Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * compatibility for HA is that the internal buffer must
- Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * not be modified once we decide to flush() it to the
- Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * disk and the write pipeline. ÊThat condition is
- Ê Ê Ê Ê Ê Ê Ê Ê Ê Ê * guarded by [m_closedForWrites].
-                     */
-                    recordMap.remove(addr);
-//                    if (recordMap.remove(addr) == null) {
-//                        throw new AssertionError(
-//                                "Address already cleared: addr=" + addr
-//                                        + ", latchedAddr=" + latchedAddr);
-//                    }
-                }
-            } // synchronized(tmp)
+
+            // Remove record from this cache.
+            final RecordMetadata removed = recordMap.remove(addr);
+
+            if (removed == null) {
+                // Must be present.
+                throw new AssertionError();
+            }
+
+            if (!prefixWrites) {
+                /*
+                 * We will not record a deleted record. We are not in HA mode.
+                 */
+                m_removed += removed.recordLength;
+                return true;
+            }
+
+            // overwrite buffer, changing file offset to negative
+            final int addr_offset = removed.bufferOffset
+                    - SIZEOF_PREFIX_WRITE_METADATA;
+            tmp.putLong(addr_offset, -removed.fileOffset); // abs write.
 
             /*
              * Fix up the debug flag when last address is cleared.
@@ -1988,9 +2067,17 @@ abstract public class WriteCache implements IWriteCache {
             if (m_written && recordMap.isEmpty()) {
                 m_written = false;
             }
+
+            m_removed += removed.recordLength;
+
+            return true;
+
         } finally {
+
             release();
+
         }
+
     }
 
     protected void registerWriteStatus(long offset, int length, char action) {
@@ -2012,8 +2099,8 @@ abstract public class WriteCache implements IWriteCache {
      *            the current extent of the backing file.
      * @throws InterruptedException
      */
-    public void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap, final long fileExtent)
-            throws InterruptedException {
+    void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap,
+            final long fileExtent) throws InterruptedException {
 
         final Iterator<Long> entries = recordMap.keySet().iterator();
         
@@ -2033,18 +2120,17 @@ abstract public class WriteCache implements IWriteCache {
                  * Using the conditional remove on ConcurrentMap guards against
                  * this.
                  */
-                boolean removed = serviceRecordMap.remove(addr, this);
+                final boolean removed = serviceRecordMap.remove(addr, this);
                 
                 registerWriteStatus(addr, 0, removed ? 'R' : 'L');
 
             }
 
         } else {
-            if (log.isInfoEnabled())
-                log.info("clean WriteCache: hashCode=" + hashCode()); // debug
-                                                                        // to
-                                                                        // see
-                                                                        // recycling
+            if (log.isInfoEnabled()) {
+                // debug to see recycling
+                log.info("clean WriteCache: hashCode=" + hashCode());
+            }
             if (m_written) {
                 log.warn("Written WriteCache but with no records");
             }
@@ -2058,195 +2144,6 @@ abstract public class WriteCache implements IWriteCache {
     public void setRecordMap(Collection<RecordMetadata> map) {
         throw new RuntimeException("setRecordMap NotImplemented");
     }
-
-    // /**
-    // * Method called by HA to send to socket.
-    // *
-    // * WriteCache serializes the recordMap and then the buffer. Enabling the
-    // use of DirectBuffers if
-    // * available.
-    // *
-    // * @param ostr
-    // * @throws InterruptedException
-    // * @throws IllegalStateException
-    // */
-    // public void sendTo(ObjectSocketChannelStream out) throws
-    // IllegalStateException, InterruptedException, IOException {
-    //      
-    // final ObjectOutputStream outstr = out.getOutputStream();
-    // sendRecordMap(outstr);
-    //      
-    // log.info("Acquiring Buffer");
-    // final ByteBuffer tmp = acquire();
-    // try {
-    // int pos = tmp.position();
-    // if (log.isTraceEnabled()) {
-    // log.trace("sendTo, pos: " + pos);
-    // }
-    // outstr.writeInt(pos);
-    //          
-    // ByteBuffer view = tmp.duplicate();
-    // view.limit(pos);
-    // view.position(0);
-    // if (log.isTraceEnabled()) {
-    // log.trace(show(view, "sendTo bytes"));
-    // }
-    //          
-    // out.write(view);
-    // } finally {
-    // release();
-    // }
-    // log.info("sendTo: done");
-    // }
-    //
-    // /**
-    // * This is the HA chaining method for the writeCache. Setting this
-    // writeCache to the
-    // * state defined by the inputStream, and parsing data on to the output
-    // stream if not null
-    // *
-    // * Note: The initial implementation populates the ByteBuffer from the
-    // input channel and
-    // * then writes to the output. We would like to be able to write
-    // concurrently with the
-    // * input using non-blocking IO. This isn't necessarily a huge win if the
-    // network IO is significantly
-    // * faster than the disk IO, since we need a full buffer in order to write
-    // to start the write task.
-    // *
-    // * @param in
-    // * @param out
-    // * @throws InterruptedException
-    // * @throws IllegalStateException
-    // */
-    // public void receiveAndForward(ObjectSocketChannelStream in,
-    // HAConnect out) throws IllegalStateException,
-    // InterruptedException, IOException {
-    //        
-    // if (log.isInfoEnabled())
-    // log.info("receiveRecordMap from " + in);
-    //        
-    // receiveRecordMap(in.getInputStream());
-    //
-    // ObjectInputStream instr = in.getInputStream();
-    // int sze = instr.readInt();
-    //        
-    // if (log.isTraceEnabled()) {
-    // log.trace("readByteArray: " + sze);
-    // }
-    //        
-    // final byte[] buf = in.readByteArray(sze);
-    //
-    // this.writeRaw(0, buf, sze);
-    //
-    // // in.getChannel().read(tmp);
-    //
-    // if (out != null) {
-    // ObjectOutputStream outstr = out.getOutputStream();
-    // sendRecordMap(outstr);
-    //
-    // // would be nice to be able to send to the channel
-    // // BUT this dual mode approach causes problem with current naive
-    // // ObjectStreams
-    // if (false) {
-    // // out.getChannel().write(tmp);
-    // } else {
-    // try {
-    // outstr.writeInt(sze);
-    // outstr.write(buf, 0, sze);
-    // } catch (Exception e) {
-    // throw new RuntimeException(e);
-    // }
-    // }
-    // outstr.flush();
-    // }
-    //
-    // // now should flush the WriteCache, but leave control to caller
-    // log.info("receiveAndForward done");
-    //      
-    // }
-
-    // /**
-    // * Writes bytes direct to underlying Buffer
-    // *
-    // * @param i
-    // * @param buf2
-    // * @param sze
-    // * @throws InterruptedException
-    // * @throws IllegalStateException
-    // */
-    // private void writeRaw(int i, byte[] buf, int sze) throws
-    // IllegalStateException, InterruptedException {
-    // final ByteBuffer tmp = acquire();
-    // try {
-    // if (log.isTraceEnabled()) {
-    // log.trace(show(buf, sze, "writeRaw"));
-    // }
-    // tmp.put(buf, i, sze);
-    // } finally {
-    // release();
-    // }
-    // }
-
-    // /**
-    // * If scattered writes then send whole map...
-    // *
-    // * Optimize this for non-scattered writes!
-    // */
-    // private void sendRecordMap(ObjectOutputStream out) {
-    // final Collection<RecordMetadata> data = recordMap.values();
-    // try {
-    // if (log.isTraceEnabled())
-    // log.trace("sendRecordMap, size: " + data.size());
-    // out.writeInt(data.size());
-    // final Iterator<RecordMetadata> values = data.iterator();
-    // while (values.hasNext()) {
-    // final RecordMetadata md = values.next();
-    // if (log.isTraceEnabled())
-    // log.trace("sendRecordMap, entry: " + md);
-    // out.writeLong(md.fileOffset);
-    // out.writeInt(md.bufferOffset);
-    // out.writeInt(md.recordLength);
-    // }
-    // } catch (IOException e) {
-    // e.printStackTrace();
-    // throw new RuntimeException(e);
-    // }
-    // }
-    //
-    // private void receiveRecordMap(ObjectInputStream in) {
-    // try {
-    // int mapsize = in.readInt();
-    // if (log.isTraceEnabled())
-    // log.trace("receiveRecordMap, size: " + mapsize);
-    // while (mapsize-- > 0) {
-    // long fileOffset = in.readLong();
-    // int bufferOffset = in.readInt();
-    // int recordLength = in.readInt();
-    //              
-    // long endRec = fileOffset + recordLength;
-    // if (endRec > lastOffset)
-    // lastOffset = endRec; // update lastOffset for each entry
-    //              
-    // if (log.isTraceEnabled())
-    // log.trace("receiveRecordMap - entry fileOffset: " + fileOffset +
-    // ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
-    //
-    // recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset,
-    // recordLength));
-    // if (recordMap.size() == 1) {
-    // firstOffset.set(fileOffset);
-    // }
-    // }
-    // } catch (IOException e) {
-    // e.printStackTrace();
-    // throw new RuntimeException(e);
-    // } catch (Throwable e) {
-    // e.printStackTrace();
-    // throw new RuntimeException(e);
-    // }
-    //      
-    // }
 
     /**
      * Checksum helper computes the running checksum from series of
@@ -2383,6 +2280,170 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     /**
+     * Transfers records from this {@link WriteCache} to the destination
+     * {@link WriteCache}, updating the record map in the
+     * {@link WriteCacheService} as it goes.
+     * <p>
+     * This method handles prefixWrites and useChecksum to transfer the correct
+     * bytes for the associated {@link RecordMetadata}.
+     * 
+     * @param dst
+     *            Records are transferred into the <i>dst</i> {@link WriteCache}
+     *            .
+     * @param writeCacheService
+     * 
+     * @return Returns true if the transfer is complete, or false if the
+     *         destination runs out of room.
+     * 
+     * @throws InterruptedException
+     */
+    // package private
+    static boolean transferTo(final WriteCache src, final WriteCache dst,
+            final ConcurrentMap<Long, WriteCache> serviceRecordMap)
+            throws InterruptedException {
+
+        if (src == null)
+            throw new IllegalArgumentException();
+        if (dst == null)
+            throw new IllegalArgumentException();
+        if (src == dst)
+            throw new IllegalArgumentException();
+        if (src.m_closedForWrites) {
+            // the source buffer must not be closed for writes.
+            throw new IllegalStateException();
+        }
+        if (dst.m_closedForWrites) {
+            // the dst buffer must not be closed for writes.
+            throw new IllegalStateException();
+        }
+        /*
+         * Note: This method is only invoked during critical code in
+         * WriteTask.call(). No other thread can write on [src] (because it is
+         * closed for writes) and no other thread can write on [dst] (because it
+         * is not visible to any other thread). Therefore we DO NOT need a lock
+         * here to prevent concurrent writers on [src] or [dst].
+         * 
+         * However, there is a problem where concurrent clears of an addr are
+         * permitted. Those clears are not able to effect [src] since it is
+         * closed for writes. But they are also not being applied to the [dst]
+         * buffer since the serviceRecordMap is incrementally updated as we copy
+         * the records from [src] to [dst].
+         * 
+         * Therefore, WriteCacheService.clearWrite() must be MUTEX with this
+         * method for the scope of the [src] buffer or we can lose that
+         * clearWrite(). I suggest that we add a distinct lock for this purpose
+         * so the only contention for WriteCacheService.clearWrite() is with
+         * transferTo() for the buffer that is currently being compacted (the
+         * [src] buffer).
+         * 
+         * Note: For HA, replicated WriteCache buffers MUST set closeForWrites()
+         * to ensure that compaction DOES NOT take place on the followers!!!
+         */
+        final Lock lock = src.transferLock;
+        lock.lock();
+        try {
+            /*
+             * Use a lock to ensure that the current state of the ByteBuffer is
+             * visible to this thread. This can be the readLock because (a) we
+             * are only reading on [src]; and (b) this method is invoked from a
+             * critical section in WriteTask.call(), writes are closed on [src],
+             * and nobody can modify [src] (it could also be the writeLock, but
+             * it does not really matter which we use here as far as I can tell
+             * since both closedForWrites() and the critical section are
+             * guaranteeing that no writes will be applied to [src]).
+             */
+            final ByteBuffer bb = src.acquire().duplicate();
+            try {
+
+                final int chklen = 0; // useChecksum ? 4 : 0;          
+                final int prefixlen = src.prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0;
+                final int xtralen = chklen + prefixlen;
+    
+                final Set<Entry<Long, RecordMetadata>> es = src.recordMap.entrySet();
+                final Iterator<Entry<Long, RecordMetadata>> entries = es.iterator();
+                while (entries.hasNext()) {
+                    final Entry<Long, RecordMetadata> entry = entries.next();
+                    final long offset = entry.getKey(); // file offset.
+                    final RecordMetadata md = entry.getValue();
+                    if (serviceRecordMap != null) {
+                        final WriteCache tmp = serviceRecordMap.get(offset);
+                        if (tmp == null)
+                            throw new AssertionError("Not owned: offset="
+                                    + offset + ", md=" + md);
+                        else if (tmp != src)
+                            throw new AssertionError(
+                                    "Record not owned by this cache: src="
+                                            + src + ", owner=" + tmp
+                                            + ", offset=" + offset + ", md="
+                                            + md);
+                    }
+                    
+                    final int len = md.recordLength + xtralen;
+                    final int dstremaining = dst.remaining();
+                    if (len > dstremaining) {
+                        // Not enough room in destination for this record.
+                        if (dstremaining >= 512) {
+                            // Destinaction still has room, keep looking.
+                            continue;
+                        }
+                        // Destination is full (or full enough).
+                        return false;
+                    }
+    
+                    final ByteBuffer dup = bb;//bb.duplicate(); (dup'd above).
+                    final int pos = md.bufferOffset - prefixlen;// include prefix
+                    final int limit = pos + len; // and any postfix
+                    dup.limit(limit);
+                    dup.position(pos);
+                    dst.writeRaw(offset, dup, md.latchedAddr);
+                    
+                    if (dst.remaining() != (dstremaining - len)) {
+                        throw new AssertionError("dst.remaining(): " + dst.remaining() + " expected: " + dstremaining);
+                    }
+                    
+                    if (serviceRecordMap != null) {
+                        /*
+                         * Note: As soon as we update the service record map it
+                         * is possible that WriteCacheService.clearWrite() will
+                         * clear the record from [dst]. We can not rely on the
+                         * record remaining in [dst] after this method call!
+                         */
+                        final WriteCache tmp = serviceRecordMap
+                                .put(offset, dst);
+                        if (tmp != src)
+                            throw new AssertionError("tmp=" + tmp + ",src="
+                                    + src + ", offset=" + offset + ", md=" + md);
+                    }
+
+                    // Clear entry from src recordMap.
+                    entries.remove();
+                }
+                
+                // true iff all records were transfered out.
+                final boolean isEmpty = src.recordMap.isEmpty();
+
+                return isEmpty;
+                
+            } finally {
+                try {
+                    if (src.m_closedForWrites) {
+                        // the source buffer must not be closed for writes.
+                        throw new IllegalStateException();
+                    }
+                    if (dst.m_closedForWrites) {
+                        // the dst buffer must not be closed for writes.
+                        throw new IllegalStateException();
+                    }
+                } finally {
+                    src.release();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+    
+    /**
      * Overridden by
      * {@link FileChannelScatteredWriteCache#resetRecordMapFromBuffer(ByteBuffer, Map)}
      * .
@@ -2412,7 +2473,12 @@ abstract public class WriteCache implements IWriteCache {
      * @throws InterruptedException
      * @throws IllegalStateException
      */
-    void closeForWrites() throws IllegalStateException, InterruptedException {
+    /*
+     * Note: exposed to IHAJournalStrategy.writeRawBuffer(). Implementations of
+     * that method must close the mock WriteCache against writes to prevent
+     * compaction of replicated WriteCache buffers on the receiver (HA).
+     */
+    public void closeForWrites() throws IllegalStateException, InterruptedException {
 
         /*
          * Note: clearAddrMap() uses acquire() to operate on the recordMap and
@@ -2437,6 +2503,49 @@ abstract public class WriteCache implements IWriteCache {
 
         }
 
+    }
+    
+    public boolean isClosedForWrites() {
+
+        return m_closedForWrites;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff we are allowed to compact buffers. The
+     * default implementation of the {@link WriteCache} is for a Worm and can
+     * never compact.
+     * <p>
+     * Note: This method is package private for access by
+     * {@link WriteCacheService}.
+     */
+    boolean canCompact() {
+
+        return false;
+        
+    }
+
+    /**
+     * Return the percentage of space that has been removed through the
+     * application of {@link #clearAddrMap(long, int)} and hence could be
+     * recovered through compaction of the {@link WriteCache}.
+     * 
+     * @return The percentage of recoverable space in [0:100].
+     */
+    int potentialCompaction() {
+
+        /*
+         * FIXME Modify to report the % unused space and also modify
+         * transferTo() to NOT stop at the first record that can not be copied,
+         * but instead continue to see if it can move any small records into the
+         * target buffer.
+         */
+        final int percentEmpty = (m_removed * 100) / bytesWritten();
+        
+        assert percentEmpty >= 0 && percentEmpty <= 100;
+
+        return percentEmpty;
+        
     }
 
 }
