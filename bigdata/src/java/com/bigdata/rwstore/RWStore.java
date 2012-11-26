@@ -723,7 +723,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		m_writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
 		
         if (log.isInfoEnabled())
-            log.info(com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+            log.info(com.bigdata.journal.Options.WRITE_CACHE_BUFFER_COUNT
                     + "=" + m_writeCacheBufferCount);
 
         this.m_maxDirtyListSize = Integer.valueOf(fileMetadata.getProperty(
