@@ -825,7 +825,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 addClean(cache, false/* addFirst */);
 
-                if (log.isInfoEnabled()) {
+                if (!wasEmpty && log.isInfoEnabled()) {
                     final WriteCacheServiceCounters tmp = counters.get();
                     final long nhit = tmp.nhit.get();
                     final long ntests = nhit + tmp.nmiss.get();
