@@ -786,11 +786,15 @@ abstract public class AbstractMRMWTestCase
         
         /**
          * 
-         * @param groundTruth The ground truth records.
-         * @param store The backing store.
-         * @param nwrites #of reads to perform.
+         * @param groundTruth
+         *            The ground truth records.
+         * @param store
+         *            The backing store.
+         * @param nreads
+         *            #of reads to perform.
          */
-        public ReaderTask(GroundTruth groundTruth, IRawStore store, int nreads) {
+        public ReaderTask(final GroundTruth groundTruth, final IRawStore store,
+                final int nreads) {
 
             this.groundTruth = groundTruth;
             

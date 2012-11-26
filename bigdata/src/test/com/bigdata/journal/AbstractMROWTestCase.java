@@ -438,9 +438,9 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
          * 
          * @param store
          * @param writer
-         * @param nwrites #of reads to perform.
+         * @param nops #of reads to perform.
          */
-        public ReaderTask(IRawStore store, WriterTask writer, int nops) {
+        public ReaderTask(final IRawStore store, final WriterTask writer, final int nops) {
 
             this.store = store;
             

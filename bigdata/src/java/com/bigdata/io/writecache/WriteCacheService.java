@@ -57,15 +57,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.writecache.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -73,7 +70,6 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumMember;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
@@ -460,10 +456,6 @@ abstract public class WriteCacheService implements IWriteCache {
 
             /*
              * Setup a reasonable default if no value was specified.
-             * 
-             * TODO This is probably not going to be a good default when there
-             * are a large number of buffers in the write cache and we are
-             * compacting the write cache buffers.
              */
             
             maxDirtyListSize = Math.max(nbuffers - 4/* nfree */, 1);
@@ -619,17 +611,16 @@ abstract public class WriteCacheService implements IWriteCache {
     private volatile long cacheSequence = 0;
 
     /**
-     * Determines how long the dirty list should grow until it is flushed.
-     * 
-     * For the WORM there is no advantage to any buffering, but the RWStore
-     * may recycle storage, so:
-     * 1) Writes can be avoided if delayed
-     * 2) Buffers could potentially be compacted, further delaying writes.
-     */
-    /*
-     * TODO This needs to be volatile unless some lock is identified to guard
+     * Determines how long the dirty list should grow until the
+     * {@link WriteCache} buffers are coalesced and/or written to disk.
+     * <p>
+     * Note: For the WORM there is no advantage to any buffering, but the
+     * RWStore may recycle storage, so: 1) Writes can be avoided if delayed 2)
+     * Buffers could potentially be compacted, further delaying writes.
+     * <p>
+     * Note: This needs to be volatile unless some lock is identified to guard
      * the transient change in this value applied by flush().
-     * 
+     * <p>
      * Note: This MUST BE GTE ONE (1) since WriteTask.call() will otherwise drop
      * through without actually taking anything off of the dirtyList.
      */
@@ -650,7 +641,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private class WriteTask implements Callable<Void> {
+    class WriteTask implements Callable<Void> {
 
         private ByteBuffer checksumBuffer;
         
@@ -836,12 +827,11 @@ abstract public class WriteCacheService implements IWriteCache {
                             + buffers[0].capacity() + ",nbuffers="
                             + tmp.nbuffers + ",nclean=" + tmp.nclean
                             + ",ndirty=" + tmp.ndirty + ",maxDirty="
-                            + tmp.maxdirty + ",nflush=" + tmp.nflush
-                            + ",nwrite=" + tmp.nwrite + ",hitRate=" + hitRate
-                            + ", empty=" + wasEmpty + ", didCompact="
-                            + didCompact + ", didWrite=" + didWrite
-                            + ", ncompact=" + c.ncompact + ", nwriteOnDisk="
-                            + c.nwriteOnDisk);
+                            + tmp.maxdirty + ",hitRate=" + hitRate + ",empty="
+                            + wasEmpty + ",didCompact=" + didCompact
+                            + ",didWrite=" + didWrite + ", ncompact="
+                            + c.ncompact + ",nwriteOnDisk="
+                            + c.nbuffedEvictedToChannel);
                 }
 
             } // while(true)
@@ -1144,7 +1134,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
             cache.flush(false/* force */);
             
-            counters.get().nwriteOnDisk++;
+            counters.get().nbuffedEvictedToChannel++;
 
             // Wait for the downstream IOs to finish.
             if (remoteWriteFuture != null) {
@@ -1878,7 +1868,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
 
         // maintain nwrites
-        counters.get().nwrites++;
+        counters.get().ncacheWrites++;
 
         // #of bytes in the record.
         final int remaining = data.remaining();
@@ -2446,7 +2436,7 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public boolean clearWrite(final long offset, final int latchedAddr) {
         try {
-            counters.get().nclearRequests++;
+            counters.get().nclearAddrRequests++;
             while (true) {
                 final WriteCache cache = recordMap.get(offset);
                 if (cache == null) {
@@ -2478,7 +2468,7 @@ abstract public class WriteCacheService implements IWriteCache {
                      */
                     if (cache.clearAddrMap(offset, latchedAddr)) {
                         // Found and cleared.
-                        counters.get().nclears++;
+                        counters.get().nclearAddrCleared++;
                         debugAddrs(offset, 0, 'F');
                         return true;
                     }
@@ -2547,197 +2537,6 @@ abstract public class WriteCacheService implements IWriteCache {
         return recordMap.get(addr) != null;
     }
     
-    /**
-     * Performance counters for the {@link WriteCacheService}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public static class WriteCacheServiceCounters extends WriteCacheCounters {
-
-        /** #of configured buffers (immutable). */
-        public final int nbuffers;
-
-        /**
-         * The configured dirty list threshold before evicting to disk
-         * (immutable).
-         */
-        public final int dirtyListThreshold;
-
-        /**
-         * The threshold of reclaimable space at which we will attempt to
-         * coalesce records in cache buffers.
-         */
-        public final int compactingThreshold;
-
-        /**
-         * #of dirty buffers (instantaneous).
-         * <p>
-         * Note: This is set by the {@link WriteTask} thread and by
-         * {@link WriteCacheService#reset()}. It is volatile so it is visible
-         * from a thread which looks at the counters and for correct publication
-         * from reset().
-         */
-        public volatile int ndirty;
-
-        /**
-         * #of clean buffers (instantaneous).
-         * <p>
-         * Note: This is set by the {@link WriteTask} thread and by
-         * {@link WriteCacheService#reset()}. It is volatile so it is visible
-         * from a thread which looks at the counters and for correct publication
-         * from reset().
-         */
-        public volatile int nclean;
-
-        /**
-         * The maximum #of dirty buffers observed by the {@link WriteTask} (its
-         * maximum observed backlog). This is only set by the {@link WriteTask}
-         * thread, but it is volatile so it is visible from a thread which looks
-         * at the counters.
-         */
-        public volatile int maxdirty;
-
-        /**
-         * #of times the {@link WriteCacheService} was reset (typically to
-         * handle an error condition).
-         * <p>
-         * Note: This is set by {@link WriteCacheService#reset()}. It is
-         * volatile so it is visible from a thread which looks at the counters
-         * and for correct publication from reset().
-         */
-        public volatile long nreset;
-
-        /**
-         * The #of {@link WriteCache} blocks sent by the leader to the first
-         * downstream follower.
-         */
-        public volatile long nsend;
-
-        /**
-         * The #of {@link WriteCache} buffers written to the disk.
-         */
-        public volatile long nwriteOnDisk;
-
-        /**
-         * The #of {@link WriteCache} buffers that have been compacted.
-         */
-        public volatile long ncompact;
-
-        /**
-         * The #of record-level writes made to the writeCacheService.
-         */
-        public volatile long nwrites;
-
-        /**
-         * The #of addresses cleared by the writeCacheService.
-         */
-        public volatile long nclearRequests;
-        
-        /**
-         * The #of addresses cleared by the writeCacheService.
-         */
-        public volatile long nclears;
-        
-        public WriteCacheServiceCounters(final int nbuffers,
-                final int dirtyListThreshold, final int compactingThreshold) {
-
-            this.nbuffers = nbuffers;
-
-            this.dirtyListThreshold = dirtyListThreshold;
-
-            this.compactingThreshold = compactingThreshold;
-            
-        }
-        
-        public CounterSet getCounters() {
-
-            final CounterSet root = super.getCounters();
-
-            root.addCounter("nbuffers",
-                    new OneShotInstrument<Integer>(nbuffers));
-
-            root.addCounter("dirtyListThreshold",
-                    new OneShotInstrument<Integer>(dirtyListThreshold));
-
-            root.addCounter("compactingThreshold",
-                    new OneShotInstrument<Integer>(compactingThreshold));
-
-            root.addCounter("ndirty", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(ndirty);
-                }
-            });
-
-            root.addCounter("maxDirty", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(maxdirty);
-                }
-            });
-
-            root.addCounter("nclean", new Instrument<Integer>() {
-                public void sample() {
-                    setValue(nclean);
-                }
-            });
-
-            root.addCounter("nreset", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nreset);
-                }
-            });
-
-            root.addCounter("nsend", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nsend);
-                }
-            });
-
-            root.addCounter("nwriteOnDisk", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nwriteOnDisk);
-                }
-            });
-            root.addCounter("ncompact", new Instrument<Long>() {
-                public void sample() {
-                    setValue(ncompact);
-                }
-            });
-
-            root.addCounter("nwrites", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nwrites);
-                }
-            });
-
-            root.addCounter("nclearRequests", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nclearRequests);
-                }
-            });
-
-            root.addCounter("nclears", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nclears);
-                }
-            });
-
-            root.addCounter("mbPerSec", new Instrument<Double>() {
-                public void sample() {
-                    final double mbPerSec = (((double) bytesWritten)
-                            / Bytes.megabyte32 / (TimeUnit.NANOSECONDS
-                            .toSeconds(elapsedWriteNanos)));
-                    setValue(((long) (mbPerSec * 100)) / 100d);
-                    
-                }
-            });
-
-            return root;
-
-        }
-
-    } // class WriteCacheServiceCounters
-
     /**
      * Note: Atomic reference is used so the counters may be imposed from
      * outside.
