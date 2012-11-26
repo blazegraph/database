@@ -3201,19 +3201,23 @@ public class RWStore implements IStore, IBufferedWriter {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
 		}
-		try {
-			/*
-			 * The call to flush the cache cannot be made while holding the
-			 * extension writeLock, since the writeOnChannel takes the
-			 * extension readLock.
-			 * TODO: Confirm that this cannot be a problem... that writes could
-			 * not be added to the writeCache by another thread to the
-			 * allocation block area.
-			 */
-			m_writeCache.flush(true);
-		} catch (InterruptedException e) {
-			throw new RuntimeException("Flush interrupted in extend file");
-		}
+        /**
+         * Note: Synchronous flush of the WriteCacheService should not be
+         * required. It has been commented out in support of
+         * 
+         * <a href="https://sourceforge.net/apps/trac/bigdata/ticket/621">
+         * Coalesce records in write cache</a>
+         */
+//		try {
+//			/*
+//			 * The call to flush the cache cannot be made while holding the
+//			 * extension writeLock, since the writeOnChannel takes the
+//			 * extension readLock.
+//			 */
+//			m_writeCache.flush(true);
+//		} catch (InterruptedException e) {
+//			throw new RuntimeException("Flush interrupted in extend file");
+//		}
 
 		final Lock writeLock = this.m_extensionLock.writeLock();
 		
