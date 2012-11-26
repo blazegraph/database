@@ -829,9 +829,9 @@ abstract public class WriteCacheService implements IWriteCache {
                             + ",ndirty=" + tmp.ndirty + ",maxDirty="
                             + tmp.maxdirty + ",hitRate=" + hitRate + ",empty="
                             + wasEmpty + ",didCompact=" + didCompact
-                            + ",didWrite=" + didWrite + ", ncompact="
-                            + c.ncompact + ",nwriteOnDisk="
-                            + c.nbuffedEvictedToChannel);
+                            + ",didWrite=" + didWrite + ",ncompact="
+                            + c.ncompact + ",nbufferEvictedToChannel="
+                            + c.nbufferEvictedToChannel);
                 }
 
             } // while(true)
@@ -1134,7 +1134,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
             cache.flush(false/* force */);
             
-            counters.get().nbuffedEvictedToChannel++;
+            counters.get().nbufferEvictedToChannel++;
 
             // Wait for the downstream IOs to finish.
             if (remoteWriteFuture != null) {
