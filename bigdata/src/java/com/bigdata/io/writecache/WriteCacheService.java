@@ -829,7 +829,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     final WriteCacheServiceCounters tmp = counters.get();
                     final long nhit = tmp.nhit.get();
                     final long ntests = nhit + tmp.nmiss.get();
-                    final double hitRate=(ntests == 0L ? 0d : (double) nhit / ntests);
+                    final int hitRate = (int) (100 * ((ntests == 0L ? 0d
+                            : (double) nhit / ntests)));
                     final WriteCacheServiceCounters c = counters.get();
                     log.info("WriteCacheService: bufferCapacity="
                             + buffers[0].capacity() + ",nbuffers="

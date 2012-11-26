@@ -1102,7 +1102,8 @@ abstract public class WriteCache implements IWriteCache {
             final TimeUnit unit) throws IOException, TimeoutException,
             InterruptedException {
 
-        assert m_closedForWrites;
+        if(!m_closedForWrites)
+            closeForWrites();
 
         // start time
         final long begin = System.nanoTime();
