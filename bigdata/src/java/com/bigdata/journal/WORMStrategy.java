@@ -58,6 +58,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
@@ -1032,7 +1033,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final int nwrites = writeOnDisk(data, firstOffset);
 
                 final WriteCacheCounters counters = this.counters.get();
-                counters.nwrite += nwrites;
+                counters.nchannelWrite += nwrites;
                 counters.bytesWritten += nbytes;
                 counters.elapsedWriteNanos += (System.nanoTime() - begin);
 

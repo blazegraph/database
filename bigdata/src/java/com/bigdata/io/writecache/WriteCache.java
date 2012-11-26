@@ -50,9 +50,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.Instrument;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -68,7 +66,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.concurrent.Memoizer;
 
 /**
  * This class provides a write cache with read-through for NIO writes on a
@@ -827,10 +824,13 @@ abstract public class WriteCache implements IWriteCache {
 
                 tmp.put(data);
 
-                // copy the record into the cache, updating position() as we go.
-                // TODO: Note that the checker must be invalidated if a RWCache
-                // "deletes" an entry
-                // by zeroing an address.
+                /*
+                 * Copy the record into the cache, updating position() as we go.
+                 * 
+                 * Note that the checker must be invalidated if a RWCache
+                 * "deletes" an entry by zeroing an address. Hence, the code no
+                 * longer updates the checksum when [prefixWrites:=true].
+                 */
                 if (checker != null && !prefixWrites) {
                     // update the checksum (no side-effects on [data])
                     final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
@@ -1114,7 +1114,7 @@ abstract public class WriteCache implements IWriteCache {
         // remaining nanoseconds to wait.
         long remaining = nanos;
 
-        final WriteCacheCounters counters = this.counters.get();
+//        final WriteCacheCounters counters = this.counters.get();
 
         final Lock writeLock = lock.writeLock();
 
@@ -1136,7 +1136,7 @@ abstract public class WriteCache implements IWriteCache {
 
             if (log.isTraceEnabled())
                 log.trace("nbytes=" + nbytes + ", firstOffset="
-                        + getFirstOffset() + ", nflush=" + counters.nflush);
+                        + getFirstOffset());// + ", nflush=" + counters.nflush);
 
             if (nbytes == 0) {
 
@@ -1170,7 +1170,7 @@ abstract public class WriteCache implements IWriteCache {
                     throw new TimeoutException("Unable to flush WriteCache");
                 }
 
-                counters.nflush++;
+//                counters.nflush++;
 
                 return ret;
 
@@ -1506,175 +1506,6 @@ abstract public class WriteCache implements IWriteCache {
     }
 
     /**
-     * Performance counters for the {@link WriteCache}.
-     * <p>
-     * Note: thread-safety is required for: {@link #nhit} and {@link #nmiss}.
-     * The rest should be Ok without additional synchronization, CAS operators,
-     * etc (mainly because they are updated while holding a lock).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    public static class WriteCacheCounters {
-
-        /*
-         * read on the cache.
-         */
-
-        /**
-         * #of read requests that are satisfied by the write cache.
-         */
-        public final CAT nhit = new CAT();
-
-        /**
-         * The #of read requests that are not satisfied by the write cache.
-         */
-        public final CAT nmiss = new CAT();
-
-        /*
-         * write on the cache.
-         */
-
-        /**
-         * #of records accepted for eventual write onto the backing channel.
-         */
-        public long naccept;
-
-        /**
-         * #of bytes accepted for eventual write onto the backing channel.
-         */
-        public long bytesAccepted;
-
-        /*
-         * write on the channel.
-         */
-
-        /**
-         * #of times {@link IWriteCache#flush(boolean)} was called.
-         */
-        public long nflush;
-
-        /**
-         * #of writes on the backing channel. Note that some write cache
-         * implementations do ordered writes and will therefore do one write per
-         * record while others do append only and therefore do one write per
-         * write cache flush. Note that in both cases we may have to redo a
-         * write if the backing channel was concurrently closed, so the value
-         * here can diverge from the #of accepted records and the #of requested
-         * flushes.
-         */
-        public long nwrite;
-
-        /**
-         * #of bytes written onto the backing channel.
-         */
-        public long bytesWritten;
-
-        /**
-         * Total elapsed time writing onto the backing channel.
-         */
-        public long elapsedWriteNanos;
-
-        public CounterSet getCounters() {
-
-            final CounterSet root = new CounterSet();
-
-            /*
-             * read on the cache.
-             */
-
-            root.addCounter("nhit", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nhit.get());
-                }
-            });
-
-            root.addCounter("nmiss", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nmiss.get());
-                }
-            });
-
-            root.addCounter("hitRate", new Instrument<Double>() {
-                public void sample() {
-                    final long nhit = WriteCacheCounters.this.nhit.get();
-                    final long ntests = nhit + WriteCacheCounters.this.nmiss.get();
-                    setValue(ntests == 0L ? 0d : (double) nhit / ntests);
-                }
-            });
-
-            /*
-             * write on the cache.
-             */
-
-            // #of records accepted by the write cache.
-            root.addCounter("naccept", new Instrument<Long>() {
-                public void sample() {
-                    setValue(naccept);
-                }
-            });
-
-            // #of bytes in records accepted by the write cache.
-            root.addCounter("bytesAccepted", new Instrument<Long>() {
-                public void sample() {
-                    setValue(bytesAccepted);
-                }
-            });
-
-            /*
-             * write on the channel.
-             */
-
-            // #of times the write cache was flushed to the backing channel.
-            root.addCounter("nflush", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nflush);
-                }
-            });
-
-            // #of writes onto the backing channel.
-            root.addCounter("nwrite", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nwrite);
-                }
-            });
-
-            // #of bytes written onto the backing channel.
-            root.addCounter("bytesWritten", new Instrument<Long>() {
-                public void sample() {
-                    setValue(bytesWritten);
-                }
-            });
-
-            // average bytes per write (will under report if we must retry
-            // writes).
-            root.addCounter("bytesPerWrite", new Instrument<Double>() {
-                public void sample() {
-                    final double bytesPerWrite = (nwrite == 0 ? 0d : (bytesWritten / (double) nwrite));
-                    setValue(bytesPerWrite);
-                }
-            });
-
-            // elapsed time writing on the backing channel.
-            root.addCounter("writeSecs", new Instrument<Double>() {
-                public void sample() {
-                    setValue(elapsedWriteNanos / 1000000000.);
-                }
-            });
-
-            return root;
-
-        } // getCounters()
-
-        public String toString() {
-
-            return getCounters().toString();
-
-        }
-
-    } // class WriteCacheCounters
-
-    /**
      * A {@link WriteCache} implementation suitable for an append-only file such
      * as the {@link WORMStrategy} or the output file of the
      * {@link IndexSegmentBuilder}.
@@ -1754,7 +1585,7 @@ abstract public class WriteCache implements IWriteCache {
             final int nwrites = FileChannelUtility.writeAll(opener, data, pos);
 
             final WriteCacheCounters counters = this.counters.get();
-            counters.nwrite += nwrites;
+            counters.nchannelWrite += nwrites;
             counters.bytesWritten += nbytes;
             counters.elapsedWriteNanos += (System.nanoTime() - begin);
 
@@ -1774,13 +1605,6 @@ abstract public class WriteCache implements IWriteCache {
      * To support HA, we prefix each write with the file position and buffer
      * length in the cache. This enables the cache buffer to be sent as a single
      * stream and the RecordMap rebuilt downstream.
-     * 
-     * FIXME Once the file system cache fills up the throughput is much lower
-     * for the RW mode. Look into putting a thread pool to work on the scattered
-     * writes. This could be part of a refactor to apply a thread pool to IOs
-     * and related to prefetch and {@link Memoizer} behaviors. [Now that we are
-     * compacting {@link WriteCache} buffers we could also do a fully ordered
-     * write in {@link WriteCacheService#flush(boolean, long, TimeUnit)} .
      */
     public static class FileChannelScatteredWriteCache extends WriteCache {
 
@@ -1882,7 +1706,7 @@ abstract public class WriteCache implements IWriteCache {
             }
 
             final WriteCacheCounters counters = this.counters.get();
-            counters.nwrite += nwrites;
+            counters.nchannelWrite += nwrites;
             counters.bytesWritten += nbytes;
             counters.elapsedWriteNanos += (System.nanoTime() - begin);
 

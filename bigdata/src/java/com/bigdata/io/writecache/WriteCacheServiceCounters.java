@@ -1,0 +1,227 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+package com.bigdata.io.writecache;
+
+import java.util.concurrent.TimeUnit;
+
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.writecache.WriteCacheService.WriteTask;
+import com.bigdata.rawstore.Bytes;
+
+/**
+ * Performance counters for the {@link WriteCacheService}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
+public class WriteCacheServiceCounters extends WriteCacheCounters implements
+        IWriteCacheServiceCounters {
+
+    /** #of configured buffers (immutable). */
+    public final int nbuffers;
+
+    /**
+     * The configured dirty list threshold before evicting to disk (immutable).
+     */
+    public final int dirtyListThreshold;
+
+    /**
+     * The threshold of reclaimable space at which we will attempt to coalesce
+     * records in cache buffers.
+     */
+    public final int compactingThreshold;
+
+    /**
+     * #of dirty buffers (instantaneous).
+     * <p>
+     * Note: This is set by the {@link WriteTask} thread and by
+     * {@link WriteCacheService#reset()}. It is volatile so it is visible from a
+     * thread which looks at the counters and for correct publication from
+     * reset().
+     */
+    public volatile int ndirty;
+
+    /**
+     * #of clean buffers (instantaneous).
+     * <p>
+     * Note: This is set by the {@link WriteTask} thread and by
+     * {@link WriteCacheService#reset()}. It is volatile so it is visible from a
+     * thread which looks at the counters and for correct publication from
+     * reset().
+     */
+    public volatile int nclean;
+
+    /**
+     * The maximum #of dirty buffers observed by the {@link WriteTask} (its
+     * maximum observed backlog). This is only set by the {@link WriteTask}
+     * thread, but it is volatile so it is visible from a thread which looks at
+     * the counters.
+     */
+    public volatile int maxdirty;
+
+    /**
+     * #of times the {@link WriteCacheService} was reset (typically to handle an
+     * error condition).
+     * <p>
+     * Note: This is set by {@link WriteCacheService#reset()}. It is volatile so
+     * it is visible from a thread which looks at the counters and for correct
+     * publication from reset().
+     */
+    public volatile long nreset;
+
+    /**
+     * The #of {@link WriteCache} blocks sent by the leader to the first
+     * downstream follower.
+     */
+    public volatile long nsend;
+
+    /**
+     * The #of {@link WriteCache} buffers written to the disk.
+     */
+    public volatile long nbuffedEvictedToChannel;
+
+    /**
+     * The #of {@link WriteCache} buffers that have been compacted.
+     */
+    public volatile long ncompact;
+
+    /**
+     * The #of record-level writes made onto the {@link WriteCacheService}.
+     */
+    public volatile long ncacheWrites;
+
+    /**
+     * The requests to clear an address from the cache.
+     * 
+     * @see WriteCacheService#clearWrite(long, int)
+     */
+    public volatile long nclearAddrRequests;
+
+    /**
+     * The #of addresses actually found and cleared from the cache by the
+     * {@link WriteCacheService}.
+     * 
+     * @see WriteCacheService#clearWrite(long, int)
+     */
+    public volatile long nclearAddrCleared;
+
+    public WriteCacheServiceCounters(final int nbuffers,
+            final int dirtyListThreshold, final int compactingThreshold) {
+
+        this.nbuffers = nbuffers;
+
+        this.dirtyListThreshold = dirtyListThreshold;
+
+        this.compactingThreshold = compactingThreshold;
+
+    }
+
+    public CounterSet getCounters() {
+
+        final CounterSet root = super.getCounters();
+
+        root.addCounter(NBUFFERS, new OneShotInstrument<Integer>(nbuffers));
+
+        root.addCounter(DIRTY_LIST_THRESHOLD, new OneShotInstrument<Integer>(
+                dirtyListThreshold));
+
+        root.addCounter(COMPACTING_THRESHOLD, new OneShotInstrument<Integer>(
+                compactingThreshold));
+
+        root.addCounter(NDIRTY, new Instrument<Integer>() {
+            public void sample() {
+                setValue(ndirty);
+            }
+        });
+
+        root.addCounter(MAX_DIRTY, new Instrument<Integer>() {
+            public void sample() {
+                setValue(maxdirty);
+            }
+        });
+
+        root.addCounter(NCLEAN, new Instrument<Integer>() {
+            public void sample() {
+                setValue(nclean);
+            }
+        });
+
+        root.addCounter(NRESET, new Instrument<Long>() {
+            public void sample() {
+                setValue(nreset);
+            }
+        });
+
+        root.addCounter(NSEND, new Instrument<Long>() {
+            public void sample() {
+                setValue(nsend);
+            }
+        });
+
+        root.addCounter(NBUFFER_EVICTED_TO_CHANNEL, new Instrument<Long>() {
+            public void sample() {
+                setValue(nbuffedEvictedToChannel);
+            }
+        });
+
+        root.addCounter(NCOMPACT, new Instrument<Long>() {
+            public void sample() {
+                setValue(ncompact);
+            }
+        });
+
+        root.addCounter(NCACHE_WRITES, new Instrument<Long>() {
+            public void sample() {
+                setValue(ncacheWrites);
+            }
+        });
+
+        root.addCounter(NCLEAR_ADDR_REQUESTS, new Instrument<Long>() {
+            public void sample() {
+                setValue(nclearAddrRequests);
+            }
+        });
+
+        root.addCounter(NCLEAR_ADDR_CLEARED, new Instrument<Long>() {
+            public void sample() {
+                setValue(nclearAddrCleared);
+            }
+        });
+
+        root.addCounter(MB_PER_SEC, new Instrument<Double>() {
+            public void sample() {
+                final double mbPerSec = (((double) bytesWritten)
+                        / Bytes.megabyte32 / (TimeUnit.NANOSECONDS
+                        .toSeconds(elapsedWriteNanos)));
+                setValue(((long) (mbPerSec * 100)) / 100d);
+
+            }
+        });
+
+        return root;
+
+    }
+
+} // class WriteCacheServiceCounters
