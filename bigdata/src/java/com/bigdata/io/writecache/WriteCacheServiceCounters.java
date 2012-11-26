@@ -100,7 +100,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
     /**
      * The #of {@link WriteCache} buffers written to the disk.
      */
-    public volatile long nbuffedEvictedToChannel;
+    public volatile long nbufferEvictedToChannel;
 
     /**
      * The #of {@link WriteCache} buffers that have been compacted.
@@ -182,7 +182,7 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
 
         root.addCounter(NBUFFER_EVICTED_TO_CHANNEL, new Instrument<Long>() {
             public void sample() {
-                setValue(nbuffedEvictedToChannel);
+                setValue(nbufferEvictedToChannel);
             }
         });
 
