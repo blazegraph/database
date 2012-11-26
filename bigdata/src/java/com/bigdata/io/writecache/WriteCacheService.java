@@ -742,8 +742,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     if (compactionEnabled && !flush && cache.canCompact()
                             && percentEmpty >= COMPACTION_THRESHOLD) {
 
-                        if (log.isTraceEnabled())
-                            log.trace("PotentialCompaction, reduction of: "
+                        if (log.isDebugEnabled())
+                            log.debug("PotentialCompaction, reduction of: "
                                     + percentEmpty + "%");
 
                         // Attempt to compact cache block.
@@ -866,7 +866,8 @@ abstract public class WriteCacheService implements IWriteCache {
                         addClean(reserve, true/* addFirst */);
                         
                         if (log.isDebugEnabled())
-                            log.debug("RETURNING RESERVE");
+                            log.debug("RETURNING RESERVE: curCompactingCache.bytesWritten="
+                                    + curCompactingCache.bytesWritten());
 
                         return true;
                     }
@@ -896,6 +897,9 @@ abstract public class WriteCacheService implements IWriteCache {
                     throw new AssertionError(
                             "We must be able to compact the cache");
                 }
+                if (log.isDebugEnabled())
+                    log.debug("USING RESERVE: curCompactingCache.bytesWritten="
+                            + curCompactingCache.bytesWritten());
                 // Buffer was compacted.
                 return true;
             } finally {
@@ -1092,8 +1096,8 @@ abstract public class WriteCacheService implements IWriteCache {
              * trap asynchronous close exceptions arising from the interrupt of
              * a concurrent IO operation and retry until they succeed.
              */
-            if (log.isTraceEnabled())
-                log.trace("Writing to file: " + cache.toString());
+            if (log.isDebugEnabled())
+                log.debug("Writing to file: " + cache.toString());
 
             cache.flush(false/* force */);
 
