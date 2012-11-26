@@ -169,6 +169,14 @@ public class TestWriteCacheServiceLifetime extends TestCase3 {
                 true/* useChecksums */, fileExtent, config.opener,
                 config.quorum) {
 
+            /**
+             * The scattered write cache supports compaction.
+             */
+            @Override
+            protected final boolean canCompact() {
+                return rw;
+            }
+
             @Override
             public WriteCache newWriteCache(final IBufferAccess buf,
                     final boolean useChecksum, final boolean bufferHasData,

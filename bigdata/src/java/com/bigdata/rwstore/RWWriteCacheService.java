@@ -57,6 +57,14 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
     }
 
     /**
+     * The scattered write cache supports compaction.
+     */
+    @Override
+    protected final boolean canCompact() {
+        return true;
+    }
+
+    /**
      * Provide default {@link FileChannelScatteredWriteCache}.
      * <p>
      * Note: This is used by the unit tests, but not by the {@link RWStore}.

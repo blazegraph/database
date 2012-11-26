@@ -288,7 +288,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * Disable {@link WriteCache} compaction when <code>false</code>.
      * <p>
      * Note: This is set to <code>false</code> when
-     * {@link #COMPACTION_THRESHOLD} is 100.
+     * {@link #compactionThreshold} is 100.
      */
     private final boolean compactionEnabled;
     
@@ -296,7 +296,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * The minimum percentage of empty space that could be recovered before we
      * will attempt to compact a {@link WriteCache} buffer (in [0:100]).
      */
-    private final int COMPACTION_THRESHOLD = 20; 
+    private final int compactionThreshold = 20; 
     
     /**
      * The current buffer. Modification of this value and reset of the current
@@ -450,8 +450,8 @@ abstract public class WriteCacheService implements IWriteCache {
     public WriteCacheService(final int nbuffers, int maxDirtyListSize,
             final boolean prefixWrites, final int compactionThreshold,
             final boolean useChecksum, final long fileExtent,
-            final IReopenChannel<? extends Channel> opener,
-            final Quorum quorum) throws InterruptedException {
+            final IReopenChannel<? extends Channel> opener, final Quorum quorum)
+            throws InterruptedException {
 
         if (nbuffers <= 0)
             throw new IllegalArgumentException();
@@ -513,7 +513,7 @@ abstract public class WriteCacheService implements IWriteCache {
         /*
          * Configure the desired dirtyListThreshold.
          */
-        if (prefixWrites) {
+        if(canCompact()){
             /*
              * Setup the RWS dirtyListThreshold.
              */
@@ -528,7 +528,14 @@ abstract public class WriteCacheService implements IWriteCache {
         }
         assert m_dirtyListThreshold >= 1;
         assert m_dirtyListThreshold <= buffers.length;
-        
+
+        if (log.isInfoEnabled())
+            log.info("nbuffers=" + nbuffers + ", dirtyListThreshold="
+                    + m_dirtyListThreshold + ", compactionThreshold="
+                    + compactionThreshold + ", compactionEnabled="
+                    + compactionEnabled + ", prefixWrites=" + prefixWrites
+                    + ", useChecksum=" + useChecksum + ", quorum=" + quorum);
+
         // save the current file extent.
         this.fileExtent.set(fileExtent);
 
@@ -551,7 +558,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
         // Set the same counters object on each of the write cache instances.
         final WriteCacheServiceCounters counters = new WriteCacheServiceCounters(
-                nbuffers);
+                nbuffers, m_dirtyListThreshold, compactionThreshold);
 
         for (int i = 0; i < buffers.length; i++) {
         
@@ -576,6 +583,20 @@ abstract public class WriteCacheService implements IWriteCache {
         // run the write task
         localWriteFuture = localWriteService.submit(newWriteTask());
 
+    }
+    
+    /**
+     * Return <code>true</code> iff we are allowed to compact buffers. The
+     * default implementation of the {@link WriteCache} is for a Worm and can
+     * never compact.
+     * <p>
+     * Note: This method is package private for access by
+     * {@link WriteCacheService}.
+     */
+    protected boolean canCompact() {
+
+        return false;
+        
     }
     
     /**
@@ -735,12 +756,14 @@ abstract public class WriteCacheService implements IWriteCache {
                 // Await dirty cache buffer.
                 final WriteCache cache = awaitDirtyBuffer();
 
+                boolean didCompact = false;
+                boolean didWrite = false;
                 if (!cache.isEmpty()) {
 
                     final int percentEmpty = cache.potentialCompaction();
-
-                    if (compactionEnabled && !flush && cache.canCompact()
-                            && percentEmpty >= COMPACTION_THRESHOLD) {
+                    
+                    if (compactionEnabled && !flush //&& cache.canCompact()
+                            && percentEmpty >= compactionThreshold) {
 
                         if (log.isDebugEnabled())
                             log.debug("PotentialCompaction, reduction of: "
@@ -756,13 +779,17 @@ abstract public class WriteCacheService implements IWriteCache {
 
                             // Write cache block if did not compact.
                             writeCacheBlock(cache);
-
+                            didWrite = true;
+                            
                         }
+                        
+                        didCompact = true;
 
                     } else {
 
                         // Write cache block.
                         writeCacheBlock(cache);
+                        didWrite = true;
 
                     }
 
@@ -793,13 +820,16 @@ abstract public class WriteCacheService implements IWriteCache {
                     final long nhit = tmp.nhit.get();
                     final long ntests = nhit + tmp.nmiss.get();
                     final double hitRate=(ntests == 0L ? 0d : (double) nhit / ntests);
+                    final WriteCacheServiceCounters c = counters.get();
                     log.info("WriteCacheService: bufferCapacity="
                             + buffers[0].capacity() + ",nbuffers="
                             + tmp.nbuffers + ",nclean=" + tmp.nclean
                             + ",ndirty=" + tmp.ndirty + ",maxDirty="
                             + tmp.maxdirty + ",nflush=" + tmp.nflush
-                            + ",nwrite=" + tmp.nwrite + ",hitRate="
-                            + hitRate);
+                            + ",nwrite=" + tmp.nwrite + ",hitRate=" + hitRate
+                            + ", didCompact=" + didCompact + ", didWrite="
+                            + didWrite + ", ncompact=" + c.ncompact
+                            + ", nwriteOnDisk=" + c.nwriteOnDisk);
                 }
 
             } // while(true)
@@ -904,13 +934,14 @@ abstract public class WriteCacheService implements IWriteCache {
                 return true;
             } finally {
 //                dirtyListLock.lock();
-//                try {
+                try {
                     // Now reset compactingCache with dirtyListLock held
                     assert !flush;
                     compactingCache = curCompactingCache;
-//                } finally {
+                    counters.get().ncompact++;
+                } finally {
                     dirtyListLock.unlock();
-//                }
+                }
             }
 
         } // compactCache()
@@ -1100,6 +1131,8 @@ abstract public class WriteCacheService implements IWriteCache {
                 log.debug("Writing to file: " + cache.toString());
 
             cache.flush(false/* force */);
+            
+            counters.get().nwriteOnDisk++;
 
             // Wait for the downstream IOs to finish.
             if (remoteWriteFuture != null) {
@@ -1281,6 +1314,8 @@ abstract public class WriteCacheService implements IWriteCache {
 
             counters.get().nreset++;
 
+            flush = false;
+            
         } finally {
             writeLock.unlock();
         }
@@ -1403,6 +1438,9 @@ abstract public class WriteCacheService implements IWriteCache {
             writeLock.unlock();
         }
     
+        if (log.isInfoEnabled())
+            log.info(counters.get().toString());
+
     }
 
     /**
@@ -2509,6 +2547,18 @@ abstract public class WriteCacheService implements IWriteCache {
         public final int nbuffers;
 
         /**
+         * The configured dirty list threshold before evicting to disk
+         * (immutable).
+         */
+        public final int dirtyListThreshold;
+
+        /**
+         * The threshold of reclaimable space at which we will attempt to
+         * coalesce records in cache buffers.
+         */
+        public final int compactingThreshold;
+
+        /**
          * #of dirty buffers (instantaneous).
          * <p>
          * Note: This is set by the {@link WriteTask} thread and by
@@ -2550,23 +2600,41 @@ abstract public class WriteCacheService implements IWriteCache {
          * The #of {@link WriteCache} blocks sent by the leader to the first
          * downstream follower.
          */
-        public volatile long nsend;        
+        public volatile long nsend;
+
         /**
-         * The #of writes made to the writeCacheService.
+         * The #of {@link WriteCache} buffers written to the disk.
+         */
+        public volatile long nwriteOnDisk;
+
+        /**
+         * The #of {@link WriteCache} buffers that have been compacted.
+         */
+        public volatile long ncompact;
+
+        /**
+         * The #of record-level writes made to the writeCacheService.
          */
         public volatile long nwrites;
+
         /**
          * The #of addresses cleared by the writeCacheService.
          */
         public volatile long nclearRequests;
+        
         /**
          * The #of addresses cleared by the writeCacheService.
          */
         public volatile long nclears;
         
-        public WriteCacheServiceCounters(final int nbuffers) {
-            
+        public WriteCacheServiceCounters(final int nbuffers,
+                final int dirtyListThreshold, final int compactingThreshold) {
+
             this.nbuffers = nbuffers;
+
+            this.dirtyListThreshold = dirtyListThreshold;
+
+            this.compactingThreshold = compactingThreshold;
             
         }
         
@@ -2576,6 +2644,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
             root.addCounter("nbuffers",
                     new OneShotInstrument<Integer>(nbuffers));
+
+            root.addCounter("dirtyListThreshold",
+                    new OneShotInstrument<Integer>(dirtyListThreshold));
+
+            root.addCounter("compactingThreshold",
+                    new OneShotInstrument<Integer>(compactingThreshold));
 
             root.addCounter("ndirty", new Instrument<Integer>() {
                 public void sample() {
@@ -2604,6 +2678,17 @@ abstract public class WriteCacheService implements IWriteCache {
             root.addCounter("nsend", new Instrument<Long>() {
                 public void sample() {
                     setValue(nsend);
+                }
+            });
+
+            root.addCounter("nwriteOnDisk", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nwriteOnDisk);
+                }
+            });
+            root.addCounter("ncompact", new Instrument<Long>() {
+                public void sample() {
+                    setValue(ncompact);
                 }
             });
 
