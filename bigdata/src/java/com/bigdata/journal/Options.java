@@ -599,7 +599,7 @@ public interface Options {
     /**
      * @see #WRITE_CACHE_COMPACTION_THRESHOLD
      */
-    String DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD = "30";
+    String DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD = "20";
     
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.

@@ -1732,6 +1732,101 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
     /**
      * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, two buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_RW_7buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        if(skipHATest()) return;
+
+        final int nbuffers = 7;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final int k = 3;
+        final long lastCommitTime = 0L;
+        final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
+        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
+                k, fixture);
+        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
+                k, fixture);
+//        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum2 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
+//                k, fixture);
+        try {
+            
+            fixture.start();
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+
+            final QuorumActor<?,?> actor0 = quorum0.getActor();
+            final QuorumActor<?,?> actor1 = quorum1.getActor();
+//            final QuorumActor<?,?> actor2 = quorum2.getActor();
+
+            actor0.memberAdd();
+            actor1.memberAdd();
+//            actor2.memberAdd();
+            fixture.awaitDeque();
+            
+            actor0.pipelineAdd();
+            actor1.pipelineAdd();
+//            actor2.pipelineAdd();
+            fixture.awaitDeque();
+            
+            // actor0 will become the leader.
+            actor0.castVote(lastCommitTime);
+            actor1.castVote(lastCommitTime);
+//            actor2.castVote(lastCommitTime);
+            fixture.awaitDeque();
+
+            // note token and verify expected leader.
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
+            quorum0.assertLeader(token);
+
+            // Verify the expected services joined.
+            assertEquals(2,quorum0.getJoined().length);
+
+            final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
+                    largeRecordRate, useChecksums, isHighlyAvailable,
+                    StoreTypeEnum.RW, quorum0/* leader */);
+
+            // Verify #of cache blocks received by the clients.
+            assertEquals(nsend, quorum1.getClient().nreceived.get());
+
+            // Verify still leader, same token.
+            quorum0.assertLeader(token);
+            
+            // Verify the expected services still joined.
+            assertEquals(2,quorum0.getJoined().length);
+
+        } finally {
+
+            quorum0.terminate();
+            quorum1.terminate();
+//            quorum2.terminate();
+            fixture.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
      * of the leader using a quorum with k := 3, 3 running services, six buffers
      * and the default #of records written and the default percentage of large
      * records.
@@ -2004,6 +2099,14 @@ public class TestWORMWriteCacheService extends TestCase3 {
             writeCacheService = new WriteCacheService(nbuffers,
                     maxDirtyListSize, prefixWrites, compactionThreshold,
                     useChecksums, fileExtent, opener, quorum) {
+
+                /**
+                 * The scattered write cache supports compaction.
+                 */
+                @Override
+                protected final boolean canCompact() {
+                    return storeType == StoreTypeEnum.RW;
+                }
 
                 @Override
                 public WriteCache newWriteCache(final IBufferAccess buf,

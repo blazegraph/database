@@ -265,7 +265,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
      */
     public void test_removeAllRWStore() {
 
-        final Journal store = new Journal(getProperties());
+        final Properties properties = getProperties();
+        
+//        properties.setProperty(Journal.Options.WRITE_CACHE_BUFFER_COUNT,"20");
+        
+        final Journal store = new Journal(properties);
 
         try {
         

@@ -1817,14 +1817,6 @@ abstract public class WriteCache implements IWriteCache {
         }
 
         /**
-         * The scattered write cache supports compaction.
-         */
-        @Override
-        final boolean canCompact() {
-            return true;
-        }
-
-        /**
          * Called by WriteCacheService to process a direct write for large
          * blocks and also to flush data from dirty caches.
          */
@@ -2511,19 +2503,19 @@ abstract public class WriteCache implements IWriteCache {
         
     }
 
-    /**
-     * Return <code>true</code> iff we are allowed to compact buffers. The
-     * default implementation of the {@link WriteCache} is for a Worm and can
-     * never compact.
-     * <p>
-     * Note: This method is package private for access by
-     * {@link WriteCacheService}.
-     */
-    boolean canCompact() {
-
-        return false;
-        
-    }
+//    /**
+//     * Return <code>true</code> iff we are allowed to compact buffers. The
+//     * default implementation of the {@link WriteCache} is for a Worm and can
+//     * never compact.
+//     * <p>
+//     * Note: This method is package private for access by
+//     * {@link WriteCacheService}.
+//     */
+//    boolean canCompact() {
+//
+//        return false;
+//        
+//    }
 
     /**
      * Return the percentage of space that has been removed through the
@@ -2532,14 +2524,8 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @return The percentage of recoverable space in [0:100].
      */
-    int potentialCompaction() {
+    final int potentialCompaction() {
 
-        /*
-         * FIXME Modify to report the % unused space and also modify
-         * transferTo() to NOT stop at the first record that can not be copied,
-         * but instead continue to see if it can move any small records into the
-         * target buffer.
-         */
         final int percentEmpty = (m_removed * 100) / bytesWritten();
         
         assert percentEmpty >= 0 && percentEmpty <= 100;
