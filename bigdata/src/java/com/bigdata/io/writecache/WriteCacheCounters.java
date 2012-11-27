@@ -115,7 +115,7 @@ public class WriteCacheCounters implements IWriteCacheCounters {
             }
         });
 
-        root.addCounter(NMISS, new Instrument<Double>() {
+        root.addCounter(HIT_RATE, new Instrument<Double>() {
             public void sample() {
                 final long nhit = WriteCacheCounters.this.nhit.get();
                 final long ntests = nhit + nmiss.get();
