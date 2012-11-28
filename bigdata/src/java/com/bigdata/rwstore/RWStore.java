@@ -819,49 +819,66 @@ public class RWStore implements IStore, IBufferedWriter {
     /**
      * Called from WriteCache.resetRecordMapFromBuffer
      * 
-     * If a FixedAllocator already exists for the address then just set the address as active,
-     * otherwise, create a new allocator and try again, which should work second time around
-     * if we are correctly in sync.
+     * If a FixedAllocator already exists for the address then just set the
+     * address as active, otherwise, create a new allocator and try again, which
+     * should work second time around if we are correctly in sync.
      * 
      * @param latchedAddr
+     *            The latched address.
      * @param size
+     *            The size of the application data -or- <code>-size</code> if
+     *            this provides notice of the existence of an allocator for that
+     *            <i>latchedAddr</i> but the address itself should not yet be
+     *            allocated.
      */
     void addAddress(final int latchedAddr, final int size) {
-    	// ignore zero address
-    	if (latchedAddr == 0)
-    		return;
-    	
-		m_allocationLock.lock();
-		try {		
-	    	FixedAllocator alloc = null;
-	    	try {
-	    		alloc = getBlock(latchedAddr);			
-	    	} catch (final PhysicalAddressResolutionException par) {
-	    		// Must create new allocator    		
-	    	}
-	    	if (alloc == null) {
-				final int i = fixedAllocatorIndex(size);
-				final int block = 64 * m_allocSizes[i];
-				final ArrayList<FixedAllocator> list = m_freeFixed[i];
-				final FixedAllocator allocator = new FixedAllocator(this, block);
-						
-				allocator.setFreeList(list);
-				allocator.setIndex(m_allocs.size());
-	
-				m_allocs.add(allocator);
-				
-				// Check correctly synchronized creation
-				assert allocator == getBlock(latchedAddr);
-	    		
-				alloc = allocator;    		
-	    	}
-	    	
-	   		assert size <= alloc.getSlotSize();
-			
-			alloc.setAddressExternal(latchedAddr);
-		} finally {
-			m_allocationLock.unlock();
-		}
+        // ignore zero address
+        if (latchedAddr == 0)
+            return;
+
+        m_allocationLock.lock();
+        try {
+            FixedAllocator alloc = null;
+            try {
+                alloc = getBlock(latchedAddr);
+            } catch (final PhysicalAddressResolutionException par) {
+                // Must create new allocator
+            }
+            final int size2 = size < 0 ? -size : size;
+            if (alloc == null) {
+                final int i = fixedAllocatorIndex(size2);
+                final int block = 64 * m_allocSizes[i];
+                final ArrayList<FixedAllocator> list = m_freeFixed[i];
+                final FixedAllocator allocator = new FixedAllocator(this, block);
+
+                allocator.setFreeList(list);
+                allocator.setIndex(m_allocs.size());
+
+                m_allocs.add(allocator);
+
+                // Check correctly synchronized creation
+                assert allocator == getBlock(latchedAddr);
+
+                alloc = allocator;
+            }
+
+            assert size2 <= alloc.getSlotSize();
+
+            if (size > 0) {
+
+                /*
+                 * This is a real allocation.
+                 */
+
+                alloc.setAddressExternal(latchedAddr);
+
+            }
+
+        } finally {
+
+            m_allocationLock.unlock();
+
+        }
 	}
     
     /**

@@ -33,6 +33,8 @@ import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -293,6 +295,16 @@ abstract public class WriteCache implements IWriteCache {
          */
         public final int latchedAddr;
         
+        /**
+         * Set <code>true</code> when the record is deleted.
+         * <p>
+         * Note: The {@link RecordMetadata} is removed from the
+         * {@link WriteCache#recordMap} when the record is deleted. This flag is
+         * only visible if the {@link RecordMetadata} was entered onto the
+         * {@link WriteCache#orderedRecords} list.
+         */
+        private volatile boolean deleted;
+        
         public RecordMetadata(final long fileOffset, final int bufferOffset,
                 final int recordLength, final int latchedAddr) {
 
@@ -304,12 +316,15 @@ abstract public class WriteCache implements IWriteCache {
             
             this.latchedAddr = latchedAddr;
 
+            this.deleted = false;
+            
         }
 
         public String toString() {
 
             return getClass().getSimpleName() + "{fileOffset=" + fileOffset
-                    + ",off=" + bufferOffset + ",len=" + recordLength + "}";
+                    + ",bufferOffset=" + bufferOffset + ",len=" + recordLength
+                    + ", delete=" + deleted + "}";
 
         }
 
@@ -323,6 +338,18 @@ abstract public class WriteCache implements IWriteCache {
      */
     final private ConcurrentMap<Long/* fileOffset */, RecordMetadata> recordMap;
 
+    /**
+     * An ordered list of the {@link RecordMetadata} in the order in which those
+     * records were created. This is maintained only for HA. It is used to
+     * communicate the allocations and deletes to a downstream RWS HA follower.
+     * The RWS follower relies on the ordered presentation of the addresses to
+     * infer the order in which the allocators were created, the size of the
+     * regions managed by those allocators, and the order in which the
+     * allocators appear in the allocator list (this is the same as the order of
+     * the creation of those allocators).
+     */
+    final private List<RecordMetadata> orderedRecords;
+    
     /**
      * The offset of the first record written onto the {@link WriteCache}. This
      * information is used when {@link #appendOnly} is <code>true</code> as it
@@ -533,6 +560,21 @@ abstract public class WriteCache implements IWriteCache {
             recordMap = new ConcurrentHashMap<Long, RecordMetadata>(indexDefaultCapacity);
         }
 
+        if (isHighlyAvailable && !bufferHasData) {
+
+            /*
+             * Only in HA mode, and not when we are processing a raw write cache
+             * buffer replicated from the leader.
+             */
+            
+            orderedRecords = new LinkedList<WriteCache.RecordMetadata>();
+            
+        } else {
+            
+            orderedRecords = null;
+            
+        }
+        
         if (bufferHasData) {
             /*
              * Populate the record map from the record.
@@ -637,7 +679,7 @@ abstract public class WriteCache implements IWriteCache {
      *       buffer (and hence it has fewer bytes remaining than might otherwise
      *       be expected).
      */
-    final public boolean isEmpty() {
+    final boolean isEmpty() {
 
         return recordMap.isEmpty();
 
@@ -861,13 +903,23 @@ abstract public class WriteCache implements IWriteCache {
              * Add metadata for the record so it can be read back from the
              * cache.
              */
-            if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, datalen, latchedAddr)) != null) {
+            
+            final RecordMetadata md = new RecordMetadata(offset, pos, datalen,
+                    latchedAddr);
+
+            if (recordMap.put(Long.valueOf(offset), md) != null) {
                 /*
                  * Note: This exception indicates that the abort protocol did
                  * not reset() the current write cache before new writes were
                  * laid down onto the buffer.
                  */
                 throw new AssertionError("Record exists for offset in cache: offset=" + offset);
+            }
+            
+            if (orderedRecords != null) {
+
+                orderedRecords.add(md);
+
             }
 
             if (log.isTraceEnabled()) { // @todo rather than hashCode() set a
@@ -1410,6 +1462,9 @@ abstract public class WriteCache implements IWriteCache {
         
         // clear the index since all records were flushed to disk.
         recordMap.clear();
+        
+        if (orderedRecords != null)
+            orderedRecords.clear();
 
         // clear to well known invalid offset.
         firstOffset.set(-1L);
@@ -1732,37 +1787,79 @@ abstract public class WriteCache implements IWriteCache {
                 final Map<Long, RecordMetadata> recordMap) {
 
             recordMap.clear();
-//            final int sp = buf.position(); // start position.
             final int limit = buf.limit(); // end position.
             int pos = buf.position(); // start position
-//            buf.limit(sp);
-//            int nwrite = 0;
             while (pos < limit) {
                 buf.position(pos);
-                final long addr = buf.getLong(); // 8 bytes
-                if (addr == 0L) { // end of content
-                    break;
-                }
-                final int sze = buf.getInt(); // 4 bytes.
-                final int latchedAddr = buf.getInt(); // 4 bytes.
-                if (sze == 0 /* old style deleted */) {
-                    /*
-                     * Should only happen if a previous write was already made
-                     * to the buffer but the allocation has since been freed.
-                     */
-                    recordMap.remove(addr);
-                    removeAddress(latchedAddr);
-                } else if (addr < 0 /* new style deleted */) {
-                    if (recordMap.get(addr) != null) {
+                // 8 bytes (negative iff record is deleted)
+                final long fileOffset = buf.getLong(); 
+                assert fileOffset != 0L;
+                // 4 bytes (negative iff no data follows)
+                final int recordLength = buf.getInt();
+                assert recordLength != 0;
+                // 4 bytes
+                final int latchedAddr = buf.getInt();  
+//                if (sze == 0 /* old style deleted */) {
+//                    /*
+//                     * Should only happen if a previous write was already made
+//                     * to the buffer but the allocation has since been freed.
+//                     */
+//                    recordMap.remove(addr);
+//                    removeAddress(latchedAddr);
+                if (fileOffset < 0 /* new style deleted */) {
+                    if (recordMap.get(fileOffset) != null) {
                         // Should have been removed already.
                         throw new AssertionError();
                     }
-                } else if (sze > 0) {
-                    recordMap.put(addr, new RecordMetadata(addr, pos + SIZEOF_PREFIX_WRITE_METADATA, sze, latchedAddr));
-                    addAddress(latchedAddr, sze);
+                    /*
+                     * Make sure that the address is declared. This covers the
+                     * case where a record is allocated and then recycled before
+                     * the WriteCache in which it was recorded is evicted from
+                     * the dirtyList. This can happen when we are not
+                     * compacting, as well as when we are compacting.
+                     * 
+                     * Note: RWS will interpret a -recordLength as notification
+                     * of the existence of an allocator for that address but
+                     * will not create an actual allocation for that address at
+                     * this time.
+                     */
+                    // Ensure allocator exists (allocation may or may not be
+                    // created).
+                    addAddress(latchedAddr, recordLength);
+                    if (recordLength > 0) {
+                        // Delete allocation.
+                        removeAddress(latchedAddr);
+                    }
+                } else {
+                    /*
+                     * Note: Do not enter things into [orderedRecords] on the
+                     * follower.
+                     */
+                    if (recordLength < 0) {
+                        /*
+                         * Notice of allocation.
+                         * 
+                         * Note: recordLength is always negative for this code
+                         * path. The RWS will interpret the -recordLength as
+                         * notification of the existence of an allocator for
+                         * that address but will not create an actual allocation
+                         * for that address at this time.
+                         */
+                        addAddress(latchedAddr, recordLength);
+                    } else {
+                        /*
+                         * Actual allocation with data.
+                         */
+                        final RecordMetadata md = new RecordMetadata(
+                                fileOffset, pos + SIZEOF_PREFIX_WRITE_METADATA,
+                                recordLength, latchedAddr);
+                        recordMap.put(fileOffset, md);
+                        addAddress(latchedAddr, recordLength);
+                    }
                 }
-//                nwrite++;
-                pos += SIZEOF_PREFIX_WRITE_METADATA + sze; // skip header (addr + sze) and data
+                // skip header (addr + sze + latchedAddr) and data (if any)
+                pos += (SIZEOF_PREFIX_WRITE_METADATA + (recordLength > 0 ? recordLength
+                        : 0));
             }
         }
 
@@ -1865,6 +1962,8 @@ abstract public class WriteCache implements IWriteCache {
                 throw new AssertionError();
             }
 
+            removed.deleted = true;
+            
             if (!prefixWrites) {
                 /*
                  * We will not record a deleted record. We are not in HA mode.
@@ -2104,10 +2203,13 @@ abstract public class WriteCache implements IWriteCache {
      * This method handles prefixWrites and useChecksum to transfer the correct
      * bytes for the associated {@link RecordMetadata}.
      * 
+     * @param src
+     *            The source buffer.
      * @param dst
      *            Records are transferred into the <i>dst</i> {@link WriteCache}
      *            .
-     * @param writeCacheService
+     * @param serviceRecordMap
+     *            The {@link WriteCacheService}'s record map.
      * 
      * @return Returns true if the transfer is complete, or false if the
      *         destination runs out of room.
@@ -2258,6 +2360,96 @@ abstract public class WriteCache implements IWriteCache {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Apply the {@link #orderedRecords} to create a dense {@link WriteCache}
+     * buffer that presents the addresses from the {@link #recordMap} along with
+     * enough metadata to decide whether this is a delete or merely an address
+     * declaration. Address declarations are modeled by setting the record size
+     * to a negative value. Address deletes are modeled by setting the
+     * fileOffset to a negative value. Actual address writes are not
+     * communicated through this method, but their data will eventually make it
+     * to the follower if the address is not recycled before the
+     * {@link WriteCache} holding that data is communicated to the follower (in
+     * which case the follower will eventually see the delete marker for the
+     * address instead of the application data for the address).
+     * 
+     * @return true unless there is nothing in the {@link WriteCache}.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     */
+    boolean prepareAddressMetadataForHA() throws IllegalStateException,
+            InterruptedException {
+
+        if (!prefixWrites)
+            throw new IllegalStateException();
+
+        if (orderedRecords == null)
+            throw new IllegalStateException();
+
+        if (orderedRecords.isEmpty()) {
+
+            return false;
+
+        }
+        
+        final ByteBuffer tmp = acquire();
+
+        try {
+
+            /*
+             * Note: We need to be synchronized on the ByteBuffer here
+             * since this operation relies on the position() being
+             * stable.
+             * 
+             * Note: Also see clearAddrMap(long) which is synchronized
+             * on the acquired ByteBuffer in the same manner to protect
+             * it during critical sections which have a side effect on
+             * the buffer position.
+             */
+
+            synchronized (tmp) {
+
+                tmp.position(0);
+                tmp.limit(tmp.capacity());
+
+                for (RecordMetadata md : orderedRecords) {
+
+                    if (md.deleted) {
+                        /*
+                         * Entry is address of deleted record. No application
+                         * data follows the entry (the next thing in the buffer
+                         * will be another entry).
+                         */
+                        tmp.putLong(-md.fileOffset);
+                        tmp.putInt(-md.recordLength);
+                    } else {
+                        /*
+                         * Entry is notice of non-deleted address. No
+                         * application data follows the entry (the next thing in
+                         * the buffer will be another entry).
+                         */
+                        tmp.putLong(md.fileOffset);
+                        tmp.putInt(-md.recordLength);
+                    }
+                    tmp.putInt(md.latchedAddr);
+
+                } // next RecordMetadata
+
+            } // synchronized(tmp)
+
+            orderedRecords.clear();
+       
+            return true;
+            
+        } finally {
+
+            release();
+
+        }
+
     }
     
     /**

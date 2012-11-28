@@ -485,7 +485,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
         this.useChecksum = useChecksum;
 
-        this.compactionEnabled = compactionThreshold < 100;
+        this.compactionEnabled = canCompact() && compactionThreshold < 100;
 
 //      this.opener = opener;
 
@@ -505,7 +505,7 @@ abstract public class WriteCacheService implements IWriteCache {
         /*
          * Configure the desired dirtyListThreshold.
          */
-        if(canCompact()){
+        if (compactionEnabled) {
             /*
              * Setup the RWS dirtyListThreshold.
              */
@@ -755,13 +755,25 @@ abstract public class WriteCacheService implements IWriteCache {
                  * bulk data load, it is not uncommon for all records to be
                  * recycled by the time we take something from the dirtyList, in
                  * which case the cache will be (logically) empty.
+                 * 
+                 * Note: This test (WriteCache.isEmpty()) is not decisive
+                 * because we are not holding any locks across it and the
+                 * subsequent actions. Therefore, it is possible that the cache
+                 * will become empty after it has been tested through concurrent
+                 * clearWrite() invocations. That should not be a problem. We
+                 * want to leave the cache open (versus closing it against
+                 * writes) in case we decide to compact the cache rather than
+                 * evicting it. The cache MUST NOT be closed for writes when we
+                 * compact it or we will lose the ability to clear recycled
+                 * records out of that WriteCache.
                  */
+
                 final boolean wasEmpty = cache.isEmpty();
 
                 if (!wasEmpty) {
 
                     final int percentEmpty = cache.potentialCompaction();
-                    
+
                     if (compactionEnabled && !flush //&& cache.canCompact()
                             && percentEmpty >= compactionThreshold) {
 
@@ -852,8 +864,17 @@ abstract public class WriteCacheService implements IWriteCache {
          * @throws InterruptedException
          */
         private boolean compactCache(final WriteCache cache)
-                throws InterruptedException {
+                throws InterruptedException, Exception {
 
+            /*
+             * The cache should not be closed against writes. If it were closed
+             * for writes, then we would no longer be able to capture cleared
+             * writes in the RecordMap. However, if we compact the cache, we
+             * want any cleared writes to be propagated into the compacted
+             * cache.
+             */
+            assert !cache.isClosedForWrites();
+            
             final WriteCache reserve = getReserve();
 
             if (reserve == null) {
@@ -888,6 +909,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     done = WriteCache.transferTo(cache/* src */,
                             curCompactingCache/* dst */, recordMap);
                     if (done) {
+                        sendAddressMetadata(cache);
                         /*
                          * Return reserve to the cleanList.
                          * 
@@ -932,6 +954,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isDebugEnabled())
                     log.debug("USING RESERVE: curCompactingCache.bytesWritten="
                             + curCompactingCache.bytesWritten());
+                sendAddressMetadata(cache);
                 // Buffer was compacted.
                 return true;
             } finally {
@@ -947,6 +970,42 @@ abstract public class WriteCacheService implements IWriteCache {
             }
 
         } // compactCache()
+
+        /**
+         * In HA, we need to notify a downstream RWS of the addresses that have
+         * been allocated on the leader in the same order in which the leader
+         * made those allocations. This information is used to infer the order
+         * in which the allocators for the different allocation slot sizes are
+         * created. This method will synchronous send those address notices and
+         * and also makes sure that the followers see the recycled addresses
+         * records so they can keep both their allocators and the actual
+         * allocations synchronized with the leader.
+         * 
+         * @param cache
+         *            A {@link WriteCache} whose data has been transfered into
+         *            another {@link WriteCache} through a "compact" operation.
+         * 
+         * @throws IllegalStateException
+         * @throws InterruptedException
+         * @throws ExecutionException
+         * @throws IOException
+         */
+        private void sendAddressMetadata(final WriteCache cache)
+                throws IllegalStateException, InterruptedException,
+                ExecutionException, IOException {
+
+            if (quorum == null || !quorum.isHighlyAvailable()
+                    || !quorum.getClient().isLeader(quorumToken)) {
+                return;
+            }
+
+            if (cache.prepareAddressMetadataForHA()) {
+
+                writeCacheBlock(cache);
+
+            }
+
+        }
 
         private WriteCache getReserve() throws InterruptedException {
             cleanListLock.lockInterruptibly();
@@ -988,6 +1047,11 @@ abstract public class WriteCacheService implements IWriteCache {
          * Get a dirty cache buffer. Unless we are flushing out the buffered
          * writes, we will allow the dirtyList to grow to the desired threshold
          * before we attempt to compact anything.
+         * <p>
+         * Note: This DOES NOT remove the {@link WriteCache} from the
+         * {@link #dirtyList}. It uses a peek(). The {@link WriteCache} will
+         * remain on the {@link #dirtyList} until it has been handled by
+         * {@link #doRun()}.
          * 
          * @return A dirty {@link WriteCache}.
          */
@@ -1067,10 +1131,14 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             cache.closeForWrites();
 
+            {
+                final ByteBuffer b = cache.peek();
+                if (b.position() == 0)
+                    return;
+            }
+            
             // increment writeCache sequence
             cache.setSequence(cacheSequence++);
-
-            final IHAWriteMessage msg;
 
             if (quorum != null && quorum.isHighlyAvailable()) {
 
@@ -1095,7 +1163,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 assert quorumMember != null : "Not quorum member?";
 
-                msg = cache.newHAWriteMessage(quorumToken,//
+                final IHAWriteMessage msg = cache.newHAWriteMessage(quorumToken,//
                         quorumMember.getLastCommitCounter(),//
                         quorumMember.getLastCommitTime(),//
                         checksumBuffer
@@ -1107,6 +1175,12 @@ abstract public class WriteCacheService implements IWriteCache {
                  * TODO When adding support for asynchronous replication we will
                  * have to ensure that the followers log the write cache blocks
                  * exactly once. They currently do this in HAJournalService.
+                 * 
+                 * Note: The WriteCacheService absorbs a lot of latency, but we
+                 * are still going to have that increased latency when it comes
+                 * time to flush() the data to the followers. Going asynchronous
+                 * with the dirty list replication would reduce that latency (as
+                 * would compacting the dirty list buffers when [flush:=true].
                  */
                 quorumMember.logWriteCacheBlock(msg, b.duplicate());
 
@@ -1114,10 +1188,6 @@ abstract public class WriteCacheService implements IWriteCache {
                         b);
 
                 counters.get().nsend++;
-
-            } else {
-
-                msg = null;
 
             }
 
@@ -1689,19 +1759,29 @@ abstract public class WriteCacheService implements IWriteCache {
             
             final int saveDirtyListThreshold = m_dirtyListThreshold;
             try {
+                /*
+                 * Force WriteTask.call() to evict anything in the cache.
+                 * 
+                 * Note: We need to wait until the dirtyList has been evicted
+                 * before writing out the compacting cache (if any) and then
+                 * finally drop the compactingCache onto the cleanList. Or have
+                 * a 2-stage flush.
+                 * 
+                 * FIXME We want it to continue to compact the cache buffers
+                 * during flush so it always outputs dense buffers. The code
+                 * right now will NOT compact the cache buffers when flush is
+                 * true. The behavior when flush:=true should be modified to
+                 * compact the buffer and then write it out rather than dropping
+                 * it back onto the dirty list.
+                 */
                 m_dirtyListThreshold = 1;
                 flush = true;
-                // Add any active compactingCache to dirty list
-                if (compactingCache != null) {
-                    final WriteCache tmp2 = compactingCache;
-                    compactingCache = null;
-                    dirtyList.add(tmp2);
-                    counters.get().ndirty++;
-                }
                 
                 /*
+                 * Wait until the dirtyList has been emptied.
+                 * 
                  * Note: [tmp] may be empty, but there is basically zero cost in
-                 * WriteTask to process and empty buffer and, done this way, the
+                 * WriteTask to process an empty buffer and, done this way, the
                  * code is much less complex here.
                  */
                 dirtyList.add(tmp);
@@ -1712,6 +1792,27 @@ abstract public class WriteCacheService implements IWriteCache {
                     remaining = nanos - (System.nanoTime() - begin);
                     if (!dirtyListEmpty.await(remaining, TimeUnit.NANOSECONDS)) {
                         throw new TimeoutException();
+                    }
+                }
+                /*
+                 * Add the [compactingCache] (if any) to dirty list and spin it
+                 * down again.
+                 * 
+                 * Note: We can not drop the compactingCache onto the dirtyList
+                 * until the dirtyList has been spun down to empty.
+                 */
+                if (compactingCache != null) {
+                    final WriteCache tmp2 = compactingCache;
+                    compactingCache = null;
+                    dirtyList.add(tmp2);
+                    counters.get().ndirty++;
+                    dirtyListChange.signalAll();
+                    while (!dirtyList.isEmpty() && !halt) {
+                        // remaining := (total - elapsed).
+                        remaining = nanos - (System.nanoTime() - begin);
+                        if (!dirtyListEmpty.await(remaining, TimeUnit.NANOSECONDS)) {
+                            throw new TimeoutException();
+                        }
                     }
                 }
                 if (halt)
