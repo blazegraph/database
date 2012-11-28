@@ -618,13 +618,10 @@ abstract public class WriteCacheService implements IWriteCache {
      * RWStore may recycle storage, so: 1) Writes can be avoided if delayed 2)
      * Buffers could potentially be compacted, further delaying writes.
      * <p>
-     * Note: This needs to be volatile unless some lock is identified to guard
-     * the transient change in this value applied by flush().
-     * <p>
      * Note: This MUST BE GTE ONE (1) since WriteTask.call() will otherwise drop
      * through without actually taking anything off of the dirtyList.
      */
-    private volatile int m_dirtyListThreshold;
+    private final int m_dirtyListThreshold;
     private volatile boolean flush = false;
 
     protected Callable<Void> newWriteTask() {
@@ -774,7 +771,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     final int percentEmpty = cache.potentialCompaction();
 
-                    if (compactionEnabled && !flush //&& cache.canCompact()
+                    if (compactionEnabled //&& !flush 
                             && percentEmpty >= compactionThreshold) {
 
                         if (log.isDebugEnabled())
@@ -925,12 +922,27 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         return true;
                     }
-                    // add current compacting cache to dirty list
-                    dirtyList.add(curCompactingCache);
-                    curCompactingCache = null;
-                    if (log.isTraceEnabled())
-                        log.trace("Added curCompactingCache to dirtyList");
+                    /*
+                     * The [curCompactingCache] is full.
+                     */
+                    if (flush) {
+                        /*
+                         * Send out the full cache block.
+                         */
+                        writeCacheBlock(curCompactingCache);
+                        addClean(curCompactingCache, true/* addFirst */);
+                        if (log.isTraceEnabled())
+                            log.trace("Flushed curCompactingCache");
+                    } else {
+                        /*
+                         * Add current compacting cache to dirty list.
+                         */
+                        dirtyList.add(curCompactingCache);
+                        if (log.isTraceEnabled())
+                            log.trace("Added curCompactingCache to dirtyList");
+                    }
                     // fall through. fill in the reserve cache next.
+                    curCompactingCache = null;
                 }
 
                 /*
@@ -961,7 +973,6 @@ abstract public class WriteCacheService implements IWriteCache {
 //                dirtyListLock.lock();
                 try {
                     // Now reset compactingCache with dirtyListLock held
-                    assert !flush;
                     compactingCache = curCompactingCache;
                     counters.get().ncompact++;
                 } finally {
@@ -1757,7 +1768,7 @@ abstract public class WriteCacheService implements IWriteCache {
             if (!dirtyListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
                 throw new TimeoutException();
             
-            final int saveDirtyListThreshold = m_dirtyListThreshold;
+//            final int saveDirtyListThreshold = m_dirtyListThreshold;
             try {
                 /*
                  * Force WriteTask.call() to evict anything in the cache.
@@ -1774,7 +1785,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  * compact the buffer and then write it out rather than dropping
                  * it back onto the dirty list.
                  */
-                m_dirtyListThreshold = 1;
+//                m_dirtyListThreshold = 1;
                 flush = true;
                 
                 /*
@@ -1818,7 +1829,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (halt)
                     throw new RuntimeException(firstCause.get());
             } finally {
-                m_dirtyListThreshold = saveDirtyListThreshold;
+//                m_dirtyListThreshold = saveDirtyListThreshold;
                 flush = false;
                 try {
                     assert compactingCache == null;
