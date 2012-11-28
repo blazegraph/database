@@ -939,7 +939,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                }
                 return null;
             } catch (Throwable t) {
-                log.error(t);
+                log.error("Will abort: " + t, t);
                 if (cxn != null && !cxn.isReadOnly()) {
                     /*
                      * Force rollback of the connection.
