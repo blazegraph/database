@@ -174,7 +174,6 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
      * Decoder.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class CodedRabaImpl extends AbstractCodedRaba {
 
@@ -331,7 +330,8 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
             } else {
 
-                return new byte[] { bits };
+//                return new byte[] { bits };
+                return RDFValueFactory.getValue(bits);
 
             }
 

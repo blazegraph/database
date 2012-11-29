@@ -117,12 +117,12 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * @param keyOrder
      *            The access path.
      * @param sids
-     * 			  If true, attach sids to decoded SPOs where appropriate.            
+     *            If true, attach sids to decoded SPOs where appropriate.            
      * @param leafKeySer
      * @param leafValSer
      */
     public SPOTupleSerializer(final SPOKeyOrder keyOrder,
-    		final boolean sids,
+            final boolean sids,
             final IRabaCoder leafKeySer, final IRabaCoder leafValSer) {
 
         super(new ASCIIKeyBuilderFactory(), leafKeySer, leafValSer);
@@ -163,18 +163,18 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
-	/**
-	 * Variant duplicates the behavior of {@link #serializeVal(SPO)} to provide
-	 * support for non-{@link SPO} {@link ISPO}s.
-	 */
+    /**
+     * Variant duplicates the behavior of {@link #serializeVal(SPO)} to provide
+     * support for non-{@link SPO} {@link ISPO}s.
+     */
     public byte[] serializeVal(final ISPO spo) {
 
-    	if (spo == null)
+        if (spo == null)
             throw new IllegalArgumentException();
 
-		return serializeVal(//buf,
-				spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
-		
+        return serializeVal(//buf,
+                spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
+        
     }
     
     /**
@@ -186,59 +186,61 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         if (spo == null)
             throw new IllegalArgumentException();
 
-		return serializeVal(//buf,
-				spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
+        return serializeVal(//buf,
+                spo.isOverride(), spo.getUserFlag(), spo.getStatementType());
 
-	}
+    }
 
-	/**
-	 * Return the byte[] that would be written into a statement index for this
-	 * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
-	 * bit. If the statement identifier is non-null then it will be included in
-	 * the returned byte[].
-	 * 
-	 * @param override
-	 *            <code>true</code> iff you want the
-	 *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
-	 *            when serializing values for a remote procedure that will write
-	 *            on the index, it is never set in the index itself).
-	 * @param userFlag
-	 *            <code>true</code> iff you want the
-	 *            {@link StatementEnum#MASK_USER_FLAG} bit set.
-	 * @param type
-	 *            The {@link StatementEnum}.
-	 * 
-	 * @return The value that would be written into a statement index for this
-	 *         {@link SPO}.
-	 */
+    /**
+     * Return the byte[] that would be written into a statement index for this
+     * {@link SPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
+     * bit. If the statement identifier is non-null then it will be included in
+     * the returned byte[].
+     * 
+     * @param override
+     *            <code>true</code> iff you want the
+     *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
+     *            when serializing values for a remote procedure that will write
+     *            on the index, it is never set in the index itself).
+     * @param userFlag
+     *            <code>true</code> iff you want the
+     *            {@link StatementEnum#MASK_USER_FLAG} bit set.
+     * @param type
+     *            The {@link StatementEnum}.
+     * 
+     * @return The value that would be written into a statement index for this
+     *         {@link SPO}.
+     */
 //    * @param buf
 //    *            A buffer supplied by the caller. The buffer will be reset
 //    *            before the value is written on the buffer.
-	public byte[] serializeVal(//final ByteArrayBuffer buf,
-			final boolean override, final boolean userFlag,
-			final StatementEnum type) {
-		
-//		buf.reset();
+    public byte[] serializeVal(//final ByteArrayBuffer buf,
+            final boolean override, final boolean userFlag,
+            final StatementEnum type) {
+        
+//      buf.reset();
 
-		// optionally set the override and user flag bits on the value.
-		final byte b = (byte) 
-			(type.code()
-				| (override ? StatementEnum.MASK_OVERRIDE : 0x0) 
-				| (userFlag ? StatementEnum.MASK_USER_FLAG : 0x0)
-				);
+        // optionally set the override and user flag bits on the value.
+        final byte b = (byte) 
+            (type.code()
+                | (override ? StatementEnum.MASK_OVERRIDE : 0x0) 
+                | (userFlag ? StatementEnum.MASK_USER_FLAG : 0x0)
+                );
 
-//		buf.putByte(b);
+//      buf.putByte(b);
 //
-//		final byte[] a = buf.toByteArray();
+//      final byte[] a = buf.toByteArray();
 //
 //        assert a.length == 1 : "Expecting one byte, but have "
 //                + BytesUtil.toString(a);
-		
-		return new byte[]{b};
+        
+        return RDFValueFactory.getValue(b);
 
-	}
+    }
+    
 
-	public SPO deserialize(final ITuple tuple) {
+
+    public SPO deserialize(final ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
@@ -271,12 +273,12 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
-	/**
-	 * Set the statement type, bit flags, and optional sid based on the tuple
-	 * value.
-	 */
+    /**
+     * Set the statement type, bit flags, and optional sid based on the tuple
+     * value.
+     */
     public ISPO decodeValue(final ISPO spo, final byte[] val) {
-    	
+        
         final byte code = val[0];
 
         final StatementEnum type = StatementEnum.decode(code);
@@ -288,16 +290,16 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         spo.setUserFlag(StatementEnum.isUserFlag(code));
 
         if (sids) {
-        	
+            
             // SIDs only valid for triples.
             assert keyOrder.getKeyArity() == 3;
           
             if (spo.isExplicit()) {
-            	
-            	spo.setStatementIdentifier(true);
-        	
+                
+                spo.setStatementIdentifier(true);
+            
             }
-        	
+            
         }
         
         return spo;
@@ -329,10 +331,10 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         switch (version) {
         case VERSION0:
             keyOrder = SPOKeyOrder.valueOf(in.readByte());
-			/*
-			 * New version is not backwards compatible with old journals that
-			 * used sids.
-			 */
+            /*
+             * New version is not backwards compatible with old journals that
+             * used sids.
+             */
             sids = false;
             break;
         case VERSION1:
