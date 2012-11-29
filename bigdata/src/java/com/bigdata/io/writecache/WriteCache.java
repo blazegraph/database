@@ -347,6 +347,22 @@ abstract public class WriteCache implements IWriteCache {
      * regions managed by those allocators, and the order in which the
      * allocators appear in the allocator list (this is the same as the order of
      * the creation of those allocators).
+     * <p>
+     * Note: The RWS must have the actual order in which the addresses are
+     * created. The actual address allocations are serialized by the RWStore
+     * using its allocationLock. Therefore the calls to WriteCache.write() must
+     * also be serialized. However, it might be possible for a clear of an
+     * address to be concurrent with an allocation (I need to check this with
+     * Martyn) - for example, when releasing an allocation context. In any case,
+     * it is wise to guard updates to {@link #orderedRecords} both to ensure
+     * that the allocation order is maintained and to ensure that the data
+     * structure remains consistent (since it can be updated by multiple
+     * threads).
+     * <p>
+     * Note: This data structure is guarded by the object monitor for the
+     * {@link ByteBuffer}. (This is the same thing that is used to serialize the
+     * writes on the {@link ByteBuffer}). Make sure that you are using the
+     * {@link ByteBuffer} and not a dup() of that {@link ByteBuffer}.
      */
     final private List<RecordMetadata> orderedRecords;
     
@@ -897,30 +913,48 @@ abstract public class WriteCache implements IWriteCache {
                 counters.naccept++;
                 counters.bytesAccepted += nwrite;
 
-            } // synchronized(tmp)
-
-            /*
-             * Add metadata for the record so it can be read back from the
-             * cache.
-             */
-            
-            final RecordMetadata md = new RecordMetadata(offset, pos, datalen,
-                    latchedAddr);
-
-            if (recordMap.put(Long.valueOf(offset), md) != null) {
                 /*
-                 * Note: This exception indicates that the abort protocol did
-                 * not reset() the current write cache before new writes were
-                 * laid down onto the buffer.
+                 * Add metadata for the record so it can be read back from the
+                 * cache.
                  */
-                throw new AssertionError("Record exists for offset in cache: offset=" + offset);
-            }
-            
-            if (orderedRecords != null) {
 
-                orderedRecords.add(md);
+                final RecordMetadata md = new RecordMetadata(offset, pos,
+                        datalen, latchedAddr);
 
-            }
+                if (recordMap.put(Long.valueOf(offset), md) != null) {
+                    /*
+                     * Note: This exception indicates that the abort protocol
+                     * did not reset() the current write cache before new writes
+                     * were laid down onto the buffer.
+                     */
+                    throw new AssertionError(
+                            "Record exists for offset in cache: offset="
+                                    + offset);
+                }
+
+                if (orderedRecords != null) {
+
+                    /*
+                     * Note: insert into this collection is guarded by the
+                     * object monitor for the ByteBuffer. This ensures that the
+                     * LinkedList data structure remains coherent when it is
+                     * updated by multiple threads. It also ensures that the
+                     * order of this list is the same as the ordinal position
+                     * order assigned within the ByteBuffer
+                     * 
+                     * Note: The real necessary ordering is the allocation
+                     * ordering - any address allocation before another address
+                     * MUST appear in the list before that other address. Since
+                     * some addresses are recycled while others are newly
+                     * allocated the latchedAddr values are not strictly
+                     * ascending.
+                     */
+           
+                    orderedRecords.add(md);
+
+                }
+
+            } // synchronized(tmp)
 
             if (log.isTraceEnabled()) { // @todo rather than hashCode() set a
                                         // buffer# on each WriteCache instance.
@@ -1463,8 +1497,11 @@ abstract public class WriteCache implements IWriteCache {
         // clear the index since all records were flushed to disk.
         recordMap.clear();
         
-        if (orderedRecords != null)
-            orderedRecords.clear();
+        if (orderedRecords != null) {
+            synchronized (tmp) {
+                orderedRecords.clear();
+            }
+        }
 
         // clear to well known invalid offset.
         firstOffset.set(-1L);
@@ -2389,12 +2426,6 @@ abstract public class WriteCache implements IWriteCache {
         if (orderedRecords == null)
             throw new IllegalStateException();
 
-        if (orderedRecords.isEmpty()) {
-
-            return false;
-
-        }
-        
         final ByteBuffer tmp = acquire();
 
         try {
@@ -2412,6 +2443,13 @@ abstract public class WriteCache implements IWriteCache {
 
             synchronized (tmp) {
 
+                // Note: guarded by synchronized(tmp)!
+                if (orderedRecords.isEmpty()) {
+
+                    return false;
+
+                }
+                
                 tmp.position(0);
                 tmp.limit(tmp.capacity());
 
@@ -2438,10 +2476,11 @@ abstract public class WriteCache implements IWriteCache {
 
                 } // next RecordMetadata
 
+                // Note: Guarded by synchronized(tmp)
+                orderedRecords.clear();
+
             } // synchronized(tmp)
 
-            orderedRecords.clear();
-       
             return true;
             
         } finally {
