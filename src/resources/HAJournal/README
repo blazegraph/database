@@ -1,5 +1,10 @@
 This directory contains some sample configuration for a highly available
-Journal.  The basic procedure is:
+Journal.  
+
+Note: The bigdata scripts bundled in this directory are designed to be run
+from the root directory of the SVN checkout of the bigdata code base.
+
+The basic procedure is:
 
 0. The nodes should have synchronized clocks, both for logging and to ensure
    that the transaction services have closely correlated clocks for assigning
@@ -33,6 +38,10 @@ Journal.  The basic procedure is:
    the nodes will be elected as the leader.  You can write on that node
    (e.g., using SPARQL UPDATE).  You can read on any node that is joined
    with the met quorum.
+   
+   Note: The default log4j configuration writes onto a file named 
+   "HAJournalServer.log" -- that is where you need to look for errors
+   and any other information about the running HAJournalServer process.
 
 A brief description of the files in this directory follows:
 
