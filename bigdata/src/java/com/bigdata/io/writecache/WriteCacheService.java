@@ -952,7 +952,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isTraceEnabled())
                     log.trace("Setting curCompactingCache to reserve");
 
-                reserve.resetWith(recordMap, fileExtent.get());
+                reserve.resetWith(recordMap);//, fileExtent.get());
                 curCompactingCache = reserve;
                 if (log.isTraceEnabled())
                     log.trace("Transferring to curCompactingCache");
@@ -1142,15 +1142,25 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             cache.closeForWrites();
 
+            /*
+             * Test for an empty cache.
+             * 
+             * Note: We can not do this until the cache has been closed for
+             * writes.
+             */
             {
                 final ByteBuffer b = cache.peek();
-                if (b.position() == 0)
+                if (b.position() == 0) {
+                    // Empty cache.
                     return;
+                }
             }
             
             // increment writeCache sequence
             cache.setSequence(cacheSequence++);
 
+            cache.setFileExtent(fileExtent.get());
+            
             if (quorum != null && quorum.isHighlyAvailable()) {
 
                 // Verify quorum still valid and we are the leader.
@@ -1832,7 +1842,13 @@ abstract public class WriteCacheService implements IWriteCache {
 //                m_dirtyListThreshold = saveDirtyListThreshold;
                 flush = false;
                 try {
-                    assert compactingCache == null;
+                    if(!halt) {
+                        /*
+                         * Can not check assertion if there is an existing
+                         * exception.
+                         */
+                        assert compactingCache == null;
+                    }
                 } finally {
                     dirtyListLock.unlock();
                 }
@@ -1858,7 +1874,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 // Guaranteed available hence non-blocking.
                 final WriteCache nxt = cleanList.take();
                 counters.get().nclean--;
-                nxt.resetWith(recordMap, fileExtent.get());
+                nxt.resetWith(recordMap);//, fileExtent.get());
                 current.set(nxt);
                 return true;
             } finally {
@@ -1896,23 +1912,23 @@ abstract public class WriteCacheService implements IWriteCache {
         if (fileExtent < 0L)
             throw new IllegalArgumentException();
 
-        final WriteCache cache = acquireForWriter();
-
-        try {
+//        final WriteCache cache = acquireForWriter();
+//
+//        try {
             if (log.isDebugEnabled())
                 log.debug("Set fileExtent: " + fileExtent);
 
             // make a note of the current file extent.
             this.fileExtent.set(fileExtent);
 
-            // set the current file extent on the WriteCache.
-            cache.setFileExtent(fileExtent);
-
-        } finally {
-
-            release();
-
-        }
+//            // set the current file extent on the WriteCache.
+//            cache.setFileExtent(fileExtent);
+//
+//        } finally {
+//
+//            release();
+//
+//        }
 
     }
 
@@ -2152,7 +2168,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         counters.get().nclean--;
                         // Clear the state on the new buffer and remove from
                         // cacheService map
-                        newBuffer.resetWith(recordMap, fileExtent.get());
+                        newBuffer.resetWith(recordMap);//, fileExtent.get());
 
                         // Set it as the new buffer.
                         current.set(cache = newBuffer);
@@ -2450,7 +2466,7 @@ abstract public class WriteCacheService implements IWriteCache {
             counters.get().nclean--;
             
             // Clear state on new buffer and remove from cacheService map
-            newBuffer.resetWith(recordMap, fileExtent.get());
+            newBuffer.resetWith(recordMap);//, fileExtent.get());
 
             // Set it as the new buffer.
             current.set(newBuffer);

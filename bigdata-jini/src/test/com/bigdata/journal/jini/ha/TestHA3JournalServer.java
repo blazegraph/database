@@ -380,9 +380,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
         for (RemoteRepository r : repos) {
 
-            // Should be empty.
-            assertEquals(10L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c} LIMIT 10")
+            // Should have data.
+            assertEquals(100L,
+                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c} LIMIT 100")
                             .evaluate()));
 
         }
@@ -401,6 +401,53 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify no HALog files since fully met quorum @ commit.
         assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
                 new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Do a "DROP ALL" and reverify that no solutions are found on each
+         * service.
+         */
+        {
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            repos[0].prepareUpdate("DROP ALL").evaluate();
+
+        }
+        
+        /*
+         * Verify that query on all nodes is allowed and now provides an empty
+         * result.
+         */
+        for (RemoteRepository r : repos) {
+
+            // Should be empty.
+            assertEquals(
+                    0L,
+                    countResults(r.prepareTupleQuery(
+                            "SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
+
+        }
+
+        // Current commit point.
+        final long lastCommitCounter3 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There are now THREE (3) commit points.
+        assertEquals(3L, lastCommitCounter3);
+
+        // Verify binary equality.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify no HALog files since fully met quorum @ commit.
+        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * TODO Continue test and verify restart? Or verify restart before we do
+         * the DROP ALL?
+         */
         
     }
 

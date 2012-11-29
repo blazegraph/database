@@ -954,6 +954,9 @@ public class HAJournalServer extends AbstractServer {
             @Override
             public Void call() throws Exception {
 
+                if (true)
+                    throw new UnsupportedOperationException();
+                
 //                final long readLock = leader.newTx(ITx.READ_COMMITTED);
                 
                 try {
@@ -1765,6 +1768,11 @@ public class HAJournalServer extends AbstractServer {
 
                 throw new RuntimeException(e);
 
+            } catch (RuntimeException t) {
+
+                // Wrap with the HA message.
+                throw new RuntimeException("msg=" + msg + ": " + t, t);
+                
             }
 
         }
@@ -1968,7 +1976,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             setExtent(msg);
-            writeWriteCacheBlock(msg,data);
+            writeWriteCacheBlock(msg, data);
 
         }
         

@@ -324,7 +324,7 @@ abstract public class WriteCache implements IWriteCache {
 
             return getClass().getSimpleName() + "{fileOffset=" + fileOffset
                     + ",bufferOffset=" + bufferOffset + ",len=" + recordLength
-                    + ", delete=" + deleted + "}";
+                    + ",delete=" + deleted + "}";
 
         }
 
@@ -470,7 +470,7 @@ abstract public class WriteCache implements IWriteCache {
      *            When <code>null</code> a buffer will be allocated for you from
      *            the {@link DirectBufferPool}. Buffers allocated on your behalf
      *            will be automatically released by {@link #close()}.
-     * @param scatteredWrites
+     * @param prefixWrites
      *            <code>true</code> iff the implementation uses scattered
      *            writes. The RW store uses scattered writes since its updates
      *            are written to different parts of the backing file. The WORM
@@ -496,9 +496,10 @@ abstract public class WriteCache implements IWriteCache {
      *
      * @throws InterruptedException
      */
-    public WriteCache(IBufferAccess buf, final boolean scatteredWrites, final boolean useChecksum,
-            final boolean isHighlyAvailable, final boolean bufferHasData,
-            final long fileExtent) throws InterruptedException {
+    public WriteCache(IBufferAccess buf, final boolean prefixWrites,
+            final boolean useChecksum, final boolean isHighlyAvailable,
+            final boolean bufferHasData, final long fileExtent)
+            throws InterruptedException {
 
         if (bufferHasData && buf == null)
             throw new IllegalArgumentException();
@@ -521,7 +522,7 @@ abstract public class WriteCache implements IWriteCache {
         // this.quorumManager = quorumManager;
 
         this.useChecksum = useChecksum;
-        this.prefixWrites = scatteredWrites;
+        this.prefixWrites = prefixWrites;
 
         if (isHighlyAvailable && !bufferHasData) {
             // Note: No checker if buffer has data.
@@ -570,7 +571,7 @@ abstract public class WriteCache implements IWriteCache {
          * better with concurrency, so we should benchmark this option for
          * non-scattered writes as well.
          */
-        if (scatteredWrites) {
+        if (prefixWrites) {
             recordMap = new ConcurrentSkipListMap<Long, RecordMetadata>();
         } else {
             recordMap = new ConcurrentHashMap<Long, RecordMetadata>(indexDefaultCapacity);
@@ -609,6 +610,8 @@ abstract public class WriteCache implements IWriteCache {
                 + "{recordCount=" + recordMap.size()//
                 + ",firstOffset=" + firstOffset//
                 + ",releaseBuffer=" + releaseBuffer//
+                + ",prefixWrites=" + prefixWrites//
+                + ",useChecksum=" + useChecksum//
                 + ",bytesWritten=" + bytesWritten()//
                 + ",bytesRemaining=" + remaining()//
                 + ",bytesRemoved=" + m_removed//
@@ -973,47 +976,47 @@ abstract public class WriteCache implements IWriteCache {
 
     }
 
-    /**
-     * This method supports
-     * {@link #transferTo(WriteCache, WriteCache, ConcurrentMap)} and provides a
-     * low-level code path for copying records into <i>this</i> buffer from the
-     * buffer specified by the caller.
-     * <p>
-     * Note: This method is only invoked by transferTo(). We need to check its
-     * assumptions in more depth regarding synchronization before invoking from
-     * any other context.
-     */
-    private boolean writeRaw(final long offset, final ByteBuffer bb,
-            final int latchedAddr) throws IllegalStateException,
-            InterruptedException {
-
-        assert !m_closedForWrites;
-
-        final int len = bb.limit() - bb.position();
-        
-        assert len <= remaining();
-        
-        final ByteBuffer tmp = acquire();
-        try {
-            final int pos;
-            final int prefix = (prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0);
-            final int datalen = len - prefix;
-            synchronized (tmp) {
-                pos = tmp.position();
-                tmp.put(bb);
-            }
-            final RecordMetadata old = recordMap.put(Long.valueOf(offset),
-                    new RecordMetadata(offset, pos + prefix, datalen,
-                            latchedAddr));
-            if (old != null) {
-                throw new IllegalStateException("Write already found at "
-                        + offset);
-            }
-            return true;
-        } finally {
-            release();
-        }
-    }
+//    /**
+//     * This method supports
+//     * {@link #transferTo(WriteCache, WriteCache, ConcurrentMap)} and provides a
+//     * low-level code path for copying records into <i>this</i> buffer from the
+//     * buffer specified by the caller.
+//     * <p>
+//     * Note: This method is only invoked by transferTo(). We need to check its
+//     * assumptions in more depth regarding synchronization before invoking from
+//     * any other context.
+//     */
+//    private boolean writeRaw(final long offset, final ByteBuffer bb,
+//            final int latchedAddr) throws IllegalStateException,
+//            InterruptedException {
+//
+//        assert !m_closedForWrites;
+//
+//        final int len = bb.limit() - bb.position();
+//        
+//        assert len <= remaining();
+//        
+//        final ByteBuffer tmp = acquire();
+//        try {
+//            final int pos;
+//            final int prefix = (prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0);
+//            final int datalen = len - prefix;
+//            synchronized (tmp) {
+//                pos = tmp.position();
+//                tmp.put(bb);
+//            }
+//            final RecordMetadata old = recordMap.put(Long.valueOf(offset),
+//                    new RecordMetadata(offset, pos + prefix, datalen,
+//                            latchedAddr));
+//            if (old != null) {
+//                throw new IllegalStateException("Write already found at "
+//                        + offset);
+//            }
+//            return true;
+//        } finally {
+//            release();
+//        }
+//    }
 
     /**
      * {@inheritDoc}
@@ -1565,8 +1568,7 @@ abstract public class WriteCache implements IWriteCache {
      * <p>
      * Note: <code>volatile</code> since not guarded by any lock.
      */
-    // package private : exposed to canCompact() in subclass.
-    volatile int m_removed;
+    private volatile int m_removed;
 
     /**
      * Sets the performance counters to be used by the write cache. A service
@@ -2048,12 +2050,13 @@ abstract public class WriteCache implements IWriteCache {
      * @param serviceRecordMap
      *            the map of the WriteCacheService that associates an address
      *            with a WriteCache
-     * @param fileExtent
-     *            the current extent of the backing file.
      * @throws InterruptedException
      */
-    void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap,
-            final long fileExtent) throws InterruptedException {
+//    * @param fileExtent
+//    *            the current extent of the backing file.
+    void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap
+//            final long fileExtentIsIgnored
+            ) throws InterruptedException {
 
         final Iterator<Long> entries = recordMap.keySet().iterator();
         
@@ -2062,7 +2065,8 @@ abstract public class WriteCache implements IWriteCache {
                 log.info("resetting existing WriteCache: nrecords=" + recordMap.size() + ", hashCode=" + hashCode());
 
             while (entries.hasNext()) {
-                final Long addr = entries.next();
+                
+                final Long fileOffset = entries.next();
 
                 /*
                  * We need to guard against the possibility that the entry in
@@ -2073,9 +2077,9 @@ abstract public class WriteCache implements IWriteCache {
                  * Using the conditional remove on ConcurrentMap guards against
                  * this.
                  */
-                final boolean removed = serviceRecordMap.remove(addr, this);
+                final boolean removed = serviceRecordMap.remove(fileOffset, this);
                 
-                registerWriteStatus(addr, 0, removed ? 'R' : 'L');
+                registerWriteStatus(fileOffset, 0, removed ? 'R' : 'L');
 
             }
 
@@ -2090,7 +2094,7 @@ abstract public class WriteCache implements IWriteCache {
         }       
         reset(); // must ensure reset state even if cache already empty
 
-        setFileExtent(fileExtent);
+//        setFileExtent(fileExtent);
 
     }
 
@@ -2309,54 +2313,80 @@ abstract public class WriteCache implements IWriteCache {
              * guaranteeing that no writes will be applied to [src]).
              */
             final ByteBuffer bb = src.acquire().duplicate();
+            ByteBuffer dd = null;
             try {
-
-                final int chklen = 0; // useChecksum ? 4 : 0;          
+                // Setup destination
+                dd = dst.acquire();
+                // Note: md.recordLength includes the checksum (suffix)
                 final int prefixlen = src.prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0;
-                final int xtralen = chklen + prefixlen;
     
                 final Set<Entry<Long, RecordMetadata>> es = src.recordMap.entrySet();
                 final Iterator<Entry<Long, RecordMetadata>> entries = es.iterator();
                 while (entries.hasNext()) {
                     final Entry<Long, RecordMetadata> entry = entries.next();
-                    final long offset = entry.getKey(); // file offset.
+                    final long fileOffset = entry.getKey(); // file offset.
                     final RecordMetadata md = entry.getValue();
                     if (serviceRecordMap != null) {
-                        final WriteCache tmp = serviceRecordMap.get(offset);
+                        final WriteCache tmp = serviceRecordMap.get(fileOffset);
                         if (tmp == null)
                             throw new AssertionError("Not owned: offset="
-                                    + offset + ", md=" + md);
+                                    + fileOffset + ", md=" + md);
                         else if (tmp != src)
                             throw new AssertionError(
                                     "Record not owned by this cache: src="
                                             + src + ", owner=" + tmp
-                                            + ", offset=" + offset + ", md="
+                                            + ", offset=" + fileOffset + ", md="
                                             + md);
                     }
-                    
-                    final int len = md.recordLength + xtralen;
+                    assert !md.deleted; // not deleted (deleted entries should not be in the recordMap).
+                    final int len = prefixlen + md.recordLength;
                     final int dstremaining = dst.remaining();
                     if (len > dstremaining) {
                         // Not enough room in destination for this record.
                         if (dstremaining >= 512) {
-                            // Destinaction still has room, keep looking.
+                            // Destination still has room, keep looking.
                             continue;
                         }
                         // Destination is full (or full enough).
                         return false;
                     }
     
-                    final ByteBuffer dup = bb;//bb.duplicate(); (dup'd above).
+//                    final ByteBuffer dup = bb;//bb.duplicate(); (dup'd above).
                     final int pos = md.bufferOffset - prefixlen;// include prefix
                     final int limit = pos + len; // and any postfix
-                    dup.limit(limit);
-                    dup.position(pos);
-                    dst.writeRaw(offset, dup, md.latchedAddr);
-                    
-                    if (dst.remaining() != (dstremaining - len)) {
-                        throw new AssertionError("dst.remaining(): " + dst.remaining() + " expected: " + dstremaining);
+                    final int dstoff; // offset in the destination buffer.
+                    synchronized (bb) {
+                        bb.limit(limit);
+                        bb.position(pos);
+                        // dst.writeRaw(fileOffset, dup, md.latchedAddr);
+
+                        // Copy to destination.
+                        synchronized (dd) {
+                            dstoff = dd.position() + prefixlen;
+                            dd.put(bb);
+                            assert dst.remaining() == (dstremaining - len) : "dst.remaining(): "
+                                    + dst.remaining()
+                                    + " expected: "
+                                    + dstremaining;
+                        }
                     }
-                    
+                    /*
+                     * Insert record into destination.
+                     * 
+                     * Note: The [orderedList] on the target buffer is not
+                     * updated because we handle the propagation of the address
+                     * allocation/clear notices separately and synchronously
+                     * using prepareAddressMetadataForHA().
+                     */
+                    {
+                        final RecordMetadata old = dst.recordMap.put(Long
+                                .valueOf(fileOffset), new RecordMetadata(
+                                fileOffset, dstoff/* bufferOffset */,
+                                md.recordLength, md.latchedAddr));
+
+                        assert old == null : "Write already found: " + old;
+                    }
+
                     if (serviceRecordMap != null) {
                         /*
                          * Note: As soon as we update the service record map it
@@ -2364,11 +2394,10 @@ abstract public class WriteCache implements IWriteCache {
                          * clear the record from [dst]. We can not rely on the
                          * record remaining in [dst] after this method call!
                          */
-                        final WriteCache tmp = serviceRecordMap
-                                .put(offset, dst);
-                        if (tmp != src)
-                            throw new AssertionError("tmp=" + tmp + ",src="
-                                    + src + ", offset=" + offset + ", md=" + md);
+                        final WriteCache tmp = serviceRecordMap.put(fileOffset,
+                                dst);
+                        assert src == tmp : "tmp=" + tmp + ",src=" + src
+                                + ", offset=" + fileOffset + ", md=" + md;
                     }
 
                     // Clear entry from src recordMap.
@@ -2391,6 +2420,8 @@ abstract public class WriteCache implements IWriteCache {
                         throw new IllegalStateException();
                     }
                 } finally {
+                    if (dd != null)
+                        dst.release();
                     src.release();
                 }
             }
@@ -2558,20 +2589,6 @@ abstract public class WriteCache implements IWriteCache {
         return m_closedForWrites;
         
     }
-
-//    /**
-//     * Return <code>true</code> iff we are allowed to compact buffers. The
-//     * default implementation of the {@link WriteCache} is for a Worm and can
-//     * never compact.
-//     * <p>
-//     * Note: This method is package private for access by
-//     * {@link WriteCacheService}.
-//     */
-//    boolean canCompact() {
-//
-//        return false;
-//        
-//    }
 
     /**
      * Return the percentage of space that has been removed through the
