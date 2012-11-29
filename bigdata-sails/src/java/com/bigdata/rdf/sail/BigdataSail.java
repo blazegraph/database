@@ -3992,7 +3992,24 @@ public class BigdataSail extends SailBase implements Sail {
                         final ITx txObj = journal.getTransactionManager()
                                 .getTx(this.tx);
 
-                        readsOnCommitTime = txObj.getReadsOnCommitTime();
+                        if (txObj != null) {
+
+                            // found it.
+                            readsOnCommitTime = txObj.getReadsOnCommitTime();
+                            
+                        } else {
+
+                            /**
+                             * TODO This can happen in HA because the TxState is
+                             * not available yet on the followers.
+                             * 
+                             * @see <a
+                             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623">
+                             *      HA TXS / TXS Bottleneck </a>
+                             */
+                            readsOnCommitTime = this.tx;
+                            
+                        }
 
                     } else {
                         
