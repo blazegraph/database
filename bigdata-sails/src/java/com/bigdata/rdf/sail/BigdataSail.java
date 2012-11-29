@@ -3955,10 +3955,10 @@ public class BigdataSail extends SailBase implements Sail {
                     txView = database;
                     
                 } else {
-                    
+
                     /*
                      * Locate a view of the triple store using that
-                     * read-historical timestmap.
+                     * read-historical timestamp.
                      */
 
                     txView = (AbstractTripleStore) database.getIndexManager()
@@ -3980,13 +3980,38 @@ public class BigdataSail extends SailBase implements Sail {
                 try {
                     
                     /*
+                     * Attempt to discover the commit time that this transaction
+                     * is reading on.
+                     */
+                    final long readsOnCommitTime;
+                    if (database.getIndexManager() instanceof Journal) {
+
+                        final Journal journal = (Journal) database
+                                .getIndexManager();
+
+                        final ITx txObj = journal.getTransactionManager()
+                                .getTx(this.tx);
+
+                        readsOnCommitTime = txObj.getReadsOnCommitTime();
+
+                    } else {
+                        
+                        readsOnCommitTime = timestamp;
+                    
+                    }
+                    
+                    /*
                      * Locate a view of the triple store isolated by that
                      * transaction.
+                     * 
+                     * Note: This will use the readsOnCommitTime for the
+                     * tx when that is available. This provides better
+                     * caching.
                      */
                     final AbstractTripleStore txView = (AbstractTripleStore) database
-                            .getIndexManager().getResourceLocator().locate(
-                                    namespace, tx);
-    
+                            .getIndexManager().getResourceLocator()
+                            .locate(namespace, readsOnCommitTime);
+
                     // Attach that transaction view to this SailConnection.
                     attach(txView);
     
