@@ -12,5 +12,6 @@ source src/resources/HAJournal/HAJournal.env
 
 java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
+    -Djava.security.policy=${POLICY_FILE}\
     com.bigdata.service.jini.util.ListServices \
     ${HAJOURNAL_CONFIG} $*
