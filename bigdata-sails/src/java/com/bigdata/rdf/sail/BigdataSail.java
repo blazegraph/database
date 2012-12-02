@@ -3979,55 +3979,63 @@ public class BigdataSail extends SailBase implements Sail {
 
                 try {
                     
-                    /*
-                     * Attempt to discover the commit time that this transaction
-                     * is reading on.
-                     */
-                    final long readsOnCommitTime;
-                    if (database.getIndexManager() instanceof Journal) {
-
-                        final Journal journal = (Journal) database
-                                .getIndexManager();
-
-                        final ITx txObj = journal.getTransactionManager()
-                                .getTx(this.tx);
-
-                        if (txObj != null) {
-
-                            // found it.
-                            readsOnCommitTime = txObj.getReadsOnCommitTime();
-                            
-                        } else {
-
-                            /**
-                             * TODO This can happen in HA because the TxState is
-                             * not available yet on the followers.
-                             * 
-                             * @see <a
-                             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623">
-                             *      HA TXS / TXS Bottleneck </a>
-                             */
-                            readsOnCommitTime = this.tx;
-                            
-                        }
-
-                    } else {
-                        
-                        readsOnCommitTime = timestamp;
-                    
-                    }
+//                    /*
+//                     * Attempt to discover the commit time that this transaction
+//                     * is reading on.
+//                     */
+//                    final long readsOnCommitTime;
+//                    if (database.getIndexManager() instanceof Journal) {
+//
+//                        final Journal journal = (Journal) database
+//                                .getIndexManager();
+//
+//                        final ITx txObj = journal.getTransactionManager()
+//                                .getTx(this.tx);
+//
+//                        if (txObj != null) {
+//
+//                            // found it.
+//                            readsOnCommitTime = txObj.getReadsOnCommitTime();
+//                            
+//                        } else {
+//
+//                            /**
+//                             * TODO This can happen in HA because the TxState is
+//                             * not available yet on the followers.
+//                             * 
+//                             * @see <a
+//                             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/623">
+//                             *      HA TXS / TXS Bottleneck </a>
+//                             */
+//                            readsOnCommitTime = this.tx;
+//                            
+//                        }
+//
+//                    } else {
+//                        
+//                        readsOnCommitTime = timestamp;
+//                    
+//                    }
                     
                     /*
                      * Locate a view of the triple store isolated by that
                      * transaction.
                      * 
-                     * Note: This will use the readsOnCommitTime for the
-                     * tx when that is available. This provides better
-                     * caching.
+                     * Note: This will use the readsOnCommitTime for the tx when
+                     * that is available. This provides better caching.
+                     * 
+                     * TODO This change does not work. It causes a test failure
+                     * in TestConcurrentKBCreate and may also be causing CI
+                     * problems in TestHA3JournalServer. See r6742, r6743. I
+                     * have not tracked down why using the [readsOnCommitTime]
+                     * causes a problem, but what happens is that the
+                     * DefaultResourceLocator winds up returning [txView :=
+                     * null] and an IllegalArgumentException is then thrown out
+                     * of attach(txView).
                      */
                     final AbstractTripleStore txView = (AbstractTripleStore) database
                             .getIndexManager().getResourceLocator()
-                            .locate(namespace, readsOnCommitTime);
+                            .locate(namespace, tx);//readsOnCommitTime);
 
                     // Attach that transaction view to this SailConnection.
                     attach(txView);
