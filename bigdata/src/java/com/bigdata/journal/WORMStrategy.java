@@ -2404,6 +2404,21 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         } finally {
             readLock.unlock();
         }
+//      {
+//      /*
+//       * FIXME INSTALL REPLICATED WRITE
+//       * 
+//       * Now that the replicated write has been written to the local disk,
+//       * install the replicated write onto the cleanList in the
+//       * WriteCacheService.
+//       * 
+//       * Note: The WriteCacheService must make a copy of the data since
+//       * the buffer in which it resides is owned by the HARecieveService.
+//       *
+//       * TODO Review position()/limit() preconditions for this call.
+//       */
+//      m_writeCache.installReplicatedWrite(msg, b.buffer().duplicate());
+//  }
 
     }
 
