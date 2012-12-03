@@ -5120,14 +5120,28 @@ public class RWStore implements IStore, IBufferedWriter {
          * Flush the scattered writes in the write cache to the backing
          * store.
          */
-        m_allocationLock.lock();
+        m_allocationLock.lock(); // TODO This lock is not necessary (verify!)
         try {
             // Flush writes.
             writeCache.flush(false/* force */);
         } finally {
             m_allocationLock.unlock();
         }
-
+//        {
+//            /*
+//             * FIXME INSTALL REPLICATED WRITE
+//             * 
+//             * Now that the replicated write has been written to the local disk,
+//             * install the replicated write onto the cleanList in the
+//             * WriteCacheService.
+//             * 
+//             * Note: The WriteCacheService must make a copy of the data since
+//             * the buffer in which it resides is owned by the HARecieveService.
+//             *
+//             * TODO Review position()/limit() preconditions for this call.
+//             */
+//            m_writeCache.installReplicatedWrite(msg, b.buffer().duplicate());
+//        }
     }
 
     public Future<Void> sendHALogBuffer(final IHALogRequest req,
