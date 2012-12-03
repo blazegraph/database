@@ -1507,7 +1507,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
             if (log.isDebugEnabled())
                 log.debug("#tasks=" + futures.size());
             
-            for(TaskFuture f : futures) {
+            for(TaskFuture<?> f : futures) {
                 
                 if(f.future.isDone()) {
                  
