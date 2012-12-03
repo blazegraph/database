@@ -1536,7 +1536,7 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @return cache A {@link WriteCache} to be replicated.
      */
-    final public IHAWriteMessage newHAWriteMessage(//
+    final IHAWriteMessage newHAWriteMessage(//
             final long quorumToken,
             final long lastCommitCounter,//
             final long lastCommitTime,//
@@ -2236,6 +2236,59 @@ abstract public class WriteCache implements IWriteCache {
         }
     }
 
+    /**
+     * Low-level routine copies the data from the caller's buffer into this
+     * buffer.
+     * 
+     * @param bin
+     *            The caller's buffer.
+     * 
+     * @throws InterruptedException
+     */
+    void copyRawBuffer(final ByteBuffer bin) throws InterruptedException {
+
+        final Lock writeLock = lock.writeLock();
+
+        writeLock.lockInterruptibly();
+
+        try {
+
+            final ByteBuffer buf = this.buf.get().buffer();
+
+            /*
+             * Copy the data from the caller's buffer into our own.
+             * 
+             * Note: We receive the buffer with pos=0, limit=#ofbyteswritten. As
+             * a post-condition, pos will be advanced to the limit.
+             */
+            buf.limit(bin.limit());
+            buf.position(0);
+            buf.put(bin); // copy the caller's buffer.
+
+            /*
+             * Rebuild the record map
+             * 
+             * Note: rebuild reads from position to limit, advancing the
+             * position.
+             * 
+             * Note: flush() expects pos=limit, so we are good to go after we
+             * rebuild the record map.
+             */
+
+            buf.position(0); // reset the position.
+
+            resetRecordMapFromBuffer(buf, recordMap);
+
+            buf.position(buf.limit());
+
+        } finally {
+
+            writeLock.unlock();
+
+        }
+
+    }
+    
     /**
      * Transfers records from this {@link WriteCache} to the destination
      * {@link WriteCache}, updating the record map in the
