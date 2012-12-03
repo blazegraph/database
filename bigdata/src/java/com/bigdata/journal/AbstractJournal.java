@@ -2756,6 +2756,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
              * creating a properly formed root block. For a non-HA deployment,
              * we just lay down the root block. For an HA deployment, we do a
              * 2-phase commit.
+             * 
+             * Note: In HA, the followers lay down the replicated writes
+             * synchronously. Thus, they are guaranteed to be on local storage
+             * by the time the leader finishes WriteCacheService.flush(). This
+             * does not create much latency because the WriteCacheService drains
+             * the dirtyList in a seperate thread.
              */
 			_bufferStrategy.commit();
 
@@ -5068,12 +5074,38 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * 
          * @return The proxy for that future.
          */
-        protected <E> Future<E> getProxy(final Future<E> future) {
+        final protected <E> Future<E> getProxy(final Future<E> future) {
 
-            return future;
+            return getProxy(future, false/* asyncFuture */);
 
         }
-        
+
+        /**
+         * Return a proxy object for a {@link Future} suitable for use in an RMI
+         * environment (the default implementation returns its argument).
+         * 
+         * @param future
+         *            The future.
+         * @param asyncFuture
+         *            When <code>true</code>, the service should not wait for
+         *            the {@link Future} to complete but should return a proxy
+         *            object that may be used by the client to monitor or cancel
+         *            the {@link Future}. When <code>false</code>, the method
+         *            should wait for the {@link Future} to complete and then
+         *            return a "thick" {@link Future} which wraps the completion
+         *            state but does not permit asynchronous monitoring or
+         *            cancellation of the operation wrapped by the
+         *            {@link Future}.
+         * 
+         * @return The proxy for that future.
+         */
+        protected <E> Future<E> getProxy(final Future<E> future,
+                final boolean asyncFuture) {
+
+            return future;
+            
+        }
+
         @Override
         public Future<Boolean> prepare2Phase(
                 final IHA2PhasePrepareMessage prepareMessage) {
