@@ -325,16 +325,13 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * Wait until the KB exists.
      * 
-     * @param haGlue
-     *            The server.
+     * Note: There is a data race when creating the a KB (especially the default
+     * KB) and verifying that the KB exists. If we find the KB in the row store
+     * cache but we do not find the axioms, then the subsequent attempts to
+     * resolve the KB fail - probably due to an issue with the default resource
+     * locator cache.
      * 
-     *            FIXME There is a data race when creating the a KB (especially
-     *            the default KB) and verifying that the KB exists. If we find
-     *            the KB in the row store cache but we do not find the axioms,
-     *            then the subsequent attempts to resolve the KB fail - probably
-     *            due to an issue with the default resource locator cache.
-     * 
-     *            <pre>
+     * <pre>
      * INFO : 41211 2012-11-06 08:38:41,874 : WARN : 8542 2012-11-06 08:38:41,873      qtp877533177-45 org.eclipse.jetty.util.log.Slf4jLog.warn(Slf4jLog.java:50): /sparql
      * INFO : 41211 2012-11-06 08:38:41,874 : java.lang.RuntimeException: java.lang.RuntimeException: java.lang.RuntimeException: No axioms defined? : LocalTripleStore{timestamp=-1, namespace=kb, container=null, indexManager=com.bigdata.journal.jini.ha.HAJournal@4d092447}
      * INFO : 41211 2012-11-06 08:38:41,874 :    at com.bigdata.rdf.sail.webapp.QueryServlet.doEstCard(QueryServlet.java:1120)
@@ -373,6 +370,12 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * INFO : 41212 2012-11-06 08:38:41,875 :    ... 23 more
      * </pre>
      * 
+     * @param haGlue
+     *            The server.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/617" >
+     *      Concurrent KB create fails with "No axioms defined?" </a>
+     *      
      * @see TestConcurrentKBCreate
      */
     protected void awaitKBExists(final HAGlue haGlue) throws IOException {
@@ -382,12 +385,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         assertCondition(new Runnable() {
             public void run() {
                 try {
-                    shortSleep(); // FIXME REMOVE!
                     repo.size();
                 } catch (Exception e) {
                     // KB does not exist.
                     fail();
-                    shortSleep(); // FIXME REMOVE!
                 }
             }
 

@@ -622,6 +622,12 @@ abstract public class WriteCacheService implements IWriteCache {
      * through without actually taking anything off of the dirtyList.
      */
     private final int m_dirtyListThreshold;
+    
+    /**
+     * When <code>true</code>, dirty buffers are immediately drained, compacted,
+     * and then written out to the backing media and (in HA mode) to the
+     * followers.
+     */
     private volatile boolean flush = false;
 
     protected Callable<Void> newWriteTask() {
@@ -1137,11 +1143,33 @@ abstract public class WriteCacheService implements IWriteCache {
                 throws InterruptedException, ExecutionException, IOException {
 
             /*
-             * Ensure nothing will modify this buffer before written to disk or
-             * HA pipeline
+             * IFF HA
+             * 
+             * TODO isHA should be true even if the quorum is not highly
+             * available since there still could be other services in the write
+             * pipeline (e.g., replication to an offline HAJournalServer prior
+             * to changing over into an HA3 quorum or off-site replication). The
+             * unit tests need to be updated to specify [isHighlyAvailable] for
+             * ALL quorum based test runs.
              */
-            cache.closeForWrites();
+            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
 
+            // IFF HA and this is the quorum leader.
+            final boolean isHALeader = isHA
+                    && quorum.getClient().isLeader(quorumToken);
+
+            /*
+             * Ensure nothing will modify this buffer before written to disk or
+             * HA pipeline.
+             * 
+             * Note: Do NOT increment the cacheSequence here. We need to decide
+             * whether or not the buffer is empty first, and it needs to be
+             * closed for writes before we can make that decision.
+             */
+
+            // Must be closed for writes.
+            cache.closeForWrites();
+            
             /*
              * Test for an empty cache.
              * 
@@ -1155,13 +1183,14 @@ abstract public class WriteCacheService implements IWriteCache {
                     return;
                 }
             }
-            
-            // increment writeCache sequence
+
+            // Increment WriteCache sequence.
             cache.setSequence(cacheSequence++);
 
+            // Set the current file extent on the WriteCache.
             cache.setFileExtent(fileExtent.get());
-            
-            if (quorum != null && quorum.isHighlyAvailable()) {
+
+            if (isHALeader) {//quorum != null && quorum.isHighlyAvailable()) {
 
                 // Verify quorum still valid and we are the leader.
                 quorum.assertLeader(quorumToken);
@@ -1191,17 +1220,14 @@ abstract public class WriteCacheService implements IWriteCache {
                         );
 
                 /*
-                 * The quorum leader must log the write cache block.
+                 * The quorum leader logs the write cache block here. For the
+                 * followers, the write cache blocks are currently logged by
+                 * HAJournalServer.
                  * 
-                 * TODO When adding support for asynchronous replication we will
-                 * have to ensure that the followers log the write cache blocks
-                 * exactly once. They currently do this in HAJournalService.
-                 * 
-                 * Note: The WriteCacheService absorbs a lot of latency, but we
-                 * are still going to have that increased latency when it comes
-                 * time to flush() the data to the followers. Going asynchronous
-                 * with the dirty list replication would reduce that latency (as
-                 * would compacting the dirty list buffers when [flush:=true].
+                 * Note: In HA with replicationFactor=1, this should still
+                 * attempt to replicate the write cache block in case there is
+                 * someone else in the write pipeline (for example, off-site
+                 * replication).
                  */
                 quorumMember.logWriteCacheBlock(msg, b.duplicate());
 
@@ -1220,16 +1246,31 @@ abstract public class WriteCacheService implements IWriteCache {
              * trap asynchronous close exceptions arising from the interrupt of
              * a concurrent IO operation and retry until they succeed.
              */
-            if (log.isDebugEnabled())
-                log.debug("Writing to file: " + cache.toString());
+            {
 
-            cache.flush(false/* force */);
-            
-            counters.get().nbufferEvictedToChannel++;
+                if (log.isDebugEnabled())
+                    log.debug("Writing to file: " + cache.toString());
 
-            // Wait for the downstream IOs to finish.
+                // Flush WriteCache buffer to channel (write on disk)
+                cache.flush(false/* force */);
+
+                counters.get().nbufferEvictedToChannel++;
+
+            }
+
+            /*
+             * Wait for the downstream IOs to finish.
+             * 
+             * Note: Only the leader is doing replication of the WriteCache
+             * blocks from this thread and only the leader will have a non-null
+             * value for the [remoteWriteFuture]. The followers are replicating
+             * to the downstream nodes in QuorumPipelineImpl. Since the WCS
+             * absorbs a lot of latency, replication from QuorumPipelineImpl
+             * should be fine.
+             */
             if (remoteWriteFuture != null) {
 
+                // Wait for the downstream IOs to finish.
                 remoteWriteFuture.get();
                 
             }
@@ -1708,18 +1749,28 @@ abstract public class WriteCacheService implements IWriteCache {
      * resulting in a high-level abort() and {@link #reset()} of the
      * {@link WriteCacheService}.
      * 
+     * TODO flush() is currently designed to block concurrent writes() in
+     * order to give us clean decision boundaries for the HA write pipeline and
+     * also to simplify the internal locking design. Once we get HA worked out
+     * cleanly we should explore whether or not we can relax this constraint
+     * such that writes can run concurrently with flush(). That would have
+     * somewhat higher throughput since mutable B+Tree evictions would no longer
+     * cause concurrent tasks to block during the commit protocol or the file
+     * extent protocol. [Perhaps by associating each write set with a distinct
+     * sequence counter (that is incremented by both commit and abort)?]
+     * 
+     * TODO Flush should order ALL {@link WriteCache}'s on the dirtyList by
+     * their fileOffset and then evict them in that order. This reordering will
+     * maximize the opportunity for locality during the IOs. With a large write
+     * cache (multiple GBs) this reordering could substantially reduce the
+     * IOWait associated with flush() for a large update. Note: The reordering
+     * should only be performed by the leader in HA mode - the followers will
+     * receive the {@link WriteCache} blocks in the desired order and can just
+     * drop them onto the dirtyList.
+     * 
      * @see WriteTask
      * @see #dirtyList
      * @see #dirtyListEmpty
-     * 
-     * @todo Note: flush() is currently designed to block concurrent writes() in
-     *       order to give us clean decision boundaries for the HA write
-     *       pipeline and also to simplify the internal locking design. Once we
-     *       get HA worked out cleanly we should explore whether or not we can
-     *       relax this constraint such that writes can run concurrently with
-     *       flush(). That would have somewhat higher throughput since mutable
-     *       B+Tree evictions would no longer cause concurrent tasks to block
-     *       during the commit protocol or the file extent protocol.
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
@@ -1733,7 +1784,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * block. Writing the root block is the only thing that the nodes in
              * the quorum need to do once the write cache has been flushed.
              */
-            haLog.info("Flushing the write cache.");
+            haLog.info("Flushing the write cache: seq=" + cacheSequence);
         }
 
         final long begin = System.nanoTime();
@@ -1778,7 +1829,6 @@ abstract public class WriteCacheService implements IWriteCache {
             if (!dirtyListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
                 throw new TimeoutException();
             
-//            final int saveDirtyListThreshold = m_dirtyListThreshold;
             try {
                 /*
                  * Force WriteTask.call() to evict anything in the cache.
@@ -1787,15 +1837,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  * before writing out the compacting cache (if any) and then
                  * finally drop the compactingCache onto the cleanList. Or have
                  * a 2-stage flush.
-                 * 
-                 * FIXME We want it to continue to compact the cache buffers
-                 * during flush so it always outputs dense buffers. The code
-                 * right now will NOT compact the cache buffers when flush is
-                 * true. The behavior when flush:=true should be modified to
-                 * compact the buffer and then write it out rather than dropping
-                 * it back onto the dirty list.
                  */
-//                m_dirtyListThreshold = 1;
                 flush = true;
                 
                 /*
@@ -1839,7 +1881,6 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (halt)
                     throw new RuntimeException(firstCause.get());
             } finally {
-//                m_dirtyListThreshold = saveDirtyListThreshold;
                 flush = false;
                 try {
                     if(!halt) {
@@ -1876,6 +1917,8 @@ abstract public class WriteCacheService implements IWriteCache {
                 counters.get().nclean--;
                 nxt.resetWith(recordMap);//, fileExtent.get());
                 current.set(nxt);
+                if (haLog.isInfoEnabled())
+                    haLog.info("Flushed the write cache: seq=" + cacheSequence);
                 return true;
             } finally {
                 cleanListLock.unlock();
@@ -2404,6 +2447,91 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
     }
+
+//    /**
+//     * Accept the data for a replicated {@link WriteCache} buffer and drop it
+//     * onto the dirtyList.
+//     * <p>
+//     * This method supports HA replication. It take a {@link WriteCache} from
+//     * the cleanList, resets it for new writes, copies the data from the
+//     * caller's buffer, closes the {@link WriteCache} to prevent any
+//     * modifications, and then drops the {@link WriteCache} onto the
+//     * {@link #dirtyList}.
+//     * <p>
+//     * Note: By dropping the {@link WriteCache} onto the {@link #dirtyList}, we
+//     * benefit from being able to read back the writes from the cache.
+//     * Historically, the store was simply flushing the write through to the
+//     * backing file but this did not install the writes into the cache on the
+//     * followers.
+//     * <p>
+//     * Note: The caller's buffer is copied rather than retaining a reference.
+//     * This is necessary since the {@link HAReceiveService} reuses the same
+//     * buffer for all replicated {@link WriteCache} buffers.
+//     * 
+//     * @param msg
+//     *            The {@link IHAWriteMessage}.
+//     * @param b
+//     *            The data from position to the limit will be copied. The
+//     *            position will be advanced to limit. The caller should
+//     *            {@link ByteBuffer#duplicate()} the {@link ByteBuffer} to avoid
+//     *            side-effects.
+//     * 
+//     * @throws InterruptedException
+//     * 
+//     *             FIXME Dropping the writeCache buffer onto the dirtyList does
+//     *             not work because the writes on the write pipeline are not
+//     *             synchronously written down to the disk and flush() on the
+//     *             leader does not provide a guarantee that the followers are
+//     *             also flushed.
+//     *             <p>
+//     *             Note: What would work is to first execute the synchronous
+//     *             write to the local store and then drop the write cache buffer
+//     *             (which must have a copy of the data in the buffer since the
+//     *             buffer is owned by the HAReceiveService) onto the cleanList
+//     *             in the WriteCacheService. This will be addressed when we
+//     *             install reads on cache miss since those also need to be
+//     *             installed onto the cleanList. We must also setup compaction
+//     *             for the cleanList.
+//     */
+//    public void copyRawBuffer(final IHAWriteMessage msg, final ByteBuffer b)
+//            throws InterruptedException {
+//
+//        if (haLog.isDebugEnabled())
+//            haLog.debug("msg=" + msg);
+//
+//        /*
+//         * Take a buffer from the clean list.
+//         */
+//        final WriteCache cache;
+//        cleanListLock.lockInterruptibly();
+//        try {
+//            cache = cleanList.take();
+//            counters.get().nclean--;
+//            cache.resetWith(recordMap);//, msg.getFileExtent());
+//        } finally {
+//            cleanListLock.unlock();
+//        }
+//
+//        // transfer the data from the caller's buffer (side-effect on b).
+//        cache.copyRawBuffer(b);
+//
+//        // close the cache against writes.
+//        cache.closeForWrites();
+//        
+//        /*
+//         * Add the WriteCache to the dirty list.
+//         * 
+//         * Note: The lock is required to signal dirtyListChange.
+//         */
+//        dirtyListLock.lockInterruptibly();
+//        try {
+//            dirtyList.add(cache);
+//            dirtyListChange.signalAll();
+//        } finally {
+//            dirtyListLock.unlock();
+//        }
+//        
+//    }
 
     /**
      * Move the {@link #current} buffer to the dirty list and await a clean

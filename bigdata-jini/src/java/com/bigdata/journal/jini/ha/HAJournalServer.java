@@ -20,6 +20,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -59,6 +60,7 @@ import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
@@ -74,6 +76,8 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.LatchedExecutor;
+import com.bigdata.util.concurrent.MonitoredFutureTask;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.sun.jini.start.LifeCycle;
@@ -173,6 +177,21 @@ public class HAJournalServer extends AbstractServer {
     private ZookeeperClientConfig zkClientConfig;
     
     private ZooKeeperAccessor zka;
+    
+    /**
+     * An executor used to handle events that were received in the zk watcher
+     * event thread. We can not take actions that could block in the watcher
+     * event thread. Therefore, a task for the event is dropped onto this
+     * service where it will execute asynchronously with respect to the watcher
+     * thread.
+     * <p>
+     * Note: This executor will be torn down when the backing
+     * {@link AbstractJournal#getExecutorService()} is torn down. Tasks
+     * remaining on the backing queue for the {@link LatchedExecutor} will be
+     * unable to execute successfuly and the queue will be drained as attempts
+     * to run those tasks result in {@link RejectedExecutionException}s.
+     */
+    private LatchedExecutor singleThreadExecutor;
     
     private HAGlue haGlueService;
     
@@ -394,15 +413,23 @@ public class HAJournalServer extends AbstractServer {
                         replicationFactor, zka, acl);
             }
 
+            // The HAJournal.
             this.journal = new HAJournal(properties, quorum);
             
         }
 
+        // executor for events received in the watcher thread.
+        singleThreadExecutor = new LatchedExecutor(
+                journal.getExecutorService(), 1/* nparallel */);
+        
+        // our external interface.
         haGlueService = journal.newHAGlue(serviceUUID);
 
+        // wrap the external interface, exposing administrative functions.
         final AdministrableHAGlueService administrableService = new AdministrableHAGlueService(
                 this, haGlueService);
 
+        // return that wrapped interface.
         return administrableService;
 
     }
@@ -750,7 +777,8 @@ public class HAJournalServer extends AbstractServer {
             super.start(quorum);
 
             // TODO It appears to be a problem to do this here. Maybe because
-            // the watcher is not running yet?
+            // the watcher is not running yet? Could submit a task that could
+            // await an appropriate condition to start....
 //            final QuorumActor<?, ?> actor = quorum.getActor();
 //            actor.memberAdd();
 //            actor.pipelineAdd();
@@ -765,89 +793,132 @@ public class HAJournalServer extends AbstractServer {
         public void quorumBreak() {
 
             super.quorumBreak();
-            
-            // Inform the Journal that the quorum token is invalid.
-            journal.setQuorumToken(Quorum.NO_QUORUM);
 
-            if(HA_LOG_ENABLED) {
-                
-                try {
-
-                    journal.getHALogWriter().disable();
-
-                } catch (IOException e) {
-
-                    haLog.error(e, e);
-
-                }
-                
-            }
-
-//            if (server.isRunning()) {
-//                /*
-//                 * Attempt to cast a vote for our lastCommitTime.
-//                 * 
-//                 * FIXME BOUNCE : May need to trigger when we re-connect with
-//                 * zookeeper if this event was triggered by a zk session
-//                 * expiration.
-//                 */
-//                doConditionalCastVote(server,
-//                        (Quorum<HAGlue, QuorumService<HAGlue>>) this
-//                                .getQuorum(),
-//                        journal);
-//            }
+            // Submit task to handle this event.
+            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+                    new QuorumBreakTask()));
 
         }
 
+        /**
+         * Task to handle a quorum break event.
+         */
+        private class QuorumBreakTask implements Callable<Void> {
+
+            public Void call() throws Exception {
+                
+                // Inform the Journal that the quorum token is invalid.
+                journal.setQuorumToken(Quorum.NO_QUORUM);
+
+                if (HA_LOG_ENABLED) {
+
+                    try {
+
+                        journal.getHALogWriter().disable();
+
+                    } catch (IOException e) {
+
+                        haLog.error(e, e);
+
+                    }
+
+                }
+
+                // if (server.isRunning()) {
+                // /*
+                // * Attempt to cast a vote for our lastCommitTime.
+                // *
+                // * FIXME BOUNCE : May need to trigger when we re-connect with
+                // * zookeeper if this event was triggered by a zk session
+                // * expiration.
+                // */
+                // doConditionalCastVote(server,
+                // (Quorum<HAGlue, QuorumService<HAGlue>>) this
+                // .getQuorum(),
+                // journal);
+                // }
+
+                // Done.
+                return null;
+            }
+
+        } // class QuorumBreakTask
+        
         @Override
         public void quorumMeet(final long token, final UUID leaderId) {
 
             super.quorumMeet(token, leaderId);
 
-            // Inform the journal that there is a new quorum token.
-            journal.setQuorumToken(token);
-
-            if (HA_LOG_ENABLED) {
-
-                if (isJoinedMember(token)) {
-
-                    try {
-
-                        journal.getHALogWriter().createLog(
-                                journal.getRootBlockView());
-
-                    } catch (IOException e) {
-
-                        /*
-                         * We can not remain in the quorum if we can not write
-                         * the HA Log file.
-                         */
-                        haLog.error("CAN NOT OPEN LOG: " + e, e);
-
-                        getActor().serviceLeave();
-
-                    }
-
-                } else {
-
-                    /*
-                     * The quorum met, but we are not in the met quorum.
-                     * 
-                     * Note: We need to synchronize in order to join an already
-                     * met quorum. We can not just vote our lastCommitTime. We
-                     * need to go through the synchronization protocol in order
-                     * to make sure that we actually have the same durable state
-                     * as the met quorum.
-                     */
-
-                    conditionalStartResync(token);
-
-                }
-                
-            }
+            // Submit task to handle this event.
+            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+                    new QuorumMeetTask(token, leaderId)));
 
         }
 
+        /**
+         * Task to handle a quorum meet event.
+         */
+        private class QuorumMeetTask implements Callable<Void> {
+
+            private final long token;
+            private final UUID leaderId;
+
+            public QuorumMeetTask(final long token, final UUID leaderId) {
+                this.token = token;
+                this.leaderId = leaderId;
+            }
+            
+            public Void call() throws Exception {
+                
+                // Inform the journal that there is a new quorum token.
+                journal.setQuorumToken(token);
+
+                if (HA_LOG_ENABLED) {
+
+                    if (isJoinedMember(token)) {
+
+                        try {
+
+                            journal.getHALogWriter().createLog(
+                                    journal.getRootBlockView());
+
+                        } catch (IOException e) {
+
+                            /*
+                             * We can not remain in the quorum if we can not write
+                             * the HA Log file.
+                             */
+                            haLog.error("CAN NOT OPEN LOG: " + e, e);
+
+                            getActor().serviceLeave();
+
+                        }
+
+                    } else {
+
+                        /*
+                         * The quorum met, but we are not in the met quorum.
+                         * 
+                         * Note: We need to synchronize in order to join an already
+                         * met quorum. We can not just vote our lastCommitTime. We
+                         * need to go through the synchronization protocol in order
+                         * to make sure that we actually have the same durable state
+                         * as the met quorum.
+                         */
+
+                        conditionalStartResync(token);
+
+                    }
+                    
+                }
+
+                // Done.
+                return null;
+                
+            } // call()
+            
+        } // class QuorumMeetTask
+            
         @Override
         public void pipelineAdd() {
 
@@ -884,10 +955,9 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-                resyncFuture = new FutureTaskMon<Void>(new ResyncTask());
+                resyncFuture = new MonitoredFutureTask<Void>(new ResyncTask());
 
                 journal.getExecutorService().submit(resyncFuture);
-                
 
             }
 
