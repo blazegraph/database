@@ -694,21 +694,21 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		}
 
-//        /*
-//         * Clear the future task from the memoizer cache.
-//         * 
-//         * Note: This is necessary in order to prevent the cache from retaining
-//         * a hard reference to each child materialized for the B+Tree.
-//         * 
-//         * Note: This does not depend on any additional synchronization. The
-//         * Memoizer pattern guarantees that only one thread actually call
-//         * ft.run() and hence runs this code.
-//         */
-//        if (req != null) {
-//
-//            htree.memo.removeFromCache(req);
-//
-//        }
+        /*
+         * Clear the future task from the memoizer cache.
+         * 
+         * Note: This is necessary in order to prevent the cache from retaining
+         * a hard reference to each child materialized for the B+Tree.
+         * 
+         * Note: This does not depend on any additional synchronization. The
+         * Memoizer pattern guarantees that only one thread actually call
+         * ft.run() and hence runs this code.
+         */
+        if (req != null) {
+
+            htree.memo.removeFromCache(req);
+
+        }
 
 		htree.touch(child);
 		
