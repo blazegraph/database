@@ -413,27 +413,27 @@ abstract public class AbstractHTree implements ICounterSetAccess,
         public AbstractPage compute(final LoadChildRequest req)
                 throws InterruptedException {
 
-            try {
+//            try {
 
                 return req.parent._getChild(req.index, req);
 
-            } finally {
-
-                /*
-                 * Clear the future task from the memoizer cache.
-                 * 
-                 * Note: This is necessary in order to prevent the cache from
-                 * retaining a hard reference to each child materialized for the
-                 * B+Tree.
-                 * 
-                 * Note: This does not depend on any additional synchronization.
-                 * The Memoizer pattern guarantees that only one thread actually
-                 * call ft.run() and hence runs this code.
-                 */
-
-                req.parent.htree.memo.removeFromCache(req);
-
-            }
+//            } finally {
+//
+//                /*
+//                 * Clear the future task from the memoizer cache.
+//                 * 
+//                 * Note: This is necessary in order to prevent the cache from
+//                 * retaining a hard reference to each child materialized for the
+//                 * B+Tree.
+//                 * 
+//                 * Note: This does not depend on any additional synchronization.
+//                 * The Memoizer pattern guarantees that only one thread actually
+//                 * call ft.run() and hence runs this code.
+//                 */
+//
+//                req.parent.htree.memo.removeFromCache(req);
+//
+//            }
 
         }
         
