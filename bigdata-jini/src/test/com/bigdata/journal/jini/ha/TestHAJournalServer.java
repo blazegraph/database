@@ -30,7 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import sun.security.jca.ServiceId;
+import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
@@ -75,7 +75,7 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
     /**
      * One service starts, quorum does not meet (replication factor is 3).
      * Shutdown and restart the service. Verify that it comes back up with the
-     * same {@link ServiceId}. Again, quorum does not meet.
+     * same {@link ServiceID}. Again, quorum does not meet.
      * <p>
      * 
      * Note: I have observed an improper shutdown for this test. The stack
