@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 
 /**
@@ -64,7 +64,7 @@ import com.bigdata.counters.Instrument;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class BTreeCounters implements Cloneable {
+final public class BTreeCounters implements Cloneable, ICounterSetAccess {
 
     public BTreeCounters() {
         
@@ -525,7 +525,7 @@ final public class BTreeCounters implements Cloneable {
      * the instance fields of this class.
      */
 //    synchronized 
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
         
 //        if(counterSet == null) {
             

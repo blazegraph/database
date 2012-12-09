@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -1049,31 +1050,41 @@ public class Name2Addr extends BTree {
     /**
      * Return a {@link CounterSet} reflecting the named indices that are
      * currently open (more accurately, those open named indices whose
-     * references are in {@link Name2Addr}s internal {@link #indexCache}).
-     * When index partitions are in use their {@link CounterSet}s are reported
-     * under a path formed from name of the scale-out index and partition
-     * identifier. Otherwise the {@link CounterSet}s are reported directly
-     * under the index name.
+     * references are in {@link Name2Addr}s internal {@link #indexCache}). When
+     * index partitions are in use their {@link CounterSet}s are reported under
+     * a path formed from name of the scale-out index and partition identifier.
+     * Otherwise the {@link CounterSet}s are reported directly under the index
+     * name.
+     * 
+     * @param counterSet
+     *            When non-<code>null</code> the performance counters are
+     *            entered into the caller's collection. Otherwise they are
+     *            entered into a new collection.
+     * @param found
+     *            When non-<code>null</code>, the names of the indices whose
+     *            performance counters are being returned is reported as a
+     *            side-effect on this {@link Set}.
      * 
      * @return A new {@link CounterSet} reflecting the named indices that were
      *         open as of the time that this method was invoked.
      * 
      * @see IndexManager#getIndexCounters()
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/626">
+     *      Expose performance counters for read-only indices </a>
      */
-    public CounterSet getIndexCounters() {
+    protected CounterSet getIndexCounters(final CounterSet counterSet,
+            final Set<String/* Name */> found) {
 
         assertUnisolatedInstance();
 
-        final CounterSet tmp = new CounterSet();
+        final CounterSet tmp = counterSet == null ? new CounterSet()
+                : counterSet;
         
-//        final Iterator<ICacheEntry<String, BTree>> itr = indexCache.
-//        .entryIterator();
-
         final Iterator<java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>>> itr = indexCacheEntryIterator();
 
         while (itr.hasNext()) {
 
-//            final ICacheEntry<String, BTree> entry = itr.next();
             final java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>> entry = itr.next();
 
             final String name = entry.getKey();
@@ -1104,18 +1115,27 @@ public class Name2Addr extends BTree {
 
             }
 
-			/*
-			 * Attach the B+Tree performance counters.
-			 * 
-			 * Note: These counters MUST NOT embed a hard reference to the
-			 * AbstractBTree. That could cause the BTree to be retained as long
-			 * as the caller holds the CounterSet object!
-			 */
+            /*
+             * Attach the B+Tree performance counters.
+             * 
+             * Note: These counters MUST NOT embed a hard reference to the
+             * AbstractBTree. That could cause the BTree to be retained as long
+             * as the caller holds the CounterSet object!
+             */
 
-			final CounterSet counterSet = btree.getCounters();
+            tmp.makePath(path).attach(btree.getCounters());
 
-			tmp.makePath(path).attach(counterSet);
+            if (found != null) {
+             
+                /*
+                 * Report out the names of the indices whose counters are being
+                 * returned.
+                 */
 
+                found.add(name);
+                
+            }
+			
         }
         
         return tmp;
