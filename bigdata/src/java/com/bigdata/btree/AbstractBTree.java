@@ -34,6 +34,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -69,7 +70,6 @@ import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.htree.HTreePageStats;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DirectBufferPool;
@@ -756,32 +756,39 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     
     }
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * Return some "statistics" about the btree including both the static
-	 * {@link CounterSet} and the {@link BTreeCounters}s.
-	 * <p>
-	 * Note: counters reporting directly on the {@link AbstractBTree} use a
-	 * snapshot mechanism which prevents a hard reference to the
-	 * {@link AbstractBTree} from being attached to the return
-	 * {@link CounterSet} object. One consequence is that these counters will
-	 * not update until the next time you invoke {@link #getCounters()}.
-	 * <p>
-	 * Note: In order to snapshot the counters use {@link OneShotInstrument} to
-	 * prevent the inclusion of an inner class with a reference to the outer
-	 * {@link AbstractBTree} instance.
-	 * 
-	 * @see BTreeCounters#getCounters()
-	 * 
-	 * @todo use same instance of BTreeCounters for all BTree instances in
-	 *       standalone!
-	 * 
-	 * @todo estimate heap requirements for nodes and leaves based on their
-	 *       state (keys, values, and other arrays). report estimated heap
-	 *       consumption here.
-	 */
-    public CounterSet getCounters() {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Return some "statistics" about the btree including both the static
+     * {@link CounterSet} and the {@link BTreeCounters}s.
+     * <p>
+     * Note: counters reporting directly on the {@link AbstractBTree} use a
+     * snapshot mechanism which prevents a hard reference to the
+     * {@link AbstractBTree} from being attached to the return
+     * {@link CounterSet} object. One consequence is that these counters will
+     * not update until the next time you invoke {@link #getCounters()}.
+     * <p>
+     * Note: In order to snapshot the counters use {@link OneShotInstrument} to
+     * prevent the inclusion of an inner class with a reference to the outer
+     * {@link AbstractBTree} instance.
+     * <p>
+     * Note: This method reports information that is NOT available from
+     * {@link BTreeCounters}s. Some of this information is either static or
+     * relatively static (e.g., the {@link UUID} for this index or its
+     * implementation class). Other information is dynamic (such as the #of
+     * nodes and leaves or the current size of the writeRetentionQueue). The
+     * dynamic information is valid for the specific index view as of the moment
+     * that it is sampled.
+     * 
+     * @see BTreeCounters#getCounters()
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/626">
+     *      Expose performance counters for read-only indices </a>
+     * 
+     * @todo estimate heap requirements for nodes and leaves based on their
+     *       state (keys, values, and other arrays). report estimated heap
+     *       consumption here.
+     */
+    final public CounterSet getCounters() {
 
 		final CounterSet counterSet = new CounterSet();
 		{
@@ -1336,6 +1343,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * commits, then this value will always be ZERO (0L).
      * <p>
      * Note: This is fixed for an {@link IndexSegment}.
+     * 
+     * @see ICheckpointProtocol#getLastCommitTime()
      */
     abstract public long getLastCommitTime();
 

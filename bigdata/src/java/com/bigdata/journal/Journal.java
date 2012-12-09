@@ -968,14 +968,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 			// Live index counters iff available.
             {
 
-                final CounterSet liveIndexCounters = super
-                        .getLiveIndexCounters();
+                final CounterSet indexCounters = getIndexCounters();
 
-                if (liveIndexCounters != null) {
-
+                if (indexCounters != null) {
+                    
                     tmp.makePath(IJournalCounters.indexManager).attach(
-                            liveIndexCounters);
-
+                            indexCounters);
+                    
                 }
 
             }
@@ -2757,20 +2756,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Per index counters.
      */
 
-	/**
-	 * Canonical per-index {@link BTreeCounters}. These counters are set on each
-	 * {@link AbstractBTree} that is materialized by
-	 * {@link #getIndexOnStore(String, long, IRawStore)}. The same
-	 * {@link BTreeCounters} object is used for the unisolated, read-committed,
-	 * read-historical and isolated views of the index partition and for each
-	 * source in the view regardless of whether the source is a mutable
-	 * {@link BTree} on the live journal, a read-only {@link BTree} on a
-	 * historical journal, or an {@link IndexSegment}.
-	 * 
-	 * FIXME Indices which have been dropped should be cleared from the map (the
-	 * map could also use the index UUID as the key in case the index is
-	 * re-registered).
-	 */
+    /**
+     * Canonical per-index {@link BTreeCounters}. These counters are set on each
+     * {@link AbstractBTree} that is materialized by
+     * {@link #getIndexOnStore(String, long, IRawStore)}. The same
+     * {@link BTreeCounters} object is used for the unisolated, read-committed,
+     * read-historical and isolated views of the index and for each source in
+     * the view regardless of whether the source is a mutable {@link BTree} on
+     * the live journal or a read-only {@link BTree} on a historical journal.
+     * 
+     * @see #getIndexCounters(String)
+     * @see #dropIndex(String)
+     */
     final private ConcurrentHashMap<String/* name */, BTreeCounters> indexCounters = new ConcurrentHashMap<String, BTreeCounters>();
 
     public BTreeCounters getIndexCounters(final String name) {
@@ -2809,7 +2806,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-	/**
+    /**
 	 * A Journal level semaphore used to restrict applications to a single
 	 * unisolated connection. The "unisolated" connection is an application
 	 * level construct which supports highly scalable ACID operations but only a

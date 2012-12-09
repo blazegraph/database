@@ -38,10 +38,13 @@ import java.rmi.RemoteException;
 import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -1511,38 +1514,163 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+//    /**
+//     * Return the live index counters maintained by the unisolated
+//     * {@link Name2Addr} index iff they are available. These counters are not
+//     * available for a read-only journal. They are also not available if the
+//     * journal has been concurrently shutdown (since the {@link Name2Addr}
+//     * reference will have been cleared).
+//     * <p>
+//     * Note: This is exposed to the {@link Journal} which reports this
+//     * information.
+//     * 
+//     * @return The live index counters and <code>null</code> iff they are not
+//     *         available.
+//     */
+//    protected CounterSet getLiveIndexCounters() {
+//        if (!isReadOnly()) {
+//            /*
+//             * These index counters are only available for the unisolated
+//             * Name2Addr view. If this is a read-only journal, then we can not
+//             * report out that information.
+//             */
+//            final Name2Addr tmp = _name2Addr;
+//            if (tmp != null) {
+//                /*
+//                 * Only if the Name2Addr index exists at the moment that we look
+//                 * (avoids problems with reporting during concurrent shutdown).
+//                 */
+//                return tmp.getIndexCounters();
+//            }
+//        }
+//        return null;
+//    }
+
     /**
-     * Return the live index counters maintained by the unisolated
-     * {@link Name2Addr} index iff they are available. These counters are not
-     * available for a read-only journal. They are also not available if the
-     * journal has been concurrently shutdown (since the {@link Name2Addr}
-     * reference will have been cleared).
+     * Return a {@link CounterSet} reflecting the named indices that are open or
+     * which have been recently opened.
      * <p>
-     * Note: This is exposed to the {@link Journal} which reports this
-     * information.
+     * Note: This method prefers the live view of the index since this gets us
+     * the most recent metadata for the index depth, #of nodes, #of leaves, etc.
+     * However, when the live view is not currently open, we prefer the most
+     * recent view of the index.
+     * <p>
+     * Note: This scans the live {@link Name2Addr}s internal index cache for the
+     * live indices and then scans the {@link #historicalIndexCache} for the
+     * read-only index views. Only a single {@link CounterSet} is reported for
+     * any given named index.
      * 
-     * @return The live index counters and <code>null</code> iff they are not
-     *         available.
+     * @return A new {@link CounterSet} reflecting the named indices that were
+     *         open as of the time that this method was invoked.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/626">
+     *      Expose performance counters for read-only indices </a>
      */
-    protected CounterSet getLiveIndexCounters() {
-        if (!isReadOnly()) {
-            /*
-             * These index counters are only available for the unisolated
-             * Name2Addr view. If this is a read-only journal, then we can not
-             * report out that information.
-             */
-            final Name2Addr tmp = _name2Addr;
-            if (tmp != null) {
-                /*
-                 * Only if the Name2Addr index exists at the moment that we look
-                 * (avoids problems with reporting during concurrent shutdown).
-                 */
-                return tmp.getIndexCounters();
+    protected final CounterSet getIndexCounters() {
+    
+        // If we find a live view of an index, we put its name in this set.
+        final Set<String/* name */> foundLive = new HashSet<String>();
+
+        final CounterSet tmp = new CounterSet();
+
+        /*
+         * First, search Name2Addr's internal cache.
+         */
+        {
+            final Name2Addr n2a = _name2Addr;
+
+            if (n2a != null) {
+
+                // Get the live views from n2a.
+                n2a.getIndexCounters(tmp, foundLive);
+
             }
+            
         }
-        return null;
+
+        /*
+         * Now snapshot the [indexCache], creating a map (name,ndx) mapping. We
+         * will use the most recent view of each named index.
+         * 
+         * Note: There are potentially many views of a given named index opened
+         * against different commit points. Each of these can have distinct
+         * metadata for the writeRetentionQueue, depth, #of nodes, #of leaves,
+         * etc. We are prefering the most recent view.
+         * 
+         * TODO Note the #of open views for the index (injected field, but then
+         * we need to do this for all views, including the live view).
+         */
+
+        final Map<String/* commitTime */, ICheckpointProtocol> map = new HashMap<String/* name */, ICheckpointProtocol>();
+        {
+
+            final Iterator<Map.Entry<NT, WeakReference<ICheckpointProtocol>>> itr = indexCache
+                    .entryIterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<NT, WeakReference<ICheckpointProtocol>> e = itr
+                        .next();
+
+                final NT nt = e.getKey();
+
+                final ICheckpointProtocol newVal = e.getValue().get();
+
+                if (newVal == null) {
+
+                    // Reference was cleared.
+                    continue;
+
+                }
+
+                final String name = nt.getName();
+
+                final ICheckpointProtocol oldVal = map.get(name);
+
+                if (oldVal != null) {
+
+                    final long oldTime = oldVal.getLastCommitTime();
+
+                    final long newTime = newVal.getLastCommitTime();
+
+                    if (newTime > oldTime) {
+
+                        // Prefer the most recent index view.
+                        map.put(name, newVal);
+
+                    }
+                    
+                } else {
+
+                    // There is no entry set for this name index.
+                    map.put(name, newVal);
+
+                }
+                
+            }
+
+        }
+
+        /*
+         * Now include the CounterSet for each selected read-only index view.
+         */
+
+        for (Map.Entry<String/* name */, ICheckpointProtocol> e : map
+                .entrySet()) {
+
+            final String path = e.getKey(); // name
+
+            final CounterSet aCounterSet = e.getValue().getCounters();
+
+            // Attach the CounterSet
+            tmp.makePath(path).attach(aCounterSet);
+
+        }
+
+        return tmp;
+
     }
-	
+
 	final public File getFile() {
 
 		final IBufferStrategy tmp = getBufferStrategy();
@@ -3317,17 +3445,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		if (!isReadOnly()) {
 
-			/*
-			 * Only the leader can accept writes so only the leader will
-			 * register the Name2Addr object. Followers can access the
-			 * historical Name2Addr objects from the CommitRecordIndex for
-			 * historical commit points, but not the live Name2Addr object,
-			 * which is only on the leader.
-			 */
+            /*
+             * Only the leader can accept writes so only the leader will
+             * register the Name2Addr object. Followers can access the
+             * historical Name2Addr objects from the CommitRecordIndex for
+             * historical commit points, but not the live Name2Addr object,
+             * which is only on the leader.
+             */
+	        setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
 
-			setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
-			
-			/**
+	        /**
 			 * Do not register committer to write previous root block, but
 			 * instead just create it and call explicitly when required.  This
 			 * is a workaround to allow "void" transactions.
@@ -3965,7 +4092,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * The size of the cache from (name,timestamp) to {@link IIndex}.
 	 */
-	public int getIndexCacheSize() {
+	protected int getIndexCacheSize() {
 	    
 	    return indexCache.size();
 	    
@@ -3974,7 +4101,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * The size of the canonicalizing cache from addr to {@link IIndex}.
 	 */
-	public int getHistoricalIndexCacheSize() {
+	protected int getHistoricalIndexCacheSize() {
 
 	    return historicalIndexCache.size();
 	    

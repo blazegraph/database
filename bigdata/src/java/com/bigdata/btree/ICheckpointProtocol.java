@@ -26,10 +26,10 @@ package com.bigdata.btree;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.rawstore.IRawStore;
 
 /**
  * Interface in support of the {@link Checkpoint} record protocol.
@@ -96,7 +96,18 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
 	 *             permitted to advance but not to go backwards).
 	 */
     public void setLastCommitTime(final long lastCommitTime);
-
+    
+    /**
+     * The timestamp associated with the last {@link IAtomicStore#commit()} in
+     * which writes buffered by this index were made restart-safe on the backing
+     * store. The lastCommitTime is set when the index is loaded from the
+     * backing store and updated after each commit. It is ZERO (0L) when an
+     * index is first created and will remain ZERO (0L) until the index is
+     * committed. If the backing store does not support atomic commits, then
+     * this value will always be ZERO (0L).
+     */
+    public long getLastCommitTime();
+    
 	/**
 	 * Checkpoint operation must {@link #flush()} dirty nodes, dirty persistent
 	 * data structures, etc, write a new {@link Checkpoint} record on the
