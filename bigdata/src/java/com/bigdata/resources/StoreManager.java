@@ -2539,6 +2539,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * Note: Exposed for the {@link DataService} which needs this for its
          * 2-phase commit protocol.
          */
+        @Override
         public long commitNow(final long commitTime) {
             
             return super.commitNow(commitTime);
@@ -2554,12 +2555,14 @@ abstract public class StoreManager extends ResourceEvents implements
          * this fact to avoid contention with the live {@link CommitRecordIndex}
          * for the live journal.
          */
+        @Override
         public CommitRecordIndex getCommitRecordIndex(final long addr) {
             
             return super.getCommitRecordIndex(addr);
             
         }
 
+        @Override
         public AbstractLocalTransactionManager getLocalTransactionManager() {
 
             return (AbstractLocalTransactionManager) getConcurrencyManager()
@@ -2574,24 +2577,28 @@ abstract public class StoreManager extends ResourceEvents implements
 //
 //        }
 
+        @Override
         public SparseRowStore getGlobalRowStore() {
             
             return getFederation().getGlobalRowStore();
             
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
             
             return getFederation().getGlobalRowStore(timestamp);
             
         }
 
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
             
             return getFederation().getGlobalFileSystem();
             
         }
         
+        @Override
         public DefaultResourceLocator getResourceLocator() {
             
             return (DefaultResourceLocator) getFederation()
@@ -2599,18 +2606,21 @@ abstract public class StoreManager extends ResourceEvents implements
             
         }
         
+        @Override
         public ExecutorService getExecutorService() {
             
             return getFederation().getExecutorService();
             
         }
         
+        @Override
         public IResourceLockService getResourceLockService() {
 
             return getFederation().getResourceLockService();
             
         }
 
+        @Override
         public TemporaryStore getTempStore() {
             
             return getFederation().getTempStore();
@@ -2622,6 +2632,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * is <code>null</code> since a remote caller can not have the correct
          * metadata on hand when they formulate the request.
          */
+        @Override
         protected void validateIndexMetadata(final String name,
                 final IndexMetadata metadata) {
 
@@ -2708,19 +2719,23 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
         
+        @Override
     	public ScheduledFuture<?> addScheduledTask(Runnable task,
     			long initialDelay, long delay, TimeUnit unit) {
     		return getFederation().addScheduledTask(task, initialDelay, delay, unit);
     	}
 
+        @Override
     	public boolean getCollectPlatformStatistics() {
     		return getFederation().getCollectPlatformStatistics();
     	}
 
+        @Override
     	public boolean getCollectQueueStatistics() {
     		return getFederation().getCollectQueueStatistics();
     	}
 
+        @Override
     	public int getHttpdPort() {
     		return getFederation().getHttpdPort();
     	}
