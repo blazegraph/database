@@ -2714,9 +2714,22 @@ abstract public class WriteCacheService implements IWriteCache {
                         continue;
                     }
                     // Remove entry from the recordMap.
-                    if (cache != recordMap.remove(offset)) {
-                        // Concurrent modification!
-                        throw new AssertionError();
+                    final WriteCache oldValue = recordMap.remove(offset);
+                    if (oldValue != null && cache != oldValue) {
+                        /*
+                         * Concurrent modification!
+                         * 
+                         * Note: The [WriteCache.transferLock] protects the
+                         * WriteCache against a concurrent transfer of a record
+                         * in WriteCache.transferTo(). However,
+                         * WriteCache.resetWith() does NOT take the
+                         * transferLock. Therefore, it is possible (and valid)
+                         * for the [recordMap] entry to be cleared to [null] for
+                         * this record by a concurrent resetWith() call.
+                         */
+                        throw new AssertionError("oldValue=" + oldValue
+                                + ", cache=" + cache + ", offset=" + offset
+                                + ", latchedAddr=" + latchedAddr);
                     }
                     /*
                      * Note: clearAddrMap() is basically a NOP if the WriteCache

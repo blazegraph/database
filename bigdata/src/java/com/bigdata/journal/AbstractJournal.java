@@ -3657,7 +3657,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         try {
 
             assertOpen();
-
+            
             final CommitRecordIndex commitRecordIndex = getCommitRecordIndex(_rootBlock
                     .getCommitRecordIndexAddr());
 
@@ -3746,26 +3746,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Create or re-load the index that resolves timestamps to
-	 * {@link ICommitRecord}s.
-	 * <p>
-	 * Note: The returned object is NOT cached. When addr is non-{@link #NULL},
-	 * each invocation will return a distinct {@link CommitRecordIndex} object.
-	 * This behavior is partly for historical reasons but it does serve to
-	 * protect the live {@link CommitRecordIndex} from outside access. This is
-	 * important since access to the live {@link CommitRecordIndex} is NOT
-	 * systematically protected by <code>synchronized</code> within this class.
-	 * 
-	 * @param addr
-	 *            The root address of the index -or- 0L if the index has not
-	 *            been created yet.
-	 * 
-	 * @return The {@link CommitRecordIndex} for that address or a new index if
-	 *         0L was specified as the address.
-	 * 
-	 * @see #_commitRecordIndex
-	 */
+    /**
+     * Create or re-load the index that resolves timestamps to
+     * {@link ICommitRecord}s.
+     * <p>
+     * Note: The returned object is NOT cached. When addr is non-{@link #NULL},
+     * each invocation will return a distinct {@link CommitRecordIndex} object.
+     * This behavior is partly for historical reasons but it does serve to
+     * protect the live {@link CommitRecordIndex} from outside access. This is
+     * important since access to the live {@link CommitRecordIndex} is NOT
+     * systematically protected by <code>synchronized</code> within this class.
+     * 
+     * @param addr
+     *            The root address of the index -or- 0L if the index has not
+     *            been created yet.
+     * 
+     * @return The {@link CommitRecordIndex} for that address or a new index if
+     *         0L was specified as the address.
+     * 
+     * @see #_commitRecordIndex
+     * 
+     *      TODO We could modify getCommitRecordIndex() to accept
+     *      readOnly:boolean and let it load/create a read-only view rather than
+     *      wrapping it with a ReadOnlyIndex.
+     */
 	protected CommitRecordIndex getCommitRecordIndex(final long addr) {
 
 		if (log.isInfoEnabled())
