@@ -57,7 +57,7 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentCheckpoint {
+public class IndexSegmentCheckpoint implements ICheckpoint {
 
     /**
      * Logger.
@@ -1031,6 +1031,96 @@ public class IndexSegmentCheckpoint {
         sb.append(", commitTime=" + new Date(commitTime));
 
         return sb.toString();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The checkpoint is assembled from the root block by the constructor.
+     * There is no address from which it can be re-read.
+     * 
+     * @return <code>0L</code>
+     */
+    @Override
+    public long getCheckpointAddr() {
+        return 0L;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The checkpoint is assembled from the root block by the constructor.
+     * There is no address from which it can be re-read.
+     * 
+     * @return <code>false</code>
+     */
+    @Override
+    public boolean hasCheckpointAddr() {
+        return false;
+    }
+
+    @Override
+    public long getMetadataAddr() {
+        return addrMetadata;
+    }
+
+    @Override
+    public long getRootAddr() {
+        return addrRoot;
+    }
+
+    @Override
+    public long getBloomFilterAddr() {
+        return addrBloom;
+    }
+
+    @Override
+    public int getHeight() {
+        return height;
+    }
+
+    @Override
+    public int getGlobalDepth() {
+        return 0; // ZERO since not HTree.
+    }
+
+    @Override
+    public long getNodeCount() {
+        return nnodes;
+    }
+
+    @Override
+    public long getLeafCount() {
+        return nleaves;
+    }
+
+    @Override
+    public long getEntryCount() {
+        return nentries;
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: There is no counter associated with an {@link IndexSegment}. The
+     * counter is only available for the {@link BTree}.
+     * 
+     * @return <code>0L</code>
+     */
+    @Override
+    public long getCounter() {
+        return 0;
+    }
+
+    @Override
+    public long getRecordVersion() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public IndexTypeEnum getIndexType() {
+        return IndexTypeEnum.BTree;
     }
 
 }

@@ -78,15 +78,4 @@ public interface ISimpleTreeIndexAccess extends ISimpleIndexAccess {
      */
     int getHeight();
 
-    /**
-     * Visits pages (nodes and leaves) using a low-level approach.
-     * 
-     * @param ndx
-     *            The index.
-     * 
-     * @return Some interesting statistics about the pages in that index which
-     *         the caller can print out.
-     */
-    PageStats dumpPages();
-
 }

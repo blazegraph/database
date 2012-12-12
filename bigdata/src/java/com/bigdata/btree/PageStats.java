@@ -29,33 +29,10 @@ import com.bigdata.rawstore.IRawStore;
 /**
  * Class reports various summary statistics for nodes and leaves.
  */
-abstract public class PageStats {
+abstract public class PageStats extends BaseIndexStats {
 
     /** Number of nodes/leaves visited so far. */
     public long nvisited;
-    /** The type of index. */
-    public IndexTypeEnum indexType;
-    /**
-     * The name associated with the index -or- <code>null</code> if the index is
-     * not named.
-     */
-    public String name;
-    /**
-     * The current branching factor for the index.
-     * 
-     * TODO GIST: [m] is BTree specific. The [addressBits] concept is the
-     * parallel for the HTree. This field should probably be moved into the
-     * concrete instances of the {@link PageStats} class.
-     */
-    public int m;
-    /** The #of entries in the index. */
-    public long ntuples;
-    /** The height (aka depth) of the index */
-    public int height;
-    /** The #of nodes visited. */
-    public long nnodes;
-    /** The #of leaves visited. */
-    public long nleaves;
     /** The #of bytes in the raw records for the nodes visited. */
     public long nodeBytes;
     /** The #of bytes in the raw records for the leaves visited. */
@@ -178,7 +155,8 @@ abstract public class PageStats {
      * 
      * @return The header row.
      */
-    public static String getHeaderRow() {
+    @Override
+    public String getHeaderRow() {
 
         final StringBuilder sb = new StringBuilder();
 
@@ -242,6 +220,7 @@ abstract public class PageStats {
      * 
      * @see #getHeaderRow()
      */
+    @Override
     public String getDataRow() {
 
         final PageStats stats = this;

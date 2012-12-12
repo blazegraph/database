@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
@@ -457,6 +458,11 @@ public final class SolutionSetStream extends Stream implements
             
         }
 
+    }
+
+    @Override
+    public BaseIndexStats dumpPages(final boolean recursive) {
+        return new BaseIndexStats(this);
     }
 
     /*

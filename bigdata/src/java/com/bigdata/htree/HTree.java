@@ -42,6 +42,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.HTreeIndexMetadata;
@@ -54,7 +55,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.PageStats;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -1698,7 +1698,13 @@ public class HTree extends AbstractHTree
 	}
 
 	@Override
-    public PageStats dumpPages() {
+    public BaseIndexStats dumpPages(final boolean recursive) {
+
+        if (!recursive) {
+
+            return new BaseIndexStats(this);
+
+        }
 
         final HTreePageStats stats = new HTreePageStats();
 

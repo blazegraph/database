@@ -136,7 +136,8 @@ import cutthecrap.utils.striterators.IFilter;
  * @see KeyBuilder
  */
 abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
-        ILinearList, IBTreeStatistics, ILocalBTreeView, ISimpleTreeIndexAccess {
+        ILinearList, IBTreeStatistics, ILocalBTreeView, ISimpleTreeIndexAccess,
+        ICheckpointProtocol {
 
     /**
      * The index is already closed.
@@ -1507,8 +1508,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @Override
-    public PageStats dumpPages() {
+    public BaseIndexStats dumpPages(final boolean recursive) {
 
+        if(!recursive) {
+            
+            return new BaseIndexStats(this);
+            
+        }
+        
         final BTreePageStats stats = new BTreePageStats();
         
         dumpPages(this, getRoot(), stats);

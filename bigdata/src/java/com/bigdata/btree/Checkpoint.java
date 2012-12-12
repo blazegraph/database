@@ -51,7 +51,7 @@ import com.bigdata.stream.Stream.StreamIndexMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Checkpoint implements Externalizable {
+public class Checkpoint implements ICheckpoint, Externalizable {
     
     /**
      * 
@@ -80,16 +80,6 @@ public class Checkpoint implements Externalizable {
 	 */
     private IndexTypeEnum indexType;
 
-	/**
-     * The address used to read this {@link Checkpoint} record from the
-     * store.
-     * <p>
-     * Note: This is set as a side-effect by {@link #write(IRawStore)}.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link Checkpoint} record has not been written on
-     *             a store.
-     */
     final public long getCheckpointAddr() {
         
         if (addrCheckpoint == 0L) {
@@ -102,57 +92,30 @@ public class Checkpoint implements Externalizable {
         
     }
 
-    /**
-     * Return <code>true</code> iff the checkpoint address is defined.
-     */
     final public boolean hasCheckpointAddr() {
         
-    	return addrCheckpoint != 0L;
+        return addrCheckpoint != 0L;
         
     }
 
-    /**
-     * Address that can be used to read the {@link IndexMetadata} record for
-     * the index from the store.
-     */
     final public long getMetadataAddr() {
         
         return addrMetadata;
         
     }
     
-    /**
-     * Address of the root node or leaf of the {@link BTree}.
-     * 
-     * @return The address of the root -or- <code>0L</code> iff the btree
-     *         does not have a root.
-     */
     final public long getRootAddr() {
         
         return addrRoot;
         
     }
     
-    /**
-     * Address of the {@link IBloomFilter}.
-     * 
-     * @return The address of the bloom filter -or- <code>0L</code> iff the
-     *         btree does not have a bloom filter.
-     */
     final public long getBloomFilterAddr() {
         
         return addrBloomFilter;
         
     }
 
-	/**
-	 * The height of a B+Tree. ZERO(0) means just a root leaf. Values greater
-	 * than zero give the #of levels of abstract nodes. There is always one
-	 * layer of leaves which is not included in this value.
-	 * 
-	 * @return The global depth and ZERO (0) unless the checkpoint record is for
-	 *         an {@link IndexTypeEnum#BTree}
-	 */
     public final int getHeight() {
 
 		switch (indexType) {
@@ -164,12 +127,6 @@ public class Checkpoint implements Externalizable {
         
     }
 
-	/**
-	 * The global depth of the root directory (HTree only).
-	 * 
-	 * @return The global depth and ZERO (0) unless the checkpoint record is for
-	 *         an {@link IndexTypeEnum#HTree}
-	 */
     public final int getGlobalDepth() {
     	
 		switch (indexType) {
@@ -181,59 +138,37 @@ public class Checkpoint implements Externalizable {
 
     }
 
-    /**
-     * The #of non-leaf nodes (B+Tree) or directories (HTree).
-     */
     public final long getNodeCount() {
         
         return nnodes;
         
     }
 
-    /**
-     * The #of leaves (B+Tree) or hash buckets (HTree).
-     */
     public final long getLeafCount() {
         
         return nleaves;
         
     }
 
-    /**
-     * The #of index entries (aka tuple count).
-     */
     public final long getEntryCount() {
         
         return nentries;
         
     }
 
-	/**
-	 * Return the value of the B+Tree local counter stored in the
-	 * {@link Checkpoint} record.
-	 */
     public final long getCounter() {
         
         return counter;
         
     }
 
-	/**
-	 * Return the value of the next record version number to be assigned that is
-	 * stored in the {@link Checkpoint} record. This number is incremented each
-	 * time a node or leaf is written onto the backing store. The initial value
-	 * is ZERO (0). The first value assigned to a node or leaf will be ZERO (0).
-	 */
     public final long getRecordVersion() {
         
         return counter;
         
     }
     
-    /**
-     * The type of index for this checkpoint record.
-     */
-    public IndexTypeEnum getIndexType() {
+    public final IndexTypeEnum getIndexType() {
         
         return indexType;
         

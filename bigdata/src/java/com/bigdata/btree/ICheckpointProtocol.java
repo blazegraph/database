@@ -56,12 +56,12 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
 	public long getRecordVersion();
 
 	/**
-	 * Returns the most recent {@link Checkpoint} record.
+	 * Returns the most recent {@link ICheckpoint} record.
 	 * 
-	 * @return The most recent {@link Checkpoint} record and never
+	 * @return The most recent {@link ICheckpoint} record and never
 	 *         <code>null</code>.
 	 */
-    public Checkpoint getCheckpoint();
+    public ICheckpoint getCheckpoint();
     
 	/**
 	 * The address at which the most recent {@link IndexMetadata} record was
@@ -241,5 +241,17 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
      * @see #reopen()
      */
     public boolean isOpen();
+
+    /**
+     * Reports statistics for the index.
+     * 
+     * @param recursive
+     *            When <code>true</code>, also collects statistics on the pages
+     *            (nodes and leaves) using a low-level approach.
+     * 
+     * @return Some interesting statistics about the index (and optionally the
+     *         pages in that index) which the caller can print out.
+     */
+    BaseIndexStats dumpPages(boolean recursive);
     
 }
