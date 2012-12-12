@@ -265,6 +265,11 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
                     .dumpJournal(true/* dumpHistory */, true/* dumpPages */,
                             true/* dumpIndices */, false/* showTuples */);
 
+            // test again w/o dumpPages
+            new DumpJournal(src)
+                    .dumpJournal(true/* dumpHistory */, false/* dumpPages */,
+                            true/* dumpIndices */, false/* showTuples */);
+            
         } finally {
 
             src.destroy();

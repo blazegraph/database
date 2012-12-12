@@ -44,13 +44,12 @@ import java.util.TreeMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.ICheckpointProtocol;
-import com.bigdata.btree.ISimpleTreeIndexAccess;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexTypeEnum;
-import com.bigdata.btree.PageStats;
 import com.bigdata.htree.AbstractHTree;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
@@ -342,7 +341,8 @@ public class DumpJournal {
             
         } finally {
 
-            w.close();
+            // Note: DO NOT close stdout!
+//            w.close();
         }
 
     }
@@ -649,9 +649,8 @@ public class DumpJournal {
         final Iterator<String> nitr = journal.indexNameScan(null/* prefix */,
                 commitRecord.getTimestamp());
 
-        final Map<String, PageStats> pageStats = dumpPages ? new TreeMap<String, PageStats>()
-                : null;
-		
+        final Map<String, BaseIndexStats> pageStats = new TreeMap<String, BaseIndexStats>();
+
         while (nitr.hasNext()) {
 
             // a registered index.
@@ -726,18 +725,13 @@ public class DumpJournal {
              * then we could generate (parts of) this table very quickly. As it
              * stands, we have to actually scan the pages in the index.
              */
-            if (ndx instanceof ISimpleTreeIndexAccess) {
+            {
 
-                if (pageStats != null) {
+                final BaseIndexStats stats = ndx.dumpPages(dumpPages);
 
-                    final PageStats stats = ((ISimpleTreeIndexAccess) ndx)
-                            .dumpPages();
+                out.println("\t" + stats);
 
-                    out.println("\t" + stats);
-
-                    pageStats.put(name, stats);
-
-                }
+                pageStats.put(name, stats);
 
                 if (dumpIndices) {
 
@@ -757,18 +751,18 @@ public class DumpJournal {
 
         } // while(itr) (next index)
 
-        if (pageStats != null) {
+        {
 
             /*
              * Write out the header.
              */
-            out.println(PageStats.getHeaderRow());
+            boolean first = true;
 
-            for (Map.Entry<String, PageStats> e : pageStats.entrySet()) {
+            for (Map.Entry<String, BaseIndexStats> e : pageStats.entrySet()) {
 
                 final String name = e.getKey();
 
-                final PageStats stats = e.getValue();
+                final BaseIndexStats stats = e.getValue();
 
                 if (stats == null) {
 
@@ -787,6 +781,14 @@ public class DumpJournal {
                     
                 }
 
+                if (first) {
+
+                    out.println(stats.getHeaderRow());
+
+                    first = false;
+
+                }
+                
                 /*
                  * Write out the stats for this index.
                  */

@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,6 +106,15 @@ public class StatusServlet extends BigdataRDFServlet {
      * @see DumpJournal
      */
     private static final String DUMP_PAGES = "dumpPages";
+
+    /**
+     * Restrict a low-level dump of the journal to only the indices having the
+     * specified namespace prefix. The {@link #DUMP_JOURNAL} option MUST also be
+     * specified.
+     * 
+     * @see DumpJournal
+     */
+    private static final String DUMP_NAMESPACE = "dumpNamespace";
 
     /**
      * The name of a request parameter used to request a display of the
@@ -332,11 +342,35 @@ public class StatusServlet extends BigdataRDFServlet {
                         true/* autoFlush */);
 
                 out.print("<pre>\n");
-                
-                final DumpJournal dump = new DumpJournal((Journal) getIndexManager());
 
-                final List<String> namespaces = Collections.emptyList();
-                
+                final DumpJournal dump = new DumpJournal(
+                        (Journal) getIndexManager());
+
+                final List<String> namespaces;
+
+                // Add in any specified namespace(s) (defaults to all).
+                {
+
+                    final String[] a = req.getParameterValues(DUMP_NAMESPACE);
+
+                    if (a == null) {
+
+                        namespaces = Collections.emptyList();
+
+                    } else {
+
+                        namespaces = new LinkedList<String>();
+                        
+                        for (String namespace : a) {
+
+                            namespaces.add(namespace);
+
+                        }
+                    
+                    }
+                    
+                }
+
                 final boolean dumpHistory = false;
                 
                 final boolean dumpPages = req.getParameter(DUMP_PAGES) != null;

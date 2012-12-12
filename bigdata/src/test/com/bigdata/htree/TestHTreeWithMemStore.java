@@ -34,13 +34,13 @@ import junit.framework.TestCase;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.PageStats;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -472,7 +472,7 @@ public class TestHTreeWithMemStore extends TestCase {
                     htree.writeCheckpoint();
 
                     // Verify that we can compute the page stats.
-                    final PageStats stats = htree.dumpPages();
+                    final BaseIndexStats stats = htree.dumpPages(true/*recursive*/);
 
                     if (log.isInfoEnabled())
                         log.info(stats.toString());

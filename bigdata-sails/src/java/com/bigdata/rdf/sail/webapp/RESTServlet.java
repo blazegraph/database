@@ -128,11 +128,16 @@ public class RESTServlet extends BigdataRDFServlet {
 
         /*
          * Look for linked data GET requests.
+         * 
+         * Note: URIs ending in /sparql are *assumed* to be SPARQL end points on
+         * this server. A GET against a SPARQL end point is a SERVICE
+         * DESCRIPTION request (not a DESCRIBE) and will be handled by the
+         * QueryServlet.
          */
 
         final String pathInfo = req.getPathInfo();
 
-        if (pathInfo != null) {
+        if (pathInfo != null && !pathInfo.endsWith("/sparql")) {
 
             final URI uri = new URIImpl(req.getRequestURL().toString());
 

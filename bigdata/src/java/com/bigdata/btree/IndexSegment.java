@@ -37,7 +37,6 @@ import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -122,6 +121,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 //        
 //    }
 
+    @Override
     final public int getHeight() {
         // Note: fileStore.checkpoint is now final. reopen() is not required.
 //        reopen();
@@ -130,6 +130,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     }
 
+    @Override
     final public long getNodeCount() {
         // Note: fileStore.checkpoint is now final. reopen() is not required.
 //        reopen();
@@ -138,6 +139,7 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     }
 
+    @Override
     final public long getLeafCount() {
         // Note: fileStore.checkpoint is now final. reopen() is not required.
 //        reopen();
@@ -146,12 +148,65 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     }
 
+    @Override
     final public long getEntryCount() {
         // Note: fileStore.checkpoint is now final. reopen() is not required.
 //        reopen();
 
         return fileStore.getCheckpoint().nentries;
 
+    }
+
+    @Override
+    final public ICheckpoint getCheckpoint() {
+        
+        return fileStore.getCheckpoint();
+        
+    }
+
+    @Override
+    public long getRecordVersion() {
+        return getCheckpoint().getRecordVersion();
+    }
+
+    @Override
+    public long getMetadataAddr() {
+        return getCheckpoint().getMetadataAddr();
+    }
+
+    @Override
+    public long getRootAddr() {
+        return getCheckpoint().getRootAddr();
+    }
+
+    @Override
+    public void setLastCommitTime(long lastCommitTime) {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+    }
+
+    @Override
+    public long writeCheckpoint() {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+    }
+
+    @Override
+    public Checkpoint writeCheckpoint2() {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+    }
+
+    @Override
+    public IDirtyListener getDirtyListener() {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+    }
+
+    @Override
+    public void setDirtyListener(IDirtyListener listener) {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+    }
+
+    @Override
+    public long handleCommit(long commitTime) {
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
     }
 
     /**
