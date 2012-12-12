@@ -188,6 +188,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     protected static final String USING_NAMED_GRAPH_URI = "using-named-graph-uri";
 
+    /**
+     * URL query parameter used to specify a non-default KB namespace (as an
+     * alternative to having it in the URL path). The path takes precendence
+     * over this query parameter.
+     * 
+     * @see BigdataRDFServlet#getNamespace(HttpServletRequest)
+     */
+    protected static final String NAMESPACE = "namespace";
+    
 	private final SparqlEndpointConfig m_config;
 
     /**

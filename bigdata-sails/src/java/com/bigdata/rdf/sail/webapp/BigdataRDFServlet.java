@@ -267,6 +267,21 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
         if (snmsp == -1) {
 
+            String s = req.getParameter(BigdataRDFContext.NAMESPACE);
+
+            if (s != null) {
+
+                s = s.trim();
+                
+                if (s.length() > 0) {
+
+                    // Specified as a query parameter.
+                    return s;
+                    
+                }
+
+            }
+            
             // use the default namespace.
             return getConfig().namespace;
             
