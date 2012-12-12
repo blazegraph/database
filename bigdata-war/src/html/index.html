@@ -40,10 +40,14 @@ which this page was accessed.
      use GET for database queries since they are, by and large, idempotent. 
      -->
 <h2><a href="http://www.w3.org/TR/sparql11-query/"> SPARQL Query </a></h2>
-<FORM action="sparql" method="post">
+<FORM action="sparql" method="post" name="QUERY">
    <P>
    <TEXTAREA name="query" rows="10" cols="80" title="Enter SPARQL Query."
    >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
+   </P><P>
+   Tenant Namespace
+   <INPUT type="text" name="namespace" title="Tenant namespace."
+   > (leave empty for default KB)
    </P><P>
    <INPUT type="submit" value="Send" title="Submit query.">
    <INPUT type="checkbox" name="explain" value="true"
@@ -69,6 +73,10 @@ INSERT DATA
   &lt;http:&#47;&#47;example&#47;book1&gt; dc:title "A new book" ;
                          dc:creator "A.N.Other" .
 }</TEXTAREA>
+   </P><P>
+   Tenant Namespace
+   <INPUT type="text" name="namespace" title="Tenant namespace."
+   > (leave empty for default KB)
    </P><P>
    <INPUT type="submit" value="Send" title="Submit Update.">
    <!--INPUT type="checkbox" name="explain" value="true"
