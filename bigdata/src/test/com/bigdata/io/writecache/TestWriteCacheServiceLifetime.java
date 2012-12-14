@@ -167,7 +167,7 @@ public class TestWriteCacheServiceLifetime extends TestCase3 {
         config.service = new WriteCacheService(5/* nbuffers */,
                 0/* maxDirtyListSize */, prefixWrites, compactionThreshold,
                 true/* useChecksums */, fileExtent, config.opener,
-                config.quorum) {
+                config.quorum, null) {
 
             /**
              * The scattered write cache supports compaction.

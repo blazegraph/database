@@ -149,7 +149,7 @@ public class TestRWWriteCacheService extends TestCase3 {
 
         writeCache = new RWWriteCacheService(5/* nbuffers */,
                 0/* maxDirtyListSize */, prefixWrites, compactionThreshold,
-                fileExtent, opener, quorum);
+                fileExtent, opener, quorum, null);
 
     }
 
@@ -178,15 +178,15 @@ public class TestRWWriteCacheService extends TestCase3 {
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
             {
-                assertNull(writeCache.read(addr1));
+                assertNull(writeCache.read(addr1, data1.capacity()));
                 // write record @ addr.
                 assertTrue(writeCache.write(addr1, data1.asReadOnlyBuffer(),
                         ChecksumUtility.threadChk.get().checksum(data1)));
                 // verify record @ addr can be read.
-                assertNotNull(writeCache.read(addr1));
+                assertNotNull(writeCache.read(addr1, data1.capacity()));
                 // verify data read back @ addr.
                 data1.position(0);
-                assertEquals(data1, writeCache.read(addr1));
+                assertEquals(data1, writeCache.read(addr1, data1.capacity()));
             }
         } catch (Exception e) {
             fail("Unexpected  Exception", e);
@@ -246,7 +246,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         }
         for (int i = 0; i < 500; i++) {
             AllocView v = allocs.get(i);
-            assertEquals(v.buf, writeCache.read(v.addr)); // expected,
+            assertEquals(v.buf, writeCache.read(v.addr, v.nbytes)); // expected,
             // actual
         }
         /*
@@ -258,11 +258,11 @@ public class TestRWWriteCacheService extends TestCase3 {
          */
         for (int i = 0; i < 500; i++) {
             AllocView v = allocs.get(i);
-            assertEquals(v.buf, writeCache.read(v.addr));
+            assertEquals(v.buf, writeCache.read(v.addr, v.nbytes));
         }
         for (int i = 0; i < 500; i++) {
             AllocView v = allocs.get(i);
-            assertEquals(v.buf, opener.read(v.addr, v.buf.capacity())); // expected,
+            assertEquals(v.buf, opener.read(v.addr, v.nbytes)); // expected,
             // actual
             // on
             // DISK
@@ -483,6 +483,7 @@ public class TestRWWriteCacheService extends TestCase3 {
     class AllocView {
         int addr;
         ByteBuffer buf;
+        final int nbytes;
 
         AllocView(int pa, int pos, int limit, ByteBuffer src) {
             addr = pa;
@@ -495,7 +496,7 @@ public class TestRWWriteCacheService extends TestCase3 {
 
             buf = getRandomData(limit);
             buf.mark();
-
+            nbytes = buf.capacity();
         }
     };
 
@@ -517,7 +518,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final long addr2 = 12598;
         final long addr3 = 512800;
         try {
-            assertNull(cache1.read(addr1));
+            assertNull(cache1.read(addr1, data1.capacity()));
             // write record @ addr.
             assertTrue(cache1.write(addr1, data1.asReadOnlyBuffer(),
                     ChecksumUtility.threadChk.get().checksum(data1)));
@@ -526,31 +527,31 @@ public class TestRWWriteCacheService extends TestCase3 {
             assertTrue(cache1.write(addr3, data3.asReadOnlyBuffer(),
                     ChecksumUtility.threadChk.get().checksum(data3)));
             // verify record @ addr can be read.
-            assertNotNull(cache1.read(addr1));
-            assertNotNull(cache1.read(addr2));
-            assertNotNull(cache1.read(addr3));
+            assertNotNull(cache1.read(addr1, data1.capacity()));
+            assertNotNull(cache1.read(addr2, data2.capacity()));
+            assertNotNull(cache1.read(addr3, data3.capacity()));
             
             cache1.clearAddrMap(addr2, 0);
 
             WriteCache.transferTo(cache1, cache2, null);
 
-            assertNull(cache1.read(addr1));
-            assertNotNull(cache2.read(addr1));
-            assertNull(cache2.read(addr2));
+            assertNull(cache1.read(addr1, data1.capacity()));
+            assertNotNull(cache2.read(addr1, data1.capacity()));
+            assertNull(cache2.read(addr2, data2.capacity()));
 
             // verify data read back @ addr.
             data1.position(0);
-            assertEquals(data1, cache2.read(addr1));
+            assertEquals(data1, cache2.read(addr1, data1.capacity()));
 
             // now go back the other way
             cache1.reset();
             WriteCache.transferTo(cache2, cache1, null);
 
             data1.position(0);
-            assertEquals(data1, cache1.read(addr1));
+            assertEquals(data1, cache1.read(addr1, data1.capacity()));
 
             data2.position(0);
-            assertEquals(data3, cache1.read(addr3));
+            assertEquals(data3, cache1.read(addr3, data3.capacity()));
             
             
         } finally {
@@ -592,7 +593,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             src.write(addr, data.asReadOnlyBuffer(),
                     ChecksumUtility.threadChk.get().checksum(data));
                 
-            assertNotNull(src.read(addr));
+            assertNotNull(src.read(addr, data.capacity()));
 
             final int sb = src.bytesWritten();
             assertTrue(WriteCache.transferTo(src, dst, null));
@@ -600,7 +601,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             final int db = dst.bytesWritten();
             assertTrue(sb == db);
             
-            assertNotNull(dst.read(addr));
+            assertNotNull(dst.read(addr, data.capacity()));
             
         } finally {
             src.close();

@@ -143,7 +143,7 @@ public interface IWriteCache {
      *             if checksums are enabled and the checksum for the record
      *             could not be validated.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException,
+    public ByteBuffer read(final long offset, final int nbytes) throws InterruptedException,
             ChecksumError;
 
 //    /**

@@ -41,8 +41,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -305,6 +307,14 @@ abstract public class WriteCache implements IWriteCache {
          */
         private volatile boolean deleted;
         
+        /**
+		 * When a record is used as a read cache then the readCount is
+		 * maintained as a metric on its access. ÊThis could be used
+		 * to determine eviction/compaction.
+		 * Note: Guarded by synchronized(this). Ê Ê Ê Ê
+		 */
+        private int hitCount;
+        
         public RecordMetadata(final long fileOffset, final int bufferOffset,
                 final int recordLength, final int latchedAddr) {
 
@@ -444,6 +454,10 @@ abstract public class WriteCache implements IWriteCache {
      */
     void setSequence(final long i) {
         sequence = i;
+    }
+    
+    long getSequence() {
+    	return sequence;
     }
 
     /**
@@ -976,6 +990,135 @@ abstract public class WriteCache implements IWriteCache {
 
     }
 
+    /**
+     * Any WriteCache
+     * @param offset
+     * @param data
+     * @param chk
+     * @param writeChecksum
+     *            The checksum is appended to the record IFF this argument is
+     *            <code>true</code> and checksums are in use.
+     * @return
+     * @throws InterruptedException
+     */
+//    boolean cache(final long offset, final ByteBuffer data)
+//            throws InterruptedException {
+//
+//        // Note: The offset MAY be zero. This allows for stores without any
+//        // header block.
+//
+//        assert m_closedForWrites;
+//
+//        if (data == null)
+//            throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
+//
+//        final WriteCacheCounters counters = this.counters.get();
+//
+//        final ByteBuffer tmp = acquire();
+//
+//        try {
+//
+//            final int datalen = data.remaining();
+//
+//            if (datalen > capacity) {
+//                // This is more bytes than the total capacity of the buffer.
+//                throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
+//
+//            }
+//
+//            if (datalen == 0)
+//                throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
+//
+//            /*
+//             * Note: We need to be synchronized on the ByteBuffer here since
+//             * this operation relies on the position() being stable.
+//             * 
+//             * Note: Also see clearAddrMap(long) which is synchronized on the
+//             * acquired ByteBuffer in the same manner to protect it during
+//             * critical sections which have a side effect on the buffer
+//             * position.
+//             */
+//            final int pos;
+//            synchronized (tmp) {
+//
+//                // the position() at which the record is cached in the buffer.
+//                final int spos = tmp.position();
+//
+//                if (spos + datalen > capacity) {
+//
+//                    /*
+//                     * There is not enough room left in the write cache for this
+//                     * record.
+//                     */
+//
+//                    return false;
+//
+//                }
+//
+//                // no prefix data required for read cache
+//                pos = spos;
+//
+//                tmp.put(data);
+//
+//                /*
+//                 * Copy the record into the cache, updating position() as we go.
+//                 * 
+//                 * Note that the checker must be invalidated if a RWCache
+//                 * "deletes" an entry by zeroing an address. Hence, the code no
+//                 * longer updates the checksum when [prefixWrites:=true].
+//                 */
+//                if (checker != null && !prefixWrites) {
+//                    // update the checksum (no side-effects on [data])
+//                    final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+//                    chkBuf.position(spos);
+//                    chkBuf.limit(tmp.position());
+//                    checker.update(chkBuf);
+//                }
+//
+//                // update counters while holding the lock.
+//                counters.naccept++;
+//                counters.bytesAccepted += datalen;
+//
+//                /*
+//                 * Add metadata for the record so it can be read back from the
+//                 * cache.
+//                 * 
+//                 * Do not need latched addr, since propagation for HA is not required
+//                 */
+//
+//                final RecordMetadata md = new RecordMetadata(offset, pos,
+//                        datalen, 0);
+//
+//                if (recordMap.put(Long.valueOf(offset), md) != null) {
+//                    /*
+//                     * Note: This exception indicates that the abort protocol
+//                     * did not reset() the current write cache before new writes
+//                     * were laid down onto the buffer.
+//                     */
+//                    throw new AssertionError(
+//                            "Record exists for offset in cache: offset="
+//                                    + offset);
+//                }
+//
+//            } // synchronized(tmp)
+//
+//            if (log.isTraceEnabled()) { // @todo rather than hashCode() set a
+//                                        // buffer# on each WriteCache instance.
+//                log.trace("offset=" + offset + ", pos=" + pos + ", nwrite=" + datalen
+//                        + ", nrecords=" + recordMap.size()
+//                        + ", hashCode=" + hashCode());
+//            }
+//
+//            return true;
+//
+//        } finally {
+//
+//            release();
+//
+//        }
+//
+//    }
+
 //    /**
 //     * This method supports
 //     * {@link #transferTo(WriteCache, WriteCache, ConcurrentMap)} and provides a
@@ -1024,7 +1167,7 @@ abstract public class WriteCache implements IWriteCache {
      * @throws IllegalStateException
      *             If the buffer is closed.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException, ChecksumError {
+    public ByteBuffer read(final long offset, final int nbytes) throws InterruptedException, ChecksumError {
 
         final WriteCacheCounters counters = this.counters.get();
 
@@ -1076,7 +1219,7 @@ abstract public class WriteCache implements IWriteCache {
             // flip buffer for reading.
             dst.flip();
 
-            if (useChecksum) {
+            if (useChecksum && this.sequence != -1) { // don't check if HIRS
 
                 final int chk = tmp.getInt(pos + reclen);
 
@@ -1094,14 +1237,26 @@ abstract public class WriteCache implements IWriteCache {
             if (log.isTraceEnabled()) {
                 log.trace(show(dst, "read bytes"));
             }
+            
+          // Increment cache read count
+			final int nhits;
+			synchronized (md) {
+				nhits = ++md.hitCount;
+			}
 
-            return dst;
+			if (log.isTraceEnabled()) {
+				if (nhits > 2) {
+					log.trace("Cache read ");
+				}
+			}
 
-        } finally {
+			return dst;
 
-            release();
+		} finally {
 
-        }
+			release();
+
+		}
 
     }
 
@@ -1498,7 +1653,8 @@ abstract public class WriteCache implements IWriteCache {
         }
         
         // clear the index since all records were flushed to disk.
-        recordMap.clear();
+        if (!recordMap.isEmpty())
+        	recordMap.clear();
         
         if (orderedRecords != null) {
             synchronized (tmp) {
@@ -1527,6 +1683,9 @@ abstract public class WriteCache implements IWriteCache {
         m_closedForWrites = false;
         
         m_removed = 0;
+        
+        // leave to WCS to manage referenceCount for cache
+        m_referenceCount.set(0);
 
     }
 
@@ -2000,7 +2159,7 @@ abstract public class WriteCache implements IWriteCache {
                 // Must be present.
                 throw new AssertionError();
             }
-
+            
             removed.deleted = true;
             
             if (!prefixWrites) {
@@ -2378,6 +2537,7 @@ abstract public class WriteCache implements IWriteCache {
                 while (entries.hasNext()) {
                     final Entry<Long, RecordMetadata> entry = entries.next();
                     final long fileOffset = entry.getKey(); // file offset.
+                    
                     final RecordMetadata md = entry.getValue();
                     if (serviceRecordMap != null) {
                         final WriteCache tmp = serviceRecordMap.get(fileOffset);
@@ -2459,7 +2619,7 @@ abstract public class WriteCache implements IWriteCache {
                 
                 // true iff all records were transfered out.
                 final boolean isEmpty = src.recordMap.isEmpty();
-
+                
                 return isEmpty;
                 
             } finally {
@@ -2659,5 +2819,134 @@ abstract public class WriteCache implements IWriteCache {
         return percentEmpty;
         
     }
+
+    /**
+     * This is called as part of the read caching mechanism to allocate
+     * a ByteBuffer that will be used to directly read into.
+     * 
+     * If the allocation can be made, then an entry will be created in the
+     * record map.  It is the responsibility of the WriteCacheService to 
+     * set the serviceRecordMap only once the data is really there.
+     * 
+     * Rather than returning a ByteBuffer, a WriteCacheInstallation object
+     * should be returned that provides the protocol to:
+     * 
+     * 1) Install into the recordMap
+     * 2) Release to the clean list
+     * 
+     * 
+     * @param offset
+     * @param nbytes
+     * @return
+     * @throws InterruptedException 
+     * @throws IllegalStateException 
+     * @throws InterruptedException 
+     * @throws IllegalStateException 
+     */
+//	public Installation allocate(final long offset, final int nbytes) throws IllegalStateException, InterruptedException {
+//		assert m_closedForWrites; // must be used as read cache!
+//		
+//	    final ByteBuffer tmp = acquire();
+//	    try {
+//	    	if (tmp.remaining() < nbytes)
+//	    		return null;
+//	    	final int alloc = tmp.position();
+//	    	tmp.position(alloc+nbytes); // bump allocation
+//	    	
+////	    	recordMap.put(offset, new RecordMetadata(offset, alloc, nbytes, 0));
+////	    	
+////	    	// create allocation view
+////	    	final ByteBuffer ret = tmp.duplicate();
+////	    	ret.position(alloc);
+////	    	ret.limit(alloc+nbytes);
+////
+////	    	return ret;
+//	    	
+//	    	return new Installation(tmp, offset, alloc, nbytes);
+//	    } finally {
+//	    	release();
+//	    }
+//	}
+	
+	public ByteBuffer allocate(final int nbytes) throws IllegalStateException,
+			InterruptedException {
+		final ByteBuffer tmp = acquire(); // tmp=null possible on current
+											// close() of WriteCache.
+		try {
+			// if(tmp==null&&isClosed()) throw new AsyncClosedException; // if
+			// we have one for the WCS.
+			synchronized (tmp) {
+				if (remaining() > nbytes) {
+					final int pos = tmp.position();
+					tmp.position(pos + nbytes);
+
+					final ByteBuffer ret = tmp.duplicate();
+					ret.position(pos);
+					ret.limit(pos+nbytes);
+					
+					return ret;
+				} else {
+					return null;
+				}
+			}
+		} finally {
+			release();
+		}
+	}
+	
+	void commitToMap(final long offset, final int position, final int nbytes) {
+        final RecordMetadata md = new RecordMetadata(offset, position,
+                nbytes, -1/*latchedAddr*/);
+
+        if (recordMap.put(offset, md) != null) {
+        	log.warn("Record already in cache");
+        }
+	}
+
+	/**
+	 * The referenceCount is used to protect as early resetting to the clean
+	 * list. It is incremented by the WCS when used as a readCache and
+	 * thereafter by the memoizer when the cache is used for an installation.
+	 * When decremented to zero, it should be returned to the clean list. 
+	 */
+	final AtomicInteger m_referenceCount = new AtomicInteger(0);
+	
+	public int getReferenceCount() {
+		return m_referenceCount.get();
+	}
+
+	/**
+	 * Called when a new reference is acquired
+	 * 
+	 * @return current reference count
+	 */
+	public int incrementReferenceCount() {
+		return m_referenceCount.incrementAndGet();
+	}
+
+	/**
+	 * Although public, it is designed to be used by the WriteCacheService
+	 * with a memoizer pattern to support concurrent reads to
+	 * read cache buffers.
+	 * 
+	 * Called when a reference is released.  The return
+	 * value should be tested and if zero the cache should
+	 * be returned to the clean list.
+	 * 
+	 * @return current reference count
+	 */
+	public int decrementReferenceCount() {
+		return m_referenceCount.decrementAndGet();
+	}
+
+	/**
+	 * Checks if cache recordMap contains address offset
+	 * 
+	 * @param offset
+	 * @return
+	 */
+	public boolean contains(final long offset) {
+		return recordMap.containsKey(offset);
+	}
 
 }

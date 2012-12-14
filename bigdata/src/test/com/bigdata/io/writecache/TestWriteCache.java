@@ -115,6 +115,7 @@ public class TestWriteCache extends TestCase3 {
             	final long addr2 = 12800;
             	final long addr3 = 24800;
             	final ByteBuffer data1 = getRandomData(512);
+            	final int nbytes = data1.capacity();
             	final int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
             	
             	writeCache.write(addr1, data1, chk1);
@@ -123,11 +124,11 @@ public class TestWriteCache extends TestCase3 {
             	data1.flip();
             	writeCache.write(addr3, data1, chk1); // bad checksum
             	
-            	writeCache.read(addr1);
-            	writeCache.read(addr3);
+            	writeCache.read(addr1, nbytes);
+            	writeCache.read(addr3, nbytes);
             	
             	try {
-            		writeCache.read(addr2);
+            		writeCache.read(addr2, nbytes);
             		
             		fail("Expected ChecksumError");
             	} catch (ChecksumError ce) {
@@ -271,17 +272,18 @@ public class TestWriteCache extends TestCase3 {
                 // Test successful write on the cache and immediate read back.
                 final ByteBuffer data1 = getRandomData();
                 final long addr1 = _addr.get();
-                _addr.addAndGet(data1.capacity());
+                final int nbytes1 = data1.capacity();
+                _addr.addAndGet(nbytes1);
                 {
                     assertEquals(-1L,writeCache.getFirstOffset());
                     // verify addr not found before write.
-                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr1, nbytes1));
                     // write record @ addr.
                     assertTrue(writeCache.write(addr1, data1.asReadOnlyBuffer(), no_checksum));
                     // verify record @ addr can be read.
-                    assertNotNull(writeCache.read(addr1));
+                    assertNotNull(writeCache.read(addr1, nbytes1));
                     // verify data read back @ addr.
-                    assertEquals(data1, writeCache.read(addr1));
+                    assertEquals(data1, writeCache.read(addr1, nbytes1));
                     // verify address set after 1st write.
                     assertEquals(addr1,writeCache.getFirstOffset());
                 }
@@ -292,19 +294,20 @@ public class TestWriteCache extends TestCase3 {
                  * store which does not reserve any space for root blocks, etc.
                  */
                 final ByteBuffer data2 = getRandomData();
+                final int nbytes2 = data2.capacity();
                 final long addr2 = _addr.get();
                 _addr.addAndGet(data2.capacity());
                 {
                     // verify addr not found before write.
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr2, nbytes2));
                     // write record @ addr.
                     assertTrue(writeCache.write(addr2, data2.asReadOnlyBuffer(), no_checksum));
                     // verify record @ addr can be read.
-                    assertNotNull(writeCache.read(addr2));
+                    assertNotNull(writeCache.read(addr2, nbytes2));
                     // verify data read back @ addr.
-                    assertEquals(data2, writeCache.read(addr2));
+                    assertEquals(data2, writeCache.read(addr2, nbytes2));
                     // Verify the first record can still be read back.
-                    assertEquals(data1, writeCache.read(addr1));
+                    assertEquals(data1, writeCache.read(addr1, nbytes1));
                     // verify address still set after 2nd write.
                     assertEquals(addr1, writeCache.getFirstOffset());
                 }
@@ -414,8 +417,8 @@ public class TestWriteCache extends TestCase3 {
                     writeCache.flush(force);
 
                     // verify read back of cache still good.
-                    assertEquals(data1, writeCache.read(addr1));
-                    assertEquals(data2, writeCache.read(addr2));
+                    assertEquals(data1, writeCache.read(addr1, nbytes1));
+                    assertEquals(data2, writeCache.read(addr2, nbytes2));
 //                    assertEquals(data3b, writeCache.read(addr3));
 
                     // verify read back from file now good.
@@ -445,8 +448,8 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(-1L,writeCache.getFirstOffset());
 
                     // verify read back of cache fails.
-                    assertNull(writeCache.read(addr1));
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr1, nbytes1));
+                    assertNull(writeCache.read(addr2, nbytes2));
 //                    assertNull(writeCache.read(addr3));
 
                     // verify read back from file still good.
@@ -458,7 +461,7 @@ public class TestWriteCache extends TestCase3 {
                     assertTrue(writeCache.write(addr4, data4.asReadOnlyBuffer(), no_checksum));
 
                     // verify read back.
-                    assertEquals(data4, writeCache.read(addr4));
+                    assertEquals(data4, writeCache.read(addr4, data4.capacity()));
 
                     // Verify no more writes are allowed on the cache (it is
                     // full).
@@ -470,11 +473,11 @@ public class TestWriteCache extends TestCase3 {
                     writeCache.flush(force);
 
                     // verify read back of cache for other records still fails.
-                    assertNull(writeCache.read(addr1));
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr1, nbytes1));
+                    assertNull(writeCache.read(addr2, nbytes2));
 //                    assertNull(writeCache.read(addr3));
                     // verify read back from cache of the last record written.
-                    assertEquals(data4, writeCache.read(addr4));
+                    assertEquals(data4, writeCache.read(addr4, data4.capacity()));
 
                     // verify read back from file still good.
                     assertEquals(data1, opener.read(addr1, data1.capacity()));
@@ -495,7 +498,7 @@ public class TestWriteCache extends TestCase3 {
 
                     // read fails.
                     try {
-                        writeCache.read(1L/*addr*/);
+                        writeCache.read(1L/*addr*/, 0);
                         fail("Expected: " + IllegalStateException.class);
                     } catch (IllegalStateException ex) {
                         if (log.isInfoEnabled())
@@ -650,13 +653,13 @@ public class TestWriteCache extends TestCase3 {
                 {
                     assertEquals(-1L,writeCache.getFirstOffset());
                     // verify addr not found before write.
-                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr1, data1.capacity()));
                     // write record @ addr.
                     assertTrue(writeCache.write(addr1, data1.asReadOnlyBuffer(), checker.checksum(data1)));
                     // verify record @ addr can be read.
-                    assertNotNull(writeCache.read(addr1));
+                    assertNotNull(writeCache.read(addr1, data1.capacity()));
                     // verify data read back @ addr.
-                    assertEquals(data1, writeCache.read(addr1));
+                    assertEquals(data1, writeCache.read(addr1, data1.capacity()));
                     // verify address set after 1st write.
                     assertEquals(addr1,writeCache.getFirstOffset());
                 }
@@ -670,15 +673,15 @@ public class TestWriteCache extends TestCase3 {
                 final long addr2 = _addr[1];
                 {
                     // verify addr not found before write.
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr2, data2.capacity()));
                     // write record @ addr.
                     assertTrue(writeCache.write(addr2, data2.asReadOnlyBuffer(), checker.checksum(data2)));
                     // verify record @ addr can be read.
-                    assertNotNull(writeCache.read(addr2));
+                    assertNotNull(writeCache.read(addr2, data2.capacity()));
                     // verify data read back @ addr.
-                    assertEquals(data2, writeCache.read(addr2));
+                    assertEquals(data2, writeCache.read(addr2, data2.capacity()));
                     // Verify the first record can still be read back.
-                    assertEquals(data1, writeCache.read(addr1));
+                    assertEquals(data1, writeCache.read(addr1, data1.capacity()));
                     // verify address still set after 2nd write.
                     assertEquals(addr1, writeCache.getFirstOffset());
                 }
@@ -787,8 +790,8 @@ public class TestWriteCache extends TestCase3 {
                     writeCache.flush(force);
 
                     // verify read back of cache still good.
-                    assertEquals(data1, writeCache.read(addr1));
-                    assertEquals(data2, writeCache.read(addr2));
+                    assertEquals(data1, writeCache.read(addr1, data1.capacity()));
+                    assertEquals(data2, writeCache.read(addr2, data2.capacity()));
 //                    assertEquals(data3b, writeCache.read(addr3));
 
                     // verify read back from file now good.
@@ -817,8 +820,8 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(-1L,writeCache.getFirstOffset());
 
                     // verify read back of cache fails.
-                    assertNull(writeCache.read(addr1));
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr1, data1.capacity()));
+                    assertNull(writeCache.read(addr2, data2.capacity()));
 //                    assertNull(writeCache.read(addr3));
 
                     // verify read back from file still good.
@@ -832,7 +835,7 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
 
                     // verify read back.
-                    assertEquals(data4, writeCache.read(addr4));
+                    assertEquals(data4, writeCache.read(addr4, data4.capacity()));
 
                     // Verify no more writes are allowed on the cache (it is
                     // full).
@@ -852,11 +855,11 @@ public class TestWriteCache extends TestCase3 {
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
 
                     // verify read back of cache for other records still fails.
-                    assertNull(writeCache.read(addr1));
-                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr1, data1.capacity()));
+                    assertNull(writeCache.read(addr2, data2.capacity()));
 //                    assertNull(writeCache.read(addr3));
                     // verify read back from cache of the last record written.
-                    assertEquals(data4, writeCache.read(addr4));
+                    assertEquals(data4, writeCache.read(addr4, data4.capacity()));
 
                     // verify read back from file still good.
                     assertEquals(data1, opener.read(addr1, data1.capacity()));
@@ -876,7 +879,7 @@ public class TestWriteCache extends TestCase3 {
 
                     // read fails.
                     try {
-                        writeCache.read(1L/*addr*/);
+                        writeCache.read(1L/*addr*/, 0);
                         fail("Expected: " + IllegalStateException.class);
                     } catch (IllegalStateException ex) {
                         if (log.isInfoEnabled())
@@ -956,7 +959,7 @@ public class TestWriteCache extends TestCase3 {
                         opener, 0L/* fileExtent */, null/* BufferedWrite */);  	
                 
                 final WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(
-                        buf, true/* useChecksums */,
+                        buf2, true/* useChecksums */,
                         true/* isHighlyAvailable */, false/* bufferHasData */,
                         opener, 0L/* fileExtent */, null/* BufferedWrite */);
 
@@ -969,11 +972,12 @@ public class TestWriteCache extends TestCase3 {
                  */
                 syncBuffers(buf, buf2);
                 assertEquals(buf.buffer(), buf2.buffer());
+                buf2.buffer().flip();
                 cache2.resetRecordMapFromBuffer();
-                assertEquals(cache1.read(addr1), data1);
-                if (cache2.read(addr1) == null)
+                assertEquals(cache1.read(addr1, data1.capacity()), data1);
+                if (cache2.read(addr1, data1.capacity()) == null)
                     fail("Nothing in replicated cache?");
-                assertEquals(cache2.read(addr1), data1);
+                assertEquals(cache2.read(addr1, data1.capacity()), data1);
 
                 // now simulate removal/delete
                 cache1.clearAddrMap(addr1, 0/*latchedAddr*/);
@@ -982,17 +986,17 @@ public class TestWriteCache extends TestCase3 {
 
                 cache2.resetRecordMapFromBuffer();
 
-                assertTrue(cache1.read(addr1) == null);
-                assertTrue(cache2.read(addr1) == null);
+                assertTrue(cache1.read(addr1, data1.capacity()) == null);
+                assertTrue(cache2.read(addr1, data1.capacity()) == null);
 
                 // now write second data buffer
                 cache1.write(addr1, data2, chk2);
-                data2.flip();
+                // data2.flip();
                 // buf2.buffer().limit(buf.buffer().position());
                 syncBuffers(buf, buf2);
                 cache2.resetRecordMapFromBuffer();
-                assertEquals(cache2.read(addr1), data2);
-                assertEquals(cache1.read(addr1), data2);
+                assertEquals(cache2.read(addr1, data1.capacity()), data2);
+                assertEquals(cache1.read(addr1, data1.capacity()), data2);
         
             } finally {
             
@@ -1043,7 +1047,8 @@ public class TestWriteCache extends TestCase3 {
     class AllocView {
         final int addr;
         final ByteBuffer buf;
-
+        final int nbytes;
+        
         AllocView(final int pa, final int pos, final int limit,
                 final ByteBuffer src) {
     		addr = pa;
@@ -1056,7 +1061,7 @@ public class TestWriteCache extends TestCase3 {
 
     		buf = getRandomData(limit);
     		buf.mark();
-
+    		nbytes = buf.capacity();
     	}
     };
 
@@ -1128,7 +1133,7 @@ public class TestWriteCache extends TestCase3 {
             }
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
-             	assertEquals(v.buf, writeCache.read(v.addr));     // expected, actual   	
+             	assertEquals(v.buf, writeCache.read(v.addr, v.nbytes));     // expected, actual   	
             }
             /*
              * Flush to disk and reset the cache
@@ -1141,7 +1146,7 @@ public class TestWriteCache extends TestCase3 {
              */
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
-             	assertNull(writeCache.read(v.addr));     // should be nothing in cache   	
+             	assertNull(writeCache.read(v.addr, v.nbytes));     // should be nothing in cache   	
             }
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
@@ -1153,7 +1158,7 @@ public class TestWriteCache extends TestCase3 {
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
             	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf));
-                assertEquals(v.buf, writeCache.read(v.addr));     // expected, actual       
+                assertEquals(v.buf, writeCache.read(v.addr, v.nbytes));     // expected, actual       
             }
             writeCache.closeForWrites();
             writeCache.flush(true);
