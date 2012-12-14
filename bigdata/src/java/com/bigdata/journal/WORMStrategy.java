@@ -57,6 +57,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -126,7 +127,7 @@ import com.bigdata.util.ChecksumUtility;
  * @see BufferMode#Temporary
  */
 public class WORMStrategy extends AbstractBufferStrategy implements
-        IDiskBasedStrategy, IHABufferStrategy {
+        IDiskBasedStrategy, IHABufferStrategy, IBackingReader {
     
     /**
      * The file.
@@ -937,7 +938,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         }
         
     }
-
+    
     private class WORMWriteCacheService extends WriteCacheService {
         
         WORMWriteCacheService(final int nbuffers, final boolean useChecksum,
@@ -947,7 +948,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             super(writeCacheBufferCount, 0/* maxDirtyListSize */,
                     false/* prefixWrites */, 100/* compactionThreshold */,
-                    useChecksums, extent, opener, quorum);
+                    useChecksums, extent, opener, quorum, WORMStrategy.this /*reader*/);
 
         }
 
@@ -1153,8 +1154,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     writeCacheService.close();
                     writeCacheService = newWriteCacheService();
                 } else {
-                writeCacheService.reset();
-                writeCacheService.setExtent(extent);
+	                writeCacheService.reset();
+	                writeCacheService.setExtent(extent);
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -1369,7 +1370,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * record.
              */
             // Note: Can throw ChecksumError, InterruptedException
-            ByteBuffer tmp = writeCacheService.read(offset);
+            ByteBuffer tmp = writeCacheService.read(offset, nbytes);
             if (tmp != null) {
                 /*
                  * Hit on the write cache.
@@ -1461,16 +1462,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *            
      * @return The caller's buffer, prepared for reading.
      */
-    private ByteBuffer readRaw(final long offset, final ByteBuffer dst) {
+    public ByteBuffer readRaw(final long offset, final ByteBuffer dst) {
 
         final Lock readLock = extensionLock.readLock();
         readLock.lock();
         try {
-
+        	final int startPos = dst.position();
             try {
 
                 // the offset into the disk file.
                 final long pos = headerSize + offset;
+                // final long pos = offset;
 
                 // read on the disk.
                 final int ndiskRead = FileChannelUtility.readAll(opener, dst,
@@ -1491,8 +1493,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            // flip for reading.
-            dst.flip();
+            // Reset start position - do not flip()
+            dst.position(startPos);
 
             return dst;
         } finally {
@@ -2319,9 +2321,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         // sets the [readOnly] flag.
         super.closeForWrites();
 
-        // discard the write cache.
-        releaseWriteCache();
-        
+        // do not discard the write cache, just reset it to preserve
+        //	read cache
+        // releaseWriteCache();
+        try {
+			writeCacheService.reset();
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+
     }
 
     /**
@@ -2337,7 +2345,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private final void releaseWriteCache() {
 
         if (writeCacheService != null) {
-//            try {
+//           try {
+        		// FIXME: just reset to preserve read cache?
                 writeCacheService.close();
 //            } catch (InterruptedException e) {
 //                throw new RuntimeException(e);
@@ -2352,7 +2361,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     @Override
 	public void delete(long addr) {
-		// NOP
+		writeCacheService.clearWrite(addr, 0);
 	}
 
     @Override

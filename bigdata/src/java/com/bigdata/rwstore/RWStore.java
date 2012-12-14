@@ -37,6 +37,7 @@ import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -74,6 +75,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.BufferedWrite;
+import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.IBufferedWriter;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -238,7 +240,7 @@ import com.bigdata.util.ChecksumUtility;
  *         space can be reclaimed).
  */
 
-public class RWStore implements IStore, IBufferedWriter {
+public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     private static final transient Logger log = Logger.getLogger(RWStore.class);
 
@@ -479,10 +481,9 @@ public class RWStore implements IStore, IBufferedWriter {
     final int m_minFixedAlloc;
 	
     /**
-     * Currently we do not support a Blob header to be a Blob, so the
-     * maximum possible Blob is ((maxFixed-4) * maxFixed) - 4.
+     * We allow blob headers so the maximum blob size is Integer.MAX_VALUE.
      */
-    final int m_maxBlobAllocSize;
+    final int m_maxBlobAllocSize = Integer.MAX_VALUE;
 	
     /**
      * This lock is used to exclude readers when the extent of the backing file
@@ -683,8 +684,6 @@ public class RWStore implements IStore, IBufferedWriter {
 		
 		m_metaTransientBits = new int[m_metaBitsSize];
 		
-		// @todo Review maximum file size constraints - is this old stuff?
-		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
 		
         m_quorum = quorum;
 		
@@ -792,15 +791,18 @@ public class RWStore implements IStore, IBufferedWriter {
                 
 			}
 			
-            // setup write cache AFTER init to ensure filesize is correct!
+    		// Maximum theoretically addressable file size is determined by the
+            //	maximum allocator slot size multiplied by Integer.MAX_VALUE
+            // FIXME: do we want to constrain this as a system property?
+    		m_maxFileSize = ((long) Integer.MAX_VALUE) * m_maxFixedAlloc;
+
+    		// setup write cache AFTER init to ensure filesize is correct!
             
     		m_writeCache = newWriteCache();
 
     		final int maxBlockLessChk = m_maxFixedAlloc-4;
              
-            m_maxBlobAllocSize = Integer.MAX_VALUE;
-            
-			assert m_maxFixedAlloc > 0;
+ 			assert m_maxFixedAlloc > 0;
 			
 			m_deferredFreeOut = PSOutputStream.getNew(this, m_maxFixedAlloc, null);
 
@@ -917,6 +919,9 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_allocationLock.unlock();
 		}
 	}
+	
+	// make this field public for access from unit tests as required
+	public static boolean DEBUG_USEREADCACHE = true;
 
 	/**
      * Create and return a new {@link RWWriteCacheService} instance. The caller
@@ -934,7 +939,7 @@ public class RWStore implements IStore, IBufferedWriter {
             return new RWWriteCacheService(m_writeCacheBufferCount,
                     m_maxDirtyListSize, prefixWrites, m_compactionThreshold,
 
-                    convertAddr(m_fileSize), m_reopener, m_quorum) {
+                    convertAddr(m_fileSize), m_reopener, m_quorum, DEBUG_USEREADCACHE ? this : null) {
                 
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
@@ -1448,8 +1453,7 @@ public class RWStore implements IStore, IBufferedWriter {
 //	}
 
 	public long getMaxFileSize() {
-		final long maxSize = m_maxFileSize;
-		return maxSize << 8;
+		return m_maxFileSize;
 	}
 
 //	// Allocators
@@ -1623,7 +1627,7 @@ public class RWStore implements IStore, IBufferedWriter {
                  */
 				final ByteBuffer bbuf;
 				try {
-					bbuf = m_writeCache != null ? m_writeCache.read(paddr) : null;
+					bbuf = m_writeCache != null ? m_writeCache.read(paddr, length) : null;
 				} catch (Throwable t) {
                     throw new IllegalStateException(
                             "Error reading from WriteCache addr: " + paddr
@@ -1662,41 +1666,64 @@ public class RWStore implements IStore, IBufferedWriter {
 	                }
 				} else {
 		            // Read through to the disk.
+					// With a non-null WCS, the actual read should be via a callback to readRaw, it should not get here
+					//	unless it is not possible to cache - but maybe even then the WCS should read into a temporary
+					//	buffer
 		            final long beginDisk = System.nanoTime();
 					// If checksum is required then the buffer should be sized to include checksum in final 4 bytes
 				    final ByteBuffer bb = ByteBuffer.wrap(buf, offset, length);
-					FileChannelUtility.readAll(m_reopener, bb, paddr);
+				    
+				    // Use ReadRaw - should be the same read all
+			    	readRaw(paddr, bb);
+			    	
+			    	// enable for debug
+				    if (false) {
+				    	final byte[] nbuf = new byte[buf.length];
+					    final ByteBuffer nbb = ByteBuffer.wrap(nbuf, offset, length);
+						FileChannelUtility.readAll(m_reopener, nbb, paddr);
+				    	if (!Arrays.equals(buf, nbuf))
+				    		throw new AssertionError();
+				    	
+						m_diskReads++;
+			            // Update counters.
+			            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+			                    .acquire();
+			            try {
+			                final int nbytes = length;
+			                c.nreads++;
+			                c.bytesRead += nbytes;
+			                c.bytesReadFromDisk += nbytes;
+			                c.elapsedReadNanos += (System.nanoTime() - begin);
+			                c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+			            } finally {
+			                c.release();
+			            }
+				    }
+				    
 					final int chk = ChecksumUtility.getCHK().checksum(buf, offset, length-4); // read checksum
 					final int tstchk = bb.getInt(offset + length-4);
 					if (chk != tstchk) {
 						assertAllocators();
 						
-						final String cacheDebugInfo = m_writeCache.addrDebugInfo(paddr);
-						log.warn("Invalid data checksum for addr: " + paddr 
-								+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
-								+ ", first bytes: " + toHexString(buf, 32) + ", successful reads: " + m_diskReads
-								+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads
-								+ ", writeCacheDebug: " + cacheDebugInfo);
+						if (m_writeCache != null) {
+							final String cacheDebugInfo = m_writeCache.addrDebugInfo(paddr);
+							log.warn("Invalid data checksum for addr: " + paddr 
+									+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
+									+ ", first bytes: " + toHexString(buf, 32) + ", successful reads: " + m_diskReads
+									+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads
+									+ ", writeCacheDebug: " + cacheDebugInfo);
+						}
 						
                         throw new IllegalStateException(
                                 "Invalid data checksum from address: " + paddr
                                         + ", size: " + (length - 4));
 					}
+
+					// do not explicitly cache the read, it will be cached by the WCS!
+//					if (m_writeCache != null) { // cache the read!
+//						m_writeCache.cache(paddr, bb);
+//					}
 					
-					m_diskReads++;
-		            // Update counters.
-		            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
-		                    .acquire();
-		            try {
-		                final int nbytes = length;
-		                c.nreads++;
-		                c.bytesRead += nbytes;
-		                c.bytesReadFromDisk += nbytes;
-		                c.elapsedReadNanos += (System.nanoTime() - begin);
-		                c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
-		            } finally {
-		                c.release();
-		            }
 				}
 			} catch (PhysicalAddressResolutionException e) {
 				throw new IllegalArgumentException("Unable to read data: "+e, e);
@@ -2444,6 +2471,9 @@ public class RWStore implements IStore, IBufferedWriter {
 	            //	problems in HA.
 	            // If the allocators are torn down correctly, we should be good to clear the commitList
 				m_commitList.clear();
+				
+				// Flag no allocations since last commit
+				m_recentAlloc = false;
             }
             if (m_quorum != null) {
                 /**
@@ -2825,7 +2855,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * in reset() to unwind new FixedAllocators and/or AllocBlocks
 	 */
 	volatile private int m_committedNextAllocation;
-	final private int m_maxFileSize;
+	final private long m_maxFileSize;
 
 //	private int m_headerSize = 2048;
 
@@ -3246,13 +3276,13 @@ public class RWStore implements IStore, IBufferedWriter {
 
 			m_fileSize += adjust;
 
-			if (getMaxFileSize() < m_fileSize) {
+			final long toAddr = convertAddr(m_fileSize);
+			
+			if (getMaxFileSize() < toAddr) {
 				// whoops!! How to exit more gracefully?
 				throw new Error("System greater than maximum size");
 			}
 
-			final long toAddr = convertAddr(m_fileSize);
-			
 			if (log.isInfoEnabled()) log.info("Extending file to: " + toAddr);
 
 			m_reopener.reopenChannel();
@@ -5212,16 +5242,17 @@ public class RWStore implements IStore, IBufferedWriter {
      * 
      * @return The caller's buffer, prepared for reading.
      */
-    private ByteBuffer readRaw(final long offset, final ByteBuffer dst) {
+    public ByteBuffer readRaw(final long offset, final ByteBuffer dst) {
 
         final Lock readLock = m_extensionLock.readLock();
         readLock.lock();
         try {
-
+           	final int position = dst.position();
             try {
-
+ 
                 // the offset into the disk file.
-                final long pos = FileMetadata.headerSize0 + offset;
+                // final long pos = FileMetadata.headerSize0 + offset;
+                final long pos = offset;
 
                 // read on the disk.
                 final int ndiskRead = FileChannelUtility.readAll(m_reopener,
@@ -5242,8 +5273,8 @@ public class RWStore implements IStore, IBufferedWriter {
 
             }
 
-            // flip for reading.
-            dst.flip();
+            // reset for reading
+            dst.position(position);
 
             return dst;
         } finally {
@@ -5770,7 +5801,7 @@ public class RWStore implements IStore, IBufferedWriter {
             long remaining = totalBytes;
 
             // The offset of the current block.
-            long offset = 0L;
+            long offset = FileMetadata.headerSize0; // 0L;
 
             // The block sequence.
             long sequence = 0L;

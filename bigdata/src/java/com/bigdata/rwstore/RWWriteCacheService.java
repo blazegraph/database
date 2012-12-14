@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
@@ -49,11 +50,12 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
     public RWWriteCacheService(final int nbuffers, final int maxDirtyListSize,
             final boolean prefixWrites, final int compactionThreshold,
             final long fileExtent,
-            final IReopenChannel<? extends Channel> opener, final Quorum quorum)
+            final IReopenChannel<? extends Channel> opener, final Quorum quorum,
+            final IBackingReader reader)
             throws InterruptedException, IOException {
 
         super(nbuffers, maxDirtyListSize, prefixWrites, compactionThreshold,
-                true/* useChecksum */, fileExtent, opener, quorum);
+                true/* useChecksum */, fileExtent, opener, quorum, reader);
     }
 
     /**

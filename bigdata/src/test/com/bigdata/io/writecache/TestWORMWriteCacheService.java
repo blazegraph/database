@@ -617,7 +617,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_RW_2buffers()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 2;
+        final int nbuffers = 10;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -716,7 +716,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_RW_6buffers_recordChecksums()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 6;
+        final int nbuffers = 20;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -1561,7 +1561,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         if(skipHATest()) return;
 
-        final int nbuffers = 2;
+        final int nbuffers = 6;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
         final boolean isHighlyAvailable = true;
@@ -1645,91 +1645,96 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws IOException
      */
     public void test_writeCacheService_HA_RW_2buffer_k3_size2()
-            throws InterruptedException, IOException {
+    throws InterruptedException, IOException {
 
-        if(skipHATest()) return;
+		if (skipHATest())
+			return;
 
-    	final int nbuffers = 2;
-        final int nrecs = nrecsRW;
-        /*
-         * Note: The RW store breaks large records into multiple allocations,
-         * each of which is LTE the size of the write cache so we do not test
-         * with large records here.
-         */
-        final double largeRecordRate = 0d;
-        final boolean useChecksums = true;
-        // Note: This must be true for the write pipeline.
-        final boolean isHighlyAvailable = true;
+		final int nbuffers = 2;
+		final int nrecs = nrecsRW;
+		/*
+		 * Note: The RW store breaks large records into multiple allocations,
+		 * each of which is LTE the size of the write cache so we do not test
+		 * with large records here.
+		 */
+		final double largeRecordRate = 0d;
+		final boolean useChecksums = true;
+		// Note: This must be true for the write pipeline.
+		final boolean isHighlyAvailable = true;
 
-        final int k = 3;
-        final long lastCommitTime = 0L;
-        final MockQuorumFixture fixture = new MockQuorumFixture();
-        final String logicalServiceId = "logicalService_"+getName();
-        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
-                k, fixture);
-        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
-                k, fixture);
-//        final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum2 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
-//                k, fixture);
-        try {
-            
-            fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+		final int k = 3;
+		final long lastCommitTime = 0L;
+		final MockQuorumFixture fixture = new MockQuorumFixture();
+		final String logicalServiceId = "logicalService_" + getName();
+		final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
+				k, fixture);
+		final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
+				k, fixture);
+		// final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>
+		// quorum2 = new MockQuorum<HAPipelineGlue,
+		// MyMockQuorumMember<HAPipelineGlue>>(
+		// k, fixture);
+		try {
 
-            final QuorumActor<?,?> actor0 = quorum0.getActor();
-            final QuorumActor<?,?> actor1 = quorum1.getActor();
-//            final QuorumActor<?,?> actor2 = quorum2.getActor();
+			fixture.start();
+			quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,
+					logicalServiceId));
+			quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,
+					logicalServiceId));
+			// quorum2.start(new
+			// MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
-            actor0.memberAdd();
-            actor1.memberAdd();
-//            actor2.memberAdd();
-            fixture.awaitDeque();
-            
-            actor0.pipelineAdd();
-            actor1.pipelineAdd();
-//            actor2.pipelineAdd();
-            fixture.awaitDeque();
-            
-            // actor0 will become the leader.
-            actor0.castVote(lastCommitTime);
-            actor1.castVote(lastCommitTime);
-//            actor2.castVote(lastCommitTime);
-            fixture.awaitDeque();
+			final QuorumActor<?, ?> actor0 = quorum0.getActor();
+			final QuorumActor<?, ?> actor1 = quorum1.getActor();
+			// final QuorumActor<?,?> actor2 = quorum2.getActor();
 
-            // note token and verify expected leader.
-            final long token = quorum0.awaitQuorum();
-            assertEquals(token,quorum1.awaitQuorum());
-            quorum0.assertLeader(token);
+			actor0.memberAdd();
+			actor1.memberAdd();
+			// actor2.memberAdd();
+			fixture.awaitDeque();
 
-            // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoined().length);
+			actor0.pipelineAdd();
+			actor1.pipelineAdd();
+			// actor2.pipelineAdd();
+			fixture.awaitDeque();
 
-            final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
-                    largeRecordRate, useChecksums, isHighlyAvailable,
-                    StoreTypeEnum.RW, quorum0/* leader */);
+			// actor0 will become the leader.
+			actor0.castVote(lastCommitTime);
+			actor1.castVote(lastCommitTime);
+			// actor2.castVote(lastCommitTime);
+			fixture.awaitDeque();
 
-            // Verify #of cache blocks received by the clients.
-            assertEquals(nsend, quorum1.getClient().nreceived.get());
+			// note token and verify expected leader.
+			final long token = quorum0.awaitQuorum();
+			assertEquals(token, quorum1.awaitQuorum());
+			quorum0.assertLeader(token);
 
-            // Verify still leader, same token.
-            quorum0.assertLeader(token);
-            
-            // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoined().length);
+			// Verify the expected services joined.
+			assertEquals(2, quorum0.getJoined().length);
 
-        } finally {
+			final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
+					largeRecordRate, useChecksums, isHighlyAvailable,
+					StoreTypeEnum.RW, quorum0/* leader */);
 
-            quorum0.terminate();
-            quorum1.terminate();
-//            quorum2.terminate();
-            fixture.terminate();
+			// Verify #of cache blocks received by the clients.
+			assertEquals(nsend, quorum1.getClient().nreceived.get());
 
-        }
+			// Verify still leader, same token.
+			quorum0.assertLeader(token);
 
-    }
+			// Verify the expected services still joined.
+			assertEquals(2, quorum0.getJoined().length);
 
+		} finally {
+
+			quorum0.terminate();
+			quorum1.terminate();
+			// quorum2.terminate();
+			fixture.terminate();
+
+		}
+
+	}
     /**
      * A test of the write pipeline driving from the {@link WriteCacheService}
      * of the leader using a quorum with k := 3, 2 running services, two buffers
@@ -2098,7 +2103,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             }
             writeCacheService = new WriteCacheService(nbuffers,
                     maxDirtyListSize, prefixWrites, compactionThreshold,
-                    useChecksums, fileExtent, opener, quorum) {
+                    useChecksums, fileExtent, opener, quorum, null) {
 
                 /**
                  * The scattered write cache supports compaction.
@@ -2233,7 +2238,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     final MockRecord expected = records[prior];
 
                     // Read on the cache.
-                    ByteBuffer actual = writeCacheService.read(expected.offset);
+                    ByteBuffer actual = writeCacheService.read(expected.offset, expected.nbytes);
 
                     final boolean cacheHit = actual != null;
                     if (actual == null) {
@@ -2276,6 +2281,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             // flush the write cache to the backing file.
             log.info("Service flush().");
+System.out.println("FLUSHING");
             writeCacheService.flush(true/*force*/);
             log.info("Service flush() - done.");
 

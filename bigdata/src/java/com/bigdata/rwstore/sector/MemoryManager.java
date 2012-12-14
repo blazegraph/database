@@ -1340,11 +1340,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
 		m_allocationLock.lock();
 		int totalFreed = 0;
-		final DataInputStream strBuf = new DataInputStream(getInputStream(blockAddr));		
 		try {
+			final DataInputStream strBuf = new DataInputStream(getInputStream(blockAddr));		
 			int nxtAddr = strBuf.readInt();
-			
-			int cnt = 0;
 			
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
 				
@@ -1391,94 +1389,91 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     private int freeDeferrals(final AbstractJournal journal,
             final long fromTime,
             final long toTime) {
-        
-        final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
-            /*
-             * Commit can be called prior to Journal initialisation, in which
-             * case the commitRecordIndex will not be set.
-             */
-            final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
-            if (commitRecordIndex == null) { // TODO Why is this here?
-                return 0;
-            }
-    
-            final IndexMetadata metadata = commitRecordIndex
-                    .getIndexMetadata();
 
-            final byte[] fromKey = metadata.getTupleSerializer()
-                    .serializeKey(fromTime);
+		/*
+		 * Commit can be called prior to Journal initialisation, in which case
+		 * the commitRecordIndex will not be set.
+		 */
+		final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+		if (commitRecordIndex == null) { // TODO Why is this here?
+			return 0;
+		}
 
-            final byte[] toKey = metadata.getTupleSerializer()
-                    .serializeKey(toTime);
+		final IndexMetadata metadata = commitRecordIndex.getIndexMetadata();
 
-            commitRecords = commitRecordIndex
-                    .rangeIterator(fromKey, toKey);
-            
+		final byte[] fromKey = metadata.getTupleSerializer().serializeKey(
+				fromTime);
 
-        int totalFreed = 0;
-        int commitPointsRecycled = 0;
-        
-        while (commitRecords.hasNext()) {
-            
-            final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
+		final byte[] toKey = metadata.getTupleSerializer().serializeKey(toTime);
 
-            final CommitRecordIndex.Entry entry = tuple.getObject();
-            
-            try {   
+		final ITupleIterator<CommitRecordIndex.Entry> commitRecords = commitRecordIndex
+				.rangeIterator(fromKey, toKey);
 
-                final ICommitRecord record = CommitRecordSerializer.INSTANCE
-                        .deserialize(journal.read(entry.addr));
-    
-                final long blockAddr = record
-                        .getRootAddr(AbstractJournal.DELETEBLOCK);
-                
-                if (blockAddr != 0) {
-                
-                    totalFreed += freeDeferrals(blockAddr,
-                            record.getTimestamp());
-                    
-                }
-                
-// Note: This is releasing the ICommitRecord itself.  I've moved the responsibilty
-// for that into AbstractJournal#removeCommitRecordEntries() (invoked below).
-//              
-//                immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+		int totalFreed = 0;
+		int commitPointsRecycled = 0;
 
-                commitPointsRecycled++;
-                
-            } catch (RuntimeException re) {
+		while (commitRecords.hasNext()) {
 
-                throw new RuntimeException("Problem with entry at "
-                        + entry.addr, re);
-                
-            }
+			final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
 
-        }
-        
-        /*
-         *  
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
-         */
-        
-        // Now remove the commit record entries from the commit record index.
-        final int commitPointsRemoved = journal.removeCommitRecordEntries(
-        		fromKey, toKey);
+			final CommitRecordIndex.Entry entry = tuple.getObject();
 
-        if (txLog.isInfoEnabled())
-            txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
-                    + ", totalFreed=" + totalFreed 
-                    + ", commitPointsRecycled=" + commitPointsRecycled
-                    + ", commitPointsRemoved=" + commitPointsRemoved
-                    );
+			try {
 
-        if (commitPointsRecycled != commitPointsRemoved)
-            throw new AssertionError("commitPointsRecycled="
-                    + commitPointsRecycled + " != commitPointsRemoved="
-                    + commitPointsRemoved);
+				final ICommitRecord record = CommitRecordSerializer.INSTANCE
+						.deserialize(journal.read(entry.addr));
 
-        return totalFreed;
-    }
+				final long blockAddr = record
+						.getRootAddr(AbstractJournal.DELETEBLOCK);
+
+				if (blockAddr != 0) {
+
+					totalFreed += freeDeferrals(blockAddr, record
+							.getTimestamp());
+
+				}
+
+				// Note: This is releasing the ICommitRecord itself. I've moved
+				// the responsibilty
+				// for that into AbstractJournal#removeCommitRecordEntries()
+				// (invoked below).
+				//              
+				// immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+
+				commitPointsRecycled++;
+
+			} catch (RuntimeException re) {
+
+				throw new RuntimeException("Problem with entry at "
+						+ entry.addr, re);
+
+			}
+
+		}
+
+		/*
+		 * 
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+		 */
+
+		// Now remove the commit record entries from the commit record index.
+		final int commitPointsRemoved = journal.removeCommitRecordEntries(
+				fromKey, toKey);
+
+		if (txLog.isInfoEnabled())
+			txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
+					+ ", totalFreed=" + totalFreed + ", commitPointsRecycled="
+					+ commitPointsRecycled + ", commitPointsRemoved="
+					+ commitPointsRemoved);
+
+		if (commitPointsRecycled != commitPointsRemoved)
+			throw new AssertionError("commitPointsRecycled="
+					+ commitPointsRecycled + " != commitPointsRemoved="
+					+ commitPointsRemoved);
+
+		return totalFreed;
+	}
     
     @Override
 	public IRawTx newTx() {
