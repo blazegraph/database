@@ -138,7 +138,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
      * This uses the {@link Bigdata2ASTSPARQLParser}. 
      */
     @Override
-    protected void parseQuery(String query, String queryFileURL)
+    protected void parseOperation(String query, String queryFileURL)
             throws MalformedQueryException {
 
         new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(query, queryFileURL);
