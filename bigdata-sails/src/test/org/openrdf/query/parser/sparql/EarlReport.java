@@ -98,19 +98,14 @@ public class EarlReport {
 		testResult.addListener(listener);
 
         log.info("running query evaluation tests..");
-		BigdataSparqlTest.suite().run(testResult); // BBT : Override. FIXME RESTORE
+		BigdataSparqlTest.suite().run(testResult); // BBT : Override (both SPARQL 1.0 and SPARQL 1.1)
 		
 		log.info("running syntax tests..");
-        /*
-         * FIXME Is this being run by our class?
-         * 
-         * CoreSPARQL11SyntaxTest.suite().run(testResult);
-         */
-        Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override
-        Bigdata2ASTSPARQL11SyntaxTest.suite().run(testResult); // BBT : Override
+        Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override (SPARQL 1.0)
+        Bigdata2ASTSPARQL11SyntaxTest.suite().run(testResult); // BBT : Override (SPARQL 1.1)
 
         log.info("running update tests...");
-        BigdataSPARQLUpdateConformanceTest.suite().run(testResult);
+        BigdataSPARQLUpdateConformanceTest.suite().run(testResult); // BBT: Override (SPARQL 1.1)
 
 		con.setAutoCommit(false); // BBT: Override
 
