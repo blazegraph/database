@@ -18,6 +18,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.SESAME;
 import org.openrdf.query.MalformedQueryException;
 
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
@@ -180,8 +181,8 @@ public class PrefixDeclProcessor {
                 prefixMap.put("rdf", namespace = RDF.NAMESPACE);
             } else if (prefix.equals("rdfs")) {
                 prefixMap.put("rdfs", namespace = RDFS.NAMESPACE);
-            } else if (prefix.equals("rdf")) {
-                prefixMap.put("rdf", namespace = RDF.NAMESPACE);
+            } else if (prefix.equals("xsd")) {
+                prefixMap.put("xsd", namespace = XSD.NAMESPACE);
             } else if (prefix.equals("foaf")) {
                 prefixMap.put("foaf", namespace = FOAFVocabularyDecl.NAMESPACE);
             } else if (prefix.equals("fn")) { // XPath Functions.
