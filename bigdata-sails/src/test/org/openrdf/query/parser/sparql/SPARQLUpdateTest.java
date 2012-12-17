@@ -10,10 +10,12 @@ import java.io.InputStream;
 
 import junit.framework.TestCase;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -377,6 +379,60 @@ public abstract class SPARQLUpdateTest extends TestCase {
         assertFalse(con.hasStatement(alice, age, null, true));
     }
 
+    /**
+     * @since 2.6.10
+     */
+    public void testInsertWhereWithBlankNode()
+            throws Exception
+    {
+        logger.debug("executing testInsertWhereWithBlankNode");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append(" INSERT { ?s ex:complexAge [ rdf:value ?age; rdfs:label \"old\" ] . } ");
+        update.append(" WHERE { ?s ex:age ?age . ");
+        update.append(" } ");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        URI age = f.createURI(EX_NS, "age");
+        URI complexAge = f.createURI(EX_NS, "complexAge");
+
+        assertTrue(con.hasStatement(bob, age, null, true));
+
+        operation.execute();
+
+        RepositoryResult<Statement> sts = con.getStatements(bob, complexAge, null, true);
+
+        assertTrue(sts.hasNext());
+
+        Value v1 = sts.next().getObject();
+
+        sts.close();
+
+        sts = con.getStatements(null, RDF.VALUE, null, true);
+
+        assertTrue(sts.hasNext());
+
+        Value v2 = sts.next().getSubject();
+
+        assertEquals(v1, v2);
+
+        sts.close();
+
+        String query = getNamespaceDeclarations()
+                + " SELECT ?bn ?age ?l WHERE { ex:bob ex:complexAge ?bn. ?bn rdf:value ?age. ?bn rdfs:label ?l .} ";
+
+        TupleQueryResult result = con.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+
+        assertTrue(result.hasNext());
+
+        BindingSet bs = result.next();
+
+        assertFalse(result.hasNext());
+
+    }
+    
 	//@Test
 	public void testDeleteInsertWhere()
 		throws Exception
@@ -405,7 +461,65 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 	}
 
-	/** @since OPENRDF 2.6.6. */
+//    @Test
+    public void testDeleteWhereOptional()
+        throws Exception
+    {
+        logger.debug("executing test testDeleteWhereOptional");
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append(" DELETE { ?x foaf:name ?y; foaf:mbox ?mbox. } ");
+        update.append(" WHERE {?x foaf:name ?y. ");
+        update.append(" OPTIONAL { ?x foaf:mbox ?mbox. FILTER (str(?mbox) = \"bob@example.org\") } }");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        Literal mboxBob = f.createLiteral("bob@example.org");
+        Literal mboxAlice = f.createLiteral("alice@example.org");
+        assertTrue(con.hasStatement(bob, FOAF.MBOX, mboxBob , true));
+        assertTrue(con.hasStatement(alice, FOAF.MBOX, mboxAlice, true));
+
+
+        assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+        
+        operation.execute();
+
+        assertFalse(con.hasStatement(bob, FOAF.MBOX, mboxBob , true));
+        assertTrue(con.hasStatement(alice, FOAF.MBOX, mboxAlice, true));
+        
+        assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+    }
+
+    /** @since OPENRDF 2.6.6. */
+//    @Test
+    public void testDeleteInsertWhereWithBindings()
+        throws Exception
+    {
+        logger.debug("executing test testDeleteInsertWhereWithBindings");
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE { ?x foaf:name ?y } INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        operation.setBinding("x", bob);
+        
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        assertTrue(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+    }
+    
+    /** @since OPENRDF 2.6.6. */
 //    @Test
     public void testDeleteInsertWhereWithBindings2()
         throws Exception
@@ -460,6 +574,48 @@ public abstract class SPARQLUpdateTest extends TestCase {
         assertFalse(con.hasStatement(bob, age, originalAgeValue, true));
         assertTrue(con.hasStatement(bob, age, correctAgeValue, true));
         assertFalse(con.hasStatement(bob, age, inCorrectAgeValue, true));
+    }
+
+    /** @since OPENRDF 2.6.10. */
+    public void testConsecutiveUpdatesInSameTransaction()
+            throws Exception
+    {
+        // this tests if consecutive updates in the same transaction behave
+        // correctly. See issue SES-930
+        logger.debug("executing test testConsecutiveUpdatesInSameTransaction");
+
+        StringBuilder update1 = new StringBuilder();
+        update1.append(getNamespaceDeclarations());
+        update1.append("DELETE { ?x foaf:name ?y } WHERE {?x foaf:name ?y }");
+
+        boolean autoCommit = con.isAutoCommit();
+
+        con.setAutoCommit(false);
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update1.toString());
+
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        // update should be visible to own connection.
+        assertFalse(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        StringBuilder update2 = new StringBuilder();
+        update2.append(getNamespaceDeclarations());
+        update2.append("INSERT { ?x rdfs:label ?y } WHERE {?x foaf:name ?y }");
+
+        operation = con.prepareUpdate(QueryLanguage.SPARQL, update2.toString());
+
+        operation.execute();
+
+        // update should not have resulted in any inserts: where clause is empty.
+        assertFalse(con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
+        assertFalse(con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
+
+        con.setAutoCommit(autoCommit);
+
     }
 
     //@Test
@@ -521,13 +677,14 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph1));
 		assertFalse(message, con.hasStatement(bob, RDFS.LABEL, f.createLiteral("Bob"), true, graph2));
-        /*
-         * Note: I added the following line to verify that <alice, rdfs:label,
-         * "Alice"> is not asserted into the default graph either.
-         */
+//        /*
+//         * Note: I added the following line to verify that <alice, rdfs:label,
+//         * "Alice"> is not asserted into the default graph either. (This change
+//		   * was picked up by openrdf).
+//         */
         assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true));
-		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph2));
-		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
+//		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph2));
+//		assertFalse(message, con.hasStatement(alice, RDFS.LABEL, f.createLiteral("Alice"), true, graph1));
 	}
 
 	//@Test
@@ -705,7 +862,88 @@ public abstract class SPARQLUpdateTest extends TestCase {
 		assertTrue(msg, con.hasStatement(book1, DC.CREATOR, f.createLiteral("Ringo"), true));
 	}
 
-	//@Test
+    /**
+     * @since openrdf 2.6.10 (but test is older than that).
+     */
+    public void testDeleteTransformedWhere()
+            throws Exception
+    {
+        logger.debug("executing testDeleteTransformedWhere");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE {?y foaf:name ?n } WHERE {?x ex:containsPerson ?y . ?y foaf:name ?n . }");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        String msg = "foaf:name properties should have been deleted";
+        assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        msg = "ex:containsPerson properties should not have been deleted";
+        assertTrue(msg, con.hasStatement(graph1, f.createURI(EX_NS, "containsPerson"), bob, true));
+        assertTrue(msg, con.hasStatement(graph2, f.createURI(EX_NS, "containsPerson"), alice, true));
+
+    }
+
+    /**
+     * @since openrdf 2.6.10
+     */
+    public void testInsertDataBlankNode()
+        throws Exception
+    {
+        logger.debug("executing testInsertDataBlankNode");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT DATA { _:foo dc:title \"book 1\" ; dc:creator \"Ringo\" . } ");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertFalse(con.hasStatement(null, DC.TITLE, f.createLiteral("book 1"), true));
+        assertFalse(con.hasStatement(null, DC.CREATOR, f.createLiteral("Ringo"), true));
+
+        operation.execute();
+
+        RepositoryResult<Statement> titleStatements = con.getStatements(null, DC.TITLE, f.createLiteral("book 1"), true);
+        assertNotNull(titleStatements);
+        
+        RepositoryResult<Statement> creatorStatements = con.getStatements(null, DC.CREATOR, f.createLiteral("Ringo"), true);
+        assertNotNull(creatorStatements);
+        
+        BNode bookNode = null;
+        if (titleStatements.hasNext()) {
+            Statement ts = titleStatements.next();
+            assertFalse(titleStatements.hasNext());
+            
+            Resource subject = ts.getSubject();
+            assertTrue(subject instanceof BNode);
+            bookNode = (BNode)subject;
+        }
+        titleStatements.close();
+        assertNotNull(bookNode);
+        assertFalse("_:foo".equals(bookNode.getID()));
+        
+        if (creatorStatements.hasNext()) {
+            Statement cs = creatorStatements.next();
+            assertFalse (creatorStatements.hasNext());
+            
+            Resource subject = cs.getSubject();
+            assertTrue(subject instanceof BNode);
+            assertEquals(bookNode, subject);
+        }
+        else {
+            fail("at least one creator statement expected");
+        }
+        creatorStatements.close();
+    }
+    
+    //@Test
 	public void testInsertDataMultiplePatterns()
 		throws Exception
 	{
@@ -945,6 +1183,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
+		assertTrue(con.hasStatement(alice, FOAF.NAME, null, false, graph2));
 		operation.execute();
 		assertTrue(con.hasStatement(bob, FOAF.NAME, null, false, graph2));
 		assertFalse(con.hasStatement(alice, FOAF.NAME, null, false, graph2));
@@ -1077,14 +1316,18 @@ public abstract class SPARQLUpdateTest extends TestCase {
 
 		Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
 
+		URI graph3 = f.createURI(EX_NS, "graph3");
+
 		assertTrue(con.hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
 		assertTrue(con.hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
+        assertTrue(con.hasStatement(alice, FOAF.KNOWS, bob, false, graph1));
 		operation.execute();
 		assertTrue(con.hasStatement(graph1, DC.PUBLISHER, null, false, (Resource)null));
 		assertTrue(con.hasStatement(graph2, DC.PUBLISHER, null, false, (Resource)null));
-		assertTrue(con.hasStatement(graph1, DC.PUBLISHER, null, false, f.createURI(EX_NS, "graph3")));
-		assertTrue(con.hasStatement(graph2, DC.PUBLISHER, null, false, f.createURI(EX_NS, "graph3")));
-
+        assertTrue(con.hasStatement(graph1, DC.PUBLISHER, null, false, graph3));
+        assertTrue(con.hasStatement(graph2, DC.PUBLISHER, null, false, graph3));
+        assertTrue(con.hasStatement(alice, FOAF.KNOWS, bob, false, graph1));
+        assertFalse(con.hasStatement(alice, FOAF.KNOWS, bob, false, graph3));
 	}
 
 	//@Test
@@ -1404,7 +1647,63 @@ public abstract class SPARQLUpdateTest extends TestCase {
 //		assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
 //	}
 
-	//@Test
+    /** @since openrdf 2.6.10 */
+//    @Test
+    public void testUpdateSequenceDeleteInsert()
+        throws Exception
+    {
+        logger.debug("executing testUpdateSequenceDeleteInsert");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE {?y foaf:name ?n } WHERE {?x ex:containsPerson ?y. ?y foaf:name ?n . }; ");
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x} ");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        String msg = "foaf:name properties should have been deleted";
+        assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        msg = "foaf:name properties with value 'foo' should have been added";
+        assertTrue(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+        assertTrue(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+    }
+
+    public void testUpdateSequenceInsertDelete()
+        throws Exception
+    {
+        logger.debug("executing testUpdateSequenceInsertDelete");
+
+        StringBuilder update = new StringBuilder();
+        update.append(getNamespaceDeclarations());
+        update.append("INSERT {?x foaf:name \"foo\" } WHERE {?y ex:containsPerson ?x}; ");
+        update.append(getNamespaceDeclarations());
+        update.append("DELETE {?y foaf:name ?n } WHERE {?x ex:containsPerson ?y. ?y foaf:name ?n . } ");
+
+        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        assertTrue(con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertTrue(con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        operation.execute();
+
+        String msg = "foaf:name properties should have been deleted";
+        assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("Bob"), true));
+        assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("Alice"), true));
+
+        msg = "foaf:name properties with value 'foo' should not have been added";
+        assertFalse(msg, con.hasStatement(bob, FOAF.NAME, f.createLiteral("foo"), true));
+        assertFalse(msg, con.hasStatement(alice, FOAF.NAME, f.createLiteral("foo"), true));
+    }
+
+    //@Test
 	public void testUpdateSequenceInsertDelete2()
 		throws Exception
 	{
