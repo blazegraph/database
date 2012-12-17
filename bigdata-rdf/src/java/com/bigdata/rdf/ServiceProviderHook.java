@@ -111,8 +111,8 @@ public class ServiceProviderHook {
 
             r.add(new BigdataRDFXMLParserFactory());
 
-            // Note: This ensures that the RDFFormat for NQuads is loaded.
-            r.get(NQuadsParser.nquads);
+//            // Note: This ensures that the RDFFormat for NQuads is loaded.
+//            r.get(RDFFormat.NQUADS);
 
             r.add(new BigdataNTriplesParserFactory());
             

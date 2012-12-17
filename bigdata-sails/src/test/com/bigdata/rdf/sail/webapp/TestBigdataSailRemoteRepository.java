@@ -294,7 +294,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         // Load the resource into the KB.
         {
         	final URL url = new URL("file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/quads.nq");
-        	m_cxn.add(url, "", NQuadsParser.nquads);
+        	m_cxn.add(url, "", RDFFormat.NQUADS);
             assertEquals(7, m_cxn.size());
         }
 

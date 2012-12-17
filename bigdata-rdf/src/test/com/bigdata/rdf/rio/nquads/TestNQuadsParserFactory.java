@@ -29,6 +29,7 @@ package com.bigdata.rdf.rio.nquads;
 
 import junit.framework.TestCase2;
 
+import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
@@ -60,7 +61,7 @@ public class TestNQuadsParserFactory extends TestCase2 {
     public void test_serviceRegistry() {
 
         final RDFParserFactory parserFactory = RDFParserRegistry.getInstance()
-                .get(NQuadsParser.nquads);
+                .get(RDFFormat.NQUADS);
 
         assertNotNull(parserFactory);
 
