@@ -34,6 +34,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQL11SyntaxTest;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLSyntaxTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateConformanceTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 
 /**
@@ -83,22 +84,33 @@ public class EarlReport {
 		con.add(projectNode, DOAP.NAME, vf.createLiteral("Bigdata")); // BBT : Override
 		con.add(projectNode, DOAP.RELEASE, releaseNode);
 		con.add(releaseNode, RDF.TYPE, DOAP.VERSION);
-		con.add(releaseNode, DOAP.NAME, vf.createLiteral("Bigdata 1.1-dev")); // BBT: Override
+		con.add(releaseNode, DOAP.NAME, vf.createLiteral("Bigdata 1.2.2")); // FIXME BBT: Override each time we run this!
 		SimpleDateFormat xsdDataFormat = new SimpleDateFormat("yyyy-MM-dd");
 		String currentDate = xsdDataFormat.format(new Date());
 		con.add(releaseNode, DOAP.CREATED, vf.createLiteral(currentDate, XMLSchema.DATE));
 
 		asserterNode = vf.createBNode();
 		con.add(asserterNode, RDF.TYPE, EARL.SOFTWARE);
-		con.add(asserterNode, DC.TITLE, vf.createLiteral("OpenRDF SPARQL compliance test"));
+		con.add(asserterNode, DC.TITLE, vf.createLiteral("OpenRDF SPARQL 1.1 compliance test"));
 
 		TestResult testResult = new TestResult();
 		EarlTestListener listener = new EarlTestListener();
 		testResult.addListener(listener);
 
-		BigdataSparqlTest.suite().run(testResult); // BBT : Override.
+        log.info("running query evaluation tests..");
+		BigdataSparqlTest.suite().run(testResult); // BBT : Override. FIXME RESTORE
+		
+		log.info("running syntax tests..");
+        /*
+         * FIXME Is this being run by our class?
+         * 
+         * CoreSPARQL11SyntaxTest.suite().run(testResult);
+         */
         Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override
         Bigdata2ASTSPARQL11SyntaxTest.suite().run(testResult); // BBT : Override
+
+        log.info("running update tests...");
+        BigdataSPARQLUpdateConformanceTest.suite().run(testResult);
 
 		con.setAutoCommit(false); // BBT: Override
 
@@ -140,10 +152,16 @@ public class EarlReport {
 			if (test instanceof SPARQLQueryTest) {
 				testURI = ((SPARQLQueryTest)test).testURI;
 			}
+			// FIXME This version is gone in openrdf 2.6.10.
 			else if (test instanceof SPARQLSyntaxTest) {
 				testURI = ((SPARQLSyntaxTest)test).testURI;
 			}
-			else {
+            else if (test instanceof SPARQL11SyntaxTest) {
+                testURI = ((SPARQL11SyntaxTest)test).testURI;
+            }
+            else if (test instanceof SPARQLUpdateConformanceTest) {
+                testURI = ((SPARQLUpdateConformanceTest)test).testURI;
+            } else {
 				throw new RuntimeException("Unexpected test type: " + test.getClass());
 			}
 
