@@ -8,20 +8,40 @@ import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
 
 public class ASTQueryContainer extends ASTOperationContainer {
 
-	public ASTQueryContainer(int id) {
-		super(id);
-	}
+    private String sourceString;
+    
+    public ASTQueryContainer(int id) {
+        super(id);
+    }
 
-	public ASTQueryContainer(SyntaxTreeBuilder p, int id) {
-		super(p, id);
-	}
+    public ASTQueryContainer(SyntaxTreeBuilder p, int id) {
+        super(p, id);
+    }
 
-	public boolean containsQuery() {
-		return (getQuery() != null);
-	}
+    @Override
+    public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
+        throws VisitorException
+    {
+        return visitor.visit(this, data);
+    }
+    
+    public boolean containsQuery() {
+        return (getQuery() != null);
+    }
 
-	public ASTQuery getQuery() {
-		return super.jjtGetChild(ASTQuery.class);
-	}
+    public ASTQuery getQuery() {
+        return super.jjtGetChild(ASTQuery.class);
+    }
+
+    @Override
+    public void setSourceString(String source) {
+        sourceString = source;
+        
+    }
+
+    @Override
+    public String getSourceString() {
+        return sourceString;
+    }
 
 }

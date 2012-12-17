@@ -2,36 +2,39 @@
 /* JavaCCOptions:MULTI=true,NODE_USES_PARSER=false,VISITOR=true,TRACK_TOKENS=false,NODE_PREFIX=AST,NODE_EXTENDS=,NODE_FACTORY=,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package com.bigdata.rdf.sail.sparql.ast;
 
-import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
-import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
-import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
-import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilder;
-import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderVisitor;
-import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
 public class ASTUpdateContainer extends ASTOperationContainer {
 
-	public ASTUpdateContainer(int id) {
-		super(id);
-	}
+//  private String sourceString;
 
-	public ASTUpdateContainer(SyntaxTreeBuilder p, int id) {
-		super(p, id);
-	}
+    public ASTUpdateContainer(int id) {
+        super(id);
+    }
 
-	/** Accept the visitor. **/
-	public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
-		throws VisitorException
-	{
-		return visitor.visit(this, data);
-	}
+    public ASTUpdateContainer(SyntaxTreeBuilder p, int id) {
+        super(p, id);
+    }
 
-	public ASTUpdate getUpdate() {
-		return super.jjtGetChild(ASTUpdate.class);
-	}
+    /** Accept the visitor. **/
+    public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
+        throws VisitorException
+    {
+        return visitor.visit(this, data);
+    }
 
-	public ASTBaseDecl getBaseDecl() {
-		return super.jjtGetChild(ASTBaseDecl.class);
-	}
+    @Override
+    public void setSourceString(String source) {
+        throw new RuntimeException("should use setSourceString on parent node of type ASTUpdateSequence instead");
+    }
+
+    @Override
+    public String getSourceString() {
+        ASTUpdateSequence sequence = (ASTUpdateSequence)parent;
+        return sequence.getSourceString();
+    }
+
+    public ASTUpdate getUpdate() {
+        return this.jjtGetChild(ASTUpdate.class);
+    }
 }
 /* JavaCC - OriginalChecksum=fc3044232a8f28a530abb0172b429242 (do not edit this line) */
