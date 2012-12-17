@@ -173,7 +173,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             List<ASTPrefixDecl> sharedPrefixDeclarations = null;
 
             // For each UPDATE operation in the sequence.
-            for (ASTUpdateContainer uc : updateOperations) {
+            for (int i = 0; i < updateOperations.size(); i++) {
+
+                final ASTUpdateContainer uc = updateOperations.get(i);
+
+                if (uc.jjtGetNumChildren() == 0 && i > 0 && i < updateOperations.size() - 1) {
+                    // empty update in the middle of the sequence
+                    throw new MalformedQueryException("empty update in sequence not allowed");
+                }
 
                 StringEscapesProcessor.process(uc);
 
@@ -223,19 +230,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 BlankNodeVarProcessor.process(uc);
 
                 /*
-				 * Batch resolve ASTRDFValue to BigdataValues with their
-				 * associated IVs.
-				 * 
-				 * Note: IV resolution must proceed separately (or be
-				 * re-attempted) for each UPDATE operation in a sequence since
-				 * some operations can cause new IVs to be declared in the
-				 * lexicon. Resolution before those IVs have been declared would
-				 * produce a different result than resolution afterward (it will
-				 * be a null IV before the Value is added to the lexicon and a
-				 * TermId or BlobIV afterward).
-				 * 
-				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
-				 */
+                 * Batch resolve ASTRDFValue to BigdataValues with their
+                 * associated IVs.
+                 * 
+                 * Note: IV resolution must proceed separately (or be
+                 * re-attempted) for each UPDATE operation in a sequence since
+                 * some operations can cause new IVs to be declared in the
+                 * lexicon. Resolution before those IVs have been declared would
+                 * produce a different result than resolution afterward (it will
+                 * be a null IV before the Value is added to the lexicon and a
+                 * TermId or BlobIV afterward).
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+                 */
                 new BatchRDFValueResolver(context, true/* readOnly */)
                         .process(uc);
 
@@ -249,28 +256,32 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
                 final ASTUpdate updateNode = uc.getUpdate();
 
-                /*
-                 * Translate an UPDATE operation.
-                 */
-                final Update updateOp = (Update) updateNode.jjtAccept(
-                        updateExprBuilder, null/* data */);
-                
-                if (dataSetNode != null) {
+                if (updateNode != null) {
 
                     /*
-                     * Attach the data set (if present)
-                     * 
-                     * Note: The data set can only be attached to a
-                     * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                     * Translate an UPDATE operation.
                      */
-                    
-                    ((IDataSetNode) updateOp).setDataset(dataSetNode);
-                    
-                }
+                    final Update updateOp = (Update) updateNode.jjtAccept(
+                            updateExprBuilder, null/* data */);
 
-                updateRoot.addChild(updateOp);
+                    if (dataSetNode != null) {
+
+                        /*
+                         * Attach the data set (if present)
+                         * 
+                         * Note: The data set can only be attached to a
+                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                         */
+
+                        ((IDataSetNode) updateOp).setDataset(dataSetNode);
+
+                    }
+
+                    updateRoot.addChild(updateOp);
+
+                }
                 
-            }
+            } // foreach
 
             return astContainer;
             

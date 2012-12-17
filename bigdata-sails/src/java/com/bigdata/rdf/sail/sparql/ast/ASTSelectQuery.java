@@ -10,22 +10,26 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
 public class ASTSelectQuery extends ASTQuery {
 
-	public ASTSelectQuery(int id) {
-		super(id);
-	}
+    public ASTSelectQuery(int id) {
+        super(id);
+    }
 
-	public ASTSelectQuery(SyntaxTreeBuilder p, int id) {
-		super(p, id);
-	}
+    public ASTSelectQuery(SyntaxTreeBuilder p, int id) {
+        super(p, id);
+    }
 
-	@Override
-	public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
-		throws VisitorException
-	{
-		return visitor.visit(this, data);
-	}
+    @Override
+    public Object jjtAccept(SyntaxTreeBuilderVisitor visitor, Object data)
+        throws VisitorException
+    {
+        return visitor.visit(this, data);
+    }
 
-	public ASTSelect getSelect() {
-		return jjtGetChild(ASTSelect.class);
-	}
+    public ASTSelect getSelect() {
+        return jjtGetChild(ASTSelect.class);
+    }
+
+    public boolean isSubSelect() {
+        return ! (parent instanceof ASTQueryContainer);
+    }
 }
