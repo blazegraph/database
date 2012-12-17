@@ -3,6 +3,8 @@
  *         I've written to Jeen to request that he make this change in SVN, at
  *         which point we can drop the copy of this class from our SVN
  *         repository.
+ *         
+ *         @see https://openrdf.atlassian.net/browse/SES-1664 (Request to make private methods public in ComplexSPARQLQueryTest)
  */
 /*
  * Copyright Aduna (http://www.aduna-software.com/) (c) 2011.
