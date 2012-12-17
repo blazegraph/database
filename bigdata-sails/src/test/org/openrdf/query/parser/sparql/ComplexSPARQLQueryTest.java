@@ -74,7 +74,8 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
         f = rep.getValueFactory();
         conn = rep.getConnection();
 
-        conn.clear(); // clear existing data from repo
+        // Note: commented out - not required. BBT.
+//        conn.clear(); // clear existing data from repo
 
         bob = f.createURI(EX_NS, "bob");
         alice = f.createURI(EX_NS, "alice");
