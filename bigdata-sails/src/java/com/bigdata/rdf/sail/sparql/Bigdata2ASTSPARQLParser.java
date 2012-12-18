@@ -38,9 +38,11 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.parser.ParsedOperation;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
@@ -92,6 +94,38 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
         
         this.context = new BigdataASTContext(tripleStore);
+        
+    }
+
+    /**
+     * Parse either a SPARQL QUERY or a SPARQL UPDATE request.
+     * @param operation The request.
+     * @param baseURI The base URI.
+     * 
+     * @return The {@link ParsedOperation}
+     */
+    public ParsedOperation parseOperation(final String operation,
+            final String baseURI) throws MalformedQueryException {
+
+        final String strippedOperation = QueryParserUtil
+                .removeSPARQLQueryProlog(operation).toUpperCase();
+        
+        final ParsedOperation parsedOperation;
+        
+        if (strippedOperation.startsWith("SELECT")
+                || strippedOperation.startsWith("CONSTRUCT")
+                || strippedOperation.startsWith("DESCRIBE")
+                || strippedOperation.startsWith("ASK")) {
+
+            parsedOperation = parseQuery(operation, baseURI);
+            
+        } else {
+            
+            parsedOperation = parseUpdate(operation, baseURI);
+            
+        }
+
+        return parsedOperation;
         
     }
 
