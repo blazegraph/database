@@ -66,6 +66,9 @@ import org.slf4j.LoggerFactory;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 
+/**
+ * @openrdf
+ */
 public abstract class SPARQLQueryTest extends TestCase {
 
 	/*-----------*

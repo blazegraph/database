@@ -32,7 +32,6 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.StatementEnum;
 
 /**
  * RDF parser for N-Triples files. A specification of NTriples can be found in
@@ -54,6 +53,7 @@ import com.bigdata.rdf.model.StatementEnum;
  * 
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class BigdataNTriplesParser extends RDFParserBase {
 
@@ -134,36 +134,36 @@ public class BigdataNTriplesParser extends RDFParserBase {
 		return stack.peek();
 	}
 	
-	/**
-	 * Return a buffer of zero length and non-zero capacity. The same buffer is
-	 * reused for each thing which is parsed. This reduces the heap churn
-	 * substantially. However, you have to watch out for side-effects and
-	 * convert the buffer to a {@link String} before the buffer is reused.
-	 * 
-	 * @param capacityIsIgnored
-
-	 * @return
-	 */
-	private StringBuilder getBuffer() {
-		buffer.setLength(0);
-		return buffer;
-	}
-
-	private final StringBuilder buffer = new StringBuilder(100);
-
-	private StringBuilder getLanguageTagBuffer() {
-		languageTagBuffer.setLength(0);
-		return languageTagBuffer;
-	}
-
-	private final StringBuilder languageTagBuffer = new StringBuilder(8);
-
-	private StringBuilder getDatatypeUriBuffer() {
-		datatypeUriBuffer.setLength(0);
-		return datatypeUriBuffer;
-	}
-
-	private final StringBuilder datatypeUriBuffer = new StringBuilder(40);
+//	/**
+//	 * Return a buffer of zero length and non-zero capacity. The same buffer is
+//	 * reused for each thing which is parsed. This reduces the heap churn
+//	 * substantially. However, you have to watch out for side-effects and
+//	 * convert the buffer to a {@link String} before the buffer is reused.
+//	 * 
+//	 * @param capacityIsIgnored
+//
+//	 * @return
+//	 */
+//	private StringBuilder getBuffer() {
+//		buffer.setLength(0);
+//		return buffer;
+//	}
+//
+//	private final StringBuilder buffer = new StringBuilder(100);
+//
+//	private StringBuilder getLanguageTagBuffer() {
+//		languageTagBuffer.setLength(0);
+//		return languageTagBuffer;
+//	}
+//
+//	private final StringBuilder languageTagBuffer = new StringBuilder(8);
+//
+//	private StringBuilder getDatatypeUriBuffer() {
+//		datatypeUriBuffer.setLength(0);
+//		return datatypeUriBuffer;
+//	}
+//
+//	private final StringBuilder datatypeUriBuffer = new StringBuilder(40);
 	
 	/*--------------*
 	 * Constructors *
@@ -831,4 +831,68 @@ public class BigdataNTriplesParser extends RDFParserBase {
 	{
 		throw new RDFParseException("Unexpected end of file");
 	}
+	
+
+	/**
+	 * Return a buffer of zero length and non-zero capacity. The same buffer is
+	 * reused for each thing which is parsed. This reduces the heap churn
+	 * substantially. However, you have to watch out for side-effects and convert
+	 * the buffer to a {@link String} before the buffer is reused.
+	 * 
+	 * @param capacityIsIgnored
+	 * @return
+	 */
+	private StringBuilder getBuffer() {
+		buffer.setLength(0);
+		return buffer;
+	}
+
+	private final StringBuilder buffer = new StringBuilder(100);
+
+	/**
+	 * Return a buffer for the use of parsing literal language tags. The buffer
+	 * is of zero length and non-zero capacity. The same buffer is reused for
+	 * each tag which is parsed. This reduces the heap churn substantially.
+	 * However, you have to watch out for side-effects and convert the buffer to
+	 * a {@link String} before the buffer is reused.
+	 * 
+	 * @param capacityIsIgnored
+	 * @return
+	 */
+	private StringBuilder getLanguageTagBuffer() {
+		languageTagBuffer.setLength(0);
+		return languageTagBuffer;
+	}
+
+	private final StringBuilder languageTagBuffer = new StringBuilder(8);
+
+	/**
+	 * Return a buffer for the use of parsing literal datatype URIs. The buffer
+	 * is of zero length and non-zero capacity. The same buffer is reused for
+	 * each datatype which is parsed. This reduces the heap churn substantially.
+	 * However, you have to watch out for side-effects and convert the buffer to
+	 * a {@link String} before the buffer is reused.
+	 * 
+	 * @param capacityIsIgnored
+	 * @return
+	 */
+	private StringBuilder getDatatypeUriBuffer() {
+		datatypeUriBuffer.setLength(0);
+		return datatypeUriBuffer;
+	}
+
+	private final StringBuilder datatypeUriBuffer = new StringBuilder(40);
+
+//	@Override
+//	protected void clear() {
+//		super.clear();
+//		// get rid of anything large left in the buffers.
+//		buffer.setLength(0);
+//		buffer.trimToSize();
+//		languageTagBuffer.setLength(0);
+//		languageTagBuffer.trimToSize();
+//		datatypeUriBuffer.setLength(0);
+//		datatypeUriBuffer.trimToSize();
+//	}
+
 }

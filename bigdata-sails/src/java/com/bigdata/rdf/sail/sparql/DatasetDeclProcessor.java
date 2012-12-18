@@ -32,6 +32,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * @author Simon Schenk
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class DatasetDeclProcessor {
 

@@ -28,6 +28,7 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
  * A variant on the {@link SPARQLQueryTest} which uses the bigdata AST and does
  * not rely on {@link TupleExpr} and related classes.
  * 
+ * @openrdf
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

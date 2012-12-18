@@ -93,6 +93,7 @@ import com.bigdata.rdf.spo.SPO;
  * 
  * @author Jeen Broekstra
  * @author Bryan Thompson
+ * @openrdf
  */
 public class UpdateExprBuilder extends BigdataExprBuilder {
 

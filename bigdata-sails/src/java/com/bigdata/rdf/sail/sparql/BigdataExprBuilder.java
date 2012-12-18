@@ -109,6 +109,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
