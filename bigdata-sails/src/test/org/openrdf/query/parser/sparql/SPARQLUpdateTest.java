@@ -60,6 +60,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * @author Bryan Thompson
  * 
  * @see TestSparqlUpdate
+ * @openrdf
  */
 public abstract class SPARQLUpdateTest extends TestCase {
 

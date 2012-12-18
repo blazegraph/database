@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  * easily executed using the {@link SPARQL11ManifestTest} format. This includes
  * tests on queries with non-deterministic output (e.g. GROUP_CONCAT).
  * 
+ * @openrdf
  * @author Jeen Broekstra
  */
 public abstract class ComplexSPARQLQueryTest extends TestCase {

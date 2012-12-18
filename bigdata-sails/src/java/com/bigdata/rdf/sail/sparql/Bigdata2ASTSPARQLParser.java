@@ -77,6 +77,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
  *          $
+ * @openrdf
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 

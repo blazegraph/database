@@ -34,6 +34,7 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * Processes the prefix declarations in a SPARQL query model.
  *
  * @author Arjohn Kampman 
+ * @openrdf
  */
 public class PrefixDeclProcessor {
 

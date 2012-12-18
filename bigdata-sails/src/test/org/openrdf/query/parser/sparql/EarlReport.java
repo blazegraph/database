@@ -43,6 +43,7 @@ import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
  * Note: A variety of overrides have been made in order to run the test suite
  * against Bigdata.
  * 
+ * @openrdf
  * @author Arjohn Kampman
  * @author Bryan Thompson
  */

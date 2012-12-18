@@ -11,6 +11,8 @@ import com.bigdata.rdf.sail.sparql.ast.*;
  * Base class for visitors of the SPARQL AST.
  * 
  * @author arjohn
+ * @openrdf
+ * 
  */
 public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
 

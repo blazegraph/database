@@ -19,6 +19,7 @@ import org.openrdf.query.algebra.Var;
  * statement patterns.
  * 
  * @author Jeen
+ * @openrdf
  */
 public class NegatedPropertySet {
 

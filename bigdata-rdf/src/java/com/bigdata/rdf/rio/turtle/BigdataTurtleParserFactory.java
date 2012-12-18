@@ -14,6 +14,7 @@ import org.openrdf.rio.turtle.TurtleParser;
  * An {@link RDFParserFactory} for Turtle parsers.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BigdataTurtleParserFactory implements RDFParserFactory {
 

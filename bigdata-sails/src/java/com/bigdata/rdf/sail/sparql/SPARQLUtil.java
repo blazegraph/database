@@ -11,6 +11,7 @@ import info.aduna.text.StringUtil;
  * SPARQL-related utility methods.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class SPARQLUtil {
 

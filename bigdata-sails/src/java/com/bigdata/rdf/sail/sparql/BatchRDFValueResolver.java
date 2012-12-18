@@ -87,6 +87,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class BatchRDFValueResolver extends ASTVisitorBase {
 

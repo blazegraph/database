@@ -18,6 +18,7 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
  * sequences in strings</a>.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class StringEscapesProcessor {
 

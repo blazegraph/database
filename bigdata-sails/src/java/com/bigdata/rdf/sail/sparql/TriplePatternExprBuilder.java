@@ -56,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class TriplePatternExprBuilder extends ValueExprBuilder {
 

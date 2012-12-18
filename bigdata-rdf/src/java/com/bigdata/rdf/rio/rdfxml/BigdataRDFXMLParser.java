@@ -88,6 +88,7 @@ import com.bigdata.rdf.store.BD;
  * @see org.openrdf.rio.ParseLocationListener
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439"> Class loader problems </a>
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/498"> Bring

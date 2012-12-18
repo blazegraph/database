@@ -13,6 +13,7 @@ import org.openrdf.rio.RDFParserFactory;
  * An {@link RDFParserFactory} for N-Triples parsers.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BigdataNTriplesParserFactory implements RDFParserFactory {
 

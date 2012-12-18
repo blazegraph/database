@@ -45,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class BigdataParsedQuery extends ParsedQuery {
 

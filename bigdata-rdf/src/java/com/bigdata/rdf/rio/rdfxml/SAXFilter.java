@@ -31,6 +31,7 @@ import com.bigdata.rdf.store.BD;
  * A filter on SAX events to make life easier on the RDF parser itself. This
  * filter does things like combining a call to startElement() that is directly
  * followed by a call to endElement() to a single call to emptyElement().
+ * @openrdf
  */
 class SAXFilter implements ContentHandler {
 

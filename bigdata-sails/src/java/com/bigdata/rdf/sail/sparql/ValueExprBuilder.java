@@ -134,6 +134,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @version $Id$
  * 
  * @see FunctionRegistry
+ * @openrdf
  */
 public class ValueExprBuilder extends BigdataASTVisitorBase {
 
