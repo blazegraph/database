@@ -37,9 +37,6 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  */
 public class PrefixDeclProcessor {
 
-    private static final Pattern hexPattern = Pattern.compile(
-            "([^\\\\]|^)(%[A-F\\d][A-F\\d])", Pattern.CASE_INSENSITIVE);
-
     /**
      * Processes prefix declarations in queries. This method collects all
      * prefixes that are declared in the supplied query, verifies that prefixes
@@ -101,7 +98,8 @@ public class PrefixDeclProcessor {
             assert colonIdx >= 0 : "colonIdx should be >= 0: " + colonIdx;
 
             final String prefix = qname.substring(0, colonIdx);
-            final String localName = processEscapesAndHex(qname.substring(colonIdx + 1));
+            final String localName0 = qname.substring(colonIdx + 1);
+            final String localName = processEscapesAndHex(localName0);
 
             // Attempt to resolve the prefix to a namespace.
             String namespace = prefixMap.get(prefix);
@@ -122,39 +120,58 @@ public class PrefixDeclProcessor {
             return null;
         }
     
-        private String processEscapesAndHex(String localName) {
+        private static final Pattern hexPattern = Pattern.compile(
+                "([^\\\\]|^)(%[A-F\\d][A-F\\d])", Pattern.CASE_INSENSITIVE);
+
+        private static final Pattern escapedCharPattern = Pattern
+                .compile("\\\\[_~\\.\\-!\\$\\&\\'\\(\\)\\*\\+\\,\\;\\=\\:\\/\\?#\\@\\%]");
+
+        /**
+         * Buffer is reused for the unencode and unescape of each localName
+         * within the scope of a given Query.
+         */
+        private final StringBuffer tmp = new StringBuffer();
+        
+        private String processEscapesAndHex(final String localName) {
             
             // first process hex-encoded chars.
-            final StringBuffer unencoded = new StringBuffer();
-            Matcher m = hexPattern.matcher(localName);
-            boolean result = m.find();
-            while (result) {
-                // we match the previous char because we need to be sure we are not processing an escaped % char rather than
-                // an actual hex encoding, for example: 'foo\%bar'.
-                String previousChar = m.group(1);
-                String encoded = m.group(2);
-
-                int codePoint = Integer.parseInt(encoded.substring(1), 16);
-                String decoded = String.valueOf( Character.toChars(codePoint));
-                
-                m.appendReplacement(unencoded, previousChar + decoded);
-                result = m.find();
+            final String unencodedStr;
+            {
+                final StringBuffer unencoded = tmp; tmp.setLength(0);//new StringBuffer();
+                final Matcher m = hexPattern.matcher(localName);
+                boolean result = m.find();
+                while (result) {
+                    // we match the previous char because we need to be sure we are not processing an escaped % char rather than
+                    // an actual hex encoding, for example: 'foo\%bar'.
+                    final String previousChar = m.group(1);
+                    final String encoded = m.group(2);
+    
+                    final int codePoint = Integer.parseInt(encoded.substring(1), 16);
+                    final String decoded = String.valueOf( Character.toChars(codePoint));
+                    
+                    m.appendReplacement(unencoded, previousChar + decoded);
+                    result = m.find();
+                }
+                m.appendTail(unencoded);
+                unencodedStr = unencoded.toString();
             }
-            m.appendTail(unencoded);
 
             // then process escaped special chars.
-            StringBuffer unescaped = new StringBuffer();
-            Pattern escapedCharPattern = Pattern.compile("\\\\[_~\\.\\-!\\$\\&\\'\\(\\)\\*\\+\\,\\;\\=\\:\\/\\?#\\@\\%]");
-            m = escapedCharPattern.matcher(unencoded.toString());
-            result = m.find();
-            while (result) {
-                String escaped = m.group();
-                m.appendReplacement(unescaped, escaped.substring(1));
-                result = m.find();
-            }
-            m.appendTail(unescaped);
+            final String unescapedStr;
+            {
+                final StringBuffer unescaped = tmp; tmp.setLength(0);// new StringBuffer();
+                final Matcher m = escapedCharPattern.matcher(unencodedStr);
+                boolean result = m.find();
+                while (result) {
+                    final String escaped = m.group();
+                    m.appendReplacement(unescaped, escaped.substring(1));
+                    result = m.find();
+                }
+                m.appendTail(unescaped);
+                unescapedStr = unescaped.toString();
+   }
             
-            return unescaped.toString();
+            return unescapedStr;
         }
 
         /**

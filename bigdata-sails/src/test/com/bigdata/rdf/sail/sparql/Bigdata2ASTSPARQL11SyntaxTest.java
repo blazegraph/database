@@ -33,6 +33,8 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.query.parser.sparql.SPARQL11SyntaxTest;
 import org.openrdf.query.parser.sparql.SPARQLSyntaxTest;
 
@@ -56,6 +58,12 @@ import com.bigdata.rdf.store.LocalTripleStore;
  */
 public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
+    /**
+     * When <code>true</code> use the {@link Bigdata2ASTSPARQLParser} otherwise
+     * use the openrdf parser.
+     */
+    private static final boolean useBigdataParser = true;
+    
     /**
      * @param testURI
      * @param name
@@ -138,10 +146,27 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
      * This uses the {@link Bigdata2ASTSPARQLParser}. 
      */
     @Override
-    protected void parseOperation(String query, String queryFileURL)
+    protected void parseOperation(final String query, final String queryFileURL)
             throws MalformedQueryException {
 
-        new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(query, queryFileURL);
+        try {
+
+            if (useBigdataParser) {
+                // bigdata parser.
+                new Bigdata2ASTSPARQLParser(tripleStore).parseOperation(query,
+                        queryFileURL);
+            } else {
+                // openrdf parser.
+                QueryParserUtil
+                        .parseOperation(QueryLanguage.SPARQL, query, queryFileURL);
+            }
+            
+        } catch (MalformedQueryException ex) {
+            
+            throw new MalformedQueryException(ex + ": query=" + query
+                    + ", queryFileURL=" + queryFileURL, ex);
+            
+        }
 
     }
 
