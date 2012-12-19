@@ -56,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class TriplePatternExprBuilder extends ValueExprBuilder {
 
@@ -99,7 +100,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 
     @Override
     final public Object visit(final ASTPropertyListPath propListNode,
-    			final Object data) throws VisitorException {
+                final Object data) throws VisitorException {
 
         final TermNode subject = (TermNode) data;
 
@@ -273,12 +274,42 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //      return result;
 //  }
 //
+//    private ASTObjectList getObjectList(Node node) {
+//        if (node == null) {
+//            return null;
+//        }
+//        if (node instanceof ASTPropertyListPath) {
+//            return ((ASTPropertyListPath)node).getObjectList();
+//        }
+//        else {
+//            return getObjectList(node.jjtGetParent());
+//        }
+//    }
+//
+//    private boolean checkInverse(Node node) {
+//        if (node instanceof ASTPathElt) {
+//            return ((ASTPathElt)node).isInverse();
+//        }
+//        else {
+//            Node parent = node.jjtGetParent();
+//            if (parent != null) {
+//                return checkInverse(parent);
+//            }
+//            else {
+//                return false;
+//            }
+//        }
+//    }
+//
 //    @Override
 //    public Object visit(ASTPathSequence pathSeqNode, Object data)
 //        throws VisitorException
 //    {
 //        ValueExpr subject = (ValueExpr)data;
 //        Var subjVar = valueExpr2Var(subject);
+//
+//        // check if we should invert subject and object.
+//        boolean invertSequence = checkInverse(pathSeqNode);
 //
 //        @SuppressWarnings("unchecked")
 //        List<ValueExpr> objectList = (List<ValueExpr>)getObjectList(pathSeqNode).jjtAccept(this, null);
@@ -291,6 +322,8 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //
 //        Scope scope = pathSequencePattern.getStatementPatternScope();
 //        Var contextVar = pathSequencePattern.getContextVar();
+//
+//        Var startVar = subjVar;
 //
 //        for (int i = 0; i < pathLength; i++) {
 //            ASTPathElt pathElement = pathElements.get(i);
@@ -320,7 +353,7 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //
 //                NegatedPropertySet nps = new NegatedPropertySet();
 //                nps.setScope(scope);
-//                nps.setSubjectVar(subjVar);
+//                nps.setSubjectVar(startVar);
 //                nps.setContextVar(contextVar);
 //
 //                for (Node child : pathElement.jjtGetChildren()) {
@@ -332,13 +365,13 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //                }
 //                else {
 //                    // not last element in path.
-//                    Var nextVar = createAnonVar(subjVar.getName() + "-property-set-" + i);
+//                    Var nextVar = createAnonVar(startVar.getName() + "-property-set-" + i);
 //
 //                    List<ValueExpr> nextVarList = new ArrayList<ValueExpr>();
 //                    nextVarList.add(nextVar);
 //                    nps.setObjectList(nextVarList);
 //
-//                    subjVar = nextVar;
+//                    startVar = nextVar;
 //                }
 //
 //                // convert the NegatedPropertySet to a proper TupleExpr
@@ -352,13 +385,13 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //
 //                if (i == pathLength - 1) {
 //                    // last element in the path
-//                    pathElement.jjtGetChild(0).jjtAccept(this, data);
+//                    pathElement.jjtGetChild(0).jjtAccept(this, startVar);
 //
 //                    TupleExpr te = graphPattern.buildTupleExpr();
 //
 //                    for (ValueExpr object : objectList) {
 //                        Var objVar = valueExpr2Var(object);
-//                        te = handlePathModifiers(scope, subjVar, te, objVar, contextVar, lowerBound, upperBound);
+//                        te = handlePathModifiers(scope, startVar, te, objVar, contextVar, lowerBound, upperBound);
 //                        pathSequencePattern.addRequiredTE(te);
 //                    }
 //                }
@@ -367,17 +400,17 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //                    // to connect.
 //                    Var nextVar = createAnonVar(subjVar.getName() + "-nested-" + i);
 //
-//                    pathElement.jjtGetChild(0).jjtAccept(this, data);
+//                    pathElement.jjtGetChild(0).jjtAccept(this, startVar);
 //
 //                    TupleExpr te = graphPattern.buildTupleExpr();
 //
 //                    // replace all object list occurrences with the intermediate var.
 //
 //                    te = replaceVarOccurrence(te, objectList, nextVar);
-//                    te = handlePathModifiers(scope, subjVar, te, nextVar, contextVar, lowerBound, upperBound);
+//                    te = handlePathModifiers(scope, startVar, te, nextVar, contextVar, lowerBound, upperBound);
 //                    pathSequencePattern.addRequiredTE(te);
 //
-//                    subjVar = nextVar;
+//                    startVar = nextVar;
 //                }
 //
 //                graphPattern = parentGP;
@@ -388,46 +421,71 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //                Var predVar = valueExpr2Var(pred);
 //
 //                TupleExpr te;
+//
 //                if (i == pathLength - 1) {
 //                    // last element in the path, connect to list of defined objects
 //                    for (ValueExpr object : objectList) {
 //                        Var objVar = valueExpr2Var(object);
+//                        Var endVar = objVar;
+//
+//                        if (invertSequence) {
+//                            endVar = subjVar;
+//                        }
 //
 //                        if (pathElement.isInverse()) {
-//                            te = new StatementPattern(scope, objVar, predVar, subjVar, contextVar);
-//                            te = handlePathModifiers(scope, objVar, te, subjVar, contextVar, lowerBound, upperBound);
-//
-//                            pathSequencePattern.addRequiredTE(te);
+//                            te = new StatementPattern(scope, endVar, predVar, startVar, contextVar);
+//                            te = handlePathModifiers(scope, endVar, te, startVar, contextVar, lowerBound, upperBound);
 //                        }
 //                        else {
-//                            te = new StatementPattern(scope, subjVar, predVar, objVar, contextVar);
-//                            te = handlePathModifiers(scope, subjVar, te, objVar, contextVar, lowerBound, upperBound);
+//                            te = new StatementPattern(scope, startVar, predVar, endVar, contextVar);
+//                            te = handlePathModifiers(scope, startVar, te, endVar, contextVar, lowerBound, upperBound);
 //
-//                            pathSequencePattern.addRequiredTE(te);
 //                        }
+//
+//                        pathSequencePattern.addRequiredTE(te);
 //                    }
 //                }
 //                else {
 //                    // not the last element in the path, introduce an anonymous var
 //                    // to connect.
 //                    Var nextVar = createAnonVar(predVar.getName() + "-" + i);
-//                    if (pathElement.isInverse()) {
 //
-//                        te = new StatementPattern(scope, nextVar, predVar, subjVar, contextVar);
+//                    if (invertSequence && startVar.equals(subjVar)) { // first
+//                                                                                        // element in
+//                                                                                        // inverted
+//                                                                                        // sequence
+//                        for (ValueExpr object : objectList) {
+//                            Var objVar = valueExpr2Var(object);
+//                            startVar = objVar;
 //
-//                        te = handlePathModifiers(scope, nextVar, te, subjVar, contextVar, lowerBound, upperBound);
+//                            if (pathElement.isInverse()) {
+//                                Var temp = startVar;
+//                                startVar = nextVar;
+//                                nextVar = temp;
+//                            }
 //
-//                        pathSequencePattern.addRequiredTE(te);
+//                            te = new StatementPattern(scope, startVar, predVar, nextVar, contextVar);
+//                            te = handlePathModifiers(scope, startVar, te, nextVar, contextVar, lowerBound,
+//                                    upperBound);
+//
+//                            pathSequencePattern.addRequiredTE(te);
+//                        }
 //                    }
 //                    else {
-//                        te = new StatementPattern(scope, subjVar, predVar, nextVar, contextVar);
-//                        te = handlePathModifiers(scope, subjVar, te, nextVar, contextVar, lowerBound, upperBound);
+//
+//                        if (pathElement.isInverse()) {
+//                            startVar = nextVar;
+//                            nextVar = subjVar;
+//                        }
+//
+//                        te = new StatementPattern(scope, startVar, predVar, nextVar, contextVar);
+//                        te = handlePathModifiers(scope, startVar, te, nextVar, contextVar, lowerBound, upperBound);
 //
 //                        pathSequencePattern.addRequiredTE(te);
 //                    }
 //
 //                    // set the subject for the next element in the path.
-//                    subjVar = nextVar;
+//                    startVar = (pathElement.isInverse() ? startVar : nextVar);
 //                }
 //            }
 //        }
@@ -596,68 +654,86 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //            return result;
 //        }
 //
-//        private TupleExpr createPath(Scope scope, Var subjVar, TupleExpr pathExpression, Var endVar,
-//                Var contextVar, long length)
-//            throws VisitorException
-//        {
-//            if (pathExpression instanceof StatementPattern) {
-//                Var predVar = ((StatementPattern)pathExpression).getPredicateVar();
+//    private TupleExpr createPath(Scope scope, Var subjVar, TupleExpr pathExpression, Var endVar,
+//            Var contextVar, long length)
+//        throws VisitorException
+//    {
+//        if (pathExpression instanceof StatementPattern) {
+//            Var predVar = ((StatementPattern)pathExpression).getPredicateVar();
 //
-//                if (length == 0L) {
-//                    return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
-//                }
-//                else {
-//                    GraphPattern gp = new GraphPattern();
-//                    gp.setContextVar(contextVar);
-//                    gp.setStatementPatternScope(scope);
-//
-//                    Var nextVar = null;
-//
-//                    for (long i = 0L; i < length; i++) {
-//                        if (i < length - 1) {
-//                            nextVar = createAnonVar(predVar.getValue() + "-path-" + length + "-" + i);
-//                        }
-//                        else {
-//                            nextVar = endVar;
-//                        }
-//                        gp.addRequiredSP(subjVar, predVar, nextVar);
-//                        subjVar = nextVar;
-//                    }
-//                    return gp.buildTupleExpr();
-//                }
+//            if (length == 0L) {
+//                return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
 //            }
 //            else {
-//                if (length == 0L) {
-//                    return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
-//                }
-//                else {
-//                    GraphPattern gp = new GraphPattern();
-//                    gp.setContextVar(contextVar);
-//                    gp.setStatementPatternScope(scope);
+//                GraphPattern gp = new GraphPattern();
+//                gp.setContextVar(contextVar);
+//                gp.setStatementPatternScope(scope);
 //
-//                    Var nextVar = null;
-//                    for (long i = 0L; i < length; i++) {
-//                        if (i < length - 1L) {
-//                            nextVar = createAnonVar(subjVar.getName() + "-expression-path-" + length + "-" + i);
-//                        }
-//                        else {
-//                            nextVar = endVar;
-//                        }
+//                Var nextVar = null;
 //
-//                        // create a clone of the path expression.
-//                        TupleExpr clone = pathExpression.clone();
-//
-//                        VarReplacer replacer = new VarReplacer(endVar, nextVar);
-//                        clone.visit(replacer);
-//
-//                        gp.addRequiredTE(clone);
-//
-//                        subjVar = nextVar;
+//                for (long i = 0L; i < length; i++) {
+//                    if (i < length - 1) {
+//                        nextVar = createAnonVar(predVar.getName() + "-path-" + length + "-" + i);
 //                    }
-//                    return gp.buildTupleExpr();
+//                    else {
+//                        nextVar = endVar;
+//                    }
+//                    gp.addRequiredSP(subjVar, predVar, nextVar);
+//                    subjVar = nextVar;
 //                }
+//                return gp.buildTupleExpr();
 //            }
 //        }
+//        else {
+//            if (length == 0L) {
+//                return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
+//            }
+//            else {
+//                GraphPattern gp = new GraphPattern();
+//                gp.setContextVar(contextVar);
+//                gp.setStatementPatternScope(scope);
+//
+//                Var nextVar = null;
+//                for (long i = 0L; i < length; i++) {
+//                    if (i < length - 1L) {
+//                        nextVar = createAnonVar(subjVar.getName() + "-expression-path-" + length + "-" + i);
+//                    }
+//                    else {
+//                        nextVar = endVar;
+//                    }
+//
+//                    // create a clone of the path expression.
+//                    TupleExpr clone = pathExpression.clone();
+//
+//                    VarReplacer replacer = new VarReplacer(endVar, nextVar);
+//                    clone.visit(replacer);
+//
+//                    gp.addRequiredTE(clone);
+//
+//                    subjVar = nextVar;
+//                }
+//                return gp.buildTupleExpr();
+//            }
+//        }
+//    }
+//
+//     protected class VarCollector extends QueryModelVisitorBase<VisitorException> {
+//
+//        private final Set<Var> collectedVars = new HashSet<Var>();
+//
+//        @Override
+//        public void meet(Var var) {
+//            collectedVars.add(var);
+//        }
+//
+//        /**
+//         * @return Returns the collectedVars.
+//         */
+//        public Set<Var> getCollectedVars() {
+//            return collectedVars;
+//        }
+//
+//    }
 //
 //        private class VarReplacer extends QueryModelVisitorBase<VisitorException> {
 //
@@ -679,173 +755,260 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
 //                }
 //            }
 //        }
+//    
+//    private class SubSelectAlphaConvertor extends QueryModelVisitorBase<VisitorException> {
+//
+//        private Var toBeReplaced;
+//
+//        private Var replacement;
+//
+//        private Projection projection;
+//
+//        public SubSelectAlphaConvertor(Projection projection, Var toBeReplaced, Var replacement) {
+//            this.projection = projection;
+//            this.toBeReplaced = toBeReplaced;
+//            this.replacement = replacement;
+//        }
+//
+//        public void meet(Projection projection)
+//            throws VisitorException
+//        {
+//            if (projection.getBindingNames().contains(toBeReplaced.getName())) {
+//                super.meet(projection);
+//            }
+//        }
+//
+//        public void meet(ProjectionElem elem)
+//            throws VisitorException
+//        {
+//            if (elem.getSourceName().equals(toBeReplaced.getName())) {
+//                elem.setSourceName(replacement.getName());
+//                elem.setTargetName(replacement.getName());
+//            }
+//            super.meet(elem);
+//        }
+//
+//        public void meet(ExtensionElem elem)
+//            throws VisitorException
+//        {
+//            if (elem.getName().equals(toBeReplaced.getName())) {
+//                elem.setName(replacement.getName());
+//            }
+//            super.meet(elem);
+//        }
+//
+//        @Override
+//        public void meet(Group group)
+//            throws VisitorException
+//        {
+//            super.meet(group);
+//
+//            String name = toBeReplaced.getName();
+//
+//            Set<String> groupBindings = group.getGroupBindingNames();
+//            Set<String> newGroupBindings = new HashSet<String>(groupBindings);
+//
+//            if (groupBindings.contains(name)) {
+//                newGroupBindings.remove(name);
+//                newGroupBindings.add(replacement.getName());
+//
+//                group.setGroupBindingNames(newGroupBindings);
+//            }
+//        }
+//
+//        @Override
+//        public void meet(StatementPattern sp)
+//            throws VisitorException
+//        {
+//            if (toBeReplaced.equals(sp.getContextVar())) {
+//                if (projection.getProjectionContext() != null
+//                        && projection.getProjectionContext().equals(sp.getContextVar()))
+//                {
+//                    Var newSpContextVar = createAnonVar(sp.getContextVar().getName()
+//                            + UUID.randomUUID().toString());
+//                    sp.setContextVar(newSpContextVar);
+//                }
+//            }
+//            super.meet(sp);
+//        }
+//
+//        @Override
+//        public void meet(Var var) {
+//            if (toBeReplaced.equals(var)) {
+//                QueryModelNode parent = var.getParentNode();
+//
+//                parent.replaceChildNode(var, replacement);
+//                replacement.setParentNode(parent);
+//            }
+//        }
+//    }
 
     /*
-	 * Reification done right.
-	 * 
-	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/526 (Reification
-	 * done right)
-	 */
+     * Reification done right.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/526 (Reification
+     * done right)
+     */
     
     /**
-	 * This is invoked in two different contexts. One for a bare triple
-	 * reference pattern:
-	 * 
-	 * <pre>
-	 * <<a b c>> d e
-	 * </pre>
-	 * 
-	 * and the other for a BIND() of a triple reference pattern onto a statement
-	 * identifier variable:
-	 * 
-	 * <pre>
-	 * BIND(<<a b c>> as ?sidVar)
-	 * </pre>
-	 * 
-	 * In both cases we translate the triple reference pattern into a new
-	 * {@link StatementPatternNode}. We reach back to the parent to decide which
-	 * of the two invocation contexts applies and either generate a new SID
-	 * variable or use the one from the BIND(). Then we set the SID variable on
-	 * the {@link StatementPatternNode} and add it to the current graph pattern
-	 * group.
-	 * 
-	 * <p>
-	 * If either the subject or object position in the triple reference pattern
-	 * is a triple reference pattern, then it will have been turned into a
-	 * {@link StatementPatternNode} by recursion through this method and we
-	 * replace it with the SID variable which was assigned to that
-	 * {@link StatementPatternNode}.
-	 * 
-	 * @return The SID variable.  This allows the existing code paths to
-	 * handle nested triple reference patterns without change.
-	 */
-	public VarNode visit(final ASTTRefPattern node,
-			final Object data) throws VisitorException {
-		
-		/*
-		 * Accept and convert.
-		 */
+     * This is invoked in two different contexts. One for a bare triple
+     * reference pattern:
+     * 
+     * <pre>
+     * <<a b c>> d e
+     * </pre>
+     * 
+     * and the other for a BIND() of a triple reference pattern onto a statement
+     * identifier variable:
+     * 
+     * <pre>
+     * BIND(<<a b c>> as ?sidVar)
+     * </pre>
+     * 
+     * In both cases we translate the triple reference pattern into a new
+     * {@link StatementPatternNode}. We reach back to the parent to decide which
+     * of the two invocation contexts applies and either generate a new SID
+     * variable or use the one from the BIND(). Then we set the SID variable on
+     * the {@link StatementPatternNode} and add it to the current graph pattern
+     * group.
+     * 
+     * <p>
+     * If either the subject or object position in the triple reference pattern
+     * is a triple reference pattern, then it will have been turned into a
+     * {@link StatementPatternNode} by recursion through this method and we
+     * replace it with the SID variable which was assigned to that
+     * {@link StatementPatternNode}.
+     * 
+     * @return The SID variable.  This allows the existing code paths to
+     * handle nested triple reference patterns without change.
+     */
+    public VarNode visit(final ASTTRefPattern node,
+            final Object data) throws VisitorException {
+        
+        /*
+         * Accept and convert.
+         */
 
-		final TermNode s = (TermNode) node.jjtGetChild(0).jjtAccept(this, data);
-		
-		final TermNode p = (TermNode) node.jjtGetChild(1).jjtAccept(this, data);
-		
-		final TermNode o = (TermNode) node.jjtGetChild(2).jjtAccept(this, data);
-		
-		/*
-		 * Check constraints.
-		 */
+        final TermNode s = (TermNode) node.jjtGetChild(0).jjtAccept(this, data);
+        
+        final TermNode p = (TermNode) node.jjtGetChild(1).jjtAccept(this, data);
+        
+        final TermNode o = (TermNode) node.jjtGetChild(2).jjtAccept(this, data);
+        
+        /*
+         * Check constraints.
+         */
 
-		if(s instanceof ConstantNode) {
+        if(s instanceof ConstantNode) {
 
-			final BigdataValue v = ((ConstantNode)s).getValue();
-			
-			if (v instanceof Literal) {
+            final BigdataValue v = ((ConstantNode)s).getValue();
+            
+            if (v instanceof Literal) {
 
-				throw new VisitorException(
-						"Subject in triple reference pattern may not be literal.");
-			
-			}
-			
-		} else {
-			if (((VarNode) s).isAnonymous()) {
-				/*
-				 * Blank nodes have already been translated into variables.
-				 * 
-				 * TODO We could run into trouble here if there anonymous
-				 * variables are introduced for anything other than a blank node
-				 * (and there are). We need to explicitly mark anonymous
-				 * variables which correspond to blank nodes in the original
-				 * query and then test for isBlankNode() here.
-				 */
-				throw new VisitorException(
-						"Subject in triple reference pattern may not be blank node.");
-			}
-		}
+                throw new VisitorException(
+                        "Subject in triple reference pattern may not be literal.");
+            
+            }
+            
+        } else {
+            if (((VarNode) s).isAnonymous()) {
+                /*
+                 * Blank nodes have already been translated into variables.
+                 * 
+                 * TODO We could run into trouble here if there anonymous
+                 * variables are introduced for anything other than a blank node
+                 * (and there are). We need to explicitly mark anonymous
+                 * variables which correspond to blank nodes in the original
+                 * query and then test for isBlankNode() here.
+                 */
+                throw new VisitorException(
+                        "Subject in triple reference pattern may not be blank node.");
+            }
+        }
 
-		if (p instanceof ConstantNode) {
+        if (p instanceof ConstantNode) {
 
-			final BigdataValue v = ((ConstantNode) p).getValue();
+            final BigdataValue v = ((ConstantNode) p).getValue();
 
-			if (!(v instanceof URI)) {
+            if (!(v instanceof URI)) {
 
-				throw new VisitorException(
-						"Predicate in triple reference pattern must be IRI.");
+                throw new VisitorException(
+                        "Predicate in triple reference pattern must be IRI.");
 
-			}
+            }
 
-		}
+        }
 
-		if (o instanceof ConstantNode) {
+        if (o instanceof ConstantNode) {
 
-			final BigdataValue v = ((ConstantNode) o).getValue();
+            final BigdataValue v = ((ConstantNode) o).getValue();
 
-			if (v instanceof BNode) {
+            if (v instanceof BNode) {
 
-				throw new VisitorException(
-						"Object in triple reference pattern may not be blank node.");
+                throw new VisitorException(
+                        "Object in triple reference pattern may not be blank node.");
 
-			}
+            }
 
-		} else {
-			
-			if (((VarNode) o).isAnonymous()) {
-				/*
-				 * Blank nodes have already been translated into variables.
-				 */
-				throw new VisitorException(
-						"Object in triple reference pattern may not be blank node.");
-			}
-			
-		}
-		
-		/*
-		 * Note: The caller will associate the SID variable with this
-		 * StatementPatternNode if it appears in a BIND(<<...>> AS ?sid)
-		 * construction. That will overwrite the variable which we assign here.
-		 * 
-		 * @see GroupGraphPatternBuilder#visit(ASTBind,Object)
-		 */
+        } else {
+            
+            if (((VarNode) o).isAnonymous()) {
+                /*
+                 * Blank nodes have already been translated into variables.
+                 */
+                throw new VisitorException(
+                        "Object in triple reference pattern may not be blank node.");
+            }
+            
+        }
+        
+        /*
+         * Note: The caller will associate the SID variable with this
+         * StatementPatternNode if it appears in a BIND(<<...>> AS ?sid)
+         * construction. That will overwrite the variable which we assign here.
+         * 
+         * @see GroupGraphPatternBuilder#visit(ASTBind,Object)
+         */
 
-		final StatementPatternNode sp = new StatementPatternNode(s, p, o,
-				graphPattern.getContext(),
-				graphPattern.getStatementPatternScope());
+        final StatementPatternNode sp = new StatementPatternNode(s, p, o,
+                graphPattern.getContext(),
+                graphPattern.getStatementPatternScope());
 
-		final Node parent = node.jjtGetParent();
-		
-		final VarNode sidVar;
-		
-		if(parent instanceof ASTBind) {
-			
-			final ASTBind bind = (ASTBind) parent;
+        final Node parent = node.jjtGetParent();
+        
+        final VarNode sidVar;
+        
+        if(parent instanceof ASTBind) {
+            
+            final ASTBind bind = (ASTBind) parent;
 
-	        final Node aliasNode = bind.jjtGetChild(1);
+            final Node aliasNode = bind.jjtGetChild(1);
 
-	        final String alias = ((ASTVar) aliasNode).getName();
+            final String alias = ((ASTVar) aliasNode).getName();
 
-	        // Use the specified variable.
-			sidVar = new VarNode(alias);
-			
-//			sidVar.setSID(true);
-			
-		} else {
+            // Use the specified variable.
+            sidVar = new VarNode(alias);
+            
+//          sidVar.setSID(true);
+            
+        } else {
 
-			// Create a new variable.
-			sidVar = context.createSidVar();
+            // Create a new variable.
+            sidVar = context.createSidVar();
 
-		}
+        }
 
-		// Set the SID variable on the SP.
-		sp.setSid(sidVar);
-		
-		// add to the current join group.
-		graphPattern.addSP(sp);
+        // Set the SID variable on the SP.
+        sp.setSid(sidVar);
+        
+        // add to the current join group.
+        graphPattern.addSP(sp);
 
-//		log.error("node:=" + node + " => " + sp);
+//      log.error("node:=" + node + " => " + sp);
 
-		// Return the SID variable.
-		return sidVar;
-		
+        // Return the SID variable.
+        return sidVar;
+        
     }
  
 }

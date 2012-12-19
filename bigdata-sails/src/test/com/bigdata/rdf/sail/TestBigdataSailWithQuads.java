@@ -35,6 +35,7 @@ import junit.framework.TestSuite;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateConformanceTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
@@ -176,6 +177,11 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
              * and scale-out, not just quads.
              */
 //            tckSuite.addTestSuite(BigdataSPARQLUpdateTest.class);
+            try {
+                tckSuite.addTest(BigdataSPARQLUpdateConformanceTest.suite());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
 
         }
         

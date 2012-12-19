@@ -54,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
  * 
  * @author Arjohn Kampman
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @openrdf
  */
 class GroupGraphPattern {
 

@@ -30,6 +30,7 @@ import org.openrdf.rio.turtle.TurtleUtil;
  * </ul>
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BigdataTurtleParser extends TurtleParser {
 

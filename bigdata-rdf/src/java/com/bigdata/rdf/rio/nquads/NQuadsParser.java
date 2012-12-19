@@ -31,8 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.nio.charset.Charset;
-import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -68,60 +66,60 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
     final protected transient static Logger log = Logger
             .getLogger(NQuadsParser.class);
 
-    /**
-     * The nquads RDF format.
-     * <p>
-     * The file extension <code>.nq</code> is recommended for N-Quads documents.
-     * The media type is <code>text/x-nquads</code> and the encoding is 7-bit
-     * US-ASCII. The URI that identifies the N-Quads syntax is
-     * <code>http://sw.deri.org/2008/07/n-quads/#n-quads</code>.
-     * </p>
-     * 
-     * @see http://sw.deri.org/2008/07/n-quads/
-     */
-    static public final RDFFormat nquads;
+//    /**
+//     * The nquads RDF format.
+//     * <p>
+//     * The file extension <code>.nq</code> is recommended for N-Quads documents.
+//     * The media type is <code>text/x-nquads</code> and the encoding is 7-bit
+//     * US-ASCII. The URI that identifies the N-Quads syntax is
+//     * <code>http://sw.deri.org/2008/07/n-quads/#n-quads</code>.
+//     * </p>
+//     * 
+//     * @see http://sw.deri.org/2008/07/n-quads/
+//     */
+//    static public final RDFFormat nquads;
 
-    /**
-	 * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
-	 * 
-	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
-	 *      Class loader problems </a>
-	 * @see <a href="http://www.openrdf.org/issues/browse/SES-802"> Please add
-	 *      support for NQuads format </a>
-	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/559"> Use
-	 *      RDFFormat.NQUADS as the format identifier for the NQuads parser </a>
-	 */
-    static {
-
-        nquads = new RDFFormat(
-                // format name.
-                "N-Quads",
-                // registered mime types.
-                Arrays.asList(new String[] {"text/x-nquads"}), //
-                Charset.forName("US-ASCII"), // charset
-                // file extensions
-                Arrays.asList(new String[]{"nq"}),
-                false, // supportsNamespaces,
-                true // supportsContexts
-        );
-        
-        // register the nquads format.
-        RDFFormat.register(nquads);
-
-//        // register the parser factory for nquads.
-//        RDFParserRegistry.getInstance().add(new RDFParserFactory() {
+//    /**
+//	 * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
+//	 * 
+//	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/439">
+//	 *      Class loader problems </a>
+//	 * @see <a href="http://www.openrdf.org/issues/browse/SES-802"> Please add
+//	 *      support for NQuads format </a>
+//	 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/559"> Use
+//	 *      RDFFormat.NQUADS as the format identifier for the NQuads parser </a>
+//	 */
+//    static {
 //
-//            public RDFParser getParser() {
-//                return new NQuadsParser();
-//            }
+////        nquads = new RDFFormat(
+////                // format name.
+////                "N-Quads",
+////                // registered mime types.
+////                Arrays.asList(new String[] {"text/x-nquads"}), //
+////                Charset.forName("US-ASCII"), // charset
+////                // file extensions
+////                Arrays.asList(new String[]{"nq"}),
+////                false, // supportsNamespaces,
+////                true // supportsContexts
+////        );
+////        
+////        // register the nquads format.
+////        RDFFormat.register(nquads);
 //
-//            public RDFFormat getRDFFormat() {
-//                return nquads;
-//            }
-//
-//        });
-        
-    }
+////        // register the parser factory for nquads.
+////        RDFParserRegistry.getInstance().add(new RDFParserFactory() {
+////
+////            public RDFParser getParser() {
+////                return new NQuadsParser();
+////            }
+////
+////            public RDFFormat getRDFFormat() {
+////                return nquads;
+////            }
+////
+////        });
+//        
+//    }
 
     private ValueFactory valueFactory = new ValueFactoryImpl();
 
@@ -140,7 +138,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
 
     public RDFFormat getRDFFormat() {
 
-        return nquads;
+        return RDFFormat.NQUADS;
         
     }
 

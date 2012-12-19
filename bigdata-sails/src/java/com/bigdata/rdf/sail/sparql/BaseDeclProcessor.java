@@ -22,6 +22,7 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
  * precedence over the latter.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BaseDeclProcessor {
 

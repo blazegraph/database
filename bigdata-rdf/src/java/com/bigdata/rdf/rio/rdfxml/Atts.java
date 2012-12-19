@@ -11,6 +11,7 @@ import java.util.List;
 
 /**
  * A collection of XML attributes.
+ * @openrdf
  */
 class Atts {
 

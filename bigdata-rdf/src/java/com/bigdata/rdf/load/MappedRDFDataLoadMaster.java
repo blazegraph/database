@@ -48,7 +48,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.rio.RDFParserOptions;
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -258,9 +257,8 @@ V extends Serializable//
          * When the {@link RDFFormat} of a resource is not evident, assume that
          * it is the format specified by this value (default
          * {@value #DEFAULT_RDF_FORMAT}). The value is one of the {@link String}
-         * values of the known {@link RDFFormat}s, including
-         * {@link NQuadsParser#nquads}. It may be null, in which case there is
-         * no default.
+         * values of the known {@link RDFFormat}s. It may be null, in which case
+         * there is no default.
          */
         String RDF_FORMAT = "rdfFormat";
 

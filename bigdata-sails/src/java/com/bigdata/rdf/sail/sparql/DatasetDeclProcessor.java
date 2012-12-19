@@ -17,6 +17,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -31,6 +32,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * @author Simon Schenk
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class DatasetDeclProcessor {
 
@@ -83,7 +85,7 @@ public class DatasetDeclProcessor {
         
     }
     
-	    /**
+        /**
      * Extracts a SPARQL {@link Dataset} from an ASTQueryContainer, if one is
      * contained. Returns null otherwise.
      * 
@@ -98,26 +100,34 @@ public class DatasetDeclProcessor {
 
         final boolean update = qc instanceof ASTUpdateContainer;
         
-        final List<ASTDatasetClause> datasetClauses = qc.getOperation()
-                .getDatasetClauseList();
+        final ASTOperation op = qc.getOperation();
+
+        if(op == null) {
+
+            // Allowed for some negative syntax tests.
+            return null;
+            
+        }
+        
+        final List<ASTDatasetClause> datasetClauses = op.getDatasetClauseList();
 
         // Lazily resolved.
         BigdataURI virtualGraph = null;
 
         if (!datasetClauses.isEmpty()) {
 
-//		    dataset = new DatasetImpl();
+//          dataset = new DatasetImpl();
 
-			for (ASTDatasetClause dc : datasetClauses) {
-			
-			    final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
+            for (ASTDatasetClause dc : datasetClauses) {
+            
+                final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
 
-				try {
-					
-				    /*
-				     * Note: This is the URI with the IV already resolved.
-				     */
-//				    URI uri = new URIImpl(astIri.getValue());
+                try {
+                    
+                    /*
+                     * Note: This is the URI with the IV already resolved.
+                     */
+//                  URI uri = new URIImpl(astIri.getValue());
                     final BigdataURI uri = (BigdataURI) astIri.getRDFValue();
 
                     if (dc.isVirtual()) {
@@ -184,11 +194,14 @@ public class DatasetDeclProcessor {
 
             return null;
             
-		}
+        }
 
         // Note: Cast required to shut up the compiler.
-        return new DatasetNode((Set) defaultGraphs, (Set) namedGraphs, update);
+        @SuppressWarnings("unchecked")
+        final DatasetNode dsn = new DatasetNode((Set) defaultGraphs, (Set) namedGraphs, update);
 
-	}
+        return dsn;
+        
+    }
 
 }

@@ -93,6 +93,7 @@ import com.bigdata.rdf.spo.SPO;
  * 
  * @author Jeen Broekstra
  * @author Bryan Thompson
+ * @openrdf
  */
 public class UpdateExprBuilder extends BigdataExprBuilder {
 
@@ -104,7 +105,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     }
 
     // TODO This is not required as far as I can tell.
-//	@Override
+//  @Override
 //    public Update visit(final ASTUpdate node, final Object data)
 //            throws VisitorException {
 //
@@ -118,9 +119,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 //
 //        }
 //
-//		return null;
-//		
-//	}
+//      return null;
+//      
+//  }
 
     /**
      * Note: Variables in QuadDatas are disallowed in INSERT DATA requests (see
@@ -135,7 +136,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         final InsertData op = new InsertData();
 
-        op.setData(doQuadsData(node, data, true/* allowBlankNodes */));
+        // variables are disallowed within DELETE DATA (per the spec).
+        op.setData(doQuadsData(node, data, false/* allowVars */, true/* allowBlankNodes */));
 
         return op;
 
@@ -153,28 +155,29 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         final DeleteData op = new DeleteData();
 
+        // variables are disallowed within DELETE DATA (per the spec).
         // blank nodes are disallowed within DELETE DATA (per the spec).
-        op.setData(doQuadsData(node, data, false/* allowBlankNodes */));
+        op.setData(doQuadsData(node, data, false/* allowVars */, false/* allowBlankNodes */));
 
-	    return op;
+        return op;
    
-	}
+    }
 
-	@Override
-	public QuadData visit(final ASTQuadsNotTriples node, final Object data)
-		throws VisitorException
-	{
-		
-	    final GroupGraphPattern parentGP = graphPattern;
-		
-	    graphPattern = new GroupGraphPattern();
+    @Override
+    public QuadData visit(final ASTQuadsNotTriples node, final Object data)
+        throws VisitorException
+    {
+        
+        final GroupGraphPattern parentGP = graphPattern;
+        
+        graphPattern = new GroupGraphPattern();
 
         final TermNode contextNode = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, data);
 
-		graphPattern.setContextVar(contextNode);
+        graphPattern.setContextVar(contextNode);
 
-		graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+        graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
 
         for (int i = 1; i < node.jjtGetNumChildren(); i++) {
 
@@ -186,11 +189,11 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         parentGP.add(group);
         
-		graphPattern = parentGP;
+        graphPattern = parentGP;
 
-		return group;
-		
-	}
+        return group;
+        
+    }
 
     /**
      * This handles the "DELETE WHERE" syntax short hand.
@@ -212,23 +215,23 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/568 (DELETE WHERE
      *      fails with Java AssertionError)
      */
-	@Override
+    @Override
     public DeleteInsertGraph visit(final ASTDeleteWhere node, final Object data)
             throws VisitorException {
-	    
-		// Collect construct triples
-		final GroupGraphPattern parentGP = graphPattern;
-		graphPattern = new GroupGraphPattern();
+        
+        // Collect construct triples
+        final GroupGraphPattern parentGP = graphPattern;
+        graphPattern = new GroupGraphPattern();
 
-		// inherit scope & context
-		graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
-		graphPattern.setContextVar(parentGP.getContext());
+        // inherit scope & context
+        graphPattern.setStatementPatternScope(parentGP.getStatementPatternScope());
+        graphPattern.setContextVar(parentGP.getContext());
 
-		for (int i = 0; i < node.jjtGetNumChildren(); i++) {
+        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
 
-		    node.jjtGetChild(i).jjtAccept(this, data);
-		    
-		}
+            node.jjtGetChild(i).jjtAccept(this, data);
+            
+        }
 
         final JoinGroupNode whereClause = graphPattern.buildGroup(new JoinGroupNode());
 
@@ -240,9 +243,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         
         return op;
         
-	}
+    }
 
-	@Override
+    @Override
     public LoadGraph visit(final ASTLoad node, final Object data)
             throws VisitorException {
 
@@ -302,11 +305,11 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      * Note: DROP and CLEAR have the identical semantics for bigdata since it
      * does not support empty graphs.
      */
-	@Override
-	public ClearGraph visit(final ASTClear node, final Object data)
-		throws VisitorException
-	{
-	
+    @Override
+    public ClearGraph visit(final ASTClear node, final Object data)
+        throws VisitorException
+    {
+    
         final ClearGraph op = new ClearGraph();
 
         if (node.isSilent())
@@ -355,10 +358,10 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             }
 
         }
-		
-		return op;
-		
-	}
+        
+        return op;
+        
+    }
 
     /**
      * Note: DROP and CLEAR have the identical semantics for bigdata since it
@@ -438,7 +441,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
             op.setTargetSolutionSet(target.getValueExpression().getName());
             
-            final BigdataStatement[] params = doQuadsData(node, data, true/* allowBlankNodes */);
+            final BigdataStatement[] params = doQuadsData(node, data, false/*allowVars*/, true/* allowBlankNodes */);
 
             if (params != null && params.length > 0) {
 
@@ -591,7 +594,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     @Override
     public DeleteInsertGraph visit(final ASTModify node, final Object data)
             throws VisitorException
-	{
+    {
 
         final DeleteInsertGraph op = new DeleteInsertGraph();
         
@@ -690,8 +693,8 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             
         }
 
-		return op;
-		
+        return op;
+        
     }
 
     @Override
@@ -729,6 +732,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      *      blank node </a>
      */
     private BigdataStatement[] doQuadsData(final Node node, final Object data,
+            final boolean allowVars,
             final boolean allowBlankNodes) throws VisitorException {
 
         final GroupGraphPattern parentGP = graphPattern;
@@ -745,7 +749,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
          * TODO What is this doing? It is making some decision based on just the
          * first child...
          */
-        {
+        if (node.jjtGetNumChildren() > 0) {
 
             // first child.
             final Node child0 = node.jjtGetChild(0);
@@ -784,9 +788,16 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         while (itr.hasNext()) {
 
             final StatementPatternNode sp = itr.next();
-            
+
+            if (!allowVars) {
+                // Variables not permitted in INSERT DATA or DELETE DATA.
+                assertNotVariable(sp.s());
+                assertNotVariable(sp.p());
+                assertNotVariable(sp.o());
+            }
             if (!allowBlankNodes) {
                 // Blank nodes are not permitted in DELETE DATA.
+                // Note: predicate can never be a blank node (always URI)
                 assertNotAnonymousVariable(sp.s());
                 assertNotAnonymousVariable(sp.o());
             }
@@ -820,6 +831,27 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
     }
 
+    /**
+     * Method used to correctly reject variables in an INSERT DATA or
+     * DELETE DATA operation.
+     * 
+     * @param t
+     *            A Subject, Predicate, or Object term.
+     */
+    private void assertNotVariable(final TermNode t) throws VisitorException {
+
+        if (!t.isVariable())
+            return;
+
+        final VarNode v = (VarNode) t;
+
+        if (v.isAnonymous()) {
+            // Blank node (versus a variable)
+            return;
+        }
+
+    }
+    
     /**
      * Method used to correctly reject blank nodes in a DELETE DATA clause.
      * 

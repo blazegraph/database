@@ -188,11 +188,13 @@ public class BigdataComplexSparqlQueryTest extends ComplexSPARQLQueryTest {
      * loaded.
      */
     @Override
-    protected void loadTestData()
+    protected void loadTestData(final String dataFile)
             throws RDFParseException, RepositoryException, IOException
         {
             logger.debug("loading dataset...");
-            InputStream dataset = ComplexSPARQLQueryTest.class.getResourceAsStream("/testdata-query/dataset-query.trig");
+            final InputStream dataset = ComplexSPARQLQueryTest.class.getResourceAsStream
+                    (   dataFile // "/testdata-query/dataset-query.trig"
+                            );
             try {
                 conn.setAutoCommit(false);
                 conn.add(dataset, "", RDFFormat.TRIG);

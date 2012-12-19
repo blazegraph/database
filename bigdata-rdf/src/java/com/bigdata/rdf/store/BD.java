@@ -32,6 +32,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.SESAME;
 
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 
@@ -398,6 +399,7 @@ public interface BD {
      * 
      * @see com.bigdata.rdf.sail.BigdataSailConnection#addStatement(Resource, URI, Value, Resource...)
      * @see com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)
+     * @see SESAME#NIL
      */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
 
