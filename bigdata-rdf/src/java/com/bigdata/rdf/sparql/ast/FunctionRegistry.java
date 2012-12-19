@@ -231,7 +231,7 @@ public class FunctionRegistry {
     public static final URI XSD_STR = XMLSchema.STRING;
 
     static {
-        add(AVERAGE, new Factory() {
+        add(AVERAGE, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -245,7 +245,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(COUNT, new Factory() {
+        add(COUNT, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -261,7 +261,7 @@ public class FunctionRegistry {
 
         add(GROUP_CONCAT, new GroupConcatFactory());
 
-        add(MAX, new Factory() {
+        add(MAX, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -275,7 +275,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(MIN, new Factory() {
+        add(MIN, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -290,7 +290,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(SAMPLE, new Factory() {
+        add(SAMPLE, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -304,7 +304,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(SUM, new Factory() {
+        add(SUM, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -939,6 +939,14 @@ public class FunctionRegistry {
         
     }
 
+    public static boolean isAggregate(final URI functionUri) {
+
+        final Factory f = factories.get(functionUri);
+
+        return f != null && f instanceof AggregateFactory;
+
+    }
+
     /**
      * Verify type constraints.
      * 
@@ -1103,6 +1111,15 @@ public class FunctionRegistry {
 				final Map<String,Object> scalarValues,
 				final ValueExpressionNode... args);
 
+	}
+	
+	/**
+	 * Marker interface for aggregate functions.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+	 */
+	public static interface AggregateFactory extends Factory {
+		
 	}
 
 	public static class CompareFactory implements Factory {
@@ -1315,7 +1332,7 @@ public class FunctionRegistry {
 
 	}
 
-	public static class GroupConcatFactory implements Factory {
+	public static class GroupConcatFactory implements AggregateFactory {
 	   
 	    public interface Annotations extends GROUP_CONCAT.Annotations{
 	    }

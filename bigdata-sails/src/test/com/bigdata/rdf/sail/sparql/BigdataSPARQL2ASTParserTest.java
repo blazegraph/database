@@ -29,6 +29,8 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.QueryParserUtil;
 
+import com.bigdata.rdf.sail.BigdataSail;
+
 /**
  * Non-manifest driven versions of the manifest driven test suite to facilitate
  * debugging.
@@ -56,9 +58,9 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
      */
     public void test_qname_escape_01() throws MalformedQueryException {
        
-        final String query = " SELECT * WHERE {\n"+
-                "    ?page og:audio\\:title ?title\n"+
-                "}";
+        final String query = "PREFIX og: <http://ogp.me/ns#>\n"
+                + " SELECT * WHERE {\n" + "    ?page og:audio\\:title ?title\n"
+                + "}";
 
         parseOperation(query);
         
@@ -111,9 +113,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 + "WHERE { ?S :p ?O1; :q ?O2 } GROUP BY (?O1 + ?O2)\n"
                 + "ORDER BY ?O12";
 
-        parseOperation(query);
-        
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
 
@@ -127,9 +127,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 + "SELECT ?P (COUNT(?O) AS ?C)\n"
                 + "WHERE { ?S ?P ?O } GROUP BY ?S";
         
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
     
@@ -142,9 +140,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 + "SELECT ?P (COUNT(?O) AS ?C)\n"
                 + "WHERE { ?S ?P ?O }";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
     
@@ -157,9 +153,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 + "SELECT ((?O1 + ?O2) AS ?O12) (COUNT(?O1) AS ?C)\n"
                 + "WHERE { ?S :p ?O1; :q ?O2 } GROUP BY (?S)";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
 
@@ -173,9 +167,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 "SELECT ?O1 (COUNT(?O2) AS ?C)\n"+
                 "WHERE { ?S :p ?O1; :q ?O2 } GROUP BY (?O1 + ?O2)";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
     
@@ -191,9 +183,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
                 "}\n"+
                 "GROUP BY ?s";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
     
@@ -220,9 +210,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
 "GROUP BY ?event\n"
 ;
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
 
@@ -233,9 +221,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
 
         final String query = "SELECT * { ?s ?p ?o } GROUP BY ?s";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
     
@@ -246,9 +232,7 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
 
         final String query = "SELECT ?o { ?s ?p ?o } GROUP BY ?s";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
 
@@ -259,12 +243,9 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
 
         final String query = "SELECT (1 AS ?X) (1 AS ?X) {}";
 
-        parseOperation(query);
-
-        fail("Negative test - should fail");
+        negativeTest(query);
 
     }
-    
 
     /** Empty UPDATE. */
     public void test_syntax_update_38() throws MalformedQueryException {
@@ -345,7 +326,37 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
      */
     private static final boolean useBigdataParser = true;
     
-    protected void parseOperation(final String query)
+    /**
+     * Parse with expectation of failure.
+     * 
+     * @param query
+     *            The query or update request.
+     */
+    private void negativeTest(final String query) {
+
+        try {
+
+            parseOperation(query);
+
+            fail("Negative test - should fail");
+            
+        } catch (MalformedQueryException ex) {
+            
+            // Ignore expected exception.
+            
+        }
+
+    }
+    
+    /**
+     * Parse with expectation of success.
+     * 
+     * @param query
+     *            The query or update request.
+     *            
+     * @throws MalformedQueryException
+     */
+    private void parseOperation(final String query)
             throws MalformedQueryException {
 
         if (useBigdataParser) {
