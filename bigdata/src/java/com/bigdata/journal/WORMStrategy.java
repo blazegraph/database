@@ -946,7 +946,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<? extends Channel> opener,
                 final Quorum quorum) throws InterruptedException {
 
-            super(writeCacheBufferCount, 0/* maxDirtyListSize */,
+            super(writeCacheBufferCount, 0/* maxDirtyListSize */, 0/*readBuffers*/,
                     false/* prefixWrites */, 100/* compactionThreshold */,
                     useChecksums, extent, opener, quorum, WORMStrategy.this /*reader*/);
 

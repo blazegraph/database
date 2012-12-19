@@ -148,7 +148,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final int compactionThreshold = 30;
 
         writeCache = new RWWriteCacheService(5/* nbuffers */,
-                0/* maxDirtyListSize */, prefixWrites, compactionThreshold,
+                0/* maxDirtyListSize */, 0/*readCacheSize*/, prefixWrites, compactionThreshold,
                 fileExtent, opener, quorum, null);
 
     }
@@ -533,7 +533,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             
             cache1.clearAddrMap(addr2, 0);
 
-            WriteCache.transferTo(cache1, cache2, null);
+            WriteCache.transferTo(cache1, cache2, null, 0);
 
             assertNull(cache1.read(addr1, data1.capacity()));
             assertNotNull(cache2.read(addr1, data1.capacity()));
@@ -545,7 +545,7 @@ public class TestRWWriteCacheService extends TestCase3 {
 
             // now go back the other way
             cache1.reset();
-            WriteCache.transferTo(cache2, cache1, null);
+            WriteCache.transferTo(cache2, cache1, null, 0);
 
             data1.position(0);
             assertEquals(data1, cache1.read(addr1, data1.capacity()));
@@ -576,7 +576,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             }
             ;
 
-            assertTrue(WriteCache.transferTo(src, dst, null));
+            assertTrue(WriteCache.transferTo(src, dst, null, 0));
         } finally {
             src.close();
             dst.close();
@@ -596,7 +596,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             assertNotNull(src.read(addr, data.capacity()));
 
             final int sb = src.bytesWritten();
-            assertTrue(WriteCache.transferTo(src, dst, null));
+            assertTrue(WriteCache.transferTo(src, dst, null, 0));
 
             final int db = dst.bytesWritten();
             assertTrue(sb == db);
@@ -666,7 +666,7 @@ public class TestRWWriteCacheService extends TestCase3 {
             for (WriteCache src : srccaches) {
                 boolean done = false;
                 while (!done) {
-                    done = WriteCache.transferTo(src, dstcaches[dstIndex], null);
+                    done = WriteCache.transferTo(src, dstcaches[dstIndex], null, 0);
                     if (!done)
                         dstIndex++;
                 }

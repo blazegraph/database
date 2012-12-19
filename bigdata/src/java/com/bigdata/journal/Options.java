@@ -240,6 +240,14 @@ public interface Options {
     String WRITE_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".writeCacheBufferCount";
 
     /**
+     * Option may be used to override the #of {@link ReadCache} buffers which
+     * will be used with a {@link WriteCacheService}.
+     * 
+     * @see #DEFAULT_READ_CACHE_BUFFER_COUNT
+     */
+    String READ_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".readCacheBufferCount";
+
+    /**
      * Option may be used to control the maximum number of buffers on the
      * {@link WriteCacheService} dirty list (default
      * {@value #DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE}). This effectively
@@ -590,6 +598,13 @@ public interface Options {
      *  @see #WRITE_CACHE_BUFFER_COUNT
      */
     String DEFAULT_WRITE_CACHE_BUFFER_COUNT = "6";
+    
+    /**
+     * The #of {@link ReadCache} buffers used by the {@link WriteCacheService}.
+     * 
+     *  @see #READ_CACHE_BUFFER_COUNT
+     */
+    String DEFAULT_READ_CACHE_BUFFER_COUNT = "0"; // 20
     
     /**
      * @see #WRITE_CACHE_MAX_DIRTY_LIST_SIZE
