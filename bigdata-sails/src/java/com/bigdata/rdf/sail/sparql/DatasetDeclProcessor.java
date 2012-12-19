@@ -102,6 +102,13 @@ public class DatasetDeclProcessor {
         
         final ASTOperation op = qc.getOperation();
 
+        if(op == null) {
+
+            // Allowed for some negative syntax tests.
+            return null;
+            
+        }
+        
         final List<ASTDatasetClause> datasetClauses = op.getDatasetClauseList();
 
         // Lazily resolved.

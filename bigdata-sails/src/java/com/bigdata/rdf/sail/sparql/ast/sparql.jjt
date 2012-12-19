@@ -21,9 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/* author: Bryan Thompson
+/* @author: Bryan Thompson
+ * @openrdf
  *
- * "make javacc" to rebuild.
+ * "make javacc" to rebuild.  Be sure to first remove the sparql.jj file
+ * so it will generate a new one.
  */
  
 /*

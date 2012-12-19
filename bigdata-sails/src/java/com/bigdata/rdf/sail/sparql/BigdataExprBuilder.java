@@ -34,17 +34,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.solutions.GroupByState;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTAskQuery;
@@ -98,6 +103,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -180,6 +186,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleBindings(astQuery, queryRoot);
         
+        verifyAggregate(queryRoot);
+
         return queryRoot;
 
     }
@@ -258,6 +266,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         handleBindings(node, queryRoot);
         
+        verifyAggregate(queryRoot);
+
         return queryRoot;
         
     }
@@ -284,6 +294,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         final QueryBase queryRoot = (QueryBase) data;
 
         final ProjectionNode projection = new ProjectionNode();
+
         queryRoot.setProjection(projection);
 
         if (node.isWildcard()) {
@@ -407,6 +418,8 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleBindings(node, queryRoot);
 
+        verifyAggregate(queryRoot);
+        
         return queryRoot;
 
     }
@@ -635,10 +648,14 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             projection.setReduced(true);
         
         if (select.isWildcard()) {
+        
             projection.addProjectionVar(new VarNode("*"));
         
         } else {
-        
+
+            // Used to detect duplicate variables in a projection.
+            final Set<String> vars = new HashSet<String>();
+            
             final Iterator<ASTProjectionElem> itr = select
                     .getProjectionElemList().iterator();
             
@@ -654,13 +671,17 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                 
                 final ASTProjectionElem e = itr.next();
                 
+                final String varname;
+
                 if (!e.hasAlias()) {
                 
                     // Var
                     final ASTVar aVar = (ASTVar) e.jjtGetChild(0/* index */);
                     
-                    projection.addProjectionVar(new VarNode(aVar.getName()));
-            
+                    varname = aVar.getName();
+                    
+                    projection.addProjectionVar(new VarNode(varname));
+                    
                 } else {
                     
                     // Expression AS Var
@@ -669,13 +690,17 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
                     final IValueExpressionNode ve = (IValueExpressionNode) expr
                             .jjtAccept(this, null/* data */);
                     
-                    final String varname = e.getAlias();
+                    varname = e.getAlias();
                     
                     projection.addProjectionExpression(new AssignmentNode(
                             new VarNode(varname), ve));
                 
                 }
-            
+                
+                if (!vars.add(varname))
+                    throw new VisitorException(
+                            "duplicate variable in projection: " + varname);
+
             }
             
         }
@@ -730,16 +755,15 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             throws VisitorException {
         
         final ASTGroupClause groupNode = astQuery.getGroupClause();
+
+        if (groupNode == null)
+            return;
+
+        final GroupByNode groupBy = (GroupByNode) groupNode.jjtAccept(this,
+                null);
+
+        queryRoot.setGroupBy(groupBy);
         
-        if (groupNode != null) {
-
-            final GroupByNode groupBy = (GroupByNode) groupNode.jjtAccept(
-                    this, null);
-
-            queryRoot.setGroupBy(groupBy);
-
-        }
-
     }
     
     /**
@@ -992,6 +1016,154 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             // UNDEF
             return null;
         }
+    }
+    
+    /**
+     * Verify the various conditions that must be met when a query uses GROUP BY
+     * or when a query uses aggregates in a PROJECTION.
+     * 
+     * @param queryBase
+     *            The query.
+     * 
+     * @throws VisitorException
+     */
+    private void verifyAggregate(final QueryBase queryBase)
+            throws VisitorException {
+
+        if(true)
+            return;
+        
+        /*
+         * FIXME The following code has some dependencies on whether or not the
+         * value expressions have been cached. That is not done until we get
+         * into AST2BOpUtility. I have worked some hacks to support this in
+         * FunctionRegistry.isAggregate() and StaticAnalysis.isAggregate().
+         * However, the code is still hitting some edge cases.
+         * 
+         * There is some commented out code from openrdf that depends on setting
+         * a flag for the expression if an AggregationCollector reports at least
+         * one aggregation in a projection element. We could do this same thing
+         * here but we still need to have the logic to figure out what is an
+         * invalid aggregate.
+         */
+        
+        final ProjectionNode projection = queryBase.getProjection() == null ? null
+                : queryBase.getProjection().isEmpty() ? null : queryBase
+                        .getProjection();
+
+        final GroupByNode groupBy = queryBase.getGroupBy() == null ? null
+                : queryBase.getGroupBy().isEmpty() ? null : queryBase
+                        .getGroupBy();
+
+        final HavingNode having = queryBase.getHaving() == null ? null
+                : queryBase.getHaving().isEmpty() ? null : queryBase
+                        .getHaving();
+
+        // true if this is an aggregation query.
+        final boolean isAggregate = StaticAnalysis.isAggregate(projection,
+                groupBy, having);
+
+        if (isAggregate) {
+
+            if (projection.isWildcard())
+                throw new VisitorException(
+                        "Wildcard not allowed with aggregate.");
+
+            final IValueExpression<?>[] projectExprs = projection
+                    .getValueExpressions();
+
+            final IValueExpression<?>[] groupByExprs = groupBy == null ? null
+                    : groupBy.getValueExpressions();
+
+            final IConstraint[] havingExprs = having == null ? null
+                    : having.getConstraints();
+
+            try {
+
+                /*
+                 * Delegate logic to validate the aggregate query.
+                 */
+
+                new GroupByState(projectExprs, groupByExprs, havingExprs);
+
+            } catch (IllegalArgumentException ex) {
+
+                throw new VisitorException("Bad aggregate", ex);
+
+            }
+
+        }
+
+//        /*
+//         * Note: The following code is modeled after the openrdf code that
+//         * checks the constraints on legal aggregations.
+//         */
+//
+//        final ProjectionNode projection = queryBase.getProjection() == null ? null
+//                : queryBase.getProjection().isEmpty() ? null : queryBase
+//                        .getProjection();
+//
+//        final GroupByNode groupBy = queryBase.getGroupBy() == null ? null
+//                : queryBase.getGroupBy().isEmpty() ? null : queryBase
+//                        .getGroupBy();
+//
+//        final HavingNode having = queryBase.getHaving() == null ? null
+//                : queryBase.getHaving().isEmpty() ? null : queryBase
+//                        .getHaving();
+//
+//        if (groupBy != null) {
+//
+//            if (projection.isWildcard())
+//                throw new VisitorException(
+//                        "Wildcard not permitted with GROUP BY");
+//
+//            /*
+//             * TODO Recursive search of a ValueExpression for anything that
+//             * would be mapped onto an IAggregate.
+//             */
+////            AggregateCollector collector = new AggregateCollector();
+////            valueExpr.visit(collector);
+////
+////            if (collector.getOperators().size() > 0) {
+////                elem.setAggregateOperatorInExpression(true);
+//                
+//            for (AssignmentNode elem : projection) {
+//            
+////                if (!elem.hasAggregateOperatorInExpression()) {
+////                
+////                    final Set<String> groupNames = group.getBindingNames();
+////
+////                    ExtensionElem extElem = elem.getSourceExpression();
+////                    if (extElem != null) {
+////                        ValueExpr expr = extElem.getExpr();
+////
+////                        VarCollector collector = new VarCollector();
+////                        expr.visit(collector);
+////
+////                        for (Var var : collector.getCollectedVars()) {
+////                            if (!groupNames.contains(var.getName())) {
+////                                throw new VisitorException("variable '" + var.getName()
+////                                        + "' in projection not present in GROUP BY.");
+////
+////                            }
+////                        }
+////                    }
+////                    else {
+////                        if (!groupNames.contains(elem.getTargetName())) {
+////                            throw new VisitorException("variable '" + elem.getTargetName()
+////                                    + "' in projection not present in GROUP BY.");
+////                        }
+////                        else if (!groupNames.contains(elem.getSourceName())) {
+////                            throw new VisitorException("variable '" + elem.getSourceName()
+////                                    + "' in projection not present in GROUP BY.");
+////
+////                        }
+////                    }
+////                }
+//            }
+//            
+//        }
+
     }
 
 }

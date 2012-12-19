@@ -19,6 +19,7 @@ import junit.framework.TestResult;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
@@ -80,9 +81,12 @@ public class EarlReport {
 		con.setNamespace("dc", DC.NAMESPACE);
 
 		projectNode = vf.createBNode();
-		BNode releaseNode = vf.createBNode();
+		final BNode releaseNode = vf.createBNode();
+        final URI doapHomepage = vf.createURI("http://usefulinc.com/ns/doap#homepage"); // BBT : Override
+        final URI homepage = vf.createURI("http://www.bigdata.com/bigdata/blog/"); // BBT : Override
 		con.add(projectNode, RDF.TYPE, DOAP.PROJECT);
 		con.add(projectNode, DOAP.NAME, vf.createLiteral("Bigdata")); // BBT : Override
+        con.add(projectNode, doapHomepage, homepage); // BBT : Override
 		con.add(projectNode, DOAP.RELEASE, releaseNode);
 		con.add(releaseNode, RDF.TYPE, DOAP.VERSION);
 		con.add(releaseNode, DOAP.NAME, vf.createLiteral("Bigdata 1.2.2")); // FIXME BBT: Override each time we run this!

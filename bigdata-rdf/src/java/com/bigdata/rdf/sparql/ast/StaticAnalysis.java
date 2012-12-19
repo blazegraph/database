@@ -2300,6 +2300,34 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 final IValueExpression<?> expr = exprNode.getValueExpression();
 
+                if (expr == null) {
+                    
+                    /*
+                     * The value expression is not cached....
+                     */
+                    
+                    if (exprNode instanceof FunctionNode) {
+
+                        /*
+                         * Hack used when the BigdataExprBuilder needs to decide
+                         * on the validity of aggregate expressions before we
+                         * get around to caching the value expressions during
+                         * evaluation (i.e., to pass the compliance tests for
+                         * the parser).
+                         */
+                        final FunctionNode functionNode = (FunctionNode) exprNode;
+
+                        if (FunctionRegistry.isAggregate(functionNode
+                                .getFunctionURI()))
+
+                            return true;
+
+                    }
+                    
+                    return false;
+
+                }
+
                 if (isObviousAggregate(expr)) {
 
                     return true;
