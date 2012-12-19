@@ -74,6 +74,9 @@ public class TestAll extends TestCase {
              * parser and it is not aware of bigdata specific SPARQL extensions.
              */
 
+            // non-manifest driven suite for debugging.
+            suite.addTestSuite(BigdataSPARQL2ASTParserTest.class);
+            
             suite.addTest(Bigdata2ASTSPARQLSyntaxTest.suite());
 
             suite.addTest(Bigdata2ASTSPARQL11SyntaxTest.suite());

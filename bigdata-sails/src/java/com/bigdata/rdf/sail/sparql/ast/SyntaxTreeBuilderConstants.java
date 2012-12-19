@@ -409,7 +409,13 @@ public interface SyntaxTreeBuilderConstants {
   /** RegularExpression Id. */
   int PN_LOCAL = 199;
   /** RegularExpression Id. */
-  int VARNAME = 200;
+  int PLX = 200;
+  /** RegularExpression Id. */
+  int PERCENT = 201;
+  /** RegularExpression Id. */
+  int PN_LOCAL_ESC = 202;
+  /** RegularExpression Id. */
+  int VARNAME = 203;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -616,6 +622,9 @@ public interface SyntaxTreeBuilderConstants {
     "<PN_CHAR>",
     "<PN_PREFIX>",
     "<PN_LOCAL>",
+    "<PLX>",
+    "<PERCENT>",
+    "<PN_LOCAL_ESC>",
     "<VARNAME>",
   };
 

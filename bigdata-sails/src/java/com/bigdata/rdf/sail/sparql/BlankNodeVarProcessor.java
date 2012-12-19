@@ -26,6 +26,7 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
  * retaining scope.
  * 
  * @author Arjohn Kampman
+ * @openrdf
  */
 public class BlankNodeVarProcessor extends ASTVisitorBase {
 

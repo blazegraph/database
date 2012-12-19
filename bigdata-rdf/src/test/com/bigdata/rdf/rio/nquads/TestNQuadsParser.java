@@ -38,6 +38,7 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
@@ -72,7 +73,7 @@ public class TestNQuadsParser extends TestCase2 {
         super.setUp();
 
         parser = (NQuadsParser) RDFParserRegistry.getInstance()
-                .get(NQuadsParser.nquads).getParser();
+                .get(RDFFormat.NQUADS).getParser();
 
         assertNotNull(parser);
 

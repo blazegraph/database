@@ -66,6 +66,9 @@ import org.slf4j.LoggerFactory;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 
+/**
+ * @openrdf
+ */
 public abstract class SPARQLQueryTest extends TestCase {
 
 	/*-----------*
@@ -633,15 +636,29 @@ public abstract class SPARQLQueryTest extends TestCase {
 		if (approvedOnly) {
 			query.append("                          dawgt:approval {dawgt:Approved}; ");
 		}
-		query.append("                             mf:name {testName}; ");
-		query.append("                             mf:result {resultFile}; ");
-		query.append("                             [ mf:checkOrder {ordered} ]; ");
-		query.append("                             mf:action {action} qt:query {queryFile}; ");
-		query.append("                                               [qt:data {defaultGraph}] ");
-		query.append(" USING NAMESPACE ");
-		query.append("  mf = <http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#>, ");
-		query.append("  dawgt = <http://www.w3.org/2001/sw/DataAccess/tests/test-dawg#>, ");
-		query.append("  qt = <http://www.w3.org/2001/sw/DataAccess/tests/test-query#>");
+        query.append("                             mf:name {testName}; ");
+        query.append("                             mf:result {resultFile}; ");
+        query.append("                             [ mf:checkOrder {ordered} ]; ");
+        query.append("                             [ mf:requires {Requirement} ];");
+        query.append("                             mf:action {action} qt:query {queryFile}; ");
+        query.append("                                               [qt:data {defaultGraph}]; ");
+        query.append("                                               [sd:entailmentRegime {Regime} ]");
+
+        // skip tests involving CSV result files, these are not query tests
+        query.append(" WHERE NOT resultFile LIKE \"*.csv\" ");
+        // skip tests involving JSON, sesame currently does not have a SPARQL/JSON
+        // parser.
+        query.append(" AND NOT resultFile LIKE \"*.srj\" ");
+        // skip tests involving entailment regimes
+        query.append(" AND NOT BOUND(Regime) ");
+        // skip test involving basic federation, these are tested separately.
+        query.append(" AND (NOT BOUND(Requirement) OR (Requirement != mf:BasicFederation)) ");
+        query.append(" USING NAMESPACE ");
+        query.append("  mf = <http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#>, ");
+        query.append("  dawgt = <http://www.w3.org/2001/sw/DataAccess/tests/test-dawg#>, ");
+        query.append("  qt = <http://www.w3.org/2001/sw/DataAccess/tests/test-query#>, ");
+        query.append("  sd = <http://www.w3.org/ns/sparql-service-description#>, ");
+        query.append("  ent = <http://www.w3.org/ns/entailment/> ");
 		TupleQuery testCaseQuery = con.prepareTupleQuery(QueryLanguage.SERQL, query.toString());
 
 		query.setLength(0);
@@ -688,6 +705,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 				while (namedGraphs.hasNext()) {
 					BindingSet graphBindings = namedGraphs.next();
 					URI namedGraphURI = (URI)graphBindings.getValue("graph");
+					if(logger.isDebugEnabled()) logger.debug(" adding named graph : {}", namedGraphURI);
 					dataset.addNamedGraph(namedGraphURI);
 				}
 			}
@@ -703,6 +721,18 @@ public abstract class SPARQLQueryTest extends TestCase {
 				laxCardinalityResult.close();
 			}
 
+			// if this is enabled, Sesame passes all tests, showing that the only
+            // difference is the semantics of arbitrary-length
+            // paths
+            /*
+            if (!laxCardinality) {
+                // property-path tests always with lax cardinality because Sesame filters out duplicates by design
+                if (testURI.stringValue().contains("property-path")) {
+                    laxCardinality = true;
+                }
+            }
+            */
+			
 			// check if we should test for query result ordering
 			boolean checkOrder = false;
 			if (ordered != null) {

@@ -79,6 +79,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: GroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
  *          thompsonbry $
+ * @openrdf
  */
 public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
