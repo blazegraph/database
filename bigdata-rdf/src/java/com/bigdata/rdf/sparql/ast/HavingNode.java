@@ -78,7 +78,7 @@ public class HavingNode extends
     }
     
     /**
-     * Return the {@link IConstraint}s for this {@link ProjectionNode}.
+     * Return the {@link IConstraint}s for this {@link HavingNode}.
      */
     public IConstraint[] getConstraints() {
 
