@@ -451,6 +451,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 */
     private final int m_maxDirtyListSize;
 
+	/**
+	 * The #of read buffers that will be used by the {@link WriteCacheService}.
+	 * 
+	 * @see com.bigdata.journal.Options#READ_CACHE_BUFFER_COUNT
+	 */
+	private final int m_readCacheBufferCount;
+
     /**
      * @see com.bigdata.journal.Options#WRITE_CACHE_COMPACTION_THRESHOLD
      */
@@ -721,6 +728,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 		m_writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
 		
+		// FIXME: DEBUG
+		m_readCacheBufferCount = 0; // fileMetadata.readCacheBufferCount;
+		
         if (log.isInfoEnabled())
             log.info(com.bigdata.journal.Options.WRITE_CACHE_BUFFER_COUNT
                     + "=" + m_writeCacheBufferCount);
@@ -937,7 +947,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final boolean prefixWrites = highlyAvailable;
 
             return new RWWriteCacheService(m_writeCacheBufferCount,
-                    m_maxDirtyListSize, prefixWrites, m_compactionThreshold,
+                    m_maxDirtyListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold,
 
                     convertAddr(m_fileSize), m_reopener, m_quorum, DEBUG_USEREADCACHE ? this : null) {
                 
@@ -1636,15 +1646,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                                     + m_writeCache.addrDebugInfo(paddr), t);
 				}
 				if (bbuf != null) {
-					final byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
-					if (in.length != length-4) {
+					if (bbuf.limit() != length-4) {
 						assertAllocators();
                         throw new IllegalStateException(
                                 "Incompatible buffer size for addr: " + paddr
-                                        + ", " + in.length + " != "
+                                        + ", " + bbuf.limit() + " != "
                                         + (length - 4) + " writeCacheDebug: "
                                         + m_writeCache.addrDebugInfo(paddr));
 					}
+					final byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
 					for (int i = 0; i < length-4; i++) {
 						buf[offset+i] = in[i];
 					}

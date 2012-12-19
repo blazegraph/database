@@ -66,6 +66,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -309,7 +310,7 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * The current read cache.
      */
-    final private AtomicReference<WriteCache> readCache = new AtomicReference<WriteCache>();
+    final private AtomicReference<ReadCache> readCache = new AtomicReference<ReadCache>();
 
     /**
      * Flag set if {@link WriteTask} encounters an error. The cause is set
@@ -348,7 +349,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * A map from the offset of the record on the backing file to the cache
      * buffer on which that record was written.
      */
-    final private ConcurrentMap<Long/* offset */, WriteCache> recordMap;
+    final private ConcurrentMap<Long/* offset */, WriteCache> serviceMap;
 
     /**
      * An immutable array of the {@link WriteCache} buffer objects owned by the
@@ -356,7 +357,13 @@ abstract public class WriteCacheService implements IWriteCache {
      * placed onto the {@link #dirtyList} by
      * {@link #writeChk(long, ByteBuffer, int)}).
      */
-    final private WriteCache[] buffers;
+    final private WriteCache[] writeBuffers;
+    
+    /**
+     * An immutable array of the {@link WriteCache} buffer objects owned by the
+     * {@link WriteCacheService}.  These buffers are used for the readCache.
+     */
+    final private ReadCache[] readBuffers;
     
     /**
      * Debug arrays to chase down write/removal errors.
@@ -419,7 +426,7 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * Allocates N buffers from the {@link DirectBufferPool}.
      * 
-     * @param nbuffers
+     * @param nwriteBuffers
      *            The #of {@link WriteCache} buffers.
      * @param maxDirtyListSize
      *            The maximum #of {@link WriteCache} buffers on the
@@ -459,30 +466,33 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @throws InterruptedException
      */
-    public WriteCacheService(final int nbuffers, int maxDirtyListSize,
+    public WriteCacheService(final int nwriteBuffers, int maxDirtyListSize,
+    		final int nreadBuffers,
             final boolean prefixWrites, final int compactionThreshold,
             final boolean useChecksum, final long fileExtent,
             final IReopenChannel<? extends Channel> opener, final Quorum quorum,
             final IBackingReader reader)
             throws InterruptedException {
 
-        if (nbuffers <= 0)
+        if (nwriteBuffers <= 0)
             throw new IllegalArgumentException();
 
         if (maxDirtyListSize == 0) {
 
             /*
              * Setup a reasonable default if no value was specified.
+             * Just need to make sure we have a few spare buffers to
+             * prevent latency on acquiring a clean buffer for writing.
              */
             
-            maxDirtyListSize = Math.max(nbuffers/2 /*leave half for readCache*/, 1);
+            maxDirtyListSize = Math.max(nwriteBuffers-4, 1);
 
         }
         
         if (maxDirtyListSize < 0)
             throw new IllegalArgumentException();
 
-        if (maxDirtyListSize > nbuffers)
+        if (maxDirtyListSize > nwriteBuffers)
             throw new IllegalArgumentException();
 
         if (compactionThreshold <= 0)
@@ -519,7 +529,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
         cleanList = new LinkedBlockingDeque<WriteCache>();
 
-        buffers = new WriteCache[nbuffers];
+        writeBuffers = new WriteCache[nwriteBuffers];
 
         /*
          * Configure the desired dirtyListThreshold.
@@ -538,59 +548,82 @@ abstract public class WriteCacheService implements IWriteCache {
             m_dirtyListThreshold = 1;
         }
         assert m_dirtyListThreshold >= 1;
-        assert m_dirtyListThreshold <= buffers.length;
+        assert m_dirtyListThreshold <= writeBuffers.length;
         
-        /*
-         * HIRS cache setup
+        // Setup ReadCache
+        this.readListSize = nreadBuffers;
+        this.readList = new LinkedBlockingDeque<ReadCache>();
+        
+        readBuffers = new ReadCache[nreadBuffers];
+        
+        // pre-allocate all ReadCache
+        for (int i = 0; i < readBuffers.length; i++) {
+        	readBuffers[i] = new ReadCache(DirectBufferPool.INSTANCE.acquire());
+        }
+        
+       /*
+         * Hot cache setup
          * 
-         * Let's aim for a 1/10 of the readCache/cleanList being HIRS
+         * Let's aim for a 1/10 of the readCache
          */
-        hirsSize = Math.max(0, (buffers.length-m_dirtyListThreshold)/10);
-        hirsList = new LinkedBlockingDeque<WriteCache>();
+        hotListSize = Math.max(0, readListSize/10);
+        hotList = new LinkedBlockingDeque<ReadCache>();
+        
+        // pre-populate hotList and readList
+        for (int i = 0; i < hotListSize; i++) {
+        	hotList.add(readBuffers[i]);
+        }
 
+        for (int i = hotListSize; i < readListSize; i++) {
+        	readList.add(readBuffers[i]);
+        }
+        
+        // set initial read cache
+        hotCache = hotList.poll();        
+        readCache.set(readList.poll());
+        
         if (log.isInfoEnabled())
-            log.info("nbuffers=" + nbuffers + ", dirtyListThreshold="
+            log.info("nbuffers=" + nwriteBuffers + ", dirtyListThreshold="
                     + m_dirtyListThreshold + ", compactionThreshold="
                     + compactionThreshold + ", compactionEnabled="
                     + compactionEnabled + ", prefixWrites=" + prefixWrites
-                    + ", hirsSize=" + hirsSize
+                    + ", hotListSize=" + hotListSize
                     + ", useChecksum=" + useChecksum + ", quorum=" + quorum);
 
         // save the current file extent.
         this.fileExtent.set(fileExtent);
 
         // Add [current] WriteCache.
-        current.set(buffers[0] = newWriteCache(null/* buf */,
+        current.set(writeBuffers[0] = newWriteCache(null/* buf */,
                 useChecksum, false/* bufferHasData */, opener, fileExtent));
-        if (nbuffers > 1) {
-            readCache.set(buffers[1] = newWriteCache(null/* buf */,
-                useChecksum, false/* bufferHasData */, opener, fileExtent));
-            
-            buffers[1].incrementReferenceCount(); // for readCache
-            buffers[1].closeForWrites();
-        }
+//        if (nbuffers > 1) {
+//            readCache.set(buffers[1] = newWriteCache(null/* buf */,
+//                useChecksum, false/* bufferHasData */, opener, fileExtent));
+//            
+//            buffers[1].incrementReferenceCount(); // for readCache
+//            buffers[1].closeForWrites();
+//        }
         
         // add remaining buffers.
-        for (int i = 2; i < nbuffers; i++) {
+        for (int i = 1; i < nwriteBuffers; i++) {
 
             final WriteCache tmp = newWriteCache(null/* buf */, useChecksum,
                     false/* bufferHasData */, opener, fileExtent);
 
-            buffers[i] = tmp;
+            writeBuffers[i] = tmp;
             
-            tmp.setSequence(nextCleanListTailSequence());
-            cleanList.add(tmp);
+             cleanList.add(tmp);
 
         }
 
 
         // Set the same counters object on each of the write cache instances.
         final WriteCacheServiceCounters counters = new WriteCacheServiceCounters(
-                nbuffers, m_dirtyListThreshold, compactionThreshold);
+        		nwriteBuffers, m_dirtyListThreshold, compactionThreshold);
 
-        for (int i = 0; i < buffers.length; i++) {
+        for (int i = 0; i < writeBuffers.length; i++) {
         
-            buffers[i].setCounters(counters);
+            writeBuffers[i].setCounters(counters);
             
         }
         
@@ -600,7 +633,7 @@ abstract public class WriteCacheService implements IWriteCache {
         capacity = current.get().capacity();
 
         // set initial capacity based on an assumption of 1k buffers.
-        recordMap = new ConcurrentHashMap<Long, WriteCache>(nbuffers
+        serviceMap = new ConcurrentHashMap<Long, WriteCache>(nwriteBuffers
                 * (capacity / 1024));
 
         /*
@@ -665,6 +698,29 @@ abstract public class WriteCacheService implements IWriteCache {
     private final int m_dirtyListThreshold;
     
     /**
+     * The readCache is managed separately from the writeCache.
+     * <p>
+     * If active then the readCache may optionally be managed together
+     * with a hotList, to which frequently read buffers are transferred.
+     * <p>
+     * Data is added to the readCache:
+     * <li>after an evicted WriteCache is written to disk/HA
+     * <li>on a cache miss, disk reads are added to the cache
+     * <p>
+     * Data is added to the hotList when a readCache is evicted from the
+     * readList.  resetWith uses the hitCount associated with live data
+     * records to determine which data is transferred to the hotList.
+     * <p>
+     * When a readCache is evicted from the hotList, the entire cache
+     * is moved to the readList.
+     */
+    private final int readListSize;
+    /**
+     * The readList - maximum of readListSize
+     */
+    final private BlockingQueue<ReadCache> readList;
+
+    /**
      * Determines the size of the HIRS cache (will be zero if disabled)
      * <p>
      * Where HIRS captures High inter-reference vs Low inter-reference of
@@ -679,38 +735,18 @@ abstract public class WriteCacheService implements IWriteCache {
      * then the per record hit count is used to determine which records are
      * transferred to be maintained.
      */
-    private final int hirsSize;
+    private final int hotListSize;
     
-    /**
-     * The hirsList - maximum of hirsSize - populated lazily from cleanList
+     /**
+     * The hotList - maximum of hirsSize - populated lazily from cleanList
      */
-    final private BlockingQueue<WriteCache> hirsList;
+    final private BlockingQueue<ReadCache> hotList;
 
     /**
-     * The current hirsCache.
+     * The current hotCache.
      */
-    private WriteCache hirsCache = null;
+    private ReadCache hotCache = null;
 
-    /**
-     * The cleanListSequences are used to determine the position of a specific cache
-     * in the clean list.
-     * <p>
-     * This utilizes the cacheSequence field used HA validation.
-     * <p>
-     * We maintain a simple long count.  This value is sufficient to maintain
-     * 1,000,000 additions per second for over 500,000 years, so should suffice
-     * until the application is restarted.
-     */
-    private long m_cleanListHeadSequence = 0;
-    private long m_cleanListTailSequence = 0;
-    
-    private long nextCleanListTailSequence() {
-    	return ++m_cleanListTailSequence;
-    }
-    private long prevCleanListHeadSequence() {
-    	return --m_cleanListHeadSequence;
-    }
-    
     /**
      * Computes modular distance of a circular number list.
      * 
@@ -768,7 +804,7 @@ abstract public class WriteCacheService implements IWriteCache {
             try {
                 if (quorum != null) {
                     // allocate heap byte buffer for whole buffer checksum.
-                    checksumBuffer = ByteBuffer.allocate(buffers[0].peek()
+                    checksumBuffer = ByteBuffer.allocate(writeBuffers[0].peek()
                             .capacity());
                 } else {
                     checksumBuffer = null;
@@ -940,7 +976,7 @@ abstract public class WriteCacheService implements IWriteCache {
                             : (double) nhit / ntests)));
                     final WriteCacheServiceCounters c = counters.get();
                     log.info("WriteCacheService: bufferCapacity="
-                            + buffers[0].capacity() + ",nbuffers="
+                            + writeBuffers[0].capacity() + ",nbuffers="
                             + tmp.nbuffers + ",nclean=" + tmp.nclean
                             + ",ndirty=" + tmp.ndirty + ",maxDirty="
                             + tmp.maxdirty + ",hitRate=" + hitRate + ",empty="
@@ -1011,7 +1047,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         log.trace("Transferring to curCompactingCache");
                     
                     done = WriteCache.transferTo(cache/* src */,
-                            curCompactingCache/* dst */, recordMap);
+                            curCompactingCache/* dst */, serviceMap, 0/*threshold*/);
                     if (done) {
                         sendAddressMetadata(cache);
                         /*
@@ -1059,12 +1095,12 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isTraceEnabled())
                     log.trace("Setting curCompactingCache to reserve");
 
-                reserve.resetWith(recordMap);//, fileExtent.get());
+                reserve.resetWith(serviceMap);//, fileExtent.get());
                 curCompactingCache = reserve;
                 if (log.isTraceEnabled())
                     log.trace("Transferring to curCompactingCache");
                 done = WriteCache.transferTo(cache/* src */,
-                        curCompactingCache/* dst */, recordMap);
+                        curCompactingCache/* dst */, serviceMap, 0/*threshold*/);
 
                 if (!done) {
                     throw new AssertionError(
@@ -1142,10 +1178,10 @@ abstract public class WriteCacheService implements IWriteCache {
             dirtyListLock.lockInterruptibly();
             try {
                 assert m_dirtyListThreshold >= 1
-                        && m_dirtyListThreshold <= buffers.length : "dirtyListThreshold="
+                        && m_dirtyListThreshold <= writeBuffers.length : "dirtyListThreshold="
                         + m_dirtyListThreshold
                         + ", #buffers="
-                        + buffers.length;
+                        + writeBuffers.length;
                 /*
                  * Wait for a dirty buffer.
                  * 
@@ -1489,7 +1525,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (x != null) {
 
                     // reset if found.
-                    x.resetWith(recordMap);
+                    x.resetWith(serviceMap);
 
                     // addClean(x, true/* addFirst */);
 
@@ -1527,7 +1563,7 @@ abstract public class WriteCacheService implements IWriteCache {
             {
                 final WriteCacheServiceCounters c = counters.get();
                 c.ndirty = 0;
-                c.nclean = buffers.length-1;
+                c.nclean = writeBuffers.length-1;
                 c.nreset++;
             }
             
@@ -1591,9 +1627,8 @@ abstract public class WriteCacheService implements IWriteCache {
         cleanListLock.lockInterruptibly();
         try {
             for (WriteCache x : c) {
-                x.resetWith(recordMap);
+                x.resetWith(serviceMap);
                  cleanList.addFirst(x);
-                 x.setSequence(prevCleanListHeadSequence());
             }
             
             assert !cleanList.isEmpty();
@@ -1698,7 +1733,7 @@ abstract public class WriteCacheService implements IWriteCache {
         try {
 
             // close all buffers.
-            for (WriteCache t : buffers) {
+            for (WriteCache t : writeBuffers) {
                 try {
                     t.close();
                 } catch (InterruptedException ex) {
@@ -1707,6 +1742,16 @@ abstract public class WriteCacheService implements IWriteCache {
                 }
             }
 
+            // and any ReadCache buffers
+            for (ReadCache t : readBuffers) {
+                try {
+                    t.close();
+                } catch (InterruptedException ex) {
+                    interrupted = true;
+                    continue;
+                }
+            }
+            
             // clear reference to the current buffer.
             current.getAndSet(null);
 
@@ -1714,10 +1759,11 @@ abstract public class WriteCacheService implements IWriteCache {
             compactingCache = null;
 
             // clear reference to the readCache buffer.
-            readCache.getAndSet(null);
+            readCache.getAndSet(null);            
+            hotCache = null;
 
             // clear the service record map.
-            recordMap.clear();
+            serviceMap.clear();
 
             // clear the file extent to an illegal value.
             fileExtent.set(-1L);
@@ -2071,9 +2117,10 @@ abstract public class WriteCacheService implements IWriteCache {
                 }
                 // Guaranteed available hence non-blocking.
                 final WriteCache nxt = cleanList.take();
-                this.m_cleanListHeadSequence = (int) nxt.getSequence() + 1;
                 counters.get().nclean--;
-                nxt.resetWith(recordMap);//, fileExtent.get());
+                
+                // FIXME: should already be pristine
+                nxt.resetWith(serviceMap);//, fileExtent.get());
                 current.set(nxt);
                 if (haLog.isInfoEnabled())
                     haLog.info("Flushed the write cache: seq=" + cacheSequence);
@@ -2234,7 +2281,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 // write on the cache.
                 if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
                 	
-                 	final WriteCache old = recordMap.put(offset, cache);
+                 	final WriteCache old = serviceMap.put(offset, cache);
                     // There should be no duplicate address in the record
                     //  map since these entries should be removed, although
                     //  write data may still exist in an old WriteCache.
@@ -2293,7 +2340,7 @@ abstract public class WriteCacheService implements IWriteCache {
                          * It fits: someone already changed to a new cache,
                          * which is fine.
                          */
-                        if (recordMap.put(offset, cache) != null) {
+                        if (serviceMap.put(offset, cache) != null) {
                             // The record should not already be in the cache.
                             throw new AssertionError("Record already in cache: offset=" + offset + " "  + addrDebugInfo(offset));
                         }
@@ -2367,11 +2414,10 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         // Take a buffer from the cleanList (guaranteed avail).
                         final WriteCache newBuffer = cleanList.take();
-                        m_cleanListHeadSequence = newBuffer.getSequence() + 1;
                         counters.get().nclean--;
                         // Clear the state on the new buffer and remove from
                         // cacheService map
-                        newBuffer.resetWith(recordMap);//, fileExtent.get());
+                        newBuffer.resetWith(serviceMap);//, fileExtent.get());
 
                         // Set it as the new buffer.
                         current.set(cache = newBuffer);
@@ -2380,7 +2426,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
 
                             // This must be the only occurrence of this record.
-                            if (recordMap.put(offset, cache) != null) {
+                            if (serviceMap.put(offset, cache) != null) {
                                 throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
                             }
 
@@ -2507,7 +2553,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * method for inserting an entry into the record map?)
      * <p>
      * Note: This method DOES NOT register the record with the shared
-     * {@link #recordMap}. Since the record spans multiple {@link WriteCache}
+     * {@link #serviceMap}. Since the record spans multiple {@link WriteCache}
      * objects it can not be directly recovered without reading it from the
      * backing file.
      * 
@@ -2806,12 +2852,11 @@ abstract public class WriteCacheService implements IWriteCache {
 
             // Take a buffer from the cleanList (guaranteed avail).
             final WriteCache newBuffer = cleanList.take();
-            m_cleanListHeadSequence = newBuffer.getSequence() + 1;
 
             counters.get().nclean--;
             
             // Clear state on new buffer and remove from cacheService map
-            newBuffer.resetWith(recordMap);//, fileExtent.get());
+            newBuffer.resetWith(serviceMap);//, fileExtent.get());
 
             // Set it as the new buffer.
             current.set(newBuffer);
@@ -2828,21 +2873,51 @@ abstract public class WriteCacheService implements IWriteCache {
    
     /**
      * Add to the cleanList.
+     * <p>
+     * Since moving to an explicit readCache, we now call resetWith before
+     * adding the the cleanList.  Potentially removing latency on acquiring
+     * a new cache from the clean list.
+     * <p>
+     * If a readCache is in operation then we will transfer to the read cache
      */
     private void addClean(final WriteCache cache, final boolean addFirst)
             throws InterruptedException {
         if (cache == null)
             throw new IllegalArgumentException();
+        
+        
+        if (this.readListSize > 0) { // if there is a readCache
+        	synchronized (readCache) {
+        		final ReadCache rcache = readCache.get();
+        		if (!WriteCache.transferTo(cache, rcache, serviceMap, 0)) {
+        			// full readCache
+        			readCache.set(null);
+        			readList.add(rcache);
+        			final ReadCache ncache = getDirectReadCache();
+        			if (ncache == null) {
+        				throw new AssertionError();
+        			}
+        			
+        			// Now transfer remaining to new readCache
+        			if (!WriteCache.transferTo(cache, ncache, serviceMap, 0)) {
+        				throw new AssertionError();
+        			}
+        			
+        			readCache.set(ncache);
+        		}
+        	}
+        } else {
+        	cache.resetWith(serviceMap);
+        }
+        
         cleanListLock.lockInterruptibly();
         try {
             assert cache.isEmpty() || cache.isClosedForWrites();
             if (addFirst) {
                 cleanList.addFirst(cache);
-                cache.setSequence(prevCleanListHeadSequence());
             } else  {
                 cleanList.addLast(cache);
                 
-                cache.setSequence(nextCleanListTailSequence());
             }
             cleanListNotEmpty.signalAll();
             counters.get().nclean = cleanList.size();
@@ -2856,8 +2931,23 @@ abstract public class WriteCacheService implements IWriteCache {
 
         if (tmp != null) {
         	counters.get().nclean--;
-        	m_cleanListHeadSequence = tmp.getSequence() + 1;
         }
+
+        return tmp;
+
+    }
+
+    private ReadCache getDirectReadCache() throws InterruptedException {
+        final ReadCache tmp = readList.poll();
+
+        if (tmp != null) {
+        	counters.get().nclean--;
+        	
+            // FIXME: add hot readCache data to hotCache
+        	tmp.resetWith(serviceMap);
+       }
+        
+         
 
         return tmp;
 
@@ -2934,7 +3024,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
             }
 
-            final WriteCache cache = recordMap.get(off);
+            final WriteCache cache = serviceMap.get(off);
 
             if (cache == null) {
              
@@ -2951,7 +3041,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 final ByteBuffer ret = cache.read(off.longValue(), nbytes);
 
-            	if (ret == null && recordMap.get(off) == cache) {
+            	if (ret == null && serviceMap.get(off) == cache) {
             		throw new IllegalStateException("Inconsistent cache for offset: " + off);
             	}
 
@@ -2961,74 +3051,74 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 if (ret != null) {
                 	
-                	// check if on clean list AND hirs is enabled
-                	if (hirsSize > 0 && cache.isClosedForWrites()) {
-                		final long seq =  cache.getSequence();
-                		if (seq > 0) { // NOT already HIRS cached
-	                		final int cleanSize = cleanList.size();
-	                		final int listPos = (int) (seq - m_cleanListHeadSequence);
-	                		
-	                		if (listPos < (cleanSize/4)) {
-		                		// okay we've already got the heap buffer to return, now
-		                		//	we just want to transfer the data to the HIRS cache
-	                			// Ideally we'd like to transfer using the two direct buffers
-	                			//	but initially we'll just copy the heap buffer since this avoids
-	                			//	extra locking and clean list interactions.
-	                			// FIXME: optimize transfer to use direct buffers
-	                			synchronized(hirsList) {
-	                				// check to see if already transferred since we got the lock!
-	                				final WriteCache curCache = recordMap.get(off);
-	                				if (curCache != null && curCache.getSequence() > 0) { // not already in hirs cache
-	                					// transfer
-	                					if (hirsCache == null) {
-	                						hirsCache = getDirectCleanCache();
-	                						if (hirsCache != null)
-	                							hirsCache.setSequence(-1);
-	                					}
-	                					if (hirsCache != null) {
-	                						ByteBuffer dst = hirsCache.allocate(ret.limit());
-	                						if (dst == null) {
-	                							// add current hirsCache to hirsList tail
-	                							hirsList.add(hirsCache);
-	                							
-	                							// check size of hirsList
-	                							if (hirsList.size() >= hirsSize) { // include hirsCache
-	                								hirsCache = getDirectCleanCache();
-	    	                						if (hirsCache != null) {
-	    	                							hirsCache.setSequence(-1);
-	    	                							dst = hirsCache.allocate(ret.limit());
-	    	                						}
-	                							} else { // cycle current hirs buffers
-	                								hirsCache = hirsList.take(); // MUST be available
-	                								// FIXME: We could be throwing away good data
-	                								hirsCache.resetWith(recordMap);
-	                								hirsCache.setSequence(-1);
-	                								
-	                								dst = hirsCache.allocate(ret.limit());
-	                							}
-	                						}
-	                						
-	                						if (dst != null) {
-	                							final int bpos = dst.position();
-	                							dst.put(ret);
-	                							ret.flip(); // reset for return
-	                							
-	                							hirsCache.commitToMap(off, bpos, nbytes);
-	                							recordMap.put(off, hirsCache);
-	                							
-	                							// TODO: remove from original cache
-	                						}
-	                					}
-	                					
-	                					
-	                				}
-	                				
-	                			}
-	                			
-	                		}
-                		}
-                 	}
-
+//                	// check if on clean list AND hirs is enabled
+//                	if (hotListSize > 0 && cache.isClosedForWrites()) {
+//                		final long seq =  cache.getSequence();
+//                		if (seq > 0) { // NOT already HIRS cached
+//	                		final int cleanSize = cleanList.size();
+//	                		final int listPos = (int) (seq - m_cleanListHeadSequence);
+//	                		
+//	                		if (listPos < (cleanSize/4)) {
+//		                		// okay we've already got the heap buffer to return, now
+//		                		//	we just want to transfer the data to the HIRS cache
+//	                			// Ideally we'd like to transfer using the two direct buffers
+//	                			//	but initially we'll just copy the heap buffer since this avoids
+//	                			//	extra locking and clean list interactions.
+//	                			// FIXME: optimize transfer to use direct buffers
+//	                			synchronized(hotList) {
+//	                				// check to see if already transferred since we got the lock!
+//	                				final WriteCache curCache = serviceMap.get(off);
+//	                				if (curCache != null && curCache.getSequence() > 0) { // not already in hirs cache
+//	                					// transfer
+//	                					if (hotCache == null) {
+//	                						hotCache = getDirectCleanCache();
+//	                						if (hotCache != null)
+//	                							hotCache.setSequence(-1);
+//	                					}
+//	                					if (hotCache != null) {
+//	                						ByteBuffer dst = hotCache.allocate(ret.limit());
+//	                						if (dst == null) {
+//	                							// add current hirsCache to hirsList tail
+//	                							hotList.add(hotCache);
+//	                							
+//	                							// check size of hirsList
+//	                							if (hotList.size() >= hotListSize) { // include hirsCache
+//	                								hotCache = getDirectCleanCache();
+//	    	                						if (hotCache != null) {
+//	    	                							hotCache.setSequence(-1);
+//	    	                							dst = hotCache.allocate(ret.limit());
+//	    	                						}
+//	                							} else { // cycle current hirs buffers
+//	                								hotCache = hotList.take(); // MUST be available
+//	                								// FIXME: We could be throwing away good data
+//	                								hotCache.resetWith(serviceMap);
+//	                								hotCache.setSequence(-1);
+//	                								
+//	                								dst = hotCache.allocate(ret.limit());
+//	                							}
+//	                						}
+//	                						
+//	                						if (dst != null) {
+//	                							final int bpos = dst.position();
+//	                							dst.put(ret);
+//	                							ret.flip(); // reset for return
+//	                							
+//	                							hotCache.commitToMap(off, bpos, nbytes);
+//	                							serviceMap.put(off, hotCache);
+//	                							
+//	                							// TODO: remove from original cache
+//	                						}
+//	                					}
+//	                					
+//	                					
+//	                				}
+//	                				
+//	                			}
+//	                			
+//	                		}
+//               		}
+//                 	}
+//
                     return ret;
    
                 }
@@ -3278,6 +3368,7 @@ abstract public class WriteCacheService implements IWriteCache {
 		}
 		
 		final boolean largeRecord = nbytes > capacity;
+		final boolean directRead = largeRecord || this.readListSize == 0;
 
 		/*
 		 * The reader threads co-operatively manage the readCache on behalf of the
@@ -3293,9 +3384,9 @@ abstract public class WriteCacheService implements IWriteCache {
 		 */
 
 		// WriteCache.referenceCount := 0 ; // on reset() and init().
-		WriteCache theCache = null;
+		ReadCache theCache = null;
 		ByteBuffer bb = null;
-		if (!largeRecord) {
+		if (!directRead) {
 			synchronized (readCache) {
 
 				theCache = readCache.get();
@@ -3318,10 +3409,11 @@ abstract public class WriteCacheService implements IWriteCache {
 							addClean(theCache, false/* addFirst */);
 						}
 
-						final WriteCache newCache = getDirectCleanCache(); // non-blocking
+						final ReadCache newCache = getDirectReadCache(); // non-blocking
 																			// take
 						if (newCache != null) {
-							newCache.resetWith(recordMap); // read for writes
+							// FIXME: resetWith should be a NOP
+							newCache.resetWith(serviceMap); // read for writes
 
 							newCache.closeForWrites(); // flag as read cache
 
@@ -3368,7 +3460,7 @@ abstract public class WriteCacheService implements IWriteCache {
 		
 		// update record maps
 		theCache.commitToMap(offset, pos, nbytes);
-		recordMap.put(offset, theCache);
+		serviceMap.put(offset, theCache);
 
 		// must copy to heap buffer from cache, allowing for checksum
         final byte[] b = new byte[nbytes-4];
@@ -3463,14 +3555,14 @@ abstract public class WriteCacheService implements IWriteCache {
         try {
             counters.get().nclearAddrRequests++;
             while (true) {
-                final WriteCache cache = recordMap.get(offset);
+                final WriteCache cache = serviceMap.get(offset);
                 if (cache == null) {
                     // Not found.
                     return false;
                 }
                 cache.transferLock.lock();
                 try {
-                    final WriteCache cache2 = recordMap.get(offset);
+                    final WriteCache cache2 = serviceMap.get(offset);
                     if (cache2 != cache) {
                         /*
                          * Not found in this WriteCache.
@@ -3484,7 +3576,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
                     
                     // Remove entry from the recordMap.
-                    final WriteCache oldValue = recordMap.remove(offset);
+                    final WriteCache oldValue = serviceMap.remove(offset);
 					if (oldValue != null && cache != oldValue) {
 						/*
 						 * Concurrent modification!
@@ -3574,7 +3666,7 @@ abstract public class WriteCacheService implements IWriteCache {
     public boolean isPresent(final long addr) {
         // System.out.println("Checking address: " + addr);
         
-        return recordMap.get(addr) != null;
+        return serviceMap.get(addr) != null;
     }
     
     /**

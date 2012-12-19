@@ -47,14 +47,14 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     
-    public RWWriteCacheService(final int nbuffers, final int maxDirtyListSize,
+    public RWWriteCacheService(final int nbuffers, final int maxDirtyListSize, final int readBuffers,
             final boolean prefixWrites, final int compactionThreshold,
             final long fileExtent,
             final IReopenChannel<? extends Channel> opener, final Quorum quorum,
             final IBackingReader reader)
             throws InterruptedException, IOException {
 
-        super(nbuffers, maxDirtyListSize, prefixWrites, compactionThreshold,
+        super(nbuffers, maxDirtyListSize,  readBuffers, prefixWrites, compactionThreshold,
                 true/* useChecksum */, fileExtent, opener, quorum, reader);
     }
 

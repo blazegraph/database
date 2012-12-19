@@ -346,7 +346,7 @@ abstract public class WriteCache implements IWriteCache {
      * record. The values describe the position in buffer where that record is
      * found and the length of the record.
      */
-    final private ConcurrentMap<Long/* fileOffset */, RecordMetadata> recordMap;
+    final protected ConcurrentMap<Long/* fileOffset */, RecordMetadata> recordMap;
 
     /**
      * An ordered list of the {@link RecordMetadata} in the order in which those
@@ -2081,6 +2081,34 @@ abstract public class WriteCache implements IWriteCache {
 
    } // class FileChannelScatteredWriteCache
 
+    public static class ReadCache extends WriteCache {
+
+		public ReadCache(IBufferAccess buf) throws InterruptedException {
+			super(buf, true/* scatterredWrtes */, false/* useChecksum */,
+					false/* isHighlyAvailable */, true/* bufferHasData */, 0/* fileExtent */);
+		}
+
+		@Override
+		protected boolean writeOnChannel(ByteBuffer buf, long firstOffset,
+				Map<Long, RecordMetadata> recordMap, long nanos)
+				throws InterruptedException, TimeoutException, IOException {
+			throw new UnsupportedOperationException();
+		}
+
+		/**
+		 * Overide clearAddrMap for read cache to always remove from the record map.
+		 */
+		/* public */boolean clearAddrMap(final long addr, final int latchedAddr)
+				throws IllegalStateException, InterruptedException {
+
+			// Remove record from this cache.
+			final RecordMetadata removed = recordMap.remove(addr);
+
+			// might be null if concurrent transfer has taken place
+			return removed != null;
+		}
+	}
+    
     /**
      * To support deletion we will remove any entries for the provided address.
      * This is just to yank something out of the cache which was created and
@@ -2463,6 +2491,8 @@ abstract public class WriteCache implements IWriteCache {
      *            .
      * @param serviceRecordMap
      *            The {@link WriteCacheService}'s record map.
+     * @param threshold
+     * 				The hitCount aty which the record is transferred
      * 
      * @return Returns true if the transfer is complete, or false if the
      *         destination runs out of room.
@@ -2471,7 +2501,7 @@ abstract public class WriteCache implements IWriteCache {
      */
     // package private
     static boolean transferTo(final WriteCache src, final WriteCache dst,
-            final ConcurrentMap<Long, WriteCache> serviceRecordMap)
+            final ConcurrentMap<Long, WriteCache> serviceRecordMap, final int threshold)
             throws InterruptedException {
 
         if (src == null)
@@ -2480,14 +2510,16 @@ abstract public class WriteCache implements IWriteCache {
             throw new IllegalArgumentException();
         if (src == dst)
             throw new IllegalArgumentException();
-        if (src.m_closedForWrites) {
-            // the source buffer must not be closed for writes.
-            throw new IllegalStateException();
-        }
-        if (dst.m_closedForWrites) {
-            // the dst buffer must not be closed for writes.
-            throw new IllegalStateException();
-        }
+        
+        // FIXME: check assumptions for transferTo, closedForWrites vs ReadCache etc
+//        if (src.m_closedForWrites) {
+//            // the source buffer must not be closed for writes.
+//            throw new IllegalStateException();
+//        }
+//        if (dst.m_closedForWrites) {
+//            // the dst buffer must not be closed for writes.
+//            throw new IllegalStateException();
+//        }
         /*
          * Note: This method is only invoked during critical code in
          * WriteTask.call(). No other thread can write on [src] (because it is
@@ -2552,66 +2584,74 @@ abstract public class WriteCache implements IWriteCache {
                                             + md);
                     }
                     assert !md.deleted; // not deleted (deleted entries should not be in the recordMap).
-                    final int len = prefixlen + md.recordLength;
-                    final int dstremaining = dst.remaining();
-                    if (len > dstremaining) {
-                        // Not enough room in destination for this record.
-                        if (dstremaining >= 512) {
-                            // Destination still has room, keep looking.
-                            continue;
-                        }
-                        // Destination is full (or full enough).
-                        return false;
-                    }
-    
-//                    final ByteBuffer dup = bb;//bb.duplicate(); (dup'd above).
-                    final int pos = md.bufferOffset - prefixlen;// include prefix
-                    final int limit = pos + len; // and any postfix
-                    final int dstoff; // offset in the destination buffer.
-                    synchronized (bb) {
-                        bb.limit(limit);
-                        bb.position(pos);
-                        // dst.writeRaw(fileOffset, dup, md.latchedAddr);
+                    // only copy records >= to threshold
+					if (md.hitCount < threshold) {
+						serviceRecordMap.remove(fileOffset);
+					} else {
+						final int len = prefixlen + md.recordLength;
+						final int dstremaining = dst.remaining();
+						if (len > dstremaining) {
+							// Not enough room in destination for this record.
+							if (dstremaining >= 512) {
+								// Destination still has room, keep looking.
+								continue;
+							}
+							// Destination is full (or full enough).
+							return false;
+						}
 
-                        // Copy to destination.
-                        synchronized (dd) {
-                            dstoff = dd.position() + prefixlen;
-                            dd.put(bb);
-                            assert dst.remaining() == (dstremaining - len) : "dst.remaining(): "
-                                    + dst.remaining()
-                                    + " expected: "
-                                    + dstremaining;
-                        }
-                    }
-                    /*
-                     * Insert record into destination.
-                     * 
-                     * Note: The [orderedList] on the target buffer is not
-                     * updated because we handle the propagation of the address
-                     * allocation/clear notices separately and synchronously
-                     * using prepareAddressMetadataForHA().
-                     */
-                    {
-                        final RecordMetadata old = dst.recordMap.put(Long
-                                .valueOf(fileOffset), new RecordMetadata(
-                                fileOffset, dstoff/* bufferOffset */,
-                                md.recordLength, md.latchedAddr));
+						// final ByteBuffer dup = bb;//bb.duplicate(); (dup'd
+						// above).
+						final int pos = md.bufferOffset - prefixlen;// include
+																	// prefix
+						final int limit = pos + len; // and any postfix
+						final int dstoff; // offset in the destination buffer.
+						synchronized (bb) {
+							bb.limit(limit);
+							bb.position(pos);
+							// dst.writeRaw(fileOffset, dup, md.latchedAddr);
 
-                        assert old == null : "Write already found: " + old;
-                    }
+							// Copy to destination.
+							synchronized (dd) {
+								dstoff = dd.position() + prefixlen;
+								dd.put(bb);
+								assert dst.remaining() == (dstremaining - len) : "dst.remaining(): "
+										+ dst.remaining()
+										+ " expected: "
+										+ dstremaining;
+							}
+						}
+						/*
+						 * Insert record into destination.
+						 * 
+						 * Note: The [orderedList] on the target buffer is not
+						 * updated because we handle the propagation of the
+						 * address allocation/clear notices separately and
+						 * synchronously using prepareAddressMetadataForHA().
+						 */
+						{
+							final RecordMetadata old = dst.recordMap.put(Long
+									.valueOf(fileOffset), new RecordMetadata(
+									fileOffset, dstoff/* bufferOffset */,
+									md.recordLength, md.latchedAddr));
 
-                    if (serviceRecordMap != null) {
-                        /*
-                         * Note: As soon as we update the service record map it
-                         * is possible that WriteCacheService.clearWrite() will
-                         * clear the record from [dst]. We can not rely on the
-                         * record remaining in [dst] after this method call!
-                         */
-                        final WriteCache tmp = serviceRecordMap.put(fileOffset,
-                                dst);
-                        assert src == tmp : "tmp=" + tmp + ",src=" + src
-                                + ", offset=" + fileOffset + ", md=" + md;
-                    }
+							assert old == null : "Write already found: " + old;
+						}
+
+						if (serviceRecordMap != null) {
+							/*
+							 * Note: As soon as we update the service record map
+							 * it is possible that
+							 * WriteCacheService.clearWrite() will clear the
+							 * record from [dst]. We can not rely on the record
+							 * remaining in [dst] after this method call!
+							 */
+							final WriteCache tmp = serviceRecordMap.put(
+									fileOffset, dst);
+							assert src == tmp : "tmp=" + tmp + ",src=" + src
+									+ ", offset=" + fileOffset + ", md=" + md;
+						}
+					}
 
                     // Clear entry from src recordMap.
                     entries.remove();
@@ -2624,14 +2664,15 @@ abstract public class WriteCache implements IWriteCache {
                 
             } finally {
                 try {
-                    if (src.m_closedForWrites) {
-                        // the source buffer must not be closed for writes.
-                        throw new IllegalStateException();
-                    }
-                    if (dst.m_closedForWrites) {
-                        // the dst buffer must not be closed for writes.
-                        throw new IllegalStateException();
-                    }
+                	// FIXME: check assumptions re closedForWrites and ReadCache
+//                    if (src.m_closedForWrites) {
+//                        // the source buffer must not be closed for writes.
+//                        throw new IllegalStateException();
+//                    }
+//                    if (dst.m_closedForWrites) {
+//                        // the dst buffer must not be closed for writes.
+//                        throw new IllegalStateException();
+//                    }
                 } finally {
                     if (dd != null)
                         dst.release();

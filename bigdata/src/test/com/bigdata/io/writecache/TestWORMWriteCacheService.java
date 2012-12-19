@@ -2102,7 +2102,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 throw new AssertionError();
             }
             writeCacheService = new WriteCacheService(nbuffers,
-                    maxDirtyListSize, prefixWrites, compactionThreshold,
+                    maxDirtyListSize, 0, prefixWrites, compactionThreshold,
                     useChecksums, fileExtent, opener, quorum, null) {
 
                 /**
