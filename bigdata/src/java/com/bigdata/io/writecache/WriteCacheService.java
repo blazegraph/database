@@ -173,11 +173,11 @@ import com.bigdata.util.concurrent.Memoizer;
  * 
  * ReadCache lists
  * 	Without a hotList the readCache is managed naively by clearing any new
- * 	readCache.  This potentialy results in frequently accessed records being
+ * 	readCache.  This potentially results in frequently accessed records being
  *  lost to the cache.
  * 
  * HotCache
- *  With the HotCache evicted readCaches get transferred to hotList and 'old'
+ *  With the HotCache evicted readCaches hot records get transferred to hotList and 'old'
  *  hotCaches get added to end of readCache.  Pattern is needed to pluck reserve
  *  hotCache from readList so that it is always possible to transfer hot records
  *  from the readList.
@@ -306,6 +306,11 @@ abstract public class WriteCacheService implements IWriteCache {
      * Protected by {@link #dirtyListLock}
      */
     private WriteCache compactingCache = null;
+    
+    /**
+     * Maintained to guarantee that compaction is possible
+     */
+    private WriteCache compactingReserve = null;
     
     /**
      * Disable {@link WriteCache} compaction when <code>false</code>.
@@ -1041,14 +1046,14 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             assert !cache.isClosedForWrites();
             
-            final WriteCache reserve = getDirectCleanCache();
-
-            if (reserve == null) {
-
-                // Not guaranteed that we can compact.
-                return false;
-                
-            }
+            if (compactingReserve == null) {
+            	compactingReserve = getDirectCleanCache();        
+            	
+            	if (compactingReserve == null)
+            		return false; // cannot guarantee compaction
+            	
+                compactingReserve.resetWith(serviceMap); // should be NOP!
+           }
                 
             /*
              * We can be certain to be able to compact.
@@ -1076,14 +1081,6 @@ abstract public class WriteCacheService implements IWriteCache {
                             curCompactingCache/* dst */, serviceMap, 0/*threshold*/);
                     if (done) {
                         sendAddressMetadata(cache);
-                        /*
-                         * Return reserve to the cleanList.
-                         * 
-                         * Note: by adding to the front of the deque, we are
-                         * helping to preserve the FIFO aging policy for the
-                         * cleanList.
-                         */
-                        addClean(reserve, true/* addFirst */);
                         
                         if (log.isDebugEnabled())
                             log.debug("RETURNING RESERVE: curCompactingCache.bytesWritten="
@@ -1121,8 +1118,11 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isTraceEnabled())
                     log.trace("Setting curCompactingCache to reserve");
 
-                reserve.resetWith(serviceMap);//, fileExtent.get());
-                curCompactingCache = reserve;
+                curCompactingCache = compactingReserve;
+                compactingReserve = getDirectCleanCache();
+                if (compactingReserve != null)
+                	compactingReserve.resetWith(serviceMap); // should be NOP!
+                
                 if (log.isTraceEnabled())
                     log.trace("Transferring to curCompactingCache");
                 done = WriteCache.transferTo(cache/* src */,
@@ -3457,7 +3457,7 @@ abstract public class WriteCacheService implements IWriteCache {
 							if (newCache.incrementReferenceCount() != 1)
 								throw new AssertionError();
 
-							if (!readCache.compareAndSet(theCache/* expect */,
+							if (!readCache.compareAndSet(null/* expect */,
 									newCache/* newValue */))
 								throw new AssertionError();
 

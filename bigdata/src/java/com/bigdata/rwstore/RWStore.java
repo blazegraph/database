@@ -728,8 +728,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 		m_writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
 		
-		// FIXME: DEBUG
-		m_readCacheBufferCount = 6; // fileMetadata.readCacheBufferCount;
+		m_readCacheBufferCount = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.READ_CACHE_BUFFER_COUNT,
+                com.bigdata.journal.Options.DEFAULT_READ_CACHE_CAPACITY));
 		
         if (log.isInfoEnabled())
             log.info(com.bigdata.journal.Options.WRITE_CACHE_BUFFER_COUNT
@@ -5164,6 +5165,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         try {
             // Flush writes.
             writeCache.flush(false/* force */);
+            
+            // TODO transferTo readCache
+            
         } finally {
             m_allocationLock.unlock();
         }

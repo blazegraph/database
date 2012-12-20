@@ -167,11 +167,6 @@ public class FileMetadata {
 	public final int writeCacheBufferCount;
 
 	/**
-	 * The #of read cache buffers to be used if the write cache is enabled.
-	 */
-	public final int readCacheBufferCount;
-
-	/**
 	 * <code>true</code> iff record level checksums are enabled. These are used
 	 * beginning with {@link RootBlockView#VERSION2} and for the
 	 * {@link RWStrategy} from {@link RootBlockView#VERSION1}.
@@ -342,7 +337,7 @@ public class FileMetadata {
 			final boolean isEmptyFile, boolean deleteOnExit,
 			final boolean readOnly, final ForceEnum forceWrites,
 			final int offsetBits, final boolean writeCacheEnabled,
-			final int writeCacheBufferCount, final int readCacheBufferCount, final boolean validateChecksum,
+			final int writeCacheBufferCount, final boolean validateChecksum,
 			final long createTime, final long quorumToken,
 			final boolean alternateRootBlock,
 			final Properties properties) throws RuntimeException {
@@ -393,8 +388,6 @@ public class FileMetadata {
 		this.writeCacheEnabled = writeCacheEnabled;
 
 		this.writeCacheBufferCount = writeCacheBufferCount;
-
-		this.readCacheBufferCount = readCacheBufferCount;
 
 		this.fileMode = (readOnly ? "r" : forceWrites.asFileMode());
 
@@ -893,7 +886,6 @@ public class FileMetadata {
 	FileMetadata(final File file, final boolean useDirectBuffers,
 			final boolean readOnly, final ForceEnum forceWrites,
 			final boolean writeCacheEnabled, final int writeCacheBufferCount,
-			final int readCacheBufferCount,
 			final boolean validateChecksum, final boolean alternateRootBlock,
 			final boolean ignoreBadRootBlock, final Properties properties)
 			throws RuntimeException {
@@ -916,8 +908,6 @@ public class FileMetadata {
 		this.writeCacheEnabled = writeCacheEnabled;
 
 		this.writeCacheBufferCount = writeCacheBufferCount;
-
-		this.readCacheBufferCount = readCacheBufferCount;
 
 		this.fileMode = (readOnly ? "r" : forceWrites.asFileMode());
 				
@@ -1436,10 +1426,6 @@ public class FileMetadata {
 				properties, Options.WRITE_CACHE_BUFFER_COUNT,
 				Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
 
-		final int readCacheBufferCount = Integer.parseInt(getProperty(
-				properties, Options.READ_CACHE_BUFFER_COUNT,
-				Options.DEFAULT_READ_CACHE_BUFFER_COUNT));
-
 		final boolean validateChecksum = Boolean.parseBoolean(getProperty(
 				properties, Options.VALIDATE_CHECKSUM,
 				Options.DEFAULT_VALIDATE_CHECKSUM));
@@ -1462,11 +1448,11 @@ public class FileMetadata {
 			/*
 			 * Code path when the file exists and is non-empty.
 			 */
-
+			
 			return new FileMetadata(file, useDirectBuffers, readOnly,
 					forceWrites, writeCacheEnabled, writeCacheBufferCount,
-					readCacheBufferCount, validateChecksum, alternateRootBlock,
-					ignoreBadRootBlock, properties);
+					validateChecksum, alternateRootBlock, ignoreBadRootBlock,
+					properties);
 
 		} else {
 
@@ -1488,10 +1474,10 @@ public class FileMetadata {
 					new LongRangeValidator(initialExtent, Long.MAX_VALUE));
 
 			/*
-			 * Note: The caller SHOULD specify an explicit [createTime] when its
-			 * value is critical. The default assigned here does NOT attempt to
-			 * use a clock that is consistent with the commit protocol or even a
-			 * clock that assigns unique timestamps.
+			 * Note: The caller SHOULD specify an explicit [createTime] when
+			 * its value is critical. The default assigned here does NOT
+			 * attempt to use a clock that is consistent with the commit
+			 * protocol or even a clock that assigns unique timestamps.
 			 */
 			final long createTime = Long.parseLong(getProperty(properties,
 					Options.CREATE_TIME, "" + System.currentTimeMillis()));
@@ -1509,10 +1495,9 @@ public class FileMetadata {
 			return new FileMetadata(file, bufferMode, useDirectBuffers,
 					initialExtent, maximumExtent, create, isEmptyFile,
 					deleteOnExit, readOnly, forceWrites, offsetBits,
-					writeCacheEnabled, writeCacheBufferCount,
-					readCacheBufferCount, validateChecksum, createTime,
-					quorumToken, alternateRootBlock, properties);
-
+					writeCacheEnabled, writeCacheBufferCount, validateChecksum,
+					createTime, quorumToken, alternateRootBlock, properties);
+		
 		}
 
 	}

@@ -619,7 +619,7 @@ public interface Options {
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.
      */
-    String DEFAULT_READ_CACHE_CAPACITY = "0";
+    String DEFAULT_READ_CACHE_CAPACITY = "10";
 //  String DEFAULT_READ_CACHE_CAPACITY = "10000";
     
     /**
