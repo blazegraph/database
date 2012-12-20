@@ -2084,8 +2084,8 @@ abstract public class WriteCache implements IWriteCache {
     public static class ReadCache extends WriteCache {
 
 		public ReadCache(IBufferAccess buf) throws InterruptedException {
-			super(buf, true/* scatterredWrtes */, false/* useChecksum */,
-					false/* isHighlyAvailable */, true/* bufferHasData */, 0/* fileExtent */);
+			super(buf, false/* prefixWrites */, true/* useChecksum */,
+					false/* isHighlyAvailable */, false/* bufferHasData */, 0/* fileExtent */);
 		}
 
 		@Override
@@ -2107,6 +2107,16 @@ abstract public class WriteCache implements IWriteCache {
 			// might be null if concurrent transfer has taken place
 			return removed != null;
 		}
+		
+		/**
+		 * ReadCache is always closedForWrites
+		 */
+	    public boolean isClosedForWrites() {
+
+	        return true;
+	        
+	    }
+
 	}
     
     /**
@@ -2275,9 +2285,10 @@ abstract public class WriteCache implements IWriteCache {
                 // debug to see recycling
                 log.info("clean WriteCache: hashCode=" + hashCode());
             }
-            if (m_written) {
-                log.warn("Written WriteCache but with no records");
-            }
+            // cache is written but also transfererd to readCache
+//            if (m_written) {
+//                log.warn("Written WriteCache but with no records");
+//            }
         }       
         reset(); // must ensure reset state even if cache already empty
 
@@ -2558,11 +2569,15 @@ abstract public class WriteCache implements IWriteCache {
              */
             final ByteBuffer bb = src.acquire().duplicate();
             ByteBuffer dd = null;
+            final int srcSize = src.recordMap.size();
+            int notTransferred = 0;
+            int transferred = 0;
             try {
                 // Setup destination
                 dd = dst.acquire();
                 // Note: md.recordLength includes the checksum (suffix)
-                final int prefixlen = src.prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0;
+                // check *destination* for prefixWrites - which will be zero for ReadCache
+                final int prefixlen = dst.prefixWrites ? SIZEOF_PREFIX_WRITE_METADATA : 0;
     
                 final Set<Entry<Long, RecordMetadata>> es = src.recordMap.entrySet();
                 final Iterator<Entry<Long, RecordMetadata>> entries = es.iterator();
@@ -2573,19 +2588,24 @@ abstract public class WriteCache implements IWriteCache {
                     final RecordMetadata md = entry.getValue();
                     if (serviceRecordMap != null) {
                         final WriteCache tmp = serviceRecordMap.get(fileOffset);
-                        if (tmp == null)
-                            throw new AssertionError("Not owned: offset="
-                                    + fileOffset + ", md=" + md);
-                        else if (tmp != src)
-                            throw new AssertionError(
-                                    "Record not owned by this cache: src="
-                                            + src + ", owner=" + tmp
-                                            + ", offset=" + fileOffset + ", md="
-                                            + md);
+                        if (tmp != src) {
+                        	assert !(tmp instanceof ReadCache);
+                        	
+                        	entries.remove();
+                        	
+                        	continue;
+//                            throw new AssertionError(
+//                                    "Record not owned by this cache: src="
+//                                            + src + ", owner=" + tmp
+//                                            + ", offset=" + fileOffset + ", md="
+//                                            + md);
+                        }
                     }
                     assert !md.deleted; // not deleted (deleted entries should not be in the recordMap).
                     // only copy records >= to threshold
 					if (md.hitCount < threshold) {
+						notTransferred++;
+						
 						serviceRecordMap.remove(fileOffset);
 					} else {
 						final int len = prefixlen + md.recordLength;
@@ -2594,6 +2614,7 @@ abstract public class WriteCache implements IWriteCache {
 							// Not enough room in destination for this record.
 							if (dstremaining >= 512) {
 								// Destination still has room, keep looking.
+								notTransferred++;
 								continue;
 							}
 							// Destination is full (or full enough).
@@ -2615,6 +2636,9 @@ abstract public class WriteCache implements IWriteCache {
 							synchronized (dd) {
 								dstoff = dd.position() + prefixlen;
 								dd.put(bb);
+								
+								transferred++;
+								
 								assert dst.remaining() == (dstremaining - len) : "dst.remaining(): "
 										+ dst.remaining()
 										+ " expected: "
@@ -2655,6 +2679,7 @@ abstract public class WriteCache implements IWriteCache {
 
                     // Clear entry from src recordMap.
                     entries.remove();
+                    
                 }
                 
                 // true iff all records were transfered out.
