@@ -221,6 +221,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private final int writeCacheBufferCount;
     
     /**
+     * The #of read cache buffers to use.
+     * 
+     * @see com.bigdata.journal.Options#READ_CACHE_BUFFER_COUNT
+     */
+    private final int readCacheBufferCount;
+    
+    /**
      * <code>true</code> if the backing store will be used in an HA
      * {@link Quorum} (this is passed through to the {@link WriteCache} objects
      * which use this flag to conditionally track the checksum of the entire
@@ -905,6 +912,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.writeCacheBufferCount = fileMetadata.writeCacheBufferCount;
         
+        this.readCacheBufferCount = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.READ_CACHE_BUFFER_COUNT,
+                com.bigdata.journal.Options.DEFAULT_READ_CACHE_CAPACITY));
+        
         isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
 
         final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
@@ -946,7 +957,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<? extends Channel> opener,
                 final Quorum quorum) throws InterruptedException {
 
-            super(writeCacheBufferCount, 0/* maxDirtyListSize */, 0/*readBuffers*/,
+            super(writeCacheBufferCount, 0/* maxDirtyListSize */, readCacheBufferCount,
                     false/* prefixWrites */, 100/* compactionThreshold */,
                     useChecksums, extent, opener, quorum, WORMStrategy.this /*reader*/);
 
