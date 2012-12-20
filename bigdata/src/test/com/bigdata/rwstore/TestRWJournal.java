@@ -686,7 +686,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * Reallocates the same object several times, then commits and tests
 		 * read back.
 		 * 
-		 * 
+		 * Has been amended to exercise different cache read paths.
 		 */
 		public void test_reallocate() {
 			final Journal store = (Journal) getStore();
@@ -709,12 +709,34 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				long faddr2 = bs.write(bb);
 				bb.position(0);
 
-				store.commit();
-
-				rw.reset();
-
+				// test read from writeCache
 				ByteBuffer inbb1 = bs.read(faddr1);
 				ByteBuffer inbb2 = bs.read(faddr2);
+
+				assertEquals(bb, inbb1);
+				assertEquals(bb, inbb2);
+				
+				store.commit();
+
+				// test direct read from readCache / postCommit
+				inbb1 = bs.read(faddr1);
+				inbb2 = bs.read(faddr2);
+
+				assertEquals(bb, inbb1);
+				assertEquals(bb, inbb2);
+				
+				rw.reset();
+
+				// test read from store (via readcache)
+				inbb1 = bs.read(faddr1);
+				inbb2 = bs.read(faddr2);
+
+				assertEquals(bb, inbb1);
+				assertEquals(bb, inbb2);
+
+				// test read direct from readCache
+				inbb1 = bs.read(faddr1);
+				inbb2 = bs.read(faddr2);
 
 				assertEquals(bb, inbb1);
 				assertEquals(bb, inbb2);
@@ -984,7 +1006,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 
 				// added to try and foce bug
-				if(log.isInfoEnabled())log.info("Re-open Journal");
+				if (log.isInfoEnabled())log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 800, 1500, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
@@ -992,33 +1014,33 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				store.close();
 				// .. end add to force bug
 
-				if(log.isInfoEnabled())log.info("Re-open Journal");
+				if (log.isInfoEnabled()) log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 2000, 10000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 200, 500, tcount, true, true);
 				store.close();
-				if(log.isInfoEnabled())log.info("Re-open Journal");
+				if (log.isInfoEnabled()) log.info("Re-open Journal");
 				store = (Journal) getStore();
 				reallocBatchWithRead(store, 1, 800, 1256, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
 				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
 				showStore(store);
 				store.close();
-				if(log.isInfoEnabled())log.info("Re-open Journal");
+				if (log.isInfoEnabled()) log.info("Re-open Journal");
 				store = (Journal) getStore();
 				showStore(store);
 				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 1000, 2000, tcount, true, true);
 				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
 				store.close();
-				if(log.isInfoEnabled())log.info("Re-open Journal");
+				if (log.isInfoEnabled()) log.info("Re-open Journal");
 				store = (Journal) getStore();
 
 				bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
 				rw = bufferStrategy.getStore();
 
-				if(log.isInfoEnabled())log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+				if (log.isInfoEnabled()) log.info("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
 						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
 						+ rw.getStoreFile().length());
 			} finally {

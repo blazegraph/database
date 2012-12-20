@@ -170,6 +170,26 @@ import com.bigdata.util.concurrent.Memoizer;
  *       record compression. Note that the B+Tree leaf and node records may
  *       require an uncompressed header to allow fixup of the priorAddr and
  *       nextAddr fields.
+ * 
+ * ReadCache lists
+ * 	Without a hotList the readCache is managed naively by clearing any new
+ * 	readCache.  This potentialy results in frequently accessed records being
+ *  lost to the cache.
+ * 
+ * HotCache
+ *  With the HotCache evicted readCaches get transferred to hotList and 'old'
+ *  hotCaches get added to end of readCache.  Pattern is needed to pluck reserve
+ *  hotCache from readList so that it is always possible to transfer hot records
+ *  from the readList.
+ *  
+ *  Start with hotCache AND hotReserve.
+ *  If new reserve needed, because existing one is now used, try and compress
+ *  new readCache into current hotCache - if won't fit, then call resetWith and
+ *  lose those writes, cycle again, moving front hotCache to readList and compress
+ *  that one.  
+ *  LIMIT: If we begin with full caches with above threshold hitCounts then
+ *  the whole list will cycle around until we hit original cache which will contain
+ *  records with zero hitCounts - for practical purposes ignoring any concurrent reads.
  */
 abstract public class WriteCacheService implements IWriteCache {
 
@@ -558,7 +578,7 @@ abstract public class WriteCacheService implements IWriteCache {
         
         // pre-allocate all ReadCache
         for (int i = 0; i < readBuffers.length; i++) {
-        	readBuffers[i] = new ReadCache(DirectBufferPool.INSTANCE.acquire());
+        	readBuffers[i] = new ReadCache(null);
         }
         
        /*
@@ -581,6 +601,12 @@ abstract public class WriteCacheService implements IWriteCache {
         // set initial read cache
         hotCache = hotList.poll();        
         readCache.set(readList.poll());
+        {
+        	final ReadCache curReadCache = readCache.get();
+        	if (curReadCache != null) {
+        		curReadCache.incrementReferenceCount();
+        	}
+        }
         
         if (log.isInfoEnabled())
             log.info("nbuffers=" + nwriteBuffers + ", dirtyListThreshold="
@@ -2892,17 +2918,25 @@ abstract public class WriteCacheService implements IWriteCache {
         		if (!WriteCache.transferTo(cache, rcache, serviceMap, 0)) {
         			// full readCache
         			readCache.set(null);
-        			readList.add(rcache);
+        			if (rcache.decrementReferenceCount()==0) {
+        				readList.add(rcache);
+        			}
+        			
         			final ReadCache ncache = getDirectReadCache();
         			if (ncache == null) {
         				throw new AssertionError();
         			}
         			
+        			// remaining must be >= to announced capacity after getDirectReadCache
+        			if (ncache.remaining() < ncache.capacity())
+        				throw new AssertionError("New Cache, remaining() < capacity(): " + ncache.remaining() + " < " + ncache.capacity());
+        			
         			// Now transfer remaining to new readCache
         			if (!WriteCache.transferTo(cache, ncache, serviceMap, 0)) {
-        				throw new AssertionError();
+        				throw new AssertionError("Unable to complete transfer to new cache with remaining: " + ncache.remaining());
         			}
         			
+        			ncache.incrementReferenceCount();
         			readCache.set(ncache);
         		}
         	}
@@ -3388,7 +3422,7 @@ abstract public class WriteCacheService implements IWriteCache {
 		ByteBuffer bb = null;
 		if (!directRead) {
 			synchronized (readCache) {
-
+				
 				theCache = readCache.get();
 				// if(theCache==null&&isClosed()) throw new
 				// AsyncClosedException();
@@ -3404,9 +3438,11 @@ abstract public class WriteCacheService implements IWriteCache {
 					if (bb == null) {
 						// current readCache is no good for us - no room in
 						// buffer
+						readCache.set(null);
+						
 						if (theCache.decrementReferenceCount() == 0) {
 							// handle case where no concurrent install.
-							addClean(theCache, false/* addFirst */);
+							readList.add(theCache);
 						}
 
 						final ReadCache newCache = getDirectReadCache(); // non-blocking
@@ -3467,9 +3503,12 @@ abstract public class WriteCacheService implements IWriteCache {
         ret.get(b);
         
         if (theCache.decrementReferenceCount() == 0) {
-			addClean(theCache, false/* addFirst */);
+        	if (theCache == readCache.get())
+        		throw new AssertionError();
+        	
+			readList.add(theCache);
 		}
-
+ 
 		return ByteBuffer.wrap(b);
 	}
     
