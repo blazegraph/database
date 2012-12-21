@@ -291,8 +291,11 @@ public class BigdataRDFServletContextListener implements
             /*
              * Log some information about the default kb (#of statements, etc).
              */
+            final long effectiveTimestamp = config.timestamp == ITx.READ_COMMITTED ? indexManager
+                    .getLastCommitTime() : config.timestamp;
             log.info("\n"
-                    + rdfContext.getKBInfo(config.namespace, config.timestamp));
+                    + rdfContext
+                            .getKBInfo(config.namespace, effectiveTimestamp));
         }
 
         {
