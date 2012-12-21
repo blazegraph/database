@@ -138,6 +138,8 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
      */
     public final CAT nreadNotInstalled = new CAT();
     
+    public final CAT memoCacheSize = new CAT();
+    
     public WriteCacheServiceCounters(final int nbuffers,
             final int dirtyListThreshold, final int compactingThreshold) {
 
@@ -231,9 +233,19 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
             }
         });
 
+        /*
+         * Read Cache.
+         */
+        
         root.addCounter(NREAD_NOT_INSTALLED, new Instrument<Long>() {
             public void sample() {
                 setValue(nreadNotInstalled.get());
+            }
+        });
+
+        root.addCounter(MEMO_CACHE_SIZE, new Instrument<Long>() {
+            public void sample() {
+                setValue(memoCacheSize.get());
             }
         });
 

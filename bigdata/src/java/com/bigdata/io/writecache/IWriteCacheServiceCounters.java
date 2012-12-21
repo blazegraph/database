@@ -25,6 +25,7 @@ package com.bigdata.io.writecache;
 
 import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService.WriteTask;
+import com.bigdata.util.concurrent.Memoizer;
 
 /**
  * Interface declaring the counters exposed by the {@link WriteCacheService} .
@@ -128,6 +129,7 @@ public interface IWriteCacheServiceCounters {
     /*
      * ReadCache counters.
      */
+    
     /**
      * The #of read requests that were a miss in the cache and resulted in a
      * read through to the disk where the record was NOT installed into the read
@@ -136,5 +138,11 @@ public interface IWriteCacheServiceCounters {
      * {@link ReadCache} block to install the read).
      */
     String NREAD_NOT_INSTALLED = "nreadNotInstalled";
-    
+
+    /**
+     * The current size of the {@link Memoizer}'s internal cache that is used to
+     * serialize reads against a given byte offset on the backing file.
+     */
+    String MEMO_CACHE_SIZE = "memoCacheSize";
+
 } // interface IWriteCacheCounters

@@ -3334,15 +3334,15 @@ abstract public class WriteCacheService implements IWriteCache {
 
         }
 
-//        /**
-//         * The approximate size of the cache (used solely for debugging to
-//         * detect cache leaks).
-//         */
-//        int size() {
-//            
-//            return cache.size();
-//            
-//        }
+        /**
+         * The approximate size of the cache (used solely for debugging to
+         * detect cache leaks).
+         */
+        int size() {
+            
+            return cache.size();
+            
+        }
 
         /**
          * Called by the thread which atomically installs the record into the
@@ -3391,6 +3391,8 @@ abstract public class WriteCacheService implements IWriteCache {
     private ByteBuffer loadRecord(final long offset, final int nbytes) {
         
         try {
+
+            counters.get().memoCacheSize.set(memo.size());
 
             return memo.compute(new LoadRecordRequest(this, offset, nbytes));
 
