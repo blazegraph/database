@@ -25,9 +25,11 @@ package com.bigdata.io.writecache;
 
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService.WriteTask;
 import com.bigdata.rawstore.Bytes;
 
@@ -127,6 +129,15 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
      */
     public volatile long nclearAddrCleared;
 
+    /**
+     * The #of read requests that were a miss in the cache and resulted in a
+     * read through to the disk where the record was NOT installed into the read
+     * cache (either because there is no read cache, because the record is too
+     * large for the read cache, or because the thread could not obtain a
+     * {@link ReadCache} block to install the read).
+     */
+    public final CAT nreadNotInstalled = new CAT();
+    
     public WriteCacheServiceCounters(final int nbuffers,
             final int dirtyListThreshold, final int compactingThreshold) {
 
@@ -217,6 +228,12 @@ public class WriteCacheServiceCounters extends WriteCacheCounters implements
                         .toSeconds(elapsedWriteNanos)));
                 setValue(((long) (mbPerSec * 100)) / 100d);
 
+            }
+        });
+
+        root.addCounter(NREAD_NOT_INSTALLED, new Instrument<Long>() {
+            public void sample() {
+                setValue(nreadNotInstalled.get());
             }
         });
 
