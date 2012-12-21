@@ -78,6 +78,7 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
+import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -2980,17 +2981,44 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
+    /**
+     * Non-blocking take of a {@link ReadCache}. If successful, the returned
+     * {@link ReadCache} will be clean.
+     */
     private ReadCache getDirectReadCache() throws InterruptedException {
+
+        // Non-blocking take.
         final ReadCache tmp = readList.poll();
 
         if (tmp != null) {
-        	counters.get().nclean--;
-        	
-            // FIXME: add hot readCache data to hotCache
-        	tmp.resetWith(serviceMap);
-       }
-        
-         
+
+            counters.get().nclean--; // FIXME [nclean] is for the write cache,
+                                     // not the read cache.
+
+            try {
+                /*
+                 * Attempt to reset the record.
+                 * 
+                 * FIXME: add hot readCache data to hotCache
+                 */
+                tmp.resetWith(serviceMap);
+            } catch (InterruptedException ex) {
+                /*
+                 * If interrupted, then return the ReadCache to the list and
+                 * propagate the interrupt to the caller. This makes the
+                 * operation safe with respect to an interrupt. Either the
+                 * operation succeeds fully, or we return [null] to the caller
+                 * and propagate restore the interrupt status on the current
+                 * Thread.
+                 */
+                readList.put(tmp);
+                // Propagate the interrupt status.
+                Thread.currentThread().interrupt();
+                // ReadCache is not available.
+                return null;
+            }
+            
+        }
 
         return tmp;
 
@@ -3032,7 +3060,7 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
     }
-
+    /** Attempt to read record from cache (either write cache or read cache depending on the service map state). */
     private ByteBuffer _readFromCache(final long offset, final int nbytes)
             throws ChecksumError, InterruptedException {
         
@@ -3384,18 +3412,13 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @param offset
      * @param nbytes
-     * @return
+     * @return A heap byte buffer containing the read record.
      * @throws IllegalStateException
      * @throws InterruptedException
      */
     private ByteBuffer _getRecord(final long offset, final int nbytes)
             throws IllegalStateException, InterruptedException {
 
-		// Large records are not cached but DO use the memoizer load
-    	// assert nbytes <= capacity;
-    	
-    	// FIXME: are there still synchronization holes here and Interrupt problems?
-    	
 		/*
 		 * On entry, this thread will either install the read into the cache or
 		 * the record will already be in the cache. We are protected by the
@@ -3407,6 +3430,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 		if (tmp != null) {
 
+		    // Already in the read cache.
 			return tmp;
 
 		}
@@ -3414,113 +3438,176 @@ abstract public class WriteCacheService implements IWriteCache {
 		final boolean largeRecord = nbytes > capacity;
 		final boolean directRead = largeRecord || this.readListSize == 0;
 
-		/*
-		 * The reader threads co-operatively manage the readCache on behalf of the
-		 * WCS.  The allocation attempt for a cache buffer is serialized and when
-		 * an allocation fails a new readCache is initialized and the previous cache
-		 * reference is decremented (no longer referenced as the current read cache).
-		 * 
-		 * When a cache is selected to buffer a read, the reference is incremented while
-		 * the read is active.
-		 * 
-		 * When the reference is finally decremented to zero (either at the end of a read
-		 * or after a failed allocation) the cache can be returned to the clean list.
-		 */
-
-		// WriteCache.referenceCount := 0 ; // on reset() and init().
-		ReadCache theCache = null;
-		ByteBuffer bb = null;
-		if (!directRead) {
-			synchronized (readCache) {
-				
-				theCache = readCache.get();
-				// if(theCache==null&&isClosed()) throw new
-				// AsyncClosedException();
-				// // iff one defined.
-				assert theCache != null;
-				assert theCache.isClosedForWrites(); // always for the cleanList
-														// and
-				// readCache.
-				assert theCache.getReferenceCount() > 0;
-
-				{
-					bb = theCache.allocate(nbytes);
-					if (bb == null) {
-						// current readCache is no good for us - no room in
-						// buffer
-						readCache.set(null);
-						
-						if (theCache.decrementReferenceCount() == 0) {
-							// handle case where no concurrent install.
-							readList.add(theCache);
-						}
-
-						final ReadCache newCache = getDirectReadCache(); // non-blocking
-																			// take
-						if (newCache != null) {
-							// FIXME: resetWith should be a NOP
-							newCache.resetWith(serviceMap); // read for writes
-
-							newCache.closeForWrites(); // flag as read cache
-
-							// Add reference for readCache
-							if (newCache.incrementReferenceCount() != 1)
-								throw new AssertionError();
-
-							if (!readCache.compareAndSet(null/* expect */,
-									newCache/* newValue */))
-								throw new AssertionError();
-
-							bb = newCache.allocate(nbytes);
-							theCache = newCache;
-						}
-
-					}
-
-					if (bb != null) { // must be incremented while readCache
-						// synchronized
-						theCache.incrementReferenceCount();
-					}
-
-				}
-			}
-		}
-
-		if (bb == null) {
-			// No free buffer to install the read (OR largeRecord)
-			// TODO Put counter on #of reads w/ installs.
-			if (log.isDebugEnabled())
-				log.debug("Allocating direct, nbytes: " + nbytes);
-			
-			// TODO: checksum check
-			bb = ByteBuffer.allocate(nbytes);
-			
-			final ByteBuffer ret = reader.readRaw(offset, bb);			
-			ret.limit(nbytes-4);
-			
-			return ret;
-		}
-
-		final int pos = bb.position();
-		final ByteBuffer ret = reader.readRaw(offset, bb);
-		
-		// update record maps
-		theCache.commitToMap(offset, pos, nbytes);
-		serviceMap.put(offset, theCache);
-
-		// must copy to heap buffer from cache, allowing for checksum
-        final byte[] b = new byte[nbytes-4];
-        ret.get(b);
+		if (directRead) {
         
-        if (theCache.decrementReferenceCount() == 0) {
-        	if (theCache == readCache.get())
-        		throw new AssertionError();
-        	
-			readList.add(theCache);
-		}
+            // No free buffer to install the read (OR largeRecord)
+            return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
+
+        }
+
+        /*
+         * The reader threads co-operatively manage the readCache on behalf of
+         * the WCS. The allocation attempt for a cache buffer is serialized and
+         * when an allocation fails a new readCache is initialized and the
+         * previous cache reference is decremented (no longer referenced as the
+         * current read cache).
+         * 
+         * When a cache is selected to buffer a read, the reference is
+         * incremented while the read is active.
+         * 
+         * When the reference is finally decremented to zero (either at the end
+         * of a read or after a failed allocation) the cache can be returned to
+         * the clean list.
+         */
+
+        // The cache block into which we will install the record.
+		ReadCache theCache = null;
+		// The buffer slice into which we will install the record.
+		ByteBuffer bb = null;
+        /*
+         * Set true iff we will install a record and have incremented the
+         * reference count for the cache. if true, then this Thread MUST
+         * decrement the reference count by any code path that leaves this
+         * method. (If a obtain an allocation but do not set this flag, then we
+         * will not actually perform the installation and the cache block will
+         * not be pinned.)
+         */
+        boolean willInstall = false;
+        try {
+            synchronized (readCache) {
+                theCache = readCache.get();
+                if (theCache != null) {
+                    /*
+                     * Attempt to allocate record on current read cache.
+                     */
+                    assert theCache.getReferenceCount() > 0;
+                    bb = theCache.allocate(nbytes); // intr iff can't lock().
+                    if (bb != null) {
+                        // increment while readCache synchronized
+                        theCache.incrementReferenceCount();
+                        willInstall = true;
+                    } else {
+                        /*
+                         * At this point, the current [readCache] does not have
+                         * enough room to install the record. We will clear the
+                         * [readCache] reference and transfer it to the
+                         * [readList].
+                         * 
+                         * *** CRITICAL SECTION ***
+                         * 
+                         * We MUST transfer cache once reference is cleared or
+                         * the buffer will be lost!
+                         * 
+                         * Note: Anything on the readList MUST have
+                         * referenceCount==0 since we do not transfer to the
+                         * readList until that condition is met.
+                         */
+                        readCache.set(null);
+                        if (theCache.decrementReferenceCount() == 0) {
+                            readList.add(theCache);
+                        }
+                    }
+                }
+                if (bb == null) {
+                    /*
+                     * Either no [readCache] on entry or no room in current
+                     * [readCache] and [readCache] was set to [null].
+                     */
+                    assert readCache.get() == null; // pre-condition.
+                    final ReadCache newCache = getDirectReadCache(); // non-blocking take
+                    if (newCache != null) {
+                        assert newCache.getReferenceCount() == 0;
+                        { // CRITICAL SECTION
+                            // Pre-increment the new [readCache].
+                            newCache.incrementReferenceCount();
+                            // Set read cache reference.
+                            readCache.set(newCache/* newValue */);
+                        }
+                        // guaranteed to succeed unless interrupted
+                        bb = newCache.allocate(nbytes);
+                        theCache = newCache;
+                        { // CRITICAL SECTION.
+                            // increment while readCache synchronized
+                            theCache.incrementReferenceCount();
+                            willInstall = true;
+                        }
+                    }
+				}
+			} // synchronized(readCache)
+    
+            if (bb == null) {
+                /*
+                 * No free buffer to install the read. Read directly into a heap
+                 * ByteBuffer and return that to the caller.
+                 */
+                // TODO counter.
+                assert willInstall == false;
+                return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
+    		    }
+    
+    		    final int pos = bb.position();
+    		    final ByteBuffer ret = reader.readRaw(offset, bb);
+    		
+    		    // update record maps
+    		    theCache.commitToMap(offset, pos, nbytes);
+    		    serviceMap.put(offset, theCache);
+    
+    		    // must copy to heap buffer from cache, allowing for checksum
+            final byte[] b = new byte[nbytes - 4];
+            ret.get(b);
+            
+            return ByteBuffer.wrap(b);
+
+        } finally {
+            /*
+             * CRITICAL SECTION. If [willInstall] then we are responsible for
+             * this ReadCache and MUST decrement the counter.
+             */
+            if (willInstall && theCache.decrementReferenceCount() == 0) {
+                readList.add(theCache);
+                // END CRITICAL SECTION.
+                if (theCache == readCache.get())
+                    throw new AssertionError();
+            }
+        }
  
-		return ByteBuffer.wrap(b);
 	}
+
+    /**
+     * Read through to the backing file.
+     * 
+     * @param offset
+     *            The byte offset of the record on the backing file.
+     * @param nbytes
+     *            The #of bytes to be read.
+     * 
+     * @return The installed record in a newly allocated heap {@link ByteBuffer}
+     *         .
+     */
+    private final ByteBuffer _readFromLocalDiskIntoNewHeapByteBuffer(
+            final long offset, final int nbytes) {
+
+        // TODO Put counter on #of reads w/ installs.
+        if (log.isDebugEnabled())
+            log.debug("Allocating direct, nbytes: " + nbytes);
+
+        final ByteBuffer ret = reader.readRaw(offset,
+                ByteBuffer.allocate(nbytes));
+
+        final int chk = ChecksumUtility.getCHK().checksum(ret.array(),
+                0/* offset */, nbytes - 4/* len */); // read checksum
+
+        final int tstchk = ret.getInt(nbytes - 4);
+        
+        if (chk != tstchk)
+            throw new ChecksumError("offset=" + offset + ",nbytes=" + nbytes
+                    + ",expected=" + tstchk + ",actual=" + chk);
+        
+        ret.limit(nbytes - 4);
+        
+        return ret;
+    
+    }
     
     /**
      * Read the data from the backing file.

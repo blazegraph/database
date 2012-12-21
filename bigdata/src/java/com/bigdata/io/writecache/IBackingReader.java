@@ -36,6 +36,21 @@ import java.nio.ByteBuffer;
  */
 public interface IBackingReader {
 
+    /**
+     * Read on the backing file, installing the record into the caller's buffer.
+     * {@link ByteBuffer#remaining()} bytes will be read into the caller's
+     * buffer, starting at the specified offset in the backing file.
+     * 
+     * @param offset
+     *            The offset of the first byte (relative to the start of the
+     *            data region).
+     * @param dst
+     *            Where to put the data. Bytes will be written at position until
+     *            limit.
+     * 
+     * @return The caller's buffer, prepared for reading back the installed
+     *         record.
+     */
 	public ByteBuffer readRaw(long offset, ByteBuffer dst);
 	
 }
