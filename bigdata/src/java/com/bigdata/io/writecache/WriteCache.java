@@ -2098,6 +2098,7 @@ abstract public class WriteCache implements IWriteCache {
 		/**
 		 * Overide clearAddrMap for read cache to always remove from the record map.
 		 */
+		@Override
 		/* public */boolean clearAddrMap(final long addr, final int latchedAddr)
 				throws IllegalStateException, InterruptedException {
 
@@ -2111,11 +2112,28 @@ abstract public class WriteCache implements IWriteCache {
 		/**
 		 * ReadCache is always closedForWrites
 		 */
+	    @Override
 	    public boolean isClosedForWrites() {
 
 	        return true;
 	        
 	    }
+	    
+	    @Override
+	    public void closeForWrites() {
+
+	        throw new UnsupportedOperationException();
+	        
+	    }
+
+        @Override
+        boolean write(final long offset, final ByteBuffer data, final int chk,
+                boolean writeChecksum, final int latchedAddr)
+                throws InterruptedException {
+
+            throw new UnsupportedOperationException();
+            
+        }
 
 	}
     
@@ -2987,6 +3005,7 @@ abstract public class WriteCache implements IWriteCache {
 	 * @return current reference count
 	 */
 	public int incrementReferenceCount() {
+	    // Note: Used from critical sections. Nothing interruptable here!
 		return m_referenceCount.incrementAndGet();
 	}
 
