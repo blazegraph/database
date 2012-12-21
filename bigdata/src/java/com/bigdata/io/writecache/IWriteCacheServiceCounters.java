@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.io.writecache;
 
+import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService.WriteTask;
 
 /**
@@ -124,4 +125,16 @@ public interface IWriteCacheServiceCounters {
      */
     String MB_PER_SEC = "mbPerSec";
 
+    /*
+     * ReadCache counters.
+     */
+    /**
+     * The #of read requests that were a miss in the cache and resulted in a
+     * read through to the disk where the record was NOT installed into the read
+     * cache (either because there is no read cache, because the record is too
+     * large for the read cache, or because the thread could not obtain a
+     * {@link ReadCache} block to install the read).
+     */
+    String NREAD_NOT_INSTALLED = "nreadNotInstalled";
+    
 } // interface IWriteCacheCounters

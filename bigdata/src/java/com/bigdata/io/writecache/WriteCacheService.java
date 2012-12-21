@@ -2146,7 +2146,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 final WriteCache nxt = cleanList.take();
                 counters.get().nclean--;
                 
-                // FIXME: should already be pristine
+                // Note: should already be pristine
                 nxt.resetWith(serviceMap);//, fileExtent.get());
                 current.set(nxt);
                 if (haLog.isInfoEnabled())
@@ -2992,14 +2992,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
         if (tmp != null) {
 
-            counters.get().nclean--; // FIXME [nclean] is for the write cache,
-                                     // not the read cache.
-
             try {
                 /*
                  * Attempt to reset the record.
                  * 
-                 * FIXME: add hot readCache data to hotCache
+                 * FIXME: add hot readCache data to hotCache and track metadata
+                 * about #of hot records retained in WCS counters.
                  */
                 tmp.resetWith(serviceMap);
             } catch (InterruptedException ex) {
@@ -3032,8 +3030,6 @@ abstract public class WriteCacheService implements IWriteCache {
      * the service is already closed NOR if there is an asynchronous close of
      * the service. Instead it just returns <code>null</code> to indicate a
      * cache miss.
-     * 
-     * FIXME Change method signature to readRaw()?
      */
     public ByteBuffer read(final long offset, final int nbytes)
             throws InterruptedException, ChecksumError {
@@ -3051,35 +3047,41 @@ abstract public class WriteCacheService implements IWriteCache {
         // Cache miss.
         counters.get().nmiss.increment();
         
-        // If we have a reader to enable callbacks then schedule concurrent read
         if (reader != null) {
-	        // Read through to the disk and install the record into cache.
-	        return loadRecord(offset, nbytes);
+            
+            /*
+             * Read through to the disk and install the record into cache.
+             */
+            return loadRecord(offset, nbytes);
+
         } else {
-        	return null;
+            
+            /*
+             * No reader. Return null. Caller is responsible for reading through
+             * to the disk.
+             */
+            
+            return null;
+            
         }
 
     }
-    /** Attempt to read record from cache (either write cache or read cache depending on the service map state). */
+
+    /**
+     * Attempt to read record from cache (either write cache or read cache
+     * depending on the service map state).
+     */
     private ByteBuffer _readFromCache(final long offset, final int nbytes)
             throws ChecksumError, InterruptedException {
-        
+    
         if (nbytes > capacity) {
             /*
              * Note: Writes larger than a single write cache buffer are NOT
              * cached.
-             * 
-             * FIXME Martyn: Verify condition for edge cases (checksum is in the
-             * record count and prefixWrites are only used with the RWS and the
-             * RWS does not do large record writes so I think that this
-             * condition is correct - BT). [Consider extracting
-             * isLargeRecord(nbytes) and using here and in write() and in
-             * _getRecord() which also needs to avoid installing a large record
-             * into the read cache.]
              */
             return null;
         }
-        
+
         final Long off = Long.valueOf(offset);
 
         while (true) {
@@ -3112,12 +3114,17 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 final ByteBuffer ret = cache.read(off.longValue(), nbytes);
 
-            	if (ret == null && serviceMap.get(off) == cache) {
-            		throw new IllegalStateException("Inconsistent cache for offset: " + off);
-            	}
+                if (ret == null && serviceMap.get(off) == cache) {
 
-            	if (ret == null && log.isDebugEnabled()) {
+                    throw new IllegalStateException(
+                            "Inconsistent cache for offset: " + off);
+                    
+                }
+
+                if (ret == null && log.isDebugEnabled()) {
+
                     log.debug("WriteCache out of sync with WriteCacheService");
+
                 }
 
                 if (ret != null) {
@@ -3223,13 +3230,11 @@ abstract public class WriteCacheService implements IWriteCache {
      * Note: This class must implement equals() and hashCode() since it is used
      * within the {@link Memoizer} pattern.
      */
-    static class LoadRecordRequest {
+    private static class LoadRecordRequest {
 
         final WriteCacheService service;
         final long offset;
         final int nbytes;
-        
-        boolean evalOnce = true;
 
         public LoadRecordRequest(final WriteCacheService service,
                 final long offset, final int nbytes) {
@@ -3275,10 +3280,11 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     final private static Computable<LoadRecordRequest, ByteBuffer> loadChild = new Computable<LoadRecordRequest, ByteBuffer>() {
 
-    	/**
+        /**
          * Loads a record from the specified address.
          * 
-         * @return A heap {@link ByteBuffer} containing the data for that record. 
+         * @return A heap {@link ByteBuffer} containing the data for that
+         *         record.
          * 
          * @throws IllegalArgumentException
          *             if addr is {@link IRawStore#NULL}.
@@ -3287,10 +3293,6 @@ abstract public class WriteCacheService implements IWriteCache {
                 throws InterruptedException {
 
 			try {
-				if (!req.evalOnce) {
-					throw new AssertionError("Some guarantee that proved!");
-				}
-				req.evalOnce = false;
 
 				return req.service._getRecord(req.offset, req.nbytes);
 
@@ -3381,7 +3383,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * same record will wait on the {@link Future} for the thread doing
      * the work.
      */
-    final ReadMemoizer memo;
+    private final ReadMemoizer memo;
 
     /**
      * Enter the memoizer pattern.
@@ -3540,7 +3542,6 @@ abstract public class WriteCacheService implements IWriteCache {
                  * No free buffer to install the read. Read directly into a heap
                  * ByteBuffer and return that to the caller.
                  */
-                // TODO counter.
                 assert willInstall == false;
                 return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
     		    }
@@ -3587,7 +3588,6 @@ abstract public class WriteCacheService implements IWriteCache {
     private final ByteBuffer _readFromLocalDiskIntoNewHeapByteBuffer(
             final long offset, final int nbytes) {
 
-        // TODO Put counter on #of reads w/ installs.
         if (log.isDebugEnabled())
             log.debug("Allocating direct, nbytes: " + nbytes);
 
@@ -3604,6 +3604,9 @@ abstract public class WriteCacheService implements IWriteCache {
                     + ",expected=" + tstchk + ",actual=" + chk);
         
         ret.limit(nbytes - 4);
+
+        // This read was not installed into the read cache.
+        counters.get().nreadNotInstalled.increment();
         
         return ret;
     
