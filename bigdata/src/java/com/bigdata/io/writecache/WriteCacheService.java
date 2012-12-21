@@ -3547,8 +3547,16 @@ abstract public class WriteCacheService implements IWriteCache {
                 assert willInstall == false;
                 return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
     		    }
-    
+
+            /*
+             * [bb] is a view onto an allocation on [theCache] into which we can
+             * install the read.
+             */
+            
+            // The offset into [bb] of the allocation.
     		    final int pos = bb.position();
+    		    
+    		    // Read the record from the disk into NIO buffer.
     		    final ByteBuffer ret = reader.readRaw(offset, bb);
     		
     		    // update record maps

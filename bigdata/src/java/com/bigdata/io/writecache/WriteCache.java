@@ -60,6 +60,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.WriteCacheService.AsynchronousCloseException;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
@@ -2950,32 +2951,65 @@ abstract public class WriteCache implements IWriteCache {
 //	    	release();
 //	    }
 //	}
-	
-	public ByteBuffer allocate(final int nbytes) throws IllegalStateException,
-			InterruptedException {
-		final ByteBuffer tmp = acquire(); // tmp=null possible on current
-											// close() of WriteCache.
-		try {
-			// if(tmp==null&&isClosed()) throw new AsyncClosedException; // if
-			// we have one for the WCS.
-			synchronized (tmp) {
-				if (remaining() > nbytes) {
-					final int pos = tmp.position();
-					tmp.position(pos + nbytes);
 
-					final ByteBuffer ret = tmp.duplicate();
-					ret.position(pos);
-					ret.limit(pos+nbytes);
-					
-					return ret;
-				} else {
-					return null;
-				}
-			}
-		} finally {
-			release();
-		}
-	}
+    /**
+     * Allocate space for a record of the given length on this
+     * {@link WriteCache}.
+     * 
+     * @param nbytes
+     *            The size of the record.
+     * 
+     * @return A view of the allocation on the {@link WriteCache} -or-
+     *         <code>null</code> if there is not enough room in this
+     *         {@link WriteCache} for the allocation.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link WriteCache} has been {@link #close() closed}.
+     * @throws InterruptedException
+     *             if the lock could not be acquired.
+     */
+    public ByteBuffer allocate(final int nbytes) throws IllegalStateException,
+            InterruptedException {
+
+        final ByteBuffer tmp = acquire();
+        
+        try {
+        
+            synchronized (tmp) {
+            
+                if (remaining() > nbytes) {
+                
+                    // [pos] the position of the new allocation.
+                    final int pos = tmp.position();
+                    
+                    // Advance position() beyond the new allocation.
+                    tmp.position(pos + nbytes);
+
+                    // Dup the buffer for independent pos and limit.
+                    final ByteBuffer ret = tmp.duplicate();
+
+                    // Setup view onto new allocation.
+                    ret.position(pos);
+                    ret.limit(pos + nbytes);
+
+                    // Return view.
+                    return ret;
+
+                } else {
+                    
+                    return null;
+
+                }
+                
+            }
+
+        } finally {
+        
+            release();
+            
+        }
+        
+    }
 	
 	void commitToMap(final long offset, final int position, final int nbytes) {
         final RecordMetadata md = new RecordMetadata(offset, position,
