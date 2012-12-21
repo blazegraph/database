@@ -2913,33 +2913,7 @@ abstract public class WriteCacheService implements IWriteCache {
         
         
         if (this.readListSize > 0) { // if there is a readCache
-        	synchronized (readCache) {
-        		final ReadCache rcache = readCache.get();
-        		if (!WriteCache.transferTo(cache, rcache, serviceMap, 0)) {
-        			// full readCache
-        			readCache.set(null);
-        			if (rcache.decrementReferenceCount()==0) {
-        				readList.add(rcache);
-        			}
-        			
-        			final ReadCache ncache = getDirectReadCache();
-        			if (ncache == null) {
-        				throw new AssertionError();
-        			}
-        			
-        			// remaining must be >= to announced capacity after getDirectReadCache
-        			if (ncache.remaining() < ncache.capacity())
-        				throw new AssertionError("New Cache, remaining() < capacity(): " + ncache.remaining() + " < " + ncache.capacity());
-        			
-        			// Now transfer remaining to new readCache
-        			if (!WriteCache.transferTo(cache, ncache, serviceMap, 0)) {
-        				throw new AssertionError("Unable to complete transfer to new cache with remaining: " + ncache.remaining());
-        			}
-        			
-        			ncache.incrementReferenceCount();
-        			readCache.set(ncache);
-        		}
-        	}
+        	installReads(cache);
         } else {
         	cache.resetWith(serviceMap);
         }
@@ -2958,6 +2932,41 @@ abstract public class WriteCacheService implements IWriteCache {
         } finally {
             cleanListLock.unlock();
         }
+    }
+    
+    public boolean installReads(final WriteCache cache) throws InterruptedException {
+    	if (readListSize == 0)
+    		return false;
+    	
+    	synchronized (readCache) {
+    		final ReadCache rcache = readCache.get();
+    		if (!WriteCache.transferTo(cache, rcache, serviceMap, 0)) {
+    			// full readCache
+    			readCache.set(null);
+    			if (rcache.decrementReferenceCount()==0) {
+    				readList.add(rcache);
+    			}
+    			
+    			final ReadCache ncache = getDirectReadCache();
+    			if (ncache == null) {
+    				throw new AssertionError();
+    			}
+    			
+    			// remaining must be >= to announced capacity after getDirectReadCache
+    			if (ncache.remaining() < ncache.capacity())
+    				throw new AssertionError("New Cache, remaining() < capacity(): " + ncache.remaining() + " < " + ncache.capacity());
+    			
+    			// Now transfer remaining to new readCache
+    			if (!WriteCache.transferTo(cache, ncache, serviceMap, 0)) {
+    				throw new AssertionError("Unable to complete transfer to new cache with remaining: " + ncache.remaining());
+    			}
+    			
+    			ncache.incrementReferenceCount();
+    			readCache.set(ncache);
+    		}
+    	}
+
+    	return true;
     }
 
     private WriteCache getDirectCleanCache() throws InterruptedException {
@@ -3385,7 +3394,8 @@ abstract public class WriteCacheService implements IWriteCache {
 		// Large records are not cached but DO use the memoizer load
     	// assert nbytes <= capacity;
     	
-
+    	// FIXME: are there still synchronization holes here and Interrupt problems?
+    	
 		/*
 		 * On entry, this thread will either install the read into the cache or
 		 * the record will already be in the cache. We are protected by the

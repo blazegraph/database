@@ -468,7 +468,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * during {@link #reset(long)} in order to propagate the then current quorum
      * token to the {@link WriteCacheService}.
      */
-    RWWriteCacheService m_writeCache;
+    RWWriteCacheService m_writeCacheService;
 
 	/**
 	 * The actual allocation sizes as read from the store.
@@ -629,7 +629,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         // Added to enable debug of rare problem
         // FIXME: disable by removal once solved
         protected void registerWriteStatus(long offset, int length, char action) {
-    		m_writeCache.debugAddrs(offset, length, action);
+    		m_writeCacheService.debugAddrs(offset, length, action);
         }
 		
         @Override
@@ -809,7 +809,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     		// setup write cache AFTER init to ensure filesize is correct!
             
-    		m_writeCache = newWriteCache();
+    		m_writeCacheService = newWriteCache();
 
     		final int maxBlockLessChk = m_maxFixedAlloc-4;
              
@@ -1036,7 +1036,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 m_bufferedWrite.release();
                 m_bufferedWrite = null;
             }
-            m_writeCache.close();
+            m_writeCacheService.close();
             m_reopener.raf.close();
         } catch (Throwable t) {
             throw new RuntimeException(t);
@@ -1638,13 +1638,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                  */
 				final ByteBuffer bbuf;
 				try {
-					bbuf = m_writeCache != null ? m_writeCache.read(paddr, length) : null;
+					bbuf = m_writeCacheService != null ? m_writeCacheService.read(paddr, length) : null;
 				} catch (Throwable t) {
                     throw new IllegalStateException(
                             "Error reading from WriteCache addr: " + paddr
                                     + " length: " + (length - 4)
                                     + ", writeCacheDebug: "
-                                    + m_writeCache.addrDebugInfo(paddr), t);
+                                    + m_writeCacheService.addrDebugInfo(paddr), t);
 				}
 				if (bbuf != null) {
 					if (bbuf.limit() != length-4) {
@@ -1653,7 +1653,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                                 "Incompatible buffer size for addr: " + paddr
                                         + ", " + bbuf.limit() + " != "
                                         + (length - 4) + " writeCacheDebug: "
-                                        + m_writeCache.addrDebugInfo(paddr));
+                                        + m_writeCacheService.addrDebugInfo(paddr));
 					}
 					final byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
 					for (int i = 0; i < length-4; i++) {
@@ -1716,8 +1716,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 					if (chk != tstchk) {
 						assertAllocators();
 						
-						if (m_writeCache != null) {
-							final String cacheDebugInfo = m_writeCache.addrDebugInfo(paddr);
+						if (m_writeCacheService != null) {
+							final String cacheDebugInfo = m_writeCacheService.addrDebugInfo(paddr);
 							log.warn("Invalid data checksum for addr: " + paddr 
 									+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
 									+ ", first bytes: " + toHexString(buf, 32) + ", successful reads: " + m_diskReads
@@ -1951,7 +1951,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			if (log.isDebugEnabled())
 				log.debug("RELEASE SESSIONS");
 			for (FixedAllocator fa : m_allocs) {
-				fa.releaseSession(m_writeCache);
+				fa.releaseSession(m_writeCacheService);
 			}
 		}
 	}
@@ -2067,7 +2067,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			if (overrideSession || !this.isSessionProtected()) {
                 // Only overwrite if NOT committed
                 if (!alloc.isCommitted(addrOffset)) {
-    				    m_writeCache.clearWrite(pa,addr);
+    				    m_writeCacheService.clearWrite(pa,addr);
 //                    m_writeCache.overwrite(pa, sze);
                     /*
                      * Pass the size of the allocator, NOT the size of the
@@ -2334,7 +2334,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		final long pa = physicalAddress(newAddr);
 
 		try {
-			m_writeCache.write(pa, ByteBuffer.wrap(buf, 0, size), chk, true/*writeChecksum*/, newAddr/*latchedAddr*/);
+			m_writeCacheService.write(pa, ByteBuffer.wrap(buf, 0, size), chk, true/*writeChecksum*/, newAddr/*latchedAddr*/);
 		} catch (InterruptedException e) {
             throw new RuntimeException("Closed Store?", e);
 		}
@@ -2447,7 +2447,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * we must remember so that we avoid clearing down the store.
              */
             for (FixedAllocator fa : m_allocs) {
-            	isolatedWrites = isolatedWrites || fa.reset(m_writeCache, m_committedNextAllocation);
+            	isolatedWrites = isolatedWrites || fa.reset(m_writeCacheService, m_committedNextAllocation);
 			}
             
             if (!isolatedWrites) {
@@ -2498,8 +2498,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                  *      href="https://sourceforge.net/apps/trac/bigdata/ticket/530">
                  *      HA Journal </a>
                  */
-                m_writeCache.close();
-                m_writeCache = newWriteCache();
+                m_writeCacheService.close();
+                m_writeCacheService = newWriteCache();
             }
             /*
              * Discard any writes on the delete blocks. Those deletes MUST NOT
@@ -2583,7 +2583,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		assert addr > 0;
 		
 		try {
-			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr/*latchedAddr*/);
+			m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr/*latchedAddr*/);
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
@@ -2669,7 +2669,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 				try {
 
 				    // do not use checksum
-				    m_writeCache.write(metaBit2Addr(naddr), ByteBuffer
+				    m_writeCacheService.write(metaBit2Addr(naddr), ByteBuffer
                         .wrap(allocator.write()), 0/*chk*/, false/*useChecksum*/,0/*latchedAddr*/);
 				    
 				} catch (InterruptedException e) {
@@ -2683,8 +2683,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			writeMetaBits();
 
 			try {
-				m_writeCache.flush(true);
-				lastBlockSequence = m_writeCache.resetSequence();
+				m_writeCacheService.flush(true);
+				lastBlockSequence = m_writeCacheService.resetSequence();
 			} catch (InterruptedException e) {
 			    log.error(e, e);
 				throw new RuntimeException(e);
@@ -3084,7 +3084,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			clrBit(m_metaTransientBits, bit);
 		}
 		
-		m_writeCache.clearWrite(metaBit2Addr(bit),0/*latchedAddr*/);
+		m_writeCacheService.clearWrite(metaBit2Addr(bit),0/*latchedAddr*/);
 	}
 
     /**
@@ -3301,7 +3301,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             storeCounters.get().ntruncate++;
 			
             // must ensure writeCache is in sync for HA
-			m_writeCache.setExtent(toAddr);
+			m_writeCacheService.setExtent(toAddr);
 
 			if (log.isInfoEnabled()) log.info("Extend file done");
 		} catch (Throwable t) {
@@ -3692,7 +3692,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
         try {
         
-            m_writeCache.flush(metadata);
+            m_writeCacheService.flush(metadata);
 
             // sync the disk.
             m_reopener.reopenChannel().force(metadata);
@@ -4366,7 +4366,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     : m_parent.m_context;
 
 			for (FixedAllocator f : m_allFixed) {
-				f.abortAllocationContext(pcontext, m_store.m_writeCache);
+				f.abortAllocationContext(pcontext, m_store.m_writeCacheService);
 				f.setFreeList(freeFixed[m_store.fixedAllocatorIndex(f.m_size)]);
 			}
 			
@@ -5119,11 +5119,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         // attach the most recently updated values from the striped counters.
         root.attach(storeCounters.get().getCounters());
 
-        if (m_writeCache != null) {
+        if (m_writeCacheService != null) {
 
             final CounterSet tmp = root.makePath("writeCache");
 
-            tmp.attach(m_writeCache.getCounters());
+            tmp.attach(m_writeCacheService.getCounters());
 
         }
         
@@ -5140,7 +5140,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
          * including a ZERO (0) data length if any offset winds up being deleted
          * (released).
          */
-        final WriteCache writeCache = m_writeCache.newWriteCache(b,
+        final WriteCache writeCache = m_writeCacheService.newWriteCache(b,
                 true/* useChecksums */, true/* bufferHasData */, m_reopener,
                 msg.getFileExtent());
         
@@ -5166,8 +5166,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             // Flush writes.
             writeCache.flush(false/* force */);
             
-            // TODO transferTo readCache
-            
+            // install reads into readCache (if any)
+            m_writeCacheService.installReads(writeCache);
         } finally {
             m_allocationLock.unlock();
         }
@@ -5374,11 +5374,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	}
 
 	public void showWriteCacheDebug(long paddr) {
-		log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCache.addrDebugInfo(paddr));
+		log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCacheService.addrDebugInfo(paddr));
 	}
 
 	public CounterSet getWriteCacheCounters() {
-		return m_writeCache.getCounters();
+		return m_writeCacheService.getCounters();
 	}
 
 //	/**
@@ -5435,7 +5435,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 	public boolean inWriteCache(final int rwaddr) {
 		
-	    return m_writeCache.isPresent(physicalAddress(rwaddr, true));
+	    return m_writeCacheService.isPresent(physicalAddress(rwaddr, true));
 	    
 	}
 
