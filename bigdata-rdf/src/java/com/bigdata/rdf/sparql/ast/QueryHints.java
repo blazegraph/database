@@ -398,7 +398,7 @@ public interface QueryHints {
      */
     String SOLUTION_SET_CACHE = "solutionSetCache";
 
-    boolean DEFAULT_SOLUTION_SET_CACHE = true;
+    boolean DEFAULT_SOLUTION_SET_CACHE = false;
 
     /**
      * When <code>true</code> a DESCRIBE cache will be maintained. This can
