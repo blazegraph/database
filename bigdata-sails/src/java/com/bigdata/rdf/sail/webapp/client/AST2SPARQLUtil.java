@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 5, 2012
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sail.webapp.client;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +36,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 /**
- * Utility class for externalizing {@link TermNode}s.
+ * Utility class for externalizing SPARQL prefix declaration management.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

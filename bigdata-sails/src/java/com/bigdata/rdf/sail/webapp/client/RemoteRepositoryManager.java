@@ -40,11 +40,9 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
-import com.bigdata.rdf.sail.webapp.MiniMime;
-import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 
 /**
- * Java client for Multi-Tenancy API on remote {@link NanoSparqlServer}.
+ * Java client for the Multi-Tenancy API on a remote Nano Sparql Server.
  * 
  * <p>
  * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
@@ -54,6 +52,9 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
  *      > NanoSparqlServer REST API </a>
  * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
+ *      a bigdata-client jar for the NSS REST API </a>
+ *      
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class RemoteRepositoryManager extends RemoteRepository {

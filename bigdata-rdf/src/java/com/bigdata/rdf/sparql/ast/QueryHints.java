@@ -398,15 +398,15 @@ public interface QueryHints {
      */
     String SOLUTION_SET_CACHE = "solutionSetCache";
 
-    boolean DEFAULT_SOLUTION_SET_CACHE = false;
+    boolean DEFAULT_SOLUTION_SET_CACHE = true;
 
     /**
      * When <code>true</code> a DESCRIBE cache will be maintained. This can
-     * DESCRIBE queries, linked data queries (which are mapped to a DESCRIBE
-     * query by the NSS), and potentially accelerate star-joins (if the query
-     * plan is rewritten to hit the DESCRIBE cache and obtain the materialized
-     * joins from it, but this is best done with a fully materialized and
-     * synchronously maintained DESCRIBE cache).
+     * accelerate DESCRIBE queries, linked data queries (which are mapped to a
+     * DESCRIBE query by the NSS), and potentially accelerate star-joins (if the
+     * query plan is rewritten to hit the DESCRIBE cache and obtain the
+     * materialized joins from it, but this is best done with a fully
+     * materialized and synchronously maintained DESCRIBE cache).
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
      *      DESCRIBE CACHE </a>

@@ -58,6 +58,7 @@ import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.util.InnerCause;
 
 /**

@@ -49,6 +49,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
  * Handler for DELETE by query (DELETE verb) and DELETE by data (POST).

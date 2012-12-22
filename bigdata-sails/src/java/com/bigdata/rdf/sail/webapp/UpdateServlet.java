@@ -50,6 +50,8 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
  * Handler for NanoSparqlServer REST API UPDATE operations (PUT, not SPARQL

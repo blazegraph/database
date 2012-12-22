@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 7, 2007
  */
 
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.sail.webapp.client;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,37 +55,14 @@ public class TestAll extends TestCase {
 
     public static Test suite() {
 
-        final TestSuite suite = new TestSuite("WebApp");
-
+        final TestSuite suite = new TestSuite("WebApp Client");
+       
         /*
-         * WebApp Client.
+         * Test suite for utility class to encode and decode RDF Values for
+         * interchange via the REST API.
          */
-        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
-
-        /*
-         * Test suite utility class for building XML/HTML documents.
-         */
-        suite.addTestSuite(TestXMLBuilder.class);
-        
-        /*
-         * Test suite for content negotiation.
-         */
-        suite.addTestSuite(TestConneg.class);
-        
-        /*
-         * Core test suite for REST API behavior. This test suite is run for
-         * each mode of the database (triples, sids, quads).
-         * 
-         * Note: The test suite can also be run against a federation using the
-         * main() routine in TestNanoSparqlServerWithProxyIndexManager.
-         */
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
-        
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
-        
+        suite.addTestSuite(TestEncodeDecodeValue.class);
+                
         return suite;
 
     }

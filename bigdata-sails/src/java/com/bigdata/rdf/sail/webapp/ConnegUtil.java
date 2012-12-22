@@ -39,6 +39,7 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.properties.PropertiesFormat;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 
 /**

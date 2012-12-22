@@ -65,10 +65,9 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import org.openrdf.rio.RDFFormat;
-
 /**
  * Formats for a properties file.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class PropertiesFormat extends FileFormat implements Iterable<PropertiesFormat> {
