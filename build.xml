@@ -475,16 +475,8 @@ public class BuildInfo {
 			</java>
 	</target>
 
-   <!-- -Y ${build.dir}/lib/${version}.jar
-               -Y ${bigdata.dir}/bigdata/lib/*.jar
-               -Y ${bigdata.dir}/bigdata/lib/unimi/*.jar
-               -Y ${bigdata.dir}/bigdata/lib/icu/*.jar
-               -Y ${bigdata.dir}/bigdata/lib/jetty/*.jar
-               -Y ${bigdata.dir}/bigdata/lib/lucene/*.jar
-               -Y ${bigdata.dir}/bigdata-rdf/lib/*.jar
-               -Y ${bigdata.dir}/bigdata-sails/lib/httpcomponents/*.jar
-                  -c ${build.dir}/lib/${version}.jar
-clean, prepare, jar
+   <!-- @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" >
+                      Create a bigdata-client jar for the NSS REST API </a>
     -->
    <target name="bigdata-client" depends="clean, prepare, jar"  
          description="Prepare the bigdata web access client library.">
