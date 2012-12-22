@@ -2213,7 +2213,9 @@ abstract public class WriteCache implements IWriteCache {
 
             if (removed == null) {
                 // Must be present.
-                throw new AssertionError();
+                // throw new AssertionError();
+            	
+            	return false;
             }
             
             removed.deleted = true;
