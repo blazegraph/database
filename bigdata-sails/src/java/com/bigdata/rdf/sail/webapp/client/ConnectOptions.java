@@ -30,7 +30,6 @@ package com.bigdata.rdf.sail.webapp.client;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,7 @@ import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.rdf.ServiceProviderHook;
+//import com.bigdata.rdf.ServiceProviderHook;
 
 /**
  * Options for the HTTP connection.
@@ -89,7 +88,18 @@ public class ConnectOptions {
 
     static {
 
-        ServiceProviderHook.forceLoad();
+        /**
+         * Note: This has been commented out. If it is included, then a lot of
+         * the total code base gets dragged into the bigdata-client JAR. If this
+         * creates a problem for clients, then we will need to examine the
+         * bigdata RDF model and bigdata RDF parser packages carefully and
+         * relayer them in order to decouple them from the rest of the code
+         * base.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" >
+         *      Create a bigdata-client jar for the NSS REST API </a>
+         */
+//        ServiceProviderHook.forceLoad();
 
         /*
          * FIXME We really need to know whether we are talking to a triple or
