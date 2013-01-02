@@ -179,7 +179,7 @@ public class TestSubjectCentricFullTextIndex extends AbstractTripleStoreTestCase
 
     private LiteralImpl getLargeLiteral(final AbstractTripleStore store) {
         
-        final int len = store.getLexiconRelation().getBlobsThreshold();
+        final int len = store.getLexiconRelation().getLexiconConfiguration().getBlobsThreshold();
 
         final StringBuilder sb = new StringBuilder(len);
 

@@ -475,15 +475,15 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         
     }
 
-    protected void assertWritable() {
-        
-        if(isReadOnly()) {
-            
-            throw new IllegalStateException("READ_ONLY");
-            
-        }
-        
-    }
+//    protected void assertWritable() {
+//        
+//        if(isReadOnly()) {
+//            
+//            throw new IllegalStateException("READ_ONLY");
+//            
+//        }
+//        
+//    }
 
     /**
      * Ctor specified by {@link DefaultResourceLocator}.

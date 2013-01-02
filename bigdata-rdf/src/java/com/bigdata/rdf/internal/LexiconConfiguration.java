@@ -30,6 +30,7 @@ package com.bigdata.rdf.internal;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -58,7 +59,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -82,15 +83,15 @@ public class LexiconConfiguration<V extends BigdataValue>
     private static final Logger log = 
         Logger.getLogger(LexiconConfiguration.class);
 
-//    /**
-//     * The maximum character length of an RDF {@link Value} before it will be
-//     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
-//     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
-//     * indices.
-//     * 
-//     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
-//     */
-//    private final int blobsThreshold;
+    /**
+     * The maximum character length of an RDF {@link Value} before it will be
+     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
+     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
+     * indices.
+     * 
+     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+     */
+    private final int blobsThreshold;
     
     private final long MAX_UNSIGNED_BYTE = 1 << 9 - 1;
     private final long MAX_UNSIGNED_SHORT = 1 << 17 -1;
@@ -134,8 +135,13 @@ public class LexiconConfiguration<V extends BigdataValue>
 	 * @see AbstractTripleStore.Options#INLINE_DATE_TIMES
 	 */
 	private final boolean inlineDateTimes;
-    
+
     /**
+     * @see AbstractTripleStore.Options#INLINE_DATE_TIMES_TIMEZONE
+     */
+	private final TimeZone inlineDateTimesTimeZone;
+
+	/**
      * @see AbstractTripleStore.Options#REJECT_INVALID_XSD_VALUES
      */
     final boolean rejectInvalidXSDValues;
@@ -174,28 +180,42 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
     
-    /**
-     * Return the maximum length of a Unicode string which may be inlined into
-     * the statement indices. This applies to blank node IDs, literal labels
-     * (including the {@link XSDStringExtension}), local names of {@link URI}s,
-     * etc.
-     * 
-     * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
-     */
     public int getMaxInlineStringLength() {
 
         return maxInlineTextLength;
         
     }
 
-    /**
-     * 
-     * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
-     */
     public boolean isInlineTextLiterals() {
     	
-    	return inlineTextLiterals;
+        return inlineTextLiterals;
     	
+    }
+
+    @Override
+    public boolean isInlineLiterals() {
+
+        return inlineXSDDatatypeLiterals;
+        
+    }
+
+    @Override
+    public boolean isInlineDateTimes() {
+        return inlineDateTimes;
+    }
+
+    @Override
+    public TimeZone getInlineDateTimesTimeZone() {
+
+        return inlineDateTimesTimeZone;
+        
+    }
+    
+    @Override
+    public int getBlobsThreshold() {
+        
+        return blobsThreshold;
+        
     }
 
     public String toString() {
@@ -204,7 +224,11 @@ public class LexiconConfiguration<V extends BigdataValue>
     	
     	sb.append(getClass().getName());
     	
-		sb.append("{ "
+        sb.append("{ "
+                + AbstractTripleStore.Options.BLOBS_THRESHOLD
+                + "=" + blobsThreshold);
+        
+		sb.append(", "
 				+ AbstractTripleStore.Options.INLINE_XSD_DATATYPE_LITERALS
 				+ "=" + inlineXSDDatatypeLiterals);
 
@@ -237,20 +261,21 @@ public class LexiconConfiguration<V extends BigdataValue>
     
     @SuppressWarnings("rawtypes")
     public LexiconConfiguration(//
-//            final int blobsThreshold,
+            final int blobsThreshold,
             final boolean inlineXSDDatatypeLiterals,//
             final boolean inlineTextLiterals,//
             final int maxInlineTextLength,//
             final boolean inlineBNodes,//
             final boolean inlineDateTimes,//
+            final TimeZone inlineDateTimesTimeZone,
             final boolean rejectInvalidXSDValues,
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory//
             ) {
 
-//        if (blobsThreshold < 0)
-//            throw new IllegalArgumentException();
+        if (blobsThreshold < 0)
+            throw new IllegalArgumentException();
 
         if (maxInlineTextLength < 0)
             throw new IllegalArgumentException();
@@ -261,12 +286,13 @@ public class LexiconConfiguration<V extends BigdataValue>
         if (valueFactory == null)
             throw new IllegalArgumentException();
 
-//        this.blobsThreshold = blobsThreshold;
+        this.blobsThreshold = blobsThreshold;
         this.inlineXSDDatatypeLiterals = inlineXSDDatatypeLiterals;
         this.inlineTextLiterals = inlineTextLiterals;
         this.maxInlineTextLength = maxInlineTextLength;
         this.inlineBNodes = inlineBNodes;
         this.inlineDateTimes = inlineDateTimes;
+        this.inlineDateTimesTimeZone = inlineDateTimesTimeZone;
         this.rejectInvalidXSDValues = rejectInvalidXSDValues;
         this.xFactory = xFactory;
         this.vocab = vocab;
@@ -284,9 +310,9 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     @SuppressWarnings("unchecked")
-    public void initExtensions(final LexiconRelation lex) {
+    public void initExtensions(final IDatatypeURIResolver resolver) {
 
-        xFactory.init(lex);
+        xFactory.init(resolver, (ILexiconConfiguration<BigdataValue>) this/* config */);
 
         for (IExtension<BigdataValue> extension : xFactory.getExtensions()) {
 
@@ -906,5 +932,5 @@ public class LexiconConfiguration<V extends BigdataValue>
         }
 
     }
-    
+
 }
