@@ -27,7 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataValue;
+
 
 /**
  * A class which does not support any extensions.
@@ -38,7 +39,8 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 public class NoExtensionFactory implements IExtensionFactory {
 
     @Override
-    public void init(LexiconRelation lex) {
+    public void init(final IDatatypeURIResolver lex,
+            final ILexiconConfiguration<BigdataValue> config) {
 
     }
 

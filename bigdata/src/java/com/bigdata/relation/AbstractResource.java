@@ -49,6 +49,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.rules.FastClosure;
 import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.RuleFastClosure5;
@@ -840,5 +841,21 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 //        properties.put(name, value);
 //
 //    }
+
+    public boolean isReadOnly() {
+
+        return TimestampUtility.isReadOnly(getTimestamp());
+        
+    }
+    
+    final protected void assertWritable() {
+        
+        if(isReadOnly()) {
+            
+            throw new IllegalStateException("READ_ONLY");
+            
+        }
+        
+    }
 
 }

@@ -340,6 +340,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 AbstractTripleStore.Options.STORE_BLANK_NODES,
                 AbstractTripleStore.Options.DEFAULT_STORE_BLANK_NODES));
         
+        final int blobsThreshold;
         {
 
             blobsThreshold = Integer.parseInt(getProperty(
@@ -556,8 +557,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              */
             
             lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
+                    blobsThreshold,
                     inlineLiterals, inlineTextLiterals,
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
+                    inlineDateTimesTimeZone,
                     rejectInvalidXSDValues, xFactory, vocab, valueFactory);
 
         }
@@ -769,15 +772,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     private final boolean storeBlankNodes;
     
-    /**
-     * The maximum character length of an RDF {@link Value} before it will be
-     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
-     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
-     * indices.
-     * 
-     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
-     */
-    private final int blobsThreshold;
+//    /**
+//     * The maximum character length of an RDF {@link Value} before it will be
+//     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
+//     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
+//     * indices.
+//     * 
+//     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+//     */
+//    private final int blobsThreshold;
 
     /**
      * @see AbstractTripleStore.Options#TERMID_BITS_TO_REVERSE
@@ -1557,6 +1560,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     public boolean isBlob(final Value v) {
 
+        final int blobsThreshold = lexiconConfiguration.getBlobsThreshold();
+
         if (blobsThreshold == 0)
             return true;
         
@@ -1564,17 +1569,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
-    /**
-     * Return the threshold at which a literal would be stored in the
-     * {@link LexiconKeyOrder#BLOBS} index.
-     * 
-     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
-     */
-    public int getBlobsThreshold() {
-        
-        return blobsThreshold;
-        
-    }
+//    /**
+//     * Return the threshold at which a literal would be stored in the
+//     * {@link LexiconKeyOrder#BLOBS} index.
+//     * 
+//     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+//     */
+//    public int getBlobsThreshold() {
+//        
+//        return blobsThreshold;
+//        
+//    }
     
     /**
      * Batch insert of terms into the database.

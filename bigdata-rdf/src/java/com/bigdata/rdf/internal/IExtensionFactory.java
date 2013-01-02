@@ -24,8 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.URI;
+
 import com.bigdata.rdf.internal.impl.BlobIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * IExtensionFactories are responsible for enumerating what extensions are
@@ -38,14 +41,21 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 public interface IExtensionFactory {
 
     /**
-     * This will be called very early in the IExtensionFactory lifecycle so that 
-     * the {@link BlobIV}s for the {@link IExtension}'s datatype URIs will be on 
-     * hand when needed.  Also gets other relevant configuration information
-     * from the lexicon such as whether or not to inline xsd:datetimes and what
+     * This will be called very early in the IExtensionFactory lifecycle so that
+     * the {@link BlobIV}s for the {@link IExtension}'s datatype URIs will be on
+     * hand when needed. Also gets other relevant configuration information from
+     * the lexicon such as whether or not to inline xsd:datetimes and what
      * timezone to use to do so.
+     * 
+     * @param resolver
+     *            The interface used to resolve an {@link URI} to an
+     *            {@link BigdataURI}.
+     * @param config
+     *            The {@link ILexiconConfiguration}.
      */
-    void init(final LexiconRelation lex);
-    
+    void init(final IDatatypeURIResolver resolver,
+            final ILexiconConfiguration<BigdataValue> config);
+
     /**
      * Return the supported extensions.
      */

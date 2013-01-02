@@ -410,15 +410,15 @@ public class BigdataFileSystem extends
         
     }
     
-    final protected void assertWritable() {
-        
-        if(isReadOnly()) {
-            
-            throw new IllegalStateException("READ_ONLY");
-            
-        }
-        
-    }
+//    final protected void assertWritable() {
+//        
+//        if(isReadOnly()) {
+//            
+//            throw new IllegalStateException("READ_ONLY");
+//            
+//        }
+//        
+//    }
     
     /**
      * Note: A commit is required in order for a read-committed view to have

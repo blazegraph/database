@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -71,7 +72,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -930,11 +930,14 @@ public class HashCollisionUtility {
 		// factory does not support any extensions.
 		final IExtensionFactory xFactory = new IExtensionFactory() {
 
-			public void init(LexiconRelation lex) {
-				// NOP
+            @Override
+            public void init(final IDatatypeURIResolver resolver,
+                    final ILexiconConfiguration<BigdataValue> config) {
+                // NOP
 			}
 
-			@SuppressWarnings("unchecked")
+		    @Override
+			@SuppressWarnings("rawtypes")
 			public IExtension[] getExtensions() {
 				return new IExtension[] {};
 			}
@@ -948,12 +951,13 @@ public class HashCollisionUtility {
 		 * since the DateTimeExtension uses the LexiconRelation to do its work.
 		 */
 		conf = new LexiconConfiguration<BigdataValue>(
-//		        256,  // blobsThreshold
+		        256,  // blobsThreshold
 				true, // inlineXSDDatatypeLiterals
 				true, // inlineTextLiterals
 				64,   // maxInlineStringLength
 				true, // inlineBNodes
 				false, // inlineDateTimes
+				TimeZone.getDefault(), // inlineDateTimesTimeZone
 				false, // rejectInvalidXSDValues
 				xFactory, // extension factory
 				vocab,    // predefined vocabulary
