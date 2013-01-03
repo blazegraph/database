@@ -59,14 +59,17 @@ import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -419,9 +422,31 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 queryRoot.setDataset(dataSetNode);
 
             }
+            
+            /*
+             * I think here we could set the value expressions and do last-
+             * minute validation.
+             */
+            final ASTSetValueExpressionsOptimizer opt = 
+            		new ASTSetValueExpressionsOptimizer();
+            
+            final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
+            
+            final QueryRoot queryRoot2 = (QueryRoot)
+            		opt.optimize(context2, queryRoot, null);
+            
+            BigdataExprBuilder.verifyAggregate(queryRoot2);
 
             return ast;
 
+        } catch (IllegalArgumentException e) {
+        
+            throw new MalformedQueryException(e.getMessage(), e);
+            
+        } catch (VisitorException e) {
+        
+            throw new MalformedQueryException(e.getMessage(), e);
+            
         } catch (ParseException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);
