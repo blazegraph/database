@@ -131,6 +131,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
@@ -4295,6 +4296,17 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
                     return ve;
 
+                }
+                
+                if (op instanceof UnknownFunctionBOp) {
+                	
+                	/*
+                	 * We want to defer on unknown functions until execution
+                	 * time (to allow simple parsing to succeed).
+                	 */
+                	
+                	return ve;
+                	
                 }
 
             }

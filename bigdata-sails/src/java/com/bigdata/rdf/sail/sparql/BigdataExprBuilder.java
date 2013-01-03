@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.query.algebra.TupleExpr;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -186,7 +187,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleBindings(astQuery, queryRoot);
         
-        verifyAggregate(queryRoot);
+//        verifyAggregate(queryRoot);
 
         return queryRoot;
 
@@ -266,7 +267,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         handleBindings(node, queryRoot);
         
-        verifyAggregate(queryRoot);
+//        verifyAggregate(queryRoot);
 
         return queryRoot;
         
@@ -418,7 +419,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         
         handleBindings(node, queryRoot);
 
-        verifyAggregate(queryRoot);
+//        verifyAggregate(queryRoot);
         
         return queryRoot;
 
@@ -1027,24 +1028,34 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
      * 
      * @throws VisitorException
      */
-    private void verifyAggregate(final QueryBase queryBase)
+    public static void verifyAggregate(final QueryBase queryBase)
             throws VisitorException {
 
-        if(true)
-            return;
+//        if(true)
+//            return;
         
         /*
-         * FIXME The following code has some dependencies on whether or not the
+         * The following code has some dependencies on whether or not the
          * value expressions have been cached. That is not done until we get
          * into AST2BOpUtility. I have worked some hacks to support this in
          * FunctionRegistry.isAggregate() and StaticAnalysis.isAggregate().
          * However, the code is still hitting some edge cases.
+         * 
+         * MP: I fixed this by running the ASTSetValueOptimizer earlier in the
+         * parsing process - ie. in Bigdata2ASTSPARQLParser.parseQuery2.
          * 
          * There is some commented out code from openrdf that depends on setting
          * a flag for the expression if an AggregationCollector reports at least
          * one aggregation in a projection element. We could do this same thing
          * here but we still need to have the logic to figure out what is an
          * invalid aggregate.
+         * 
+         * MP: I think the place to go look for reference is Sesame's
+         * TupleExprBuilder, especially:
+         * 
+         * public TupleExpr visit(ASTSelect node, Object data)
+         * 
+         * And also look at the AggregateCollector.
          */
         
         final ProjectionNode projection = queryBase.getProjection() == null ? null

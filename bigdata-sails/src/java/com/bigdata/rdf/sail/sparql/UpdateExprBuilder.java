@@ -38,6 +38,7 @@ import java.util.List;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -236,6 +237,21 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         final JoinGroupNode whereClause = graphPattern.buildGroup(new JoinGroupNode());
 
         graphPattern = parentGP;
+
+        // no blank nodes in DELETE WHERE statement patterns
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+        		whereClause, StatementPatternNode.class);
+
+        while (itr.hasNext()) {
+
+            final StatementPatternNode sp = itr.next();
+            
+            // Blank nodes are not permitted in DELETE WHERE.
+            // Note: predicate can never be a blank node (always URI)
+            assertNotAnonymousVariable(sp.s());
+            assertNotAnonymousVariable(sp.o());
+            
+        }
 
         final DeleteInsertGraph op = new DeleteInsertGraph();
 
@@ -788,12 +804,13 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         while (itr.hasNext()) {
 
             final StatementPatternNode sp = itr.next();
-
+            
             if (!allowVars) {
                 // Variables not permitted in INSERT DATA or DELETE DATA.
                 assertNotVariable(sp.s());
                 assertNotVariable(sp.p());
                 assertNotVariable(sp.o());
+                assertNotVariable(sp.c());
             }
             if (!allowBlankNodes) {
                 // Blank nodes are not permitted in DELETE DATA.
@@ -840,6 +857,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      */
     private void assertNotVariable(final TermNode t) throws VisitorException {
 
+    	if (t == null)
+    		return;
+    	
         if (!t.isVariable())
             return;
 
@@ -849,6 +869,9 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             // Blank node (versus a variable)
             return;
         }
+        
+        throw new VisitorException(
+                "Variable not permitted in this context: " + t);
 
     }
     
@@ -861,17 +884,26 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
     private void assertNotAnonymousVariable(final TermNode t)
             throws VisitorException {
 
-        if (!t.isVariable())
-            return;
+        if (t.isVariable()) {
         
-        final VarNode v = (VarNode) t;
-        
-        if (v.isAnonymous())
-            throw new VisitorException(
-                    "BlankNode not permitted in this context: " + t);
+	        final VarNode v = (VarNode) t;
+	        
+	        if (v.isAnonymous())
+	            throw new VisitorException(
+	                    "BlankNode not permitted in this context: " + t);
+	        
+        } else {
+        	
+    		final IV iv = t.getValueExpression().get();
+    		
+    		if (iv.isBNode())
+                throw new VisitorException(
+                        "BlankNode not permitted in this context: " + t);
+        	
+        }
         
     }
-
+    
     /**
      * Convert the {@link TermNode} to a {@link BigdataValue}. IFF the
      * {@link TermNode} is an anonymous variable, then it is converted into a

@@ -278,45 +278,45 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
      */
     public void test_syntax_update_bad_03() throws MalformedQueryException {
 
-        final String query = "DELETE DATA { ?s <p> <o> }";
+        final String query = "DELETE DATA { ?s <:p> <:o> }";
 
-        parseOperation(query);
+        negativeTest(query);
 
     }
 
     /** Variable in INSERT DATA's data. */
     public void test_syntax_update_bad_04() throws MalformedQueryException {
 
-        final String query = "INSERT DATA { GRAPH ?g {<s> <p> <o> } }";
+        final String query = "INSERT DATA { GRAPH ?g {<:s> <:p> <:o> } }";
 
-        parseOperation(query);
+        negativeTest(query);
 
     }
     
     /** Too many separators (in UPDATE request) */
     public void test_syntax_update_bad_08() throws MalformedQueryException {
 
-        final String query = "CREATE GRAPH <g> ;; LOAD <remote> into GRAPH <g>";
+        final String query = "CREATE GRAPH <:g> ;; LOAD <:remote> into GRAPH <:g>";
 
-        parseOperation(query);
+        negativeTest(query);
 
     }
     
     /** Too many separators (in UPDATE request) */
     public void test_syntax_update_bad_09() throws MalformedQueryException {
 
-        final String query = "CREATE GRAPH <g> ; LOAD <remote> into GRAPH <g> ;;";
+        final String query = "CREATE GRAPH <:g> ; LOAD <:remote> into GRAPH <:g> ;;";
 
-        parseOperation(query);
+        negativeTest(query);
 
     }
     
     /** BNode in DELETE WHERE */
     public void test_syntax_update_bad_10() throws MalformedQueryException {
 
-        final String query = "DELETE WHERE { _:a <p> <o> }";
+        final String query = "DELETE WHERE { _:a <:p> <:o> }";
 
-        parseOperation(query);
+        negativeTest(query);
 
     }
     

@@ -200,6 +200,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?s where {?s ?p ?o} GROUP BY ?o
      * </pre>
+     * 
+     * MP: Pretty sure this is an illegal query?
      */
     public void test_groupBy_bareVar() throws MalformedQueryException, TokenMgrError,
             ParseException {
@@ -243,6 +245,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?s where {?s ?p ?o} GROUP BY (?o AS ?z)
      * </pre>
+     * 
+     * MP: Pretty sure this is an illegal query?
      */
     public void test_groupBy_bindExpr() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -288,6 +292,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?s where {?s ?p ?o} GROUP BY str(?o)
      * </pre>
+     * 
+     * MP: Pretty sure this is an illegal query?
      */
     public void test_groupBy_functionCall() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -337,6 +343,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT ?s where {?s ?p ?o} HAVING (?o GT ?s)
      * </pre>
+     * 
+     * MP: Pretty sure this is an illegal query?
      */
     public void test_having() throws MalformedQueryException,
             TokenMgrError, ParseException {
