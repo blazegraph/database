@@ -233,9 +233,14 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         }
 
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
+        /*
+         * We can't ask the parser to parse this query anymore (it's an illegal
+         * aggregation query) because the parser will throw an error now that
+         * it checks for these sorts of things.
+         */
+//        final QueryRoot actual = parse(sparql, baseURI);
+//
+//        assertSameAST(sparql, expected, actual);
 
     }
 
@@ -280,9 +285,14 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         }
 
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
+        /*
+         * We can't ask the parser to parse this query anymore (it's an illegal
+         * aggregation query) because the parser will throw an error now that
+         * it checks for these sorts of things.
+         */
+//        final QueryRoot actual = parse(sparql, baseURI);
+//
+//        assertSameAST(sparql, expected, actual);
 
     }
 
@@ -330,9 +340,14 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         }
 
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
+        /*
+         * We can't ask the parser to parse this query anymore (it's an illegal
+         * aggregation query) because the parser will throw an error now that
+         * it checks for these sorts of things.
+         */
+//        final QueryRoot actual = parse(sparql, baseURI);
+//
+//        assertSameAST(sparql, expected, actual);
 
     }
 
@@ -380,9 +395,14 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
         }
 
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
+        /*
+         * We can't ask the parser to parse this query anymore (it's an illegal
+         * aggregation query) because the parser will throw an error now that
+         * it checks for these sorts of things.
+         */
+//        final QueryRoot actual = parse(sparql, baseURI);
+//
+//        assertSameAST(sparql, expected, actual);
 
     }
 
