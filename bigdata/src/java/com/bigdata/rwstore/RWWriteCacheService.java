@@ -49,12 +49,13 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
     
     public RWWriteCacheService(final int nbuffers, final int maxDirtyListSize, final int readBuffers,
             final boolean prefixWrites, final int compactionThreshold,
+            final int hotCacheSize, final int hotCacheThreshold,
             final long fileExtent,
             final IReopenChannel<? extends Channel> opener, final Quorum quorum,
             final IBackingReader reader)
             throws InterruptedException, IOException {
 
-        super(nbuffers, maxDirtyListSize,  readBuffers, prefixWrites, compactionThreshold,
+        super(nbuffers, maxDirtyListSize,  readBuffers, prefixWrites, compactionThreshold, hotCacheSize, hotCacheThreshold,
                 true/* useChecksum */, fileExtent, opener, quorum, reader);
     }
 

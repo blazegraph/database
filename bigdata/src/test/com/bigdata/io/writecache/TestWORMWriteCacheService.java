@@ -2089,6 +2089,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
             final boolean prefixWrites;
             final int compactionThreshold;
+            final int hotCacheThreshold = 1;
             switch (storeType) {
             case WORM:
                 prefixWrites = false;
@@ -2103,6 +2104,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             }
             writeCacheService = new WriteCacheService(nbuffers,
                     maxDirtyListSize, 0, prefixWrites, compactionThreshold,
+                    0/*hotCacheSize*/, hotCacheThreshold,
                     useChecksums, fileExtent, opener, quorum, null) {
 
                 /**

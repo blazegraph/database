@@ -584,6 +584,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// number of bits in FixedAllocators
 			properties.setProperty(RWStore.Options.FREE_BITS_THRESHOLD, "50");
 
+			properties.setProperty(Options.READ_CACHE_BUFFER_COUNT, "20");
+
 			// Size of META_BITS_BLOCKS
 			properties.setProperty(RWStore.Options.META_BITS_SIZE, "9");
 

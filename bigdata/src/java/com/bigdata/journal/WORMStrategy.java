@@ -228,6 +228,21 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private final int readCacheBufferCount;
     
     /**
+     * The threshold at which readCache records are moved to the
+     * hotCache
+     * 
+     * @see com.bigdata.journal.Options#HOT_CACHE_THRESHOLD
+     */
+    private final int hotCacheThreshold;
+    
+    /**
+     * The number of hotCache buffers
+     * 
+     * @see com.bigdata.journal.Options#HOT_CACHE_SIZE
+     */
+    private final int hotCacheSize;
+    
+    /**
      * <code>true</code> if the backing store will be used in an HA
      * {@link Quorum} (this is passed through to the {@link WriteCache} objects
      * which use this flag to conditionally track the checksum of the entire
@@ -914,7 +929,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
         this.readCacheBufferCount = Integer.valueOf(fileMetadata.getProperty(
                 com.bigdata.journal.Options.READ_CACHE_BUFFER_COUNT,
-                com.bigdata.journal.Options.DEFAULT_READ_CACHE_CAPACITY));
+                com.bigdata.journal.Options.DEFAULT_READ_CACHE_BUFFER_COUNT));
+        
+        this.hotCacheThreshold = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.HOT_CACHE_THRESHOLD,
+                com.bigdata.journal.Options.DEFAULT_HOT_CACHE_THRESHOLD));
+        
+        this.hotCacheSize = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.HOT_CACHE_SIZE,
+                com.bigdata.journal.Options.DEFAULT_HOT_CACHE_SIZE));
         
         isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
 
@@ -958,7 +981,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final Quorum quorum) throws InterruptedException {
 
             super(writeCacheBufferCount, 0/* maxDirtyListSize */, readCacheBufferCount,
-                    false/* prefixWrites */, 100/* compactionThreshold */,
+                    false/* prefixWrites */, 100/* compactionThreshold */, hotCacheSize, hotCacheThreshold,
                     useChecksums, extent, opener, quorum, WORMStrategy.this /*reader*/);
 
         }

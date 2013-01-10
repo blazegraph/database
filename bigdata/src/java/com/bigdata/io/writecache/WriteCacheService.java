@@ -30,6 +30,7 @@ package com.bigdata.io.writecache;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -67,6 +68,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache.ReadCache;
+import com.bigdata.io.writecache.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -495,6 +497,7 @@ abstract public class WriteCacheService implements IWriteCache {
     public WriteCacheService(final int nwriteBuffers, int maxDirtyListSize,
     		final int nreadBuffers,
             final boolean prefixWrites, final int compactionThreshold,
+            final int hotCacheSize, final int hotCacheThreshold,
             final boolean useChecksum, final long fileExtent,
             final IReopenChannel<? extends Channel> opener, final Quorum quorum,
             final IBackingReader reader)
@@ -590,10 +593,19 @@ abstract public class WriteCacheService implements IWriteCache {
        /*
          * Hot cache setup
          * 
-         * Let's aim for a 1/10 of the readCache
+         * Let's aim for a 1/10 of the readCache, but hotListSize must be at least 3 
+         * to function
          */
-        hotListSize = Math.max(0, readListSize/10);
+        {
+        	if (hotCacheSize < (readListSize * 0.8) && hotCacheSize > 2) {
+        		hotListSize = hotCacheSize;
+        	} else {
+        		hotListSize = 0;
+        	}
+        }
         hotList = new LinkedBlockingDeque<ReadCache>();
+        
+        this.hotCacheThreshold = hotCacheThreshold;
         
         // pre-populate hotList and readList
         for (int i = 0; i < hotListSize; i++) {
@@ -606,6 +618,7 @@ abstract public class WriteCacheService implements IWriteCache {
         
         // set initial read cache
         hotCache = hotList.poll();        
+        hotReserve = hotList.poll();        
         readCache.set(readList.poll());
         {
         	final ReadCache curReadCache = readCache.get();
@@ -778,6 +791,17 @@ abstract public class WriteCacheService implements IWriteCache {
      * The current hotCache.
      */
     private ReadCache hotCache = null;
+
+    /**
+     * Current hotCacheThreshold above which readCache records are 
+     * transferred to the hotCache.
+     */
+	final private int hotCacheThreshold;
+
+    /**
+     * The current hotReserve.
+     */
+    private ReadCache hotReserve = null;
 
     /**
      * Computes modular distance of a circular number list.
@@ -1788,6 +1812,7 @@ abstract public class WriteCacheService implements IWriteCache {
             // clear reference to the readCache buffer.
             readCache.getAndSet(null);            
             hotCache = null;
+            hotReserve = null;
 
             // clear the service record map.
             serviceMap.clear();
@@ -2988,18 +3013,75 @@ abstract public class WriteCacheService implements IWriteCache {
     private ReadCache getDirectReadCache() throws InterruptedException {
 
         // Non-blocking take.
-        final ReadCache tmp = readList.poll();
+        ReadCache tmp = readList.poll();
 
         if (tmp != null) {
 
             try {
+            	
                 /*
                  * Attempt to reset the record.
-                 * 
+                 * ;
                  * FIXME: add hot readCache data to hotCache and track metadata
                  * about #of hot records retained in WCS counters.
                  */
-                tmp.resetWith(serviceMap);
+            	synchronized (readCache) {
+            		if (hotCache != null) {
+            			int cycles = 0;
+            			while (tmp != null) {
+                        	final int totalRecords = tmp.recordMap.size();
+                        	if (log.isDebugEnabled() && totalRecords > 0) {
+            	            	int hitRecords = 0;
+            	            	int hotRecords = 0;
+            	            	final Iterator<RecordMetadata> values = tmp.recordMap.values().iterator();
+            	            	while (values.hasNext()) {
+            	            		final RecordMetadata md = values.next();
+            	            		if (md.getHitCount() > 0) {
+            	            			hitRecords++;
+            	            			if (md.getHitCount() > hotCacheThreshold)
+            	            				hotRecords++;
+            	            		}
+            	            	}
+            	            	
+            	            	log.debug("Recycled ReadCache, hot(>" + hotCacheThreshold + "): " + hotRecords + ", hit: " + hitRecords + " of " + totalRecords);
+                        	}
+
+                        	if (WriteCache.transferTo(tmp, hotCache, serviceMap, hotCacheThreshold)) {
+                        		if (!tmp.isEmpty())
+                        			throw new AssertionError();
+                        		
+                        		tmp.reset();
+            					break;
+            				}
+                        	
+                        	if (log.isDebugEnabled())
+                        		log.debug("Cycle HOTCACHE: " + ++cycles);
+                        	
+            				// transfer not completed, so:
+            				//	move current hotCache to end of HotList
+            				//	move head of HotList to end of ReadList
+            				//	make hotReserve new hotCache
+            				//	complete transfer to new hotCache
+            				//	make now empty tmp new hotReserve
+            				hotList.add(hotCache);
+            				readList.add(hotList.poll().resetHitCounts());
+            				if (!hotReserve.isEmpty())
+            					throw new AssertionError();
+            				
+            				hotCache = hotReserve;
+            				hotReserve = null;
+            				if (!WriteCache.transferTo(tmp, hotCache, serviceMap, hotCacheThreshold)) {
+            					throw new AssertionError();
+            				}
+            				tmp.reset();
+            				hotReserve = tmp;
+            				
+            				tmp = readList.poll();
+            			}
+            		} else {
+            			tmp.resetWith(serviceMap);
+            		}
+            	}
             } catch (InterruptedException ex) {
                 /*
                  * If interrupted, then return the ReadCache to the list and
@@ -3569,6 +3651,10 @@ abstract public class WriteCacheService implements IWriteCache {
             
             return ByteBuffer.wrap(b);
 
+        } catch (Throwable t) {
+        	t.printStackTrace(System.err);
+        	
+        	throw new RuntimeException(t);
         } finally {
             /*
              * CRITICAL SECTION. If [willInstall] then we are responsible for
