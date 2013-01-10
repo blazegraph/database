@@ -464,6 +464,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	private final int m_compactionThreshold;
 	
     /**
+     * @see com.bigdata.journal.Options#HOT_CACHE_THRESHOLD
+     */
+	private final int m_hotCacheThreshold;
+	
+    /**
+     * @see com.bigdata.journal.Options#HOT_CACHE_SIZE
+     */
+	private final int m_hotCacheSize;
+	
+    /**
      * Note: This is not final because we replace the {@link WriteCacheService}
      * during {@link #reset(long)} in order to propagate the then current quorum
      * token to the {@link WriteCacheService}.
@@ -730,7 +740,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		
 		m_readCacheBufferCount = Integer.valueOf(fileMetadata.getProperty(
                 com.bigdata.journal.Options.READ_CACHE_BUFFER_COUNT,
-                com.bigdata.journal.Options.DEFAULT_READ_CACHE_CAPACITY));
+                com.bigdata.journal.Options.DEFAULT_READ_CACHE_BUFFER_COUNT));
 		
         if (log.isInfoEnabled())
             log.info(com.bigdata.journal.Options.WRITE_CACHE_BUFFER_COUNT
@@ -751,6 +761,22 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         if (log.isInfoEnabled())
             log.info(com.bigdata.journal.Options.WRITE_CACHE_COMPACTION_THRESHOLD + "="
                     + m_compactionThreshold);
+
+        this.m_hotCacheThreshold = Double.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.HOT_CACHE_THRESHOLD,
+                com.bigdata.journal.Options.DEFAULT_HOT_CACHE_THRESHOLD)).intValue();
+
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.HOT_CACHE_THRESHOLD + "="
+                    + m_hotCacheThreshold);
+
+        this.m_hotCacheSize = Double.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.HOT_CACHE_SIZE,
+                com.bigdata.journal.Options.DEFAULT_HOT_CACHE_SIZE)).intValue();
+
+        if (log.isInfoEnabled())
+            log.info(com.bigdata.journal.Options.HOT_CACHE_SIZE + "="
+                    + m_hotCacheSize);
 
         // m_writeCache = newWriteCache();
 
@@ -948,7 +974,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final boolean prefixWrites = highlyAvailable;
 
             return new RWWriteCacheService(m_writeCacheBufferCount,
-                    m_maxDirtyListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold,
+                    m_maxDirtyListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
 
                     convertAddr(m_fileSize), m_reopener, m_quorum, DEBUG_USEREADCACHE ? this : null) {
                 

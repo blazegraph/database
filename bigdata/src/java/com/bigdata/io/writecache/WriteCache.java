@@ -60,6 +60,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService.AsynchronousCloseException;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
@@ -337,6 +338,10 @@ abstract public class WriteCache implements IWriteCache {
                     + ",delete=" + deleted + "}";
 
         }
+
+		final int getHitCount() {
+			return hitCount;
+		}
 
     } // class RecordMetadata
 
@@ -2135,6 +2140,24 @@ abstract public class WriteCache implements IWriteCache {
             
         }
 
+        /**
+         * Called from WCS when moving from hotList to ReadList.
+         * 
+         * The hitCounts must be reset or full cache will always
+         * be copied.
+         * 
+         * @return this ReadCache
+         */
+		ReadCache resetHitCounts() {
+			Iterator<RecordMetadata> mds = recordMap.values().iterator();
+			
+			while (mds.hasNext()) {
+				mds.next().hitCount = 0;
+			}
+			
+			return this;
+		}
+
 	}
     
     /**
@@ -2213,7 +2236,9 @@ abstract public class WriteCache implements IWriteCache {
 
             if (removed == null) {
                 // Must be present.
-                // throw new AssertionError();
+            	if (true) {
+            		throw new AssertionError("Buffer not closed for writes, but record moved.  Mayhaps compacted to another?");
+            	}
             	
             	return false;
             }
@@ -2278,27 +2303,32 @@ abstract public class WriteCache implements IWriteCache {
         final Iterator<Long> entries = recordMap.keySet().iterator();
         
         if (serviceRecordMap != null && entries.hasNext()) {
-            if (log.isInfoEnabled())
-                log.info("resetting existing WriteCache: nrecords=" + recordMap.size() + ", hashCode=" + hashCode());
-
-            while (entries.hasNext()) {
-                
-                final Long fileOffset = entries.next();
-
-                /*
-                 * We need to guard against the possibility that the entry in
-                 * the service record map has been updated concurrently such
-                 * that it now points to a different WriteCache instance. This
-                 * is possible (for the RWStore) if a recently freed record has
-                 * been subsequently reallocated on a different WriteCache.
-                 * Using the conditional remove on ConcurrentMap guards against
-                 * this.
-                 */
-                final boolean removed = serviceRecordMap.remove(fileOffset, this);
-                
-                registerWriteStatus(fileOffset, 0, removed ? 'R' : 'L');
-
-            }
+        	transferLock.lock();
+        	try {
+	            if (log.isInfoEnabled())
+	                log.info("resetting existing WriteCache: nrecords=" + recordMap.size() + ", hashCode=" + hashCode());
+	
+	            while (entries.hasNext()) {
+	                
+	                final Long fileOffset = entries.next();
+	
+	                /*
+	                 * We need to guard against the possibility that the entry in
+	                 * the service record map has been updated concurrently such
+	                 * that it now points to a different WriteCache instance. This
+	                 * is possible (for the RWStore) if a recently freed record has
+	                 * been subsequently reallocated on a different WriteCache.
+	                 * Using the conditional remove on ConcurrentMap guards against
+	                 * this.
+	                 */
+	                final boolean removed = serviceRecordMap.remove(fileOffset, this);
+	                
+	                registerWriteStatus(fileOffset, 0, removed ? 'R' : 'L');
+	
+	            }
+        	} finally {
+        		transferLock.unlock();
+        	}
 
         } else {
             if (log.isInfoEnabled()) {
@@ -2523,7 +2553,7 @@ abstract public class WriteCache implements IWriteCache {
      * @param serviceRecordMap
      *            The {@link WriteCacheService}'s record map.
      * @param threshold
-     * 				The hitCount aty which the record is transferred
+     * 				The hitCount at which the record is transferred
      * 
      * @return Returns true if the transfer is complete, or false if the
      *         destination runs out of room.

@@ -248,6 +248,22 @@ public interface Options {
     String READ_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".readCacheBufferCount";
 
     /**
+     * Option may be used to override the threshold at which retained readCache records
+     * are moved to the hotCache which will be used with a {@link WriteCacheService}.
+     * 
+     * @see #DEFAULT_HOT_CACHE_THRESHOLD
+     */
+    String HOT_CACHE_THRESHOLD = AbstractJournal.class.getName()+".hotCacheThreshold";
+
+    /**
+     * Option may be used to override the number of hotCache buffers which will be 
+     * used with a {@link WriteCacheService}.
+     * 
+     * @see #DEFAULT_HOT_CACHE_SIZE
+     */
+    String HOT_CACHE_SIZE = AbstractJournal.class.getName()+".hotCacheSize";
+
+    /**
      * Option may be used to control the maximum number of buffers on the
      * {@link WriteCacheService} dirty list (default
      * {@value #DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE}). This effectively
@@ -617,15 +633,19 @@ public interface Options {
     String DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD = "20";
     
     /**
-     * The default for {@link #READ_CACHE_CAPACITY}.
-     */
-    String DEFAULT_READ_CACHE_CAPACITY = "10";
-//  String DEFAULT_READ_CACHE_CAPACITY = "10000";
-    
-    /**
      * The default for {@link #READ_CACHE_MAX_RECORD_SIZE}.
      */
     String DEFAULT_READ_CACHE_MAX_RECORD_SIZE = ""+(2*Bytes.kilobyte);
+    
+    /**
+     * The default for {@link #HOT_CACHE_THRESHOLD}.
+     */
+    String DEFAULT_HOT_CACHE_THRESHOLD = "1";
+    
+    /**
+     * The default for {@link #HOT_CACHE_THRESHOLD}.
+     */
+    String DEFAULT_HOT_CACHE_SIZE = "10";
     
     /**
      * The default initial extent for a new journal.
