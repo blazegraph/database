@@ -51,6 +51,13 @@ import com.bigdata.jini.start.IServiceListener;
  */
 public class ProcessHelper {
 
+    /**
+     * Note: LOG @ INFO if you want to see all messages written on the console
+     * by a child process, otherwise only the first N lines will be copied onto
+     * the console of the parent process.
+     * 
+     * @see BigdataStatics#echoProcessStartupLineCount
+     */
     protected static final Logger log = Logger.getLogger(ProcessHelper.class);
 
     /**
