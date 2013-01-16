@@ -66,6 +66,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
+import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -1573,6 +1574,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
 		try {
 	        assertOpen(); // check again after taking lock
+	        
+	        assertNoRebuild();
 
 			// length includes space for the checksum
 			if (length > m_maxFixedAlloc) {
@@ -1780,6 +1783,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		}
 	}
 
+    /**
+     * Convenience check for thoseA batch invoice public methods that must be restricted if a rebuild is in progress
+     */
+	private void assertNoRebuild() {
+		if (m_rebuildRequest != null)
+			throw new IllegalStateException("Invalid when rebuilding");
+	}
+
 	private void assertAllocators() {
 		for (int i = 0; i < m_allocs.size(); i++) {
 			if (m_allocs.get(i).getIndex() != i) {
@@ -1832,6 +1843,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	public void free(final long laddr, final int sze, final IAllocationContext context) {
 	    assertOpen();
+        assertNoRebuild();
 		final int addr = (int) laddr;
 		
 		switch (addr) {
@@ -2462,6 +2474,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    m_allocationLock.lock();
 		try {
 	        assertOpen();
+	        assertNoRebuild();
 	        
 	        boolean isolatedWrites = false;
             /**
@@ -2623,6 +2636,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 	public void commit() {
 	    assertOpen();
+        assertNoRebuild();
+
 		checkCoreAllocations();
 
 		// take allocation lock to prevent other threads allocating during commit
@@ -4605,6 +4620,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public ByteBuffer readRootBlock(final boolean rootBlock0) {
         
         assertOpen();
+        assertNoRebuild();
         
         final ByteBuffer tmp = ByteBuffer
                 .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
@@ -5776,6 +5792,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
 
     private long lastBlockSequence = 0;
+
+	private HARebuildRequest m_rebuildRequest = null;
 	
 	 //    /**
 //     * Only blacklist the addr if not already available, in other words
@@ -5898,5 +5916,35 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
 
     }
+
+    /**
+     * Used as part of the rebuild protocol
+     * @throws IOException 
+     */
+	public void writeRaw(final long offset, final ByteBuffer transfer) throws IOException {
+		if (m_rebuildRequest == null)
+			throw new IllegalStateException("Store is not in rebuild state");
+
+		FileChannelUtility.writeAll(m_reopener, transfer, offset);
+	}
+
+	public void prepareForRebuild(final HARebuildRequest req) {
+		assert m_rebuildRequest == null;
+		assert m_open;
+		
+		m_rebuildRequest = req;
+	}
+
+	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+		assert m_rebuildRequest != null;
+		assert !m_open;
+		
+		assert m_rebuildRequest.equals(req);
+		
+		// TODO: reinit from file
+		this.resetFromHARootBlock(rbv);
+		
+		m_rebuildRequest = null;
+	}
 
 }

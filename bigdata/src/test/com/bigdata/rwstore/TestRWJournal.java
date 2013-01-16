@@ -163,6 +163,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		properties.setProperty(Options.WRITE_CACHE_ENABLED, "" + writeCacheEnabled);
 
+	    properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, "10");
+	       
 		// number of bits in FixedAllocators
 		properties.setProperty(com.bigdata.rwstore.RWStore.Options.DEFAULT_FREE_BITS_THRESHOLD, "1000");
 
@@ -3112,6 +3114,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * using a write cache. Since small write caches are disallowed, we wind up
 	 * testing with the write cache disabled!
 	 */
-	private static final boolean writeCacheEnabled = false; // 512;
+	private static final boolean writeCacheEnabled = true; // 512;
 
 }
