@@ -55,7 +55,7 @@ public interface IHAWriteMessage extends IHAWriteMessageBase {
     /** The length of the backing file on the disk. */
     long getFileExtent();
 
-    /** The file offset at which the data will be written (WORM only). */
+    /** The file offset at which the data will be written (WORM only or for Rebuild request). */
     long getFirstOffset();
 
 }

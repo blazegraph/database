@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -823,5 +824,46 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
     public long getBlockSequence() {
         return m_store.getBlockSequence();
     }
+
+	@Override
+	public ByteBuffer readRaw(final long position, final ByteBuffer transfer) {
+		return m_store.readRaw(position, transfer);
+	}
+
+	@Override
+	public void writeRawBuffer(final HARebuildRequest req,
+			final IHAWriteMessage msg, final ByteBuffer transfer)
+			throws IOException {
+		if (req == null)
+			throw new IllegalArgumentException();
+
+		if (m_rebuildSequence != msg.getSequence())
+			throw new IllegalStateException(
+					"Invalid sequence number for rebuild, expected: "
+							+ m_rebuildSequence + ", actual: "
+							+ msg.getSequence());
+
+		m_store.writeRaw(msg.getFirstOffset(), transfer);
+
+		if (log.isDebugEnabled())
+			log.debug("Transfer rebuild: " + msg.getSequence() + ", address: "
+					+ msg.getFirstOffset());
+
+		m_rebuildSequence++;
+	}
+
+	private int m_rebuildSequence = -1;
+	
+	@Override
+	public void prepareForRebuild(final HARebuildRequest req) {
+		m_store.prepareForRebuild(req);
+		m_rebuildSequence = 0;
+	}
+
+	@Override
+	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+		m_store.completeRebuild(req, rbv);
+		m_rebuildSequence = -1;
+	}
 
 }

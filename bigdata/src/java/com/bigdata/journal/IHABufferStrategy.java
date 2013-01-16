@@ -33,6 +33,7 @@ import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.concurrent.Future;
 
+import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -165,5 +166,36 @@ public interface IHABufferStrategy extends IBufferStrategy {
      */
     void computeDigest(Object snapshot, MessageDigest digest)
             throws DigestException, IOException;
+
+    /**
+     * Used to support the rebuild protocol.
+     * 
+     * @param position - absolute file offset
+     * @param transfer - target buffer for read
+     */
+	ByteBuffer readRaw(long position, ByteBuffer transfer);
+
+	/**
+	 * Used to support the rebuild protocol
+	 * 
+	 * @param req
+	 * @param msg
+	 * @param transfer
+	 * @throws IOException 
+	 */
+	void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
+			ByteBuffer transfer) throws IOException;
+
+	/**
+	 * Sets strategy to be ready to rebuild store
+	 * @param req
+	 */
+	void prepareForRebuild(HARebuildRequest req);
+
+	/**
+	 * Informs strategy to reload from rebuilt store
+	 * @param req
+	 */
+	void completeRebuild(HARebuildRequest req, IRootBlockView rbv);
 
 }

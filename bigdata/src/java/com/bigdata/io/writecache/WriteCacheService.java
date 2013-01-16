@@ -1543,10 +1543,10 @@ abstract public class WriteCacheService implements IWriteCache {
                     dirtyListLock.unlock();
                 }
 
-                // ensure cleanList is not empty after WriteTask terminates.
+                // ensure cleanList is not empty after WriteTask terminates, handling single buffer case
                 cleanListLock.lockInterruptibly();
                 try {
-                    if (cleanList.isEmpty())
+                    if (writeBuffers.length > 1 && cleanList.isEmpty())
                         throw new AssertionError();
                 } finally {
                     cleanListLock.unlock();
@@ -3120,6 +3120,9 @@ abstract public class WriteCacheService implements IWriteCache {
         final ByteBuffer tmp = _readFromCache(offset, nbytes);
 
         if (tmp != null) {
+        	
+        	if (tmp.remaining() == 0)
+        		throw new AssertionError();
 
             // Cache hit.
             return tmp;
@@ -3134,7 +3137,12 @@ abstract public class WriteCacheService implements IWriteCache {
             /*
              * Read through to the disk and install the record into cache.
              */
-            return loadRecord(offset, nbytes);
+            final ByteBuffer ret = loadRecord(offset, nbytes);
+            
+            if (ret != null && ret.remaining() == 0)
+            	throw new AssertionError();
+            
+            return ret;
 
         } else {
             
@@ -3376,7 +3384,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
 			try {
 
-				return req.service._getRecord(req.offset, req.nbytes);
+				final ByteBuffer ret = req.service._getRecord(req.offset, req.nbytes);
+				
+				if (ret != null && ret.remaining() == 0)
+					throw new AssertionError();
+				
+				return ret;
 
 			} finally {
 
@@ -3517,6 +3530,9 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (tmp != null) {
 
 		    // Already in the read cache.
+			if (tmp.remaining() == 0)
+				throw new AssertionError();
+			
 			return tmp;
 
 		}
@@ -3527,8 +3543,12 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (directRead) {
         
             // No free buffer to install the read (OR largeRecord)
-            return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
-
+            final ByteBuffer ret = _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
+            
+            if (ret != null && ret.remaining() == 0)
+            	throw new AssertionError();
+      
+            return ret;
         }
 
         /*
@@ -3628,7 +3648,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  */
                 assert willInstall == false;
                 return _readFromLocalDiskIntoNewHeapByteBuffer(offset, nbytes);
-    		    }
+    		}
 
             /*
              * [bb] is a view onto an allocation on [theCache] into which we can
@@ -3700,6 +3720,9 @@ abstract public class WriteCacheService implements IWriteCache {
                     + ",expected=" + tstchk + ",actual=" + chk);
         
         ret.limit(nbytes - 4);
+        
+        if (ret.remaining() == 0)
+        	throw new AssertionError();
 
         // This read was not installed into the read cache.
         counters.get().nreadNotInstalled.increment();

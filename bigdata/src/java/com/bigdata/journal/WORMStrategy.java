@@ -49,6 +49,7 @@ import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.ha.QuorumRead;
+import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -1306,7 +1307,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         try {
             // Try reading from the local store.
-            return readFromLocalStore(addr);
+            final ByteBuffer ret = readFromLocalStore(addr);
+            
+            return ret != null ? ret.duplicate() : null;
+            
         } catch (InterruptedException e) {
             // wrap and rethrow.
             throw new RuntimeException(e);
@@ -1365,6 +1369,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
 
         final long offset = getOffset(addr);
+        
+        final long paddr = offset2PhysicalAddress(offset);
 
         final int nbytes = getByteCount(addr);
 
@@ -1404,7 +1410,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * record.
              */
             // Note: Can throw ChecksumError, InterruptedException
-            ByteBuffer tmp = writeCacheService.read(offset, nbytes);
+            ByteBuffer tmp = writeCacheService.read(paddr, nbytes);
             if (tmp != null) {
                 /*
                  * Hit on the write cache.
@@ -1440,7 +1446,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             final ByteBuffer dst = ByteBuffer.allocate(nbytes);
 
             // Read through to the disk.
-            readRaw(/* nbytes, */offset, dst);
+            readRaw(/* nbytes, */paddr, dst);
 
             if (useChecksums) {
 
@@ -1452,7 +1458,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 
                 if (chk != ChecksumUtility.threadChk.get().checksum(dst)) {
                     
-                    throw new ChecksumError("offset=" + offset + ", nbytes="
+                    throw new ChecksumError("address=" + paddr + ", nbytes="
                             + nbytes);
                 
                 }
@@ -1483,13 +1489,24 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
+     * Adjusts the offset by the headerSize, such that writing to a zero offset
+     * would not corrupt the header.
+     * 
+     * @param offset - the WORMStore address
+     * @return the physical address of the offset provided
+     */
+    private long offset2PhysicalAddress(final long offset) {
+		return offset + headerSize;
+	}
+
+	/**
      * Read on the backing file. {@link ByteBuffer#remaining()} bytes will be
      * read into the caller's buffer, starting at the specified offset in the
      * backing file.
      * 
      * @param offset
-     *            The offset of the first byte (relative to the start of the
-     *            data region).
+     *            The offset of the first byte (now absolute, not relative to the 
+     *            start of the data region).
      * @param dst
      *            Where to put the data. Bytes will be written at position until
      *            limit.
@@ -1505,8 +1522,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
 
                 // the offset into the disk file.
-                final long pos = headerSize + offset;
-                // final long pos = offset;
+                // final long pos = headerSize + offset;
+                final long pos = offset; // offset is physical disk address
 
                 // read on the disk.
                 final int ndiskRead = FileChannelUtility.readAll(opener, dst,
@@ -1796,9 +1813,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
                 offset = getOffset(addr);
 
-                boolean wroteOnCache = false;
+            	final long paddr = offset2PhysicalAddress(offset);
+
+            	boolean wroteOnCache = false;
                 if (writeCacheService != null) {
-                    if (!writeCacheService.write(offset, data, chk))
+                    if (!writeCacheService.write(paddr, data, chk))
                         throw new AssertionError();
                     wroteOnCache = true;
                 }
@@ -1821,7 +1840,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     readLock.lock();
                     try {
 
-                        writeOnDisk(data, offset);
+                        writeOnDisk(data, paddr);
 
                         if (useChecksums) {
                             /*
@@ -1833,7 +1852,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                             b.clear();
                             b.putInt(chk);
                             b.flip();
-                            writeOnDisk(b, offset + remaining);
+                            writeOnDisk(b, paddr + remaining);
                         }
 
                     } finally {
@@ -1883,6 +1902,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * in use.
      */
     private final ByteBuffer _checkbuf;
+
+	private HARebuildRequest m_rebuildRequest;
+
+	private int m_rebuildSequence;
     
     /**
      * Make sure that the file is large enough to accept a write of
@@ -1997,10 +2020,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         /* 
          * The position in the file at which the record will be written
-         * (this is adjusted for the root blocks).
+         * (this is now the absolute position).
          */
 
-        final long pos = headerSize + offset;
+        // final long pos = headerSize + offset;
+        assert offset >= headerSize;
+        
+        final long pos = offset;
 
         final int nwrites;
         try {
@@ -2395,7 +2421,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     @Override
 	public void delete(long addr) {
-		writeCacheService.clearWrite(addr, 0);
+    	if (writeCacheService != null)
+    		writeCacheService.clearWrite(addr, 0);
 	}
 
     @Override
@@ -2639,4 +2666,38 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
+	@Override
+	public void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
+			ByteBuffer transfer) throws IOException {
+		if (m_rebuildRequest == null)
+			throw new IllegalStateException("Store is not in rebuild state");
+		
+		if (m_rebuildSequence != msg.getSequence())
+			throw new IllegalStateException("Invalid sequence number for rebuild, expected: " + m_rebuildSequence + ", actual: " + msg.getSequence());
+
+		FileChannelUtility.writeAll(this.opener, transfer, msg.getFirstOffset());
+		
+		m_rebuildSequence++;
+	}
+
+	@Override
+	public void prepareForRebuild(HARebuildRequest req) {
+		assert m_rebuildRequest == null;
+		
+		m_rebuildRequest = req;
+		m_rebuildSequence = 0;
+	}
+
+	@Override
+	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+		assert m_rebuildRequest != null;
+		
+		assert m_rebuildRequest.equals(req);
+		
+		// TODO: reinit from file
+		this.resetFromHARootBlock(rbv);
+		
+		m_rebuildRequest = null;
+	}
+	
 }
