@@ -1224,7 +1224,7 @@ abstract public class WriteCache implements IWriteCache {
             // flip buffer for reading.
             dst.flip();
 
-            if (useChecksum && this.sequence != -1) { // don't check if HIRS
+            if (useChecksum && !(this instanceof ReadCache)) { // don't check if HIRS
 
                 final int chk = tmp.getInt(pos + reclen);
 

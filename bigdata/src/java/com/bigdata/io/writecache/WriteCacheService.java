@@ -3656,19 +3656,31 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             
             // The offset into [bb] of the allocation.
-    		    final int pos = bb.position();
-    		    
-    		    // Read the record from the disk into NIO buffer.
-    		    final ByteBuffer ret = reader.readRaw(offset, bb);
-    		
-    		    // update record maps
-    		    theCache.commitToMap(offset, pos, nbytes);
-    		    serviceMap.put(offset, theCache);
-    
-    		    // must copy to heap buffer from cache, allowing for checksum
+		    final int pos = bb.position();
+		    
+		    // Read the record from the disk into NIO buffer.
+		    final ByteBuffer ret = reader.readRaw(offset, bb);
+		
+		    // must copy to heap buffer from cache, allowing for checksum
             final byte[] b = new byte[nbytes - 4];
             ret.get(b);
             
+            // calculate checksum from readRaw before adding to readCache!
+            {
+            	final int datalen = nbytes - 4;
+	            final int chk = ret.getInt(pos + datalen);
+	
+	            if (chk != ChecksumUtility.threadChk.get().checksum(b, 0/* offset */, datalen)) {
+	
+	                throw new ChecksumError();
+	
+	            }
+            }
+          
+		    // update record maps
+		    theCache.commitToMap(offset, pos, nbytes);
+		    serviceMap.put(offset, theCache);
+
             return ByteBuffer.wrap(b);
 
         } catch (Throwable t) {
