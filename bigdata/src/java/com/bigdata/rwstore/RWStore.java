@@ -5930,14 +5930,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 	public void prepareForRebuild(final HARebuildRequest req) {
 		assert m_rebuildRequest == null;
-		assert m_open;
 		
 		m_rebuildRequest = req;
 	}
 
 	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
 		assert m_rebuildRequest != null;
-		assert !m_open;
 		
 		assert m_rebuildRequest.equals(req);
 		
