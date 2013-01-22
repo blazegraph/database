@@ -129,12 +129,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         suite.addTestSuite(com.bigdata.rdf.sail.TestLexJoinOps.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestMaterialization.class);
-        /*
-         * Note: The following test is not integrated into CI because it is not
-         * yet known whether the test will pass once it gets past the
-         * NotMaterializedException.
-         */
-        // suite.addTestSuite(com.bigdata.rdf.sail.TestTicket632.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket632.class);
 
         // The Sesame TCK, including the SPARQL test suite.
         {

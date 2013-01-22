@@ -46,6 +46,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
@@ -145,8 +146,7 @@ public class ServiceCallUtility {
     /**
      * Convert the {@link IBindingSet} into an openrdf {@link BindingSet}.
      * <p>
-     * Note: The {@link IVCache} MUST be set. An exception WILL be thrown if the
-     * {@link IV} has not been materialized.
+     * Note: The {@link IVCache} MUST be set for non-inline {@link IV}s. 
      * 
      * @param vars
      *            The set of variables which are to be projected (optional).
@@ -154,9 +154,13 @@ public class ServiceCallUtility {
      *            {@link BindingSet}.
      * @param in
      *            A bigdata {@link IBindingSet} with materialized values.
+     *            
+     * @throws NotMaterializedException
+     *             if a non-inline {@link IV} has not had its {@link IVCache}
+     *             set.
      */
-    static public BindingSet bigdata2Openrdf(final Set<IVariable<?>> vars,
-            final IBindingSet in) {
+    static public BindingSet bigdata2Openrdf(final LexiconRelation lex,
+            final Set<IVariable<?>> vars, final IBindingSet in) {
 
         final MapBindingSet out = new MapBindingSet();
         
@@ -183,26 +187,43 @@ public class ServiceCallUtility {
             final IV iv = (IV) e.getValue().get();
 
             final BigdataValue value;
-            
-            try {
-            
-                value = iv.getValue();
 
-            } catch (NotMaterializedException ex) {
-        
-                /*
-                 * Add the variable name to the stack trace.
+            if (iv.isInline()) {
+
+                /**
+                 * Materialize inline IV as Value.
+                 * 
+                 * @see <a
+                 *      href="http://sourceforge.net/apps/trac/bigdata/ticket/632">
+                 *      NotMaterializedException when a SERVICE call needs
+                 *      variables that are provided as query input bindings </a>
                  */
-                
-                throw new NotMaterializedException("var=" + name + ", val="
-                        + iv, ex);
-                
+                value = iv.asValue(lex);
+
+            } else {
+
+                try {
+
+                    // Recover Value from the IVCache.
+                    value = iv.getValue();
+
+                } catch (NotMaterializedException ex) {
+
+                    /*
+                     * Add the variable name to the stack trace.
+                     */
+
+                    throw new NotMaterializedException("var=" + name + ", val="
+                            + iv, ex);
+
+                }
+
             }
 
             out.addBinding(name, value);
 
         }
-        
+
         return out;
 
     }
@@ -280,14 +301,14 @@ public class ServiceCallUtility {
      * @param in
      *            The solutions to be converted (required).
      */
-    static public BindingSet[] convert(final Set<IVariable<?>> projectedVars,
-            final IBindingSet[] in) {
+    static public BindingSet[] convert(final LexiconRelation lex,
+            final Set<IVariable<?>> projectedVars, final IBindingSet[] in) {
 
         final BindingSet[] out = new BindingSet[in.length];
 
         for (int i = 0; i < in.length; i++) {
 
-            out[i] = ServiceCallUtility.bigdata2Openrdf(projectedVars,
+            out[i] = ServiceCallUtility.bigdata2Openrdf(lex, projectedVars,
                     in[i]);
 
         }
