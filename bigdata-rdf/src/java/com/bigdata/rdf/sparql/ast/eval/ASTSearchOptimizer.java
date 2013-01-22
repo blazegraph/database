@@ -245,8 +245,17 @@ public class ASTSearchOptimizer implements IASTOptimizer {
 
                     final TermNode p = sp.p();
 
-                    if (p.isConstant()) {
-
+                    /**
+                     * This test only allows a binding for the predicate to
+                     * be a URI.
+                     * 
+                     * @see <a href=
+                     *      "https://sourceforge.net/apps/trac/bigdata/ticket/633"
+                     *      > ClassCastException when binding non-uri values to
+                     *      a variable that occurs in predicate position.<a>
+                     */
+                    if (p.isConstant() && p.getValue() instanceof URI) {
+                        
                         final URI uri = (URI) ((ConstantNode) p).getValue();
 
                         if (uri != null // Must be a known value.
