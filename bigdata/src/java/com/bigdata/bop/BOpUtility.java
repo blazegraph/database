@@ -1245,7 +1245,7 @@ public class BOpUtility {
             // copy accepted binding sets to the default sink.
             sink.add(tmp);
             
-            nout += chunk.length;
+            nout += tmp.length;
             
             if (sink2 != null) {
 

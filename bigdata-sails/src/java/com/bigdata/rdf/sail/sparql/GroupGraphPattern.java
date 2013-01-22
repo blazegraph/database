@@ -42,6 +42,8 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.PathNode;
+import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
@@ -176,6 +178,18 @@ class GroupGraphPattern {
         // Fill in the inherited context and scope.
         children.add(new StatementPatternNode(s, p, o, context, spScope));
 
+    }
+    
+    public void addPP(final TermNode s, final PathNode p, final TermNode o) {
+    	
+        assertValid();
+
+        if (log.isInfoEnabled())
+            log.info("pattern= ( " + s + " " + p + " " + o + " )");
+
+        // Fill in the inherited context and scope.
+        children.add(new PropertyPathNode(s, p, o, context, spScope));
+    	
     }
 
     public void addSP(final StatementPatternNode sp) {
