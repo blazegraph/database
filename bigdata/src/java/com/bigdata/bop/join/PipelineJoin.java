@@ -64,6 +64,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ArrayAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
+import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBindingSetAccessPath;
@@ -1350,17 +1351,28 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 */
 			final private IAccessPath<E> accessPath;
 
-			/**
-			 * Return the <em>fromKey</em> for the {@link IAccessPath} generated
-			 * from the {@link IBindingSet} for this task.
-			 * 
-			 * @todo Layered access paths do not expose a fromKey, but the
-			 *       information we need is available
-			 *       {@link IKeyOrder#getFromKey(IKeyBuilder, IPredicate)}.
-			 */
+			            /**
+             * Return the <em>fromKey</em> for the {@link IAccessPath} generated
+             * from the {@link IBindingSet} for this task.
+             * 
+             * @todo Layered access paths do not expose a fromKey, but the
+             *       information we need is available
+             *       {@link IKeyOrder#getFromKey(IKeyBuilder, IPredicate)}.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/631">
+             *      ClassCastException in SIDs mode query </a>
+             */
 			protected byte[] getFromKey() {
 
-				return ((AccessPath<E>) accessPath).getFromKey();
+                if (accessPath instanceof EmptyAccessPath) {
+                 
+                    // EmptyAccessPath does not extend AccessPath.
+                    return BytesUtil.EMPTY;
+                    
+                }
+                
+                return ((AccessPath<E>) accessPath).getFromKey();
 
 			}
 
