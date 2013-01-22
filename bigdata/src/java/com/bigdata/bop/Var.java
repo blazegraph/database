@@ -37,6 +37,20 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
 
     private static final long serialVersionUID = -7100443208125002485L;
     
+    private boolean anonymous = false;
+    
+    public void setAnonymous(boolean anonymous) {
+    	
+    	this.anonymous = anonymous;
+    	
+    }
+    
+    public boolean isAnonymous() {
+    	
+    	return anonymous;
+    	
+    }
+    
     final private String name;
 
     final public boolean isVar() {

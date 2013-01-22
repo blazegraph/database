@@ -35,6 +35,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -137,9 +138,6 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryBase
                     .getWhereClause();
 
-            final Set<IVariable<?>> varSet = sa.getSpannedVariables(
-                    whereClause, new LinkedHashSet<IVariable<?>>());
-
             final ProjectionNode p2 = new ProjectionNode();
             
             queryBase.setProjection(p2);
@@ -150,9 +148,13 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             if(projection.isReduced())
                 p2.setReduced(true);
             
+            final Set<IVariable<?>> varSet = sa.getSpannedVariables(
+                    whereClause, new LinkedHashSet<IVariable<?>>());
+
             for(IVariable<?> var : varSet) {
             
-                p2.addProjectionVar(new VarNode(var.getName()));
+            	if (!((Var) var).isAnonymous())
+            		p2.addProjectionVar(new VarNode(var.getName()));
                 
             }
             

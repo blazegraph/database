@@ -499,6 +499,8 @@ public abstract class SPARQLUpdateTest extends TestCase {
     public void testDeleteInsertWhereWithBindings()
         throws Exception
     {
+        if (!BINDINGS)
+            return;
         logger.debug("executing test testDeleteInsertWhereWithBindings");
         StringBuilder update = new StringBuilder();
         update.append(getNamespaceDeclarations());

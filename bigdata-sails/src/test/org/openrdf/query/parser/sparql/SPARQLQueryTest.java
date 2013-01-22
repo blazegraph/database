@@ -369,6 +369,14 @@ public abstract class SPARQLQueryTest extends TestCase {
                     message.append(stmts.next());
                     message.append("\n");
                 }
+                message.append("\n===================================\n");
+                message.append("actual results:\n");
+                for (BindingSet bs : queryBindings)
+                	message.append(bs).append("\n");
+                message.append("\n===================================\n");
+                message.append("expected results:\n");
+                for (BindingSet bs : expectedBindings)
+                	message.append(bs).append("\n");
             } finally {
                 con.close();
             }

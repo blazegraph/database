@@ -845,6 +845,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof ArbitraryLengthPathNode) {
+        	
+        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	
+        } else if (node instanceof ZeroLengthPathNode) {
+        	
+        	vars.addAll(((ZeroLengthPathNode) node).getProducedBindings());
+        	
         } else if(node instanceof SubqueryRoot) {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
@@ -995,6 +1003,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof ArbitraryLengthPathNode) {
+        	
+        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	
+        } else if (node instanceof ZeroLengthPathNode) {
+        	
+        	vars.addAll(((ZeroLengthPathNode) node).getProducedBindings());
+        	
         } else if(node instanceof SubqueryRoot) {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
@@ -1093,6 +1109,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 }
 
+            } else if (child instanceof ArbitraryLengthPathNode) {
+            	
+            	vars.addAll(((ArbitraryLengthPathNode) child).getProducedBindings());
+            	
+            } else if (child instanceof ZeroLengthPathNode) {
+            	
+            	vars.addAll(((ZeroLengthPathNode) child).getProducedBindings());
+            	
             } else if (child instanceof NamedSubqueryInclude
                     || child instanceof SubqueryRoot
                     || child instanceof ServiceNode) {
