@@ -58,9 +58,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.halog.HALogReader;
-import com.bigdata.ha.halog.HALogWriter;
-import com.bigdata.ha.halog.IHALogReader;
+import com.bigdata.ha.althalog.HALogFile;
+import com.bigdata.ha.althalog.HALogManager;
+import com.bigdata.ha.althalog.IHALogReader;
 import com.bigdata.ha.msg.HADigestResponse;
 import com.bigdata.ha.msg.HALogDigestResponse;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
@@ -238,17 +238,7 @@ public class HAJournal extends Journal {
      * @see Options#HA_LOG_DIR
      * @see HALogWriter
      */
-    private final HALogWriter haLogWriter;
-
-    /**
-     * The {@link HALogWriter} for this {@link HAJournal} and never
-     * <code>null</code>.
-     */
-    HALogWriter getHALogWriter() {
-
-        return haLogWriter;
-        
-    }
+    private final HALogManager haLogManager;
 
     /**
      * {@inheritDoc}
@@ -297,9 +287,13 @@ public class HAJournal extends Journal {
 
         }
 
-        // Set up the HA log writer.
-        haLogWriter = new HALogWriter(haLogDir);
+        // Set up the HA log manager.
+        haLogManager = new HALogManager(haLogDir);
 
+    }
+    
+    public HALogManager getHALogManager() {
+    	return haLogManager;
     }
 
     /**
@@ -416,9 +410,9 @@ public class HAJournal extends Journal {
      */
     @Override
     protected void _close() {
-    
+        
         try {
-            haLogWriter.disable();
+            haLogManager.disable();
         } catch (IOException e) {
             haLog.error(e, e);
         }
@@ -445,7 +439,7 @@ public class HAJournal extends Journal {
                 if (f.isDirectory())
                     return true;
                 
-                return f.getName().endsWith(HALogWriter.HA_LOG_EXT);
+                return f.getName().endsWith(HALogFile.HA_LOG_EXT);
             }
 
         });
@@ -589,7 +583,7 @@ public class HAJournal extends Journal {
             final long commitCounter = msg.getCommitCounter();
 
             final File logFile = new File(haLogDir,
-                    HALogWriter.getHALogFileName(commitCounter));
+            		HALogFile.getHALogFileName(commitCounter));
 
             if (!logFile.exists()) {
 
@@ -598,10 +592,11 @@ public class HAJournal extends Journal {
 
             }
 
-            final HALogReader r = new HALogReader(logFile);
+            final HALogFile haLogFile = new HALogFile(logFile);
+            final IHALogReader reader = haLogFile.getReader();
 
             final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
-                    r.getOpeningRootBlock(), r.getClosingRootBlock());
+                    reader.getOpeningRootBlock(), reader.getClosingRootBlock());
 
             if (haLog.isDebugEnabled())
                 haLog.debug("msg=" + msg + ", resp=" + resp);
@@ -625,7 +620,7 @@ public class HAJournal extends Journal {
              * file needs to be an atomic decision and thus MUST be made by the
              * HALogManager.
              */
-            final IHALogReader r = getHALogWriter().getReader(commitCounter);
+            final IHALogReader r = haLogManager.getReader(commitCounter);
 
             // Task sends an HALog file along the pipeline.
             final FutureTask<Void> ft = new FutureTaskMon<Void>(
@@ -882,7 +877,7 @@ public class HAJournal extends Journal {
              * file needs to be an atomic decision and thus MUST be made by the
              * HALogManager.
              */
-            final IHALogReader r = getHALogWriter().getReader(commitCounter);
+            final IHALogReader r = haLogManager.getReader(commitCounter);
 
             final MessageDigest digest = MessageDigest.getInstance("MD5");
 

@@ -183,7 +183,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     final boolean trackActiveSetInMDC = false; // MUST be false for deploy
 
-    private final IResourceManager resourceManager;
+    private final WeakReference<IResourceManager> resourceManagerRef;
     
     /**
      * The name of the service if the write service is running inside of a
@@ -365,7 +365,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         }
 
-        this.resourceManager = resourceManager;
+        this.resourceManagerRef = new WeakReference<IResourceManager>(resourceManager);
 
         /*
          * Tracks rejected executions on a counter.
@@ -947,7 +947,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * conditions?
                      */
                     
-                    final AbstractJournal journal = resourceManager.getLiveJournal();
+                    final AbstractJournal journal = getLiveJournal();
                     
                     if(journal.isOpen()) {
 
@@ -1790,11 +1790,26 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * are met.
      */
     private boolean isShouldOverflow() {
-
-        return resourceManager.isOverflowEnabled()
+    	final IResourceManager rm = getResourceManager();
+    	
+        return rm.isOverflowEnabled()
 //        && (forceOverflow.get() || resourceManager.shouldOverflow());
-        && resourceManager.shouldOverflow();
+        && rm.shouldOverflow();
         
+    }
+    
+    /**
+     * Not sure if there is any utility in checking for null reference.
+     * 
+     * @return
+     */
+    private IResourceManager getResourceManager() {
+    	return resourceManagerRef.get();
+    }
+    
+    private AbstractJournal getLiveJournal() {
+    	final IResourceManager rm = getResourceManager();
+    	return rm == null ? null : rm.getLiveJournal();
     }
     
     /**
@@ -1835,7 +1850,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: This returns a Future. We could use that to cancel
              * asynchronous overflow processing if there were a reason to do so.
              */
-            resourceManager.overflow();
+        	getResourceManager().overflow();
         
             noverflow++;
             
@@ -2301,7 +2316,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          * so there is nothing to rollback).
          */
 
-        if(!resourceManager.isOpen()) {
+        if(getResourceManager() == null || !getResourceManager().isOpen()) {
             
             log.warn("ResourceManager not open?");
 
@@ -2313,7 +2328,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         // note: throws IllegalStateException if resource manager is not open.
         // final AbstractJournal journal = resourceManager.getLiveJournal();
-        final AbstractJournal journal = resourceManager.getLiveJournal();
+        final AbstractJournal journal = getLiveJournal();
 
         if(!journal.isOpen()) {
 
@@ -2592,9 +2607,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * abort().
              */
 
-            final AbstractJournal journal = resourceManager.getLiveJournal();
+            final AbstractJournal journal = getLiveJournal();
 
-            if(journal.isOpen()) {
+            if (journal.isOpen()) {
 
                 // Abandon the write sets.
                 
@@ -2606,14 +2621,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 log.info("Did abort");
             
         } catch(Throwable t) {
+        	
+        	if (getResourceManager() == null) {
+                log.error("Abort with collected journal: " + serviceName, t);
+        	} else {
             
-            AbstractJournal journal = resourceManager.getLiveJournal();
-
-            if(journal.isOpen()) {
-
-                log.error("Problem with abort? : "+serviceName+" : "+t, t);
-                
-            }
+	            AbstractJournal journal = getLiveJournal();
+	
+	            if(journal.isOpen()) {
+	
+	                log.error("Problem with abort? : "+serviceName+" : "+t, t);
+	                
+	            }
+        	}
 
         } finally {
 

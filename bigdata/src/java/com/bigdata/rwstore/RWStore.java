@@ -2315,84 +2315,92 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * WriteCacheService, building BlobHeader as you go.
      **/
     public long alloc(final byte buf[], final int size,
-            final IAllocationContext context) {
+			final IAllocationContext context) {
 
-        final long begin = System.nanoTime();
-        
-        if (size > (m_maxFixedAlloc - 4)) {
-        
-            if (size > getMaxBlobSize())
-                throw new IllegalArgumentException(
-                        "Allocation request beyond maximum BLOB of " + getMaxBlobSize());
-
-            if (log.isTraceEnabled())
-                log.trace("BLOB ALLOC: " + size);
-            
-            if (m_storageStats != null) {
-            	m_storageStats.allocateBlob(size);
-            }
-
-            final PSOutputStream psout = PSOutputStream.getNew(this,
-                    m_maxFixedAlloc, context);
-            try {
-                
-                int i = 0;
-                final int blocks = size/512;
-                for (int b = 0; b < blocks; b++) {
-                    psout.write(buf, i, 512); // add 512 bytes at a time
-                    i += 512;
-                }
-                psout.write(buf, i, size - i);
-
-                return psout.save();
-            
-            } catch (IOException e) {
-                
-                throw new RuntimeException("Closed Store?", e);
-                
-            } finally {
-            	try {
-            		psout.close(); // return stream
-            	} catch (IOException ioe) {
-            		// should not happen, since this should only be
-            		// recycling
-            		log.warn("Unexpected error closing PSOutputStream", ioe);
-            	}
-            }
-
-        }
-
-		final int newAddr = alloc(size + 4, context); // allow size for checksum
-		
-		if (newAddr == 0)
-			throw new IllegalStateException("NULL address allocated");
-
-		final int chk = ChecksumUtility.getCHK().checksum(buf, size);
-		
-		final long pa = physicalAddress(newAddr);
-
+		m_allocationLock.lock();
 		try {
-			m_writeCacheService.write(pa, ByteBuffer.wrap(buf, 0, size), chk, true/*writeChecksum*/, newAddr/*latchedAddr*/);
-		} catch (InterruptedException e) {
-            throw new RuntimeException("Closed Store?", e);
+			final long begin = System.nanoTime();
+
+			if (size > (m_maxFixedAlloc - 4)) {
+
+				if (size > getMaxBlobSize())
+					throw new IllegalArgumentException(
+							"Allocation request beyond maximum BLOB of "
+									+ getMaxBlobSize());
+
+				if (log.isTraceEnabled())
+					log.trace("BLOB ALLOC: " + size);
+
+				if (m_storageStats != null) {
+					m_storageStats.allocateBlob(size);
+				}
+
+				final PSOutputStream psout = PSOutputStream.getNew(this,
+						m_maxFixedAlloc, context);
+				try {
+
+					int i = 0;
+					final int blocks = size / 512;
+					for (int b = 0; b < blocks; b++) {
+						psout.write(buf, i, 512); // add 512 bytes at a time
+						i += 512;
+					}
+					psout.write(buf, i, size - i);
+
+					return psout.save();
+
+				} catch (IOException e) {
+
+					throw new RuntimeException("Closed Store?", e);
+
+				} finally {
+					try {
+						psout.close(); // return stream
+					} catch (IOException ioe) {
+						// should not happen, since this should only be
+						// recycling
+						log.warn("Unexpected error closing PSOutputStream", ioe);
+					}
+				}
+
+			}
+
+			final int newAddr = alloc(size + 4, context); // allow size for
+															// checksum
+
+			if (newAddr == 0)
+				throw new IllegalStateException("NULL address allocated");
+
+			final int chk = ChecksumUtility.getCHK().checksum(buf, size);
+
+			final long pa = physicalAddress(newAddr);
+
+			try {
+				m_writeCacheService.write(pa, ByteBuffer.wrap(buf, 0, size),
+						chk, true/* writeChecksum */, newAddr/* latchedAddr */);
+			} catch (InterruptedException e) {
+				throw new RuntimeException("Closed Store?", e);
+			}
+
+			// Update counters.
+			final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+					.acquire();
+			try {
+				final int nwrite = size + 4;// size plus checksum.
+				c.nwrites++;
+				c.bytesWritten += nwrite;
+				c.elapsedWriteNanos += (System.nanoTime() - begin);
+				if (nwrite > c.maxWriteSize) {
+					c.maxWriteSize = nwrite;
+				}
+			} finally {
+				c.release();
+			}
+
+			return newAddr;
+		} finally {
+			m_allocationLock.unlock();
 		}
-
-        // Update counters.
-        final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
-                .acquire();
-        try {
-            final int nwrite = size + 4;// size plus checksum.
-            c.nwrites++;
-            c.bytesWritten += nwrite;
-            c.elapsedWriteNanos += (System.nanoTime() - begin);
-            if (nwrite > c.maxWriteSize) {
-                c.maxWriteSize = nwrite;
-            }
-        } finally {
-            c.release();
-        }
-
-        return newAddr;
 	}
 
 //	/****************************************************************************

@@ -172,6 +172,8 @@ abstract public class AbstractHAJournalTestCase
     protected Journal getStore(final Properties properties) {
 
         stores = new Journal[replicationCount];
+        
+        System.err.println("Setting stores array");
 
         for (int i = 0; i < replicationCount; i++) {
 
