@@ -240,24 +240,43 @@ public interface Options {
     String WRITE_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".writeCacheBufferCount";
 
     /**
+     * <strong>ALPHA FEATURE</strong>
+     * <p>
      * Option may be used to override the #of {@link ReadCache} buffers which
-     * will be used with a {@link WriteCacheService}.
+     * will be used with a {@link WriteCacheService}. When ZERO (0) the read
+     * cache is disabled.
+     * <p>
+     * The purpose of the read cache is to provide additional buffering of the
+     * disk under the control of the database. When enabled, records read from
+     * the disk are installed into the read cache as well as write cache records
+     * once they have been flushed to the disk. Records evicted from the read
+     * cache are transferred to the hot cache (if enabled) if they have been
+     * touched multiple times while on the read cache.
      * 
      * @see #DEFAULT_READ_CACHE_BUFFER_COUNT
+     * @see #HOT_CACHE_SIZE
      */
     String READ_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".readCacheBufferCount";
 
     /**
-     * Option may be used to override the threshold at which retained readCache records
-     * are moved to the hotCache which will be used with a {@link WriteCacheService}.
+     * <strong>ALPHA FEATURE</strong>
+     * <p>
+     * Option may be used to override the #of touches at which a retained
+     * readCache record is moved to the hotCache. Records which are touched
+     * multiple times while on the read cache are transferred to the hot cache.
+     * Records evicted from the hot cache are dropped back to the read cache
+     * where they get a chance to demonstrate that they are still hot before
+     * being evicted from the read cache.
      * 
      * @see #DEFAULT_HOT_CACHE_THRESHOLD
      */
     String HOT_CACHE_THRESHOLD = AbstractJournal.class.getName()+".hotCacheThreshold";
 
     /**
-     * Option may be used to override the number of hotCache buffers which will be 
-     * used with a {@link WriteCacheService}.
+     * <strong>ALPHA FEATURE</strong>
+     * <p>
+     * Option may be used to override the number of hotCache buffers which will
+     * be used with a {@link WriteCacheService}.
      * 
      * @see #DEFAULT_HOT_CACHE_SIZE
      */
@@ -632,10 +651,10 @@ public interface Options {
      */
     String DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD = "20";
     
-    /**
-     * The default for {@link #READ_CACHE_MAX_RECORD_SIZE}.
-     */
-    String DEFAULT_READ_CACHE_MAX_RECORD_SIZE = ""+(2*Bytes.kilobyte);
+//    /**
+//     * The default for {@link #READ_CACHE_MAX_RECORD_SIZE}.
+//     */
+//    String DEFAULT_READ_CACHE_MAX_RECORD_SIZE = ""+(2*Bytes.kilobyte);
     
     /**
      * The default for {@link #HOT_CACHE_THRESHOLD}.

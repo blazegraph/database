@@ -44,42 +44,6 @@ import com.bigdata.util.ChecksumError;
  */
 public interface IWriteCache {
 
-//    /**
-//     * Write the record on the cache. This interface DOES NOT provide any
-//     * guarantee about the ordering of writes. Callers who require a specific
-//     * ordering must coordinate that ordering themselves, e.g., by synchronizing
-//     * across their writes onto the cache.
-//     * 
-//     * @param offset
-//     *            The offset of that record (maybe relative to a base offset).
-//     * @param data
-//     *            The record. The bytes from the current
-//     *            {@link ByteBuffer#position()} to the
-//     *            {@link ByteBuffer#limit()} will be written and the
-//     *            {@link ByteBuffer#position()} will be advanced to the
-//     *            {@link ByteBuffer#limit()} . The caller may subsequently
-//     *            modify the contents of the buffer without changing the state
-//     *            of the cache (i.e., the data are copied into the cache).
-//     * 
-//     * @return <code>true</code> iff the caller's record was transferred to the
-//     *         cache. When <code>false</code>, there is not enough room left in
-//     *         the write cache for this record.
-//     * 
-//     * @throws InterruptedException
-//     * @throws IllegalStateException
-//     *             If the buffer is closed.
-//     * @throws IllegalArgumentException
-//     *             If the caller's record is larger than the maximum capacity of
-//     *             cache (the record could not fit within the cache). The caller
-//     *             should check for this and provide special handling for such
-//     *             large records. For example, they can be written directly onto
-//     *             the backing channel.
-//     * 
-//     * @deprecated by {@link #writeChk(long, ByteBuffer, int)}
-//     */
-//    public boolean write(final long offset, final ByteBuffer data)
-//            throws InterruptedException;
-
     /**
      * Write the record on the cache. This interface DOES NOT provide any
      * guarantee about the ordering of writes. Callers who require a specific
@@ -87,7 +51,7 @@ public interface IWriteCache {
      * across their writes onto the cache.
      * 
      * @param offset
-     *            The offset of that record (maybe relative to a base offset).
+     *            The file offset of that record in the backing file.
      * @param data
      *            The record. The bytes from the current
      *            {@link ByteBuffer#position()} to the
@@ -122,8 +86,7 @@ public interface IWriteCache {
     /**
      * Read a record from the write cache.
      * 
-     * @param offset
-     *            The offset of that record (maybe relative to a base offset).
+     * @param offset     *            The file offset of that record in the backing file.
      * @param nbytes
      *            The length of the record (decoded from the address by the
      *            caller).
@@ -145,36 +108,6 @@ public interface IWriteCache {
      */
     public ByteBuffer read(final long offset, final int nbytes) throws InterruptedException,
             ChecksumError;
-
-//    /**
-//     * Update a record in the write cache.
-//     * 
-//     * @param addr
-//     *            The address of the record.
-//     * @param off
-//     *            The byte offset of the update.
-//     * @param data
-//     *            The data to be written onto the record in the cache starting
-//     *            at that byte offset. The bytes from the current
-//     *            {@link ByteBuffer#position()} to the
-//     *            {@link ByteBuffer#limit()} will be written and the
-//     *            {@link ByteBuffer#position()} will be advanced to the
-//     *            {@link ByteBuffer#limit()}. The caller may subsequently modify
-//     *            the contents of the buffer without changing the state of the
-//     *            cache (i.e., the data are copied into the cache).
-//     * 
-//     * @return <code>true</code> iff the record was updated and
-//     *         <code>false</code> if no record for that address was found in the
-//     *         cache.
-//     * 
-//     * @throws InterruptedException
-//     * @throws IllegalStateException
-//     * 
-//     * @throws IllegalStateException
-//     *             if the buffer is closed.
-//     */
-//    public boolean update(final long addr, final int off, final ByteBuffer data)
-//            throws IllegalStateException, InterruptedException;
 
     /**
      * Flush the writes to the backing channel but does not force anything to

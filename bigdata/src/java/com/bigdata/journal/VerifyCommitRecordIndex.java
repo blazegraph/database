@@ -94,6 +94,8 @@ public class VerifyCommitRecordIndex {
 
         final int removed = jrnl.removeCommitRecordEntries(zeroKey, releaseKey);
         
+        System.out.println("Commit Record Index verified with " + removed + " records removed");
+
         jrnl.commit();
         
     }

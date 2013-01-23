@@ -170,10 +170,10 @@ public interface IHABufferStrategy extends IBufferStrategy {
     /**
      * Used to support the rebuild protocol.
      * 
-     * @param position - absolute file offset
+     * @param fileOffset - absolute file offset
      * @param transfer - target buffer for read
      */
-	ByteBuffer readRaw(long position, ByteBuffer transfer);
+	ByteBuffer readRaw(long fileOffset, ByteBuffer transfer);
 
 	/**
 	 * Used to support the rebuild protocol
