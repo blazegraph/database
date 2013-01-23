@@ -150,7 +150,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final int hotCacheThreshold = 1;
 
         writeCache = new RWWriteCacheService(5/* nbuffers */,
-                0/* maxDirtyListSize */, 0/*readCacheSize*/, prefixWrites, compactionThreshold,
+                0/* maxDirtyListSize */, 5/*readCacheSize*/, prefixWrites, compactionThreshold,
                 0/*hotCacheSize*/, hotCacheThreshold,
                 fileExtent, opener, quorum, null);
 

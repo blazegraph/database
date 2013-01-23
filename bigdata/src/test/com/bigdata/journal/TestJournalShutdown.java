@@ -202,6 +202,13 @@ public class TestJournalShutdown extends TestCase2 {
         try {
             try {
 
+//                final Object tst = new Object() {
+//                    protected void finalize() throws Throwable {
+//                        super.finalize();
+//                       System.err.println("Finalizer called!!");
+//                    }
+//                };
+
                 for (int i = 0; i < limit; i++) {
 
                     final Journal jnl = new Journal(properties) {
@@ -214,6 +221,7 @@ public class TestJournalShutdown extends TestCase2 {
                                                 + ncreated
                                                 + ", nalive="
                                                 + nunfinalized);
+                            destroy();
                         }
                     };
 
@@ -241,7 +249,7 @@ public class TestJournalShutdown extends TestCase2 {
                          */
                         final AbstractTask task1 = new NOpTask(
                                 jnl.getConcurrencyManager(), ITx.UNISOLATED,
-                                "name");
+								"name");
 
                         /*
                          * Task does not create an index. Since it accesses a
@@ -265,16 +273,17 @@ public class TestJournalShutdown extends TestCase2 {
                          */
                         final AbstractTask task2 = new RegisterIndexTask(
                                 jnl.getConcurrencyManager(), "name",
-                                new IndexMetadata("name", UUID.randomUUID()));
+                                new IndexMetadata("name", UUID.randomUUID()));;
 
                         /*
                          * Submit one of the tasks and *wait* for its Future.
                          */
-                        jnl.getConcurrencyManager().submit(task1).get();
-                        jnl.getConcurrencyManager().submit(task1b).get();
-                        jnl.getConcurrencyManager().submit(task2).get();
+                      jnl.getConcurrencyManager().submit(task1).get();
+                      jnl.getConcurrencyManager().submit(task1b).get();
+                      jnl.getConcurrencyManager().submit(task2).get();
+						
                          
-                    } catch (ExecutionException e) {
+                    } catch (/*Execution*/Exception e) {
                         log.error("Problem registering index: " + e, e);
                     }
                     
@@ -369,11 +378,16 @@ public class TestJournalShutdown extends TestCase2 {
             /*
              * Ensure that all journals are destroyed by the end of the test.
              */
+        	int destroyed = 0;
             for (int i = 0; i < refs.length; i++) {
                 final Journal jnl = refs[i] == null ? null : refs[i].get();
                 if (jnl != null) {
+                	destroyed++;
                     jnl.destroy();
                 }
+            }
+            if (destroyed > 0) {
+            	System.err.println("Destroyed " + destroyed + " non finalized journals");
             }
 
         }

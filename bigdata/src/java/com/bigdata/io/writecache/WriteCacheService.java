@@ -2446,50 +2446,29 @@ abstract public class WriteCacheService implements IWriteCache {
                     /*
                      * Take the buffer from the cleanList and set it has the
                      * [current] buffer.
-                     * 
-                     * Note: We use the [cleanListNotEmpty] Condition so we can
-                     * notice a [halt].
                      */
-                    cleanListLock.lockInterruptibly();
+                    
+                    // Grab buffer from clean list.
+                    final WriteCache newBuffer = takeFromClean();
+                    
+                    counters.get().nclean--;
+                    // Clear the state on the new buffer and remove from
+                    // cacheService map
+                    newBuffer.resetWith(serviceMap);//, fileExtent.get());
 
-                    try {
+                    // Set it as the new buffer.
+                    current.set(cache = newBuffer);
 
-                        if (log.isInfoEnabled() && cleanList.isEmpty())
-                            log.info("Waiting for clean buffer");
+                    // Try to write on the new buffer.
+                    if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
+
+                        // This must be the only occurrence of this record.
+                        if (serviceMap.put(offset, cache) != null) {
+                            throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
+                        }
+
                         
-                        while (cleanList.isEmpty() && !halt) {
-                            cleanListNotEmpty.await();
-                        }
-
-                        if (halt)
-                            throw new RuntimeException(firstCause.get());
-
-                        // Take a buffer from the cleanList (guaranteed avail).
-                        final WriteCache newBuffer = cleanList.take();
-                        counters.get().nclean--;
-                        // Clear the state on the new buffer and remove from
-                        // cacheService map
-                        newBuffer.resetWith(serviceMap);//, fileExtent.get());
-
-                        // Set it as the new buffer.
-                        current.set(cache = newBuffer);
-
-                        // Try to write on the new buffer.
-                        if (cache.write(offset, data, chk, useChecksum, latchedAddr)) {
-
-                            // This must be the only occurrence of this record.
-                            if (serviceMap.put(offset, cache) != null) {
-                                throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
-                            }
-
-                            
-                            return true;
-
-                        }
-
-                    } finally {
-
-                        cleanListLock.unlock();
+                        return true;
 
                     }
 
@@ -2513,6 +2492,43 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
     }
+    
+	private WriteCache takeFromClean() throws InterruptedException {
+		cleanListLock.lockInterruptibly();
+
+		try {
+
+			while (true) {
+
+				if (log.isInfoEnabled() && cleanList.isEmpty())
+					log.info("Waiting for clean buffer");
+
+				/*
+				 * Note: We use the [cleanListNotEmpty] Condition so we can
+				 * notice a [halt].
+				 */
+				while (cleanList.isEmpty() && !halt) {
+					cleanListNotEmpty.await();
+				}
+
+				if (halt)
+					throw new RuntimeException(firstCause.get());
+
+				// Poll() rather than take() since other methods poll() the list
+				// unprotected.
+				final WriteCache ret = cleanList.poll();
+
+				if (ret != null) {
+					return ret;
+				}
+
+			}
+
+		} finally {
+			cleanListLock.unlock();
+		}
+	}
+    
 
 //    /**
 //     * Caches data read from disk (or even read from "older" cache).

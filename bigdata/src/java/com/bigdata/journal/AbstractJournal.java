@@ -1389,7 +1389,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		if (_bufferStrategy.isOpen()) {
 
 			if (log.isInfoEnabled())
-				log.info("Closing journal: " + getFile());
+				log.info("Closing journal in finalize: " + getFile());
 
 			shutdownNow();
 
