@@ -183,6 +183,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     final boolean trackActiveSetInMDC = false; // MUST be false for deploy
 
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/196"> Journal leaks memory </a>
+     */
     private final WeakReference<IResourceManager> resourceManagerRef;
     
     /**
@@ -221,11 +224,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private static class MyLockManager<R extends Comparable<R>> extends
             NonBlockingLockManagerWithNewDesign<R> {
 
-//        /*
-//         * FIXME restored hard reference since introducing just a weak reference
-//         * here appears to be causing some odd behaviors.  Track these behaviors
-//         * down and sort this all out.
-//         */
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/196"> Journal leaks memory </a>
+     */
 //        private final WriteExecutorService service;
         private final WeakReference<WriteExecutorService> serviceRef;
 
@@ -260,7 +261,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private static class MyRejectedExecutionHandler implements
             RejectedExecutionHandler {
@@ -946,10 +946,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * write service could recover or are they all terminal
                      * conditions?
                      */
-                    
-                    final AbstractJournal journal = getLiveJournal();
-                    
-                    if(journal.isOpen()) {
+
+                    final IResourceManager rm = getResourceManager();
+
+                    final AbstractJournal journal = rm == null ? null : rm
+                            .getLiveJournal();
+
+                    if (journal != null && journal.isOpen()) {
 
                         throw new RuntimeException("Commit failed: "+r);
                         
@@ -1310,6 +1313,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
 
+        // Get the hard reference to the resource manager (pin it).
+        final IResourceManager rm = getResourceManager();
+        
         // true iff we acquire the exclusive lock for overflow processing.
         boolean locked = false;
         try {
@@ -1349,7 +1355,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * enabled for the resource manager. However, if it is enabled then
              * overflow processing can be forced using [forceOverflow].
              */
-            final boolean shouldOverflow = isShouldOverflow();
+            final boolean shouldOverflow = isShouldOverflow(rm);
 
             if (shouldOverflow && overflowLog.isInfoEnabled()) {
 
@@ -1509,7 +1515,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 // this task will do synchronous overflow processing.
                 MDC.put("taskState","doSyncOverflow");
                 
-                overflow();
+                // pass in the pinned hard reference to the resource manager.
+                overflow(rm);
 
                 MDC.put("taskState","didSyncOverflow");
 
@@ -1789,9 +1796,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Return <code>true</code> if the pre-conditions for overflow processing
      * are met.
      */
-    private boolean isShouldOverflow() {
-    	final IResourceManager rm = getResourceManager();
-    	
+    private boolean isShouldOverflow(final IResourceManager rm) {
+
+        if (rm == null || !rm.isOpen()) {
+            // The journal is finalized/not-open.
+            return false;
+        }
+        
         return rm.isOverflowEnabled()
 //        && (forceOverflow.get() || resourceManager.shouldOverflow());
         && rm.shouldOverflow();
@@ -1799,19 +1810,27 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
-     * Not sure if there is any utility in checking for null reference.
+     * Return the {@link IResourceManager} - does NOT check for a cleared
+     * {@link WeakReference} on {@link #resourceManagerRef}.
      * 
-     * @return
+     * @return The {@link IResourceManager} -or- <code>null</code> if the
+     *         {@link WeakReference} was cleared.
      */
     private IResourceManager getResourceManager() {
-    	return resourceManagerRef.get();
+
+        return resourceManagerRef.get();
+        
     }
     
-    private AbstractJournal getLiveJournal() {
-    	final IResourceManager rm = getResourceManager();
-    	return rm == null ? null : rm.getLiveJournal();
-    }
-    
+//    /** Return the live journal for the {@link IResourceManager}. */
+//    private AbstractJournal getLiveJournal() {
+//
+//        final IResourceManager rm = getResourceManager();
+//        
+//        return rm == null ? null : rm.getLiveJournal();
+//        
+//    }
+
     /**
      * Once an overflow condition has been recognized and NO tasks are
      * {@link #nrunning} then {@link IResourceManager#overflow()} MAY be invoked
@@ -1825,7 +1844,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Pre-conditions: You own the {@link #lock} and {@link #nrunning} is
      * zero(0).
      */
-    private void overflow() {
+    private void overflow(final IResourceManager rm) {
 
         assert lock.isHeldByCurrentThread();
 
@@ -1850,7 +1869,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: This returns a Future. We could use that to cancel
              * asynchronous overflow processing if there were a reason to do so.
              */
-        	getResourceManager().overflow();
+        	rm.overflow();
         
             noverflow++;
             
@@ -2172,7 +2191,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private static class TaskAndTime implements Comparable<TaskAndTime> {
 
@@ -2241,7 +2259,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 //     * 
 //     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 //     *         Thompson</a>
-//     * @version $Id$
 //     */
 //    private static class SubmitTimeComparator implements
 //            Comparator<AbstractTask> {
@@ -2316,8 +2333,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          * so there is nothing to rollback).
          */
 
-        if(getResourceManager() == null || !getResourceManager().isOpen()) {
-            
+        // Get a hard reference to the resource manager (pin it).
+        final IResourceManager rm = getResourceManager();
+
+        if (rm == null || !rm.isOpen()) {
+
             log.warn("ResourceManager not open?");
 
             resetState();
@@ -2327,8 +2347,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
         
         // note: throws IllegalStateException if resource manager is not open.
-        // final AbstractJournal journal = resourceManager.getLiveJournal();
-        final AbstractJournal journal = getLiveJournal();
+        final AbstractJournal journal = rm.getLiveJournal();
 
         if(!journal.isOpen()) {
 
@@ -2506,6 +2525,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         assert lock.isHeldByCurrentThread();
 
+        // Get a hard reference to the resource manager (pin it).
+        final IResourceManager rm = getResourceManager();
+        
         // Note: set true iff this thread gets interrupted.
         boolean interrupted = false;
         
@@ -2607,7 +2629,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * abort().
              */
 
-            final AbstractJournal journal = getLiveJournal();
+            final AbstractJournal journal = rm.getLiveJournal();
 
             if (journal.isOpen()) {
 
@@ -2622,11 +2644,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch(Throwable t) {
         	
-        	if (getResourceManager() == null) {
+        	if (rm == null) {
                 log.error("Abort with collected journal: " + serviceName, t);
         	} else {
             
-	            AbstractJournal journal = getLiveJournal();
+        	    final AbstractJournal journal = rm.getLiveJournal();
 	
 	            if(journal.isOpen()) {
 	
