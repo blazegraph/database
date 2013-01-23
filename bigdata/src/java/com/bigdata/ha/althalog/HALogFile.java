@@ -34,11 +34,9 @@ import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.Formatter;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
@@ -163,7 +161,7 @@ public class HALogFile {
 
 	// protected by m_writeLock
 	private long m_writePosition = -1;
-	private AtomicLong m_sequence = new AtomicLong(0);
+	private long m_sequence = 0;
 
 	/**
 	 * This constructor is called by the log manager to create the file. A
@@ -341,7 +339,7 @@ public class HALogFile {
 						+ m_openRootBlock.getLastCommitTime() + ", but msg="
 						+ msg);
 
-			if (m_sequence.get() != msg.getSequence())
+			if (m_sequence != msg.getSequence())
 				throw new IllegalStateException("nextSequence=" + m_sequence
 						+ ", but msg=" + msg);
 
@@ -392,7 +390,7 @@ public class HALogFile {
 				throw new AssertionError();
 			}
 
-			m_sequence.incrementAndGet();
+			m_sequence++;
 
 			m_fileChange.signalAll();
 

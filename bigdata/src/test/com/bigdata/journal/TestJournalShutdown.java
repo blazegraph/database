@@ -30,7 +30,6 @@ package com.bigdata.journal;
 import java.lang.ref.WeakReference;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
@@ -202,13 +201,6 @@ public class TestJournalShutdown extends TestCase2 {
         try {
             try {
 
-//                final Object tst = new Object() {
-//                    protected void finalize() throws Throwable {
-//                        super.finalize();
-//                       System.err.println("Finalizer called!!");
-//                    }
-//                };
-
                 for (int i = 0; i < limit; i++) {
 
                     final Journal jnl = new Journal(properties) {
@@ -221,6 +213,7 @@ public class TestJournalShutdown extends TestCase2 {
                                                 + ncreated
                                                 + ", nalive="
                                                 + nunfinalized);
+                            // ensure that journals are destroyed when the are finalized.
                             destroy();
                         }
                     };
@@ -273,7 +266,7 @@ public class TestJournalShutdown extends TestCase2 {
                          */
                         final AbstractTask task2 = new RegisterIndexTask(
                                 jnl.getConcurrencyManager(), "name",
-                                new IndexMetadata("name", UUID.randomUUID()));;
+                                new IndexMetadata("name", UUID.randomUUID()));
 
                         /*
                          * Submit one of the tasks and *wait* for its Future.
@@ -282,7 +275,6 @@ public class TestJournalShutdown extends TestCase2 {
                       jnl.getConcurrencyManager().submit(task1b).get();
                       jnl.getConcurrencyManager().submit(task2).get();
 						
-                         
                     } catch (/*Execution*/Exception e) {
                         log.error("Problem registering index: " + e, e);
                     }
@@ -387,7 +379,7 @@ public class TestJournalShutdown extends TestCase2 {
                 }
             }
             if (destroyed > 0) {
-            	System.err.println("Destroyed " + destroyed + " non finalized journals");
+            	log.error("Destroyed " + destroyed + " non finalized journals");
             }
 
         }

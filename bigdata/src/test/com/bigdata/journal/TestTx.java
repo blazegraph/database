@@ -1256,7 +1256,7 @@ public class TestTx extends ProxyTestCase<Journal> {
      */
     public void testStress() throws InterruptedException, ExecutionException {
 
-        final int ntx = 100; // 30;
+        final int ntx = 30;
         final int nops = 10000;
 
         final Journal store = getStore();

@@ -163,8 +163,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Start 3rd service.
         final HAGlue serverC = startC();
 
-        awaitKBExists(serverC);
-
         // Wait until the quorum is fully met. The token should not change.
         assertEquals(token, awaitFullyMetQuorum());
 
