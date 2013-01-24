@@ -3505,7 +3505,11 @@ abstract public class WriteCacheService implements IWriteCache {
 
             counters.get().memoCacheSize.set(memo.size());
 
-            return memo.compute(new LoadRecordRequest(this, offset, nbytes));
+            final ByteBuffer ret = memo.compute(new LoadRecordRequest(this, offset, nbytes));
+            
+            // Duplicate buffer since memoizer may return same ByteBuffer to multiple callers
+            //	resulting in problems of concurrent read
+            return ret.duplicate();
 
         } catch (InterruptedException e) {
 
