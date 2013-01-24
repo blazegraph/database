@@ -320,7 +320,12 @@ public class TestMemStore extends AbstractJournalTestCase {
 		public void test_stressSessionProtection() {
 			// Sequential logic
 
-			final Journal store = getJournal(getProperties());
+            final Properties p = getProperties();
+
+            // Note: No longer the default. Must be explicitly set.
+            p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+            final Journal store = getJournal(p);
 			try {
 				final IRWStrategy bs = (IRWStrategy) store.getBufferStrategy();
 
