@@ -30,7 +30,6 @@ package com.bigdata.journal;
 import java.lang.ref.WeakReference;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
@@ -214,6 +213,8 @@ public class TestJournalShutdown extends TestCase2 {
                                                 + ncreated
                                                 + ", nalive="
                                                 + nunfinalized);
+                            // ensure that journals are destroyed when the are finalized.
+                            destroy();
                         }
                     };
 
@@ -270,11 +271,11 @@ public class TestJournalShutdown extends TestCase2 {
                         /*
                          * Submit one of the tasks and *wait* for its Future.
                          */
-                        jnl.getConcurrencyManager().submit(task1).get();
-                        jnl.getConcurrencyManager().submit(task1b).get();
-                        jnl.getConcurrencyManager().submit(task2).get();
-                         
-                    } catch (ExecutionException e) {
+                      jnl.getConcurrencyManager().submit(task1).get();
+                      jnl.getConcurrencyManager().submit(task1b).get();
+                      jnl.getConcurrencyManager().submit(task2).get();
+                        
+                    } catch (/*Execution*/Exception e) {
                         log.error("Problem registering index: " + e, e);
                     }
                     
@@ -369,11 +370,16 @@ public class TestJournalShutdown extends TestCase2 {
             /*
              * Ensure that all journals are destroyed by the end of the test.
              */
+            int destroyed = 0;
             for (int i = 0; i < refs.length; i++) {
                 final Journal jnl = refs[i] == null ? null : refs[i].get();
                 if (jnl != null) {
+                    destroyed++;
                     jnl.destroy();
                 }
+            }
+            if (destroyed > 0) {
+                log.error("Destroyed " + destroyed + " non finalized journals");
             }
 
         }
