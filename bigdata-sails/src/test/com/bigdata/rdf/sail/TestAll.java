@@ -28,7 +28,6 @@ package com.bigdata.rdf.sail;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 import org.apache.log4j.Level;
@@ -102,12 +101,10 @@ public class TestAll extends TestCase {
 
         /* quad store in scale-out.
          * 
-         * FIXME Restore this test suite.  It is out best protection against
-         * regression of the cluster database mode.
-         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/196 (Journal Leaks Memory)
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary Journals in CI)
          */
-//        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
+        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 
