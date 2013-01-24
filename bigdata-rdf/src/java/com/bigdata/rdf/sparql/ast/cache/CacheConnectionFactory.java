@@ -32,6 +32,7 @@ import java.util.WeakHashMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
@@ -84,9 +85,20 @@ public class CacheConnectionFactory {
         if (queryEngine == null)
             throw new IllegalArgumentException();
 
-        if(!QueryHints.CACHE_ENABLED) {
-            
-            // Feature is disabled.
+        if (!QueryHints.CACHE_ENABLED
+                || !(queryEngine.getIndexManager() instanceof AbstractJournal)) {
+
+            /**
+             * Feature is disabled.
+             * 
+             * Note: IBTreeManager does not support HTree methods, so
+             * TemporaryStore can not substitute for AbstractJournal in
+             * CacheConnectionImpl. This is a GIST issue. There are a number of
+             * methods that we would need to implement and they would also need
+             * to be on the IJournal implementations in AbstractTask (Might be
+             * better to just directly wire the solutions are named and durable
+             * rather than cachable).
+             */
             return null;
             
         }
