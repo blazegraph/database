@@ -38,8 +38,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IBTreeManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -66,7 +68,7 @@ public class QueryEngineFactory {
      * to keep any {@link QueryEngine} objects wired into the cache unless the
      * application is holding a hard reference to the {@link QueryEngine}.
      */
-    private static ConcurrentWeakValueCache<Journal, QueryEngine> standaloneQECache = new ConcurrentWeakValueCache<Journal, QueryEngine>(
+    private static ConcurrentWeakValueCache<IBTreeManager, QueryEngine> standaloneQECache = new ConcurrentWeakValueCache<IBTreeManager, QueryEngine>(
             0/* queueCapacity */
     );
 
@@ -95,15 +97,15 @@ public class QueryEngineFactory {
      *         and its weak reference has not been cleared.
      */
     static public QueryEngine getExistingQueryController(
-            final IIndexManager indexManager) {
+            final IBTreeManager indexManager) {
 
         if (indexManager instanceof IBigdataFederation<?>) {
 
             return federationQECache.get((IBigdataFederation<?>) indexManager);
             
         }
-        
-        return standaloneQECache.get((Journal)indexManager);
+        // Note: Also supports TemporaryStore.
+        return standaloneQECache.get(indexManager);
         
     }
 
@@ -122,8 +124,8 @@ public class QueryEngineFactory {
             return getFederatedQueryController((IBigdataFederation<?>) indexManager);
             
         }
-        
-        return getStandaloneQueryController((Journal) indexManager);
+        // Note: Also supports TemporaryStore.
+        return getStandaloneQueryController((IBTreeManager) indexManager);
         
     }
 
@@ -131,12 +133,13 @@ public class QueryEngineFactory {
      * Singleton factory for standalone.
      * 
      * @param indexManager
-     *            The journal.
-     *            
+     *            The index manager. Can be a {@link TemporaryStore} or
+     *            {@link Journal}.
+     * 
      * @return The query controller.
      */
     static public QueryEngine getStandaloneQueryController(
-            final Journal indexManager) {
+            final IBTreeManager indexManager) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -172,7 +175,7 @@ public class QueryEngineFactory {
      * @return The new query engine.
      */
     private static QueryEngine newStandaloneQueryEngine(
-            final Journal indexManager) {
+            final IBTreeManager indexManager) {
 
         if (log.isInfoEnabled())
             log.info("Initiallizing query engine: " + indexManager);
