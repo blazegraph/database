@@ -1541,6 +1541,18 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	volatile private int m_frees = 0;
 	volatile private long m_nativeAllocBytes = 0;
 	
+	/**
+	 * Alternative method signature returning a ByteBuffer rather than receiving a
+	 * byte array.
+	 * <p>
+	 * If a blob then an extra byte array is required in which to build the data,
+	 * but otherwise extra buffering could be avoided be reading directly from
+	 * the WriteCacheService.
+	 * 
+	 * @param rwaddr
+	 * @param sze
+	 * @return
+	 */
 	public ByteBuffer getData(final long rwaddr, final int sze) {
 		if (true || sze > m_maxFixedAlloc || m_writeCacheService == null) {
 		    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
