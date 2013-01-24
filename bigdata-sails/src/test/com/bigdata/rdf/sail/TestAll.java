@@ -99,12 +99,12 @@ public class TestAll extends TestCase {
         // NanoSparqlServer
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
 
-        /* quad store in scale-out.
+        /* FIXME Restore:: quad store in scale-out.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/196 (Journal Leaks Memory)
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/523 (Temporary Journals in CI)
          */
-        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
+//        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 
