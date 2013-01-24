@@ -1309,7 +1309,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             // Try reading from the local store.
             final ByteBuffer ret = readFromLocalStore(addr);
             
-            return ret != null ? ret.duplicate() : null;
+            return ret; // ret != null ? ret.duplicate() : null;
             
         } catch (InterruptedException e) {
             // wrap and rethrow.
@@ -2471,6 +2471,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         readLock.lock();
         try {
             writeCache.flush(false/* force */);
+            
+            // install reads into readCache (if any)
+            writeCacheService.installReads(writeCache);
         } finally {
             readLock.unlock();
         }
