@@ -617,7 +617,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_RW_2buffers()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 10;
+        final int nbuffers = 2;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -716,7 +716,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
     public void test_writeCacheService_RW_6buffers_recordChecksums()
             throws InterruptedException, IOException {
 
-        final int nbuffers = 20;
+        final int nbuffers = 6;
         final int nrecs = nrecsRW;
         /*
          * Note: The RW store breaks large records into multiple allocations,
@@ -1561,7 +1561,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         if(skipHATest()) return;
 
-        final int nbuffers = 6;
+        final int nbuffers = 2;
         final boolean useChecksums = true;
         // Note: This must be true for the write pipeline.
         final boolean isHighlyAvailable = true;
@@ -2283,7 +2283,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             // flush the write cache to the backing file.
             log.info("Service flush().");
-System.out.println("FLUSHING");
+
             writeCacheService.flush(true/*force*/);
             log.info("Service flush() - done.");
 
