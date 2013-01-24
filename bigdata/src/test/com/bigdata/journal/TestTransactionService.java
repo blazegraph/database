@@ -1009,7 +1009,12 @@ public class TestTransactionService extends TestCase2 {
     public void test_newTx_readOnly_releaseTimeRespectsReadsOnCommitTime()
             throws IOException {
         
-        final MockTransactionService service = newFixture();
+        final Properties p = new Properties();
+
+        // Note: No longer the default. Must be explicitly set.
+        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+        final MockTransactionService service = newFixture(p);
 
         try {
 
@@ -1105,7 +1110,12 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_historyGone() throws IOException {
 
-        final MockTransactionService service = newFixture();
+        final Properties p = new Properties();
+
+        // Note: No longer the default. Must be explicitly set.
+        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+        final MockTransactionService service = newFixture(p);
 
         try {
 
@@ -1282,7 +1292,12 @@ public class TestTransactionService extends TestCase2 {
      */
     public void test_newTx_readOnly_historyGone2() throws IOException {
 
-        final MockTransactionService service = newFixture();
+        final Properties p = new Properties();
+
+        // Note: No longer the default. Must be explicitly set.
+        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+        final MockTransactionService service = newFixture(p);
 
         try {
 
