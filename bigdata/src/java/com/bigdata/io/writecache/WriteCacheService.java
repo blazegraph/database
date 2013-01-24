@@ -485,7 +485,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
         this.useChecksum = useChecksum;
 
-        this.compactionEnabled = canCompact() && compactionThreshold < 100;
+        this.compactionEnabled = false;//canCompact() && compactionThreshold < 100;
 
 //      this.opener = opener;
 
