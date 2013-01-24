@@ -1340,8 +1340,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	private int freeDeferrals(final long blockAddr, final long lastReleaseTime) {
 		m_allocationLock.lock();
 		int totalFreed = 0;
+		DataInputStream strBuf = null;		
 		try {
-			final DataInputStream strBuf = new DataInputStream(getInputStream(blockAddr));		
+			strBuf = new DataInputStream(getInputStream(blockAddr));		
 			int nxtAddr = strBuf.readInt();
 			
 			while (nxtAddr != 0) { // while (false && addrs-- > 0) {
@@ -1366,11 +1367,18 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
             if (log.isTraceEnabled())
                 log.trace("Updated m_lastDeferredReleaseTime="
                         + m_lastDeferredReleaseTime);
-			strBuf.close();
 		} catch (IOException e) {
 			throw new RuntimeException("Problem freeing deferrals", e);
 		} finally {
 			m_allocationLock.unlock();
+			if (strBuf != null) {
+				try {
+					strBuf.close();
+				} catch (IOException e) {
+					if (log.isInfoEnabled())
+						log.info(e);
+				}
+			}
 		}
 		
 		return totalFreed;
