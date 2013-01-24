@@ -690,11 +690,13 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
          * Allocate buffer to include checksum to allow single read but then
          * return ByteBuffer excluding those bytes
          */
-        final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
-
-        m_store.getData(rwaddr, buf, 0, sze+4);
-
-        return ByteBuffer.wrap(buf, 0, sze);
+//        final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
+//
+//        m_store.getData(rwaddr, buf, 0, sze+4);
+//
+//        return ByteBuffer.wrap(buf, 0, sze);
+        
+        return m_store.getData(rwaddr,  sze);
 
     }
 

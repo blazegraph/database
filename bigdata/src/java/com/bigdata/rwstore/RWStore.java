@@ -95,6 +95,7 @@ import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1539,6 +1540,42 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	volatile private int m_allocations = 0;
 	volatile private int m_frees = 0;
 	volatile private long m_nativeAllocBytes = 0;
+	
+	public ByteBuffer getData(final long rwaddr, final int sze) {
+		if (true || sze > m_maxFixedAlloc || m_writeCacheService == null) {
+		    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
+		
+		    getData(rwaddr, buf, 0, sze+4);
+		
+		    return ByteBuffer.wrap(buf, 0, sze);
+		} else {
+            final long paddr = physicalAddress((int) rwaddr);
+			
+            if (paddr == 0) {
+                
+                assertAllocators();
+
+                throw new PhysicalAddressResolutionException(rwaddr);
+                
+			}
+            
+			assert paddr > 0;
+            try {
+				return m_writeCacheService.read(paddr, sze);
+			} catch (Throwable e) {
+				/*
+				 * Note: ClosedByInterruptException can be thrown out of
+				 * FileChannelUtility.readAll(), typically because the LIMIT on
+				 * a query was satisfied, but we do not want to log that as an
+				 * error.
+				 */
+//				log.error(e,e);
+				throw new RuntimeException("addr=" + rwaddr + " : cause=" + e, e);
+
+			}
+		}
+	}
+
 
     /**
      * If the buf[] size is greater than the maximum fixed allocation, then the
