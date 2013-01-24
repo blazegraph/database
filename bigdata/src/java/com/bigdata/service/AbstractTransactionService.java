@@ -157,10 +157,16 @@ abstract public class AbstractTransactionService extends AbstractService
         String MIN_RELEASE_AGE_NEVER = "" + Long.MAX_VALUE;
 
         /**
-         * Default minimum release age is ZERO(0L) milliseconds (only the last
-         * commit point will be retained after a full compacting merge).
+         * Default minimum release age is ONE(1L) milliseconds (only the last
+         * commit point will be retained after a full compacting merge). This
+         * causes the RWStore to use its recycler mode by default rather than
+         * its session protection mode.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/638"
+         *      >Change DEFAULT_MIN_RELEASE_AGE to 1ms</a>
          */
-        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_NO_HISTORY;
+        String DEFAULT_MIN_RELEASE_AGE = "1";
+//        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_NO_HISTORY;
 
     }
     
