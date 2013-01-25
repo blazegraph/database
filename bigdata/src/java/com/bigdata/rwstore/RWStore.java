@@ -1554,7 +1554,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * @return
 	 */
 	public ByteBuffer getData(final long rwaddr, final int sze) {
-		if (true || sze > m_maxFixedAlloc || m_writeCacheService == null) {
+		if (sze > m_maxFixedAlloc || m_writeCacheService == null || true) {
 		    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
 		
 		    getData(rwaddr, buf, 0, sze+4);
@@ -1573,7 +1573,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             
 			assert paddr > 0;
             try {
-				return m_writeCacheService.read(paddr, sze);
+				return m_writeCacheService.read(paddr, sze+4);
 			} catch (Throwable e) {
 				/*
 				 * Note: ClosedByInterruptException can be thrown out of
