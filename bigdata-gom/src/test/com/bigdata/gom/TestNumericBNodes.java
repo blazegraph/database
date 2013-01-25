@@ -77,7 +77,7 @@ public class TestNumericBNodes extends RemoteGOMTestCase {
 
 			final String resource = "foaf-tbl-plus-6-degrees-small.nq";
 			
-			load(getClass().getResource(resource), NQuadsParser.nquads);
+			load(getClass().getResource(resource), RDFFormat.NQUADS);
 			
 			new Example1(om).call();
 			

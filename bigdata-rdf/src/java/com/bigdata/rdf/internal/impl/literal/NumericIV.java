@@ -24,16 +24,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.literal;
 
-import java.math.BigInteger;
-
 import org.openrdf.model.Literal;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
- * Superclass for the inline numerics - XSDNumericIV, XSDIntegerIV, and 
- * XSDDecimalIV. 
+ * Superclass for the inline numerics - {@link XSDNumericIV},
+ * {@link XSDIntegerIV}, and {@link XSDDecimalIV}.
  */ 
 public abstract class NumericIV<V extends BigdataLiteral, T> extends
         AbstractLiteralIV<V, T> implements Literal {

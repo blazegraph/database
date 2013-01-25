@@ -60,6 +60,8 @@ import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.paths.ArbitraryLengthPathOp;
+import com.bigdata.bop.paths.ZeroLengthPathOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DropOp;
@@ -96,6 +98,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -103,6 +106,7 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
@@ -131,6 +135,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.ZeroLengthPathNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
@@ -2275,6 +2280,84 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
 
     /**
+     * Generate the query plan for an arbitrary length path.
+     */
+    private static PipelineOp convertArbitraryLengthPath(PipelineOp left,
+            final ArbitraryLengthPathNode alpNode, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
+
+    	final JoinGroupNode subgroup = (JoinGroupNode) alpNode.subgroup();
+    	
+        // Convert the child join group.
+        final PipelineOp subquery = convertJoinGroup(null,
+                subgroup, doneSet, ctx, false/* needsEndOp */);
+
+        final IVariableOrConstant<?> leftTerm = 
+        		(IVariableOrConstant<?>) alpNode.left().getValueExpression();
+        
+        final IVariableOrConstant<?> rightTerm = 
+        		(IVariableOrConstant<?>) alpNode.right().getValueExpression();
+        
+        final IVariable<?> tVarLeft = 
+        		(IVariable<?>) alpNode.tVarLeft().getValueExpression();
+        
+        final IVariable<?> tVarRight = 
+        		(IVariable<?>) alpNode.tVarRight().getValueExpression();
+        
+        /**
+         * We need to drop the internal variables bound by the subquery (in the
+         * case where the subquery is a nested path).
+         */
+    	final Set<IVariable<?>> varsToDrop = new LinkedHashSet<IVariable<?>>();
+    	ctx.sa.getDefinitelyProducedBindings(subgroup, varsToDrop, true);
+    	varsToDrop.remove(tVarLeft);
+    	varsToDrop.remove(tVarRight);
+    	
+        left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
+    			new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
+    			new NV(ArbitraryLengthPathOp.Annotations.LEFT_TERM, leftTerm),
+    			new NV(ArbitraryLengthPathOp.Annotations.RIGHT_TERM, rightTerm),
+    			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
+    			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
+    			new NV(ArbitraryLengthPathOp.Annotations.LOWER_BOUND, alpNode.lowerBound()),
+    			new NV(ArbitraryLengthPathOp.Annotations.UPPER_BOUND, alpNode.upperBound()),
+    			new NV(ArbitraryLengthPathOp.Annotations.VARS_TO_DROP, 
+    					varsToDrop.toArray(new IVariable<?>[varsToDrop.size()])),
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER)//
+                ), ctx.queryHints);
+
+        return left;
+
+    }
+
+    /**
+     * Generate the query plan for a zero length path.
+     */
+    private static PipelineOp convertZeroLengthPath(PipelineOp left,
+            final ZeroLengthPathNode zlpNode, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
+
+        final IVariableOrConstant<?> leftTerm = 
+        		(IVariableOrConstant<?>) zlpNode.left().getValueExpression();
+        
+        final IVariableOrConstant<?> rightTerm = 
+        		(IVariableOrConstant<?>) zlpNode.right().getValueExpression();
+        
+        left = applyQueryHints(new ZeroLengthPathOp(leftOrEmpty(left),//
+    			new NV(ZeroLengthPathOp.Annotations.LEFT_TERM, leftTerm),
+    			new NV(ZeroLengthPathOp.Annotations.RIGHT_TERM, rightTerm),
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER)//
+                ), ctx.queryHints);
+
+        return left;
+
+    }
+
+    /**
      * Join group consists of: statement patterns, constraints, and sub-groups
      * <p>
      * Sub-groups can be either join groups (optional) or unions (non-optional)
@@ -2434,6 +2517,16 @@ public class AST2BOpUtility extends AST2BOpJoins {
                         getJoinConstraints(sp), 
 //                        new BOpContextBase(ctx.queryEngine), ctx.idFactory,
                         sp.getQueryHints());
+                continue;
+            } else if (child instanceof ArbitraryLengthPathNode) {
+            	@SuppressWarnings("unchecked")
+            	final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
+                left = convertArbitraryLengthPath(left, alpNode, doneSet, ctx);
+                continue;
+            } else if (child instanceof ZeroLengthPathNode) {
+            	@SuppressWarnings("unchecked")
+            	final ZeroLengthPathNode zlpNode = (ZeroLengthPathNode) child;
+                left = convertZeroLengthPath(left, zlpNode, doneSet, ctx);
                 continue;
             } else if (child instanceof ServiceNode) {
                 // SERVICE
@@ -4295,6 +4388,17 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
                     return ve;
 
+                }
+                
+                if (op instanceof UnknownFunctionBOp) {
+                	
+                	/*
+                	 * We want to defer on unknown functions until execution
+                	 * time (to allow simple parsing to succeed).
+                	 */
+                	
+                	return ve;
+                	
                 }
 
             }

@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Properties;
 
 import junit.framework.TestCase;
@@ -35,6 +38,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -50,6 +54,7 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -235,8 +240,27 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
+        final QueryRoot ast = new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
                 baseURI).getOriginalAST();
+        
+        final Collection<ValueExpressionNode> nodes = 
+        		new LinkedList<ValueExpressionNode>();
+        
+        final Iterator<ValueExpressionNode> itr = BOpUtility.visitAll(
+        		ast, ValueExpressionNode.class);
+
+        while (itr.hasNext()) {
+
+            final ValueExpressionNode node = itr.next();
+            nodes.add(node);
+            
+        }
+        
+        for (ValueExpressionNode node : nodes) {
+        	node.invalidate();
+        }
+        
+        return ast;
 
     }
 

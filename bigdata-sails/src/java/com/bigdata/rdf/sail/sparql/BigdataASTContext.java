@@ -54,6 +54,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @openrdf
  */
 public class BigdataASTContext {
 

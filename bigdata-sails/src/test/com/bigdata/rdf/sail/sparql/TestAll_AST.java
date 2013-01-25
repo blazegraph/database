@@ -67,13 +67,13 @@ public class TestAll_AST extends TestCase {
 		 */
 		suite.addTestSuite(TestTriplePatternBuilder.class);
 
-		/*
-		 * Test suite for the proposed standardization of
-		 * "reification done right".
-		 * 
-		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/526
-		 * (Reification done right)
-		 */
+        /**
+         * Test suite for the proposed standardization of
+         * "reification done right".
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
+         *      Reification done right </a>
+         */
 		if (false) // TODO Integrate into CI.
 			suite.addTestSuite(TestReificationDoneRightParser.class);
 

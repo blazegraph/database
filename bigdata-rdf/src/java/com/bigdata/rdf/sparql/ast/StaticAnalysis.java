@@ -845,6 +845,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof ArbitraryLengthPathNode) {
+        	
+        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	
+        } else if (node instanceof ZeroLengthPathNode) {
+        	
+        	vars.addAll(((ZeroLengthPathNode) node).getProducedBindings());
+        	
         } else if(node instanceof SubqueryRoot) {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
@@ -995,6 +1003,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 //                
 //            }
 
+        } else if (node instanceof ArbitraryLengthPathNode) {
+        	
+        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	
+        } else if (node instanceof ZeroLengthPathNode) {
+        	
+        	vars.addAll(((ZeroLengthPathNode) node).getProducedBindings());
+        	
         } else if(node instanceof SubqueryRoot) {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
@@ -1093,6 +1109,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 }
 
+            } else if (child instanceof ArbitraryLengthPathNode) {
+            	
+            	vars.addAll(((ArbitraryLengthPathNode) child).getProducedBindings());
+            	
+            } else if (child instanceof ZeroLengthPathNode) {
+            	
+            	vars.addAll(((ZeroLengthPathNode) child).getProducedBindings());
+            	
             } else if (child instanceof NamedSubqueryInclude
                     || child instanceof SubqueryRoot
                     || child instanceof ServiceNode) {
@@ -2299,6 +2323,34 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             for (IValueExpressionNode exprNode : projection) {
 
                 final IValueExpression<?> expr = exprNode.getValueExpression();
+
+                if (expr == null) {
+                    
+                    /*
+                     * The value expression is not cached....
+                     */
+                    
+                    if (exprNode instanceof FunctionNode) {
+
+                        /*
+                         * Hack used when the BigdataExprBuilder needs to decide
+                         * on the validity of aggregate expressions before we
+                         * get around to caching the value expressions during
+                         * evaluation (i.e., to pass the compliance tests for
+                         * the parser).
+                         */
+                        final FunctionNode functionNode = (FunctionNode) exprNode;
+
+                        if (FunctionRegistry.isAggregate(functionNode
+                                .getFunctionURI()))
+
+                            return true;
+
+                    }
+                    
+                    return false;
+
+                }
 
                 if (isObviousAggregate(expr)) {
 

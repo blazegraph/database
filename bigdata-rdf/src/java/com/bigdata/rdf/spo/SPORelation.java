@@ -1635,6 +1635,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @param keyOrder
      *            The selected index order.
+     * @param filter
+     *            An optional filter on the visited {@link IV}s.
      * 
      * @return An iterator visiting the distinct term identifiers.
      * 
@@ -1642,7 +1644,39 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
     public IChunkedIterator<IV> distinctTermScan(
-            final IKeyOrder<ISPO> keyOrder, final ITermIVFilter termIdFilter) {
+            final IKeyOrder<ISPO> keyOrder, final ITermIVFilter filter) {
+
+        return distinctTermScan(keyOrder, null/* fromKey */, null/* toKey */,
+                filter);
+
+    }
+    
+    /**
+     * Efficient scan of the distinct term identifiers that appear in the first
+     * position of the keys for the statement index corresponding to the
+     * specified {@link IKeyOrder}. For example, using {@link SPOKeyOrder#POS}
+     * will give you the term identifiers for the distinct predicates actually
+     * in use within statements in the {@link SPORelation}.
+     * 
+     * @param keyOrder
+     *            The selected index order.
+     * @param filter
+     *            An optional filter on the visited {@link IV}s.
+     * @param fromKey
+     *            The first key for the scan -or- <code>null</code> to start the
+     *            scan at the head of the index.
+     * @param toKey
+     *            The last key (exclusive upper bound) for the scan -or-
+     *            <code>null</code> to scan until the end of the index.
+     * 
+     * @return An iterator visiting the distinct term identifiers.
+     * 
+     * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
+     *       fast scans across multiple shards when chunk-wise order is Ok.
+     */
+    public IChunkedIterator<IV> distinctTermScan(
+            final IKeyOrder<ISPO> keyOrder, final byte[] fromKey,
+            final byte[] toKey, final ITermIVFilter termIdFilter) {
 
         final DistinctTermAdvancer filter = new DistinctTermAdvancer(keyArity);
         
@@ -1678,7 +1712,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         @SuppressWarnings("unchecked")
         final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
-                .rangeIterator(null/* fromKey */, null/* toKey */,
+                .rangeIterator(fromKey, toKey,//
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
                     
@@ -1703,6 +1737,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 IChunkedIterator.DEFAULT_CHUNK_SIZE, IV.class);
                 
     }
+    
 	/**
      * Efficient scan of the distinct term identifiers that appear in the first
      * position of the keys for the statement index corresponding to the

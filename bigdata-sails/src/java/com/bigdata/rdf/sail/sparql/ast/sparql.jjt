@@ -1,3 +1,33 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/* @author: Bryan Thompson
+ * @openrdf
+ *
+ * "make javacc" to rebuild.  Be sure to first remove the sparql.jj file
+ * so it will generate a new one.
+ */
+ 
 /*
  * Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2007.
  *
@@ -12,12 +42,12 @@
  */
 
 options {
-	MULTI=true;
-	VISITOR=true;
-	VISITOR_EXCEPTION="VisitorException";
-	STATIC=false;
-	UNICODE_INPUT=true;
-	JAVA_UNICODE_ESCAPE=true; // pre-process unicode escapes, see section A.2 of spec
+    MULTI=true;
+    VISITOR=true;
+    VISITOR_EXCEPTION="VisitorException";
+    STATIC=false;
+    UNICODE_INPUT=true;
+    JAVA_UNICODE_ESCAPE=true; // pre-process unicode escapes, see section A.2 of spec
 }
 
 PARSER_BEGIN(SyntaxTreeBuilder)
@@ -35,52 +65,54 @@ import org.openrdf.rio.RDFParser.DatatypeHandling;
 
 public class SyntaxTreeBuilder {
 
-	/**
-	 * Parses the supplied SPARQL query and builds a syntax tree from it.
-	 *
-	 * @param query A SPARQL query string.
-	 * @return The root of the syntax tree.
-	 * @throws TokenMgrError If the query was syntactically incorrect.
-	 * @throws ParseException If the query was syntactically incorrect.
-	 */
-	public static ASTQueryContainer parseQuery(final String query)
-		throws TokenMgrError, ParseException
-	{
-		final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(query) );
+    /**
+     * Parses the supplied SPARQL query and builds a syntax tree from it.
+     *
+     * @param query A SPARQL query string.
+     * @return The root of the syntax tree.
+     * @throws TokenMgrError If the query was syntactically incorrect.
+     * @throws ParseException If the query was syntactically incorrect.
+     */
+    public static ASTQueryContainer parseQuery(final String query)
+        throws TokenMgrError, ParseException
+    {
+        final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(query) );
 
-		// Set size of tab to 1 to force tokenmanager to report correct column
-		// index for substring splitting of service graph pattern.
-		stb.jj_input_stream.setTabSize(1);
+        // Set size of tab to 1 to force tokenmanager to report correct column
+        // index for substring splitting of service graph pattern.
+        stb.jj_input_stream.setTabSize(1);
 
-		final ASTQueryContainer container = stb.QueryContainer();
-		container.setSourceString(query);
-		return container;
-	}
+        final ASTQueryContainer container = stb.QueryContainer();
+        container.setSourceString(query);
+        return container;
+    }
 
-	/**
-	 * Parses the supplied SPARQL update sequence and builds a syntax tree from it.
-	 *
-	 * @param sequence A SPARQL update sequence string.
-	 * @return The root of the syntax tree.
-	 * @throws TokenMgrError If the update sequence was syntactically incorrect.
-	 * @throws ParseException If the update sequence was syntactically incorrect.
-	 */
-	public static ASTUpdateSequence parseUpdateSequence(final String sequence)
-		throws TokenMgrError, ParseException
-	{
-		final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(sequence) );
-		return stb.UpdateSequence();
-	}
-	
-	/**
-	 * Trims <tt>n</tt> character from the start and end of the supplied string.
-	 */
-	private static String _trimString(String s, int n) {
-		if (s.length() >= 2 * n) {
-			s = s.substring(n, s.length() - n);
-		}
-		return s;
-	}
+    /**
+     * Parses the supplied SPARQL update sequence and builds a syntax tree from it.
+     *
+     * @param sequence A SPARQL update sequence string.
+     * @return The root of the syntax tree.
+     * @throws TokenMgrError If the update sequence was syntactically incorrect.
+     * @throws ParseException If the update sequence was syntactically incorrect.
+     */
+    public static ASTUpdateSequence parseUpdateSequence(final String sequence)
+        throws TokenMgrError, ParseException
+    {
+        final SyntaxTreeBuilder stb = new SyntaxTreeBuilder( new StringReader(sequence) );
+        final ASTUpdateSequence seq = stb.UpdateSequence();
+        seq.setSourceString(sequence);
+        return seq;
+    }
+    
+    /**
+     * Trims <tt>n</tt> character from the start and end of the supplied string.
+     */
+    private static String _trimString(String s, int n) {
+        if (s.length() >= 2 * n) {
+            s = s.substring(n, s.length() - n);
+        }
+        return s;
+    }
 }
 PARSER_END(SyntaxTreeBuilder)
 
@@ -90,162 +122,162 @@ PARSER_END(SyntaxTreeBuilder)
 
 TOKEN :
 {
-	// Whitespace characters
-	<#WS_CHAR: " " | "\t" | "\n" | "\r" | "\f">
+    // Whitespace characters
+    <#WS_CHAR: " " | "\t" | "\n" | "\r" | "\f">
 }
 
 SKIP :
 {
-	<WHITESPACE: <WS_CHAR>>
+    <WHITESPACE: <WS_CHAR>>
 }
 
 SPECIAL_TOKEN :
 {
-	<SINGLE_LINE_COMMENT: "#" (~["\n","\r"])*>
+    <SINGLE_LINE_COMMENT: "#" (~["\n","\r"])*>
 }
 
 // Special characters
 TOKEN :
 {
-	<LPAREN: "(">
-|	<RPAREN: ")">
-|	<LBRACE: "{">
-|	<RBRACE: "}">
-|	<LBRACK: "[">
-|	<RBRACK: "]">
-|	<SEMICOLON: ";">
-|	<COMMA: ",">
-|	<DOT: ".">
-|	<EQ: "=">
-|	<NE: "!=">
-|	<GT: ">">
-|	<LT: "<">
-|	<LE: "<=">
-|	<GE: ">=">
-|	<NOT: "!">
-|	<OR: "||">
-|	<AND: "&&">
-|	<PLUS: "+">
-|	<MINUS: "-">
-|	<STAR: "*">
-|	<QUESTION: "?">
-|	<SLASH: "/">
+    <LPAREN: "(">
+|   <RPAREN: ")">
+|   <LBRACE: "{">
+|   <RBRACE: "}">
+|   <LBRACK: "[">
+|   <RBRACK: "]">
+|   <SEMICOLON: ";">
+|   <COMMA: ",">
+|   <DOT: ".">
+|   <EQ: "=">
+|   <NE: "!=">
+|   <GT: ">">
+|   <LT: "<">
+|   <LE: "<=">
+|   <GE: ">=">
+|   <NOT: "!">
+|   <OR: "||">
+|   <AND: "&&">
+|   <PLUS: "+">
+|   <MINUS: "-">
+|   <STAR: "*">
+|   <QUESTION: "?">
+|   <SLASH: "/">
 |       <PIPE: "|">
-|	<INVERSE: "^">
-|	<DT_PREFIX: "^^">
-|	<NIL: <LPAREN> (<WS_CHAR>)* <RPAREN>>
-|	<ANON: <LBRACK> (<WS_CHAR>)* <RBRACK>>
+|   <INVERSE: "^">
+|   <DT_PREFIX: "^^">
+|   <NIL: <LPAREN> (<WS_CHAR>)* <RPAREN>>
+|   <ANON: <LBRACK> (<WS_CHAR>)* <RBRACK>>
 }
 
 TOKEN :
 {
-	<IS_A: "a"> // Note: case-sensitive!
+    <IS_A: "a"> // Note: case-sensitive!
 }
 
 TOKEN [IGNORE_CASE] :
 {
-	<BASE: "base">
-|	<PREFIX: "prefix">
-|	<SELECT: "select">
-|	<CONSTRUCT: "construct">
-|	<DESCRIBE: "describe">
-|	<ASK: "ask">
-|	<DISTINCT: "distinct">
-|	<REDUCED: "reduced">
-|	<AS: "as">
-|	<FROM: "from">
-|	<NAMED: "named">
-|	<WHERE: "where">
-|	<ORDER: "order">
-|	<GROUP: "group">
-|	<BY: "by">
-|	<ASC: "asc">
-|	<DESC: "desc">
-|	<LIMIT: "limit">
-|	<OFFSET: "offset">
-|	<OPTIONAL: "optional">
-|	<GRAPH: "graph">
-|	<UNION: "union">
-|	<MINUS_SETOPER: "minus">
-|	<FILTER: "filter">
-|	<HAVING: "having">
-|	<EXISTS: "exists">
-|	<NOT_EXISTS: "not exists">
-|	<STR: "str">
-|	<LANG: "lang">
-|	<LANGMATCHES: "langmatches">
-|	<DATATYPE: "datatype">
-|	<BOUND: "bound">
-|	<SAMETERM: "sameTerm">
-|	<IS_IRI: ("isIRI"|"isURI")>
-|	<IS_BLANK: "isBlank">
-|	<IS_LITERAL: "isLiteral">
-|	<IS_NUMERIC: "isNumeric">
-|	<COALESCE: "coalesce">
-|	<BNODE: "bnode">
-|	<STRDT: "strdt">
-|	<STRLANG: "strlang">
-|	<IRI: "IRI"|"URI">
-|	<IF: "if">
-|	<IN: "in">
-|	<NOT_IN: "not in">
-|	<COUNT: "count">
-|	<SUM: "sum">
-|	<MIN: "min">
-|	<MAX: "max">
-|	<AVG: "avg">
-|	<SAMPLE: "sample">
-|	<GROUP_CONCAT: "group_concat">
-|	<SEPARATOR: "separator">
-|	<REGEX: "regex">
-|	<TRUE: "true">
-|	<FALSE: "false">
-|	<BIND: "bind">
-|	<SERVICE: "service">
-|	<BINDINGS: "bindings">
-|	<UNDEF: "UNDEF">
-|	<STRLEN: "strlen">
-|	<SUBSTR: "substr">
-|	<STR_STARTS: "strStarts">
-|	<STR_ENDS: "strEnds">
-|	<STR_BEFORE: "strBefore">
-|	<STR_AFTER: "strAfter">
-|	<REPLACE: "replace">
-|	<UCASE: "ucase">
-|	<LCASE: "lcase">
-|	<CONCAT: "concat">
-|	<CONTAINS: "contains">
-|	<ENCODE_FOR_URI: "encode_for_URI">
-|	<RAND: "rand">
-|	<ABS: "abs">
-|	<CEIL: "ceil">
-|	<FLOOR: "floor">
-|	<ROUND: "round">
-|	<NOW: "now">
-|	<YEAR: "year">
-|	<MONTH: "month">
-|	<DAY: "day">
-|	<HOURS: "hours">
-|	<MINUTES: "minutes">
-|	<SECONDS: "seconds">
-|	<TIMEZONE: "timezone">
-|	<TZ: "tz">
-|	<MD5: "md5">
-|	<SHA1: "sha1">
-|	<SHA224: "sha224">
-|	<SHA256: "sha256">
-|	<SHA384: "sha384">
-|	<SHA512: "sha512">
+    <BASE: "base">
+|   <PREFIX: "prefix">
+|   <SELECT: "select">
+|   <CONSTRUCT: "construct">
+|   <DESCRIBE: "describe">
+|   <ASK: "ask">
+|   <DISTINCT: "distinct">
+|   <REDUCED: "reduced">
+|   <AS: "as">
+|   <FROM: "from">
+|   <NAMED: "named">
+|   <WHERE: "where">
+|   <ORDER: "order">
+|   <GROUP: "group">
+|   <BY: "by">
+|   <ASC: "asc">
+|   <DESC: "desc">
+|   <LIMIT: "limit">
+|   <OFFSET: "offset">
+|   <OPTIONAL: "optional">
+|   <GRAPH: "graph">
+|   <UNION: "union">
+|   <MINUS_SETOPER: "minus">
+|   <FILTER: "filter">
+|   <HAVING: "having">
+|   <EXISTS: "exists">
+|   <NOT_EXISTS: "not exists">
+|   <STR: "str">
+|   <LANG: "lang">
+|   <LANGMATCHES: "langmatches">
+|   <DATATYPE: "datatype">
+|   <BOUND: "bound">
+|   <SAMETERM: "sameTerm">
+|   <IS_IRI: ("isIRI"|"isURI")>
+|   <IS_BLANK: "isBlank">
+|   <IS_LITERAL: "isLiteral">
+|   <IS_NUMERIC: "isNumeric">
+|   <COALESCE: "coalesce">
+|   <BNODE: "bnode">
+|   <STRDT: "strdt">
+|   <STRLANG: "strlang">
+|   <IRI: "IRI"|"URI">
+|   <IF: "if">
+|   <IN: "in">
+|   <NOT_IN: "not in">
+|   <COUNT: "count">
+|   <SUM: "sum">
+|   <MIN: "min">
+|   <MAX: "max">
+|   <AVG: "avg">
+|   <SAMPLE: "sample">
+|   <GROUP_CONCAT: "group_concat">
+|   <SEPARATOR: "separator">
+|   <REGEX: "regex">
+|   <TRUE: "true">
+|   <FALSE: "false">
+|   <BIND: "bind">
+|   <SERVICE: "service">
+|   <BINDINGS: "bindings">
+|   <UNDEF: "UNDEF">
+|   <STRLEN: "strlen">
+|   <SUBSTR: "substr">
+|   <STR_STARTS: "strStarts">
+|   <STR_ENDS: "strEnds">
+|   <STR_BEFORE: "strBefore">
+|   <STR_AFTER: "strAfter">
+|   <REPLACE: "replace">
+|   <UCASE: "ucase">
+|   <LCASE: "lcase">
+|   <CONCAT: "concat">
+|   <CONTAINS: "contains">
+|   <ENCODE_FOR_URI: "encode_for_URI">
+|   <RAND: "rand">
+|   <ABS: "abs">
+|   <CEIL: "ceil">
+|   <FLOOR: "floor">
+|   <ROUND: "round">
+|   <NOW: "now">
+|   <YEAR: "year">
+|   <MONTH: "month">
+|   <DAY: "day">
+|   <HOURS: "hours">
+|   <MINUTES: "minutes">
+|   <SECONDS: "seconds">
+|   <TIMEZONE: "timezone">
+|   <TZ: "tz">
+|   <MD5: "md5">
+|   <SHA1: "sha1">
+|   <SHA224: "sha224">
+|   <SHA256: "sha256">
+|   <SHA384: "sha384">
+|   <SHA512: "sha512">
 }
 
-TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
+TOKEN [IGNORE_CASE] :   // Bigdata extension specific tokens
 {
     <INCLUDE: "include">
 |   <LET: "let">
-|	<ASSIGN: ":=">
-| 	<VAR3: "%" <VARNAME>>
+|   <ASSIGN: ":=">
+|   <VAR3: "%" <VARNAME>>
 |   <VIRTUAL_GRAPH: "virtual graph">
-|	<GRAPHS: "graphs">
+|   <GRAPHS: "graphs">
 |   <SOLUTIONS: "solutions">
 |   <TREF_OPEN: "<<">
 |   <TREF_CLOSE: ">>">
@@ -257,87 +289,94 @@ TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 |   <VERIFY: "VERIFY">
 |   <IGNORE: "IGNORE">
 |   <NORMALIZE: "NORMALIZE">
+// Managing Truth Maintenance
+//|   <ENABLE: "enable">
+//|   <DISABLE: "disable">
+//|   <ENTAILMENTS>
 }
 
-TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
+TOKEN [IGNORE_CASE] :   // SPARQL 1.1 Update-specific tokens
 {
-	<LOAD: "load">
-|	<CLEAR: "clear">
-|	<DROP: "drop">
-|	<ADD: "add">
-|	<MOVE: "move">
-|	<COPY: "copy">
-|	<CREATE: "create">
-|	<INSERT: "insert">
-|	<DATA: "data">
-|	<DELETE: "delete">
-|	<WITH: "with">
-|	<SILENT: "silent">
-|	<DEFAULT_GRAPH: "default">
-|	<ALL: "all">
-|	<INTO: "into">
-|	<TO: "to">
-|	<USING: "using">
-}
-
-TOKEN:
-{
-	<Q_IRI_REF: "<" (~["<", ">", "\"", "{", "}", "|", "^", "`", "\\", "\u0000"-"\u0020"])* ">">
-
-|	<PNAME_NS: (<PN_PREFIX>)? ":">
-|	<PNAME_LN: (<PN_PREFIX>)? ":" <PN_LOCAL>> // Note: PN_LOCAL not optional, case handled by PNAME_NS
-
-|	<BLANK_NODE_LABEL: "_:" <PN_LOCAL>>
-
-|	<VAR1: "?" <VARNAME>>
-|	<VAR2: "$" <VARNAME>>
-|	<LANGTAG: "@" (<ALPHA>)+ ("-" (<ALPHA>|<NUM>)+)*>
-|	<INTEGER: (<NUM>)+>
-|	<INTEGER_POSITIVE: "+" <INTEGER>>
-|	<INTEGER_NEGATIVE: "-" <INTEGER>>
-|	<DECIMAL: (<DECIMAL1>|<DECIMAL2>)>
-|	<#DECIMAL1: (<NUM>)+ "." (<NUM>)*>
-|	<#DECIMAL2: "." (<NUM>)+>
-|	<DECIMAL_POSITIVE: "+" <DECIMAL>>
-|	<DECIMAL_NEGATIVE: "-" <DECIMAL>>
-|	<DOUBLE: (<DOUBLE1>|<DOUBLE2>|<DOUBLE3>)>
-|	<#DOUBLE1: (<NUM>)+ "." (<NUM>)* <EXPONENT>>
-|	<#DOUBLE2: "." (<NUM>)+ <EXPONENT>>
-|	<#DOUBLE3: (<NUM>)+ <EXPONENT>>
-|	<#EXPONENT: ["e","E"] (["+","-"])? (<NUM>)+>
-|	<DOUBLE_POSITIVE: "+" <DOUBLE>>
-|	<DOUBLE_NEGATIVE: "-" <DOUBLE>>
-|	<STRING_LITERAL1: "'" (<SAFE_CHAR1>|<ECHAR>)* "'">
-|	<STRING_LITERAL2: "\"" (<SAFE_CHAR2>|<ECHAR>)* "\"">
-|	<STRING_LITERAL_LONG1: "'''" ( ("'"|"''")? (<SAFE_CHAR_LONG1>|<ECHAR>) )* "'''">
-|	<STRING_LITERAL_LONG2: "\"\"\"" ( ("\""|"\"\"")? (<SAFE_CHAR_LONG2>|<ECHAR>) )* "\"\"\"">
-|	<#SAFE_CHAR1: (~["'", "\\", "\r", "\n"])>
-|	<#SAFE_CHAR2: (~["\"", "\\", "\r", "\n"])>
-|	<#SAFE_CHAR_LONG1: (~["'","\\"])>
-|	<#SAFE_CHAR_LONG2: (~["\"","\\"])>
-|	<#ECHAR: "\\" ["t", "b", "n", "r", "f", "\\", "\"", "'"]>
-|	<#HEX: ["0"-"9"] | ["A"-"F"] | ["a"-"f"]>
-|	<#ALPHA: ["a"-"z","A"-"Z"]>
-|	<#NUM: ["0"-"9"]>
+    <LOAD: "load">
+|   <CLEAR: "clear">
+|   <DROP: "drop">
+|   <ADD: "add">
+|   <MOVE: "move">
+|   <COPY: "copy">
+|   <CREATE: "create">
+|   <INSERT: "insert">
+|   <DATA: "data">
+|   <DELETE: "delete">
+|   <WITH: "with">
+|   <SILENT: "silent">
+|   <DEFAULT_GRAPH: "default">
+|   <ALL: "all">
+|   <INTO: "into">
+|   <TO: "to">
+|   <USING: "using">
 }
 
 TOKEN:
 {
-	<#PN_CHARS_BASE:
-	    <ALPHA> | ["\u00C0"-"\u00D6"] | ["\u00D8"-"\u00F6"] | ["\u00F8"-"\u02FF"] | ["\u0370"-"\u037D"]
-	  | ["\u037F"-"\u1FFF"] | ["\u200C"-"\u200D"] | ["\u2070"-"\u218F"] | ["\u2C00"-"\u2FEF"]
-	  | ["\u3001"-"\uD7FF"] | ["\uF900"-"\uFDCF"] | ["\uFDF0"-"\uFFFD"]
-	  // | ["\u10000"-"\uEFFFF"] FIXME: JavaCC/Java can't handle this?
-	>
-|	<#PN_CHARS_U: <PN_CHARS_BASE> | "_">
-|	<#PN_START_CHAR: <PN_CHARS_U> | <NUM>>
-|	<#VAR_CHAR: <PN_START_CHAR> | "\u00B7" | ["\u0300"-"\u036F"] | ["\u203F"-"\u2040"]>
-|	<#PN_END_CHAR: <VAR_CHAR> | "-">
-|	<#PN_CHAR: <PN_END_CHAR> | ".">
+    <Q_IRI_REF: "<" (~["<", ">", "\"", "{", "}", "|", "^", "`", "\\", "\u0000"-"\u0020"])* ">">
 
-|	<#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHAR>)* <PN_END_CHAR> )?>
-|	<#PN_LOCAL: <PN_START_CHAR> ( (<PN_CHAR>)* <PN_END_CHAR> )?>
-|	<#VARNAME: <PN_START_CHAR> (<VAR_CHAR>)*>
+|   <PNAME_NS: (<PN_PREFIX>)? ":">
+|   <PNAME_LN: (<PN_PREFIX>)? ":" <PN_LOCAL>> // Note: PN_LOCAL not optional, case handled by PNAME_NS
+
+|   <BLANK_NODE_LABEL: "_:" <PN_LOCAL>>
+
+|   <VAR1: "?" <VARNAME>>
+|   <VAR2: "$" <VARNAME>>
+|   <LANGTAG: "@" (<ALPHA>)+ ("-" (<ALPHA>|<NUM>)+)*>
+|   <INTEGER: (<NUM>)+>
+|   <INTEGER_POSITIVE: "+" <INTEGER>>
+|   <INTEGER_NEGATIVE: "-" <INTEGER>>
+|   <DECIMAL: (<DECIMAL1>|<DECIMAL2>)>
+|   <#DECIMAL1: (<NUM>)+ "." (<NUM>)*>
+|   <#DECIMAL2: "." (<NUM>)+>
+|   <DECIMAL_POSITIVE: "+" <DECIMAL>>
+|   <DECIMAL_NEGATIVE: "-" <DECIMAL>>
+|   <DOUBLE: (<DOUBLE1>|<DOUBLE2>|<DOUBLE3>)>
+|   <#DOUBLE1: (<NUM>)+ "." (<NUM>)* <EXPONENT>>
+|   <#DOUBLE2: "." (<NUM>)+ <EXPONENT>>
+|   <#DOUBLE3: (<NUM>)+ <EXPONENT>>
+|   <#EXPONENT: ["e","E"] (["+","-"])? (<NUM>)+>
+|   <DOUBLE_POSITIVE: "+" <DOUBLE>>
+|   <DOUBLE_NEGATIVE: "-" <DOUBLE>>
+|   <STRING_LITERAL1: "'" (<SAFE_CHAR1>|<ECHAR>)* "'">
+|   <STRING_LITERAL2: "\"" (<SAFE_CHAR2>|<ECHAR>)* "\"">
+|   <STRING_LITERAL_LONG1: "'''" ( ("'"|"''")? (<SAFE_CHAR_LONG1>|<ECHAR>) )* "'''">
+|   <STRING_LITERAL_LONG2: "\"\"\"" ( ("\""|"\"\"")? (<SAFE_CHAR_LONG2>|<ECHAR>) )* "\"\"\"">
+|   <#SAFE_CHAR1: (~["'", "\\", "\r", "\n"])>
+|   <#SAFE_CHAR2: (~["\"", "\\", "\r", "\n"])>
+|   <#SAFE_CHAR_LONG1: (~["'","\\"])>
+|   <#SAFE_CHAR_LONG2: (~["\"","\\"])>
+|   <#ECHAR: "\\" ["t", "b", "n", "r", "f", "\\", "\"", "'"]>
+|   <#HEX: ["0"-"9"] | ["A"-"F"] | ["a"-"f"]>
+|   <#ALPHA: ["a"-"z","A"-"Z"]>
+|   <#NUM: ["0"-"9"]>
+}
+
+TOKEN:
+{
+    <#PN_CHARS_BASE:
+        <ALPHA> | ["\u00C0"-"\u00D6"] | ["\u00D8"-"\u00F6"] | ["\u00F8"-"\u02FF"] | ["\u0370"-"\u037D"]
+      | ["\u037F"-"\u1FFF"] | ["\u200C"-"\u200D"] | ["\u2070"-"\u218F"] | ["\u2C00"-"\u2FEF"]
+      | ["\u3001"-"\uD7FF"] | ["\uF900"-"\uFDCF"] | ["\uFDF0"-"\uFFFD"]
+      // | ["\u10000"-"\uEFFFF"] FIXME: JavaCC/Java can't handle this?
+    >
+|   <#PN_CHARS_U: <PN_CHARS_BASE> | "_">
+|   <#PN_START_CHAR: <PN_CHARS_U> | <NUM> | <PLX>> 
+|   <#VAR_CHAR: <PN_START_CHAR> | "\u00B7" | ["\u0300"-"\u036F"] | ["\u203F"-"\u2040"]>
+|   <#PN_END_CHAR: <VAR_CHAR> | "-">
+|   <#PN_CHAR: <PN_END_CHAR> | ".">
+
+|   <#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHAR>)* <PN_END_CHAR> )?>
+|   <#PN_LOCAL: <PN_START_CHAR> ( ( <PN_CHAR> | <PLX> )* (<PN_END_CHAR> | <PLX> ) )?>
+|   <#PLX: <PERCENT> | <PN_LOCAL_ESC>>
+|   <#PERCENT: "%" <HEX> <HEX>>
+|   <#PN_LOCAL_ESC: "\\" [ "_", "~", ".", "-", "!", "$", "&", "\"", "(", ")", "*", "+", ",", ";", "=", ":", "/", "?", "#", "@", "%" ]>
+|   <#VARNAME: <PN_START_CHAR> (<VAR_CHAR>)*>
 }
 
 //
@@ -347,83 +386,92 @@ TOKEN:
 ASTUpdateSequence UpdateSequence():
 {}
 {
-    UpdateContainer() ( <SEMICOLON> [ UpdateContainer() ] )* <EOF>
+    UpdateContainer() [ <SEMICOLON> UpdateSequence() ] <EOF>
     { return jjtThis; }
 }
 
 ASTUpdateContainer UpdateContainer():
 {}
 {
-    Prolog() Update()
+    Prolog() [ Update() ]
     { return jjtThis; }
 }
 
 ASTQueryContainer QueryContainer():
 {}
 {
-	Prolog() Query() <EOF>
-	{ return jjtThis; }
+    Prolog() Query() <EOF>
+    { return jjtThis; }
 }
 
 void Prolog() #void :
 {}
 {
-	( PrefixDecl() | BaseDecl() )*
+    ( PrefixDecl() | BaseDecl() )*
 }
 
 void BaseDecl() :
 { Token t; }
 {
-	<BASE> t = <Q_IRI_REF> {jjtThis.setIRI(_trimString(t.image, 1));}
+    <BASE> t = <Q_IRI_REF> {jjtThis.setIRI(_trimString(t.image, 1));}
 }
 
 void PrefixDecl() :
 { Token prefix; }
 {
-	<PREFIX> prefix = <PNAME_NS> IRI()
-	{
-		// Remove trailing colon from prefix
-		String prefixStr = prefix.image;
-		prefixStr = prefixStr.substring(0, prefixStr.length() - 1);
+    <PREFIX> prefix = <PNAME_NS> IRI()
+    {
+        // Remove trailing colon from prefix
+        String prefixStr = prefix.image;
+        prefixStr = prefixStr.substring(0, prefixStr.length() - 1);
 
-		jjtThis.setPrefix(prefixStr);
-	}
+        jjtThis.setPrefix(prefixStr);
+    }
 }
 
 
 void Query() #void :
 {}
 {
-    (SelectQuery() | ConstructQuery() |	DescribeQuery() | AskQuery())
+    (SelectQuery() | ConstructQuery() | DescribeQuery() | AskQuery())
 }
 
 void SelectQuery() :
 {}
 {
-	Select()
-	( DatasetClause() )*
-	( NamedSubquery() )*
-	WhereClause()
-	SolutionModifier()
-	[BindingsClause()]
+    Select()
+    ( DatasetClause() )*
+    ( NamedSubquery() )*
+    WhereClause()
+    SolutionModifier()
+    [BindingsClause()]
+}
+
+void SubSelect() #SelectQuery : // subselect does not accept dataset clauses
+{}
+{
+    Select()
+    WhereClause()
+    SolutionModifier()
+    [BindingsClause()]
 }
 
 void Select() :
 {}
 {
-	<SELECT>
-	
-	[
-		<DISTINCT> {jjtThis.setDistinct(true);}
-	|
-		<REDUCED> {jjtThis.setReduced(true);}
-	]
+    <SELECT>
+    
+    [
+        <DISTINCT> {jjtThis.setDistinct(true);}
+    |
+        <REDUCED> {jjtThis.setReduced(true);}
+    ]
 
-	(
-		<STAR> { jjtThis.setWildcard(true); }
-	|
-		( ProjectionElem() )+ 
-	)
+    (
+        <STAR> { jjtThis.setWildcard(true); }
+    |
+        ( ProjectionElem() )+ 
+    )
 }
 
 void ProjectionElem() :
@@ -437,19 +485,19 @@ void ProjectionElem() :
 void ConstructQuery() :
 {}
 {
-	Construct()
-	( DatasetClause() )*
-	( NamedSubquery() )*
-	WhereClause()
-	SolutionModifier()
-	[BindingsClause()]
+    Construct()
+    ( DatasetClause() )*
+    ( NamedSubquery() )*
+    WhereClause()
+    SolutionModifier()
+    [BindingsClause()]
 }
 
 void Construct() :
 {}
-{	
-	<CONSTRUCT> [ LOOKAHEAD(2) ConstructClause() ]
-	
+{   
+    <CONSTRUCT> [ LOOKAHEAD(2) ConstructClause() ]
+    
 }
 
 void ConstructClause() #void :
@@ -462,53 +510,64 @@ void ConstructClause() #void :
 void DescribeQuery() :
 {}
 {
-	Describe()
-	( DatasetClause() )*
-	( NamedSubquery() )*
-	[ WhereClause() ]
-	SolutionModifier()
-	[BindingsClause()]
+    Describe()
+    ( DatasetClause() )*
+    ( NamedSubquery() )*
+    [ WhereClause() ]
+    SolutionModifier()
+    [BindingsClause()]
 }
 
 void Describe() :
 {}
 {
-	<DESCRIBE>
-	(
-		<STAR> { jjtThis.setWildcard(true); }
-	|
-		( VarOrIRIref() )+
-	)
+    <DESCRIBE>
+    (
+        <STAR> { jjtThis.setWildcard(true); }
+    |
+        ( VarOrIRIref() )+
+    )
 }
 
 void AskQuery() :
 {}
 {
-	<ASK>
-	( DatasetClause() )*
-	( NamedSubquery() )*
-	WhereClause()
-	[BindingsClause()]
+    <ASK>
+    ( DatasetClause() )*
+    ( NamedSubquery() )*
+    WhereClause()
+    [BindingsClause()]
 }
 
 void NamedSubquery() :
-{Token t;}{
-  	<WITH> <LBRACE> SelectQuery() <RBRACE> <AS> t = <VAR3>  	{  	  jjtThis.setName(t.image);
-  	}} 
+{Token t;}
+{
+    <WITH> <LBRACE> SelectQuery() <RBRACE> <AS> t = <VAR3>
+    {
+      jjtThis.setName(t.image);
+    }
+} 
 
 void DatasetClause() :
 {}
 {
-	<FROM>
-	[<NAMED> {jjtThis.setNamed(true);}]
-	[<VIRTUAL_GRAPH> {jjtThis.setVirtual(true);}]
-	IRIref()
+    <FROM>
+    (      (        [<NAMED> {jjtThis.setNamed(true);}]
+        [<VIRTUAL_GRAPH> {jjtThis.setVirtual(true);}]
+        IRIref()
+      )
+      // Note: This appears to be an openrdf specific extension whose
+      // semantics are to query the default graph.  That is what we do
+      // anyway if nothing is specified. E.g., "SELECT * FROM DEFAULT"
+      // and "SELECT *" will do the same thing for bigdata.
+      | <DEFAULT_GRAPH> 
+    )
 }
 
 void WhereClause() :
 {}
 {
-	 [<WHERE>] GroupGraphPattern()
+     [<WHERE>] GroupGraphPattern()
 }
 
 // Note: Modified to group the binding variables and binding sets for more
@@ -521,12 +580,15 @@ void BindingsClause() :
 }
 
 void BindingVars() :
-{}{	( Var() )*
+{}
+{
+    ( Var() )*
 }
 
 void BindingSets() :
 {}
-{	<LBRACE> ( BindingSet() )* <RBRACE>
+{
+    <LBRACE> ( BindingSet() )* <RBRACE>
 }
 
 void BindingSet() :
@@ -538,11 +600,11 @@ void BindingSet() :
 void BindingValue() :
 {}
 {
-	IRIref()
-|	RDFLiteral()
-|	NumericLiteral()
-|	BooleanLiteral()
-|	<UNDEF> 
+    IRIref()
+|   RDFLiteral()
+|   NumericLiteral()
+|   BooleanLiteral()
+|   <UNDEF> 
 }
 
 void SolutionModifier() #void :
@@ -560,16 +622,16 @@ void GroupClause() :
 void OrderClause() :
 {}
 {
-	<ORDER> <BY> ( OrderCondition() )+
+    <ORDER> <BY> ( OrderCondition() )+
 }
 
 void GroupCondition() :
 {}
 {
-	FunctionCall()
-|	BuiltInCall()
-|	<LPAREN> Expression() [ <AS> Var() ] <RPAREN> 
-|	Var()
+    FunctionCall()
+|   BuiltInCall()
+|   <LPAREN> Expression() [ <AS> Var() ] <RPAREN> 
+|   Var()
 }
 
 void HavingClause() :
@@ -581,67 +643,67 @@ void HavingClause() :
 void OrderCondition() :
 {}
 {
-	[ <ASC> | <DESC> {jjtThis.setAscending(false);}] BrackettedExpression()
-|	FunctionCall()
-|	BuiltInCall()
-|	Var()
+    [ <ASC> | <DESC> {jjtThis.setAscending(false);}] BrackettedExpression()
+|   FunctionCall()
+|   BuiltInCall()
+|   Var()
 }
 
 void LimitOffsetClauses() #void :
 {}
 {
-	Limit() [ Offset() ]
+    Limit() [ Offset() ]
 |
-	Offset() [ Limit() ]
+    Offset() [ Limit() ]
 }
 
 void Limit() :
 { Token t; }
 {
-	<LIMIT> t = <INTEGER>
-	{ jjtThis.setValue(Long.parseLong(t.image)); }
+    <LIMIT> t = <INTEGER>
+    { jjtThis.setValue(Long.parseLong(t.image)); }
 }
 
 void Offset() :
 { Token t; }
 {
-	<OFFSET> t = <INTEGER>
-	{ jjtThis.setValue(Long.parseLong(t.image)); }
+    <OFFSET> t = <INTEGER>
+    { jjtThis.setValue(Long.parseLong(t.image)); }
 }
 
 // Note: Allows return of the text for the SERVICE's inner graph pattern.
 Token GroupGraphPattern() #GraphPatternGroup :
 {Token endOfPatternToken; }
 {
-	<LBRACE> 
-	(
-	    SelectQuery() 
-	    | 
-	    GraphPattern()
-	) 
-	endOfPatternToken = <RBRACE>
-	{
-	    return endOfPatternToken;
-	}
+    <LBRACE> 
+    (
+        SubSelect() 
+        | 
+        GraphPattern()
+    ) 
+    endOfPatternToken = <RBRACE>
+    {
+        return endOfPatternToken;
+    }
 }
 //void GroupGraphPattern() #GraphPatternGroup :
 //{}
 //{
-//	<LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
+//  <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
 //}
 
 void GraphPattern() #void :
 {}
 {
-	[BasicGraphPattern()] [ GraphPatternNotTriples() [<DOT>] GraphPattern() ]
+    [BasicGraphPattern()] [ GraphPatternNotTriples() [<DOT>] GraphPattern() ]
 }
 
 void BasicGraphPattern() :
 {}
 {
-	TriplesBlock() ( FilterOrBind() [<DOT>] [TriplesBlock()] )*
+    TriplesBlock() ( FilterOrBind() [<DOT>] [TriplesBlock()] )*
 |
-	( FilterOrBind() [<DOT>] [TriplesBlock()] )+
+    ( FilterOrBind() [<DOT>] [TriplesBlock()] )+
 }
 
 
@@ -667,53 +729,53 @@ void NamedSubqueryInclude() :
 void VarList() #void :
 {}
 {
-	<NIL>
+    <NIL>
 |
-	<LPAREN> Var() ( <COMMA> Var() )* <RPAREN>
+    <LPAREN> Var() ( <COMMA> Var() )* <RPAREN>
 }
 
 void TriplesBlock() #void :
 {}
 {
-	// Note: recursive rule rewriten to non-recursive rule, requires lookahead
-	TriplesSameSubjectPath() ( LOOKAHEAD(2) <DOT> TriplesSameSubjectPath() )* [<DOT>]
+    // Note: recursive rule rewriten to non-recursive rule, requires lookahead
+    TriplesSameSubjectPath() ( LOOKAHEAD(2) <DOT> TriplesSameSubjectPath() )* [<DOT>]
 }
 
 void TriplesTemplate() #void :
 {}
 {
-	// Note: recursive rule rewriten to non-recursive rule, requires lookahead
-	TriplesSameSubject() ( LOOKAHEAD(2) <DOT> TriplesSameSubject() )* [<DOT>]
+    // Note: recursive rule rewriten to non-recursive rule, requires lookahead
+    TriplesSameSubject() ( LOOKAHEAD(2) <DOT> TriplesSameSubject() )* [<DOT>]
 }
 
 void GraphPatternNotTriples() #void :
 {}
 {
-	OptionalGraphPattern()
-|	GroupOrUnionGraphPattern()
-|	GraphGraphPattern()
-|	MinusGraphPattern()
-|	ServiceGraphPattern()
+    OptionalGraphPattern()
+|   GroupOrUnionGraphPattern()
+|   GraphGraphPattern()
+|   MinusGraphPattern()
+|   ServiceGraphPattern()
 }
 
 void OptionalGraphPattern() :
 {}
 {
-	// Note: does not refer GroupGraphPattern() because constraints are not limited
-	// to the optional graph pattern, but can also reference the operator's LHS
-    <OPTIONAL> <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
+    // Note: does not refer GroupGraphPattern() because constraints are not limited
+    // to the optional graph pattern, but can also reference the operator's LHS
+    <OPTIONAL> <LBRACE> (SubSelect() | GraphPattern()) <RBRACE>
 }
 
 void GraphGraphPattern() :
 {}
 {
-	<GRAPH> VarOrIRIref() GroupGraphPattern()
+    <GRAPH> VarOrIRIref() GroupGraphPattern()
 }
 
 void GroupOrUnionGraphPattern() #void :
 {}
 {
-	GroupGraphPattern() [ <UNION> GroupOrUnionGraphPattern() #UnionGraphPattern(2) ]
+    GroupGraphPattern() [ <UNION> GroupOrUnionGraphPattern() #UnionGraphPattern(2) ]
 }
 
 void MinusGraphPattern() :
@@ -727,64 +789,64 @@ void ServiceGraphPattern() :
 {
     t =  <SERVICE> 
     {
-	jjtThis.setBeginTokenLinePos(t.beginLine);
-	jjtThis.setBeginTokenColumnPos(t.beginColumn);
+    jjtThis.setBeginTokenLinePos(t.beginLine);
+    jjtThis.setBeginTokenColumnPos(t.beginColumn);
     }
     [<SILENT> { jjtThis.setSilent(true); } ] 
     VarOrIRIref() 
     t = GroupGraphPattern()
     {
-	jjtThis.setEndTokenLinePos(t.beginLine);
-	jjtThis.setEndTokenColumnPos(t.beginColumn);
+    jjtThis.setEndTokenLinePos(t.beginLine);
+    jjtThis.setEndTokenColumnPos(t.beginColumn);
     }
 }
 
 void Filter() #void :
 {}
 {
-	<FILTER> Constraint()
+    <FILTER> Constraint()
 }
 
 void Constraint() :
 {}
 {
-	BrackettedExpression()
-|	BuiltInCall()
-|	FunctionCall()
+    BrackettedExpression()
+|   BuiltInCall()
+|   FunctionCall()
 }
 
 void FunctionCall() :
 {}
 {
-	IRIref() ArgList()
+    IRIref() ArgList()
 }
 
 void ArgList() #void :
 {}
 {
-	<NIL>
+    <NIL>
 |
-	<LPAREN> Expression() ( <COMMA> Expression() )* <RPAREN>
+    <LPAREN> Expression() ( <COMMA> Expression() )* <RPAREN>
 }
 
 void TriplesSameSubject() :
 {}
 {
-	VarOrTerm() PropertyList()
+    VarOrTerm() PropertyList()
 |
-	TriplesNode() [PropertyList()]
+    TriplesNode() [PropertyList()]
 }
 
 void PropertyList() :
 {}
 {
-	Verb() ObjectList() [ <SEMICOLON> [PropertyList()] ]
+    Verb() ObjectList() [ <SEMICOLON> [PropertyList()] ]
 }
 
 void ObjectList():
 {}
 {
-	Object() ( <COMMA> Object() )*
+    Object() ( <COMMA> Object() )*
 }
 
 void TriplesSameSubjectPath() :
@@ -851,7 +913,7 @@ void PathNegatedPropertySet() #void :
     PathOneInPropertySet() 
     |
     <LPAREN>
-	[ PathOneInPropertySet() ( <PIPE> PathOneInPropertySet() )* ]
+    [ PathOneInPropertySet() ( <PIPE> PathOneInPropertySet() )* ]
     <RPAREN>
 }
 
@@ -871,20 +933,20 @@ void PathMod() :
 }
 {
     <STAR> { jjtThis.setLowerBound(0);
-	     jjtThis.setUpperBound(Long.MAX_VALUE);
+         jjtThis.setUpperBound(Long.MAX_VALUE);
     }
     |
     <QUESTION> { jjtThis.setLowerBound(0);
-		 jjtThis.setUpperBound(1); 
+         jjtThis.setUpperBound(1); 
     }
     |
     <PLUS> { jjtThis.setLowerBound(1);
-	     jjtThis.setUpperBound(Long.MAX_VALUE);
+         jjtThis.setUpperBound(Long.MAX_VALUE);
     }
     |
     <LBRACE> ( min = <INTEGER> {jjtThis.setLowerBound(Long.parseLong(min.image)); } 
-		( <COMMA> ( <RBRACE> | max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); } <RBRACE> ) | <RBRACE> ) 
-			| <COMMA> max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); } <RBRACE> )
+        ( <COMMA> ( <RBRACE> {jjtThis.setUpperBound(Long.MAX_VALUE); } | max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); } <RBRACE> ) | <RBRACE> ) 
+            | <COMMA> max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); jjtThis.setLowerBound(0); } <RBRACE> )
 }
 
 void VerbSimple() #void :
@@ -896,52 +958,52 @@ void VerbSimple() #void :
 void Object() #void :
 {}
 {
-	GraphNode()
+    GraphNode()
 |   TRefPattern() // extension for triple reference patterns.
 }
 
 void Verb() #void :
 {}
 {
-	VarOrIRIref()
+    VarOrIRIref()
 |
-	<IS_A> { jjtThis.setValue(RDF.TYPE.toString()); } #IRI
+    <IS_A> { jjtThis.setValue(RDF.TYPE.toString()); } #IRI
 }
 
 void TriplesNode() #void :
 {}
 {
-	Collection()
+    Collection()
 |
-	BlankNodePropertyList()
+    BlankNodePropertyList()
 }
 
 void BlankNodePropertyList() :
 {}
 {
-	<LBRACK> PropertyList() <RBRACK>
+    <LBRACK> PropertyList() <RBRACK>
 }
 
 void Collection() :
 {}
 {
-	<LPAREN> ( GraphNode() )+ <RPAREN>
+    <LPAREN> ( GraphNode() )+ <RPAREN>
 }
 
 void GraphNode() #void :
 {}
 {
-	VarOrTerm()
+    VarOrTerm()
 |
-	TriplesNode()
+    TriplesNode()
 }
 
 void VarOrTerm() #void :
 {}
 {
-	Var()
+    Var()
 |
-	GraphTerm()
+    GraphTerm()
 }
 
 void VarOrIRIref() #void :
@@ -955,130 +1017,128 @@ void VarOrIRIref() #void :
 void Var() :
 { Token t; }
 {
-	( t = <VAR1> | t = <VAR2> )
-	{ jjtThis.setName(t.image.substring(1)); }
+    ( t = <VAR1> | t = <VAR2> )
+    { jjtThis.setName(t.image.substring(1)); }
 }
 
 void GraphTerm() #void :
 {
-	boolean positive = true;
+    boolean positive = true;
 }
 {
-	IRIref()
+    IRIref()
 |
-	RDFLiteral()
+    RDFLiteral()
 |
-	NumericLiteral()
+    NumericLiteral()
 |
-	BooleanLiteral()
+    BooleanLiteral()
 |
-	BlankNode()
+    BlankNode()
 |
-	<NIL> {jjtThis.setValue(RDF.NIL.toString());} #IRI
+    <NIL> {jjtThis.setValue(RDF.NIL.toString());} #IRI
 }
 
 void Expression() #void :
 {}
 {
-	ConditionalOrExpression()
+    ConditionalOrExpression()
 }
 
 void ConditionalOrExpression() #void :
 {}
 {
-	ConditionalAndExpression() [ <OR> ConditionalOrExpression() #Or(2) ]
+    ConditionalAndExpression() [ <OR> ConditionalOrExpression() #Or(2) ]
 }
 
 void ConditionalAndExpression() #void :
 {}
 {
-	ValueLogical() [ <AND> ConditionalAndExpression() #And(2) ]
+    ValueLogical() [ <AND> ConditionalAndExpression() #And(2) ]
 }
 
 void ValueLogical() #void :
 {}
 {
-	RelationalExpression()
+    RelationalExpression()
 }
 
 void RelationalExpression() #void :
 {}
 {
-	NumericExpression()
-	[
-		<EQ> NumericExpression() {jjtThis.setOperator(CompareOp.EQ);} #Compare(2)
-	|	<NE> NumericExpression() {jjtThis.setOperator(CompareOp.NE);} #Compare(2)
-	|	<LT> NumericExpression() {jjtThis.setOperator(CompareOp.LT);} #Compare(2)
-	|	<LE> NumericExpression() {jjtThis.setOperator(CompareOp.LE);} #Compare(2)
-	|	<GE> NumericExpression() {jjtThis.setOperator(CompareOp.GE);} #Compare(2)
-	|	<GT> NumericExpression() {jjtThis.setOperator(CompareOp.GT);} #Compare(2)
-//	@see http://www.openrdf.org/issues/browse/SES-818
-//	|	In() 
-//	|	NotIn()
-	|	In()    #Infix(2)	|	NotIn() #Infix(2)
-	]
+    NumericExpression()
+    [
+        <EQ> NumericExpression() {jjtThis.setOperator(CompareOp.EQ);} #Compare(2)
+    |   <NE> NumericExpression() {jjtThis.setOperator(CompareOp.NE);} #Compare(2)
+    |   <LT> NumericExpression() {jjtThis.setOperator(CompareOp.LT);} #Compare(2)
+    |   <LE> NumericExpression() {jjtThis.setOperator(CompareOp.LE);} #Compare(2)
+    |   <GE> NumericExpression() {jjtThis.setOperator(CompareOp.GE);} #Compare(2)
+    |   <GT> NumericExpression() {jjtThis.setOperator(CompareOp.GT);} #Compare(2)
+    |   In() #Infix(2)
+    |   NotIn() #Infix(2)
+    ]
 }
 
 void NumericExpression () #void :
 {}
 {
-	AdditiveExpression()
+    AdditiveExpression()
 }
 
 void AdditiveExpression() #void :
 {}
 {
-	MultiplicativeExpression()
-	(
-	  <PLUS> MultiplicativeExpression() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
-	| <MINUS> MultiplicativeExpression() {jjtThis.setOperator(MathOp.MINUS);} #Math(2)
-	| NumericLiteralPositive() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
-	| NumericLiteralNegative() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
-	)*
+    MultiplicativeExpression()
+    (
+      <PLUS> MultiplicativeExpression() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
+    | <MINUS> MultiplicativeExpression() {jjtThis.setOperator(MathOp.MINUS);} #Math(2)
+    | NumericLiteralPositive() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
+    | NumericLiteralNegative() {jjtThis.setOperator(MathOp.PLUS);} #Math(2)
+    )*
 }
 
 void MultiplicativeExpression() #void :
 {}
 {
-	UnaryExpression()
-	(
-	  <STAR> UnaryExpression() {jjtThis.setOperator(MathOp.MULTIPLY);} #Math(2)
-	| <SLASH> UnaryExpression() {jjtThis.setOperator(MathOp.DIVIDE);} #Math(2)
-	)*
+    UnaryExpression()
+    (
+      <STAR> UnaryExpression() {jjtThis.setOperator(MathOp.MULTIPLY);} #Math(2)
+    | <SLASH> UnaryExpression() {jjtThis.setOperator(MathOp.DIVIDE);} #Math(2)
+    )*
 }
 
 void UnaryExpression() #void :
 {}
 {
-	<NOT> PrimaryExpression() #Not
+    <NOT> PrimaryExpression() #Not
 |
-	[<PLUS>] PrimaryExpression()
+    [<PLUS>] PrimaryExpression()
 |
-	UnaryMinus() PrimaryExpression() {jjtThis.setOperator(MathOp.MULTIPLY);} #Math(2)
+    UnaryMinus() PrimaryExpression() {jjtThis.setOperator(MathOp.MULTIPLY);} #Math(2)
 }
 
 void UnaryMinus() #NumericLiteral :
 {}
 {
-	<MINUS>
-	{
-		jjtThis.setValue("-1");
-		jjtThis.setDatatype(XMLSchema.INTEGER);
-	}
+    <MINUS>
+    {
+        jjtThis.setValue("-1");
+        jjtThis.setDatatype(XMLSchema.INTEGER);
+    }
 }
 
 void PrimaryExpression() #void :
 {}
 {
-	BrackettedExpression()
-|	BuiltInCall()
-|	LOOKAHEAD(2) FunctionCall()
-|	IRIref()
-|	RDFLiteral()
-|	NumericLiteral()
-|	BooleanLiteral()
-|	Var()
-| 	Aggregate()
+    BrackettedExpression()
+|   BuiltInCall()
+|   LOOKAHEAD(2) FunctionCall()
+|   IRIref()
+|   RDFLiteral()
+|   NumericLiteral()
+|   BooleanLiteral()
+|   Var()
+|   Aggregate()
 }
 
 void Aggregate() #void :
@@ -1140,92 +1200,92 @@ void GroupConcat() :
 void BrackettedExpression() #void :
 {}
 {
-	<LPAREN> Expression() <RPAREN>
+    <LPAREN> Expression() <RPAREN>
 }
 
 void BuiltInCall() #void :
 {}
 {
-	Bound()
-|	SameTerm()
-|	ExistsFunc()
-|	NotExistsFunc()
-|	Coalesce()
-|	If()
-|	StringFunction()
-|	NumericFunction()
-|	RDFTermFunction()
-|	DateTimeFunction()
-|	HashFunction()
+    Bound()
+|   SameTerm()
+|   ExistsFunc()
+|   NotExistsFunc()
+|   Coalesce()
+|   If()
+|   StringFunction()
+|   NumericFunction()
+|   RDFTermFunction()
+|   DateTimeFunction()
+|   HashFunction()
 }
 
 void StringFunction() #void :
 {}
 {
-	Substr()
-|	StrLen()
-|	UpperCase()
-|	LowerCase()
-|	StrStarts()
-|	StrEnds()
-|	StrBefore()
-|	StrAfter()
-|	Replace()
-|	Concat()
-|	Contains()
-|	EncodeForURI()
-|	LangMatches()
-|	RegexExpression()
+    Substr()
+|   StrLen()
+|   UpperCase()
+|   LowerCase()
+|   StrStarts()
+|   StrEnds()
+|   StrBefore()
+|   StrAfter()
+|   Replace()
+|   Concat()
+|   Contains()
+|   EncodeForURI()
+|   LangMatches()
+|   RegexExpression()
 }
 void NumericFunction() #void :
 {}
 {
-	Rand()
-|	Abs()
-|	Ceil()
-|	Floor()
-|	Round()
+    Rand()
+|   Abs()
+|   Ceil()
+|   Floor()
+|   Round()
 }
 
 void RDFTermFunction() #void :
 {}
 {
-	IsIRI()
-|	IsBlank()
-|	IsLiteral()
-|	IsNumeric()
-|	BNodeFunc()
-|	IRIFunc()
-|	Lang()
-|	Datatype()
-|	Str()
-|	StrDt()
-|	StrLang()
+    IsIRI()
+|   IsBlank()
+|   IsLiteral()
+|   IsNumeric()
+|   BNodeFunc()
+|   IRIFunc()
+|   Lang()
+|   Datatype()
+|   Str()
+|   StrDt()
+|   StrLang()
 }
 
 void DateTimeFunction() #void :
 {}
 {
-	Now()
-|	Year()
-|	Month()
-|	Day()
-|	Hours()
-|	Minutes()
-|	Seconds()
-|	Timezone()
-|	Tz()
+    Now()
+|   Year()
+|   Month()
+|   Day()
+|   Hours()
+|   Minutes()
+|   Seconds()
+|   Timezone()
+|   Tz()
 }
 
 void HashFunction() #void :
 {}
 {
-	MD5()
-|	SHA1()
-|	SHA224()
-|	SHA256()
-|	SHA384()
-|	SHA512()
+    MD5()
+|   SHA1()
+|   SHA224()
+|   SHA256()
+|   SHA384()
+|   SHA512()
 }
 
 
@@ -1448,85 +1508,85 @@ void Coalesce() :
 void Str() :
 {}
 {
-	<STR> <LPAREN> Expression() <RPAREN>
+    <STR> <LPAREN> Expression() <RPAREN>
 }
 
 void Lang() :
 {}
 {
-	<LANG> <LPAREN> Expression() <RPAREN>
+    <LANG> <LPAREN> Expression() <RPAREN>
 }
 
 void LangMatches() :
 {}
 {
-	<LANGMATCHES> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+    <LANGMATCHES> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
 }
 
 void Datatype() :
 {}
 {
-	<DATATYPE> <LPAREN> Expression() <RPAREN>
+    <DATATYPE> <LPAREN> Expression() <RPAREN>
 }
 
 void Bound() :
 {}
 {
-	<BOUND> <LPAREN> Var() <RPAREN>
+    <BOUND> <LPAREN> Var() <RPAREN>
 }
 
 void SameTerm() :
 {}
 {
-	<SAMETERM> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+    <SAMETERM> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
 }
 
 void IsIRI() :
 {}
 {
-	<IS_IRI> <LPAREN> Expression() <RPAREN>
+    <IS_IRI> <LPAREN> Expression() <RPAREN>
 }
 
 void IsBlank() :
 {}
 {
-	<IS_BLANK> <LPAREN> Expression() <RPAREN>
+    <IS_BLANK> <LPAREN> Expression() <RPAREN>
 }
 
 void IsLiteral() :
 {}
 {
-	<IS_LITERAL> <LPAREN> Expression() <RPAREN>
+    <IS_LITERAL> <LPAREN> Expression() <RPAREN>
 }
 
 void IsNumeric() :
 {}
 {
-	<IS_NUMERIC> <LPAREN> Expression() <RPAREN>
+    <IS_NUMERIC> <LPAREN> Expression() <RPAREN>
 }
 
 void BNodeFunc() :
 {}
 {
-	<BNODE> ( <NIL> | <LPAREN> Expression() <RPAREN> ) 
+    <BNODE> ( <NIL> | <LPAREN> Expression() <RPAREN> ) 
 }
 
 void IRIFunc() :
 {}
 {
-	<IRI> <LPAREN> Expression() <RPAREN>
+    <IRI> <LPAREN> Expression() <RPAREN>
 }
 
 void StrDt() :
 {}
 {
-	<STRDT> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+    <STRDT> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
 }
 
 void StrLang() :
 {}
 {
-	<STRLANG> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
+    <STRLANG> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
 }
 
 void Bind() :
@@ -1538,16 +1598,17 @@ void Bind() :
 }
 
 // LET ( ?x := expr ) is an alternative for BIND( expr AS ?x). They do the same thing.
+// TODO Handle TRefPattern() in LET.
 void Let() :
 {}
 {
-	<LET> <LPAREN> Var() <ASSIGN> Expression() <RPAREN>
+    <LET> <LPAREN> Var() <ASSIGN> Expression() <RPAREN>
 }
 
 void RegexExpression() :
 {}
 {
-	<REGEX> <LPAREN> Expression() <COMMA> Expression() [ <COMMA> Expression() ] <RPAREN>
+    <REGEX> <LPAREN> Expression() <COMMA> Expression() [ <COMMA> Expression() ] <RPAREN>
 }
 
 void ExistsFunc() :
@@ -1566,113 +1627,113 @@ void NotExistsFunc() :
 void RDFLiteral() :
 { Token t; }
 {
-	String()
-	[
-		t = <LANGTAG> {jjtThis.setLang(t.image.substring(1));}
-	|
-		<DT_PREFIX> IRIref()
-	]
+    String()
+    [
+        t = <LANGTAG> {jjtThis.setLang(t.image.substring(1));}
+    |
+        <DT_PREFIX> IRIref()
+    ]
 }
 
 void NumericLiteral() #void :
 {}
 {
-	(
-		NumericLiteralUnsigned()
-	|	NumericLiteralPositive()
-	|	NumericLiteralNegative()
-	)
+    (
+        NumericLiteralUnsigned()
+    |   NumericLiteralPositive()
+    |   NumericLiteralNegative()
+    )
 }
 
 void NumericLiteralUnsigned() #NumericLiteral :
 { Token t; URI datatype; }
 {
-	(
-		t = <INTEGER> { datatype = XMLSchema.INTEGER; }
-	|	t = <DECIMAL> { datatype = XMLSchema.DECIMAL; }
-	|	t = <DOUBLE> { datatype = XMLSchema.DOUBLE; }
-	)
+    (
+        t = <INTEGER> { datatype = XMLSchema.INTEGER; }
+    |   t = <DECIMAL> { datatype = XMLSchema.DECIMAL; }
+    |   t = <DOUBLE> { datatype = XMLSchema.DOUBLE; }
+    )
 
-	{
-		jjtThis.setValue(t.image);
-		jjtThis.setDatatype(datatype);
-	}
+    {
+        jjtThis.setValue(t.image);
+        jjtThis.setDatatype(datatype);
+    }
 }
 
 void NumericLiteralPositive() #NumericLiteral :
 { Token t; URI datatype; }
 {
-	(
-		t = <INTEGER_POSITIVE> { datatype = XMLSchema.INTEGER; }
-	|	t = <DECIMAL_POSITIVE> { datatype = XMLSchema.DECIMAL; }
-	|	t = <DOUBLE_POSITIVE> { datatype = XMLSchema.DOUBLE; }
-	)
+    (
+        t = <INTEGER_POSITIVE> { datatype = XMLSchema.INTEGER; }
+    |   t = <DECIMAL_POSITIVE> { datatype = XMLSchema.DECIMAL; }
+    |   t = <DOUBLE_POSITIVE> { datatype = XMLSchema.DOUBLE; }
+    )
 
-	{
-		jjtThis.setValue(t.image);
-		jjtThis.setDatatype(datatype);
-	}
+    {
+        jjtThis.setValue(t.image);
+        jjtThis.setDatatype(datatype);
+    }
 }
 
 void NumericLiteralNegative() #NumericLiteral :
 { Token t; URI datatype; }
 {
-	(
-		t = <INTEGER_NEGATIVE> { datatype = XMLSchema.INTEGER; }
-	|	t = <DECIMAL_NEGATIVE> { datatype = XMLSchema.DECIMAL; }
-	|	t = <DOUBLE_NEGATIVE> { datatype = XMLSchema.DOUBLE; }
-	)
+    (
+        t = <INTEGER_NEGATIVE> { datatype = XMLSchema.INTEGER; }
+    |   t = <DECIMAL_NEGATIVE> { datatype = XMLSchema.DECIMAL; }
+    |   t = <DOUBLE_NEGATIVE> { datatype = XMLSchema.DOUBLE; }
+    )
 
-	{
-		jjtThis.setValue(t.image);
-		jjtThis.setDatatype(datatype);
-	}
+    {
+        jjtThis.setValue(t.image);
+        jjtThis.setDatatype(datatype);
+    }
 }
 
 void BooleanLiteral() #void :
 {}
 {
-	<TRUE> #True
-|	<FALSE> #False
+    <TRUE> #True
+|   <FALSE> #False
 }
 
 void String() :
 { Token t; }
 {
-	( t = <STRING_LITERAL1> | t= <STRING_LITERAL2> )
-	{jjtThis.setValue(_trimString(t.image, 1));}
+    ( t = <STRING_LITERAL1> | t= <STRING_LITERAL2> )
+    {jjtThis.setValue(_trimString(t.image, 1));}
 |
-	( t = <STRING_LITERAL_LONG1> | t = <STRING_LITERAL_LONG2>)
-	{jjtThis.setValue(_trimString(t.image, 3));}
+    ( t = <STRING_LITERAL_LONG1> | t = <STRING_LITERAL_LONG2>)
+    {jjtThis.setValue(_trimString(t.image, 3));}
 }
 
 void IRIref() #void :
 {}
 {
-	IRI()
+    IRI()
 |
-	PrefixedName()
+    PrefixedName()
 }
 
 void PrefixedName() #QName :
 { Token t; }
 {
-	(t = <PNAME_LN> | t = <PNAME_NS>)
-	{jjtThis.setValue(t.image);}
+    (t = <PNAME_LN> | t = <PNAME_NS>)
+    {jjtThis.setValue(t.image);}
 }
 
 void BlankNode() :
 { Token t; }
 {
-	t = <BLANK_NODE_LABEL> {jjtThis.setID(t.image.substring(2));}
+    t = <BLANK_NODE_LABEL> {jjtThis.setID(t.image.substring(2));}
 |
-	<ANON>
+    <ANON>
 }
 
 void IRI() :
 { Token t; }
 {
-	t = <Q_IRI_REF> {jjtThis.setValue(_trimString(t.image, 1));}
+    t = <Q_IRI_REF> {jjtThis.setValue(_trimString(t.image, 1));}
 }
 
 /// SPARQL 1.1 Update productions
@@ -1681,10 +1742,10 @@ void IRI() :
 void GraphRefAll() :
 {}
 {
-	GraphRef() 
-|	<DEFAULT_GRAPH> {jjtThis.setDefault(true); }
-|	<NAMED> 	    {jjtThis.setNamed(true); }
-|	<ALL>           {jjtThis.setAllGraphs(true); jjtThis.setAllSolutions(true); }
+    GraphRef() 
+|   <DEFAULT_GRAPH> {jjtThis.setDefault(true); }
+|   <NAMED>         {jjtThis.setNamed(true); }
+|   <ALL>           {jjtThis.setAllGraphs(true); jjtThis.setAllSolutions(true); }
 |   <GRAPHS>        {jjtThis.setAllGraphs(true); }
 |   LOOKAHEAD(2)
  SolutionsRef()
@@ -1694,28 +1755,28 @@ void GraphRefAll() :
 void GraphOrDefault() :
 {}
 {
-	<DEFAULT_GRAPH>
-|	[<GRAPH>] IRIref()
+    <DEFAULT_GRAPH>
+|   [<GRAPH>] IRIref()
 }
 
 void GraphRef() #void :
 {}
 { 
-	<GRAPH> IRIref() 
+    <GRAPH> IRIref() 
 }
 
 // bigdata extension: either a GRAPH uri or a SOLUTIONS name.
 //void GraphOrSolutionsRef() #void :
 //{}
 //{ 
-//	(GraphRef()|SolutionsRef())
+//  (GraphRef()|SolutionsRef())
 //}
 
 // bigdata extension: A SOLUTIONS name (aka named solution set ref).
 void SolutionsRef() :
 {Token t;}
 {
-	<SOLUTIONS> t = <VAR3> {jjtThis.setName(t.image);}  
+    <SOLUTIONS> t = <VAR3> {jjtThis.setName(t.image);}  
 }
 
 void QuadData() #void :
@@ -1739,17 +1800,17 @@ void QuadsNotTriples() :
 void Update() #void :
 {}
 {
-	Load()
-|	Clear()
-|	Drop()
-|	Add()
-|	Move()
-|	Copy()
-|	Create()
-|	LOOKAHEAD(2) InsertData()
-|	LOOKAHEAD(2) DeleteData() 
-|	LOOKAHEAD(2) DeleteWhere()
-|	LOOKAHEAD(2) Modify()
+    Load()
+|   Clear()
+|   Drop()
+|   Add()
+|   Move()
+|   Copy()
+|   Create()
+|   LOOKAHEAD(2) InsertData()
+|   LOOKAHEAD(2) DeleteData() 
+|   LOOKAHEAD(2) DeleteWhere()
+|   LOOKAHEAD(2) Modify()
 }
 
 void Load() :
@@ -1770,42 +1831,42 @@ void Load() :
 void Clear() :
 {}
 {
-	<CLEAR> [<SILENT> {jjtThis.setSilent(true);} ] GraphRefAll()
+    <CLEAR> [<SILENT> {jjtThis.setSilent(true);} ] GraphRefAll()
 }
 
 void Drop() :
 {}
 {
-	<DROP> [<SILENT> {jjtThis.setSilent(true);} ] GraphRefAll()
+    <DROP> [<SILENT> {jjtThis.setSilent(true);} ] GraphRefAll()
 }
 
 void Add() :
 {}
 {
-	<ADD> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
+    <ADD> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
 }
 
 void Move() :
 {}
 {
-	<MOVE> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
+    <MOVE> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
 }
 
 void Copy() :
 {}
 {
-	<COPY> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
+    <COPY> [<SILENT> {jjtThis.setSilent(true);} ] GraphOrDefault() <TO> GraphOrDefault()
 }
 
 // bigdata extension: CREATE SOLUTIONS ...
 void Create() :
 {}
 {
-	<CREATE> [<SILENT> {jjtThis.setSilent(true);} ]
-	 ( GraphRef()
-//	 | SolutionsRef() (<LBRACE> TriplesTemplate() <RBRACE>)?
-	 | SolutionsRef() (QuadData())?
-	 )
+    <CREATE> [<SILENT> {jjtThis.setSilent(true);} ]
+     ( GraphRef()
+//   | SolutionsRef() (<LBRACE> TriplesTemplate() <RBRACE>)?
+     | SolutionsRef() (QuadData())?
+     )
 }
 
 void InsertData() :
@@ -1829,9 +1890,10 @@ void DeleteWhere() :
 void DeleteClause() :
 {Token t;}
 {
+//    <DELETE> QuadData()
     <DELETE>
     (
-      <FROM> t = <VAR3> Select() {jjtThis.setName(t.image);}	
+      <FROM> t = <VAR3> Select() {jjtThis.setName(t.image);}    
     | QuadData()
     )
 }
@@ -1839,6 +1901,7 @@ void DeleteClause() :
 void InsertClause() :
 {Token t;}
 {
+//    <INSERT> QuadData()
     <INSERT> (<INTO> t = <VAR3> Select() {jjtThis.setName(t.image);}
      | QuadData())
 }
@@ -1884,5 +1947,6 @@ void VarOrTermOrTRefP() #void :
 void TRefPattern() :
 {}
 {
-  <TREF_OPEN> VarOrTermOrTRefP() VarOrIRIrefOrIsA() VarOrTermOrTRefP() <TREF_CLOSE>} 
+  <TREF_OPEN> VarOrTermOrTRefP() VarOrIRIrefOrIsA() VarOrTermOrTRefP() <TREF_CLOSE>
+} 
 

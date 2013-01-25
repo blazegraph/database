@@ -16,7 +16,12 @@
   	which you start the servlet container so you may have to edit it for your
   	installation, e.g., by specifying an absolution path.  Also, it is a good
   	idea to review the RWStore.properties file as well and specify the location
-  	of the database file on which it will persist your data.</description>
+  	of the database file on which it will persist your data.
+  	
+  	Note: You MAY override this parameter using
+  	"-Dcom.bigdata.rdf.sail.webapp.ConfigParams.propertyFile=FILE"
+  	when starting the servlet container.
+  	</description>
   </context-param>
   <context-param>
   	<param-name>namespace</param-name>

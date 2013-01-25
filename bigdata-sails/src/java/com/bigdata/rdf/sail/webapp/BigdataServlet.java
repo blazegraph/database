@@ -42,12 +42,13 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
  * any service action/
  */
-abstract public class BigdataServlet extends HttpServlet {
+abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 	
 	/**
      * 
@@ -92,25 +93,6 @@ abstract public class BigdataServlet extends HttpServlet {
         HTTP_METHOD_NOT_ALLOWED = HttpServletResponse.SC_METHOD_NOT_ALLOWED,
 		HTTP_INTERNALERROR = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
 		HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
-
-	/**
-	 * Common MIME types for dynamic content.
-	 */
-	public static final transient String
-		MIME_TEXT_PLAIN = "text/plain",
-		MIME_TEXT_HTML = "text/html",
-//		MIME_TEXT_XML = "text/xml",
-        /**
-         * General purpose binary <code>application/octet-stream</code>.
-         */
-		MIME_DEFAULT_BINARY = "application/octet-stream",
-        MIME_APPLICATION_XML = "application/xml",
-        MIME_TEXT_JAVASCRIPT = "text/javascript",
-        /**
-         * The traditional encoding of URL query parameters within a POST
-         * message body.
-         */
-        MIME_APPLICATION_URL_ENCODED = "application/x-www-form-urlencoded";
 
     protected <T> T getRequiredServletContextAttribute(final String name) {
 

@@ -103,6 +103,15 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-exists-06"
     });
 
+    /**
+     * The tests test things that are no longer in the spec.
+     */
+    static final Collection<String> badTests = Arrays.asList(new String[] {
+		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-04",
+		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-05",
+		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-06",
+      });
+
 	/**
 	 * The following tests require Unicode configuration for identical
 	 * comparisons. This appears to work with {ASCII,IDENTICAL} or
@@ -153,7 +162,9 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/495 (SPARQL 1.1
          * Property Paths)
          */
-        suite1 = filterOutTests(suite1, "property-paths");
+//        suite1 = filterOutTests(suite1, "property-paths");
+        
+        suite1 = filterOutTests(suite1, badTests);
         
         /**
          * BSBM BI use case query 5
@@ -222,13 +233,76 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
        
     }
 
+    static TestSuite filterOutTests(final TestSuite suite1, final Collection<String> testURIs) {
+
+        final TestSuite suite2 = new TestSuite(suite1.getName());
+        @SuppressWarnings("unchecked")
+        final Enumeration<Test> e = suite1.tests();
+        while (e.hasMoreElements()) {
+            final Test aTest = e.nextElement();
+            if (aTest instanceof TestSuite) {
+            	final TestSuite aTestSuite = (TestSuite) aTest;
+                suite2.addTest(filterOutTests(aTestSuite, testURIs));
+            } else if (aTest instanceof SPARQLQueryTest) {
+                final SPARQLQueryTest test = (SPARQLQueryTest) aTest;
+                if (!testURIs.contains(test.getTestURI())) {
+                    suite2.addTest(test);
+                }
+            }
+
+        }
+        return suite2;
+       
+    }
+
     /**
      * An array of URIs for tests to be run. When null or empty the default test
      * suite is run. When specified, only the tests matching these test URIs are
      * run.
      */
     static final Collection<String> testURIs = Arrays.asList(new String[] {
-    		
+
+    	// property paths
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-collection-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-collection-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-alternative-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-alternative-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-inverse-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-inverse-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-inverse-03",
+//// Simple Sequences		
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-02",  // with inverse
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-03",
+//// Sequence 04, 05, and 06 use the Property paths forms {...}, which were removed in the July 24th Working Draft
+////		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-04",
+////		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-05",
+////		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-06",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-sequence-07",  // with optional
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-negated-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-negated-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-negated-03",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-negated-04",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-03",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-04",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-05",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-06",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-03",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-cycles-04",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-wildcard-reflexive-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-01",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-02",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-03",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-04",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-05",
+//		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-nested-06",
+
+
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-simple"
     		
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-datatype-2"

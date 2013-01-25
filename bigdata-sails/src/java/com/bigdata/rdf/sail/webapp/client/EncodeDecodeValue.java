@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 13, 2011
  */
 
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.rdf.sail.webapp.client;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;

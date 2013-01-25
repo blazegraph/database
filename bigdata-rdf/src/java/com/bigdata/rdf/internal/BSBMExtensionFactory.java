@@ -30,8 +30,8 @@ package com.bigdata.rdf.internal;
 import java.util.Collection;
 
 import com.bigdata.rdf.internal.impl.extensions.USDFloatExtension;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Adds inlining for the
@@ -43,12 +43,13 @@ import com.bigdata.rdf.model.BigdataLiteral;
  */
 public class BSBMExtensionFactory extends DefaultExtensionFactory {
 
-    protected void _init(final LexiconRelation lex, 
-    		final Collection<IExtension> extensions) {
+    protected void _init(final IDatatypeURIResolver resolver,
+            final ILexiconConfiguration<BigdataValue> lex,
+            final Collection<IExtension> extensions) {
 
         // Extension to inline "USD" datatypes.
-        extensions.add(new USDFloatExtension<BigdataLiteral>(lex));
-        
+        extensions.add(new USDFloatExtension<BigdataLiteral>(resolver));
+
     }
     
 }

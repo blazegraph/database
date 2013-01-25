@@ -60,6 +60,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * The backing embedded database.
      */
+    @Override
     public Journal getIndexManager() {
         
         return store;
@@ -69,6 +70,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * Delegates the operation to the backing store.
      */
+    @Override
     synchronized public long commit() {
      
         final long begin = System.currentTimeMillis();
@@ -85,6 +87,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
         return commitTime;
     }
 
+    @Override
     synchronized public void abort() {
                 
         super.abort();
@@ -94,18 +97,21 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
     }
     
+    @Override
     public boolean isStable() {
         
         return store.isStable();
         
     }
     
+    @Override
     public boolean isReadOnly() {
         
         return super.isReadOnly() || store.isReadOnly();
         
     }
 
+    @Override
     public void close() {
         
         super.close();
@@ -290,6 +296,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
      * does support concurrent readers for {@link ITx#READ_COMMITTED} and
      * read-historical views.
      */
+    @Override
     public boolean isConcurrent() {
 
         return getTimestamp() == ITx.UNISOLATED;

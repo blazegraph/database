@@ -150,13 +150,29 @@ public class BigdataRDFServletContextListener implements
             
         } else {
 
-            /*
+            /**
              * The index manager will be open based on the specified property
              * file or config file.
+             * 
+             * Note: You may override the location of the property file using
+             * <pre>
+             * -Dcom.bigdata.rdf.sail.webapp.ConfigParams.propertyFile=FILE
+             * </pre>
              */
             
-            final String propertyFile = context
+            // The fully qualified name of the environment variable.
+            final String FQN_PROPERTY_FILE = ConfigParams.class.getName() + "."
+                    + ConfigParams.PROPERTY_FILE;
+
+            // The default value is taken from the web.xml file.
+            final String defaultValue = context
                     .getInitParameter(ConfigParams.PROPERTY_FILE);
+            
+            // The effective location of the property file.
+            final String propertyFile = System.getProperty(//
+                    FQN_PROPERTY_FILE,//
+                    defaultValue//
+                    );
 
             if (propertyFile == null)
                 throw new RuntimeException("Required config-param: "

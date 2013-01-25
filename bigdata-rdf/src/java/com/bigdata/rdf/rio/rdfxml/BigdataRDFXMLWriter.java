@@ -39,6 +39,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/498"> Bring
  *      bigdata RDF/XML parser up to openrdf 2.6.3.</a>
+ * @openrdf
  */
 public class BigdataRDFXMLWriter implements RDFWriter {
 

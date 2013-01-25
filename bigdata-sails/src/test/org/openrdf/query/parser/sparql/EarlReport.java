@@ -19,6 +19,7 @@ import junit.framework.TestResult;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
@@ -34,6 +35,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQL11SyntaxTest;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLSyntaxTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateConformanceTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 
 /**
@@ -42,6 +44,7 @@ import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
  * Note: A variety of overrides have been made in order to run the test suite
  * against Bigdata.
  * 
+ * @openrdf
  * @author Arjohn Kampman
  * @author Bryan Thompson
  */
@@ -78,27 +81,36 @@ public class EarlReport {
 		con.setNamespace("dc", DC.NAMESPACE);
 
 		projectNode = vf.createBNode();
-		BNode releaseNode = vf.createBNode();
+		final BNode releaseNode = vf.createBNode();
+        final URI doapHomepage = vf.createURI("http://usefulinc.com/ns/doap#homepage"); // BBT : Override
+        final URI homepage = vf.createURI("http://www.bigdata.com/bigdata/blog/"); // BBT : Override
 		con.add(projectNode, RDF.TYPE, DOAP.PROJECT);
 		con.add(projectNode, DOAP.NAME, vf.createLiteral("Bigdata")); // BBT : Override
+        con.add(projectNode, doapHomepage, homepage); // BBT : Override
 		con.add(projectNode, DOAP.RELEASE, releaseNode);
 		con.add(releaseNode, RDF.TYPE, DOAP.VERSION);
-		con.add(releaseNode, DOAP.NAME, vf.createLiteral("Bigdata 1.1-dev")); // BBT: Override
+		con.add(releaseNode, DOAP.NAME, vf.createLiteral("Bigdata 1.2.2")); // FIXME BBT: Override each time we run this!
 		SimpleDateFormat xsdDataFormat = new SimpleDateFormat("yyyy-MM-dd");
 		String currentDate = xsdDataFormat.format(new Date());
 		con.add(releaseNode, DOAP.CREATED, vf.createLiteral(currentDate, XMLSchema.DATE));
 
 		asserterNode = vf.createBNode();
 		con.add(asserterNode, RDF.TYPE, EARL.SOFTWARE);
-		con.add(asserterNode, DC.TITLE, vf.createLiteral("OpenRDF SPARQL compliance test"));
+		con.add(asserterNode, DC.TITLE, vf.createLiteral("OpenRDF SPARQL 1.1 compliance test"));
 
 		TestResult testResult = new TestResult();
 		EarlTestListener listener = new EarlTestListener();
 		testResult.addListener(listener);
 
-		BigdataSparqlTest.suite().run(testResult); // BBT : Override.
-        Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override
-        Bigdata2ASTSPARQL11SyntaxTest.suite().run(testResult); // BBT : Override
+        log.info("running query evaluation tests..");
+		BigdataSparqlTest.suite().run(testResult); // BBT : Override (both SPARQL 1.0 and SPARQL 1.1)
+		
+		log.info("running syntax tests..");
+        Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override (SPARQL 1.0)
+        Bigdata2ASTSPARQL11SyntaxTest.suite().run(testResult); // BBT : Override (SPARQL 1.1)
+
+        log.info("running update tests...");
+        BigdataSPARQLUpdateConformanceTest.suite().run(testResult); // BBT: Override (SPARQL 1.1)
 
 		con.setAutoCommit(false); // BBT: Override
 
@@ -140,10 +152,16 @@ public class EarlReport {
 			if (test instanceof SPARQLQueryTest) {
 				testURI = ((SPARQLQueryTest)test).testURI;
 			}
+			// FIXME This version is gone in openrdf 2.6.10.
 			else if (test instanceof SPARQLSyntaxTest) {
 				testURI = ((SPARQLSyntaxTest)test).testURI;
 			}
-			else {
+            else if (test instanceof SPARQL11SyntaxTest) {
+                testURI = ((SPARQL11SyntaxTest)test).testURI;
+            }
+            else if (test instanceof SPARQLUpdateConformanceTest) {
+                testURI = ((SPARQLUpdateConformanceTest)test).testURI;
+            } else {
 				throw new RuntimeException("Unexpected test type: " + test.getClass());
 			}
 

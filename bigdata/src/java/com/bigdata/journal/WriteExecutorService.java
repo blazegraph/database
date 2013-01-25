@@ -922,8 +922,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  */
 //                IJournal jnl = r.getJournal();
 //                if (jnl instanceof AbstractTask.IsolatedActionJournal) {
-//                	// undo any journal writes prior to external commit
-//                	((AbstractTask.IsolatedActionJournal) jnl).abortContext();
+//                  // undo any journal writes prior to external commit
+//                  ((AbstractTask.IsolatedActionJournal) jnl).abortContext();
 //                }
 
                 // add to the commit group.
@@ -1869,7 +1869,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: This returns a Future. We could use that to cancel
              * asynchronous overflow processing if there were a reason to do so.
              */
-        	rm.overflow();
+            rm.overflow();
         
             noverflow++;
             
@@ -2643,19 +2643,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 log.info("Did abort");
             
         } catch(Throwable t) {
-        	
-        	if (rm == null) {
-                log.error("Abort with collected journal: " + serviceName, t);
-        	} else {
             
-        	    final AbstractJournal journal = rm.getLiveJournal();
-	
-	            if(journal.isOpen()) {
-	
-	                log.error("Problem with abort? : "+serviceName+" : "+t, t);
-	                
-	            }
-        	}
+            if (rm == null) {
+                log.error("Abort with collected journal: " + serviceName, t);
+            } else {
+            
+                final AbstractJournal journal = rm.getLiveJournal();
+    
+                if(journal.isOpen()) {
+    
+                    log.error("Problem with abort? : "+serviceName+" : "+t, t);
+                    
+                }
+            }
 
         } finally {
 

@@ -54,6 +54,7 @@ import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.htree.HTree;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
@@ -774,8 +775,10 @@ public class ServiceCallJoin extends PipelineOp {
                     final ServiceCall<BindingSet> serviceCall,
                     final IBindingSet left[]) throws Exception {
 
+                final LexiconRelation lex = db.getLexiconRelation(); 
+                
                 // Convert IBindingSet[] to openrdf BindingSet[].
-                final BindingSet[] left2 = ServiceCallUtility.convert(
+                final BindingSet[] left2 = ServiceCallUtility.convert(lex,
                         projectedVars, left);
 
                 /*

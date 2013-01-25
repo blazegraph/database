@@ -140,6 +140,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     public DefaultOptimizerList() {
 
         /**
+         * Many (most) property path expressions can be re-written as simple
+         * joins and UNIONs and filters.  We need to do this before we set
+         * the value expressions.
+         */
+        add(new ASTPropertyPathOptimizer());
+        
+        /**
          * Visit all the value expression nodes and convert them into value
          * expressions. If a value expression can be evaluated to a constant,
          * then it is replaced by that constant.
