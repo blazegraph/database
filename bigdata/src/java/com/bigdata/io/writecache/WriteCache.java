@@ -2769,54 +2769,10 @@ abstract public class WriteCache implements IWriteCache {
         
     }
 
-    /**
-     * This is called as part of the read caching mechanism to allocate
-     * a ByteBuffer that will be used to directly read into.
-     * 
-     * If the allocation can be made, then an entry will be created in the
-     * record map.  It is the responsibility of the WriteCacheService to 
-     * set the serviceRecordMap only once the data is really there.
-     * 
-     * Rather than returning a ByteBuffer, a WriteCacheInstallation object
-     * should be returned that provides the protocol to:
-     * 
-     * 1) Install into the recordMap
-     * 2) Release to the clean list
-     * 
-     * 
-     * @param offset
-     * @param nbytes
-     * @return
-     * @throws InterruptedException 
-     * @throws IllegalStateException 
-     * @throws InterruptedException 
-     * @throws IllegalStateException 
+    /*
+     * Managing reference counts for the memoizer pattern for the ReadCache.
      */
-//	public Installation allocate(final long offset, final int nbytes) throws IllegalStateException, InterruptedException {
-//		assert m_closedForWrites; // must be used as read cache!
-//		
-//	    final ByteBuffer tmp = acquire();
-//	    try {
-//	    	if (tmp.remaining() < nbytes)
-//	    		return null;
-//	    	final int alloc = tmp.position();
-//	    	tmp.position(alloc+nbytes); // bump allocation
-//	    	
-////	    	recordMap.put(offset, new RecordMetadata(offset, alloc, nbytes, 0));
-////	    	
-////	    	// create allocation view
-////	    	final ByteBuffer ret = tmp.duplicate();
-////	    	ret.position(alloc);
-////	    	ret.limit(alloc+nbytes);
-////
-////	    	return ret;
-//	    	
-//	    	return new Installation(tmp, offset, alloc, nbytes);
-//	    } finally {
-//	    	release();
-//	    }
-//	}
-
+    
     /**
      * Allocate space for a record of the given length on this
      * {@link WriteCache}.
