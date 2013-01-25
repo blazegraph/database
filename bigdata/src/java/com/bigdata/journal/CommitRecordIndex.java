@@ -59,7 +59,7 @@ public class CommitRecordIndex extends BTree {
     /**
      * Instance used to encode the timestamp into the key.
      */
-    private IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+    private final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
     
     /**
      * A weak value cache for {@link ICommitRecord}s. Note that lookup may be
