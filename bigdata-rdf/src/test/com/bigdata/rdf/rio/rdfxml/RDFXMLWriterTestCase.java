@@ -41,20 +41,21 @@ public abstract class RDFXMLWriterTestCase extends RDFWriterTest {
 		Repository rep1 = new SailRepository(new MemoryStore());
 		rep1.initialize();
 
-		/*
-		 * FIXME There appears to be a problem resolving these resources in the
-		 * classpath. They are in the test jar. we might need to modify the
-		 * classpath search to find them. See DataLoader for how.
-		 */
-		final String resource1 = "/cia-factbook/CIA-onto-enhanced.rdf";
-		final String resource2 = "/cia-factbook/CIA-facts-enhanced.rdf";
+        /*
+         * Note: I had some troubles getting these resources to resolve against
+         * the classpath. They are in the test jar. I wound up both removing the
+         * leading '/' and also changing the code to explicitly reference a
+         * class in the openrdf test jar rather than [this].
+         */
+		final String resource1 = "cia-factbook/CIA-onto-enhanced.rdf";
+		final String resource2 = "cia-factbook/CIA-facts-enhanced.rdf";
 		
-		final URL ciaScheme = this.getClass().getResource(resource1);
+		final URL ciaScheme = RDFWriterTest.class.getClassLoader().getResource(resource1);
 		if (ciaScheme == null)
 			throw new RuntimeException("Could not locate resource: "
 					+ resource1);
 		
-		final URL ciaFacts = this.getClass().getResource(resource2);
+		final URL ciaFacts = RDFWriterTest.class.getClassLoader().getResource(resource2);
 		if (ciaFacts == null)
 			throw new RuntimeException("Could not locate resource: "
 					+ resource2);
