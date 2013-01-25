@@ -552,9 +552,12 @@ void DatasetClause() :
 {}
 {
     <FROM>
-    [<NAMED> {jjtThis.setNamed(true);}]
-    [<VIRTUAL_GRAPH> {jjtThis.setVirtual(true);}]
-    IRIref()
+    (      (        [<NAMED> {jjtThis.setNamed(true);}]
+        [<VIRTUAL_GRAPH> {jjtThis.setVirtual(true);}]
+        IRIref()
+      )
+      | <DEFAULT_GRAPH>
+    )
 }
 
 void WhereClause() :

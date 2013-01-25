@@ -165,7 +165,7 @@ public abstract class SPARQLASTQueryTest extends SPARQLQueryTest {
 			
 		    final String queryString = readQueryString();
 		    
-		    System.err.println(queryString);
+//		    System.err.println(queryString);
             
             final BigdataSailQuery query = con
                     .prepareNativeSPARQLQuery(QueryLanguage.SPARQL,

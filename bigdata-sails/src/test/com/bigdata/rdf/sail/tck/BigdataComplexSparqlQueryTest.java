@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
@@ -197,7 +198,7 @@ public class BigdataComplexSparqlQueryTest extends ComplexSPARQLQueryTest {
                             );
             try {
                 conn.setAutoCommit(false);
-                conn.add(dataset, "", RDFFormat.TRIG);
+                conn.add(dataset, "", RDFFormat.forFileName(dataFile));
                 conn.commit();
             }
             finally {
