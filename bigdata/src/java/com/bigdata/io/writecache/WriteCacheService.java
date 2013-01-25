@@ -59,7 +59,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.Node;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
@@ -152,6 +151,31 @@ import com.bigdata.util.concurrent.Memoizer;
  * compression and with the optional checksum. Applications which assume that
  * lengthOf(addr) == byte[].length will break, but that's life.
  * 
+ * <h2>ReadCache</h2>
+ * 
+ * Without a hotList the readCache is managed naively by clearing any new
+ * readCache. This potentially results in frequently accessed records being lost
+ * to the cache.
+ * 
+ * <h2>HotCache</h2>
+ * 
+ * With the HotCache evicted readCaches hot records get transferred to hotList
+ * and 'old' hotCaches get added to end of readCache. Pattern is needed to pluck
+ * reserve hotCache from readList so that it is always possible to transfer hot
+ * records from the readList.
+ * <p>
+ * Start with hotCache AND hotReserve.
+ * 
+ * If new reserve needed, because existing one is now used, try and compress new
+ * readCache into current hotCache - if won't fit, then call resetWith and lose
+ * those writes, cycle again, moving front hotCache to readList and compress
+ * that one.
+ * <p>
+ * LIMIT: If we begin with full caches with above threshold hitCounts then the
+ * whole list will cycle around until we hit original cache which will contain
+ * records with zero hitCounts - for practical purposes ignoring any concurrent
+ * reads.
+ * 
  * @see WriteCache
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -173,26 +197,6 @@ import com.bigdata.util.concurrent.Memoizer;
  *       record compression. Note that the B+Tree leaf and node records may
  *       require an uncompressed header to allow fixup of the priorAddr and
  *       nextAddr fields.
- * 
- * ReadCache lists
- * 	Without a hotList the readCache is managed naively by clearing any new
- * 	readCache.  This potentially results in frequently accessed records being
- *  lost to the cache.
- * 
- * HotCache
- *  With the HotCache evicted readCaches hot records get transferred to hotList and 'old'
- *  hotCaches get added to end of readCache.  Pattern is needed to pluck reserve
- *  hotCache from readList so that it is always possible to transfer hot records
- *  from the readList.
- *  
- *  Start with hotCache AND hotReserve.
- *  If new reserve needed, because existing one is now used, try and compress
- *  new readCache into current hotCache - if won't fit, then call resetWith and
- *  lose those writes, cycle again, moving front hotCache to readList and compress
- *  that one.  
- *  LIMIT: If we begin with full caches with above threshold hitCounts then
- *  the whole list will cycle around until we hit original cache which will contain
- *  records with zero hitCounts - for practical purposes ignoring any concurrent reads.
  */
 abstract public class WriteCacheService implements IWriteCache {
 
@@ -3250,8 +3254,8 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     /**
-     * Helper loads a child node from the specified address by delegating to
-     * {@link Node#_getChild(int)}.
+     * Helper loads a child node from the specified address by delegating
+     * {@link WriteCacheService#_getRecord(long, int)}.
      */
     final private static Computable<LoadRecordRequest, ByteBuffer> loadChild = new Computable<LoadRecordRequest, ByteBuffer>() {
 
