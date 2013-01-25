@@ -591,7 +591,7 @@ abstract public class WriteCache implements IWriteCache {
          * to use the ConcurrentHashMap which has the advantage of constant
          * access time for read through support.
          * 
-         * TODO: some literature indicates the ConcurrentSkipListMap scales
+         * Note: some literature indicates the ConcurrentSkipListMap scales
          * better with concurrency, so we should benchmark this option for
          * non-scattered writes as well.
          */
@@ -2238,14 +2238,15 @@ abstract public class WriteCache implements IWriteCache {
             final RecordMetadata removed = recordMap.remove(addr);
 
             if (removed == null) {
-                // Must be present.
-            	if (true) {
-            		throw new AssertionError("Buffer not closed for writes, but record moved.  Mayhaps compacted to another?");
-            	}
-            	
-            	return false;
+                /*
+                 * Must be present.
+                 * 
+                 * Buffer not closed for writes, but record moved. Mayhaps
+                 * compacted to another?
+                 */
+                throw new AssertionError();
             }
-            
+
             removed.deleted = true;
             
             if (!prefixWrites) {
@@ -2623,8 +2624,8 @@ abstract public class WriteCache implements IWriteCache {
             final ByteBuffer bb = src.acquire().duplicate();
             ByteBuffer dd = null;
 //            final int srcSize = src.recordMap.size();
-            int notTransferred = 0;
-            int transferred = 0;
+//            int notTransferred = 0;
+//            int transferred = 0;
             try {
                 // Setup destination
                 dd = dst.acquire();
@@ -2657,7 +2658,7 @@ abstract public class WriteCache implements IWriteCache {
                     assert !md.deleted; // not deleted (deleted entries should not be in the recordMap).
                     // only copy records >= to threshold
 					if (md.hitCount < threshold) {
-						notTransferred++;
+//						notTransferred++;
 						
 						serviceRecordMap.remove(fileOffset);
 					} else {
@@ -2667,7 +2668,7 @@ abstract public class WriteCache implements IWriteCache {
 							// Not enough room in destination for this record.
 							if (dstremaining >= 512) {
 								// Destination still has room, keep looking.
-								notTransferred++;
+//								notTransferred++;
 								continue;
 							}
 							// Destination is full (or full enough).
@@ -2690,7 +2691,7 @@ abstract public class WriteCache implements IWriteCache {
 								dstoff = dd.position() + prefixlen;
 								dd.put(bb);
 								
-								transferred++;
+//								transferred++;
 								
 								assert dst.remaining() == (dstremaining - len) : "dst.remaining(): "
 										+ dst.remaining()

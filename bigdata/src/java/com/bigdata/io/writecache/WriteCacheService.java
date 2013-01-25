@@ -305,15 +305,14 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * Used to compact sparsely utilized {@link WriteCache}.
-     * 
-     * Protected by {@link #dirtyListLock}
      */
-    private WriteCache compactingCache = null;
+    private final AtomicReference<WriteCache> compactingCacheRef = new AtomicReference<WriteCache>();
     
     /**
-     * Maintained to guarantee that compaction is possible
+     * Maintained to guarantee that compaction is possible. This is always a
+     * clean cache. 
      */
-    private WriteCache compactingReserve = null;
+    private final AtomicReference<WriteCache> compactingReserveRef = new AtomicReference<WriteCache>();
     
     /**
      * Disable {@link WriteCache} compaction when <code>false</code>.
@@ -785,7 +784,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * The current hotCache.
-     */// FIXME GUARDED BY WHAT?
+     * <p>
+     * Note: Guarded by the {@link #readCache} reference.
+     */
     private ReadCache hotCache = null;
 
     /**
@@ -796,7 +797,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * The current hotReserve.
-     */ // FIXME GUARDED BY WHAT?
+     * <p>
+     * Note: Guarded by the {@link #readCache} reference.
+     */
     private ReadCache hotReserve = null;
 
 //    /**
@@ -925,7 +928,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  * Clear compactingCache reference now that the WriteTask is
                  * known to be terminated.
                  */
-                compactingCache = null; // clear reference.
+                compactingCacheRef.set(null); // clear reference.
                 checksumBuffer = null;
             }
         } // call()
@@ -1066,15 +1069,19 @@ abstract public class WriteCacheService implements IWriteCache {
              * cache.
              */
             assert !cache.isClosedForWrites();
-            
-            if (compactingReserve == null) {
-            	compactingReserve = getDirectCleanCache();        
-            	
-            	if (compactingReserve == null)
-            		return false; // cannot guarantee compaction
-            	
-                compactingReserve.resetWith(serviceMap); // should be NOP!
-           }
+
+            if (compactingReserveRef.get() == null) {
+
+                final WriteCache tmp = getDirectCleanCache();
+
+                if (tmp == null)
+                    return false; // cannot guarantee compaction
+
+                tmp.resetWith(serviceMap); // should be NOP!
+
+                compactingReserveRef.set(tmp);
+
+            }
                 
             /*
              * We can be certain to be able to compact.
@@ -1087,8 +1094,7 @@ abstract public class WriteCacheService implements IWriteCache {
             dirtyListLock.lockInterruptibly();
             try {
                 // Might be null.
-                curCompactingCache = compactingCache;
-                compactingCache = null;
+                curCompactingCache = compactingCacheRef.getAndSet(null);
 //            } finally {
 //                dirtyListLock.unlock();
 //            }
@@ -1139,10 +1145,14 @@ abstract public class WriteCacheService implements IWriteCache {
                 if (log.isTraceEnabled())
                     log.trace("Setting curCompactingCache to reserve");
 
-                curCompactingCache = compactingReserve;
-                compactingReserve = getDirectCleanCache();
-                if (compactingReserve != null)
-                	compactingReserve.resetWith(serviceMap); // should be NOP!
+                curCompactingCache = compactingReserveRef.getAndSet(null);
+                {
+                    final WriteCache tmp = getDirectCleanCache();
+                    if (tmp != null) {
+                        tmp.resetWith(serviceMap); // should be NOP!
+                        compactingReserveRef.set(tmp);
+                    }
+                }
                 
                 if (log.isTraceEnabled())
                     log.trace("Transferring to curCompactingCache");
@@ -1163,7 +1173,7 @@ abstract public class WriteCacheService implements IWriteCache {
 //                dirtyListLock.lock();
                 try {
                     // Now reset compactingCache with dirtyListLock held
-                    compactingCache = curCompactingCache;
+                    compactingCacheRef.set(curCompactingCache);
                     counters.get().ncompact++;
                 } finally {
                     dirtyListLock.unlock();
@@ -1524,6 +1534,9 @@ abstract public class WriteCacheService implements IWriteCache {
                  * be concurrency in WriteTask.call() such that we did not get
                  * all of the dirty buffers the first time we called this method
                  * above.
+                 * 
+                 * Note: This will ignore the [compactingReserve]. That
+                 * WriteCache is always clean and can stay where it is.
                  */
                 drainAndResetDirtyList();
 
@@ -1535,11 +1548,11 @@ abstract public class WriteCacheService implements IWriteCache {
                 try {
                     if (!dirtyList.isEmpty())
                         throw new AssertionError();
-                    if (compactingCache != null)
-                        throw new AssertionError();
                 } finally {
                     dirtyListLock.unlock();
                 }
+                if (compactingCacheRef.get() != null)
+                    throw new AssertionError();
 
                 // ensure cleanList is not empty after WriteTask terminates, handling single buffer case
                 cleanListLock.lockInterruptibly();
@@ -1805,12 +1818,14 @@ abstract public class WriteCacheService implements IWriteCache {
             current.getAndSet(null);
 
             // clear reference to the compactingCache buffer.
-            compactingCache = null;
+            compactingCacheRef.getAndSet(null);
 
             // clear reference to the readCache buffer.
-            readCache.getAndSet(null);            
-            hotCache = null;
-            hotReserve = null;
+            readCache.getAndSet(null);
+            synchronized (readCache) {
+                hotCache = null;
+                hotReserve = null;
+            }
 
             // clear the service record map.
             serviceMap.clear();
@@ -2117,9 +2132,8 @@ abstract public class WriteCacheService implements IWriteCache {
                  * Note: We can not drop the compactingCache onto the dirtyList
                  * until the dirtyList has been spun down to empty.
                  */
-                if (compactingCache != null) {
-                    final WriteCache tmp2 = compactingCache;
-                    compactingCache = null;
+                final WriteCache tmp2 = compactingCacheRef.getAndSet(null/* newValue */);
+                if (tmp2 != null) {
                     dirtyList.add(tmp2);
                     counters.get().ndirty++;
                     dirtyListChange.signalAll();
@@ -2141,7 +2155,7 @@ abstract public class WriteCacheService implements IWriteCache {
                          * Can not check assertion if there is an existing
                          * exception.
                          */
-                        assert compactingCache == null;
+                        assert compactingCacheRef.get() == null;
                     }
                 } finally {
                     dirtyListLock.unlock();
@@ -2924,11 +2938,23 @@ abstract public class WriteCacheService implements IWriteCache {
     	return true;
     }
 
+    /**
+     * Pool the {@link #cleanList} and return the {@link WriteCache} from the
+     * head of the {@link #cleanList} IFF one is available and otherwise
+     * <code>null</code>.
+     * 
+     * @return The {@link WriteCache} iff one was available.
+     * 
+     * @throws InterruptedException
+     */
     private WriteCache getDirectCleanCache() throws InterruptedException {
+
         final WriteCache tmp = cleanList.poll();
 
         if (tmp != null) {
-        	counters.get().nclean--;
+        
+            counters.get().nclean--;
+            
         }
 
         return tmp;
@@ -2937,7 +2963,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * Non-blocking take of a {@link ReadCache}. If successful, the returned
-     * {@link ReadCache} will be clean.
+     * {@link ReadCache} will be clean. Otherwise return <code>null</code>.
      */
     private ReadCache getDirectReadCache() throws InterruptedException {
 
