@@ -334,7 +334,10 @@ public class TestRWWriteCacheService extends TestCase3 {
                 writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker
                         .checksum(v.buf));
             } catch (Throwable t) {
-                assertTrue(t instanceof AssertionError);
+                if (!(t instanceof AssertionError)) {
+                    fail("Expecting " + AssertionError.class.getName()
+                            + ", not " + t, t);
+                }
             }
         }
 
