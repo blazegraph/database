@@ -37,6 +37,7 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -236,8 +237,39 @@ public interface Options {
      * will be used with a {@link WriteCacheService}.
      * 
      * @see #DEFAULT_WRITE_CACHE_BUFFER_COUNT
+     * @see #WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+     * @see #WRITE_CACHE_COMPACTION_THRESHOLD
      */
     String WRITE_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".writeCacheBufferCount";
+
+    /**
+     * Option may be used to control the maximum number of buffers on the
+     * {@link WriteCacheService} dirty list (default
+     * {@value #DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE}). This effectively
+     * controls the maximum number of buffers that are clean and available for
+     * writes.
+     * <p>
+     * Note: This option has no effect for a WORM mode journal.
+     */
+    String WRITE_CACHE_MAX_DIRTY_LIST_SIZE = AbstractJournal.class.getName()+".writeCacheMaxDirtyListSize";
+
+    /**
+     * Option may be used to control whether the {@link WriteCacheService} will
+     * compact the {@link WriteCache} buffers in order to reduce the number of
+     * writes to the disk (default
+     * {@value #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD}) by specifying the
+     * minimum percentage of the {@link WriteCache} buffer that could be
+     * reclaimed.
+     * <p>
+     * Note: This option has no effect for a WORM mode journal.
+     * <p>
+     * Note: If set to 100, then compaction is disabled. A {@link WriteCache}
+     * that is 100% available for compaction is empty and is simply moved to the
+     * clean list since there is nothing to write.
+     * 
+     * @see #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD
+     */
+    String WRITE_CACHE_COMPACTION_THRESHOLD = AbstractJournal.class.getName()+".writeCacheCompactionThreshold";
 
     /**
      * <strong>ALPHA FEATURE</strong>
@@ -281,35 +313,6 @@ public interface Options {
      * @see #DEFAULT_HOT_CACHE_SIZE
      */
     String HOT_CACHE_SIZE = AbstractJournal.class.getName()+".hotCacheSize";
-
-    /**
-     * Option may be used to control the maximum number of buffers on the
-     * {@link WriteCacheService} dirty list (default
-     * {@value #DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE}). This effectively
-     * controls the maximum number of buffers that are clean and available for
-     * writes.
-     * <p>
-     * Note: This option has no effect for a WORM mode journal.
-     */
-    String WRITE_CACHE_MAX_DIRTY_LIST_SIZE = AbstractJournal.class.getName()+".writeCacheMaxDirtyListSize";
-
-    /**
-     * Option may be used to control whether the {@link WriteCacheService} will
-     * compact the {@link WriteCache} buffers in order to reduce the number of
-     * writes to the disk (default
-     * {@value #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD}) by specifying the
-     * minimum percentage of the {@link WriteCache} buffer that could be
-     * reclaimed.
-     * <p>
-     * Note: This option has no effect for a WORM mode journal.
-     * <p>
-     * Note: If set to 100, then compaction is disabled. A {@link WriteCache}
-     * that is 100% available for compaction is empty and is simply moved to the
-     * clean list since there is nothing to write.
-     * 
-     * @see #DEFAULT_WRITE_CACHE_COMPACTION_THRESHOLD
-     */
-    String WRITE_CACHE_COMPACTION_THRESHOLD = AbstractJournal.class.getName()+".writeCacheCompactionThreshold";
 
 //    /**
 //     * An integer property whose value controls the size of the write cache (in
