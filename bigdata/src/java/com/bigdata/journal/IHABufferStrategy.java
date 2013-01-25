@@ -186,16 +186,16 @@ public interface IHABufferStrategy extends IBufferStrategy {
 	void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
 			ByteBuffer transfer) throws IOException;
 
-	/**
-	 * Sets strategy to be ready to rebuild store
-	 * @param req
-	 */
-	void prepareForRebuild(HARebuildRequest req);
-
-	/**
-	 * Informs strategy to reload from rebuilt store
-	 * @param req
-	 */
-	void completeRebuild(HARebuildRequest req, IRootBlockView rbv);
+//	/**
+//	 * Sets strategy to be ready to rebuild store
+//	 * @param req
+//	 */
+//	void prepareForRebuild(HARebuildRequest req);
+//
+//	/**
+//	 * Informs strategy to reload from rebuilt store
+//	 * @param req
+//	 */
+//	void completeRebuild(HARebuildRequest req, IRootBlockView rbv);
 
 }

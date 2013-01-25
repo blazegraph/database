@@ -959,9 +959,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		}
 	}
 	
-	// make this field public for access from unit tests as required
-	public static boolean DEBUG_USEREADCACHE = true;
-
 	/**
      * Create and return a new {@link RWWriteCacheService} instance. The caller
      * is responsible for closing out the old one and must be holding the
@@ -978,7 +975,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             return new RWWriteCacheService(m_writeCacheBufferCount,
                     m_maxDirtyListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
 
-                    convertAddr(m_fileSize), m_reopener, m_quorum, DEBUG_USEREADCACHE ? this : null) {
+                    convertAddr(m_fileSize), m_reopener, m_quorum, this) {
                 
                         @SuppressWarnings("unchecked")
                         public WriteCache newWriteCache(final IBufferAccess buf,
@@ -1625,7 +1622,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		try {
 	        assertOpen(); // check again after taking lock
 	        
-	        assertNoRebuild();
+//	        assertNoRebuild();
 
 			// length includes space for the checksum
 			if (length > m_maxFixedAlloc) {
@@ -1833,13 +1830,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 		}
 	}
 
-    /**
-     * Convenience check for thoseA batch invoice public methods that must be restricted if a rebuild is in progress
-     */
-	private void assertNoRebuild() {
-		if (m_rebuildRequest != null)
-			throw new IllegalStateException("Invalid when rebuilding");
-	}
+//    /**
+//     * Convenience check for thoseA batch invoice public methods that must be restricted if a rebuild is in progress
+//     */
+//	private void assertNoRebuild() {
+//		if (m_rebuildRequest != null)
+//			throw new IllegalStateException("Invalid when rebuilding");
+//	}
 
 	private void assertAllocators() {
 		for (int i = 0; i < m_allocs.size(); i++) {
@@ -1893,7 +1890,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
 	public void free(final long laddr, final int sze, final IAllocationContext context) {
 	    assertOpen();
-        assertNoRebuild();
+//        assertNoRebuild();
 		final int addr = (int) laddr;
 		
 		switch (addr) {
@@ -2532,7 +2529,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    m_allocationLock.lock();
 		try {
 	        assertOpen();
-	        assertNoRebuild();
+//	        assertNoRebuild();
 	        
 	        boolean isolatedWrites = false;
             /**
@@ -2694,7 +2691,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
 	public void commit() {
 	    assertOpen();
-        assertNoRebuild();
+//        assertNoRebuild();
 
 		checkCoreAllocations();
 
@@ -4678,7 +4675,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     public ByteBuffer readRootBlock(final boolean rootBlock0) {
         
         assertOpen();
-        assertNoRebuild();
+//        assertNoRebuild();
         
         final ByteBuffer tmp = ByteBuffer
                 .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
@@ -5851,7 +5848,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     private long lastBlockSequence = 0;
 
-	private HARebuildRequest m_rebuildRequest = null;
+//	private HARebuildRequest m_rebuildRequest = null;
 	
 	 //    /**
 //     * Only blacklist the addr if not already available, in other words
@@ -5980,27 +5977,27 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @throws IOException 
      */
 	public void writeRaw(final long offset, final ByteBuffer transfer) throws IOException {
-		if (m_rebuildRequest == null)
-			throw new IllegalStateException("Store is not in rebuild state");
+//		if (m_rebuildRequest == null)
+//			throw new IllegalStateException("Store is not in rebuild state");
 
 		FileChannelUtility.writeAll(m_reopener, transfer, offset);
 	}
 
-	public void prepareForRebuild(final HARebuildRequest req) {
-		assert m_rebuildRequest == null;
-		
-		m_rebuildRequest = req;
-	}
-
-	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
-		assert m_rebuildRequest != null;
-		
-		assert m_rebuildRequest.equals(req);
-		
-		// TODO: reinit from file
-		this.resetFromHARootBlock(rbv);
-		
-		m_rebuildRequest = null;
-	}
+//	public void prepareForRebuild(final HARebuildRequest req) {
+//		assert m_rebuildRequest == null;
+//		
+//		m_rebuildRequest = req;
+//	}
+//
+//	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+//		assert m_rebuildRequest != null;
+//		
+//		assert m_rebuildRequest.equals(req);
+//		
+//		// TODO: reinit from file
+//		this.resetFromHARootBlock(rbv);
+//		
+//		m_rebuildRequest = null;
+//	}
 
 }
