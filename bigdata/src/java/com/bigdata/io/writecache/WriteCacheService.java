@@ -1486,6 +1486,11 @@ abstract public class WriteCacheService implements IWriteCache {
      * This is necessary in order to ensure that the correct file extent is
      * communicated along the write replication pipeline when high availability
      * is enabled.
+     * <p>
+     * Note: {@link #reset()} MUST NOT interrupt readers. It should only reset
+     * those aspects of the write cache state that are associated with writes.
+     * On the other hand, {@link #close()} must close all buffers and must not
+     * permit readers to read from closed buffers.
      */
     public void reset() throws InterruptedException {
         final WriteLock writeLock = lock.writeLock();
