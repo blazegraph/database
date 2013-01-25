@@ -441,7 +441,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      *            The flags byte.
      * @return The {@link DTE}
      */
-    static public DTE getInternalDataTypeEnum(final byte flags) {
+    static public DTE getDTE(final byte flags) {
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
 
