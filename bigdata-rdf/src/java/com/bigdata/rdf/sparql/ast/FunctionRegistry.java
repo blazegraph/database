@@ -13,10 +13,13 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ImmutableBOp;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
@@ -32,7 +35,6 @@ import com.bigdata.rdf.internal.constraints.DateBOp;
 import com.bigdata.rdf.internal.constraints.DateBOp.DateOp;
 import com.bigdata.rdf.internal.constraints.DigestBOp;
 import com.bigdata.rdf.internal.constraints.DigestBOp.DigestOp;
-import com.bigdata.rdf.internal.constraints.EBVBOp;
 import com.bigdata.rdf.internal.constraints.EncodeForURIBOp;
 import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.internal.constraints.FuncBOp;
@@ -70,7 +72,6 @@ import com.bigdata.rdf.internal.constraints.StrstartsBOp;
 import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
-import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.internal.constraints.XsdStrBOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
@@ -231,7 +232,7 @@ public class FunctionRegistry {
     public static final URI XSD_STR = XMLSchema.STRING;
 
     static {
-        add(AVERAGE, new Factory() {
+        add(AVERAGE, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -245,7 +246,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(COUNT, new Factory() {
+        add(COUNT, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -261,7 +262,7 @@ public class FunctionRegistry {
 
         add(GROUP_CONCAT, new GroupConcatFactory());
 
-        add(MAX, new Factory() {
+        add(MAX, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -275,7 +276,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(MIN, new Factory() {
+        add(MIN, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -290,7 +291,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(SAMPLE, new Factory() {
+        add(SAMPLE, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -304,7 +305,7 @@ public class FunctionRegistry {
             }
         });
 
-        add(SUM, new Factory() {
+        add(SUM, new AggregateFactory() {
             public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -939,6 +940,14 @@ public class FunctionRegistry {
         
     }
 
+    public static boolean isAggregate(final URI functionUri) {
+
+        final Factory f = factories.get(functionUri);
+
+        return f != null && f instanceof AggregateFactory;
+
+    }
+
     /**
      * Verify type constraints.
      * 
@@ -997,21 +1006,31 @@ public class FunctionRegistry {
         if (functionURI == null)
             throw new IllegalArgumentException("functionURI is null");
         
-		final Factory f = factories.get(functionURI);
+//		final Factory f = factories.get(functionURI);
+//
+//        if (f == null) {
+//            /*
+//             * TODO If we eagerly translate FunctionNodes in the AST to IV value
+//             * expressions then we should probably attach a function which will
+//             * result in a runtime type error when it encounters value
+//             * expression for a function URI which was not known to the backend.
+//             * However, if we handle this translation lazily then this might not
+//             * be an issue.
+//             */
+//            throw new IllegalArgumentException("unknown function: "
+//                    + functionURI);
+//        }
 
-        if (f == null) {
-            /*
-             * TODO If we eagerly translate FunctionNodes in the AST to IV value
-             * expressions then we should probably attach a function which will
-             * result in a runtime type error when it encounters value
-             * expression for a function URI which was not known to the backend.
-             * However, if we handle this translation lazily then this might not
-             * be an issue.
-             */
-            throw new IllegalArgumentException("unknown function: "
-                    + functionURI);
+        final Factory f;
+        if (factories.containsKey(functionURI)) {
+        	
+        	f = factories.get(functionURI);
+        	
+        } else {
+        	
+        	f = new UnknownFunctionFactory(functionURI);        	
         }
-
+        
 		return f.create(globals, scalarValues, args);
 
 	}
@@ -1103,6 +1122,15 @@ public class FunctionRegistry {
 				final Map<String,Object> scalarValues,
 				final ValueExpressionNode... args);
 
+	}
+	
+	/**
+	 * Marker interface for aggregate functions.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+	 */
+	public static interface AggregateFactory extends Factory {
+		
 	}
 
 	public static class CompareFactory implements Factory {
@@ -1315,7 +1343,7 @@ public class FunctionRegistry {
 
 	}
 
-	public static class GroupConcatFactory implements Factory {
+	public static class GroupConcatFactory implements AggregateFactory {
 	   
 	    public interface Annotations extends GROUP_CONCAT.Annotations{
 	    }
@@ -1553,5 +1581,74 @@ public class FunctionRegistry {
         }
 
     }
+    
+    private static class UnknownFunctionFactory implements Factory {
+    	
+    	private URI functionURI;
+    	
+    	public UnknownFunctionFactory(final URI functionURI) {
+    		
+    		this.functionURI = functionURI;
+    		
+    	}
+    	
+        @Override
+        public IValueExpression<? extends IV> create(
+        		final GlobalAnnotations globals,
+                final Map<String, Object> scalarValues, 
+                final ValueExpressionNode... args) {
+
+            return new UnknownFunctionBOp(functionURI);
+
+        }
+    	
+    }
+    
+	public static class UnknownFunctionBOp 
+			extends ImmutableBOp implements IValueExpression<IV> {
+
+		private static final long serialVersionUID = 1L;
+		
+		private static final String FUNCTION_URI = "FUNCTION_URI";
+
+		public UnknownFunctionBOp(final URI functionURI) {
+			
+			this(BOp.NOARGS, NV.asMap(FUNCTION_URI, functionURI));
+			
+		}
+		
+		/**
+		 * Required deep copy constructor.
+		 * 
+		 * @param op
+		 */
+		public UnknownFunctionBOp(final UnknownFunctionBOp op) {
+
+			super(op);
+
+		}
+
+		/**
+		 * Required shallow copy constructor.
+		 * 
+		 * @param args
+		 *            The operands.
+		 * @param op
+		 *            The operation.
+		 */
+		public UnknownFunctionBOp(final BOp[] args, Map<String, Object> anns) {
+
+			super(args, anns);
+
+		}
+
+		public IV get(final IBindingSet bindingSet) {
+			
+			throw new UnsupportedOperationException(
+					"unknown function: " + getRequiredProperty(FUNCTION_URI));
+			
+		}
+		
+	}
 
 }

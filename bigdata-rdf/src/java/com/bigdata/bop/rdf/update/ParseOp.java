@@ -75,7 +75,7 @@ import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.sail.webapp.MiniMime;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;

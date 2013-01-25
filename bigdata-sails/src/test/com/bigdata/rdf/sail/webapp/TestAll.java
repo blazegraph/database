@@ -56,17 +56,16 @@ public class TestAll extends TestCase {
     public static Test suite() {
 
         final TestSuite suite = new TestSuite("WebApp");
-       
+
+        /*
+         * WebApp Client.
+         */
+        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
+
         /*
          * Test suite utility class for building XML/HTML documents.
          */
         suite.addTestSuite(TestXMLBuilder.class);
-        
-        /*
-         * Test suite for utility class to encode and decode RDF Values for
-         * interchange via the REST API.
-         */
-        suite.addTestSuite(TestEncodeDecodeValue.class);
         
         /*
          * Test suite for content negotiation.

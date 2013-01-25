@@ -96,7 +96,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
-import com.bigdata.rdf.sail.webapp.MiniMime;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractGraphDataUpdate;
 import com.bigdata.rdf.sparql.ast.AddGraph;

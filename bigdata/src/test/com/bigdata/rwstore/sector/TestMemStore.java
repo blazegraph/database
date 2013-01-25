@@ -16,15 +16,12 @@ import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.RWStrategy;
-import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
 
 /**
@@ -278,23 +275,23 @@ public class TestMemStore extends AbstractJournalTestCase {
 		 */
 		public void test_sessionProtection() {
 
-            final Properties p = getProperties();
+	        final Properties p = getProperties();
 
-            // Note: No longer the default. Must be explicitly set.
-            p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+	        // Note: No longer the default. Must be explicitly set.
+	        p.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
 
-            final Journal store = getJournal(p);
+			final Journal store = getJournal(p);
 			try {
 				final IRWStrategy bs = (IRWStrategy) store.getBufferStrategy();
 	
-				byte[] buf = new byte[300]; // Just some data
+				final byte[] buf = new byte[300]; // Just some data
 				r.nextBytes(buf);
 	
-				ByteBuffer bb = ByteBuffer.wrap(buf);
+				final ByteBuffer bb = ByteBuffer.wrap(buf);
 	
-				long faddr = store.write(bb); // rw.alloc(buf, buf.length);
+				final long faddr = store.write(bb); // rw.alloc(buf, buf.length);
 	
-				IRawTx tx = bs.newTx();
+				final IRawTx tx = bs.newTx();
 	
 				ByteBuffer rdBuf = store.read(faddr);
 	

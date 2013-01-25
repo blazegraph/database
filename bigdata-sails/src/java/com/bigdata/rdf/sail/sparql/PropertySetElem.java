@@ -11,6 +11,7 @@ import org.openrdf.query.algebra.ValueConstant;
 /**
  *
  * @author Jeen
+ * @openrdf
  */
 public class PropertySetElem {
 

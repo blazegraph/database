@@ -157,6 +157,20 @@ public class StaticAnalysisBase {
                 
             }
             
+        } else if (op instanceof ArbitraryLengthPathNode) {
+        	
+        	varSet.addAll(((ArbitraryLengthPathNode) op).getProducedBindings());
+        	
+        	// do not recurse
+        	return varSet;
+        	
+        } else if (op instanceof ZeroLengthPathNode) {
+        	
+        	varSet.addAll(((ZeroLengthPathNode) op).getProducedBindings());
+        	
+        	// do not recurse
+        	return varSet;
+        	
         } else if (op instanceof FilterNode && !filters) {
 
             // DO NOT RECURSE INTO THE FILTER!

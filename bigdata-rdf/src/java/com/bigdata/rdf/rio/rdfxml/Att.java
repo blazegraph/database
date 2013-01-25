@@ -7,6 +7,7 @@ package com.bigdata.rdf.rio.rdfxml;
 
 /**
  * An XML attribute.
+ * @openrdf
  */
 class Att {
 

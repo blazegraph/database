@@ -34,28 +34,24 @@ import java.util.List;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.QueryBase;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ZeroLengthPathNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -393,21 +389,31 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             }
 
             /*
-             * Add required statement pattern joins and the filters on those
-             * joins.
+             * Add required statement pattern joins, the filters on those
+             * joins, and property path stuff.
              * 
              * Note: This winds up handling materialization steps as well (it
              * calls through to Rule2BOpUtility).
              */
-            for (IGroupMemberNode n : joinGroup.getStatementPatterns()) {
+            for (IGroupMemberNode child : joinGroup) {
+            	
+            	if (child instanceof StatementPatternNode) {
                 
-                final StatementPatternNode sp = (StatementPatternNode) n;
-                
-                if (!sp.isOptional()) {
-                
-                    ordered.add(n);
+	                final StatementPatternNode sp = (StatementPatternNode) child;
+	                
+	                if (!sp.isOptional()) {
+	                
+	                    ordered.add(child);
+	                    
+	                }
+	                
+            	} else if (child instanceof ArbitraryLengthPathNode ||
+            				child instanceof ZeroLengthPathNode ||
+            				  child instanceof PropertyPathUnionNode) {
+            		
+                    ordered.add(child);
                     
-                }
+            	}
                 
             }
             
@@ -456,10 +462,14 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
                 }
 
                 @SuppressWarnings("unchecked")
-                final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
+                final GraphPatternGroup<?> subgroup = (GraphPatternGroup<?>) child;
 
                 if (subgroup.isOptional()) {
                     continue;
+                }
+                
+                if (subgroup instanceof PropertyPathUnionNode) {
+                	continue;
                 }
 
                 ordered.add(subgroup);
@@ -551,6 +561,15 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             
         }
         
+//        /*
+//         * Next do the property paths.
+//         */
+//        for (PropertyPathNode pathNode : joinGroup.getChildren(PropertyPathNode.class)) {
+//        	
+//        	ordered.add(pathNode);
+//        	
+//        }
+        
         /*
          * Next do the optional sub-groups.
          */
@@ -585,10 +604,14 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             }
 
             @SuppressWarnings("unchecked")
-            final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
+            final GraphPatternGroup<?> subgroup = (GraphPatternGroup<?>) child;
 
             if (!subgroup.isOptional()) {
                 continue;
+            }
+            
+            if (subgroup instanceof PropertyPathUnionNode) {
+            	continue;
             }
 
             ordered.add(subgroup);

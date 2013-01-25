@@ -97,6 +97,9 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 			<format property="today" pattern="yyyyMMdd" locale="en,US" />
 			<format property="osgiDate" pattern="yyyyMMdd" locale="en,US" />
 		</tstamp>
+      <condition property="client-version" value="bigdata-client-${build.ver}-${today}" else="bigdata-client-${build.ver}">
+         <istrue value="${snapshot}" />
+      </condition>
 		<condition property="version" value="bigdata-${build.ver}-${today}" else="bigdata-${build.ver}">
 			<istrue value="${snapshot}" />
 		</condition>
@@ -471,6 +474,24 @@ public class BuildInfo {
 					" />
 			</java>
 	</target>
+
+   <!-- @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" >
+                      Create a bigdata-client jar for the NSS REST API </a>
+    -->
+   <target name="bigdata-client" depends="clean, prepare, jar"  
+         description="Prepare the bigdata web access client library.">
+         <java jar="src/build/autojar/autojar.jar" fork="true" failonerror="true">
+            <arg line="-o ${build.dir}/${client-version}.jar
+               -c ${build.dir}/${version}.jar
+            	-v
+               --
+               com.bigdata.rdf.sail.webapp.client.*.class
+               com.bigdata.rdf.properties.*.class
+               com.bigdata.rdf.properties.text.*.class
+               com.bigdata.rdf.properties.xml.*.class
+               " />
+         </java>
+    </target>
 
 	<!--depends="bundleJar"-->
 	<target name="war" depends="bundleJar, autojar-strip-fastutil" 

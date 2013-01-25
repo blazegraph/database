@@ -38,9 +38,11 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.parser.ParsedOperation;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
@@ -57,14 +59,17 @@ import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -75,6 +80,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
  *          $
+ * @openrdf
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
@@ -92,6 +98,38 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
         
         this.context = new BigdataASTContext(tripleStore);
+        
+    }
+
+    /**
+     * Parse either a SPARQL QUERY or a SPARQL UPDATE request.
+     * @param operation The request.
+     * @param baseURI The base URI.
+     * 
+     * @return The {@link ParsedOperation}
+     */
+    public ParsedOperation parseOperation(final String operation,
+            final String baseURI) throws MalformedQueryException {
+
+        final String strippedOperation = QueryParserUtil
+                .removeSPARQLQueryProlog(operation).toUpperCase();
+        
+        final ParsedOperation parsedOperation;
+        
+        if (strippedOperation.startsWith("SELECT")
+                || strippedOperation.startsWith("CONSTRUCT")
+                || strippedOperation.startsWith("DESCRIBE")
+                || strippedOperation.startsWith("ASK")) {
+
+            parsedOperation = parseQuery(operation, baseURI);
+            
+        } else {
+            
+            parsedOperation = parseUpdate(operation, baseURI);
+            
+        }
+
+        return parsedOperation;
         
     }
 
@@ -173,7 +211,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             List<ASTPrefixDecl> sharedPrefixDeclarations = null;
 
             // For each UPDATE operation in the sequence.
-            for (ASTUpdateContainer uc : updateOperations) {
+            for (int i = 0; i < updateOperations.size(); i++) {
+
+                final ASTUpdateContainer uc = updateOperations.get(i);
+
+                if (uc.jjtGetNumChildren() == 0 && i > 0 && i < updateOperations.size() - 1) {
+                    // empty update in the middle of the sequence
+                    throw new MalformedQueryException("empty update in sequence not allowed");
+                }
 
                 StringEscapesProcessor.process(uc);
 
@@ -223,19 +268,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 BlankNodeVarProcessor.process(uc);
 
                 /*
-				 * Batch resolve ASTRDFValue to BigdataValues with their
-				 * associated IVs.
-				 * 
-				 * Note: IV resolution must proceed separately (or be
-				 * re-attempted) for each UPDATE operation in a sequence since
-				 * some operations can cause new IVs to be declared in the
-				 * lexicon. Resolution before those IVs have been declared would
-				 * produce a different result than resolution afterward (it will
-				 * be a null IV before the Value is added to the lexicon and a
-				 * TermId or BlobIV afterward).
-				 * 
-				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
-				 */
+                 * Batch resolve ASTRDFValue to BigdataValues with their
+                 * associated IVs.
+                 * 
+                 * Note: IV resolution must proceed separately (or be
+                 * re-attempted) for each UPDATE operation in a sequence since
+                 * some operations can cause new IVs to be declared in the
+                 * lexicon. Resolution before those IVs have been declared would
+                 * produce a different result than resolution afterward (it will
+                 * be a null IV before the Value is added to the lexicon and a
+                 * TermId or BlobIV afterward).
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
+                 */
                 new BatchRDFValueResolver(context, true/* readOnly */)
                         .process(uc);
 
@@ -249,28 +294,32 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
                 final ASTUpdate updateNode = uc.getUpdate();
 
-                /*
-                 * Translate an UPDATE operation.
-                 */
-                final Update updateOp = (Update) updateNode.jjtAccept(
-                        updateExprBuilder, null/* data */);
-                
-                if (dataSetNode != null) {
+                if (updateNode != null) {
 
                     /*
-                     * Attach the data set (if present)
-                     * 
-                     * Note: The data set can only be attached to a
-                     * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                     * Translate an UPDATE operation.
                      */
-                    
-                    ((IDataSetNode) updateOp).setDataset(dataSetNode);
-                    
-                }
+                    final Update updateOp = (Update) updateNode.jjtAccept(
+                            updateExprBuilder, null/* data */);
 
-                updateRoot.addChild(updateOp);
+                    if (dataSetNode != null) {
+
+                        /*
+                         * Attach the data set (if present)
+                         * 
+                         * Note: The data set can only be attached to a
+                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                         */
+
+                        ((IDataSetNode) updateOp).setDataset(dataSetNode);
+
+                    }
+
+                    updateRoot.addChild(updateOp);
+
+                }
                 
-            }
+            } // foreach
 
             return astContainer;
             
@@ -373,9 +422,31 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 queryRoot.setDataset(dataSetNode);
 
             }
+            
+            /*
+             * I think here we could set the value expressions and do last-
+             * minute validation.
+             */
+            final ASTSetValueExpressionsOptimizer opt = 
+            		new ASTSetValueExpressionsOptimizer();
+            
+            final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
+            
+            final QueryRoot queryRoot2 = (QueryRoot)
+            		opt.optimize(context2, queryRoot, null);
+            
+            BigdataExprBuilder.verifyAggregate(queryRoot2);
 
             return ast;
 
+        } catch (IllegalArgumentException e) {
+        
+            throw new MalformedQueryException(e.getMessage(), e);
+            
+        } catch (VisitorException e) {
+        
+            throw new MalformedQueryException(e.getMessage(), e);
+            
         } catch (ParseException e) {
         
             throw new MalformedQueryException(e.getMessage(), e);

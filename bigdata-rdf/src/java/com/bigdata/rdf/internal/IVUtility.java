@@ -469,7 +469,7 @@ public class IVUtility {
             final int o) {
         
         // The data type
-        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        final DTE dte = AbstractIV.getDTE(flags);
         switch (dte) {
         case XSDInt: {
             final int x = KeyBuilder.decodeInt(key, o);
@@ -533,7 +533,7 @@ public class IVUtility {
         }
         
         // The data type
-        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        final DTE dte = AbstractIV.getDTE(flags);
         switch (dte) {
         case XSDByte: {
             final byte x = key[o];//KeyBuilder.decodeByte(key[o]);
@@ -580,7 +580,7 @@ public class IVUtility {
             int o) {
 
         // The data type
-        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        final DTE dte = AbstractIV.getDTE(flags);
         
         final boolean isExtension = AbstractIV.isExtension(flags);
         

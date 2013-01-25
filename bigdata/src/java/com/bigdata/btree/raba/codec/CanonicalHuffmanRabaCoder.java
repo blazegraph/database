@@ -613,7 +613,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     interface Byte2Symbol {
 
@@ -635,7 +634,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     interface Symbol2Byte {
 
@@ -661,7 +659,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     abstract protected static class AbstractCodingSetup implements Byte2Symbol,
             Symbol2Byte {
@@ -909,13 +906,10 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
     /**
      * Sets up for coding an {@link IRaba} representing B+Tree values. For this
      * case the code book is generated from only the non-zero frequency counts.
-     * This results in a more compact code, but the code can not be searched
-     * since it only the byte values with non-zero frequencies have assigned
-     * code words.
+     * This results in a more compact code.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      * 
      *          FIXME If most byte values are used, then simply code them all.
      *          This will be more efficient (smaller data record, no indirection
@@ -1042,7 +1036,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                 /*
                  * Remap the used bytes, building at the same time maps from
-                 * symbol to bytes and from bytes to symbols.
+                 * symbols to bytes and from bytes to symbols.
                  */
 
                 this.packedFrequency = new int[nsymbols];
@@ -1351,7 +1345,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     // @todo private
     public static class CodedRabaImpl extends AbstractCodedRaba {

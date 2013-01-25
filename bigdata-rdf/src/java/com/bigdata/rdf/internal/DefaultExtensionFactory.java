@@ -6,8 +6,8 @@ import java.util.LinkedList;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Default {@link IExtensionFactory}. The following extensions are supported:
@@ -34,32 +34,33 @@ public class DefaultExtensionFactory implements IExtensionFactory {
             
     }
     
-    public void init(final LexiconRelation lex) {
+    public void init(final IDatatypeURIResolver resolver,
+            final ILexiconConfiguration<BigdataValue> config) {
 
     	/*
     	 * Always going to inline the derived numeric types.
     	 */
-    	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(lex));
+    	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(resolver));
     	
-    	if (lex.isInlineDateTimes()) {
+    	if (config.isInlineDateTimes()) {
     		
     		extensions.add(new DateTimeExtension<BigdataLiteral>(
-    				lex, lex.getInlineDateTimesTimeZone()));
+    				resolver, config.getInlineDateTimesTimeZone()));
     		
     	}
 
-        if (lex.getMaxInlineStringLength() > 0) {
+        if (config.getMaxInlineStringLength() > 0) {
 			/*
 			 * Note: This extension is used for both literals and URIs. It MUST
 			 * be enabled when MAX_INLINE_TEXT_LENGTH is GT ZERO (0). Otherwise
 			 * we will not be able to inline either the local names or the full
 			 * text of URIs.
 			 */
-            extensions.add(new XSDStringExtension<BigdataLiteral>(lex, lex
+            extensions.add(new XSDStringExtension<BigdataLiteral>(resolver, config
                     .getMaxInlineStringLength()));
         }
         
-        _init(lex, extensions);
+        _init(resolver, config, extensions);
 
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
@@ -68,9 +69,10 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     /**
      * Give subclasses a chance to add extensions.
      */
-    protected void _init(final LexiconRelation lex, 
-    		final Collection<IExtension> extensions) {
-    	
+    protected void _init(final IDatatypeURIResolver resolver,
+            final ILexiconConfiguration<BigdataValue> config,
+            final Collection<IExtension> extensions) {
+
     	// noop
     	
     }

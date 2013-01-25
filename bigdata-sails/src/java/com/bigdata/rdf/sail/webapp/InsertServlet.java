@@ -46,6 +46,8 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**

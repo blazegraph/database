@@ -46,6 +46,7 @@ import org.openrdf.query.parser.QueryParserUtil;
  * purely a test for data storage and retrieval which assumes that no
  * inferencing or whatsoever is performed. This is an abstract class that should
  * be extended for specific Sail implementations.
+ * @openrdf
  */
 public abstract class RDFStoreTest extends TestCase {
 

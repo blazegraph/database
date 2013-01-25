@@ -34,7 +34,6 @@ import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -50,9 +49,7 @@ import javax.xml.parsers.SAXParserFactory;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -64,7 +61,6 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
@@ -74,6 +70,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
@@ -100,17 +97,9 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
-import com.bigdata.rdf.sail.webapp.EncodeDecodeValue;
-import com.bigdata.rdf.sail.webapp.MiniMime;
-import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sparql.ast.AST2SPARQLUtil;
-import com.bigdata.rdf.store.BD;
 
 /**
- * Java API to the {@link NanoSparqlServer}.
+ * Java API to the Nano Sparql Server.
  * <p>
  * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
@@ -118,12 +107,28 @@ import com.bigdata.rdf.store.BD;
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
  *      > NanoSparqlServer REST API </a>
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
+ *      a bigdata-client jar for the NSS REST API </a>
  */
 public class RemoteRepository {
 
     private static final transient Logger log = Logger
             .getLogger(RemoteRepository.class);
 
+    /*
+     * Note: These fields are replicated from the com.bigdata.rdf.store.BD
+     * interface in order to avoid dragging in other aspects of the bigdata code
+     * base.
+     */
+    
+    /**
+     * The namespace used for bigdata specific extensions.
+     */
+    private static final String BD_NAMESPACE = "http://www.bigdata.com/rdf#";
+
+    private static final URI BD_NULL_GRAPH = new URIImpl(BD_NAMESPACE + "nullGraph");
+    
     /**
      * The name of the <code>UTF-8</code> character encoding.
      */
@@ -201,8 +206,6 @@ public class RemoteRepository {
      *            The thread pool for processing HTTP responses.
      * 
      * @see DefaultClientConnectionManagerFactory
-     * @see QueryEngine#getClientConnectionManager()
-     * @see IIndexManager#getExecutorService()
      */
     public RemoteRepository(final String sparqlEndpointURL,
             final HttpClient httpClient, final Executor executor) {
@@ -375,7 +378,7 @@ public class RemoteRepository {
                  * openrdf nullGraph.
                  */
 
-                final Resource c = contexts[i] == null ? BD.NULL_GRAPH
+                final Resource c = contexts[i] == null ? BD_NULL_GRAPH
                         : contexts[i];
 
                 sb.append("FROM " + util.toExternal(c) + "\n");
@@ -1723,10 +1726,10 @@ public class RemoteRepository {
             
             final String contentType = entity.getContentType().getValue();
 
-            if (!contentType.startsWith(BigdataRDFServlet.MIME_APPLICATION_XML)) {
+            if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
                 throw new RuntimeException("Expecting Content-Type of "
-                        + BigdataRDFServlet.MIME_APPLICATION_XML + ", not "
+                        + IMimeTypes.MIME_APPLICATION_XML + ", not "
                         + contentType);
 
             }
@@ -1785,10 +1788,10 @@ public class RemoteRepository {
             
             final String contentType = entity.getContentType().getValue();
 
-            if (!contentType.startsWith(BigdataRDFServlet.MIME_APPLICATION_XML)) {
+            if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
                 throw new RuntimeException("Expecting Content-Type of "
-                        + BigdataRDFServlet.MIME_APPLICATION_XML + ", not "
+                        + IMimeTypes.MIME_APPLICATION_XML + ", not "
                         + contentType);
 
             }
@@ -1847,10 +1850,10 @@ public class RemoteRepository {
             
             final String contentType = entity.getContentType().getValue();
 
-            if (!contentType.startsWith(BigdataRDFServlet.MIME_APPLICATION_XML)) {
+            if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
                 throw new RuntimeException("Expecting Content-Type of "
-                        + BigdataRDFServlet.MIME_APPLICATION_XML + ", not "
+                        + IMimeTypes.MIME_APPLICATION_XML + ", not "
                         + contentType);
 
             }

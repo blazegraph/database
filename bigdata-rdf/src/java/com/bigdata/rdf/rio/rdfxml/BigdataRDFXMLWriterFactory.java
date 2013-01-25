@@ -18,6 +18,7 @@ import org.openrdf.rio.RDFWriterFactory;
  * 
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class BigdataRDFXMLWriterFactory implements RDFWriterFactory {
 

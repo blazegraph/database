@@ -24,13 +24,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.TimeZone;
+
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
+import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -39,6 +44,47 @@ import com.bigdata.rdf.vocab.Vocabulary;
  */
 public interface ILexiconConfiguration<V extends BigdataValue> {
 
+    /**
+     * Return the maximum length of a Unicode string which may be inlined into
+     * the statement indices. This applies to blank node IDs, literal labels
+     * (including the {@link XSDStringExtension}), local names of {@link URI}s,
+     * etc.
+     * 
+     * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
+     */
+    public int getMaxInlineStringLength();
+    
+    /**
+     * 
+     * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
+     */
+    public boolean isInlineTextLiterals();
+    
+    /**
+     * Return <code>true</code> if datatype literals are being inlined into
+     * the statement indices.
+     */
+    public boolean isInlineLiterals();
+    
+    /**
+     * Return <code>true</code> if xsd:datetime literals are being inlined into
+     * the statement indices.
+     */
+    public boolean isInlineDateTimes();
+    
+    /**
+     * Return the default time zone to be used for inlining.
+     */
+    public TimeZone getInlineDateTimesTimeZone();
+    
+    /**
+     * Return the threshold at which a literal would be stored in the
+     * {@link LexiconKeyOrder#BLOBS} index.
+     * 
+     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+     */
+    public int getBlobsThreshold();
+    
     /**
      * Create an inline {@link IV} for the supplied RDF value if inlining is
      * supported for the supplied RDF value.
@@ -87,7 +133,7 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Initialize the extensions, which need to resolve their datatype URIs into
      * term ids.
      */
-    void initExtensions(final LexiconRelation lex);
+    void initExtensions(final IDatatypeURIResolver resolver);
 
     /**
      * Return the value factory for the lexicon.

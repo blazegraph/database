@@ -1496,22 +1496,6 @@ abstract public class AbstractTripleStore extends
      */
     abstract public boolean isStable();
 
-    public boolean isReadOnly() {
-
-        return TimestampUtility.isReadOnly(getTimestamp());
-        
-    }
-    
-    final protected void assertWritable() {
-        
-        if(isReadOnly()) {
-            
-            throw new IllegalStateException("READ_ONLY");
-            
-        }
-        
-    }
-
     @Override
     public AbstractTripleStore init() {
     

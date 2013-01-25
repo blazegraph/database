@@ -14,6 +14,7 @@ import org.openrdf.rio.RDFParserFactory;
  * 
  * @author Arjohn Kampman
  * @author Bryan Thompson
+ * @openrdf
  */
 public class BigdataRDFXMLParserFactory implements RDFParserFactory {
 

@@ -118,6 +118,8 @@ public class VarNode extends TermNode {
 
 	    setProperty(Annotations.ANONYMOUS, anonymous);
 	    
+	    ((Var) getValueExpression()).setAnonymous(anonymous);
+	    
 	}
 
 //	/**

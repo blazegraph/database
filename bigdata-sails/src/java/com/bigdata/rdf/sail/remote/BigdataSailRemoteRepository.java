@@ -127,6 +127,11 @@ public class BigdataSailRemoteRepository implements Repository {
 	}
 
 	@Override
+	public boolean isInitialized() {
+		return true;
+	}
+
+	@Override
 	public boolean isWritable() throws RepositoryException {
 		return true;
 	}
