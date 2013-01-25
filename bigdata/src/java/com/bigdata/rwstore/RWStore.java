@@ -1554,7 +1554,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * @return
 	 */
 	public ByteBuffer getData(final long rwaddr, final int sze) {
-		if (sze > m_maxFixedAlloc || m_writeCacheService == null || true) {
+		// must allow for checksum
+		if (sze > (m_maxFixedAlloc-4) || m_writeCacheService == null) {
 		    final byte buf[] = new byte[sze + 4]; // 4 bytes for checksum
 		
 		    getData(rwaddr, buf, 0, sze+4);
