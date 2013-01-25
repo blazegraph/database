@@ -1375,8 +1375,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				try {
 					strBuf.close();
 				} catch (IOException e) {
-					if (log.isInfoEnabled())
-						log.info(e);
+					log.error(e,e);
 				}
 			}
 		}
