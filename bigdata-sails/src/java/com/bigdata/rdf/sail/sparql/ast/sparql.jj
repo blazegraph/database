@@ -982,7 +982,11 @@ void DatasetClause() :
         [<VIRTUAL_GRAPH> {jjtn000.setVirtual(true);}]
         IRIref()
       )
-      | <DEFAULT_GRAPH>
+      // Note: This appears to be an openrdf specific extension whose
+      // semantics are to query the default graph.  That is what we do
+      // anyway if nothing is specified. E.g., "SELECT * FROM DEFAULT"
+      // and "SELECT *" will do the same thing for bigdata.
+      | <DEFAULT_GRAPH> 
     )/*@bgen(jjtree)*/
     } catch (Throwable jjte000) {
       if (jjtc000) {
