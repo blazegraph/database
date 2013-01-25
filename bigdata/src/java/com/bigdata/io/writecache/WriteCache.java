@@ -60,10 +60,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.writecache.WriteCache.ReadCache;
-import com.bigdata.io.writecache.WriteCacheService.AsynchronousCloseException;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.rawstore.Bytes;
@@ -309,12 +306,14 @@ abstract public class WriteCache implements IWriteCache {
         private volatile boolean deleted;
         
         /**
-		 * When a record is used as a read cache then the readCount is
-		 * maintained as a metric on its access. ÊThis could be used
-		 * to determine eviction/compaction.
-		 * Note: Guarded by synchronized(this). Ê Ê Ê Ê
-		 */
-        private int hitCount;
+         * When a record is used as a read cache then the readCount is
+         * maintained as a metric on its access. ÊThis could be used to
+         * determine eviction/compaction.
+         * <p>
+         * Note: volatile to guarantee visibility of updates. Might do better
+         * with synchronized(this), synchronized(cache), or CAS.
+         */
+        private volatile int hitCount;
         
         public RecordMetadata(final long fileOffset, final int bufferOffset,
                 final int recordLength, final int latchedAddr) {
@@ -350,6 +349,8 @@ abstract public class WriteCache implements IWriteCache {
      * keys are the file offsets that would be used to read the corresponding
      * record. The values describe the position in buffer where that record is
      * found and the length of the record.
+     * <p>
+     * Note: Exposed to inner classes.
      */
     final protected ConcurrentMap<Long/* fileOffset */, RecordMetadata> recordMap;
 
@@ -442,28 +443,32 @@ abstract public class WriteCache implements IWriteCache {
      */
     private volatile boolean m_closedForWrites = false;
 
-    /**
-     * The sequence must be set when the cache is ready to be flushed.  In HA this
-     * is sent down the pipeline to ensure correct synchronization when processing
-     * logged messages.
-     */
-    private long sequence = -1;
-
-    /**
-     * The sequence #of this {@link WriteCache} block within the current write
-     * set (origin ZERO(0)). This must be set when the cache is ready to be
-     * flushed. In HA this is sent down the pipeline to ensure correct
-     * synchronization when processing logged messages. This also winds up in
-     * the {@link IRootBlockView} as a summary of the #of {@link WriteCache}
-     * blocks transmitted during the write set for a specific commit point.
-     */
-    void setSequence(final long i) {
-        sequence = i;
-    }
-    
-    long getSequence() {
-    	return sequence;
-    }
+//    /**
+//     * The sequence must be set when the cache is ready to be flushed.  In HA this
+//     * is sent down the pipeline to ensure correct synchronization when processing
+//     * logged messages.
+//     */
+//    private long sequence = -1;
+//
+//    /**
+//     * The sequence #of this {@link WriteCache} block within the current write
+//     * set (origin ZERO(0)). This must be set when the cache is ready to be
+//     * flushed. In HA this is sent down the pipeline to ensure correct
+//     * synchronization when processing logged messages. This also winds up in
+//     * the {@link IRootBlockView} as a summary of the #of {@link WriteCache}
+//     * blocks transmitted during the write set for a specific commit point.
+//     */
+//    void setSequence(final long i) {
+//        sequence = i;
+//    }
+//
+//    /**
+//     * The sequence #of this {@link WriteCache} block within the current write
+//     * set (origin ZERO(0)).
+//     */
+//    long getSequence() {
+//        return sequence;
+//    }
 
     /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
@@ -1243,11 +1248,8 @@ abstract public class WriteCache implements IWriteCache {
                 log.trace(show(dst, "read bytes"));
             }
             
-          // Increment cache read count
-			final int nhits;
-			synchronized (md) {
-				nhits = ++md.hitCount;
-			}
+            // Increment cache read count
+            final int nhits = ++md.hitCount;
 
 			if (log.isTraceEnabled()) {
 				if (nhits > 2) {
@@ -1704,6 +1706,7 @@ abstract public class WriteCache implements IWriteCache {
             final long quorumToken,
             final long lastCommitCounter,//
             final long lastCommitTime,//
+            final long sequence,
             final ByteBuffer tmp
             ) {
 
@@ -2619,7 +2622,7 @@ abstract public class WriteCache implements IWriteCache {
              */
             final ByteBuffer bb = src.acquire().duplicate();
             ByteBuffer dd = null;
-            final int srcSize = src.recordMap.size();
+//            final int srcSize = src.recordMap.size();
             int notTransferred = 0;
             int transferred = 0;
             try {

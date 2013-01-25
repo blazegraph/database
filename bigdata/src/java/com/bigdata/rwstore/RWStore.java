@@ -66,7 +66,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumPipeline;
-import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
@@ -95,7 +94,6 @@ import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
-import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -5268,21 +5266,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         } finally {
             m_allocationLock.unlock();
         }
-//        {
-//            /*
-//             * FIXME INSTALL REPLICATED WRITE
-//             * 
-//             * Now that the replicated write has been written to the local disk,
-//             * install the replicated write onto the cleanList in the
-//             * WriteCacheService.
-//             * 
-//             * Note: The WriteCacheService must make a copy of the data since
-//             * the buffer in which it resides is owned by the HARecieveService.
-//             *
-//             * TODO Review position()/limit() preconditions for this call.
-//             */
-//            m_writeCache.installReplicatedWrite(msg, b.buffer().duplicate());
-//        }
     }
 
     public Future<Void> sendHALogBuffer(final IHALogRequest req,

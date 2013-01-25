@@ -40,8 +40,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BTree.Counter;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -2477,21 +2477,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         } finally {
             readLock.unlock();
         }
-//      {
-//      /*
-//       * FIXME INSTALL REPLICATED WRITE
-//       * 
-//       * Now that the replicated write has been written to the local disk,
-//       * install the replicated write onto the cleanList in the
-//       * WriteCacheService.
-//       * 
-//       * Note: The WriteCacheService must make a copy of the data since
-//       * the buffer in which it resides is owned by the HARecieveService.
-//       *
-//       * TODO Review position()/limit() preconditions for this call.
-//       */
-//      m_writeCache.installReplicatedWrite(msg, b.buffer().duplicate());
-//  }
 
     }
 

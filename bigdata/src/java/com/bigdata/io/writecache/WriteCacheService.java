@@ -720,14 +720,10 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public long resetSequence() {
      
-        final long tmp = cacheSequence;
-        
-        cacheSequence = 0;
-        
-        return tmp;
+        return cacheSequence.getAndSet(0L);
         
     }
-    private volatile long cacheSequence = 0;
+    private final AtomicLong cacheSequence = new AtomicLong(0);
 
     /**
      * Determines how long the dirty list should grow until the
@@ -789,7 +785,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * The current hotCache.
-     */
+     */// FIXME GUARDED BY WHAT?
     private ReadCache hotCache = null;
 
     /**
@@ -800,21 +796,21 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * The current hotReserve.
-     */
+     */ // FIXME GUARDED BY WHAT?
     private ReadCache hotReserve = null;
 
-    /**
-     * Computes modular distance of a circular number list.
-     * 
-     * eg start: 1, end:5, mod: 20 = 5-1 = ((5+20)-1)%20 = 4
-     * or start:15, end:3, mod: 20 = (3+20)-15 = 8
-     * 
-     * Used to determine the position of a cache from front of
-     * the clean list
-     */
-    private int modDistance(final int start, final int end, final int mod) {
-     	return ((end + mod) - start) % mod;
-    }
+//    /**
+//     * Computes modular distance of a circular number list.
+//     * 
+//     * eg start: 1, end:5, mod: 20 = 5-1 = ((5+20)-1)%20 = 4
+//     * or start:15, end:3, mod: 20 = (3+20)-15 = 8
+//     * 
+//     * Used to determine the position of a cache from front of
+//     * the clean list
+//     */
+//    private int modDistance(final int start, final int end, final int mod) {
+//     	return ((end + mod) - start) % mod;
+//    }
         
     /**
      * When <code>true</code>, dirty buffers are immediately drained, compacted,
@@ -1337,7 +1333,8 @@ abstract public class WriteCacheService implements IWriteCache {
             }
 
             // Increment WriteCache sequence.
-            cache.setSequence(cacheSequence++);
+            final long thisSequence = cacheSequence.getAndIncrement();
+//            cache.setSequence(thisSequence);
 
             // Set the current file extent on the WriteCache.
             cache.setFileExtent(fileExtent.get());
@@ -1368,6 +1365,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 final IHAWriteMessage msg = cache.newHAWriteMessage(quorumToken,//
                         quorumMember.getLastCommitCounter(),//
                         quorumMember.getLastCommitTime(),//
+                        thisSequence,//
                         checksumBuffer
                         );
 
@@ -1619,7 +1617,7 @@ abstract public class WriteCacheService implements IWriteCache {
             }
             
             // reset cacheSequence for HA
-            cacheSequence = 0;
+            resetSequence();
 
             /*
              * Restart the WriteTask
@@ -2777,91 +2775,6 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
-//    /**
-//     * Accept the data for a replicated {@link WriteCache} buffer and drop it
-//     * onto the dirtyList.
-//     * <p>
-//     * This method supports HA replication. It take a {@link WriteCache} from
-//     * the cleanList, resets it for new writes, copies the data from the
-//     * caller's buffer, closes the {@link WriteCache} to prevent any
-//     * modifications, and then drops the {@link WriteCache} onto the
-//     * {@link #dirtyList}.
-//     * <p>
-//     * Note: By dropping the {@link WriteCache} onto the {@link #dirtyList}, we
-//     * benefit from being able to read back the writes from the cache.
-//     * Historically, the store was simply flushing the write through to the
-//     * backing file but this did not install the writes into the cache on the
-//     * followers.
-//     * <p>
-//     * Note: The caller's buffer is copied rather than retaining a reference.
-//     * This is necessary since the {@link HAReceiveService} reuses the same
-//     * buffer for all replicated {@link WriteCache} buffers.
-//     * 
-//     * @param msg
-//     *            The {@link IHAWriteMessage}.
-//     * @param b
-//     *            The data from position to the limit will be copied. The
-//     *            position will be advanced to limit. The caller should
-//     *            {@link ByteBuffer#duplicate()} the {@link ByteBuffer} to avoid
-//     *            side-effects.
-//     * 
-//     * @throws InterruptedException
-//     * 
-//     *             FIXME Dropping the writeCache buffer onto the dirtyList does
-//     *             not work because the writes on the write pipeline are not
-//     *             synchronously written down to the disk and flush() on the
-//     *             leader does not provide a guarantee that the followers are
-//     *             also flushed.
-//     *             <p>
-//     *             Note: What would work is to first execute the synchronous
-//     *             write to the local store and then drop the write cache buffer
-//     *             (which must have a copy of the data in the buffer since the
-//     *             buffer is owned by the HAReceiveService) onto the cleanList
-//     *             in the WriteCacheService. This will be addressed when we
-//     *             install reads on cache miss since those also need to be
-//     *             installed onto the cleanList. We must also setup compaction
-//     *             for the cleanList.
-//     */
-//    public void copyRawBuffer(final IHAWriteMessage msg, final ByteBuffer b)
-//            throws InterruptedException {
-//
-//        if (haLog.isDebugEnabled())
-//            haLog.debug("msg=" + msg);
-//
-//        /*
-//         * Take a buffer from the clean list.
-//         */
-//        final WriteCache cache;
-//        cleanListLock.lockInterruptibly();
-//        try {
-//            cache = cleanList.take();
-//            counters.get().nclean--;
-//            cache.resetWith(recordMap);//, msg.getFileExtent());
-//        } finally {
-//            cleanListLock.unlock();
-//        }
-//
-//        // transfer the data from the caller's buffer (side-effect on b).
-//        cache.copyRawBuffer(b);
-//
-//        // close the cache against writes.
-//        cache.closeForWrites();
-//        
-//        /*
-//         * Add the WriteCache to the dirty list.
-//         * 
-//         * Note: The lock is required to signal dirtyListChange.
-//         */
-//        dirtyListLock.lockInterruptibly();
-//        try {
-//            dirtyList.add(cache);
-//            dirtyListChange.signalAll();
-//        } finally {
-//            dirtyListLock.unlock();
-//        }
-//        
-//    }
-
     /**
      * Move the {@link #current} buffer to the dirty list and await a clean
      * buffer. The clean buffer is set as the {@link #current} buffer and
@@ -3031,89 +2944,90 @@ abstract public class WriteCacheService implements IWriteCache {
         // Non-blocking take.
         ReadCache tmp = readList.poll();
 
-        if (tmp != null) {
+        if (tmp == null)
+            return null;
 
-            try {
-            	
-                /*
-                 * Attempt to reset the record.
-                 * ;
-                 * FIXME: add hot readCache data to hotCache and track metadata
-                 * about #of hot records retained in WCS counters.
-                 */
-            	synchronized (readCache) {
-            		if (hotCache != null) {
-            			int cycles = 0;
-            			while (tmp != null) {
-                        	final int totalRecords = tmp.recordMap.size();
-                        	if (log.isDebugEnabled() && totalRecords > 0) {
-            	            	int hitRecords = 0;
-            	            	int hotRecords = 0;
-            	            	final Iterator<RecordMetadata> values = tmp.recordMap.values().iterator();
-            	            	while (values.hasNext()) {
-            	            		final RecordMetadata md = values.next();
-            	            		if (md.getHitCount() > 0) {
-            	            			hitRecords++;
-            	            			if (md.getHitCount() > hotCacheThreshold)
-            	            				hotRecords++;
-            	            		}
-            	            	}
-            	            	
-            	            	log.debug("Recycled ReadCache, hot(>" + hotCacheThreshold + "): " + hotRecords + ", hit: " + hitRecords + " of " + totalRecords);
-                        	}
+        try {
 
-                        	if (WriteCache.transferTo(tmp, hotCache, serviceMap, hotCacheThreshold)) {
-                        		if (!tmp.isEmpty())
-                        			throw new AssertionError();
-                        		
-                        		tmp.reset();
-            					break;
-            				}
-                        	
-                        	if (log.isDebugEnabled())
-                        		log.debug("Cycle HOTCACHE: " + ++cycles);
-                        	
-            				// transfer not completed, so:
-            				//	move current hotCache to end of HotList
-            				//	move head of HotList to end of ReadList
-            				//	make hotReserve new hotCache
-            				//	complete transfer to new hotCache
-            				//	make now empty tmp new hotReserve
-            				hotList.add(hotCache);
-            				readList.add(hotList.poll().resetHitCounts());
-            				if (!hotReserve.isEmpty())
-            					throw new AssertionError();
-            				
-            				hotCache = hotReserve;
-            				hotReserve = null;
-            				if (!WriteCache.transferTo(tmp, hotCache, serviceMap, hotCacheThreshold)) {
-            					throw new AssertionError();
-            				}
-            				tmp.reset();
-            				hotReserve = tmp;
-            				
-            				tmp = readList.poll();
-            			}
-            		} else {
-            			tmp.resetWith(serviceMap);
-            		}
-            	}
-            } catch (InterruptedException ex) {
-                /*
-                 * If interrupted, then return the ReadCache to the list and
-                 * propagate the interrupt to the caller. This makes the
-                 * operation safe with respect to an interrupt. Either the
-                 * operation succeeds fully, or we return [null] to the caller
-                 * and propagate restore the interrupt status on the current
-                 * Thread.
-                 */
-                readList.put(tmp);
-                // Propagate the interrupt status.
-                Thread.currentThread().interrupt();
-                // ReadCache is not available.
-                return null;
-            }
-            
+            /*
+             * Attempt to reset the record.
+             */
+            synchronized (readCache) {
+                if (hotCache == null) {
+                    tmp.resetWith(serviceMap);
+                    return tmp;
+                }
+                int cycles = 0;
+                while (tmp != null) {
+                    if (log.isDebugEnabled() && !tmp.isEmpty()) {
+                        /*
+                         * Just debug stuff.
+                         */
+                        int hitRecords = 0;
+                        int hotRecords = 0;
+                        int totalRecords = 0;
+                        final Iterator<RecordMetadata> values = tmp.recordMap
+                                .values().iterator();
+                        while (values.hasNext()) {
+                            final RecordMetadata md = values.next();
+                            totalRecords++;
+                            if (md.getHitCount() > 0) {
+                                hitRecords++;
+                                if (md.getHitCount() > hotCacheThreshold)
+                                    hotRecords++;
+                            }
+                        }
+                        log.debug("Recycled ReadCache, hot(>" + hotCacheThreshold + "): " + hotRecords + ", hit: " + hitRecords + " of " + totalRecords);
+                    }
+
+                    if (WriteCache.transferTo(tmp, hotCache, serviceMap,
+                            hotCacheThreshold)) {
+                        if (!tmp.isEmpty())
+                            throw new AssertionError();
+
+                        tmp.reset();
+                        break;
+                    }
+
+                    if (log.isDebugEnabled())
+                        log.debug("Cycle HOTCACHE: " + ++cycles);
+
+                    // transfer not completed, so:
+                    // move current hotCache to end of HotList
+                    // move head of HotList to end of ReadList
+                    // make hotReserve new hotCache
+                    // complete transfer to new hotCache
+                    // make now empty tmp new hotReserve
+                    hotList.add(hotCache);
+                    readList.add(hotList.poll().resetHitCounts());
+                    if (!hotReserve.isEmpty())
+                        throw new AssertionError();
+
+                    hotCache = hotReserve;
+                    hotReserve = null;
+                    if (!WriteCache.transferTo(tmp, hotCache, serviceMap,
+                            hotCacheThreshold)) {
+                        throw new AssertionError();
+                    }
+                    tmp.reset();
+                    hotReserve = tmp;
+
+                    tmp = readList.poll();
+                } // while (tmp != null)
+            } // synchronized(readCache)
+        } catch (InterruptedException ex) {
+            /*
+             * If interrupted, then return the ReadCache to the list and
+             * propagate the interrupt to the caller. This makes the operation
+             * safe with respect to an interrupt. Either the operation succeeds
+             * fully, or we return [null] to the caller and propagate restore
+             * the interrupt status on the current Thread.
+             */
+            readList.put(tmp);
+            // Propagate the interrupt status.
+            Thread.currentThread().interrupt();
+            // ReadCache is not available.
+            return null;
         }
 
         return tmp;
@@ -3233,79 +3147,8 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 }
 
-                if (ret != null) {
-                	
-//                	// check if on clean list AND hirs is enabled
-//                	if (hotListSize > 0 && cache.isClosedForWrites()) {
-//                		final long seq =  cache.getSequence();
-//                		if (seq > 0) { // NOT already HIRS cached
-//	                		final int cleanSize = cleanList.size();
-//	                		final int listPos = (int) (seq - m_cleanListHeadSequence);
-//	                		
-//	                		if (listPos < (cleanSize/4)) {
-//		                		// okay we've already got the heap buffer to return, now
-//		                		//	we just want to transfer the data to the HIRS cache
-//	                			// Ideally we'd like to transfer using the two direct buffers
-//	                			//	but initially we'll just copy the heap buffer since this avoids
-//	                			//	extra locking and clean list interactions.
-//	                			// FIXME: optimize transfer to use direct buffers
-//	                			synchronized(hotList) {
-//	                				// check to see if already transferred since we got the lock!
-//	                				final WriteCache curCache = serviceMap.get(off);
-//	                				if (curCache != null && curCache.getSequence() > 0) { // not already in hirs cache
-//	                					// transfer
-//	                					if (hotCache == null) {
-//	                						hotCache = getDirectCleanCache();
-//	                						if (hotCache != null)
-//	                							hotCache.setSequence(-1);
-//	                					}
-//	                					if (hotCache != null) {
-//	                						ByteBuffer dst = hotCache.allocate(ret.limit());
-//	                						if (dst == null) {
-//	                							// add current hirsCache to hirsList tail
-//	                							hotList.add(hotCache);
-//	                							
-//	                							// check size of hirsList
-//	                							if (hotList.size() >= hotListSize) { // include hirsCache
-//	                								hotCache = getDirectCleanCache();
-//	    	                						if (hotCache != null) {
-//	    	                							hotCache.setSequence(-1);
-//	    	                							dst = hotCache.allocate(ret.limit());
-//	    	                						}
-//	                							} else { // cycle current hirs buffers
-//	                								hotCache = hotList.take(); // MUST be available
-//	                								// FIXME: We could be throwing away good data
-//	                								hotCache.resetWith(serviceMap);
-//	                								hotCache.setSequence(-1);
-//	                								
-//	                								dst = hotCache.allocate(ret.limit());
-//	                							}
-//	                						}
-//	                						
-//	                						if (dst != null) {
-//	                							final int bpos = dst.position();
-//	                							dst.put(ret);
-//	                							ret.flip(); // reset for return
-//	                							
-//	                							hotCache.commitToMap(off, bpos, nbytes);
-//	                							serviceMap.put(off, hotCache);
-//	                							
-//	                							// TODO: remove from original cache
-//	                						}
-//	                					}
-//	                					
-//	                					
-//	                				}
-//	                				
-//	                			}
-//	                			
-//	                		}
-//               		}
-//                 	}
-//
+                if (ret != null)
                     return ret;
-   
-                }
 
                 // May have been transferred to another Cache!
                 //
