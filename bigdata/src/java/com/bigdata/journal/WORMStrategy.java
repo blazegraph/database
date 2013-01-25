@@ -1903,9 +1903,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private final ByteBuffer _checkbuf;
 
-	private HARebuildRequest m_rebuildRequest;
-
-	private int m_rebuildSequence;
+//	private HARebuildRequest m_rebuildRequest;
+//
+//	private int m_rebuildSequence;
     
     /**
      * Make sure that the file is large enough to accept a write of
@@ -2672,35 +2672,35 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 	@Override
 	public void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
 			ByteBuffer transfer) throws IOException {
-		if (m_rebuildRequest == null)
-			throw new IllegalStateException("Store is not in rebuild state");
-		
-		if (m_rebuildSequence != msg.getSequence())
-			throw new IllegalStateException("Invalid sequence number for rebuild, expected: " + m_rebuildSequence + ", actual: " + msg.getSequence());
+//		if (m_rebuildRequest == null)
+//			throw new IllegalStateException("Store is not in rebuild state");
+//		
+//		if (m_rebuildSequence != msg.getSequence())
+//			throw new IllegalStateException("Invalid sequence number for rebuild, expected: " + m_rebuildSequence + ", actual: " + msg.getSequence());
 
 		FileChannelUtility.writeAll(this.opener, transfer, msg.getFirstOffset());
 		
-		m_rebuildSequence++;
+//		m_rebuildSequence++;
 	}
 
-	@Override
-	public void prepareForRebuild(HARebuildRequest req) {
-		assert m_rebuildRequest == null;
-		
-		m_rebuildRequest = req;
-		m_rebuildSequence = 0;
-	}
-
-	@Override
-	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
-		assert m_rebuildRequest != null;
-		
-		assert m_rebuildRequest.equals(req);
-		
-		// TODO: reinit from file
-		this.resetFromHARootBlock(rbv);
-		
-		m_rebuildRequest = null;
-	}
+//	@Override
+//	public void prepareForRebuild(HARebuildRequest req) {
+//		assert m_rebuildRequest == null;
+//		
+//		m_rebuildRequest = req;
+//		m_rebuildSequence = 0;
+//	}
+//
+//	@Override
+//	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+//		assert m_rebuildRequest != null;
+//		
+//		assert m_rebuildRequest.equals(req);
+//		
+//		// TODO: reinit from file
+//		this.resetFromHARootBlock(rbv);
+//		
+//		m_rebuildRequest = null;
+//	}
 	
 }

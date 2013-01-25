@@ -6,24 +6,20 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 
+import junit.framework.TestCase;
+
 import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
-import com.bigdata.journal.IBufferStrategy;
-import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.IHABufferStrategy;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumUtility;
-
-import junit.framework.TestCase;
 
 /**
  * Shortcuts the HA transfer protocols to exercise directly the low level
@@ -34,7 +30,17 @@ import junit.framework.TestCase;
  */
 public class TestRawTransfers extends TestCase {
 	
-	final Random random = new Random();
+    private Random random;
+
+    protected void setUp() throws Exception {
+        super.setUp();
+        random = new Random();
+    }
+
+    protected void tearDown() throws Exception {
+        random = null;
+        super.tearDown();
+    }
 
 	/**
 	 * Create two stores:
@@ -72,9 +78,9 @@ public class TestRawTransfers extends TestCase {
 			final ByteBuffer transfer = ByteBuffer.allocate(1024 * 1024);
 			long position = FileMetadata.headerSize0;
 
-			// AN HARebuild request must be sent to the destination resulting in
-			//	a prepareForRebuild request.
-			dst.prepareForRebuild(req);
+//			// AN HARebuild request must be sent to the destination resulting in
+//			//	a prepareForRebuild request.
+//			dst.prepareForRebuild(req);
 
 			// transfer full file store
 			long sequence = 0;
@@ -111,7 +117,8 @@ public class TestRawTransfers extends TestCase {
 			
 			final  IRootBlockView activeRbv = rbv0.getCommitCounter() > rbv1.getCommitCounter() ? rbv0 : rbv1;
 
-			dst.completeRebuild(req, activeRbv);
+//			dst.completeRebuild(req, activeRbv);
+			dst.resetFromHARootBlock(activeRbv);
 			
 			// now see if we can read the data written to the first journal from the second
 			data.position(0);

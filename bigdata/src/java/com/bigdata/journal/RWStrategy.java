@@ -839,11 +839,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 		if (req == null)
 			throw new IllegalArgumentException();
 
-		if (m_rebuildSequence != msg.getSequence())
-			throw new IllegalStateException(
-					"Invalid sequence number for rebuild, expected: "
-							+ m_rebuildSequence + ", actual: "
-							+ msg.getSequence());
+//		if (m_rebuildSequence != msg.getSequence())
+//			throw new IllegalStateException(
+//					"Invalid sequence number for rebuild, expected: "
+//							+ m_rebuildSequence + ", actual: "
+//							+ msg.getSequence());
 
 		m_store.writeRaw(msg.getFirstOffset(), transfer);
 
@@ -851,21 +851,21 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 			log.debug("Transfer rebuild: " + msg.getSequence() + ", address: "
 					+ msg.getFirstOffset());
 
-		m_rebuildSequence++;
+//		m_rebuildSequence++;
 	}
 
-	private int m_rebuildSequence = -1;
-	
-	@Override
-	public void prepareForRebuild(final HARebuildRequest req) {
-		m_store.prepareForRebuild(req);
-		m_rebuildSequence = 0;
-	}
-
-	@Override
-	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
-		m_store.completeRebuild(req, rbv);
-		m_rebuildSequence = -1;
-	}
+//	private int m_rebuildSequence = -1;
+//	
+//	@Override
+//	public void prepareForRebuild(final HARebuildRequest req) {
+//		m_store.prepareForRebuild(req);
+//		m_rebuildSequence = 0;
+//	}
+//
+//	@Override
+//	public void completeRebuild(final HARebuildRequest req, final IRootBlockView rbv) {
+//		m_store.completeRebuild(req, rbv);
+//		m_rebuildSequence = -1;
+//	}
 
 }
