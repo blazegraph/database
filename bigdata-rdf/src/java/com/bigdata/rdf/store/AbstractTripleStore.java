@@ -2298,10 +2298,23 @@ abstract public class AbstractTripleStore extends
     /**
      * This method is extremely inefficient for scale-out as it does one RMI per
      * request!
+     * 
+     * @return the corresponding {@link BigdataValue} if found and
+     *         <code>null</code> if not found or if the {@link LexiconRelation}
+     *         is not available (e.g., a {@link TempTripleStore} .
      */
     final public BigdataValue getTerm(final IV iv) {
 
-        return getLexiconRelation().getTerm(iv);
+        final LexiconRelation r = getLexiconRelation();
+
+        if (r == null) {
+
+            // Note: No LexiconRelation.
+            return null;
+
+        }
+
+        return getTerm(iv);
 
     }
 
