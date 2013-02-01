@@ -568,7 +568,17 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
         
     }
 
-    public long getMetaBitsAddr() {
+    /**
+     * Supports protocol in BigdataSailConnection to check for modifications
+     * prior to calling rollback().
+     * 
+     * @return true if store has been modified since last commit()
+     */
+	public boolean isDirty() {
+		return m_store.requiresCommit();
+	}
+
+	public long getMetaBitsAddr() {
         
         return m_store.getMetaBitsAddr();
         

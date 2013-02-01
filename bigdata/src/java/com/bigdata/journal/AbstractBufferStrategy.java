@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -41,6 +42,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Abstract base class for {@link IBufferStrategy} implementation.
@@ -648,4 +651,19 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return false;
     }
 
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		throw new UnsupportedOperationException();
+	}
 }

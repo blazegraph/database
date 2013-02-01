@@ -38,6 +38,7 @@ import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rwstore.IStreamStore;
 
 /**
  * <p>
@@ -86,7 +87,7 @@ import com.bigdata.mdi.IResourceMetadata;
  *      .
  * 
  */
-public interface IRawStore extends IAddressManager, ICounterSetAccess {
+public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamStore {
     
     /**
      * Write the data (unisolated).

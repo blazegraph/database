@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -34,6 +35,8 @@ import com.bigdata.io.TestCase3;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Unit tests for a B+Tree with raw record support enabled (this is where a
@@ -454,6 +457,20 @@ public class TestRawRecords extends AbstractBTreeTestCase {
 			return delegate.write(data);
 		}
 
+		@Override
+		public IPSOutputStream getOutputStream() {
+			return delegate.getOutputStream();
+		}
+
+		@Override
+		public IPSOutputStream getOutputStream(IAllocationContext context) {
+			return delegate.getOutputStream(context);
+		}
+
+		@Override
+		public InputStream getInputStream(long addr) {
+			return delegate.getInputStream(addr);
+		}
 	}
 
 }
