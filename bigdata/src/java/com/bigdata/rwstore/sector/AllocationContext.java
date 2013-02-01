@@ -427,6 +427,16 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		return m_root.getPhysicalAddress(addr);
 	}
 
+	@Override
+	public long allocate(ByteBuffer data, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void free(long addr, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
 //	private SectorAllocation m_head = null;
 //	
 //	/**
