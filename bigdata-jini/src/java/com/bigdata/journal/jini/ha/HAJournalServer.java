@@ -47,8 +47,7 @@ import com.bigdata.ha.HAGlueDelegate;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.RunState;
-import com.bigdata.ha.althalog.HALogManager;
-import com.bigdata.ha.althalog.IHALogWriter;
+import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
 import com.bigdata.ha.msg.HARebuildRequest;
@@ -815,7 +814,7 @@ public class HAJournalServer extends AbstractServer {
 
                     try {
 
-                        journal.getHALogManager().disable();
+                        journal.getHALogWriter().disable();
 
                     } catch (IOException e) {
 
@@ -880,7 +879,7 @@ public class HAJournalServer extends AbstractServer {
 
                         try {
 
-                        	journal.getHALogManager().createLog(
+                            journal.getHALogWriter().createLog(
                                     journal.getRootBlockView());
 
                         } catch (IOException e) {
@@ -1409,9 +1408,9 @@ public class HAJournalServer extends AbstractServer {
             // Make sure we have the correct HALogWriter open.
             logLock.lock();
             try {
-                final HALogManager logManager = journal.getHALogManager();
-                logManager.disable();
-                logManager.createLog(openRootBlock);
+                final HALogWriter logWriter = journal.getHALogWriter();
+                logWriter.disable();
+                logWriter.createLog(openRootBlock);
             } finally {
                 logLock.unlock();
             }
@@ -1553,8 +1552,8 @@ public class HAJournalServer extends AbstractServer {
             // Close out the current HALog writer.
             logLock.lock();
             try {
-                final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
-                logWriter.close(closeRootBlock);
+                final HALogWriter logWriter = journal.getHALogWriter();
+                logWriter.closeLog(closeRootBlock);
             } finally {
                 logLock.unlock();
             }
@@ -1644,7 +1643,7 @@ public class HAJournalServer extends AbstractServer {
                     
                 }
                 
-                final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
+                final HALogWriter logWriter = journal.getHALogWriter();
 
                 if (haLog.isDebugEnabled())
                     haLog.debug("HALog.commitCounter="
@@ -1747,7 +1746,7 @@ public class HAJournalServer extends AbstractServer {
                 
                 if (HA_LOG_ENABLED) {
 
-                    final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
+                    final HALogWriter logWriter = journal.getHALogWriter();
 
                     if (msg.getCommitCounter() == logWriter.getCommitCounter()
                             && msg.getSequence() == (logWriter.getSequence() - 1)) {
@@ -1879,7 +1878,7 @@ public class HAJournalServer extends AbstractServer {
                  * files.
                  */
 
-                final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
+                final HALogWriter logWriter = journal.getHALogWriter();
 
                 final long journalCommitCounter = journal.getRootBlockView()
                         .getCommitCounter();
@@ -1962,7 +1961,7 @@ public class HAJournalServer extends AbstractServer {
         private void resyncTransitionToMetQuorum(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
 
-            final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
+            final HALogWriter logWriter = journal.getHALogWriter();
             
             final IRootBlockView rootBlock = journal.getRootBlockView();
 
@@ -2031,7 +2030,7 @@ public class HAJournalServer extends AbstractServer {
 
             if (HA_LOG_ENABLED) {
 
-                final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
+                final HALogWriter logWriter = journal.getHALogWriter();
 
                 if (msg.getCommitCounter() != logWriter.getCommitCounter()) {
 
@@ -2068,9 +2067,7 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final IHALogWriter logWriter = journal.getHALogManager().getOpenLogFile().getWriter();
-
-                logWriter.write(msg, data);
+                journal.getHALogWriter().write(msg, data);
                 
             } finally {
                 
@@ -2135,14 +2132,12 @@ public class HAJournalServer extends AbstractServer {
             logLock.lock();
 
             try {
-            	final HALogManager logManager = journal.getHALogManager();
-                final IHALogWriter logWriter = logManager.getOpenLogFile().getWriter();
-                
+
                 // Close off the old log file with the root block.
-                logWriter.close(rootBlock);
+                journal.getHALogWriter().closeLog(rootBlock);
                 
                 // Open up a new log file with this root block.
-                logManager.createLog(rootBlock);
+                journal.getHALogWriter().createLog(rootBlock);
                 
             } finally {
                 
@@ -2166,7 +2161,49 @@ public class HAJournalServer extends AbstractServer {
             logLock.lock();
 
             try {
-                journal.getHALogManager().removeAllLogFiles(includeCurrent);
+
+                final File logDir = journal.getHALogDir();
+
+                final File[] files = logDir.listFiles(new FilenameFilter() {
+
+                    @Override
+                    public boolean accept(final File dir, final String name) {
+
+                        return name.endsWith(HALogWriter.HA_LOG_EXT);
+
+                    }
+                });
+
+                int ndeleted = 0;
+                long totalBytes = 0L;
+
+                final File currentFile = journal.getHALogWriter().getFile();
+
+                for (File file : files) {
+
+                    final long len = file.length();
+
+                    final boolean delete = includeCurrent
+                            || currentFile != null
+                            && file.getName().equals(currentFile.getName());
+
+                    if (delete && !file.delete()) {
+
+                        haLog.warn("COULD NOT DELETE FILE: " + file);
+
+                        continue;
+
+                    }
+
+                    ndeleted++;
+
+                    totalBytes += len;
+
+                }
+
+                haLog.info("PURGED LOGS: ndeleted=" + ndeleted
+                        + ", totalBytes=" + totalBytes);
+
             } finally {
 
                 logLock.unlock();
