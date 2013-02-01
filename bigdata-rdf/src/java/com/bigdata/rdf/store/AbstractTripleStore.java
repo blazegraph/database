@@ -2314,7 +2314,7 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        return getTerm(iv);
+        return r.getTerm(iv);
 
     }
 
