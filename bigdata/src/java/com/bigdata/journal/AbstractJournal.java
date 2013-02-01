@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -134,6 +135,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IAllocationManager;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
@@ -5977,5 +5979,20 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return removed;
         
     }
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		throw new UnsupportedOperationException();
+	}
 
 }

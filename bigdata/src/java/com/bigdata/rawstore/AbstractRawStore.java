@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a
@@ -104,4 +107,19 @@ abstract public class AbstractRawStore implements IRawStore {
 //        // NOP
 //    }
     
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		throw new UnsupportedOperationException();
+	}
 }

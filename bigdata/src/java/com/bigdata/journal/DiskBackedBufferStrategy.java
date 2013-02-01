@@ -25,12 +25,15 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Abstract base class for implementations that use a direct buffer as a write
@@ -430,4 +433,21 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 	public void setNextOffset(long lastOffset) {
 		// void for default DiskBackedBufferStrategy
 	}
+	
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		throw new UnsupportedOperationException();
+	}
+
 }

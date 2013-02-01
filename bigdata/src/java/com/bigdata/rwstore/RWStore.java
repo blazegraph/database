@@ -2548,6 +2548,14 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 
+	/**
+	 * 
+	 * @return
+	 */
+	public boolean isDirty() {
+		return requiresCommit();
+	}
+	
 //	static final float s_version = 3.0f;
 //
 //	public String getVersionString() {

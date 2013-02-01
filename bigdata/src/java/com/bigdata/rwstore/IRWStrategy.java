@@ -12,7 +12,7 @@ import com.bigdata.rwstore.sector.MemStrategy;
  * @author Martyn Cutcher
  */
 public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
-        IAllocationManagerStore, IStreamStore, IHistoryManager {
+        IAllocationManagerStore, IHistoryManager {
 
     /**
      * Return the backing {@link IStore}.

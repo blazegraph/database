@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -72,6 +73,7 @@ import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
 import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -2708,6 +2710,21 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             throw new UnsupportedOperationException();
         }
 
+    	@Override
+    	public IPSOutputStream getOutputStream() {
+    		return delegate.getOutputStream();
+    	}
+
+    	@Override
+    	public IPSOutputStream getOutputStream(IAllocationContext context) {
+    		return delegate.getOutputStream(context);
+    	}
+
+    	@Override
+    	public InputStream getInputStream(long addr) {
+    		return delegate.getInputStream(addr);
+    	}
+
     } // class IsolatatedActionJournal
 
     /**
@@ -3155,6 +3172,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 			return delegate.getHttpdPort();
 		}
 
+		@Override
+		public IPSOutputStream getOutputStream() {
+            throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public IPSOutputStream getOutputStream(IAllocationContext context) {
+            throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public InputStream getInputStream(long addr) {
+			return delegate.getInputStream(addr);
+		}
     } // class ReadOnlyJournal
 
     /**
