@@ -423,7 +423,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 
 	@Override
 	public void delete(long addr, IAllocationContext context) {
-		throw new UnsupportedOperationException();
+		m_mmgr.free(addr, context);
 	}
 
 	@Override
@@ -455,7 +455,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
      */
 	@Override
 	public long write(final ByteBuffer data, final IAllocationContext context) {
-		throw new UnsupportedOperationException();
+		return m_mmgr.allocate(data, context);
 	}
 
 	public boolean isCommitted(final long addr) {
