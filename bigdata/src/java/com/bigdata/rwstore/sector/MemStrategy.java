@@ -57,7 +57,7 @@ import com.bigdata.util.ChecksumUtility;
  */
 public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationManagerStore {
 	
-	final private MemoryManager m_mmgr;
+	final private IMemoryManager m_mmgr;
 	final private IAddressManager m_am;
 	
 	private volatile boolean m_modifiable = true;
@@ -73,7 +73,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 	    if (mmgr == null)
             throw new IllegalArgumentException();
 		
-	    m_mmgr = (MemoryManager) mmgr;
+	    m_mmgr = (IMemoryManager) mmgr;
 		
 	    m_am = new IAddressManager() {
 

@@ -37,6 +37,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.TransientResourceMetadata;
@@ -46,7 +47,7 @@ import com.bigdata.rawstore.TransientResourceMetadata;
  * 
  * @author thompsonbry
  */
-public class MemStore extends AbstractRawStore {
+public class MemStore extends AbstractRawStore implements IAllocationManagerStore {
 
 //	private static final transient Logger log = Logger
 //			.getLogger(MemStore.class);
@@ -173,12 +174,26 @@ public class MemStore extends AbstractRawStore {
 
 	}
 	
+    @Override
+    public long write(ByteBuffer data, IAllocationContext context) {
+    
+        return m_strategy.write(data, context);
+
+    }
+
 	public void delete(final long addr) {
 
 		m_strategy.delete(addr);
 
 	}
 	
+    @Override
+    public void delete(long addr, IAllocationContext context) {
+
+        m_strategy.delete(addr, context);
+        
+    }
+
 	public CounterSet getCounters() {
 
 		final CounterSet root = new CounterSet();

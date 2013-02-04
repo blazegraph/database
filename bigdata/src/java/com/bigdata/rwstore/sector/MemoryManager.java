@@ -1705,6 +1705,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 
+    @Override
+    public long write(ByteBuffer data, IAllocationContext context) {
+        return allocate(data, context);
+    }
+
 	@Override
 	public void free(long addr, IAllocationContext context) {
 		m_allocationLock.lock();
@@ -1714,5 +1719,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			m_allocationLock.unlock();
 		}
 	}
+
+    @Override
+    public void delete(long addr, IAllocationContext context) {
+        free(addr,context);
+    }
 
 }

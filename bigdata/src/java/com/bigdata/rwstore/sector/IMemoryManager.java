@@ -51,7 +51,7 @@ import com.bigdata.rwstore.IStore;
  * 
  * @author martyncutcher
  */
-public interface IMemoryManager extends IStore, ICounterSetAccess, IAllocationContext {
+public interface IMemoryManager extends IStore, ICounterSetAccess, IAllocationContext, IAllocationManagerStore {
 
 	/**
 	 * Allocates space on the backing resource and copies the provided data.
