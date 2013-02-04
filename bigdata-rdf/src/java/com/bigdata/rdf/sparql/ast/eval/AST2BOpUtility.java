@@ -2446,9 +2446,15 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * children of this group.
          * 
          * @see ASTAttachJoinFilterOptimizer
+         * 
+         * I commented this out because this is allowed now - because of
+         * property paths we now have filters that are not attached to joins,
+         * but this is perfectly fine.
+         * 
+         * TODO Allow the ArbitraryLengthPathOp to accept filters.
          */
-        assert sa.getJoinFilters(joinGroup).isEmpty() : "Unattached join filters: "
-                + joinGroup;
+//        assert sa.getJoinFilters(joinGroup).isEmpty() : "Unattached join filters: "
+//                + joinGroup;
         
         /*
          * FIXME We need to move away from the DataSetJoin class and replace it

@@ -222,6 +222,9 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             
         }
 
+        // The join filters that become attached to joins.
+        final List<FilterNode> attachedFilters = new LinkedList<FilterNode>();
+
         /*
          * Figure out which filters are attached to which joins.
          */
@@ -239,7 +242,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             final FilterNode[][] assignedConstraints = sa
                     .getJoinGraphConstraints(path, joinFilters
                             .toArray(new FilterNode[joinFilters.size()]),
-                            knownBound, true/* pathIsComplete */);
+                            knownBound, false/* pathIsComplete */);
 
             /*
              * Attach the join filters.
@@ -254,6 +257,8 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
                     tmp.setAttachedJoinFilters(Arrays.asList(filters));
                     
+                    attachedFilters.addAll(Arrays.asList(filters));
+                    
                 }
 
             }
@@ -264,7 +269,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
          * Remove all join filters from the group. They have all been attached
          * to the joins.
          */
-        for (FilterNode joinFilter : joinFilters) {
+        for (FilterNode joinFilter : attachedFilters) {
 
             group.removeArg(joinFilter);
 
