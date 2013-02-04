@@ -132,7 +132,7 @@ abstract public class AbstractTransactionService extends AbstractService
          * history not required for the read-committed view is released each
          * time the {@link ResourceManager} overflows.
          */
-        String MIN_RELEASE_AGE_NO_HISTORY = "0";
+        String MIN_RELEASE_AGE_NO_HISTORY = "1";
 
         /** Minimum release age is one minutes. */
         String MIN_RELEASE_AGE_1M = "" + 1/* mn */* 60/* sec */* 1000/* ms */;
