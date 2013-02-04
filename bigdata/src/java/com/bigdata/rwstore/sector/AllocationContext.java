@@ -299,6 +299,11 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, null);
 	}
 
+    @Override
+    public IPSOutputStream getOutputStream(IAllocationContext context) {
+        return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, context);
+    }
+
 	@Override
 	public InputStream getInputStream(long addr) {
 		return new PSInputStream(this, addr);
@@ -424,10 +429,20 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		throw new UnsupportedOperationException();
 	}
 
+    @Override
+    public long write(ByteBuffer data, IAllocationContext context) {
+        return allocate(data,context);
+    }
+
 	@Override
 	public void free(long addr, IAllocationContext context) {
 		throw new UnsupportedOperationException();
 	}
+
+    @Override
+    public void delete(long addr, IAllocationContext context) {
+        free(addr,context);
+    }
 
 //	private SectorAllocation m_head = null;
 //	
