@@ -129,6 +129,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumMember;
 import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -214,7 +215,7 @@ import com.bigdata.util.NT;
  *       been asynchronously closed.
  */
 public abstract class AbstractJournal implements IJournal/* , ITimestampService */
-, IAllocationManager
+, IAllocationManager, IAllocationManagerStore
 {
 
 	/**
@@ -3274,6 +3275,23 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		return _bufferStrategy.getOutputStream();
 	}
 
+	@Override
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+
+		assertCanWrite();
+
+		if (_bufferStrategy instanceof IRWStrategy) {
+
+			return ((IRWStrategy) _bufferStrategy).getOutputStream(context);
+
+		} else {
+
+			return _bufferStrategy.getOutputStream();
+
+		}
+
+	}
+	
 	@Override
 	public InputStream getInputStream(long addr) {
 		return _bufferStrategy.getInputStream(addr);

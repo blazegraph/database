@@ -2665,7 +2665,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
     	@Override
     	public IPSOutputStream getOutputStream() {
-    		return delegate.getOutputStream();
+    		return delegate.getOutputStream(this);
     	}
 
     	@Override
