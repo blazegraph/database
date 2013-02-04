@@ -103,52 +103,67 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
         logger.debug("tearDown complete.");
     }
 
-    // @Test
-    public void testNullContext1()
-        throws Exception
-    {
-        loadTestData("/testdata-query/dataset-query.trig");
-        StringBuilder query = new StringBuilder();
-        query.append(" SELECT * ");
-        query.append(" FROM DEFAULT ");
-        query.append(" WHERE { ?s ?p ?o } ");
-
-        TupleQuery tq = null;
-        try {
-            tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
-        }
-        catch (RepositoryException e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
-        catch (MalformedQueryException e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
-
-        try {
-            TupleQueryResult result = tq.evaluate();
-            assertNotNull(result);
-
-            while (result.hasNext()) {
-                BindingSet bs = result.next();
-                assertNotNull(bs);
-
-                Resource s = (Resource)bs.getValue("s");
-
-                assertNotNull(s);
-                assertFalse(bob.equals(s)); // should not be present in default
-                                                        // graph
-                assertFalse(alice.equals(s)); // should not be present in default
-                                                        // graph
-            }
-            result.close();
-        }
-        catch (QueryEvaluationException e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
-    }
+    /**
+     * This test is disabled pending feedback from the openrdf team.
+     * 
+     * <pre>
+     * Looking at the SPARQL 1.1 spec, this does not look like a legal syntax production.  Is this an openrdf extension to the SPARQL grammar?
+     * 
+     * [13]    DatasetClause     ::=   'FROM' ( DefaultGraphClause | NamedGraphClause )
+     * [14]    DefaultGraphClause    ::=   SourceSelector
+     * [15]    NamedGraphClause      ::=   'NAMED' SourceSelector
+     * [16]    SourceSelector    ::=   iri
+     * As you can see, all of the FROM syntax variations have a required IRI.  
+     * 
+     * Should we translate "FROM DEFAULT" as if nothing had been specified (in which case we will query the default graph anyway).     *
+     * </pre>
+     */
+//    // @Test
+//    public void testNullContext1()
+//        throws Exception
+//    {
+//        loadTestData("/testdata-query/dataset-query.trig");
+//        StringBuilder query = new StringBuilder();
+//        query.append(" SELECT * ");
+//        query.append(" FROM DEFAULT ");
+//        query.append(" WHERE { ?s ?p ?o } ");
+//
+//        TupleQuery tq = null;
+//        try {
+//            tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query.toString());
+//        }
+//        catch (RepositoryException e) {
+//            e.printStackTrace();
+//            fail(e.getMessage());
+//        }
+//        catch (MalformedQueryException e) {
+//            e.printStackTrace();
+//            fail(e.getMessage());
+//        }
+//
+//        try {
+//            TupleQueryResult result = tq.evaluate();
+//            assertNotNull(result);
+//
+//            while (result.hasNext()) {
+//                BindingSet bs = result.next();
+//                assertNotNull(bs);
+//
+//                Resource s = (Resource)bs.getValue("s");
+//
+//                assertNotNull(s);
+//                assertFalse(bob.equals(s)); // should not be present in default
+//                                                        // graph
+//                assertFalse(alice.equals(s)); // should not be present in default
+//                                                        // graph
+//            }
+//            result.close();
+//        }
+//        catch (QueryEvaluationException e) {
+//            e.printStackTrace();
+//            fail(e.getMessage());
+//        }
+//    }
 
     // @Test
     public void testNullContext2()
