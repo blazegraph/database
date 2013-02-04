@@ -42,40 +42,45 @@ import com.bigdata.rawstore.IPSOutputStream;
  * PSOutputStream
  *
  * Provides stream interface direct to the low-level store.
- *
+ * <p>
  * Retrieved from an IObjectStore to enable output to the store.
- *
+ * <p>
  * The key idea here is that rather than a call like :
+ * <pre>
  *	store.realloc(oldAddr, byteOutputStream)=> newAddress
- *
+ * 
  * instead :
  *	store.allocStream(oldAddr)=>PSOutputStream
  *
  * and then :
  *	stream.save()=> newAddress
- *
+ * </pre>
+ * <p>
  * This will enable large data formats to be streamed to the data store,
  *	where the previous interface would have required that the entire
  *	resource was loaded into a memory structure first, before being
  *	written out in a single block to the store.
- *
+ * <p>
  * This new approach will also enable the removal of BLOB allocation
  *	strategy.  Instead, "BLOBS" will be served by linked fixed allocation
  *	blocks, flushed out by the stream.
- *
+ * <p>
  * A big advantage of this is that BLOB reallocation is now a lot simpler,
  *	since BLOB storage is simply a potentially large number of 8K blocks.
- *
+ * <p>
  * This also opens up the possibility of a Stream oriented data type, that
  *	could be used to serve up a variety of data streams.  By providing
  *	relevant interfaces with the client/server system, a server can then
  *	provide multiple streams to a high number of clients.
- *
+ * <p>
  * To this end, the output stream has a fixed buffer size, and they are recycled
  *	from a pool of output streams.
- *
+ * <p>
  * It is <em>important</em>  that output streams are bound to the IStore they
  *	are requested for.
+ * <p>
+ * See ticket #641 that discusses creating and using a pool for PSOutputStream
+ * allocation.
  **/
 public class PSOutputStream extends IPSOutputStream {
     
