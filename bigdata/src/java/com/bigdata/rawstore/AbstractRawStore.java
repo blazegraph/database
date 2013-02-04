@@ -114,6 +114,7 @@ abstract public class AbstractRawStore implements IRawStore {
 	public IPSOutputStream getOutputStream() {
 		// TODO: implement an optional pooled object creation
 		//	to allow re-use of streams (with their buffers).
+		// see ticket:#641
 		return new WORMOutputStream();
 	}
 
