@@ -1697,12 +1697,22 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	@Override
 	public long allocate(ByteBuffer data, IAllocationContext context) {
-		return establishContextAllocation(context).allocate(data);
+		m_allocationLock.lock();
+		try {
+			return establishContextAllocation(context).allocate(data);
+		} finally {
+			m_allocationLock.unlock();
+		}
 	}
 
 	@Override
 	public void free(long addr, IAllocationContext context) {
-		establishContextAllocation(context).free(addr);
+		m_allocationLock.lock();
+		try {
+			establishContextAllocation(context).free(addr);
+		} finally {
+			m_allocationLock.unlock();
+		}
 	}
 
 }
