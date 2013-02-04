@@ -2662,7 +2662,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.write(data, oldAddr, this);
 //        }
 
-        public void delete(final long addr) {
+
+    	@Override
+    	public IPSOutputStream getOutputStream() {
+    		return delegate.getOutputStream();
+    	}
+
+    	@Override
+    	public InputStream getInputStream(long addr) {
+    		return delegate.getInputStream(addr);
+    	}
+
+    	public void delete(final long addr) {
             delegate.delete(addr, this);
         }
 
@@ -2709,16 +2720,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public Iterator<String> indexNameScan(String prefix, long timestamp) {
             throw new UnsupportedOperationException();
         }
-
-    	@Override
-    	public IPSOutputStream getOutputStream() {
-    		return delegate.getOutputStream();
-    	}
-
-    	@Override
-    	public InputStream getInputStream(long addr) {
-    		return delegate.getInputStream(addr);
-    	}
 
     } // class IsolatatedActionJournal
 

@@ -29,13 +29,11 @@ package com.bigdata.rawstore;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.journal.AbstractBufferStrategy;
 
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a

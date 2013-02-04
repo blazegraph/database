@@ -3269,6 +3269,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	@Override
 	public IPSOutputStream getOutputStream() {
+        assertCanWrite();
+
 		return _bufferStrategy.getOutputStream();
 	}
 
