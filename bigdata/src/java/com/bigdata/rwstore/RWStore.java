@@ -90,6 +90,8 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;

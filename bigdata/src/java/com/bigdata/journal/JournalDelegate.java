@@ -40,9 +40,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -276,11 +276,6 @@ public class JournalDelegate implements IJournal {
 	@Override
 	public IPSOutputStream getOutputStream() {
 		return delegate.getOutputStream();
-	}
-
-	@Override
-	public IPSOutputStream getOutputStream(IAllocationContext context) {
-		return delegate.getOutputStream(context);
 	}
 
 	@Override

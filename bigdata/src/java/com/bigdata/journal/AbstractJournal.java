@@ -128,14 +128,14 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumMember;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IAllocationManager;
-import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
 import com.bigdata.rwstore.sector.MemoryManager;
@@ -5982,11 +5982,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	@Override
 	public IPSOutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public IPSOutputStream getOutputStream(IAllocationContext context) {
 		throw new UnsupportedOperationException();
 	}
 

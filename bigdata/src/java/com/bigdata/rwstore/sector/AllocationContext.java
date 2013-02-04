@@ -38,8 +38,8 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.PSOutputStream;
 
@@ -297,14 +297,6 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 	@Override
 	public IPSOutputStream getOutputStream() {
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, null);
-	}
-
-	@Override
-	public IPSOutputStream getOutputStream(final IAllocationContext context) {
-		if (context != null)
-			throw new IllegalArgumentException("Nested AllocationContexts are not supported");
-		
-		return getOutputStream();
 	}
 
 	@Override

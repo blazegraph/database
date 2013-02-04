@@ -66,9 +66,9 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 

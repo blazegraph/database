@@ -32,8 +32,8 @@ import java.nio.channels.FileChannel;
 
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 
 /**
  * Abstract base class for implementations that use a direct buffer as a write
@@ -437,11 +437,6 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
 	@Override
 	public IPSOutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public IPSOutputStream getOutputStream(IAllocationContext context) {
 		throw new UnsupportedOperationException();
 	}
 

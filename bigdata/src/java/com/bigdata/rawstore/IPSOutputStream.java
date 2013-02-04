@@ -1,4 +1,4 @@
-package com.bigdata.rwstore;
+package com.bigdata.rawstore;
 
 import java.io.OutputStream;
 

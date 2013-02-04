@@ -21,9 +21,10 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rwstore;
+package com.bigdata.rawstore;
 
 import java.io.InputStream;
+
 
 /**
  * Interface for reading and writing streams on a persistence store.
@@ -40,20 +41,6 @@ public interface IStreamStore {
      * @return The output stream.
      */
     public IPSOutputStream getOutputStream();
-
-    /**
-     * Return an output stream which can be used to write on the backing store
-     * within the given allocation context. You can recover the address used to
-     * read back the data from the {@link IPSOutputStream}.
-     * 
-     * @param context
-     *            The context within which any allocations are made by the
-     *            returned {@link IPSOutputStream}.
-     *            
-     * @return an output stream to stream data to and to retrieve an address to
-     *         later stream the data back.
-     */
-    public IPSOutputStream getOutputStream(final IAllocationContext context);
 
     /**
      * Return an input stream from which a previously written stream may be read

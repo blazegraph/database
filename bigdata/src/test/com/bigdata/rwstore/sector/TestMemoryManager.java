@@ -23,8 +23,8 @@ import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.util.InnerCause;

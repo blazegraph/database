@@ -28,8 +28,9 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.IAllocationManager;
+import com.bigdata.rwstore.IAllocationManagerStore;
 import com.bigdata.rwstore.IStore;
 
 /**
