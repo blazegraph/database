@@ -40,10 +40,10 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TestRestartSafe;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Test suite for {@link BTree#removeAll()}.
@@ -329,11 +329,6 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 		@Override
 		public IPSOutputStream getOutputStream() {
 			return delegate.getOutputStream();
-		}
-
-		@Override
-		public IPSOutputStream getOutputStream(IAllocationContext context) {
-			return delegate.getOutputStream(context);
 		}
 
 		@Override

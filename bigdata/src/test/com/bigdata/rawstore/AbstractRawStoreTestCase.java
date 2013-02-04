@@ -41,7 +41,6 @@ import java.util.zip.GZIPOutputStream;
 import com.bigdata.io.TestCase3;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Base class for writing tests of the {@link IRawStore} interface.

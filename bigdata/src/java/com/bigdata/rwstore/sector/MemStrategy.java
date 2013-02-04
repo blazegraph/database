@@ -42,8 +42,9 @@ import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
+import com.bigdata.rwstore.IAllocationManagerStore;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.util.ChecksumUtility;
@@ -54,9 +55,9 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:matyncutcher@users.sourceforge.net">Martyn Cutcher</a>
  * @version $Id$
  */
-public class MemStrategy implements IBufferStrategy, IRWStrategy {
+public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationManagerStore {
 	
-	final private IMemoryManager m_mmgr;
+	final private MemoryManager m_mmgr;
 	final private IAddressManager m_am;
 	
 	private volatile boolean m_modifiable = true;
@@ -72,7 +73,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	    if (mmgr == null)
             throw new IllegalArgumentException();
 		
-	    m_mmgr = mmgr;
+	    m_mmgr = (MemoryManager) mmgr;
 		
 	    m_am = new IAddressManager() {
 

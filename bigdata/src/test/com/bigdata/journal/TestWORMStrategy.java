@@ -43,8 +43,8 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Test suite for {@link WORMStrategy} journal.

@@ -165,7 +165,7 @@ abstract public class AbstractTransactionService extends AbstractService
          * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/638"
          *      >Change DEFAULT_MIN_RELEASE_AGE to 1ms</a>
          */
-        String DEFAULT_MIN_RELEASE_AGE = "1";
+        String DEFAULT_MIN_RELEASE_AGE = "0";
 //        String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_NO_HISTORY;
 
     }

@@ -36,8 +36,6 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a
@@ -119,14 +117,6 @@ abstract public class AbstractRawStore implements IRawStore {
 		// TODO: implement an optional pooled object creation
 		//	to allow re-use of streams (with their buffers).
 		return new WORMOutputStream();
-	}
-
-	@Override
-	public IPSOutputStream getOutputStream(IAllocationContext context) {
-		// For a WORM an allocation context means less since allocations
-		//	cannot be released and recycled
-		// FIXME: should this just call getOutputStream() ?
-		throw new UnsupportedOperationException();
 	}
 
 	@Override

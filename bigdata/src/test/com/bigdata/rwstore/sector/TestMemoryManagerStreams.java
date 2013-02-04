@@ -16,7 +16,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 

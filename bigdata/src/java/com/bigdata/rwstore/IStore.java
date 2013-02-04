@@ -26,6 +26,9 @@ package com.bigdata.rwstore;
 
 import java.io.File;
 
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IStreamStore;
+
 /**
  * The {@link IStore} interface provides persistent storage abstraction for
  * fixed size allocations and allocation recycling.

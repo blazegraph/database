@@ -65,6 +65,8 @@ import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -72,8 +74,6 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -2716,11 +2716,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     	}
 
     	@Override
-    	public IPSOutputStream getOutputStream(IAllocationContext context) {
-    		return delegate.getOutputStream(context);
-    	}
-
-    	@Override
     	public InputStream getInputStream(long addr) {
     		return delegate.getInputStream(addr);
     	}
@@ -3174,11 +3169,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
 		@Override
 		public IPSOutputStream getOutputStream() {
-            throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public IPSOutputStream getOutputStream(IAllocationContext context) {
             throw new UnsupportedOperationException();
 		}
 

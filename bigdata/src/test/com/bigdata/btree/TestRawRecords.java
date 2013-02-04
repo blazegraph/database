@@ -33,10 +33,10 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.TestCase3;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * Unit tests for a B+Tree with raw record support enabled (this is where a
@@ -460,11 +460,6 @@ public class TestRawRecords extends AbstractBTreeTestCase {
 		@Override
 		public IPSOutputStream getOutputStream() {
 			return delegate.getOutputStream();
-		}
-
-		@Override
-		public IPSOutputStream getOutputStream(IAllocationContext context) {
-			return delegate.getOutputStream(context);
 		}
 
 		@Override

@@ -103,6 +103,7 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.changesets.DelegatingChangeLog;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -3036,9 +3037,14 @@ public class BigdataSail extends SailBase implements Sail {
 //            * arises because the {@link SailConnection} is using unisolated writes
 //            * on the database).
 //            * 
-//            // discard any changes that might be lying around.
-//            rollback();
+            // discard any changes that might be lying around. But only if we know
+            // the journal has uncommitted writes.
+//            if (database.isDirty())
+//                        rollback();
 
+            // final IIndexManager im = getDatabase().getIndexManager();
+            
+            
             try {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
