@@ -434,15 +434,4 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 		// void for default DiskBackedBufferStrategy
 	}
 	
-
-	@Override
-	public IPSOutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getInputStream(long addr) {
-		throw new UnsupportedOperationException();
-	}
-
 }

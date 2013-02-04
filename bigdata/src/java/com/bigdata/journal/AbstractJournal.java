@@ -3267,6 +3267,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
+	@Override
+	public IPSOutputStream getOutputStream() {
+		return _bufferStrategy.getOutputStream();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		return _bufferStrategy.getInputStream(addr);
+	}
+
+
 	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
     public void delete(final long addr) {
 
@@ -5979,15 +5990,4 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return removed;
         
     }
-
-	@Override
-	public IPSOutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getInputStream(long addr) {
-		throw new UnsupportedOperationException();
-	}
-
 }

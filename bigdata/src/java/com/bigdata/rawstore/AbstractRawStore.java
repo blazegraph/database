@@ -150,15 +150,15 @@ abstract public class AbstractRawStore implements IRawStore {
 	 * conventional allocation.
 	 */
 	class WORMOutputStream extends IPSOutputStream {
-		final byte[] m_buffer = new byte[WORM_STREAM_BUFFER_SIZE];
-		int m_cursor = 0;
+		final private byte[] m_buffer = new byte[WORM_STREAM_BUFFER_SIZE];
+		private int m_cursor = 0;
 		
-		int m_bytesWritten = 0;
+		private int m_bytesWritten = 0;
 		
-		boolean m_open = true; // open on creation
+		private boolean m_open = true; // open on creation
 		
-		ByteArrayOutputStream m_hdrData = null;
-		DataOutputStream m_header = null;
+		private ByteArrayOutputStream m_hdrData = null;
+		private DataOutputStream m_header = null;
 
 		@Override
 		public long getAddr() {
@@ -256,8 +256,8 @@ abstract public class AbstractRawStore implements IRawStore {
 	 */
 	class WORMInputStream extends InputStream {
 		
-		final ByteBuffer m_hbb;
-		ByteBuffer m_bb;
+		final private ByteBuffer m_hbb;
+		private ByteBuffer m_bb;
 		
 		WORMInputStream(final long stream_addr) {
 //			if (stream_addr > 0) {
