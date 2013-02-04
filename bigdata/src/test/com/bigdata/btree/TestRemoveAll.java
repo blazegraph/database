@@ -27,22 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.File;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TestRestartSafe;
-import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IAllocationContext;
-import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.RawStoreDelegate;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -222,18 +216,12 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 	 * 
 	 * @author thompsonbry
 	 */
-	private static class MyRawStore implements IRawStore {
-		
-		final IRawStore delegate;
+	private static class MyRawStore extends RawStoreDelegate {
 		
 		long expectDelete = IRawStore.NULL;
 
 		public MyRawStore(final IRawStore delegate) {
-			this.delegate = delegate;
-		}
-
-		public void close() {
-			delegate.close();
+		    super(delegate);
 		}
 
 		public void delete(long addr) {
@@ -242,98 +230,6 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 				expectDelete = IRawStore.NULL;
 			}
 			delegate.delete(addr);
-		}
-
-		public void deleteResources() {
-			delegate.deleteResources();
-		}
-
-		public void destroy() {
-			delegate.destroy();
-		}
-
-		public void force(boolean metadata) {
-			delegate.force(metadata);
-		}
-
-		public int getByteCount(long addr) {
-			return delegate.getByteCount(addr);
-		}
-
-		public CounterSet getCounters() {
-			return delegate.getCounters();
-		}
-
-		public File getFile() {
-			return delegate.getFile();
-		}
-
-		public long getOffset(long addr) {
-			return delegate.getOffset(addr);
-		}
-
-       public long getPhysicalAddress(final long addr) {
-            return delegate.getPhysicalAddress(addr);
-        }
-
-		public IResourceMetadata getResourceMetadata() {
-			return delegate.getResourceMetadata();
-		}
-
-		public UUID getUUID() {
-			return delegate.getUUID();
-		}
-
-		public boolean isFullyBuffered() {
-			return delegate.isFullyBuffered();
-		}
-
-		public boolean isOpen() {
-			return delegate.isOpen();
-		}
-
-		public boolean isReadOnly() {
-			return delegate.isReadOnly();
-		}
-
-		public boolean isStable() {
-			return delegate.isStable();
-		}
-
-		public ByteBuffer read(long addr) {
-			return delegate.read(addr);
-		}
-
-		public long size() {
-			return delegate.size();
-		}
-
-		public long toAddr(int nbytes, long offset) {
-			return delegate.toAddr(nbytes, offset);
-		}
-
-		public String toString(long addr) {
-			return delegate.toString(addr);
-		}
-
-//		@Override
-//		public long write(ByteBuffer data, long oldAddr) {
-//			return delegate.write(data, oldAddr);
-//		}
-
-		@Override
-		public long write(ByteBuffer data) {
-			return delegate.write(data);
-		}
-
-		@Override
-		public IPSOutputStream getOutputStream() {
-			return delegate.getOutputStream();
-		}
-
-		@Override
-		public InputStream getInputStream(long addr) {
-			return delegate.getInputStream(addr);
 		}
 	}
 
