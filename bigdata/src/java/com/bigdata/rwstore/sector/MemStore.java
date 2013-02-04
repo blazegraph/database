@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore.sector;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -37,6 +38,8 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.TransientResourceMetadata;
+import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rwstore.IPSOutputStream;
 
 /**
  * An {@link IRawStore} backed by an {@link IMemoryManager}.
@@ -333,5 +336,41 @@ public class MemStore extends AbstractRawStore {
 	public String toString(final long addr) {
 		return getAddressManager().toString(addr);
 	}
+	
+	/*
+	 * Delegate stream handling to MemoryManager
+	 */
+    public IPSOutputStream getOutputStream() {
+    	return m_strategy.getOutputStream();
+    }
+
+    /**
+     * Return an output stream which can be used to write on the backing store
+     * within the given allocation context. You can recover the address used to
+     * read back the data from the {@link IPSOutputStream}.
+     * 
+     * @param context
+     *            The context within which any allocations are made by the
+     *            returned {@link IPSOutputStream}.
+     *            
+     * @return an output stream to stream data to and to retrieve an address to
+     *         later stream the data back.
+     */
+    public IPSOutputStream getOutputStream(final IAllocationContext context) {
+    	return m_strategy.getOutputStream(context);
+    }
+
+    /**
+     * Return an input stream from which a previously written stream may be read
+     * back.
+     * 
+     * @param addr
+     *            The address at which the stream was written.
+     *            
+     * @return an input stream for the data for provided address
+     */
+    public InputStream getInputStream(long addr) {
+    	return m_strategy.getInputStream(addr);
+    }
 
 }

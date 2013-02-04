@@ -318,6 +318,12 @@ public class PSOutputStream extends IPSOutputStream {
   		return 0;
   	}
   	
+  	if (m_count == 0) {
+  		m_isSaved = true;
+  		
+  		return 0; // allow for empty stream
+  	}
+  	
   	int addr = (int) m_store.alloc(m_buf, m_count, m_context);
   	
   	if (m_blobHeader != null) {
