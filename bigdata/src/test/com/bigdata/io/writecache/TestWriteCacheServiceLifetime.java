@@ -166,7 +166,7 @@ public class TestWriteCacheServiceLifetime extends TestCase3 {
         final int compactionThreshold = 30;
         final int hotCacheThreshold = 1;
         config.service = new WriteCacheService(5/* nbuffers */,
-                0/* maxDirtyListSize */, 0/* readCacheSize*/, prefixWrites, compactionThreshold,
+                2/* minCleanListSize */, 0/* readCacheSize*/, prefixWrites, compactionThreshold,
                 0/*hotCacheSize*/, hotCacheThreshold,
                 true/* useChecksums */, fileExtent, config.opener,
                 config.quorum, null) {

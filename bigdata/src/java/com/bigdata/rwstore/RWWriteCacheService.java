@@ -47,7 +47,7 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     
-    public RWWriteCacheService(final int nbuffers, final int maxDirtyListSize, final int readBuffers,
+    public RWWriteCacheService(final int nbuffers, final int minCleanListSize, final int readBuffers,
             final boolean prefixWrites, final int compactionThreshold,
             final int hotCacheSize, final int hotCacheThreshold,
             final long fileExtent,
@@ -55,7 +55,7 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
             final IBackingReader reader)
             throws InterruptedException, IOException {
 
-        super(nbuffers, maxDirtyListSize,  readBuffers, prefixWrites, compactionThreshold, hotCacheSize, hotCacheThreshold,
+        super(nbuffers, minCleanListSize,  readBuffers, prefixWrites, compactionThreshold, hotCacheSize, hotCacheThreshold,
                 true/* useChecksum */, fileExtent, opener, quorum, reader);
     }
 

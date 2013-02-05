@@ -237,7 +237,7 @@ public interface Options {
      * will be used with a {@link WriteCacheService}.
      * 
      * @see #DEFAULT_WRITE_CACHE_BUFFER_COUNT
-     * @see #WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+     * @see #WRITE_CACHE_MIN_CLEAN_LIST_SIZE
      * @see #WRITE_CACHE_COMPACTION_THRESHOLD
      */
     String WRITE_CACHE_BUFFER_COUNT = AbstractJournal.class.getName()+".writeCacheBufferCount";
@@ -245,13 +245,13 @@ public interface Options {
     /**
      * Option may be used to control the maximum number of buffers on the
      * {@link WriteCacheService} dirty list (default
-     * {@value #DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE}). This effectively
+     * {@value #DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE}). This effectively
      * controls the maximum number of buffers that are clean and available for
      * writes.
      * <p>
      * Note: This option has no effect for a WORM mode journal.
      */
-    String WRITE_CACHE_MAX_DIRTY_LIST_SIZE = AbstractJournal.class.getName()+".writeCacheMaxDirtyListSize";
+    String WRITE_CACHE_MIN_CLEAN_LIST_SIZE = AbstractJournal.class.getName()+".writeCacheMinCleanListSize";
 
     /**
      * Option may be used to control whether the {@link WriteCacheService} will
@@ -645,9 +645,9 @@ public interface Options {
     String DEFAULT_READ_CACHE_BUFFER_COUNT = "0"; // 20
     
     /**
-     * @see #WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+     * @see #WRITE_CACHE_MIN_CLEAN_LIST_SIZE
      */
-    String DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE = "0";
+    String DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE = "3";
     
     /**
      * @see #WRITE_CACHE_COMPACTION_THRESHOLD

@@ -2085,7 +2085,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
             final long fileExtent = opener.reopenChannel().size();
 
-            final int maxDirtyListSize = 0; // use default by default.
+            final int minCleanListSize = 0; // use default by default.
             
             final boolean prefixWrites;
             final int compactionThreshold;
@@ -2103,7 +2103,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 throw new AssertionError();
             }
             writeCacheService = new WriteCacheService(nbuffers,
-                    maxDirtyListSize, 0, prefixWrites, compactionThreshold,
+                    minCleanListSize, 0, prefixWrites, compactionThreshold,
                     0/*hotCacheSize*/, hotCacheThreshold,
                     useChecksums, fileExtent, opener, quorum, null) {
 

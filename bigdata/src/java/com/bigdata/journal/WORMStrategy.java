@@ -981,7 +981,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<? extends Channel> opener,
                 final Quorum quorum) throws InterruptedException {
             // Note: Compaction explicitly disabled for the WORM.
-            super(writeCacheBufferCount, 0/* maxDirtyListSize */, readCacheBufferCount,
+            super(writeCacheBufferCount, 0/* minCleanListSize */, readCacheBufferCount,
                     false/* prefixWrites */, 100/* compactionThreshold */, hotCacheSize, hotCacheThreshold,
                     useChecksums, extent, opener, quorum, WORMStrategy.this /*reader*/);
 
