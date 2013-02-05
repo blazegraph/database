@@ -273,6 +273,12 @@ public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamSt
     public boolean isFullyBuffered();
     
     /**
+     * @return true if has been modified since last synchronized with stable
+     * storage
+     */
+    public boolean isDirty();
+    
+    /**
      * Force the data to stable storage. While this is NOT sufficient to
      * guarantee an atomic commit, the data must be forced to disk as part of an
      * atomic commit protocol.

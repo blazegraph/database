@@ -73,7 +73,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 	    if (mmgr == null)
             throw new IllegalArgumentException();
 		
-	    m_mmgr = (IMemoryManager) mmgr;
+	    m_mmgr = mmgr;
 		
 	    m_am = new IAddressManager() {
 
@@ -475,7 +475,16 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 
 	@Override
 	public IPSOutputStream getOutputStream(final IAllocationContext context) {
-		return m_mmgr.getOutputStream(context);
+		if (m_mmgr instanceof MemoryManager)
+			return ((MemoryManager) m_mmgr).getOutputStream(context);
+		
+		// FIXME: revisit class hierarchy to determine correct inheritance
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public boolean isDirty() {
+		return m_dirty;
 	}
 
 //	@Override

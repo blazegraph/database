@@ -282,4 +282,9 @@ public class JournalDelegate implements IJournal {
 	public InputStream getInputStream(long addr) {
 		return delegate.getInputStream(addr);
 	}
+
+	@Override
+	public boolean isDirty() {
+		return delegate.isDirty();
+	}
 }

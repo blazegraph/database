@@ -231,6 +231,11 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 			}
 			delegate.delete(addr);
 		}
+
+		@Override
+		public boolean isDirty() {
+			return delegate.isDirty();
+		}
 	}
 
 }
