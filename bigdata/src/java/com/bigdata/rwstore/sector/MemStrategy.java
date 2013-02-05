@@ -475,11 +475,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 
 	@Override
 	public IPSOutputStream getOutputStream(final IAllocationContext context) {
-		if (m_mmgr instanceof MemoryManager)
-			return ((MemoryManager) m_mmgr).getOutputStream(context);
-		
-		// FIXME: revisit class hierarchy to determine correct inheritance
-		throw new UnsupportedOperationException();
+		return m_mmgr.getOutputStream(context);
 	}
 
 	@Override
