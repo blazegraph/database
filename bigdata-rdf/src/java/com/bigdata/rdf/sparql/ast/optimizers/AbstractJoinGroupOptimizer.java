@@ -29,15 +29,18 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -157,6 +160,27 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
                 optimize(ctx, sa, childGroup);
 
+            } else if (child instanceof FilterNode) {
+            	
+            	final FilterNode filter = (FilterNode) child;
+            	
+            	final IValueExpressionNode ve = filter.getValueExpressionNode();
+
+            	if (ve instanceof SubqueryFunctionNodeBase) {
+
+                    final SubqueryFunctionNodeBase subqueryFunction = (SubqueryFunctionNodeBase) ve;
+
+                    final GraphPatternGroup<IGroupMemberNode> graphPattern = subqueryFunction
+                            .getGraphPattern();
+
+                    if (graphPattern != null) {
+
+                    	optimize(ctx, sa, graphPattern);
+                    	
+                    }
+                    
+            	}
+            	
             }
             
         }
