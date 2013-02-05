@@ -459,7 +459,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @param nwriteBuffers
      *            The #of {@link WriteCache} buffers.
-     * @param maxDirtyListSize
+     * @param minCleanListSize
      *            The maximum #of {@link WriteCache} buffers on the
      *            {@link #dirtyList} before we start to evict {@link WriteCache}
      *            buffers to the disk -or- ZERO (0) to use a default value. <br>
@@ -497,7 +497,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @throws InterruptedException
      */
-    public WriteCacheService(final int nwriteBuffers, int maxDirtyListSize,
+    public WriteCacheService(final int nwriteBuffers, int minCleanListSize,
     		final int nreadBuffers,
             final boolean prefixWrites, final int compactionThreshold,
             final int hotCacheSize, final int hotCacheThreshold,
@@ -509,7 +509,7 @@ abstract public class WriteCacheService implements IWriteCache {
         if (nwriteBuffers <= 0)
             throw new IllegalArgumentException();
 
-        if (maxDirtyListSize == 0) {
+        if (minCleanListSize == 0) { // default
 
             /*
              * Setup a reasonable default if no value was specified.
@@ -517,14 +517,14 @@ abstract public class WriteCacheService implements IWriteCache {
              * prevent latency on acquiring a clean buffer for writing.
              */
             
-            maxDirtyListSize = Math.max(nwriteBuffers-4, 1);
+            minCleanListSize = Math.min(4, nwriteBuffers);
 
         }
         
-        if (maxDirtyListSize < 0)
-            throw new IllegalArgumentException();
+        if (minCleanListSize > nwriteBuffers)
+            minCleanListSize = nwriteBuffers;
 
-        if (maxDirtyListSize > nwriteBuffers)
+        if (minCleanListSize < 0)
             throw new IllegalArgumentException();
 
         if (compactionThreshold <= 0)
@@ -569,13 +569,17 @@ abstract public class WriteCacheService implements IWriteCache {
         if (compactionEnabled) {
             /*
              * Setup the RWS dirtyListThreshold.
+             * 
+             * allow for compacting cache and reserve
              */
-//            final int dirtyListThreshold = nbuffers - 3 - maxDirtyListSize;
-            m_dirtyListThreshold = Math.max(1, maxDirtyListSize);
+            m_dirtyListThreshold = Math.max(1, nwriteBuffers - minCleanListSize - 2); 
         } else {
             /*
-             * Note: We always want a threshold of ONE (1) for the WORM since we
-             * can not compact cache buffers for that store mode.
+             * Note: We always want a threshold of ONE (1) for the WORM since:
+             * 1) We can not compact cache buffers for that store mode.
+             * 2) We still want to write data to the file even if it will
+             * 	never be read (as in the case of "deleted" data in same transaction
+             * 	as it was allocated).
              */
             m_dirtyListThreshold = 1;
         }

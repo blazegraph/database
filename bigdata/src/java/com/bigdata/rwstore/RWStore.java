@@ -447,9 +447,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	private final int m_writeCacheBufferCount;
 
 	/**
-	 * @see com.bigdata.journal.Options#WRITE_CACHE_MAX_DIRTY_LIST_SIZE
+	 * @see com.bigdata.journal.Options#WRITE_CACHE_MIN_CLEAN_LIST_SIZE
 	 */
-    private final int m_maxDirtyListSize;
+    private final int m_minCleanListSize;
 
 	/**
 	 * The #of read buffers that will be used by the {@link WriteCacheService}.
@@ -746,13 +746,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             log.info(com.bigdata.journal.Options.WRITE_CACHE_BUFFER_COUNT
                     + "=" + m_writeCacheBufferCount);
 
-        this.m_maxDirtyListSize = Integer.valueOf(fileMetadata.getProperty(
-                com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE,
-                com.bigdata.journal.Options.DEFAULT_WRITE_CACHE_MAX_DIRTY_LIST_SIZE));
+        this.m_minCleanListSize = Integer.valueOf(fileMetadata.getProperty(
+                com.bigdata.journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE,
+                com.bigdata.journal.Options.DEFAULT_WRITE_CACHE_MIN_CLEAN_LIST_SIZE));
 
         if (log.isInfoEnabled())
-            log.info(com.bigdata.journal.Options.WRITE_CACHE_MAX_DIRTY_LIST_SIZE + "="
-                    + m_maxDirtyListSize);
+            log.info(com.bigdata.journal.Options.WRITE_CACHE_MIN_CLEAN_LIST_SIZE + "="
+                    + m_minCleanListSize);
 
         this.m_compactionThreshold = Double.valueOf(fileMetadata.getProperty(
                 com.bigdata.journal.Options.WRITE_CACHE_COMPACTION_THRESHOLD,
@@ -971,7 +971,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final boolean prefixWrites = highlyAvailable;
 
             return new RWWriteCacheService(m_writeCacheBufferCount,
-                    m_maxDirtyListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
+                    m_minCleanListSize, m_readCacheBufferCount, prefixWrites, m_compactionThreshold, m_hotCacheSize, m_hotCacheThreshold,
 
                     convertAddr(m_fileSize), m_reopener, m_quorum, this) {
                 
@@ -1999,7 +1999,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	    
 	    if (!m_allocationLock.isHeldByCurrentThread()) {
             /*
-             * In order for changes to m_activeTxCOunt to be visible the caller
+             * In order for changes to m_activeTxCount to be visible the caller
              * MUST be holding the lock.
              */
             throw new IllegalMonitorStateException();
@@ -2027,7 +2027,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * the writeCache must be maintained to support readers of uncommitted and
 	 * unwritten allocations.
 	 */
-	void releaseSessions() {
+	private void releaseSessions() {
 		assert(m_activeTxCount == 0 && m_contexts.isEmpty());
 		
 		if (m_minReleaseAge == 0) {
