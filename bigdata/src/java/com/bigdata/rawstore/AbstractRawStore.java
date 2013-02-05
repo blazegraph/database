@@ -81,6 +81,10 @@ abstract public class AbstractRawStore implements IRawStore {
 	public void delete(final long addr) {
 	    // NOP.
 	}
+	
+	public boolean isDirty() {
+		throw new UnsupportedOperationException();
+	}
 
 //	public void delete(long addr, IAllocationContext context) {
 //		delete(addr);

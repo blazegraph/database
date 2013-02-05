@@ -1122,7 +1122,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             lastBlockSequence = writeCacheService.resetSequence();
 
         }
-
+        
+        // remember offset at commit
+        commitOffset.set(nextOffset.get());
     }
 
     /**
@@ -1134,7 +1136,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @return true if store has been modified since last commit()
      */
 	public boolean isDirty() {
-		throw new UnsupportedOperationException();
+		return commitOffset.get() != nextOffset.get();
 	}
 
 
@@ -2511,7 +2513,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     @Override
     public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 
-        nextOffset.set(rootBlock.getNextOffset());
+    	final long rbNextOffset = rootBlock.getNextOffset();
+        nextOffset.set(rbNextOffset);
+        commitOffset.set(rbNextOffset);
         
     }
 

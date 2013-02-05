@@ -2269,6 +2269,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	public boolean isDirty() {
+
+	    return _bufferStrategy.isDirty();
+
+	}
+
 	public boolean isFullyBuffered() {
 
 		return _bufferStrategy.isFullyBuffered();

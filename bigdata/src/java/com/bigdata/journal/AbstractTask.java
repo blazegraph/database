@@ -2721,6 +2721,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             throw new UnsupportedOperationException();
         }
 
+		@Override
+		public boolean isDirty() {
+			return delegate.isDirty();
+		}
+
     } // class IsolatatedActionJournal
 
     /**
@@ -3176,6 +3181,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 		@Override
 		public InputStream getInputStream(long addr) {
 			return delegate.getInputStream(addr);
+		}
+
+		@Override
+		public boolean isDirty() {
+			return false; // it's readOnly - cannot be dirty
 		}
     } // class ReadOnlyJournal
 

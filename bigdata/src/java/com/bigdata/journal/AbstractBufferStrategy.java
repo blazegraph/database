@@ -185,6 +185,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * for the counter.
      */
     final protected AtomicLong nextOffset;
+    final protected AtomicLong commitOffset;
 
     static final NumberFormat cf;
     
@@ -274,6 +275,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         this.maximumExtent = maximumExtent; // MAY be zero!
         
         this.nextOffset = new AtomicLong(nextOffset);
+        this.commitOffset = new AtomicLong(nextOffset);
         
         this.bufferMode = bufferMode;
         
