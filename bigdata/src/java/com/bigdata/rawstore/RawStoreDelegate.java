@@ -159,9 +159,4 @@ public class RawStoreDelegate implements IRawStore {
         return delegate.getInputStream(addr);
     }
 
-	@Override
-	public boolean isDirty() {
-		return delegate.isDirty();
-	}
-
 }

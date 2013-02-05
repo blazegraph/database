@@ -81,38 +81,6 @@ abstract public class AbstractRawStore implements IRawStore {
 	public void delete(final long addr) {
 	    // NOP.
 	}
-	
-	public boolean isDirty() {
-		throw new UnsupportedOperationException();
-	}
-
-//	public void delete(long addr, IAllocationContext context) {
-//		delete(addr);
-//	}
-//
-//	public long write(ByteBuffer data, IAllocationContext context) {
-//		return write(data);
-//	}
-//
-//	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
-//		return write(data, oldAddr);
-//	}
-//
-//    /**
-//     * The default implementation is a NOP.
-//     */
-//	public void detachContext(IAllocationContext context) {
-//		// NOP
-//	}
-//
-//    /**
-//     * The default implementation is a NOP.
-//     */
-//    public void abortContext(final IAllocationContext context) {
-//        // NOP
-//    }
-    
-
 
 	@Override
 	public IPSOutputStream getOutputStream() {

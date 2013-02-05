@@ -2269,12 +2269,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	public boolean isDirty() {
-
-	    return _bufferStrategy.isDirty();
-
-	}
-
 	public boolean isFullyBuffered() {
 
 		return _bufferStrategy.isFullyBuffered();
@@ -2431,6 +2425,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	@Override
 	public void abort() {
 
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
@@ -2694,6 +2689,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //	 */
 //	abstract public AbstractLocalTransactionManager getLocalTransactionManager();
 
+    @Override
+    public boolean isDirty() {
+
+        return _bufferStrategy.isDirty();
+
+    }
+
+    @Override
 	public long commit() {
 
 		final ILocalTransactionManager transactionManager = getLocalTransactionManager();

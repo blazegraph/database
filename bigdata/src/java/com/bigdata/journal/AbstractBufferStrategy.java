@@ -185,6 +185,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * for the counter.
      */
     final protected AtomicLong nextOffset;
+
+    /** The WORM address of the last committed allocation. */
     final protected AtomicLong commitOffset;
 
     static final NumberFormat cf;
@@ -275,6 +277,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         this.maximumExtent = maximumExtent; // MAY be zero!
         
         this.nextOffset = new AtomicLong(nextOffset);
+        
         this.commitOffset = new AtomicLong(nextOffset);
         
         this.bufferMode = bufferMode;
@@ -609,17 +612,34 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     }
 
-    /** The default is a NOP. */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation checks the current allocation offset with that in the
+     * rootBlock
+     * 
+     * @return true if store has been modified since last commit()
+     */
     @Override
-	public void commit() {
+    public boolean isDirty() {
 
-        // NOP for WORM.
+        return commitOffset.get() != nextOffset.get();
+        
     }
 
-    /** The default is a NOP. */
+    @Override
+    public void commit() {
+
+        // remember offset at commit
+        commitOffset.set(nextOffset.get());
+        
+    }
+
+    @Override
     public void abort() {
 
-        // NOP
+        // restore the last committed value for nextOffset.
+        nextOffset.set(commitOffset.get());
         
     }
     

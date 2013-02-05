@@ -445,6 +445,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 	/**
 	 * Calls through to store and then to WriteCacheService.reset
 	 */
+	@Override
 	public void abort() {
 
 	    m_store.reset();
@@ -574,6 +575,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
      * 
      * @return true if store has been modified since last commit()
      */
+    @Override
 	public boolean isDirty() {
 		return m_store.requiresCommit();
 	}

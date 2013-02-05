@@ -1122,23 +1122,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             lastBlockSequence = writeCacheService.resetSequence();
 
         }
-        
-        // remember offset at commit
-        commitOffset.set(nextOffset.get());
+
+        super.commit();
+
     }
-
-    /**
-     * Supports protocol in BigdataSailConnection to check for modifications
-     * prior to calling rollback().
-     * <p>
-     * Checks the current allocation offset with that in the rootBlock
-     * 
-     * @return true if store has been modified since last commit()
-     */
-	public boolean isDirty() {
-		return commitOffset.get() != nextOffset.get();
-	}
-
 
 	@Override
     public long getBlockSequence() {
@@ -1157,6 +1144,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     @Override
     public void abort() {
+
+        super.abort();
 
         if (writeCacheService != null) {
             try {
@@ -1182,7 +1171,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 throw new RuntimeException(e);
             }
         }
-        
+
     }
     
     /**

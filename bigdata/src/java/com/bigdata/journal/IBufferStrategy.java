@@ -231,6 +231,15 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
     public void abort();
 
     /**
+     * Return <code>true</code> if the store has been modified since the last
+     * {@link #commit()} or {@link #abort()}.
+     * 
+     * @return true if store has been modified since last {@link #commit()} or
+     *         {@link #abort()}.
+     */
+    public boolean isDirty();
+    
+    /**
      * The RWStrategy requires meta allocation info in the root block, this
      * method is the hook to enable access. The metaStartAddr is the address in
      * the file where the allocation blocks are stored.
