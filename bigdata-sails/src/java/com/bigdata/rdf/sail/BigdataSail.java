@@ -3052,6 +3052,13 @@ public class BigdataSail extends SailBase implements Sail {
                 /*
                  * Do implicit rollback() of a dirty connection.
                  * 
+                 * Note: DO NOT invoke rollback unless the indices are dirty.
+                 * Discarding the unisolated indices will throw out a LOT of
+                 * cached index pages. You only want to do that when there are
+                 * dirty pages which MUST be discarded. There is a significant
+                 * negative impact on performance if you discard the unisolated
+                 * indices at each commit() point of the Sail!
+                 * 
                  * If we have flushed any writes from the assertion or
                  * retraction buffers to the indices, then we should go rollback
                  * the connection before it is closed. rollback() causes the
