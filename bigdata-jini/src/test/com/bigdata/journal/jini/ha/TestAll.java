@@ -61,7 +61,7 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      * 
-     * FIXME Test {@link WORMStrategy} and {@link RWStore} (through an override?)
+     * FIXME (*) Test {@link WORMStrategy} and {@link RWStore} (through an override?)
      * 
      * FIXME The NSS should transparently proxy mutation requests to the quorum
      * leader (and to a global leader if offsite is supported, or maybe that is
@@ -85,8 +85,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHAJournalServer.class);
 
         // HA2 test suite (k=3, but only 2 services are running).
-        // FIXME Enable TestHA2JournalServer in CI (debug bounce leader/follower first).
-//        suite.addTestSuite(TestHA2JournalServer.class);
+        // FIXME (***) Enable TestHA2JournalServer in CI (debug bounce leader/follower first).
+        //suite.addTestSuite(TestHA2JournalServer.class);
 
         // HA3 test suite.
         suite.addTestSuite(TestHA3JournalServer.class);

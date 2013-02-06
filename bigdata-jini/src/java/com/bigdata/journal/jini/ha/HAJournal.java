@@ -706,7 +706,7 @@ public class HAJournal extends Journal {
         }
 
         /*
-         * FIXME REBUILD: Take a read lock and send everything from the backing
+         * REBUILD: Take a read lock and send everything from the backing
          * file, but do not include the root blocks. The first buffer can be
          * short (to exclude the root blocks). That will put the rest of the
          * buffers on a 1MB boundary which will provide more efficient IOs.

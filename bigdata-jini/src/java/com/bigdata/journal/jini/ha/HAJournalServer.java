@@ -1004,7 +1004,7 @@ public class HAJournalServer extends AbstractServer {
          * 
          *         Blow off the root blocks (zero commit counters). Then install
          *         when known synched to specific commit point and enter
-         *         resync.+
+         *         resync.
          */
         private class RebuildTask implements Callable<Void> {
 

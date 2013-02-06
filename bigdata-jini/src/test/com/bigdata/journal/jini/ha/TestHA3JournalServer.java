@@ -42,7 +42,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
  * of THREE (3) and a fully met {@link Quorum}.
  * 
- * FIXME We need unit tests where we fail (shutdown) the service in at the head
+ * FIXME (***) We need unit tests where we fail (shutdown) the service in at the head
  * of the pipeline (the leader), the 2nd position, and the last position. We
  * need to make sure that the quorum remains (when failing a follower) and that
  * it re-meets (when failing a leader). We also need to extend these tests to
@@ -50,7 +50,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * versions of these tests that bounce the service rather than shutting it down
  * and then restarting it.
  * 
- * FIXME We need unit tests that focus on resynchronization (writes were missed
+ * FIXME (***) We need unit tests that focus on resynchronization (writes were missed
  * during a service shutdown or bounce and hence the service must synchronize
  * when it comes back up).
  * 
