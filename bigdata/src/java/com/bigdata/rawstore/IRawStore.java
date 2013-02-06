@@ -86,7 +86,7 @@ import com.bigdata.mdi.IResourceMetadata;
  *      .
  * 
  */
-public interface IRawStore extends IAddressManager, ICounterSetAccess {
+public interface IRawStore extends IAddressManager, ICounterSetAccess, IStreamStore {
     
     /**
      * Write the data (unisolated).

@@ -23,14 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -63,6 +68,8 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -1152,9 +1159,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
+        super.commit();
+
     }
 
-    @Override
+	@Override
     public long getBlockSequence() {
 
         return lastBlockSequence;
@@ -1171,6 +1180,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     @Override
     public void abort() {
+
+        super.abort();
 
         if (writeCacheService != null) {
             try {
@@ -1196,7 +1207,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 throw new RuntimeException(e);
             }
         }
-        
+
     }
     
     /**
@@ -2549,7 +2560,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     @Override
     public void resetFromHARootBlock(final IRootBlockView rootBlock) {
 
-        nextOffset.set(rootBlock.getNextOffset());
+    	final long rbNextOffset = rootBlock.getNextOffset();
+        nextOffset.set(rbNextOffset);
+        commitOffset.set(rbNextOffset);
         
     }
 
@@ -2653,7 +2666,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         }
 
     }
-
 	@Override
 	public void writeRawBuffer(HARebuildRequest req, IHAWriteMessage msg,
 			ByteBuffer transfer) throws IOException {

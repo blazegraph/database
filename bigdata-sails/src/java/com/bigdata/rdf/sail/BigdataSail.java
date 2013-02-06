@@ -1552,6 +1552,24 @@ public class BigdataSail extends SailBase implements Sail {
         private StatementBuffer<Statement> retractBuffer;
 
         /**
+         * Set to <code>true</code> if we {@link #flush()} either of the
+         * {@link StatementBuffer}s. The flag reflects whether or not the
+         * buffered writes were propagated to the underlying indices. For some
+         * database modes those writes will be buffered by the indices and then
+         * incrementally flushed through to the disk. For others (a federation)
+         * the writes are shard wise ACID.
+         * <p>
+         * Guarded by <code>synchronized(this)</code> (sychronized on the
+         * {@link BigdataSailConnection}).
+         * 
+         * @see #isDirty()
+         * @see #assertBuffer
+         * @see #retractBuffer
+         * @see #flush()
+         */
+        protected boolean dirty = false;
+        
+        /**
          * A canonicalizing mapping for blank nodes whose life cycle is the same
          * as that of the {@link SailConnection}.
          * 
@@ -1593,7 +1611,7 @@ public class BigdataSail extends SailBase implements Sail {
                     + ",open=" + openConn + "}";
 
         }
-        
+
         public BigdataSail getBigdataSail() {
             
             return BigdataSail.this;
@@ -2908,6 +2926,22 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
+            dirty = false;
+            
+        }
+
+        /**
+         * Set to <code>true</code> if we {@link #flush()} either of the
+         * {@link StatementBuffer}s. The flag reflects whether or not the
+         * buffered writes were propagated to the underlying indices. For some
+         * database modes those writes will be buffered by the indices and then
+         * incrementally flushed through to the disk. For others (a federation)
+         * the writes are shard wise ACID.
+         */
+        public synchronized boolean isDirty() {
+
+            return dirty;
+
         }
         
         /**
@@ -2951,6 +2985,8 @@ public class BigdataSail extends SailBase implements Sail {
                 changeLog.transactionCommited(commitTime);
                 
             }
+
+            dirty = false;
             
             return commitTime;
             
@@ -2968,21 +3004,6 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
-//        /**
-//         * Commit the write set, providing detailed feedback on the change set 
-//         * that occurred as a result of this commit.
-//         * 
-//         * @return
-//         *          an iterator over a set of {@link IChangeRecord}s.
-//         */
-//        public synchronized Iterator<IChangeRecord> commit2() throws SailException {
-//
-//            commit();
-//            
-//            return new EmptyIterator<IChangeRecord>();
-//            
-//        }
-
         final public boolean isOpen() throws SailException {
 
             return openConn;
@@ -2990,17 +3011,27 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Note: This does NOT implicitly {@link #rollback()} the
-         * {@link SailConnection}. If you are doing error handling do NOT
-         * assume that {@link #close()} will discard all writes.<p>
-         * 
-         * @todo Since there is a moderate amount of state (the buffers) it
-         *       would be nice to not have to reallocate those. In order to
-         *       reuse the buffer for writable connections we need to separate
-         *       the concept of whether or not the connection is opened from its
-         *       buffer state. Note that the scale-out triple store allows
-         *       concurrent writers, so each writer needs its own buffers for
-         *       that scenario.
+         * {@inheritDoc}
+         * <p>
+         * Note: If writes have been applied through the
+         * {@link BigdataSailConnection} and neither {@link #commit()} nor
+         * {@link #rollback()} has been invoked, then an implicit
+         * {@link #rollback()} WILL be performed.
+         * <p>
+         * Note: This logic to invoke the implicit {@link #rollback()} WILL NOT
+         * notice whether changes were applied at the
+         * {@link AbstractTripleStore} layer. It bases its decision SOLELY on
+         * whether updates were observed at the {@link BigdataSailConnection}.
+         * It is possible to make updates at other layers and you are
+         * responsible for calling {@link #rollback()} when handling an error
+         * condition if you are going around the {@link BigdataSailConnection}
+         * for those updates.
+         * <p>
+         * Note: Since {@link #close()} discards any uncommitted writes it is
+         * important to commit the {@link #getDatabase()} made from OUTSIDE of
+         * the {@link BigdataSail} before opening a {@link SailConnection} (this
+         * artifact arises because the {@link SailConnection} is using
+         * unisolated writes on the database).
          */
         public synchronized void close() throws SailException {
 
@@ -3015,30 +3046,55 @@ public class BigdataSail extends SailBase implements Sail {
             if (txLog.isInfoEnabled())
                 txLog.info("SAIL-CLOSE-CONN: conn=" + this);
 
-    		/*
-             * Note: I have commented out the implicit [rollback]. It causes the
-             * live indices to be discarded by the backing journal which is a
-             * significant performance hit. This means that if you write on a
-             * SailConnection and do NOT explicitly rollback() the writes then
-             * any writes that were flushed through to the database will remain
-             * there and participate in the next commit.
-             * 
-             * @todo we could notice if there were writes and only rollback the
-             * store when there were uncommitted writes.  this scenario can only
-             * arise for the Journal.  Any federation based system will be using
-             * unisolated operations with auto-commit.
-             */
-            
-//            * Note: Since {@link #close()} discards any uncommitted writes it is
-//            * important to commit the {@link #getDatabase()} made from OUTSIDE of
-//            * the {@link BigdataSail} before opening a {@link SailConnection},
-//            * even if the connection does not write on the database (this artifact
-//            * arises because the {@link SailConnection} is using unisolated writes
-//            * on the database).
-//            * 
-//            // discard any changes that might be lying around.
-//            rollback();
+            final IIndexManager im = getDatabase().getIndexManager();
 
+            if (isDirty()) {
+                /*
+                 * Do implicit rollback() of a dirty connection.
+                 * 
+                 * Note: DO NOT invoke rollback unless the indices are dirty.
+                 * Discarding the unisolated indices will throw out a LOT of
+                 * cached index pages. You only want to do that when there are
+                 * dirty pages which MUST be discarded. There is a significant
+                 * negative impact on performance if you discard the unisolated
+                 * indices at each commit() point of the Sail!
+                 * 
+                 * If we have flushed any writes from the assertion or
+                 * retraction buffers to the indices, then we should go rollback
+                 * the connection before it is closed. rollback() causes the
+                 * live indices to be discarded by the backing journal which is
+                 * a significant performance hit. This means that if you write
+                 * on a SailConnection and do NOT explicitly rollback() the
+                 * writes then any writes that were flushed through to the
+                 * database will remain there and participate in the next
+                 * commit. Really, people should be using a pattern that
+                 * guarantees this, but we have often seen code that does not
+                 * provide this guarantee.
+                 * 
+                 * Note: For an AbstractJournal, the writes will have been
+                 * buffered on the unisolated views of the indices. Those
+                 * indices may have been incrementally flushed to the disk, but
+                 * there can still be dirty index pages in memory. It is vitally
+                 * important that those views of the indices are discarded and
+                 * that the any incrementally flushed index pages are discarded
+                 * (the internal views of those indices must be discarded so
+                 * they will be reloaded from their last checkpoint and the
+                 * allocations associated with those pages must be released
+                 * since they will not become committed state).
+                 * 
+                 * Note: For a federation, those writes will have been made
+                 * through shard-wise ACID operations and no rollback is
+                 * possible - they are already durable. Further, the client has
+                 * only a remote view of the indices so there is no state that
+                 * needs to be discarded.
+                 * 
+                 * Note: TemporaryRawStore does not allow rollback (it does not
+                 * have any sense of commit points). This code path will result
+                 * in an UnsupportedOperationException.
+                 */
+                rollback();
+            }
+            
             try {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
@@ -3047,11 +3103,10 @@ public class BigdataSail extends SailBase implements Sail {
                     // release the reentrant lock
                     lock.unlock();
                 }
-        		if (unisolated && getDatabase().getIndexManager() instanceof Journal) {
+                if (unisolated && im instanceof Journal) {
                     // release the permit.
-        			((Journal) getDatabase().getIndexManager())
-        					.releaseUnisolatedConnection();
-        		}
+                    ((Journal) im).releaseUnisolatedConnection();
+                }
                 openConn = false;
             }
             
@@ -3116,6 +3171,9 @@ public class BigdataSail extends SailBase implements Sail {
 
                 if (flushAssertBuffer && assertBuffer != null) {
 
+                    if (!assertBuffer.isEmpty())
+                        dirty = true;
+
                     // flush statements
                     assertBuffer.flush();
 
@@ -3134,6 +3192,9 @@ public class BigdataSail extends SailBase implements Sail {
 
                 if (flushRetractBuffer && retractBuffer != null) {
 
+                    if (!retractBuffer.isEmpty())
+                        dirty = true;
+
                     // flush statements.
                     retractBuffer.flush();
 
@@ -3148,7 +3209,10 @@ public class BigdataSail extends SailBase implements Sail {
 
                     }
 
+                    dirty = true;
+
                 }
+
             }
 
         }
@@ -3790,6 +3854,8 @@ public class BigdataSail extends SailBase implements Sail {
                     
                 }
 
+                dirty = false;
+                
                 return commitTime;
             
             } catch(IOException ex) {
@@ -3826,6 +3892,8 @@ public class BigdataSail extends SailBase implements Sail {
             
                 txService.abort(tx);
                 
+                dirty = false;
+
                 newTx();
             
             } catch(IOException ex) {

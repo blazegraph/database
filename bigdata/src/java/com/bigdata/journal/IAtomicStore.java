@@ -62,6 +62,15 @@ public interface IAtomicStore extends IRawStore {
     public long commit();
 
     /**
+     * Return <code>true</code> if the store has been modified since the last
+     * {@link #commit()} or {@link #abort()}.
+     * 
+     * @return true if store has been modified since last {@link #commit()} or
+     *         {@link #abort()}.
+     */
+    public boolean isDirty();
+    
+    /**
      * Set a persistence capable data structure for callback during the commit
      * protocol.
      * <p>

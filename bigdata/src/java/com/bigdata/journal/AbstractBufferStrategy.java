@@ -23,7 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -38,6 +42,8 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
@@ -180,6 +186,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      */
     final protected AtomicLong nextOffset;
 
+    /** The WORM address of the last committed allocation. */
+    final protected AtomicLong commitOffset;
+
     static final NumberFormat cf;
     
     static {
@@ -268,6 +277,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         this.maximumExtent = maximumExtent; // MAY be zero!
         
         this.nextOffset = new AtomicLong(nextOffset);
+        
+        this.commitOffset = new AtomicLong(nextOffset);
         
         this.bufferMode = bufferMode;
         
@@ -601,17 +612,34 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     }
 
-    /** The default is a NOP. */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation checks the current allocation offset with that in the
+     * rootBlock
+     * 
+     * @return true if store has been modified since last commit()
+     */
     @Override
-	public void commit() {
+    public boolean isDirty() {
 
-        // NOP for WORM.
+        return commitOffset.get() != nextOffset.get();
+        
     }
 
-    /** The default is a NOP. */
+    @Override
+    public void commit() {
+
+        // remember offset at commit
+        commitOffset.set(nextOffset.get());
+        
+    }
+
+    @Override
     public void abort() {
 
-        // NOP
+        // restore the last committed value for nextOffset.
+        nextOffset.set(commitOffset.get());
         
     }
     

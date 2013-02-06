@@ -28,7 +28,8 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IStore;
 
@@ -50,7 +51,7 @@ import com.bigdata.rwstore.IStore;
  * 
  * @author martyncutcher
  */
-public interface IMemoryManager extends IStore, ICounterSetAccess {
+public interface IMemoryManager extends IStore, ICounterSetAccess, IAllocationContext, IAllocationManagerStore {
 
 	/**
 	 * Allocates space on the backing resource and copies the provided data.
@@ -148,6 +149,8 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 	 */
 	public long allocate(int nbytes);
 
+	public long allocate(ByteBuffer data, IAllocationContext context);
+
 	/**
 	 * Return an array of {@link ByteBuffer}s providing an updatable view onto
 	 * the backing allocation.
@@ -206,6 +209,8 @@ public interface IMemoryManager extends IStore, ICounterSetAccess {
 	 *             is any address which encodes a 0 byte length.
 	 */
 	public void free(long addr);
+
+	public void free(long addr, IAllocationContext context);
 
 	/**
 	 * Clears all current allocations. Clearing an allocation context makes the

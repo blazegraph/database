@@ -38,8 +38,8 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.PSOutputStream;
 
@@ -299,13 +299,10 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, null);
 	}
 
-	@Override
-	public IPSOutputStream getOutputStream(final IAllocationContext context) {
-		if (context != null)
-			throw new IllegalArgumentException("Nested AllocationContexts are not supported");
-		
-		return getOutputStream();
-	}
+    @Override
+    public IPSOutputStream getOutputStream(IAllocationContext context) {
+        return PSOutputStream.getNew(this, SectorAllocator.BLOB_SIZE+4 /*no checksum*/, context);
+    }
 
 	@Override
 	public InputStream getInputStream(long addr) {
@@ -426,6 +423,26 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 	public long getPhysicalAddress(final long addr) {
 		return m_root.getPhysicalAddress(addr);
 	}
+
+	@Override
+	public long allocate(ByteBuffer data, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+    @Override
+    public long write(ByteBuffer data, IAllocationContext context) {
+        return allocate(data,context);
+    }
+
+	@Override
+	public void free(long addr, IAllocationContext context) {
+		throw new UnsupportedOperationException();
+	}
+
+    @Override
+    public void delete(long addr, IAllocationContext context) {
+        free(addr,context);
+    }
 
 //	private SectorAllocation m_head = null;
 //	

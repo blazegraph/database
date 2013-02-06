@@ -57,8 +57,8 @@ import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.service.AbstractTransactionService;
@@ -1696,5 +1696,35 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			m_allocationLock.unlock();
 		}
 	}
+
+	@Override
+	public long allocate(ByteBuffer data, IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			return establishContextAllocation(context).allocate(data);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+    @Override
+    public long write(ByteBuffer data, IAllocationContext context) {
+        return allocate(data, context);
+    }
+
+	@Override
+	public void free(long addr, IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			establishContextAllocation(context).free(addr);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
+    @Override
+    public void delete(long addr, IAllocationContext context) {
+        free(addr,context);
+    }
 
 }

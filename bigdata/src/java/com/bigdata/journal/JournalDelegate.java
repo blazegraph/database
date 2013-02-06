@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Properties;
@@ -39,6 +40,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -269,4 +272,19 @@ public class JournalDelegate implements IJournal {
     public Iterator<String> indexNameScan(String prefix, long timestamp) {
         return delegate.indexNameScan(prefix, timestamp);
     }
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+		return delegate.getOutputStream();
+	}
+
+	@Override
+	public InputStream getInputStream(long addr) {
+		return delegate.getInputStream(addr);
+	}
+
+	@Override
+	public boolean isDirty() {
+		return delegate.isDirty();
+	}
 }

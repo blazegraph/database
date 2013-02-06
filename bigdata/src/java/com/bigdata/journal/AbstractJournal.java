@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -127,12 +128,14 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumMember;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationManagerStore;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IAllocationManager;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.sector.MemStrategy;
@@ -212,7 +215,7 @@ import com.bigdata.util.NT;
  *       been asynchronously closed.
  */
 public abstract class AbstractJournal implements IJournal/* , ITimestampService */
-, IAllocationManager
+, IAllocationManager, IAllocationManagerStore
 {
 
 	/**
@@ -2422,6 +2425,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	@Override
 	public void abort() {
 
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
@@ -2685,6 +2689,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //	 */
 //	abstract public AbstractLocalTransactionManager getLocalTransactionManager();
 
+    @Override
+    public boolean isDirty() {
+
+        return _bufferStrategy.isDirty();
+
+    }
+
+    @Override
 	public long commit() {
 
 		final ILocalTransactionManager transactionManager = getLocalTransactionManager();
@@ -3264,6 +3276,36 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
         
     }
+
+	@Override
+	public IPSOutputStream getOutputStream() {
+        assertCanWrite();
+
+		return _bufferStrategy.getOutputStream();
+	}
+
+	@Override
+	public IPSOutputStream getOutputStream(final IAllocationContext context) {
+
+		assertCanWrite();
+
+		if (_bufferStrategy instanceof IRWStrategy) {
+
+			return ((IRWStrategy) _bufferStrategy).getOutputStream(context);
+
+		} else {
+
+			return _bufferStrategy.getOutputStream();
+
+		}
+
+	}
+	
+	@Override
+	public InputStream getInputStream(long addr) {
+		return _bufferStrategy.getInputStream(addr);
+	}
+
 
 	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
     public void delete(final long addr) {
@@ -5977,5 +6019,4 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return removed;
         
     }
-
 }

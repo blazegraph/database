@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -64,6 +65,8 @@ import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -71,7 +74,6 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
-import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -2660,7 +2662,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.write(data, oldAddr, this);
 //        }
 
-        public void delete(final long addr) {
+
+    	@Override
+    	public IPSOutputStream getOutputStream() {
+    		return delegate.getOutputStream(this);
+    	}
+
+    	@Override
+    	public InputStream getInputStream(long addr) {
+    		return delegate.getInputStream(addr);
+    	}
+
+    	public void delete(final long addr) {
             delegate.delete(addr, this);
         }
 
@@ -2707,6 +2720,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public Iterator<String> indexNameScan(String prefix, long timestamp) {
             throw new UnsupportedOperationException();
         }
+
+		@Override
+		public boolean isDirty() {
+			return delegate.isDirty();
+		}
 
     } // class IsolatatedActionJournal
 
@@ -3155,6 +3173,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 			return delegate.getHttpdPort();
 		}
 
+		@Override
+		public IPSOutputStream getOutputStream() {
+            throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public InputStream getInputStream(long addr) {
+			return delegate.getInputStream(addr);
+		}
+
+		@Override
+		public boolean isDirty() {
+			return false; // it's readOnly - cannot be dirty
+		}
     } // class ReadOnlyJournal
 
     /**
