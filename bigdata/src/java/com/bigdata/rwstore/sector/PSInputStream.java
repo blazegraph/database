@@ -54,6 +54,8 @@ public class PSInputStream extends InputStream {
 				m_buffers[index] = block[0];
 				
 			}
+		} else if (sze == 0) {
+			m_buffers = new ByteBuffer[0];
 		} else {
 			m_buffers = mm.get(addr);
 		}

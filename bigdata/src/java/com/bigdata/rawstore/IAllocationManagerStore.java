@@ -21,11 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rwstore;
+package com.bigdata.rawstore;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.IAllocationManager;
 
 /**
  * Adds capability to write and delete allocations within an
@@ -36,7 +36,7 @@ import com.bigdata.rawstore.IRawStore;
  * @see IAllocationManager
  * @see IAllocationContext
  */
-public interface IAllocationManagerStore extends IRawStore {
+public interface IAllocationManagerStore extends IStreamStore {
 
     /**
      * Write the data within the allocation context. The write is not visible
@@ -63,5 +63,19 @@ public interface IAllocationManagerStore extends IRawStore {
      *            The allocation context.
      */
     void delete(long addr, IAllocationContext context);
+    
+    /**
+     * Return an output stream which can be used to write on the backing store
+     * within the given allocation context. You can recover the address used to
+     * read back the data from the {@link IPSOutputStream}.
+     * 
+     * @param context
+     *            The context within which any allocations are made by the
+     *            returned {@link IPSOutputStream}.
+     *            
+     * @return an output stream to stream data to and to retrieve an address to
+     *         later stream the data back.
+     */
+    public IPSOutputStream getOutputStream(final IAllocationContext context);
 
 }

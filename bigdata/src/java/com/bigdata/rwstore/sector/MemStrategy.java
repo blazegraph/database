@@ -42,8 +42,9 @@ import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IAllocationManagerStore;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.util.ChecksumUtility;
@@ -54,7 +55,7 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:matyncutcher@users.sourceforge.net">Martyn Cutcher</a>
  * @version $Id$
  */
-public class MemStrategy implements IBufferStrategy, IRWStrategy {
+public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationManagerStore {
 	
 	final private IMemoryManager m_mmgr;
 	final private IAddressManager m_am;
@@ -423,7 +424,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 
 	@Override
 	public void delete(long addr, IAllocationContext context) {
-		throw new UnsupportedOperationException();
+		m_mmgr.free(addr, context);
 	}
 
 	@Override
@@ -455,7 +456,7 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
      */
 	@Override
 	public long write(final ByteBuffer data, final IAllocationContext context) {
-		throw new UnsupportedOperationException();
+		return m_mmgr.allocate(data, context);
 	}
 
 	public boolean isCommitted(final long addr) {
@@ -475,6 +476,11 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy {
 	@Override
 	public IPSOutputStream getOutputStream(final IAllocationContext context) {
 		return m_mmgr.getOutputStream(context);
+	}
+
+	@Override
+	public boolean isDirty() {
+		return m_dirty;
 	}
 
 //	@Override

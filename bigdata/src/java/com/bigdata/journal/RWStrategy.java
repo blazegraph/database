@@ -48,8 +48,8 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rwstore.IAllocationContext;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.rwstore.RWStore;
@@ -446,6 +446,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
 	/**
 	 * Calls through to store and then to WriteCacheService.reset
 	 */
+	@Override
 	public void abort() {
 
 	    m_store.reset();
@@ -569,7 +570,18 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
         
     }
 
-    public long getMetaBitsAddr() {
+    /**
+     * Supports protocol in BigdataSailConnection to check for modifications
+     * prior to calling rollback().
+     * 
+     * @return true if store has been modified since last commit()
+     */
+    @Override
+	public boolean isDirty() {
+		return m_store.requiresCommit();
+	}
+
+	public long getMetaBitsAddr() {
         
         return m_store.getMetaBitsAddr();
         

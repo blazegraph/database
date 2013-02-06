@@ -401,14 +401,14 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * Toggle comment appropriately to activate/deactivate
      */
-//  final long[] addrsUsed = new long[4024 * 1024];
-//  int addrsUsedCurs = 0;
-//  final char[] addrActions = new char[addrsUsed.length];
-//  final int[] addrLens = new int[addrsUsed.length];
-    private final long[] addrsUsed = null;
-    private int addrsUsedCurs = 0;
-    private final char[] addrActions = null;
-    private final int[] addrLens = null;
+	// final long[] addrsUsed = new long[4024 * 1024];
+	// private int addrsUsedCurs = 0;
+	// final char[] addrActions = new char[addrsUsed.length];
+	// final int[] addrLens = new int[addrsUsed.length];
+	private final long[] addrsUsed = null;
+	private int addrsUsedCurs = 0;
+	private final char[] addrActions = null;
+	private final int[] addrLens = null;
     
     /**
      * The backing reader that can be used when a cache read misses.

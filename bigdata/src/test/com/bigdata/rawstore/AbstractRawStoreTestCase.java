@@ -27,10 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import com.bigdata.io.TestCase3;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.WORMStrategy;
 
 /**
  * Base class for writing tests of the {@link IRawStore} interface.
@@ -952,6 +962,197 @@ abstract public class AbstractRawStoreTestCase extends TestCase3 {
 
     }
     
+    IRawStore ensureStreamStore(final IRawStore store) {
+    	return store instanceof Journal ? ((Journal) store).getBufferStrategy() : store;
+    }
+    
+	public void testSimpleStringStream() throws IOException, ClassNotFoundException {
+		final IRawStore store = getStore();
+
+		try {
+
+			final IRawStore rawstore = ensureStreamStore(store);
+			
+			final IPSOutputStream psout = rawstore.getOutputStream();
+			final ObjectOutputStream outdat = new ObjectOutputStream(psout);
+			
+			final String hw = "Hello World";
+			
+			outdat.writeObject(hw);
+			outdat.flush();
+			
+			final long addr = psout.getAddr();
+			
+			final InputStream instr = rawstore.getInputStream(addr);
+			
+			final ObjectInputStream inobj = new ObjectInputStream(instr);
+			final String tst = (String) inobj.readObject();
+			
+			assertTrue(hw.equals(tst));
+			
+		} finally {
+
+			store.destroy();
+
+		}
+		
+	}
+	
+	public void testSimpleStringStreamFromStandardAllocation() throws IOException, ClassNotFoundException {
+		final IRawStore store = getStore();
+
+		try {
+
+			final IRawStore strategy = ensureStreamStore(store);
+			
+			final IPSOutputStream psout = strategy.getOutputStream();
+			final ObjectOutputStream outdat = new ObjectOutputStream(psout);
+			
+			final String hw = "Hello World";
+			
+			// Now confirm similar with non-stream allocation
+			final ByteArrayOutputStream bbout = new ByteArrayOutputStream();
+			final ObjectOutputStream outdat2 = new ObjectOutputStream(bbout);
+			
+			outdat2.writeObject(hw);
+			outdat2.flush();
+			
+			final ByteBuffer bb = ByteBuffer.wrap(bbout.toByteArray());
+			final long addr2 = strategy.write(bb);
+			
+			// see if we can read back as stream after allocating as buffer
+			
+			final InputStream instr2 = strategy.getInputStream(addr2);
+			
+			final ObjectInputStream inobj2 = new ObjectInputStream(instr2);
+			final String tst2 = (String) inobj2.readObject();
+			
+			assertTrue(hw.equals(tst2));
+			
+
+		} finally {
+
+			store.destroy();
+
+		}
+		
+	}
+	
+	public void testEmptyStream() throws IOException, ClassNotFoundException {
+		final IRawStore store = getStore();
+
+		try {
+
+			final IRawStore strategy = ensureStreamStore(store);
+			
+			final IPSOutputStream psout = strategy.getOutputStream();
+			
+			final long addr = psout.getAddr();
+			
+			final InputStream instr = strategy.getInputStream(addr);
+			
+			assertTrue(-1 == instr.read());
+		} finally {
+
+			store.destroy();
+
+		}
+		
+	}
+
+	/**
+	 * Writing a blob sized object stream is an excellent test since the ObjectInputStream
+	 * will likely throw an exception if there is a data error.
+	 */
+	public void testBlobObjectStreams() throws IOException, ClassNotFoundException {
+		final IRawStore store = getStore();
+
+		try {
+
+			final IRawStore strategy =  ensureStreamStore(store);
+			IPSOutputStream psout = strategy.getOutputStream();
+						
+			ObjectOutputStream outdat = new ObjectOutputStream(psout);
+			final String blobBit = "A bit of a blob...";
+			
+			for (int i = 0; i < 40000; i++)
+				outdat.writeObject(blobBit);
+			outdat.close();
+			
+			long addr = psout.getAddr(); // save and retrieve the address
+			
+			InputStream instr = strategy.getInputStream(addr);
+			
+			ObjectInputStream inobj = new ObjectInputStream(instr);
+			for (int i = 0; i < 40000; i++) {
+				try {
+					final String tst = (String) inobj.readObject();
+				
+					assertTrue(blobBit.equals(tst));
+				} catch (IOException ioe) {
+					System.err.println("Problem at " + i);
+					throw ioe;
+				}
+			}
+			
+			try {
+				inobj.readObject();
+				fail("Expected EOFException");
+			} catch (EOFException eof) {
+				// expected
+			} catch (Exception ue) {
+				fail("Expected EOFException not this", ue);
+			}
+		
+			// confirm that the stream address can be freed
+			strategy.delete(addr);
+		} finally {
+			store.destroy();
+		}
+	}
+
+	/**
+	 * This test exercises the stream interface and serves as an example of
+	 * stream usage for compressed IO.
+	 */
+	public void testZipStreams() throws IOException, ClassNotFoundException {
+		final IRawStore store = getStore();
+
+		try {
+
+			final IRawStore strategy =  ensureStreamStore(store);
+			final IPSOutputStream psout = strategy.getOutputStream();
+			
+			ObjectOutputStream outdat = new ObjectOutputStream(new GZIPOutputStream(psout));
+			final String blobBit = "A bit of a blob...";
+			
+			for (int i = 0; i < 40000; i++)
+				outdat.writeObject(blobBit);
+			outdat.close();
+			
+			long addr = psout.getAddr(); // save and retrieve the address
+				
+			InputStream instr = strategy.getInputStream(addr);
+			
+			ObjectInputStream inobj = new ObjectInputStream(new GZIPInputStream(instr));
+			for (int i = 0; i < 40000; i++) {
+				try {
+					final String tst = (String) inobj.readObject();
+				
+					assertTrue(blobBit.equals(tst));
+				} catch (IOException ioe) {
+					fail("Problem at " + i, ioe);
+				}
+			}
+			
+			strategy.delete(addr);
+		
+		} finally {
+			store.destroy();
+		}
+	}
+
+
 //    /**
 //     * Test verifies delete of a record and the behavior of read once the
 //     * record has been deleted.

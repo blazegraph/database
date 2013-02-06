@@ -23,7 +23,8 @@ import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase2;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rwstore.IPSOutputStream;
+import com.bigdata.rawstore.IAllocationContext;
+import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.PSInputStream;
 import com.bigdata.rwstore.PSOutputStream;
 import com.bigdata.util.InnerCause;
@@ -77,6 +78,19 @@ public class TestMemoryManager extends TestCase2 {
 		String retstr = getString(saddr);
 		
 		assertTrue(helloWorld.equals(retstr));
+		
+		manager.free(saddr);
+		
+		try {
+			getString(saddr);
+			fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+			// expected
+		}
+		
+		final long saddr2 = allocate(manager, helloWorld);
+		
+		assertTrue(saddr == saddr2);
 	}
 
 	/**
@@ -142,6 +156,41 @@ public class TestMemoryManager extends TestCase2 {
 			context.clear();
 			
 		}
+	}
+	
+	/**
+	 * Rather than creating contexts directly, instead associate with
+	 * externally created context.
+	 */
+	public void testNestedAllocationContexts() {
+		final IAllocationContext context = new IAllocationContext() {};
+		
+		final String test = "Hello World";
+		
+		final long addr1 = allocate(manager, context, test);
+		final long addr2 = allocate(manager, context, test);
+		
+		assertTrue(addr1 != addr2);
+		
+		final String res = getString(addr1);
+		
+		assertTrue(res.equals(test));
+		
+		manager.free(addr1, context);
+		
+		// check recycling of original allocation
+		final long addr3 = allocate(manager, context, test);
+		
+		// should not be recycled because of session protection
+		assertTrue(addr1 != addr3);
+				
+		manager.detachContext(context);
+		
+		// now check recycling
+		final long addr4 = allocate(manager, context, test);
+		
+		// confirm that addr1 is now available for use
+		assertTrue(addr1 == addr4);
 	}
 	
 	public void testAllocationContextsStreams() throws IOException {
@@ -448,6 +497,14 @@ public class TestMemoryManager extends TestCase2 {
 		final ByteBuffer bb = ByteBuffer.wrap(val.getBytes());
 		
 		return mm.allocate(bb, false/* blocks */);
+		
+	}
+
+	private long allocate(final IMemoryManager mm, final IAllocationContext context, String val) {
+		
+		final ByteBuffer bb = ByteBuffer.wrap(val.getBytes());
+		
+		return mm.allocate(bb, context);
 		
 	}
 

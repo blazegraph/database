@@ -31,6 +31,7 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.util.ChecksumUtility;

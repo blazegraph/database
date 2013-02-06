@@ -3,6 +3,7 @@ package com.bigdata.rwstore;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy;
+import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rwstore.sector.MemStrategy;
 
 /**
@@ -12,7 +13,7 @@ import com.bigdata.rwstore.sector.MemStrategy;
  * @author Martyn Cutcher
  */
 public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
-        IAllocationManagerStore, IStreamStore, IHistoryManager {
+        IAllocationManagerStore, IHistoryManager {
 
     /**
      * Return the backing {@link IStore}.

@@ -485,11 +485,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     @Override
     public void commit() {
-    	if (writeCache != null) {
-	    	synchronized(this) {
-	    		flushWriteCache();
-	    	}
-    	}
+        if (writeCache != null) {
+            synchronized (this) {
+                flushWriteCache();
+            }
+        }
+        super.commit();
     }
     
     /**
