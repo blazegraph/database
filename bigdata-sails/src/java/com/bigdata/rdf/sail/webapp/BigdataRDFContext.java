@@ -97,6 +97,7 @@ import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -748,11 +749,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
         final AbstractQuery setupQuery(final BigdataSailRepositoryConnection cxn) {
 
             // Note the begin time for the query.
-            final long begin =  System.nanoTime();
-            
+            final long begin = System.nanoTime();
+
             final AbstractQuery query = newQuery(cxn);
 
-        	// Figure out the UUID under which the query will execute.
+            // Figure out the UUID under which the query will execute.
             final UUID queryId2 = setQueryId(((BigdataSailQuery) query)
                     .getASTContainer());
             
@@ -845,6 +846,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
+            final long queryTimeout = getConfig().queryTimeout;
+            
+            if (queryTimeout > 0) {
+
+                final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+                originalQuery.setTimeout(queryTimeout);
+                
+            }
+            
 //            final ASTContainer astContainer = ((BigdataParsedQuery) parsedQuery)
 //                    .getASTContainer();
 

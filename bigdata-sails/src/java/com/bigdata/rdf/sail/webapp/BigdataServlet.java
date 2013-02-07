@@ -148,8 +148,8 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             final HttpServletResponse resp) throws IOException {
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
-	    
-        if(quorum == null) {
+
+        if (quorum == null) {
          
             // No quorum.
             return true;
@@ -190,6 +190,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                 "Not quorum leader.");
         
+        // Not writable.  Response has been committed.
         return false;
         
 	}

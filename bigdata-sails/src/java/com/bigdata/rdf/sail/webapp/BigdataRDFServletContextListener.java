@@ -286,8 +286,43 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        final boolean readOnly;
+        {
+
+            final String s = context.getInitParameter(ConfigParams.READ_ONLY);
+
+            readOnly = s == null ? ConfigParams.DEFAULT_READ_ONLY : Boolean
+                    .valueOf(s);
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.READ_ONLY + "=" + readOnly);
+
+        }
+
+        final long queryTimeout;
+        {
+
+            final String s = context
+                    .getInitParameter(ConfigParams.QUERY_TIMEOUT);
+
+            queryTimeout = s == null ? ConfigParams.DEFAULT_QUERY_TIMEOUT
+                    : Integer.valueOf(s);
+
+            if (queryTimeout < 0) {
+
+                throw new RuntimeException(ConfigParams.QUERY_TIMEOUT
+                        + " : Must be non-negative, not: " + s);
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.QUERY_TIMEOUT + "=" + queryTimeout);
+
+        }
+
         final SparqlEndpointConfig config = new SparqlEndpointConfig(namespace,
-                timestamp, queryThreadPoolSize, describeEachNamedGraph);
+                timestamp, queryThreadPoolSize, describeEachNamedGraph,
+                readOnly, queryTimeout);
 
         rdfContext = new BigdataRDFContext(config, indexManager);
 

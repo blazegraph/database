@@ -138,6 +138,32 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     private volatile BigdataRDFContext m_context;
 
     /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Overridden to support read-only deployments.
+     * 
+     * @see SparqlEndpointConfig#readOnly
+     * @see ConfigParams#READ_ONLY
+     */
+    @Override
+    protected boolean isWritable(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+        
+        if(getConfig().readOnly) {
+            
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Not writable.");
+
+            // Not writable.  Response has been committed.
+            return false;
+            
+        }
+        
+        return super.isWritable(req, resp);
+        
+    }
+
+    /**
      * Write the stack trace onto the output stream. This will show up in the
      * client's response. This code path should be used iff we have already
      * begun writing the response. Otherwise, an HTTP error status should be
