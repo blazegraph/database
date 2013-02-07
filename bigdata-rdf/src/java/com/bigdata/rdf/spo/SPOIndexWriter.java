@@ -188,7 +188,7 @@ public class SPOIndexWriter implements Callable<Long> {
         
 //        assert quads == spoRelation.getContainer().isQuads();
         
-        sids = spoRelation.statementIdentifiers;
+        sids = spoRelation.getStatementIdentifiers();
 
     }
 
