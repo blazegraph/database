@@ -65,24 +65,50 @@ public class DumpIndexSegment {
 
     /**
      * Dump one or more {@link IndexSegment}s.
+     * <p>
+     * Note: The <code>-nodeState</code> and <code>-leafState</code> options
+     * also require you to turn up the logging level in order to see the output.
+     * However, when true they will apply a variety of validation tests to the
+     * nodes and leaves regardless of whether their state is written onto the
+     * console.
      * 
      * @param args
-     *            usage <code>[file|-d level]+</code>, where <i>file</i> is
-     *            the name of a n {@link IndexSegmentStore} file and
-     *            <code>level is the name of the {@link Level} to be used
-     *            for the {@link AbstractBTree#dumpLog}</code>
-     *            
-     * @throws IOException 
+     *            usage <code>[file|-d level|-nodeState|-leafState]+</code>,
+     *            where
+     *            <dl>
+     *            <dt>file</dt>
+     *            <dl>
+     *            is the name of a n {@link IndexSegmentStore} file
+     *            </dl>
+     *            <dt>level</dt>
+     *            <dl>
+     *            is the name of the {@link Level} to be used for the
+     *            {@link AbstractBTree#dumpLog}
+     *            </dl>
+     *            <dt>-nodeState</dt>
+     *            <dl>
+     *            Enables the dump of the {@link Node} state
+     *            </dl>
+     *            <dt>-leafState</dt>
+     *            <dl>
+     *            Enables the dump of the {@link Node} state
+     *            </dl>
+     *            </dl>
+     * 
+     * @throws IOException
      */
-    public static void main(String[] args) throws IOException {
-        
-        if(args.length==0) {
+    public static void main(final String[] args) throws IOException {
+
+        if (args.length == 0) {
          
             usage();
-            
+
             System.exit(1);
-            
+
         }
+
+        boolean dumpNodeState = false;
+        boolean dumpLeafState = false;
 
         for (int i = 0; i < args.length; i++) {
 
@@ -90,8 +116,8 @@ public class DumpIndexSegment {
 
             if (arg.startsWith("-")) {
 
-                if( arg.equals("-d")) {
-                    
+                if (arg.equals("-d")) {
+
                     final Level level = Level.toLevel(args[++i]);
                     
                     System.out.println("Setting log level: "+level);
@@ -116,6 +142,14 @@ public class DumpIndexSegment {
                         }
                     }
                     
+                } else if(arg.equals("-nodeState")) {
+                    
+                    dumpNodeState = true;
+                    
+                } else if(arg.equals("-leafState")) {
+
+                    dumpLeafState = true;
+
                 } else {
                     
                     System.err.println("Unknown option: "+arg);
@@ -136,7 +170,7 @@ public class DumpIndexSegment {
                     
                 }
 
-                dumpIndexSegment(file);
+                dumpIndexSegment(file, dumpNodeState, dumpLeafState);
 
             }
 
@@ -144,16 +178,8 @@ public class DumpIndexSegment {
 
     }
 
-    static void dumpIndexSegment(final File file) throws IOException {
-
-        /*
-         * Note: These options also require you to turn up the logging level in
-         * order to see the output. However, when true they will apply a variety
-         * of validation tests to the nodes and leaves regardless of whether
-         * their state is written onto the console.
-         */
-        boolean dumpNodeState = true; // @todo command line option
-        boolean dumpLeafState = true;// @todo command line option
+    static void dumpIndexSegment(final File file, final boolean dumpNodeState,
+            final boolean dumpLeafState) throws IOException {
 
         final IndexSegmentStore store = new IndexSegmentStore(file);
 
@@ -354,8 +380,9 @@ public class DumpIndexSegment {
      * 
      * @param store
      */
-    static void dumpLeavesReverseScan(IndexSegmentStore store,boolean dumpLeafState) {
-        
+    static void dumpLeavesReverseScan(final IndexSegmentStore store,
+            final boolean dumpLeafState) {
+
         final long begin = System.currentTimeMillis();
         
         final AbstractBTree btree = store.loadIndexSegment(); 
@@ -458,8 +485,9 @@ public class DumpIndexSegment {
      * 
      * @param store
      */
-    static void dumpLeavesForwardScan(IndexSegmentStore store,boolean dumpLeafState) {
-        
+    static void dumpLeavesForwardScan(final IndexSegmentStore store,
+            final boolean dumpLeafState) {
+
         final long begin = System.currentTimeMillis();
         
         final AbstractBTree btree = store.loadIndexSegment(); 
