@@ -41,6 +41,16 @@
   	<description>The size of the thread pool used to service SPARQL queries -OR-
     ZERO (0) for an unbounded thread pool.</description>
   </context-param>
+  <context-param>
+   <param-name>readOnly</param-name>
+   <param-value>false</param-value>
+   <description>When true, the REST API will not permit mutation operations.</description>
+  </context-param>
+  <context-param>
+   <param-name>queryTimeout</param-name>
+   <param-value>0</param-value>
+   <description>When non-zero, the timeout for queries (milliseconds).</description>
+  </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
   </listener>
