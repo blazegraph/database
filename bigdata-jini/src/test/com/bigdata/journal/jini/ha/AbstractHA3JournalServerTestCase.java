@@ -879,21 +879,29 @@ public class AbstractHA3JournalServerTestCase extends
         if (!restart) {
 
             // security policy
-            copyFile(new File("policy.all"), new File(serviceDir, "policy.all"));
+            copyFile(new File("policy.all"),
+                    new File(serviceDir, "policy.all"), false/* append */);
 
             // log4j configuration.
             copyFile(new File(
                     "bigdata/src/resources/logging/log4j-dev.properties"),
-                    new File(serviceDir, "log4j.properties"));
+                    new File(serviceDir, "log4j-" + name + ".properties"),
+                    false/* append */);
+
+            // append log4j templates to get service specific log files.
+            copyFile(new File(SRC_PATH,"log4j-template-"+name+".properties"),
+                    new File(serviceDir, "log4j-" + name + ".properties"),
+                    true/* append */);
 
             // java logging configuration.
             copyFile(new File(
                     "bigdata/src/resources/logging/logging.properties"),
-                    new File(serviceDir, "logging.properties"));
+                    new File(serviceDir, "logging-" + name + ".properties"),
+                    false/* append */);
 
             // HAJournalServer configuration
             copyFile(new File(SRC_PATH, sourceConfigFileName), //
-                    new File(serviceDir, installedConfigFileName));
+                    new File(serviceDir, installedConfigFileName), false/* append */);
 
         }
         
@@ -986,23 +994,23 @@ public class AbstractHA3JournalServerTestCase extends
      *            The source file (must exist).
      * @param dst
      *            The target file.
-     *            
+     * 
      * @throws IOException
      */
-    static private void copyFile(final File src, final File dst)
-            throws IOException {
+    static private void copyFile(final File src, final File dst,
+            final boolean append) throws IOException {
 
         if (!src.exists())
             throw new FileNotFoundException(src.getAbsolutePath());
 
         if (log.isInfoEnabled())
-            log.info("src=" + src + ", dst=" + dst);
-        
+            log.info("src=" + src + ", dst=" + dst + ", append=" + append);
+
         FileInputStream is = null;
         FileOutputStream os = null;
         try {
             is = new FileInputStream(src);
-            os = new FileOutputStream(dst, false/* append */);
+            os = new FileOutputStream(dst, append);
             copyStream(is, os);
             os.flush();
         } finally {
