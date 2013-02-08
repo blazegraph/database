@@ -451,7 +451,7 @@ public class HAJournalServer extends AbstractServer {
             @Override
             public void notify(final QuorumEvent e) {
                 if (log.isTraceEnabled())
-                    System.err.println("QuorumEvent: " + e); // TODO LOG @ TRACE
+                    log.trace(e); // TODO LOG @ TRACE
             }
         });
 
