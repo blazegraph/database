@@ -30,12 +30,12 @@ package com.bigdata.io;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.journal.TestHelper;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
+
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.journal.TestHelper;
 
 /**
  * Base class for some <code>assertEquals</code> methods not covered by
@@ -204,11 +204,14 @@ public class TestCase3 extends TestCase2 {
                 cond.run();
                 // success.
                 return;
-            } catch (final AssertionFailedError e) {
+            } catch (final Throwable e) {
+//                final boolean interesting = //
+//                InnerCause.isInnerCause(e, AssertionFailedError.class) || //
+//                        InnerCause.isInnerCause(e, TimeoutException.class);
                 remaining = nanos - (System.nanoTime() - begin);
                 if (remaining < 0) {
                     // Timeout - rethrow the failed assertion.
-                    throw e;
+                    throw new RuntimeException(e);
                 }
                 // Sleep up to 10ms or the remaining nanos, which ever is less.
                 final int millis = (int) Math.min(
@@ -225,7 +228,7 @@ public class TestCase3 extends TestCase2 {
                     remaining = nanos - (System.nanoTime() - begin);
                     if (remaining < 0) {
                         // Timeout - rethrow the failed assertion.
-                        throw e;
+                        throw new RuntimeException(e);
                     }
                 }
             }
