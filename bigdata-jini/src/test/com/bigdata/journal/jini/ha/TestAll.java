@@ -86,7 +86,7 @@ public class TestAll extends TestCase {
 
         // HA2 test suite (k=3, but only 2 services are running).
         // FIXME (***) Enable TestHA2JournalServer in CI (debug bounce leader/follower first).
-        //suite.addTestSuite(TestHA2JournalServer.class);
+        suite.addTestSuite(TestHA2JournalServer.class);
 
         // HA3 test suite.
         suite.addTestSuite(TestHA3JournalServer.class);

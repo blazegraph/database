@@ -824,19 +824,19 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-                // if (server.isRunning()) {
-                // /*
-                // * Attempt to cast a vote for our lastCommitTime.
-                // *
-                // * FIXME BOUNCE : May need to trigger when we re-connect with
-                // * zookeeper if this event was triggered by a zk session
-                // * expiration.
-                // */
-                // doConditionalCastVote(server,
-                // (Quorum<HAGlue, QuorumService<HAGlue>>) this
-                // .getQuorum(),
-                // journal);
-                // }
+                if (server.isRunning()) {
+                    /*
+                     * Attempt to cast a vote for our lastCommitTime.
+                     * 
+                     * FIXME BOUNCE : May need to trigger when we re-connect
+                     * with zookeeper if this event was triggered by a zk
+                     * session expiration.
+                     */
+                    doConditionalCastVote(
+                            server,
+                            (Quorum<HAGlue, QuorumService<HAGlue>>) getQuorum(),
+                            journal);
+                }
 
                 // Done.
                 return null;
