@@ -1892,6 +1892,12 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 try {
                     // ask it to move itself to the end of the pipeline (RMI)
                     ((HAPipelineGlue) otherService).moveToEndOfPipeline().get();
+                    modified = true;
+                    if(qlog.isInfoEnabled()) {
+                        qlog.info("moved   ="+otherId);
+                        qlog.info("pipeline="+Arrays.toString(getPipeline()));
+                        qlog.info("joined  ="+Arrays.toString(getJoined()));
+                    }
                 } catch (IOException ex) {
                     throw new QuorumException(
                             "Could not move service to end of the pipeline: serviceId="
@@ -1905,12 +1911,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                             "Could not move service to end of the pipeline: serviceId="
                                     + serviceId + ", otherId=" + otherId, e);
                 }
-                if(qlog.isInfoEnabled()) {
-                 qlog.info("moved   ="+otherId);
-                 qlog.info("pipeline="+Arrays.toString(getPipeline()));
-                 qlog.info("joined  ="+Arrays.toString(getJoined()));
-                }
-                modified = true;
             }
             return modified;
         }
