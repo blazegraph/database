@@ -4817,7 +4817,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
 	private volatile long quorumToken = Quorum.NO_QUORUM;
 
-    protected final long getQuorumToken() {
+    protected long getQuorumToken() {
 
         return quorumToken;
         
