@@ -158,6 +158,10 @@ public class HALogWriter {
 			throw new IllegalStateException();
 
 	}
+	
+	public boolean isOpen() {
+	    return m_state != null;
+	}
 
 	/**
 	 * Return the log file (if any).

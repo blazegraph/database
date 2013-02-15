@@ -64,6 +64,13 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * 
+     * @return The reference from an atomic variable that will be cleared if the
+     *         quorum terminates.
+     */
     public Quorum<?,?> getQuorum() {
 
         final Quorum<?,?> tmp = quorum.get();

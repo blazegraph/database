@@ -395,6 +395,18 @@ public class HAJournal extends Journal {
 
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to expose this method to the {@link HAJournalServer}.
+     */
+    @Override
+    protected final long getQuorumToken() {
+    
+        return super.getQuorumToken();
+
+    }
+    
     @Override
     public final File getHALogDir() {
 
