@@ -144,7 +144,8 @@ public interface HAPipelineGlue extends Remote {
      *            
      * @return The response.
      */
-    IHAWriteSetStateResponse getHAWriteSetState(IHAWriteSetStateRequest req);
+    IHAWriteSetStateResponse getHAWriteSetState(IHAWriteSetStateRequest req)
+            throws IOException;
 
     /**
      * Request the root blocks for the HA Log for the specified commit point.
