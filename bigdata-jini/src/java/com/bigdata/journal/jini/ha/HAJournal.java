@@ -58,6 +58,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.halog.IHALogReader;
@@ -73,6 +74,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
@@ -240,6 +242,21 @@ public class HAJournal extends Journal {
      */
     private final HALogWriter haLogWriter;
 
+    /**
+     * The most recently observed *live* {@link IHAWriteMessage}.
+     * <p>
+     * Note: The {@link HALogWriter} will log live messages IFF they are
+     * consistent with the state of the {@link HAJournalServer} when they are
+     * received. In contrast, this field notices each *live* message that is
+     * replicated along the HA pipline.
+     * <p>
+     * Note: package private - exposed to {@link HAJournalServer}.
+     * 
+     * @see QuorumServiceBase#handleReplicatedWrite(IHASyncRequest,
+     *      IHAWriteMessage, ByteBuffer)
+     */
+    volatile IHAWriteMessage lastLiveHAWriteMessage = null;
+    
     /**
      * The {@link HALogWriter} for this {@link HAJournal} and never
      * <code>null</code>.
@@ -532,6 +549,9 @@ public class HAJournal extends Journal {
     @Override
     protected void doLocalAbort() {
 
+        // Clear the last live message out.
+        this.lastLiveHAWriteMessage = null;
+        
         super.doLocalAbort();
 
     }
