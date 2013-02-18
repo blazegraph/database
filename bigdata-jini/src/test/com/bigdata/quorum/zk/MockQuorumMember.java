@@ -19,6 +19,8 @@ import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
@@ -244,6 +246,12 @@ abstract class MockQuorumMember<S extends Remote> extends AbstractQuorumMember<S
         @Override
         public Future<Void> sendHAStore(IHARebuildRequest msg)
                 throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public IHAWriteSetStateResponse getHAWriteSetState(
+                IHAWriteSetStateRequest req) {
             throw new UnsupportedOperationException();
         }
 
