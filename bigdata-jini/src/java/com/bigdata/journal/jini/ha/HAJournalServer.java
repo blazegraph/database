@@ -1051,30 +1051,16 @@ public class HAJournalServer extends AbstractServer {
                 }
 
                 /*
-                 * Attempt to cast a vote for our lastCommitTime.
-                 * 
                  * Attempt to add the service as a member, add the service to
                  * the pipeline, and conditionally cast a vote for the last
-                 * commit time. If the service is already a quorum member or
-                 * already in the pipeline, then those are NOPs. If the quorum
-                 * is already met, then the service DOES NOT cast a vote for its
-                 * lastCommitTime - it will need to resynchronize instead.
+                 * commit time IFF the quorum has NOT met.
                  * 
-                 * FIXME RESYNC : There needs to be an atomic decision whether
-                 * to cast a vote and then join or to start synchronizing. We
-                 * need to synchronize if a quorum is already met. We need to
-                 * cast our vote iff a quorum has not met. However, I can not
-                 * see any (easy) way to make this operation atomic. Maybe the
-                 * leader simply needs to verify the actual lastCommitTime of
-                 * each service when the quorum meets, or maybe a service can
-                 * only join the quorum if it can verify that the leader has the
-                 * same lastCommitTime for its current root block. Once writes
-                 * start, we need to be resynchronizing rather than joining the
-                 * quorum.
+                 * If the service is already a quorum member or already in the
+                 * pipeline, then those are NOPs.
                  * 
-                 * FIXME BOUNCE : May need to trigger when we re-connect with
-                 * zookeeper if this event was triggered by a zk session
-                 * expiration.
+                 * If the quorum is already met, then the service DOES NOT cast
+                 * a vote for its lastCommitTime - it will need to resynchronize
+                 * instead.
                  */
 
                 // ensure member.
@@ -1185,9 +1171,16 @@ public class HAJournalServer extends AbstractServer {
 
             /**
              * Spin until the journal.quorumToken is set (by the event handler).
+             * <p>
+             * Note: If
              * 
-             * Note: If our rootBlock.commitCounter==0 then we also have to wait
-             * until the leader's root blocks are installed.
+             * @param awaitRootBlocks
+             *            When <code>true</code> and our
+             *            <code>rootBlock.commitCounter==0</code>, this method
+             *            will also wait until the leader's root blocks are
+             *            installed. This is a necessary pre-condition before
+             *            entering {@link RunMetTask}, but it is NOT a
+             *            pre-condition for {@link ResyncTask}.
              */
             private void awaitJournalToken(final long token,
                     final boolean awaitRootBlocks) throws IOException,
