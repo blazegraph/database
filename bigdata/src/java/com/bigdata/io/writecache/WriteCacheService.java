@@ -733,6 +733,15 @@ abstract public class WriteCacheService implements IWriteCache {
     private final AtomicLong cacheSequence = new AtomicLong(0);
 
     /**
+     * Return the then current write cache block sequence number.
+     */
+    public long getSequence() {
+
+        return cacheSequence.get();
+        
+    }
+    
+    /**
      * Determines how long the dirty list should grow until the
      * {@link WriteCache} buffers are coalesced and/or written to disk.
      * <p>

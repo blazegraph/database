@@ -50,6 +50,8 @@ import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.ValidationError;
 
 /**
@@ -218,6 +220,12 @@ public class HAGlueDelegate implements HAGlue {
     public Future<Void> globalWriteLock(final IHAGlobalWriteLockRequest req)
             throws IOException, TimeoutException, InterruptedException {
         return delegate.globalWriteLock(req);
+    }
+
+    @Override
+    public IHAWriteSetStateResponse getHAWriteSetState(
+            IHAWriteSetStateRequest req) {
+        return delegate.getHAWriteSetState(req);
     }
 
 }

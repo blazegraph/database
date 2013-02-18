@@ -58,6 +58,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -98,6 +99,7 @@ import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HAReadResponse;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HARootBlockResponse;
+import com.bigdata.ha.msg.HAWriteSetStateResponse;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
 import com.bigdata.ha.msg.IHA2PhaseCommitMessage;
 import com.bigdata.ha.msg.IHA2PhasePrepareMessage;
@@ -116,6 +118,8 @@ import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
@@ -5828,6 +5832,49 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         public Future<Void> sendHAStore(IHARebuildRequest msg)
                 throws IOException {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public IHAWriteSetStateResponse getHAWriteSetState(
+                final IHAWriteSetStateRequest req) {
+
+            final long token = getQuorum().token();
+            
+            // Verify leader for that token.
+            getQuorum().assertLeader(token);
+
+            /*
+             * Note: This lock will prevent concurrent commit so the
+             * commitCounter is known to be valid for the blockSequence.
+             */
+
+            final IHAWriteSetStateResponse resp;
+            
+            final Lock lock = _fieldReadWriteLock.readLock();
+            
+            lock.lock();
+            
+            try {
+
+                final IRootBlockView rb = _rootBlock;
+                
+                final long sequence = ((IHABufferStrategy) getBufferStrategy())
+                        .getCurrentBlockSequence();
+
+                resp = new HAWriteSetStateResponse(rb.getCommitCounter(),
+                        rb.getLastCommitTime(), sequence);
+
+            } finally {
+                
+                lock.unlock();
+                
+            }
+
+            // Verify still leader for that token.
+            getQuorum().assertLeader(token);
+            
+            return resp;
+            
         }
 
         @Override
