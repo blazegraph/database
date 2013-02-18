@@ -5841,6 +5841,29 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     private long lastBlockSequence = 0;
 
+    /**
+     * @see IHABufferStrategy#getCurrentBlockSequence()
+     */
+    public long getCurrentBlockSequence() {
+        
+        final WriteCacheService tmp = m_writeCacheService;
+
+        if (tmp == null) {
+
+            /*
+             * Either this is not an HA strategy mode -or- we are in abort() and
+             * the value temporarily [null]. If there is an abort(), then the
+             * counter will be reset to 0L.
+             */
+            
+            return 0L;
+            
+        }
+
+        return tmp.getSequence();
+        
+    }
+    
 //	private HARebuildRequest m_rebuildRequest = null;
 	
 	 //    /**

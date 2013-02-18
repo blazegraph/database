@@ -39,6 +39,8 @@ import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.service.proxy.ThickFuture;
@@ -135,6 +137,16 @@ public interface HAPipelineGlue extends Remote {
             throws IOException;
 
     /**
+     * Request metadata about the current write set from the quorum leader.
+     * 
+     * @param req
+     *            The request.
+     *            
+     * @return The response.
+     */
+    IHAWriteSetStateResponse getHAWriteSetState(IHAWriteSetStateRequest req);
+
+    /**
      * Request the root blocks for the HA Log for the specified commit point.
      * 
      * @param msg
@@ -225,5 +237,5 @@ public interface HAPipelineGlue extends Remote {
 //     * </pre>
 //     */
 //    Future<IHASnapshotDigestResponse> computeSnapshotDigest(IHASnapshotDigestRequest req) throws IOException;
-    
+
 }

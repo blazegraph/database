@@ -59,6 +59,8 @@ import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.ha.msg.IHAWriteSetStateRequest;
+import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -259,6 +261,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
         @Override
         public Future<Void> sendHAStore(IHARebuildRequest msg)
                 throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public IHAWriteSetStateResponse getHAWriteSetState(
+                IHAWriteSetStateRequest req) {
             throw new UnsupportedOperationException();
         }
 

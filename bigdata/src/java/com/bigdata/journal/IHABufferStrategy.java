@@ -39,6 +39,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -138,11 +139,26 @@ public interface IHABufferStrategy extends IBufferStrategy {
     void resetFromHARootBlock(final IRootBlockView rootBlock);
 
     /**
-     * Return the #of {@link WriteCache} blocks that have been written out as
-     * part of the current write set. This value is origin ZERO (0) and is reset
-     * to ZERO (0) after each commit or abort.
+     * Return the #of {@link WriteCache} blocks that were written out for the
+     * last write set. This is used to communicate the #of write cache blocks in
+     * the commit point back to {@link AbstractJournal#commitNow(long)}. It is
+     * part of the commit protocol. 
+     * <p>
+     * Note: This DOES NOT reflect the current value of the block sequence
+     * counter for ongoing writes. That counter is owned by the
+     * {@link WriteCacheService}.
+     * 
+     * @see WriteCacheService#resetSequence()
+     * @see #getCurrentBlockSequence()
      */
-    long getBlockSequence();
+    long getBlockSequence(); // TODO RENAME => getBlockSequenceCountForCommitPoint()
+
+    /**
+     * Return the then-current write cache block sequence.
+     * 
+     * @see #getBlockSequence()
+     */
+    long getCurrentBlockSequence();
 
     /**
      * Snapshot the allocators in preparation for computing a digest of the

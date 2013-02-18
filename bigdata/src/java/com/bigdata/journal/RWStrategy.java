@@ -839,6 +839,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
         return m_store.getBlockSequence();
     }
 
+    @Override
+    public long getCurrentBlockSequence() {
+        return m_store.getCurrentBlockSequence();
+    }
+
 	@Override
 	public ByteBuffer readRaw(final long position, final ByteBuffer transfer) {
 		return m_store.readRaw(position, transfer);
