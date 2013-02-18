@@ -224,7 +224,7 @@ public class HAGlueDelegate implements HAGlue {
 
     @Override
     public IHAWriteSetStateResponse getHAWriteSetState(
-            IHAWriteSetStateRequest req) {
+            IHAWriteSetStateRequest req) throws IOException {
         return delegate.getHAWriteSetState(req);
     }
 
