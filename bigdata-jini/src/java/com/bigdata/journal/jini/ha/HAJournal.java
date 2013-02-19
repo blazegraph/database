@@ -65,7 +65,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HADigestResponse;
 import com.bigdata.ha.msg.HALogDigestResponse;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
-import com.bigdata.ha.msg.HARootBlockResponse;
+import com.bigdata.ha.msg.HASendStoreResponse;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
@@ -75,7 +75,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
-import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -522,9 +522,10 @@ public class HAJournal extends Journal {
      * Extended to expose this method to the {@link HAQuorumService}.
      */
     @Override
-    protected void installRootBlocks(final IRootBlockView rootBlock) {
+    protected void installRootBlocks(final IRootBlockView rootBlock0,
+            final IRootBlockView rootBlock1) {
 
-        super.installRootBlocks(rootBlock);
+        super.installRootBlocks(rootBlock0, rootBlock1);
 
     }
     
@@ -738,20 +739,20 @@ public class HAJournal extends Journal {
         }
 
         /*
-         * REBUILD: Take a read lock and send everything from the backing
-         * file, but do not include the root blocks. The first buffer can be
-         * short (to exclude the root blocks). That will put the rest of the
-         * buffers on a 1MB boundary which will provide more efficient IOs.
+         * REBUILD: Take a read lock and send everything from the backing file,
+         * but do not include the root blocks. The first buffer can be short (to
+         * exclude the root blocks). That will put the rest of the buffers on a
+         * 1MB boundary which will provide more efficient IOs.
          */
         @Override
-        public Future<IHARootBlockResponse> sendHAStore(
+        public Future<IHASendStoreResponse> sendHAStore(
                 final IHARebuildRequest req) throws IOException {
 
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req);
 
             // Task sends an HALog file along the pipeline.
-            final FutureTask<IHARootBlockResponse> ft = new FutureTaskMon<IHARootBlockResponse>(
+            final FutureTask<IHASendStoreResponse> ft = new FutureTaskMon<IHASendStoreResponse>(
                     new SendStoreTask(req));
 
             // Run task.
@@ -765,7 +766,7 @@ public class HAJournal extends Journal {
         /**
          * Class sends the backing file along the write pipeline.
          */
-        private class SendStoreTask implements Callable<IHARootBlockResponse> {
+        private class SendStoreTask implements Callable<IHASendStoreResponse> {
             
             private final IHARebuildRequest req;
             
@@ -778,13 +779,17 @@ public class HAJournal extends Journal {
                 
             }
             
-            public IHARootBlockResponse call() throws Exception {
+            public IHASendStoreResponse call() throws Exception {
                 
                 // The quorum token (must remain valid through this operation).
                 final long quorumToken = getQuorumToken();
                 
                 // Grab a read lock.
                 final long txId = newTx(ITx.READ_COMMITTED);
+                
+                // Get both root blocks (atomically).
+                final IRootBlockView[] rootBlocks = getRootBlocks();
+                
                 IBufferAccess buf = null;
                 try {
 
@@ -861,10 +866,10 @@ public class HAJournal extends Journal {
                         haLog.info("Sent store file: #blocks=" + sequence
                                 + ", #bytes=" + (fileExtent - headerSize));
 
-                    // The current root block.
-                    final IHARootBlockResponse resp = new HARootBlockResponse(
-                            getRootBlockView());
-                    
+                    // The root blocks (from above) and stats on the operation.
+                    final IHASendStoreResponse resp = new HASendStoreResponse(
+                            rootBlocks[0], rootBlocks[1], totalBytes, sequence);
+
                     // Done.
                     return resp;
 

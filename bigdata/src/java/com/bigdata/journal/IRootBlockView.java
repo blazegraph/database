@@ -295,4 +295,18 @@ public interface IRootBlockView {
      */
     public ByteBuffer asReadOnlyBuffer();
 
+    /**
+     * Return a version of the caller's root block that is flagged as either
+     * rootBlock0 or rootBlock1 as indicated by the argument. Root blocks are
+     * immutable, so this will either return your argument or return a new
+     * {@link IRootBlockView} in which the sense of the {@link #isRootBlock0()}
+     * flag is now correct.
+     * 
+     * @param rootBlock0
+     *            Whether you want rootBlock0 or rootBlock1.
+     * 
+     * @return The root block.
+     */
+    public IRootBlockView asRootBlock(final boolean rootBlock0);
+
 }

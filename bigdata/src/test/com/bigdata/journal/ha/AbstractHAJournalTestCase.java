@@ -466,7 +466,8 @@ for(int i=0; i<3; i++)log.error("quorum["+i+"]:"+(stores[i].getQuorum()).toStrin
             }
 
             @Override
-            public void installRootBlocks(IRootBlockView rootBlock) {
+            public void installRootBlocks(IRootBlockView rootBlock0,
+                    final IRootBlockView rootBlock1) {
                 throw new UnsupportedOperationException();
             }
 

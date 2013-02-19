@@ -37,7 +37,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
-import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
@@ -211,7 +211,7 @@ public interface HAPipelineGlue extends Remote {
      *         will report the current root block in effect as of the moment
      *         when the <code>sendHAStore</code> operation was completed.
      */
-    Future<IHARootBlockResponse> sendHAStore(IHARebuildRequest msg)
+    Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
             throws IOException;
 
 //    /**

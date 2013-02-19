@@ -55,7 +55,8 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
-import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
@@ -738,11 +739,18 @@ public class HAJournalServer extends AbstractServer {
 
                     if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 
+                        // Note: This is a normal exit condition.
                         log.info("Interrupted.");
-                        
+
                     } else {
 
                         log.error(t, t);
+
+                        /*
+                         * Unhandled error. Transition to SeekConsensus!
+                         */
+
+                        enterRunState(new SeekConsensusTask());
 
                     }
 
@@ -764,6 +772,21 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
+            /**
+             * Core method.
+             * <p>
+             * Note: The service will AUTOMATICALLY transition to
+             * {@link RunStateEnum#SeekConsensus} if there is an abnormal exit
+             * from this method UNLESS it has entered
+             * {@link RunStateEnum#Shutdown}.
+             * 
+             * @return <T> if this is a normal exit.
+             * 
+             * @throws InterruptedException
+             *             if this is a normal exit.
+             * @throws Exception
+             *             if this is an abnormal exit.
+             */
             abstract protected T doRun() throws Exception;
             
             /**
@@ -1442,8 +1465,9 @@ public class HAJournalServer extends AbstractServer {
                     // The current root block.
                     final IRootBlockView rb = journal.getRootBlockView();
 
-                    // Use timestamp from leader (not critical).
-                    final long createTime = leader.nextTimestamp();
+                    // Use timestamp. TODO Why not working w/ TXS?
+                    final long createTime = System.currentTimeMillis();
+//                            journal.getTransactionService().nextTimestamp();
 
                     // New root blocks for a (logically) empty Journal.
                     final RootBlockUtility rbu = new RootBlockUtility(journal
@@ -1458,43 +1482,25 @@ public class HAJournalServer extends AbstractServer {
                      * been buffered before we start the resynchronization of
                      * the local store.
                      */
-                    installRootBlocks(rbu.rootBlock);
+                    installRootBlocks(rbu.rootBlock0, rbu.rootBlock1);
 
                 }
-                
-                /*
-                 * Make a note of the root block that is in effect when we being
-                 * the rebuild procedure. Once we have replicated the backing
-                 * store from the leader, we will need to replay all HALog files
-                 * starting with commitCounter+1 for this root block. Once we
-                 * catch up, we can atomically join and lay down the root blocks
-                 * from the leader for the most recent commit point.
-                 */
-                final IRootBlockView rootBlockAtStartOfCopy = leader
-                        .getRootBlock(
-                                new HARootBlockRequest(null/* storeUUID */))
-                        .getRootBlock();
 
                 /*
                  * Replicate the backing store of the leader.
                  * 
-                 * Note: We are holding a read lock, so committed allocations
-                 * will not be overwritten. However, the replicated backing file
-                 * will not be logically consistent until we apply all HALog
-                 * files since the commit point noted above.
-                 * 
                  * Note: This remoteFuture MUST be cancelled if the RebuildTask
                  * is interrupted.
                  */
-                final Future<IHARootBlockResponse> remoteFuture = leader
+                final Future<IHASendStoreResponse> remoteFuture = leader
                         .sendHAStore(new HARebuildRequest(getServiceId()));
 
-                final IRootBlockView rootBlockAtEndOfCopy;
+                final IHASendStoreResponse resp;
                 
                 try {
 
                     // Wait for the raw store to be replicated.
-                    rootBlockAtEndOfCopy = remoteFuture.get().getRootBlock();
+                    resp = remoteFuture.get();
                     
                 } finally {
 
@@ -1502,54 +1508,12 @@ public class HAJournalServer extends AbstractServer {
                     remoteFuture.cancel(true/* mayInterruptIfRunning */);
                     
                 }
- 
-                /*
-                 * Figure out the commit point that the leader was in when the
-                 * copy operation finished. We can not lay down root blocks
-                 * until we have caught up to this commit point.
-                 */
-                final long commitPointAtEndOfCopy = rootBlockAtEndOfCopy
-                        .getCommitCounter();
+                
+                // Caught up on the backing store as of that copy.
+                installRootBlocks(resp.getRootBlock0(), resp.getRootBlock1());
 
-                /*
-                 * Request each HALog starting with the commit point identified
-                 * above. As each HALog is received, we write it onto a local
-                 * HALog file and apply the write cache blocks to the backing
-                 * store. However, we do NOT lay down root blocks or go through
-                 * commit points until we have caught up on all writes since the
-                 * commitCounter at which we started to replicate the leader's
-                 * backing store.
-                 * 
-                 * Note: All services joined with the met quorum WILL be
-                 * maintaining HALog files since (a) they are maintained for
-                 * every active write set; and (b) the quorum is not fully met
-                 * since this service is not joined with the met quorum.
-                 */
-                {
-
-                    // The last commit point that has been captured.
-                    long commitCounter = rootBlockAtStartOfCopy
-                            .getCommitCounter();
-
-                    // Until joined with the met quorum.
-                    while (!getQuorum().getMember().isJoinedMember(token)) {
-
-                        /*
-                         * Note: We do NOT go through local commits with each
-                         * replicated write set until we are caught up.
-                         */
-                        final boolean incremental = commitCounter >= commitPointAtEndOfCopy;
-
-                        // Replicate and apply the next write set
-                        replicateAndApplyWriteSet(leader, token,
-                                commitCounter + 1, incremental);
-
-                        // Replicate the next write set.
-                        commitCounter++;
-
-                    }
-
-                }
+                // Resync.
+                enterRunState(new ResyncTask(token));
 
                 // Done.
                 return null;
@@ -1638,7 +1602,6 @@ public class HAJournalServer extends AbstractServer {
                  * that is replicated. This let's us catch up incrementally with
                  * the quorum.
                  */
-                final boolean incremental = true;
 
                 // Until joined with the met quorum.
                 while (!getQuorum().getMember().isJoinedMember(token)) {
@@ -1648,8 +1611,7 @@ public class HAJournalServer extends AbstractServer {
                             .getCommitCounter();
 
                     // Replicate and apply the next write set
-                    replicateAndApplyWriteSet(leader, token, commitCounter + 1,
-                            incremental);
+                    replicateAndApplyWriteSet(leader, token, commitCounter + 1);
 
                 }
 
@@ -1674,13 +1636,6 @@ public class HAJournalServer extends AbstractServer {
          * @param closingCommitCounter
          *            The commit counter for the <em>closing</em> root block of
          *            the write set to be replicated.
-         * @param incremental
-         *            When <code>true</code> this is an incremental
-         *            re-synchronization based on replicated HALog files. When
-         *            <code>false</code>, this is a ground up rebuild (disaster
-         *            recovery). For the ground up rebuild we DO NOT go through
-         *            a local commit with each HALog file that we replicate and
-         *            apply.
          * 
          * @throws IOException
          * @throws FileNotFoundException
@@ -1688,9 +1643,9 @@ public class HAJournalServer extends AbstractServer {
          * @throws InterruptedException
          */
         private void replicateAndApplyWriteSet(final S leader,
-                final long token, final long closingCommitCounter,
-                final boolean incremental) throws FileNotFoundException,
-                IOException, InterruptedException, ExecutionException {
+                final long token, final long closingCommitCounter)
+                throws FileNotFoundException, IOException,
+                InterruptedException, ExecutionException {
 
             if (leader == null)
                 throw new IllegalArgumentException();
@@ -1702,8 +1657,7 @@ public class HAJournalServer extends AbstractServer {
             getQuorum().assertQuorum(token);
 
             if (haLog.isInfoEnabled())
-                haLog.info("RESYNC: commitCounter=" + closingCommitCounter
-                        + ", incremental=" + incremental);
+                haLog.info("RESYNC: commitCounter=" + closingCommitCounter);
 
             final IHALogRootBlocksResponse resp;
             try {
@@ -1769,10 +1723,12 @@ public class HAJournalServer extends AbstractServer {
              * If the local journal is empty, then we need to replace both of
              * it's root blocks with the opening root block.
              */
-            if (closingCommitCounter == 1 && incremental) {
+            if (closingCommitCounter == 1) {
 
                 // Install the initial root blocks.
-                installRootBlocks(openRootBlock);
+                installRootBlocks(
+                        openRootBlock.asRootBlock(true/* rootBlock0 */),
+                        openRootBlock.asRootBlock(false/* rootBlock0 */));
 
             }
 
@@ -1812,7 +1768,7 @@ public class HAJournalServer extends AbstractServer {
                  */
 
                 if (conditionalJoinWithMetQuorum(leader, token,
-                        closingCommitCounter - 1, incremental)) {
+                        closingCommitCounter - 1)) {
 
                     /*
                      * We are caught up and have joined the met quorum.
@@ -1841,10 +1797,8 @@ public class HAJournalServer extends AbstractServer {
 
                     if (haLog.isDebugEnabled())
                         haLog.debug("HALOG REPLICATION START: closingCommitCounter="
-                                + closingCommitCounter
-                                + ", incremental="
-                                + incremental);
-                    
+                                + closingCommitCounter);
+
                     ft = leader
                             .sendHALogForWriteSet(new HALogRequest(
                                     server.serviceUUID, closingCommitCounter,
@@ -1855,31 +1809,10 @@ public class HAJournalServer extends AbstractServer {
 
                     success = true;
 
-                } catch(ExecutionException ex) {
-                
-                    final String msg = "HALog not available: commitCounter="
-                            + closingCommitCounter;
-
-                    log.error(msg, ex);
-
                     /*
-                     * If the quorum broke, then we will re-enter SeekConsensus
-                     * when it meets.
+                     * Note: Uncaught exception will result in SeekConsensus.
                      */
-                    getQuorum().assertQuorum(token);
-
-                    /*
-                     * Otherwise restart resync/rebuild.
-                     * 
-                     * Note: If we can not get the HALog root blocks (at the top
-                     * of this method) then we will enter REBUILD at that top.
-                     */
-                    enterRunState(incremental ? new ResyncTask(token)
-                            : new RebuildTask(token));
-
-                    // Force immediate exit of the resync protocol.
-                    throw new InterruptedException(msg);
-
+                    
                 } finally {
 
                     if (ft != null) {
@@ -1941,19 +1874,9 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
-            if (incremental) {
-
-                /*
-                 * FIXME REBUILD: We need to put down BOTH root blocks if we are
-                 * going to transition from non-incremental to incremental.
-                 */
-                
-                // Local commit.
-                journal.doLocalCommit(
-                        (QuorumService<HAGlue>) HAQuorumService.this,
-                        closeRootBlock);
-
-            }
+            // Local commit.
+            journal.doLocalCommit((QuorumService<HAGlue>) HAQuorumService.this,
+                    closeRootBlock);
 
             // Close out the current HALog writer.
             logLock.lock();
@@ -1966,7 +1889,7 @@ public class HAJournalServer extends AbstractServer {
 
             if (haLog.isInfoEnabled())
                 haLog.info("Replicated write set: commitCounter="
-                        + closingCommitCounter + ", incremental=" + incremental);
+                        + closingCommitCounter);
 
         }
 
@@ -1983,21 +1906,14 @@ public class HAJournalServer extends AbstractServer {
          * @param openingCommitCounter
          *            The commit counter for the <em>opening</em> root block of
          *            the write set that is currently being replicated.
-         * @param incremental
-         *            When <code>true</code> this is an incremental
-         *            re-synchronization based on replicated HALog files. When
-         *            <code>false</code>, this is a ground up rebuild (disaster
-         *            recovery). For the ground up rebuild we DO NOT go through
-         *            a local commit with each HALog file that we replicate and
-         *            apply.
          * 
          * @return <code>true</code> iff we were able to join the met quorum.
+         * 
          * @throws InterruptedException
          */
         private boolean conditionalJoinWithMetQuorum(final S leader,
-                final long quorumToken, final long openingCommitCounter,
-                final boolean incremental) throws IOException,
-                InterruptedException {
+                final long quorumToken, final long openingCommitCounter)
+                throws IOException, InterruptedException {
 
 //            // Get the current root block from the quorum leader.
 //            final IRootBlockView currentRootBlockOnLeader = leader
@@ -2014,8 +1930,7 @@ public class HAJournalServer extends AbstractServer {
                 haLog.debug("sameCommitCounter=" + sameCommitCounter
                         + ", openingCommitCounter=" + openingCommitCounter
                         + ", currentWriteSetStateOnLeader="
-                        + currentWriteSetStateOnLeader //
-                        + ", incremental=" + incremental);
+                        + currentWriteSetStateOnLeader);
 
             if (!sameCommitCounter
                     || currentWriteSetStateOnLeader.getSequence() > 0L) {
@@ -2062,19 +1977,6 @@ public class HAJournalServer extends AbstractServer {
 
                     return false;
 
-                }
-
-                if (!incremental) {
-
-                    /*
-                     * FIXME REBUILD : When this is a ground up service rebuild,
-                     * we need to lay down both root blocks atomically when we
-                     * are ready to join the met quorum (or perhaps at the next
-                     * commit point after we join the met quorum).
-                     */
-                    
-                    throw new UnsupportedOperationException();
-                    
                 }
                 
                 final HALogWriter logWriter = journal.getHALogWriter();
@@ -2172,7 +2074,8 @@ public class HAJournalServer extends AbstractServer {
                 final long commitCounter = journal.getRootBlockView()
                         .getCommitCounter();
 
-                if (req != null && !req.isIncremental()) {
+                if (req != null && !req.isIncremental()
+                        && req instanceof IHARebuildRequest) {
 
                     /*
                      * This message and payload are part of a ground up service
@@ -2182,7 +2085,7 @@ public class HAJournalServer extends AbstractServer {
                      * Note: HALog blocks during rebuild are written onto the
                      * appropriate HALog file using the same rules that apply to
                      * resynchronization. We also capture the root blocks for
-                     * those replicate HALog files. However, during a REBUILD,
+                     * those replicated HALog files. However, during a REBUILD,
                      * we DO NOT go through a local commit for the replicated
                      * HALog files until the service is fully synchronized. This
                      * prevents the service from having root blocks that are
@@ -2196,13 +2099,14 @@ public class HAJournalServer extends AbstractServer {
                      * store blocks represent a contiguous extent on the file
                      * NOT scattered writes.
                      * 
-                     * FIXME REBUILD : Handle replicated HALog write blocks
-                     * 
-                     * FIXME REBUILD : Handle replicated backing store write
-                     * blocks.
+                     * REBUILD : Replicated HALog write blocks are handled just
+                     * like resync (see below).
                      */
 
-                    throw new UnsupportedOperationException();
+                    journal.getBufferStrategy().writeRawBuffer(
+                            (HARebuildRequest) req, msg, data);
+                    
+                    return;
 
                 }
 
@@ -2227,7 +2131,10 @@ public class HAJournalServer extends AbstractServer {
 
                 }
 
-                if (RunStateEnum.Resync.equals(runStateRef.get())) {
+                final RunStateEnum runState = runStateRef.get();
+
+                if (RunStateEnum.Resync.equals(runState)
+                        || RunStateEnum.Rebuild.equals(runState)) {
 
                     /*
                      * If we are resynchronizing, then pass ALL messages (both
@@ -2355,6 +2262,9 @@ public class HAJournalServer extends AbstractServer {
                          * of the last resync message. We are caught up. We need
                          * to log and apply this live message, cancel the resync
                          * task, and enter RunMet.
+                         * 
+                         * FIXME REBUILD: Verify that we have installed the root
+                         * blocks by this point.
                          */
 
                         resyncTransitionToMetQuorum(msg, data);
@@ -2679,9 +2589,10 @@ public class HAJournalServer extends AbstractServer {
         }
 
         @Override
-        public void installRootBlocks(final IRootBlockView rootBlock) {
+        public void installRootBlocks(final IRootBlockView rootBlock0,
+                final IRootBlockView rootBlock1) {
 
-            journal.installRootBlocks(rootBlock);
+            journal.installRootBlocks(rootBlock0, rootBlock1);
 
         }
 
