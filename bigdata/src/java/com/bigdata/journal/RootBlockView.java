@@ -612,6 +612,22 @@ public class RootBlockView implements IRootBlockView {
         
     }
     
+    public IRootBlockView asRootBlock(final boolean rootBlock0) {
+
+        if (rootBlock0 && isRootBlock0()) {
+        
+            return this;
+            
+        } else if (!rootBlock0 && !isRootBlock0()) {
+            
+            return this;
+            
+        }
+
+        return new RootBlockView(rootBlock0, asReadOnlyBuffer(), checker);
+
+    }
+    
     /**
      * Create a new read-only view from the supplied buffer.
      * 

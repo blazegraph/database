@@ -61,18 +61,17 @@ public class ChecksumUtility {
 	 * static access to a ThreadLocal Checksum utility
 	 * 
 	 * @return the ChecksumUtility
-	 * 
-	 * @deprecated Use {@link #threadChk} and {@link ThreadLocal#get()}.
 	 */
 	public static ChecksumUtility getCHK() {
-		ChecksumUtility chk = (ChecksumUtility) threadChk.get();
-		
-		if (chk == null) {
-			chk = new ChecksumUtility();
-			threadChk.set(chk);
-		}
-		
-		return chk;
+	    return threadChk.get();
+//		ChecksumUtility chk = (ChecksumUtility) threadChk.get();
+//		
+//		if (chk == null) {
+//			chk = new ChecksumUtility();
+//			threadChk.set(chk);
+//		}
+//		
+//		return chk;
 	}
 
     /**
