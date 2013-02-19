@@ -44,6 +44,7 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAGlueDelegate;
+import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.RunState;
@@ -1383,7 +1384,7 @@ public class HAJournalServer extends AbstractServer {
          * Rebuild the backing store from scratch.
          * <p>
          * If we can not replicate ALL log files for the commit points that we
-         * need to make up on this service, then we can not incrementally
+         * need to catch up on this service, then we can not incrementally
          * resynchronize this service and we will have to do a full rebuild of
          * the service instead.
          * <p>
@@ -1391,36 +1392,24 @@ public class HAJournalServer extends AbstractServer {
          * read lock (a read-only tx against then current last commit time).
          * This prevents the history from being recycled, but does not prevent
          * concurrent writes on the existing backing store extent, or extension
-         * of the backing store.
+         * of the backing store. This read lock is asserted by the quourm leader
+         * when we ask it to send its backing store over the pipeline.
          * <p>
-         * While holding that read lock, we need to make a copy of the bytes in
-         * the backing store. This copy can be streamed. It must start at the
-         * first valid offset beyond the root blocks since we do not want to
-         * update the root blocks until we have caught up with and replayed the
-         * existing HA Log files. If the file is extended, we do not need to
-         * copy the extension. Note that the streamed copy does not represent
-         * any coherent commit point. However, once we apply ALL of the HA Log
-         * files up to the last commit time that we pinned with a read lock,
-         * then the local backing file will be binary consistent with that
-         * commit point and we apply both the starting and ending root block for
-         * that commit point, and finally release the read lock.
+         * The copy backing file will be consistent with the root blocks on the
+         * leader at the point where we have taken the read lock. Once we have
+         * copied the backing file, we then put down the root blocks reported
+         * back from the {@link HAPipelineGlue#sendHAStore(IHARebuildRequest)}
+         * method.
          * <p>
-         * At this point, we are still not up to date. However, the HALog files
-         * required to bring us up to date should exist and we can enter the
-         * normal resynchronization logic.
+         * At this point, we are still not up to date. We transition to
+         * {@link ResyncTask} to finish catching up with the quorum.
+         * <p>
+         * Note: Rebuild only guarantees consistent data, but not binary
+         * identity of the backing files since there can be ongoing writes on
+         * the leader.
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
-         * 
-         *         TODO We are not actually binary consistent (even if we are
-         *         data consistent) until we have either (A) joined the met
-         *         quourm; or (B) replayed the HA Logs up to commitCounter+1 for
-         *         the commitCounter on the leader as of the moment that we
-         *         finished streaming the leader's backing file to this node.
-         * 
-         *         Blow off the root blocks (zero commit counters). Then install
-         *         when known synched to specific commit point and enter
-         *         resync.
          */
         private class RebuildTask extends RunStateCallable<Void> {
 
