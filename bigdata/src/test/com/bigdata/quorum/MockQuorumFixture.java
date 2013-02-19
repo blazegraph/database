@@ -60,6 +60,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
@@ -1309,8 +1310,8 @@ public class MockQuorumFixture {
             }
 
             @Override
-            public Future<Void> sendHAStore(IHARebuildRequest msg)
-                    throws IOException {
+            public Future<IHARootBlockResponse> sendHAStore(
+                    IHARebuildRequest msg) throws IOException {
                 throw new UnsupportedOperationException();
             }
 

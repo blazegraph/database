@@ -65,6 +65,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HADigestResponse;
 import com.bigdata.ha.msg.HALogDigestResponse;
 import com.bigdata.ha.msg.HALogRootBlocksResponse;
+import com.bigdata.ha.msg.HARootBlockResponse;
 import com.bigdata.ha.msg.IHADigestRequest;
 import com.bigdata.ha.msg.IHADigestResponse;
 import com.bigdata.ha.msg.IHAGlobalWriteLockRequest;
@@ -74,6 +75,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
@@ -520,12 +522,10 @@ public class HAJournal extends Journal {
      * Extended to expose this method to the {@link HAQuorumService}.
      */
     @Override
-    protected void installRootBlocksFromQuorum(
-            final QuorumService<HAGlue> localService,
-            final IRootBlockView rootBlock) {
+    protected void installRootBlocks(final IRootBlockView rootBlock) {
 
-        super.installRootBlocksFromQuorum(localService, rootBlock);
-        
+        super.installRootBlocks(rootBlock);
+
     }
     
     /**
@@ -744,14 +744,14 @@ public class HAJournal extends Journal {
          * buffers on a 1MB boundary which will provide more efficient IOs.
          */
         @Override
-        public Future<Void> sendHAStore(final IHARebuildRequest req)
-                throws IOException {
+        public Future<IHARootBlockResponse> sendHAStore(
+                final IHARebuildRequest req) throws IOException {
 
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req);
 
             // Task sends an HALog file along the pipeline.
-            final FutureTask<Void> ft = new FutureTaskMon<Void>(
+            final FutureTask<IHARootBlockResponse> ft = new FutureTaskMon<IHARootBlockResponse>(
                     new SendStoreTask(req));
 
             // Run task.
@@ -765,7 +765,7 @@ public class HAJournal extends Journal {
         /**
          * Class sends the backing file along the write pipeline.
          */
-        private class SendStoreTask implements Callable<Void> {
+        private class SendStoreTask implements Callable<IHARootBlockResponse> {
             
             private final IHARebuildRequest req;
             
@@ -778,7 +778,7 @@ public class HAJournal extends Journal {
                 
             }
             
-            public Void call() throws Exception {
+            public IHARootBlockResponse call() throws Exception {
                 
                 // The quorum token (must remain valid through this operation).
                 final long quorumToken = getQuorumToken();
@@ -861,8 +861,12 @@ public class HAJournal extends Journal {
                         haLog.info("Sent store file: #blocks=" + sequence
                                 + ", #bytes=" + (fileExtent - headerSize));
 
+                    // The current root block.
+                    final IHARootBlockResponse resp = new HARootBlockResponse(
+                            getRootBlockView());
+                    
                     // Done.
-                    return null;
+                    return resp;
 
                 } finally {
                     
