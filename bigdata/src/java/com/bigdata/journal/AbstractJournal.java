@@ -4946,7 +4946,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     }
 
                     // Installs the root blocks and does a local abort.
-                    localService.installRootBlocksFromQuorum(tmp);
+                    localService.installRootBlocks(tmp);
 
                 } else {
 
@@ -4970,13 +4970,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
 
     /**
-     * Verify that the root blocks are consistent with the assumptions for this
-     * Journal.
-     * <p>
-     * Note: When the quorum meets for the first time, we need to take the root
+     * Install identical root blocks on the journal. This is used for a few
+     * different conditions in HA.
+     * <ol>
+     * <li>When the quorum meets for the first time, we need to take the root
      * block from the leader and use it to replace both of our root blocks (the
      * initial root blocks are identical). That will make the root blocks the
-     * same on all quorum members.
+     * same on all quorum members.</li>
+     * <li>REBUILD: When a service goes through an automated disaster recovery,
+     * we need to install new root blocks in order to make the local journal
+     * logically empty. This prevents the service from attempting to interpret
+     * the data on the backing file if there is a restart part way through the
+     * rebuild operation.</li>
+     * </ol>
      * 
      * FIXME We should also verify the following:
      * 
@@ -4985,16 +4991,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * capacity (so there will be room for the write cache
      * data in the buffers on all nodes).
      * </pre>
+     * 
+     * @see QuorumService#installRootBlocks(IRootBlockView)
      */
-    protected void installRootBlocksFromQuorum(
-            final QuorumService<HAGlue> localService,
-            final IRootBlockView rootBlock) {
+    protected void installRootBlocks(final IRootBlockView rootBlock) {
 
-        if (_rootBlock.getCommitCounter() != 0) {
-
-            throw new IllegalStateException();
-
-        }
+//        if (_rootBlock.getCommitCounter() != 0) {
+//
+//            throw new IllegalStateException();
+//
+//        }
 
         final IRootBlockView rootBlock0 = rootBlock;
 
@@ -5013,7 +5019,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
         }
-        log.info("Synchronizing root blocks with quorum.");
 
         // write root block through to disk and sync.
         _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.Force);
@@ -5024,8 +5029,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         // Choose the "current" root block.
         _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0, rootBlock1);
 
-        log.info("Synchronized root blocks with qourum: rootBlock="
-                + _rootBlock);
+        log.warn("Installed new root blocks: rootBlock=" + _rootBlock);
 
         /*
          * We need to reset the backing store with the token for the new quorum.
@@ -5829,7 +5833,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * This is implemented by HAJournal.
          */
         @Override
-        public Future<Void> sendHAStore(IHARebuildRequest msg)
+        public Future<IHARootBlockResponse> sendHAStore(IHARebuildRequest msg)
                 throws IOException {
             throw new UnsupportedOperationException();
         }

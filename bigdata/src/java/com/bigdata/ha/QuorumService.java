@@ -92,7 +92,19 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
     long getPrepareTimeout();
 
     /**
-     * Install the root blocks from the quorum on the local service.
+     * Install identical root blocks on the local service. This is used for a
+     * few different conditions in HA.
+     * <ol>
+     * <li>When the quorum meets for the first time, we need to take the root
+     * block from the leader and use it to replace both of our root blocks (the
+     * initial root blocks are identical). That will make the root blocks the
+     * same on all quorum members.</li>
+     * <li>REBUILD: When a service goes through an automated disaster recovery,
+     * we need to install new root blocks in order to make the local journal
+     * logically empty. This prevents the service from attempting to interpret
+     * the data on the backing file if there is a restart part way through the
+     * rebuild operation.</li>
+     * </ol>
      * <p>
      * Note: The initial root blocks on a service are identical, so this root
      * block will be installed as both root block ZERO (0) and root block ONE
@@ -100,10 +112,7 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      * 
      * @param rootBlock
      *            The root block.
-     * 
-     * @throws IllegalStateException
-     *             if the local service already has writes.
      */
-    void installRootBlocksFromQuorum(final IRootBlockView rootBlock);
+    void installRootBlocks(final IRootBlockView rootBlock);
 
 }

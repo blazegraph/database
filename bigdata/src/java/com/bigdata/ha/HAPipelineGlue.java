@@ -37,6 +37,7 @@ import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHARootBlockResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
@@ -206,9 +207,12 @@ public interface HAPipelineGlue extends Remote {
      *            A request to replicate a backing store.
      * 
      * @return A {@link Future} that may be used to cancel the remote process
-     *         sending the data through the write pipeline.
+     *         sending the data through the write pipeline. The {@link Future}
+     *         will report the current root block in effect as of the moment
+     *         when the <code>sendHAStore</code> operation was completed.
      */
-    Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException;
+    Future<IHARootBlockResponse> sendHAStore(IHARebuildRequest msg)
+            throws IOException;
 
 //    /**
 //     * There is something for this on HAGlue right now.

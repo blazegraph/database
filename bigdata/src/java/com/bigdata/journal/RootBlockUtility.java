@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
@@ -300,6 +301,72 @@ public class RootBlockUtility {
         
     }
 
+    /**
+     * Generate the root blocks. They are for all practical purposes identical.
+     * 
+     * @param bufferMode
+     * @param offsetBits
+     * @param createTime
+     * @param quorumToken
+     * @param storeUUID
+     */
+    public RootBlockUtility(
+            final BufferMode bufferMode,
+            final int offsetBits,
+            final long createTime, 
+            final long quorumToken,
+            final UUID storeUUID
+            ) {
+
+        if (bufferMode == null)
+            throw new IllegalArgumentException("BufferMode is required.");
+
+        if (createTime == 0L)
+            throw new IllegalArgumentException("Create time may not be zero.");
+
+        if (storeUUID == null)
+            throw new IllegalArgumentException("Store UUID is required.");
+
+        final ChecksumUtility checker = ChecksumUtility.threadChk.get();
+
+        /*
+         * WORM: The offset at which the first record will be written. This is
+         * zero(0) since the buffer offset (0) is the first byte after the root
+         * blocks.
+         * 
+         * RWStore: The field is ignored. The RWStore skips over a block to have
+         * a good byte alignment on the file.
+         */
+        final long nextOffset = 0L;
+        final long closeTime = 0L;
+        final long commitCounter = 0L;
+        final long firstCommitTime = 0L;
+        final long lastCommitTime = 0L;
+        final long commitRecordAddr = 0L;
+        final long commitRecordIndexAddr = 0L;
+        
+        final StoreTypeEnum stenum = bufferMode.getStoreType();
+        
+        final long blockSequence = IRootBlockView.NO_BLOCK_SEQUENCE;
+
+        rootBlock0 = new RootBlockView(true,
+                offsetBits, nextOffset, firstCommitTime,
+                lastCommitTime, commitCounter, commitRecordAddr,
+                commitRecordIndexAddr, storeUUID, //
+                blockSequence, quorumToken,//
+                0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
+        
+        rootBlock1 = new RootBlockView(false,
+                offsetBits, nextOffset, firstCommitTime,
+                lastCommitTime, commitCounter, commitRecordAddr,
+                commitRecordIndexAddr, storeUUID, //
+                blockSequence, quorumToken,//
+                0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
+
+        this.rootBlock = rootBlock0;
+
+    }
+    
     /**
      * Dumps the root blocks for the specified file.
      * 

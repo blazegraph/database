@@ -200,7 +200,8 @@ public class HAGlueDelegate implements HAGlue {
     }
 
     @Override
-    public Future<Void> sendHAStore(IHARebuildRequest msg) throws IOException {
+    public Future<IHARootBlockResponse> sendHAStore(IHARebuildRequest msg)
+            throws IOException {
         return delegate.sendHAStore(msg);
     }
 

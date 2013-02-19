@@ -47,7 +47,6 @@ import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Helper object used when opening or creating journal file in any of the
@@ -230,15 +229,15 @@ public class FileMetadata {
 //     */
 //    final private ChecksumUtility checker = new ChecksumUtility();
 
-    /**
-	 * The 1st root block.
-	 */
-	protected IRootBlockView rootBlock0;
-
-	/**
-	 * The 2nd root block.
-	 */
-	protected IRootBlockView rootBlock1;
+//    /**
+//	 * The 1st root block.
+//	 */
+//	protected IRootBlockView rootBlock0;
+//
+//	/**
+//	 * The 2nd root block.
+//	 */
+//	protected IRootBlockView rootBlock1;
 
 	/**
 	 * The current root block. For a new file, this is "rootBlock0". For an
@@ -692,12 +691,18 @@ public class FileMetadata {
 
             }
 
-			/*
-			 * The offset at which the first record will be written. This is
-			 * zero(0) since the buffer offset (0) is the first byte after
-			 * the root blocks.
-			 */
-			nextOffset = 0;
+            /*
+             * Create the root block objects (in memory).
+             */
+            final RootBlockUtility rbu = new RootBlockUtility(bufferMode,
+                    offsetBits, createTime, quorumToken, UUID.randomUUID());
+
+//			/*
+//			 * The offset at which the first record will be written. This is
+//			 * zero(0) since the buffer offset (0) is the first byte after
+//			 * the root blocks.
+//			 */
+//			nextOffset = 0; // Note: Move after we write the RBs.
 
 			magic = MAGIC;
 
@@ -721,43 +726,49 @@ public class FileMetadata {
 
 			}
 
-			/*
-			 * Generate the root blocks. They are for all practical purposes
-			 * identical (in fact, their timestamps will be distinct). The
-			 * root block are then written into their locations in the file.
-			 */
+            /*
+             * The root block are then written into their locations in the file.
+             */
 			{
 
-                final ChecksumUtility checker = ChecksumUtility.threadChk.get();
+//                final ChecksumUtility checker = ChecksumUtility.threadChk.get();
+//
+//				// use the caller's value for offsetBits.
+//				this.offsetBits = offsetBits;
+//				final long commitCounter = 0L;
+//				final long firstCommitTime = 0L;
+//				final long lastCommitTime = 0L;
+//				final long commitRecordAddr = 0L;
+//				final long commitRecordIndexAddr = 0L;
+//				final UUID uuid = UUID.randomUUID(); // journal's UUID.
+//				final StoreTypeEnum stenum = bufferMode.getStoreType();
+//				if (createTime == 0L) {
+//					throw new IllegalArgumentException(
+//							"Create time may not be zero.");
+//				}
+//				this.createTime = createTime;
+//				this.closeTime = 0L;
+//				final long blockSequence = IRootBlockView.NO_BLOCK_SEQUENCE;
+//				final IRootBlockView rootBlock0 = new RootBlockView(true,
+//						offsetBits, nextOffset, firstCommitTime,
+//						lastCommitTime, commitCounter, commitRecordAddr,
+//						commitRecordIndexAddr, uuid, //
+//						blockSequence, quorumToken,//
+//						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
+//				final IRootBlockView rootBlock1 = new RootBlockView(false,
+//						offsetBits, nextOffset, firstCommitTime,
+//						lastCommitTime, commitCounter, commitRecordAddr,
+//						commitRecordIndexAddr, uuid, //
+//						blockSequence, quorumToken,//
+//						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
 
-				// use the caller's value for offsetBits.
-				this.offsetBits = offsetBits;
-				final long commitCounter = 0L;
-				final long firstCommitTime = 0L;
-				final long lastCommitTime = 0L;
-				final long commitRecordAddr = 0L;
-				final long commitRecordIndexAddr = 0L;
-				final UUID uuid = UUID.randomUUID(); // journal's UUID.
-				final StoreTypeEnum stenum = bufferMode.getStoreType();
-				if (createTime == 0L) {
-					throw new IllegalArgumentException(
-							"Create time may not be zero.");
-				}
-				this.createTime = createTime;
-				this.closeTime = 0L;
-				final long blockSequence = IRootBlockView.NO_BLOCK_SEQUENCE;
-				final IRootBlockView rootBlock0 = new RootBlockView(true,
-						offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr,
-						commitRecordIndexAddr, uuid, //
-						blockSequence, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
-				final IRootBlockView rootBlock1 = new RootBlockView(false,
-						offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr,
-						commitRecordIndexAddr, uuid, //
-						blockSequence, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, RootBlockView.currentVersion, checker);
+			    // take various values from the current RB.
+	            this.nextOffset = rbu.rootBlock.getNextOffset();
+	            this.offsetBits = rbu.rootBlock.getOffsetBits();
+	            this.createTime = rbu.rootBlock.getCreateTime();
+	            this.closeTime = rbu.rootBlock.getCloseTime();
+                final IRootBlockView rootBlock0 = rbu.rootBlock0;
+                final IRootBlockView rootBlock1 = rbu.rootBlock1;
 
 				if (!temporary) {
 
@@ -986,8 +997,8 @@ public class FileMetadata {
 			 */
             final RootBlockUtility tmp = new RootBlockUtility(opener, file,
                     validateChecksum, alternateRootBlock, ignoreBadRootBlock);
-            this.rootBlock0 = tmp.rootBlock0;
-            this.rootBlock1 = tmp.rootBlock1;
+//            this.rootBlock0 = tmp.rootBlock0;
+//            this.rootBlock1 = tmp.rootBlock1;
             this.rootBlock = tmp.rootBlock;
 //			{
 //				
