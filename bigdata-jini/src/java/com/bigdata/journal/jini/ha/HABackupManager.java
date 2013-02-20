@@ -88,6 +88,10 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
 /**
  * Service for making full and incremental backups.
  * 
+ * FIXME This is completely non-functional code.  I was just experimenting
+ * with creating a standalone utility.  A functional version should be 
+ * derived by refactoring AbstractServer, HAJournalServer, etc.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class HABackupManager {
