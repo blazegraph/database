@@ -27,13 +27,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.rmi.server.ServerNotActiveException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +52,6 @@ import net.jini.config.ConfigurationException;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.export.ServerContext;
-import net.jini.io.context.ClientHost;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -455,18 +451,18 @@ public class HAJournalServer extends AbstractServer {
         if (log.isInfoEnabled())
             log.info("Starting server.");
 
+        // Setup listener that logs quorum events @ TRACE.
         journal.getQuorum().addListener(new QuorumListener() {
-
             @Override
             public void notify(final QuorumEvent e) {
                 if (log.isTraceEnabled())
-                    log.trace(e); // TODO LOG @ TRACE
+                    log.trace(e);
             }
         });
 
         // Setup the quorum client (aka quorum service).
-        quorumService = (HAQuorumService) newQuorumService(logicalServiceZPath,
-                serviceUUID, haGlueService, journal);
+        quorumService = newQuorumService(logicalServiceZPath, serviceUUID,
+                haGlueService, journal);
 
         // Start the quorum.
         journal.getQuorum().start(quorumService);
@@ -637,7 +633,7 @@ public class HAJournalServer extends AbstractServer {
      * @param store
      *            The {@link HAJournal}.
      */
-    private QuorumServiceBase<HAGlue, HAJournal> newQuorumService(
+    private HAQuorumService<HAGlue, HAJournal> newQuorumService(
             final String logicalServiceZPath,
             final UUID serviceId, final HAGlue remoteServiceImpl,
             final HAJournal store) {
@@ -825,15 +821,6 @@ public class HAJournalServer extends AbstractServer {
          * 
          * @param runStateTask
          *            The task for the new run state.
-         * 
-         *            TODO What happens if we schedule a task and we are already
-         *            in that runState? Do we interrupt the current task and
-         *            restart it? Is it always safe to do this?
-         *            <p>
-         *            Also, note that some tasks have arguments (especially
-         *            RunMet has the token and leaderId). We would have to
-         *            cancel an existing RunMet for a different token since they
-         *            are otherwise not attempting to do the same thing.
          */
         private void enterRunState(final RunStateCallable<Void> runStateTask) {
 
@@ -884,36 +871,36 @@ public class HAJournalServer extends AbstractServer {
 
         }
         
-        /**
-         * Used to submit {@link RunStateCallable} tasks for execution from
-         * within the zk watcher thread.
-         * 
-         * @param task
-         *            The task to be run.
-         */
-        private void enterRunStateFromWatcherThread(
-                final RunStateCallable<Void> task) {
-
-            // Submit task to handle this event.
-            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
-                    new SubmitRunStateTask(task)));
-
-        }
-        
-        /**
-         * Class is used to force a run state transition based on an event
-         * received in the zk watcher thread. 
-         */
-        private class SubmitRunStateTask implements Callable<Void> {
-            private final RunStateCallable<Void> task;
-            public SubmitRunStateTask(final RunStateCallable<Void> task) {
-                this.task = task;
-            }
-            public Void call() throws Exception {
-                enterRunState(task);
-                return null;
-            }
-        }
+//        /**
+//         * Used to submit {@link RunStateCallable} tasks for execution from
+//         * within the zk watcher thread.
+//         * 
+//         * @param task
+//         *            The task to be run.
+//         */
+//        private void enterRunStateFromWatcherThread(
+//                final RunStateCallable<Void> task) {
+//
+//            // Submit task to handle this event.
+//            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+//                    new SubmitRunStateTask(task)));
+//
+//        }
+//        
+//        /**
+//         * Class is used to force a run state transition based on an event
+//         * received in the zk watcher thread. 
+//         */
+//        private class SubmitRunStateTask implements Callable<Void> {
+//            private final RunStateCallable<Void> task;
+//            public SubmitRunStateTask(final RunStateCallable<Void> task) {
+//                this.task = task;
+//            }
+//            public Void call() throws Exception {
+//                enterRunState(task);
+//                return null;
+//            }
+//        }
         
         /**
          * {@inheritDoc}
@@ -984,26 +971,26 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
-        @Override
-        public void start(final Quorum<?,?> quorum) {
-            
-            if (haLog.isTraceEnabled())
-                log.trace("START");
-            
-            super.start(quorum);
-
-            // TODO It appears to be a problem to do this here. Maybe because
-            // the watcher is not running yet? Could submit a task that could
-            // await an appropriate condition to start....
-//            final QuorumActor<?, ?> actor = quorum.getActor();
-//            actor.memberAdd();
-//            actor.pipelineAdd();
-//            actor.castVote(journal.getLastCommitTime());
-
-//            // Inform the Journal about the current token (if any).
-//            journal.setQuorumToken(quorum.token());
-            
-        }
+//        @Override
+//        public void start(final Quorum<?,?> quorum) {
+//            
+//            if (haLog.isTraceEnabled())
+//                log.trace("START");
+//            
+//            super.start(quorum);
+//
+//            // Note: It appears to be a problem to do this here. Maybe because
+//            // the watcher is not running yet? Could submit a task that could
+//            // await an appropriate condition to start....
+////            final QuorumActor<?, ?> actor = quorum.getActor();
+////            actor.memberAdd();
+////            actor.pipelineAdd();
+////            actor.castVote(journal.getLastCommitTime());
+//
+////            // Inform the Journal about the current token (if any).
+////            journal.setQuorumToken(quorum.token());
+//            
+//        }
         
         @Override
         public void quorumMeet(final long token, final UUID leaderId) {
@@ -1018,10 +1005,10 @@ public class HAJournalServer extends AbstractServer {
 
         private class QuorumMeetTask implements Callable<Void> {
             private final long token;
-            private final UUID leaderId;
+//            private final UUID leaderId;
             public QuorumMeetTask(final long token, final UUID leaderId) {
                 this.token = token;
-                this.leaderId = leaderId;
+//                this.leaderId = leaderId;
             }
             public Void call() throws Exception {
                 journal.setQuorumToken(token);
@@ -1116,9 +1103,6 @@ public class HAJournalServer extends AbstractServer {
                          * Quorum is already met.
                          */
                         
-                        // Wait for the token to be set.
-                        awaitJournalToken(token, false/* awaitRootBlocks */);
-                        
                         // Resync since quorum met before we cast a vote.
                         enterRunState(new ResyncTask(token));
 
@@ -1150,9 +1134,6 @@ public class HAJournalServer extends AbstractServer {
                      * The quorum met on a different vote.
                      */
 
-                    // Wait for the token to be set.
-                    awaitJournalToken(token, false/* awaitRootBlocks */);
-
                     // Resync with the quorum.
                     enterRunState(new ResyncTask(token));
 
@@ -1171,10 +1152,9 @@ public class HAJournalServer extends AbstractServer {
         }
 
         /**
-         * Task to handle a quorum meet event.
-         * 
-         * FIXME Update pre-conditions on RunMet and transitions on
-         * SeekConsensus.
+         * While the quorum is met, accept replicated writes, laying them down
+         * on the HALog and the backing store, and participate in the 2-phase
+         * commit protocol.
          */
         private class RunMetTask extends RunStateCallable<Void> {
 
@@ -1219,87 +1199,9 @@ public class HAJournalServer extends AbstractServer {
                         throw new InterruptedException();
                     }
 
-                    /*
-                     * These conditions can not be asserted here. They need to
-                     * be put into place when the quorum meets and
-                     * handleReplicatedWrite() needs to block until those
-                     * pre-conditions are met before doing anything with a live
-                     * write.
-                     */
-                    
-//                    /*
-//                     * Verify Journal is aware of the current token.
-//                     */
-//                    {
-//
-//                        final long journalToken = journal.getQuorumToken();
-//                        
-//                        if (journalToken != token) {
-//                            throw new IllegalStateException(
-//                                    "token differs: quorum=" + token
-//                                            + ", journal=" + journalToken);
-//                        }
-//                        
-//                    }
-//
-//                    if (!isLeader(token)) {
-//
-//                        /*
-//                         * Verify that the lastCommitTime and commitCounter for
-//                         * the leader agree with those for our local Journal.
-//                         */
-//
-//                        final HAGlue leader = getLeader(token);
-//
-//                        final IRootBlockView rbLeader = leader.getRootBlock(
-//                                new HARootBlockRequest(null/* storeUUID */))
-//                                .getRootBlock();
-//
-//                        final IRootBlockView rbSelf = journal
-//                                .getRootBlockView();
-//
-//                        if (rbSelf.getCommitCounter() != rbLeader
-//                                .getCommitCounter())
-//                            throw new QuorumException("commitCounter: leader="
-//                                    + rbLeader.getCommitCounter() + ", self="
-//                                    + rbSelf.getCommitCounter());
-//
-//                        if (rbSelf.getLastCommitTime() != rbLeader
-//                                .getLastCommitTime())
-//                            throw new QuorumException(
-//                                    "lastCommitCounter: leader="
-//                                            + rbLeader.getLastCommitTime()
-//                                            + ", self="
-//                                            + rbSelf.getLastCommitTime());
-//
-//                        // Note: Throws exception if HALogWriter is not open.
-//                        final long logWriterCommitCounter = journal
-//                                .getHALogWriter().getCommitCounter();
-//
-//                        if (logWriterCommitCounter != rbSelf.getCommitCounter()) {
-//
-//                            /*
-//                             * The HALog writer must be expecting replicated
-//                             * cache blocks for the current commit point.
-//                             */
-//                            throw new QuorumException(
-//                                    "commitCounter: logWriter="
-//                                            + logWriterCommitCounter
-//                                            + ", self="
-//                                            + rbSelf.getCommitCounter());
-//
-//                        }
-//
-//                    }
-
                 } // validation of pre-conditions.
 
-                /*
-                 * Wait until this run state gets interrupted.
-                 * 
-                 * TODO Could continue to assert our invariants, or just add zk
-                 * event handlers to look for violations of those invariants.
-                 */
+                // Block until this run state gets interrupted.
                 blockInterruptably();
                 
                 // Done.
@@ -1501,9 +1403,8 @@ public class HAJournalServer extends AbstractServer {
                     // The current root block.
                     final IRootBlockView rb = journal.getRootBlockView();
 
-                    // Use timestamp. TODO Why not working w/ TXS?
+                    // Use timestamp.
                     final long createTime = System.currentTimeMillis();
-//                            journal.getTransactionService().nextTimestamp();
 
                     // New root blocks for a (logically) empty Journal.
                     final RootBlockUtility rbu = new RootBlockUtility(journal
@@ -1619,13 +1520,17 @@ public class HAJournalServer extends AbstractServer {
              */
             protected Void doRun() throws Exception {
 
+//                // Wait for the token to be set, root blocks to be valid.
+//                awaitJournalToken(token, true/* awaitRootBlocks */);
+                pipelineSetup();
+
                 /*
                  * Note: We need to discard any writes that might have been
                  * buffered before we start the resynchronization of the local
                  * store. Otherwise they could wind up flushed through by the
                  * RWStore (for example, when handling a file extension).
                  * 
-                 * Note: This is necessary. We do a low-level abort when we
+                 * Note: This IS necessary. We do a low-level abort when we
                  * install the root blocks from the quorum leader before we sync
                  * the first commit point, but we do not do the low-level abort
                  * if we already have the correct root blocks in place.
@@ -2113,13 +2018,16 @@ public class HAJournalServer extends AbstractServer {
             getQuorum().assertQuorum(token);
 
             // Verify that we have valid root blocks
-            awaitJournalToken(token, true/* awaitRootBlocks */);
+            awaitJournalToken(token);
 
             logLock.lock();
+            
             try {
+
                 final HALogWriter logWriter = journal.getHALogWriter();
 
                 if (!logWriter.isOpen()) {
+             
                     /*
                      * Open the HALogWriter for our current root blocks.
                      * 
@@ -2128,11 +2036,16 @@ public class HAJournalServer extends AbstractServer {
                      * because the historical log writes occur when we ask the
                      * leader to send us a prior commit point in RESYNC.
                      */
+                    
                     journal.getHALogWriter().createLog(
                             journal.getRootBlockView());
+                    
                 }
+
             } finally {
+            
                 logLock.unlock();
+                
             }
 
         }
@@ -2327,11 +2240,6 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                /*
-                 * TODO RESYNC : Review when (and where) we open and close log
-                 * files.
-                 */
-
                 final HALogWriter logWriter = journal.getHALogWriter();
 
                 final long journalCommitCounter = journal.getRootBlockView()
@@ -2351,9 +2259,6 @@ public class HAJournalServer extends AbstractServer {
                          * of the last resync message. We are caught up. We need
                          * to log and apply this live message, cancel the resync
                          * task, and enter RunMet.
-                         * 
-                         * FIXME REBUILD: Verify that we have installed the root
-                         * blocks by this point.
                          */
 
                         resyncTransitionToMetQuorum(msg, data);
@@ -2708,23 +2613,32 @@ public class HAJournalServer extends AbstractServer {
         /**
          * Spin until the journal.quorumToken is set (by the event handler).
          * <p>
-         * Note: If
+         * Note: The {@link #quorumMeet(long, UUID)} arrives in the zookeeper
+         * event thread. We can not take actions that could block in that
+         * thread, so it is pumped into a single threaded executor. When that
+         * executor handles the event, it sets the token on the journal. This
+         * process is of necessity asynchronous with respect to the run state
+         * transitions for the {@link HAJournalServer}. Futher, when the local
+         * journal is empty (and this service is joined with the met quorum as a
+         * follower), setting the quorum token will also cause the root blocks
+         * from the leader to be installed on this service. This method is used
+         * to ensure that the local journal state is consistent (token is set,
+         * root blocks are have been copied if the local journal is empty)
+         * before allowing certain operations to proceed.
          * 
-         * @param awaitRootBlocks
-         *            When <code>true</code> and our
-         *            <code>rootBlock.commitCounter==0</code>, this method
-         *            will also wait until the leader's root blocks are
-         *            installed. This is a necessary pre-condition before
-         *            entering {@link RunMetTask}, but it is NOT a
-         *            pre-condition for {@link ResyncTask}.
+         * @see #quorumMeet(long, UUID)
+         * @see HAJournal#setQuorumToken(long)
          */
-        private void awaitJournalToken(final long token,
-                final boolean awaitRootBlocks) throws IOException,
+        private void awaitJournalToken(final long token) throws IOException,
                 InterruptedException {
-            final S leader = getLeader(token);
-            final IRootBlockView rbLeader = leader.getRootBlock(
-                    new HARootBlockRequest(null/* storeUUID */))
-                    .getRootBlock();
+            /*
+             * Note: This is called for each HA write message received. DO NOT
+             * use any high latency or RMI calls unless we need to wait for the
+             * root blocks. That condition is detected below without any high
+             * latency operations.
+             */
+            S leader = null;
+            IRootBlockView rbLeader = null;
             final long sleepMillis = 10;
             while (true) {
                 // while token is valid.
@@ -2734,10 +2648,23 @@ public class HAJournalServer extends AbstractServer {
                     Thread.sleep(sleepMillis/* ms */);
                     continue;
                 }
-                if (awaitRootBlocks) {
+                if (isFollower(token)) {// if (awaitRootBlocks) {
                     final IRootBlockView rbSelf = journal.getRootBlockView();
                     if (rbSelf.getCommitCounter() == 0) {
-                        // Only wait if this is an empty Journal.
+                        /*
+                         * Only wait if this is an empty Journal.
+                         */
+                        if (leader == null) {
+                            /*
+                             * RMI to the leader for its current root block
+                             * (once).
+                             */
+                            leader = getLeader(token);
+                            rbLeader = leader
+                                    .getRootBlock(
+                                            new HARootBlockRequest(null/* storeUUID */))
+                                    .getRootBlock();
+                        }
                         if (!rbSelf.getUUID().equals(rbLeader.getUUID())) {
                             Thread.sleep(sleepMillis/* ms */);
                             continue;
@@ -2748,8 +2675,7 @@ public class HAJournalServer extends AbstractServer {
                  * Good to go.
                  */
                 if (haLog.isInfoEnabled())
-                    haLog.info("Journal quorumToken is set: awaitRootBlocks="
-                            + awaitRootBlocks);
+                    haLog.info("Journal quorumToken is set.");
                 break;
             }
         }
@@ -2917,81 +2843,81 @@ public class HAJournalServer extends AbstractServer {
             
         }
         
-        /**
-         * Sets up the {@link MDC} logging context. You should do this on every
-         * client facing point of entry and then call
-         * {@link #clearLoggingContext()} in a <code>finally</code> clause. You
-         * can extend this method to add additional context.
-         * <p>
-         * This implementation adds the following parameters to the {@link MDC}.
-         * <dl>
-         * <dt>serviceName</dt>
-         * <dd>The serviceName is typically a configuration property for the
-         * service. This datum can be injected into log messages using
-         * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
-         * <dt>serviceUUID</dt>
-         * <dd>The serviceUUID is, in general, assigned asynchronously by the
-         * service registrar. Once the serviceUUID becomes available it will be
-         * added to the {@link MDC}. This datum can be injected into log
-         * messages using <em>%X{serviceUUID}</em> in your log4j pattern layout.
-         * </dd>
-         * <dt>hostname</dt>
-         * <dd>The hostname statically determined. This datum can be injected
-         * into log messages using <em>%X{hostname}</em> in your log4j pattern
-         * layout.</dd>
-         * <dt>clientname
-         * <dt>
-         * <dd>The hostname or IP address of the client making the request.</dd>
-         * </dl>
-         * Note: {@link InetAddress#getHostName()} is used. This method makes a
-         * one-time best effort attempt to resolve the host name from the
-         * {@link InetAddress}.
-         */
-        private void setupLoggingContext() {
-
-            try {
-
-                // Note: This _is_ a local method call.
-                final ServiceID serviceUUID = server.getServiceID();
-
-                // Will be null until assigned by the service registrar.
-
-                if (serviceUUID != null) {
-
-                    MDC.put("serviceUUID", serviceUUID);
-
-                }
-
-                MDC.put("serviceName", server.getServiceName());
-
-                MDC.put("hostname", server.getHostName());
-
-                try {
-
-                    final InetAddress clientAddr = ((ClientHost) ServerContext
-                            .getServerContextElement(ClientHost.class))
-                            .getClientHost();
-
-                    MDC.put("clientname", clientAddr.getHostName());
-
-                } catch (ServerNotActiveException e) {
-
-                    /*
-                     * This exception gets thrown if the client has made a
-                     * direct (vs RMI) call so we just ignore it.
-                     */
-
-                }
-
-            } catch (Throwable t) {
-
-                /*
-                 * Ignore.
-                 */
-
-            }
-
-        }
+//        /**
+//         * Sets up the {@link MDC} logging context. You should do this on every
+//         * client facing point of entry and then call
+//         * {@link #clearLoggingContext()} in a <code>finally</code> clause. You
+//         * can extend this method to add additional context.
+//         * <p>
+//         * This implementation adds the following parameters to the {@link MDC}.
+//         * <dl>
+//         * <dt>serviceName</dt>
+//         * <dd>The serviceName is typically a configuration property for the
+//         * service. This datum can be injected into log messages using
+//         * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
+//         * <dt>serviceUUID</dt>
+//         * <dd>The serviceUUID is, in general, assigned asynchronously by the
+//         * service registrar. Once the serviceUUID becomes available it will be
+//         * added to the {@link MDC}. This datum can be injected into log
+//         * messages using <em>%X{serviceUUID}</em> in your log4j pattern layout.
+//         * </dd>
+//         * <dt>hostname</dt>
+//         * <dd>The hostname statically determined. This datum can be injected
+//         * into log messages using <em>%X{hostname}</em> in your log4j pattern
+//         * layout.</dd>
+//         * <dt>clientname
+//         * <dt>
+//         * <dd>The hostname or IP address of the client making the request.</dd>
+//         * </dl>
+//         * Note: {@link InetAddress#getHostName()} is used. This method makes a
+//         * one-time best effort attempt to resolve the host name from the
+//         * {@link InetAddress}.
+//         */
+//        private void setupLoggingContext() {
+//
+//            try {
+//
+//                // Note: This _is_ a local method call.
+//                final ServiceID serviceUUID = server.getServiceID();
+//
+//                // Will be null until assigned by the service registrar.
+//
+//                if (serviceUUID != null) {
+//
+//                    MDC.put("serviceUUID", serviceUUID);
+//
+//                }
+//
+//                MDC.put("serviceName", server.getServiceName());
+//
+//                MDC.put("hostname", server.getHostName());
+//
+//                try {
+//
+//                    final InetAddress clientAddr = ((ClientHost) ServerContext
+//                            .getServerContextElement(ClientHost.class))
+//                            .getClientHost();
+//
+//                    MDC.put("clientname", clientAddr.getHostName());
+//
+//                } catch (ServerNotActiveException e) {
+//
+//                    /*
+//                     * This exception gets thrown if the client has made a
+//                     * direct (vs RMI) call so we just ignore it.
+//                     */
+//
+//                }
+//
+//            } catch (Throwable t) {
+//
+//                /*
+//                 * Ignore.
+//                 */
+//
+//            }
+//
+//        }
 
         /**
          * Clear the logging context.

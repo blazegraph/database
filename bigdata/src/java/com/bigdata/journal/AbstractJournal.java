@@ -4926,8 +4926,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // This quorum member.
                 final QuorumService<HAGlue> localService = quorum.getClient();
 
-                if (localService.isJoinedMember(quorumToken)
-                        && _rootBlock.getCommitCounter() == 0
+                if (_rootBlock.getCommitCounter() == 0
                         && localService.isFollower(quorumToken)) {
 
                     /*
