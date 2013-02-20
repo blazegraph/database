@@ -54,6 +54,12 @@ public interface IHALogReader {
 	boolean isEmpty();
 	
 	/**
+     * The {@link IRootBlockView} for the committed state BEFORE the write set
+     * contained in the HA log file.
+     */
+    IRootBlockView getOpeningRootBlock() throws IOException;
+    
+    /**
 	 * The {@link IRootBlockView} for the committed state AFTER the write set
 	 * contained in the HA log file has been applied.
 	 */

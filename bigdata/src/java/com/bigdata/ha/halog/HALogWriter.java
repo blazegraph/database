@@ -676,7 +676,7 @@ public class HALogWriter {
      *             exist or can not be read.
      */
     public IHALogReader getReader(final long commitCounter)
-            throws IOException {
+            throws FileNotFoundException, IOException {
 
         final File logFile = new File(m_haLogDir,
                 HALogWriter.getHALogFileName(commitCounter));
@@ -816,14 +816,30 @@ public class HALogWriter {
 	}
 
 	static class OpenHALogReader implements IHALogReader {
-		final FileState m_state;
-		int m_record = 0;
-		long m_position = headerSize0; // initial position
+	    private final FileState m_state;
+	    private int m_record = 0;
+	    private long m_position = headerSize0; // initial position
 
-		OpenHALogReader(FileState state) {
+		OpenHALogReader(final FileState state) {
 			m_state = state;
 			m_state.m_accessors++;
 		}
+
+        @Override
+        public IRootBlockView getOpeningRootBlock() throws IOException {
+
+            final RootBlockUtility tmp = new RootBlockUtility(m_state.reopener,
+                    m_state.m_haLogFile, true/* validateChecksum */,
+                    false/* alternateRootBlock */, false/* ignoreBadRootBlock */);
+
+            final IRootBlockView closeRootBlock = tmp.chooseRootBlock();
+
+            final IRootBlockView openRootBlock = tmp.rootBlock0 == closeRootBlock ? tmp.rootBlock1
+                    : tmp.rootBlock0;
+
+            return openRootBlock;
+
+        }
 
 		@Override
 		public IRootBlockView getClosingRootBlock() throws IOException {

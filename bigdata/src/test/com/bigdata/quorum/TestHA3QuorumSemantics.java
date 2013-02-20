@@ -465,7 +465,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberRemove();
         fixture.awaitDeque();
 
-        // wait break to provide visibility for changes (but changes not
+        // await break to provide visibility for changes (but changes not
         // required for a quorum break might still not be visible.)
         quorum0.awaitBreak();
         quorum1.awaitBreak();

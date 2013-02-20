@@ -2709,7 +2709,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     final UUID clientId = client.getServiceId();
                     if (joined.contains(clientId)) {
                       final QuorumMember<S> member = getMember();
-                      if (member instanceof QuorumService) {
+                      if (false && member instanceof QuorumService) {
                         /*
                          * Set the last commit time.
                          * 

@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
@@ -49,6 +72,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogWriter;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.msg.HALogRequest;
 import com.bigdata.ha.msg.HALogRootBlocksRequest;
 import com.bigdata.ha.msg.HARebuildRequest;
@@ -61,6 +85,7 @@ import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
@@ -446,18 +471,9 @@ public class HAJournalServer extends AbstractServer {
         // Start the quorum.
         journal.getQuorum().start(quorumService);
 
-        // Submit task to seek consensus.
-        quorumService.enterRunState(quorumService.new SeekConsensusTask());
+        // Enter a run state for the HAJournalServer.
+        quorumService.enterRunState(quorumService.new RestoreTask());
         
-//        /*
-//         * Note: This CAN NOT moved into QuorumServiceImpl.start(Quorum). I
-//         * suspect that this is because the quorum watcher would not be running
-//         * at the moment that we start doing things with the actor, but I have
-//         * not verified that rationale in depth.
-//         */
-//        doConditionalCastVote(this/* server */,
-//                (Quorum<HAGlue, QuorumService<HAGlue>>) quorum, journal);
-
         /*
          * The NSS will start on each service in the quorum. However,
          * only the leader will create the default KB (if that option is
@@ -655,24 +671,19 @@ public class HAJournalServer extends AbstractServer {
         /**
          * Enum of the run states. The states are labeled by the goal of the run
          * state.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
          */
         private enum RunStateEnum {
-            Start,
+            Restore,
             SeekConsensus,
             RunMet,
             Resync,
-            Rebuild, // TODO Not finished.
-            Backup, // TODO Not implemented.
+            Rebuild, 
             Shutdown; // TODO We are not using this systematically (no ShutdownTask for this run state).
         }
         
         private final AtomicReference<RunStateEnum> runStateRef = new AtomicReference<RunStateEnum>(
                 null/* none */);
 
-        // TODO Could hook this to report out to Jini as well as the haLog file.
         protected void setRunState(final RunStateEnum runState) {
 
             if (runStateRef.get() == RunStateEnum.Shutdown) {
@@ -699,24 +710,18 @@ public class HAJournalServer extends AbstractServer {
                 
             }
 
-//            if (haLog.isInfoEnabled())
-//                haLog.info("RUNSTATE=" + runState);
+            haLog.warn("runState=" + runState + ", oldRunState=" + oldRunState
+                    + ", serviceName=" + server.getServiceName());
 
         }
         
         private abstract class RunStateCallable<T> implements Callable<T> {
             
-            private final RunStateEnum runState;
-
             /**
-             * Return the {@link RunStateEnum} for this task.
+             * The {@link RunStateEnum} for this task.
              */
-            public RunStateEnum getRunState() {
+            protected final RunStateEnum runState;
 
-                return runState;
-                
-            }
-            
             protected RunStateCallable(final RunStateEnum runState) {
 
                 if (runState == null)
@@ -731,8 +736,6 @@ public class HAJournalServer extends AbstractServer {
                 setRunState(runState);
 
                 try {
-
-                    haLog.warn(runState + ": " + server.getServiceName());
 
                     return doRun();
 
@@ -855,9 +858,9 @@ public class HAJournalServer extends AbstractServer {
 
                     success = true;
 
-                    if (haLog.isInfoEnabled())
-                        haLog.info("Entering runState="
-                                + runStateTask.getClass().getSimpleName());
+//                    if (haLog.isInfoEnabled())
+//                        haLog.info("Entering runState="
+//                                + runStateTask.getClass().getSimpleName());
 
                 } finally {
 
@@ -973,6 +976,14 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
+        @SuppressWarnings("unchecked")
+        protected void doLocalCommit(final IRootBlockView rootBlock) {
+
+            journal.doLocalCommit((QuorumService<HAGlue>) HAQuorumService.this,
+                    rootBlock);
+            
+        }
+
         @Override
         public void start(final Quorum<?,?> quorum) {
             
@@ -1041,7 +1052,7 @@ public class HAJournalServer extends AbstractServer {
                 return null;
             }
         }
-        
+                
         /**
          * Task to handle a quorum break event.
          */
@@ -1133,127 +1144,37 @@ public class HAJournalServer extends AbstractServer {
                 // await the quorum meet.
                 final long token = getQuorum().awaitQuorum();
 
-                final UUID leaderId = getQuorum().getLeaderId();
-
-                if (!isLeader(token)) {
+                if (!isJoinedMember(token)) {
 
                     /*
-                     * Wait for the token to be set and the root blocks to be
-                     * installed (if necessary).
+                     * The quorum met on a different vote.
                      */
-                    
+
+                    // Wait for the token to be set.
                     awaitJournalToken(token, false/* awaitRootBlocks */);
-                    
-                }
 
-                if (isJoinedMember(token)) {
-
-                    /*
-                     * Make sure the initial root blocks are installed before
-                     * proceeding if this is the first quorum meet (commit
-                     * counter is ZERO (0)).
-                     */
-                    awaitJournalToken(token, true/* awaitRootBlocks */);
-
-                    /*
-                     * The quorum is met, the consensus vote is our
-                     * lastCommitTime.
-                     */
-
-                    try {
-
-                        journal.getHALogWriter().createLog(
-                                journal.getRootBlockView());
-
-                    } catch (IOException e) {
-
-                        /*
-                         * We can not remain in the quorum if we can not write
-                         * the HA Log file.
-                         */
-                        haLog.error("CAN NOT OPEN LOG: " + e, e);
-
-                        // TODO Should be done with ShutdownTask()
-                        server.shutdownNow(false/* destroy */);
-
-                        throw e;
-
-                    }
-
-                    // Transition to RunMet.
-                    enterRunState(new RunMetTask(token, leaderId));
-
-                } else {
-
-                    // Quorum met on a different vote.
+                    // Resync with the quorum.
                     enterRunState(new ResyncTask(token));
 
                 }
+
+                final UUID leaderId = getQuorum().getLeaderId();
+
+                // Transition to RunMet.
+                enterRunState(new RunMetTask(token, leaderId));
 
                 // Done.
                 return null;
                 
             }
 
-            /**
-             * Spin until the journal.quorumToken is set (by the event handler).
-             * <p>
-             * Note: If
-             * 
-             * @param awaitRootBlocks
-             *            When <code>true</code> and our
-             *            <code>rootBlock.commitCounter==0</code>, this method
-             *            will also wait until the leader's root blocks are
-             *            installed. This is a necessary pre-condition before
-             *            entering {@link RunMetTask}, but it is NOT a
-             *            pre-condition for {@link ResyncTask}.
-             */
-            private void awaitJournalToken(final long token,
-                    final boolean awaitRootBlocks) throws IOException,
-                    InterruptedException {
-                final S leader = getLeader(token);
-                final IRootBlockView rbLeader = leader.getRootBlock(
-                        new HARootBlockRequest(null/* storeUUID */))
-                        .getRootBlock();
-                while (true) {
-                    Thread.sleep(10/* ms */);
-                    // while token is valid.
-                    getQuorum().assertQuorum(token);
-                    final long journalToken = journal.getQuorumToken();
-                    if (journalToken != token)
-                        continue;
-                    if (awaitRootBlocks) {
-                        final IRootBlockView rbSelf = journal
-                                .getRootBlockView();
-                        if (!rbSelf.getUUID().equals(rbLeader.getUUID())) {
-                            if (rbSelf.getCommitCounter() > 0) {
-                                final String msg = "Journal UUIDs differ @ commitCounter="
-                                        + rbSelf.getCommitCounter()
-                                        + ", self="
-                                        + rbSelf.getUUID()
-                                        + ",leader="
-                                        + rbLeader.getUUID();
-                                haLog.error(msg);
-                                server.shutdownNow(false/* destroy */);
-                                throw new IllegalStateException(msg);
-                            }
-                            continue;
-                        }
-                    }
-                    /*
-                     * Good to go.
-                     */
-                    if (haLog.isInfoEnabled())
-                        haLog.info("Journal quorumToken is set: awaitRootBlocks="
-                                + awaitRootBlocks);
-                    break;
-                }
-            }
-            
         }
 
         /**
          * Task to handle a quorum meet event.
+         * 
+         * FIXME Update pre-conditions on RunMet and transitions on
+         * SeekConsensus.
          */
         private class RunMetTask extends RunStateCallable<Void> {
 
@@ -1297,71 +1218,79 @@ public class HAJournalServer extends AbstractServer {
                          */
                         throw new InterruptedException();
                     }
-                    
+
                     /*
-                     * Verify Journal is aware of the current token.
+                     * These conditions can not be asserted here. They need to
+                     * be put into place when the quorum meets and
+                     * handleReplicatedWrite() needs to block until those
+                     * pre-conditions are met before doing anything with a live
+                     * write.
                      */
-                    {
-
-                        final long journalToken = journal.getQuorumToken();
-                        
-                        if (journalToken != token) {
-                            throw new IllegalStateException(
-                                    "token differs: quorum=" + token
-                                            + ", journal=" + journalToken);
-                        }
-                        
-                    }
-
-                    if (!isLeader(token)) {
-
-                        /*
-                         * Verify that the lastCommitTime and commitCounter for
-                         * the leader agree with those for our local Journal.
-                         */
-
-                        final HAGlue leader = getLeader(token);
-
-                        final IRootBlockView rbLeader = leader.getRootBlock(
-                                new HARootBlockRequest(null/* storeUUID */))
-                                .getRootBlock();
-
-                        final IRootBlockView rbSelf = journal
-                                .getRootBlockView();
-
-                        if (rbSelf.getCommitCounter() != rbLeader
-                                .getCommitCounter())
-                            throw new QuorumException("commitCounter: leader="
-                                    + rbLeader.getCommitCounter() + ", self="
-                                    + rbSelf.getCommitCounter());
-
-                        if (rbSelf.getLastCommitTime() != rbLeader
-                                .getLastCommitTime())
-                            throw new QuorumException(
-                                    "lastCommitCounter: leader="
-                                            + rbLeader.getLastCommitTime()
-                                            + ", self="
-                                            + rbSelf.getLastCommitTime());
-
-                        // Note: Throws exception if HALogWriter is not open.
-                        final long logWriterCommitCounter = journal
-                                .getHALogWriter().getCommitCounter();
-
-                        if (logWriterCommitCounter != rbSelf.getCommitCounter()) {
-
-                            /*
-                             * The HALog writer must be expecting replicated
-                             * cache blocks for the current commit point.
-                             */
-                            throw new QuorumException(
-                                    "commitCounter: logWriter="
-                                            + logWriterCommitCounter
-                                            + ", self="
-                                            + rbSelf.getCommitCounter());
-
-                        }
-
-                    }
+                    
+//                    /*
+//                     * Verify Journal is aware of the current token.
+//                     */
+//                    {
+//
+//                        final long journalToken = journal.getQuorumToken();
+//                        
+//                        if (journalToken != token) {
+//                            throw new IllegalStateException(
+//                                    "token differs: quorum=" + token
+//                                            + ", journal=" + journalToken);
+//                        }
+//                        
+//                    }
+//
+//                    if (!isLeader(token)) {
+//
+//                        /*
+//                         * Verify that the lastCommitTime and commitCounter for
+//                         * the leader agree with those for our local Journal.
+//                         */
+//
+//                        final HAGlue leader = getLeader(token);
+//
+//                        final IRootBlockView rbLeader = leader.getRootBlock(
+//                                new HARootBlockRequest(null/* storeUUID */))
+//                                .getRootBlock();
+//
+//                        final IRootBlockView rbSelf = journal
+//                                .getRootBlockView();
+//
+//                        if (rbSelf.getCommitCounter() != rbLeader
+//                                .getCommitCounter())
+//                            throw new QuorumException("commitCounter: leader="
+//                                    + rbLeader.getCommitCounter() + ", self="
+//                                    + rbSelf.getCommitCounter());
+//
+//                        if (rbSelf.getLastCommitTime() != rbLeader
+//                                .getLastCommitTime())
+//                            throw new QuorumException(
+//                                    "lastCommitCounter: leader="
+//                                            + rbLeader.getLastCommitTime()
+//                                            + ", self="
+//                                            + rbSelf.getLastCommitTime());
+//
+//                        // Note: Throws exception if HALogWriter is not open.
+//                        final long logWriterCommitCounter = journal
+//                                .getHALogWriter().getCommitCounter();
+//
+//                        if (logWriterCommitCounter != rbSelf.getCommitCounter()) {
+//
+//                            /*
+//                             * The HALog writer must be expecting replicated
+//                             * cache blocks for the current commit point.
+//                             */
+//                            throw new QuorumException(
+//                                    "commitCounter: logWriter="
+//                                            + logWriterCommitCounter
+//                                            + ", self="
+//                                            + rbSelf.getCommitCounter());
+//
+//                        }
+//
+//                    }
 
                 } // validation of pre-conditions.
 
@@ -1380,6 +1309,124 @@ public class HAJournalServer extends AbstractServer {
             
         } // class RunMetTask
 
+        /**
+         * Run state responsible for replaying local HALog files during service
+         * startup. This allows an offline restore of the backing journal file
+         * (a full backup) and zero or more HALog files (each an incremental
+         * backup corresponding to a single commit point). When the service
+         * starts, it will replay each HALog file for the successor of its then
+         * current commit counter.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         */
+        private class RestoreTask extends RunStateCallable<Void> {
+         
+            protected RestoreTask() {
+
+                super(RunStateEnum.Restore);
+
+            }
+
+            @Override
+            protected Void doRun() throws Exception {
+                /*
+                 * FIXME Enable restore and test. There is a problem with
+                 * replication of the WORM HALog files and backup/restore. The
+                 * WORM HALog files currently do not have the actual data on the
+                 * leader. This makes some of the code messier and also means
+                 * that the HALog files can not be binary equals on the leader
+                 * and follower and could cause problems if people harvest them
+                 * from the file system directly rather than through
+                 * sendHALogFile() since they will be missing the necessary
+                 * state in the file system if they were put there by the
+                 * leader.
+                 */
+                if(false)
+                while (true) {
+
+                    long commitCounter = journal.getRootBlockView()
+                            .getCommitCounter();
+
+                    try {
+
+                        final IHALogReader r = journal.getHALogWriter()
+                                .getReader(commitCounter + 1);
+
+                        applyHALog(r);
+
+                        doLocalCommit(r.getClosingRootBlock());
+
+                    } catch (FileNotFoundException ex) {
+
+                        /*
+                         * No such HALog file. Ignore and exit this loop.
+                         */
+                        break;
+
+                    } catch (IOException ex) {
+
+                        log.error("Problem reading HALog file: commitCounter="
+                                + commitCounter + ": " + ex, ex);
+                        
+                        break;
+
+                    }
+
+                }
+
+                // Submit task to seek consensus.
+                enterRunState(new SeekConsensusTask());
+
+                // Done.
+                return null;
+
+            }
+
+            /**
+             * Apply the write set to the local journal.
+             * 
+             * @param r
+             *            The {@link IHALogReader} for the HALog file containing
+             *            the write set.
+             *            
+             * @throws IOException
+             * @throws InterruptedException
+             */
+            private void applyHALog(final IHALogReader r) throws IOException,
+                    InterruptedException {
+
+                final IBufferAccess buf = DirectBufferPool.INSTANCE.acquire();
+
+                try {
+
+                    while (r.hasMoreBuffers()) {
+
+//                        // IHABufferStrategy
+//                        final IHABufferStrategy strategy = journal
+//                                .getBufferStrategy();
+
+                        // get message and fill write cache buffer (unless
+                        // WORM).
+                        final IHAWriteMessage msg = r.processNextBuffer(buf
+                                .buffer());
+
+                        writeWriteCacheBlock(msg, buf.buffer());
+                        
+                    }
+
+                    haLog.warn("Applied HALog: closingCommitCounter="
+                            + r.getClosingRootBlock().getCommitCounter());
+
+                } finally {
+
+                    buf.release();
+
+                }
+            }
+
+        }
+        
         /**
          * Rebuild the backing store from scratch.
          * <p>
@@ -1864,8 +1911,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             // Local commit.
-            journal.doLocalCommit((QuorumService<HAGlue>) HAQuorumService.this,
-                    closeRootBlock);
+            doLocalCommit(closeRootBlock);
 
             // Close out the current HALog writer.
             logLock.lock();
@@ -2041,11 +2087,63 @@ public class HAJournalServer extends AbstractServer {
             
         }
 
+        
+        /**
+         * Make sure the pipeline is setup properly.
+         * <p>
+         * We need to block until the quorum meet has caused the quorumToken to
+         * be set on the Journal and the HALogWriter to be configured so we can
+         * begin to accept replicated live writes.
+         * <p>
+         * Also, if this is the first quorum meet (commit counter is ZERO (0)),
+         * then we need to make sure that the root blocks have been replicated
+         * from the leader before proceeding.
+         * 
+         * @throws IOException
+         * @throws FileNotFoundException
+         * @throws InterruptedException
+         */
+        private void pipelineSetup() throws FileNotFoundException, IOException,
+                InterruptedException {
+
+            // The current token (if any).
+            final long token = getQuorum().token();
+
+            // Verify that the quorum is met.
+            getQuorum().assertQuorum(token);
+
+            // Verify that we have valid root blocks
+            awaitJournalToken(token, true/* awaitRootBlocks */);
+
+            logLock.lock();
+            try {
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                if (!logWriter.isOpen()) {
+                    /*
+                     * Open the HALogWriter for our current root blocks.
+                     * 
+                     * Note: We always use the current root block when receiving
+                     * an HALog file, even for historical writes. This is
+                     * because the historical log writes occur when we ask the
+                     * leader to send us a prior commit point in RESYNC.
+                     */
+                    journal.getHALogWriter().createLog(
+                            journal.getRootBlockView());
+                }
+            } finally {
+                logLock.unlock();
+            }
+
+        }
+        
         @Override
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
 
+            pipelineSetup();
+            
             logLock.lock();
             try {
 
@@ -2101,6 +2199,8 @@ public class HAJournalServer extends AbstractServer {
 
                 final HALogWriter logWriter = journal.getHALogWriter();
 
+                assert logWriter.isOpen();
+                
                 if (msg.getCommitCounter() == logWriter.getCommitCounter()
                         && msg.getSequence() == (logWriter.getSequence() - 1)) {
 
@@ -2419,7 +2519,6 @@ public class HAJournalServer extends AbstractServer {
              */
             logWriteCacheBlock(msg, data);
 
-            setExtent(msg);
             writeWriteCacheBlock(msg, data);
 
         }
@@ -2434,6 +2533,20 @@ public class HAJournalServer extends AbstractServer {
         public void logWriteCacheBlock(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException {
 
+            try {
+
+                // Make sure the pipeline is setup properly.
+                pipelineSetup();
+                
+            } catch (InterruptedException e) {
+                
+                // Propagate the interrupt.
+                Thread.currentThread().interrupt();
+                
+                return;
+                
+            }
+            
             logLock.lock();
 
             try {
@@ -2454,6 +2567,8 @@ public class HAJournalServer extends AbstractServer {
         private void writeWriteCacheBlock(final IHAWriteMessage msg,
                 final ByteBuffer data) throws IOException, InterruptedException {
 
+            setExtent(msg);
+            
             /*
              * Note: the ByteBuffer is owned by the HAReceiveService. This just
              * wraps up the reference to the ByteBuffer with an interface that
@@ -2590,7 +2705,56 @@ public class HAJournalServer extends AbstractServer {
             return server.getServiceDir();
         }
         
-    }
+        /**
+         * Spin until the journal.quorumToken is set (by the event handler).
+         * <p>
+         * Note: If
+         * 
+         * @param awaitRootBlocks
+         *            When <code>true</code> and our
+         *            <code>rootBlock.commitCounter==0</code>, this method
+         *            will also wait until the leader's root blocks are
+         *            installed. This is a necessary pre-condition before
+         *            entering {@link RunMetTask}, but it is NOT a
+         *            pre-condition for {@link ResyncTask}.
+         */
+        private void awaitJournalToken(final long token,
+                final boolean awaitRootBlocks) throws IOException,
+                InterruptedException {
+            final S leader = getLeader(token);
+            final IRootBlockView rbLeader = leader.getRootBlock(
+                    new HARootBlockRequest(null/* storeUUID */))
+                    .getRootBlock();
+            final long sleepMillis = 10;
+            while (true) {
+                // while token is valid.
+                getQuorum().assertQuorum(token);
+                final long journalToken = journal.getQuorumToken();
+                if (journalToken != token) {
+                    Thread.sleep(sleepMillis/* ms */);
+                    continue;
+                }
+                if (awaitRootBlocks) {
+                    final IRootBlockView rbSelf = journal.getRootBlockView();
+                    if (rbSelf.getCommitCounter() == 0) {
+                        // Only wait if this is an empty Journal.
+                        if (!rbSelf.getUUID().equals(rbLeader.getUUID())) {
+                            Thread.sleep(sleepMillis/* ms */);
+                            continue;
+                        }
+                    }
+                }
+                /*
+                 * Good to go.
+                 */
+                if (haLog.isInfoEnabled())
+                    haLog.info("Journal quorumToken is set: awaitRootBlocks="
+                            + awaitRootBlocks);
+                break;
+            }
+        }
+        
+    } // class HAQuorumService
 
     /**
      * Setup and start the {@link NanoSparqlServer}.
