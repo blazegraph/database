@@ -33,6 +33,7 @@ import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -392,7 +393,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
                 }
             }
 
-        });
+        }, 5, TimeUnit.SECONDS);
         
     }
     

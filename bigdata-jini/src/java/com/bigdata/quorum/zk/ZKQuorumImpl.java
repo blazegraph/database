@@ -1360,8 +1360,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                         log.info(e.toString());
                     switch (e.getState()) {
                     case Disconnected:
-                    	log.warn("DISCONNECTED: " + token());
-                    	setToken(NO_QUORUM);
+                        log.warn("DISCONNECTED: " + token());
                         return;
                     case SyncConnected:
                         break;
@@ -1717,13 +1716,13 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 final OrderedSetDifference<UUID> diff = new OrderedSetDifference<UUID>(
                         aold, anew);
                 for (UUID t : diff.removed()) {
-                	if (log.isInfoEnabled())
-                		log.info("removing: " + t);
+                	if (log.isTraceEnabled())
+                		log.trace("removing: " + t);
                     remove(t);
                 }
                 for (UUID t : diff.added()) {
-                	if (log.isInfoEnabled())
-                		log.info("adding: " + t);
+                	if (log.isTraceEnabled())
+                		log.trace("adding: " + t);
                     add(t);
                 }
             }
@@ -1733,13 +1732,13 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 final UnorderedSetDifference<UUID> diff = new UnorderedSetDifference<UUID>(
                         aold, anew);
                 for (UUID t : diff.removed()) {
-                	if (log.isInfoEnabled())
-                		log.info("removing: " + t);
+                	if (log.isTraceEnabled())
+                		log.trace("removing: " + t);
                     remove(t);
                 }
                 for (UUID t : diff.added()) {
-                	if (log.isInfoEnabled())
-                		log.info("adding: " + t);
+                	if (log.isTraceEnabled())
+                		log.trace("adding: " + t);
                     add(t);
                 }
             }

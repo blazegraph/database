@@ -1895,10 +1895,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             try {
 
                 // Wait long enough for the RMI request to end.
-                Thread.sleep(500/* ms */);
+                Thread.sleep(250/* ms */);
 
             } catch (InterruptedException e) {
-            	log.warn("Shutdown interrupted", e);
             	
                 // Propagate interrupt.
                 Thread.currentThread().interrupt();

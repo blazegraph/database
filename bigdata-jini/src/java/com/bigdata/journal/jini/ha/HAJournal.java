@@ -856,9 +856,7 @@ public class HAJournal extends Journal {
                         final Future<?> snd = getBufferStrategy().sendRawBuffer(req, sequence,
                                 quorumToken, fileExtent, offset, nbytes, b);
                         
-                        if (snd != null) {
-                        	snd.get(); // wait for data sent!
-                        }
+                        snd.get(); // wait for data sent!
 
                         remaining -= nbytes;
                         
