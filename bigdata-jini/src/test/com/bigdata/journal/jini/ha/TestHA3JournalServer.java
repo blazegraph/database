@@ -726,13 +726,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Wait until the quorum is fully met. After RESYNC
 		assertEquals(token, awaitFullyMetQuorum(20));
 
-		System.err.println("FULLY MET");
+		log.info("FULLY MET");
 		
 		while (!spin.get()) {
 			Thread.sleep(50);
 		}
 
-		System.err.println("Should be safe to test digests now");
+		log.info("Should be safe to test digests now");
 		
 		// Cannot predict last commit counter or whether even logs will remain
 		// assertHALogDigestsEquals(1L/* firstCommitCounter */,
@@ -773,7 +773,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
 				new HAGlue[] { serverA, serverB, serverC });
 
-		System.err.println("ALL GOOD!");
+		log.info("ALL GOOD!");
 	}
     
 	   /**
@@ -878,7 +878,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 					try {
 						getRemoteRepository(leader).prepareUpdate(updateStr)
 								.evaluate();
-						System.err.println("Updated");
+						log.info("Updated");
 					} catch (Exception e) {
 						e.printStackTrace();
 						
@@ -896,13 +896,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Wait until the quorum is fully met. After RESYNC
 		assertEquals(token, awaitFullyMetQuorum(20));
 
-		System.err.println("FULLY MET");
+		log.info("FULLY MET");
 		
 		while (!spin.get()) {
 			Thread.sleep(50);
 		}
 
-		System.err.println("Should be safe to test digests now");
+		log.info("Should be safe to test digests now");
 		
 		// Cannot predict last commit counter or whether even logs will remain
 		// assertHALogDigestsEquals(1L/* firstCommitCounter */,
@@ -943,7 +943,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
 				new HAGlue[] { serverA, serverB, serverC });
 
-		System.err.println("ALL GOOD!");
+		log.info("ALL GOOD!");
 	}
     
     /**
