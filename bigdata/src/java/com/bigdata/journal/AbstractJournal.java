@@ -5041,9 +5041,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         // Choose the "current" root block.
         _rootBlock = RootBlockUtility.chooseRootBlock(rootBlock0, rootBlock1);
-
+        
         haLog.warn("Installed new root blocks: rootBlock0=" + rootBlock0
                 + ", rootBlock1=" + rootBlock1);
+
+        // now reset the store with the root block
+        if (_bufferStrategy instanceof RWStrategy)
+        	((RWStrategy) _bufferStrategy).resetFromHARootBlock(_rootBlock);
+
 
         /*
          * We need to reset the backing store with the token for the new quorum.

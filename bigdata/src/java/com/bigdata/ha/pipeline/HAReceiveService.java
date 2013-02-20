@@ -828,7 +828,7 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
         }
         
         public Void call() throws Exception {
-
+        	
 //            awaitAccept();
 //            
 //            /*
@@ -899,6 +899,9 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             // End of stream flag.
             boolean EOS = false;
             
+            // for debug retain number of low level reads
+            int reads = 0;
+            
             while (rem > 0 && !EOS) {
 
                 // block up to the timeout.
@@ -934,8 +937,10 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
                                 + (rdlen > 0 ? rem - rdlen : rem)
                                 + " bytes remaining.");
 
-                    if (rdlen > 0)
+                    if (rdlen > 0) {
+                    	reads++;
                         updateChk(rdlen);
+                    }
 
                     if (rdlen == -1) {
                         // The stream is closed?
@@ -1003,7 +1008,14 @@ public class HAReceiveService<M extends IHAWriteMessageBase> extends Thread {
             // prepare for reading.
             localBuffer.flip();
 
-            if (message.getChk() != (int) chk.getValue()) {
+			if (log.isTraceEnabled())
+				log.trace("Prior check checksum: " + chk.getValue()
+						+ " for position: " + localBuffer.position()
+						+ ", limit: " + localBuffer.limit()
+						+ ", number of reads: " + reads + ", buffer: "
+						+ localBuffer);
+
+        	if (message.getChk() != (int) chk.getValue()) {
                 throw new ChecksumError("msg=" + message.toString()
                         + ", actual=" + chk.getValue());
             }

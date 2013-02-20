@@ -824,8 +824,8 @@ public class HAJournal extends Journal {
                     // The #of bytes remaining.
                     long remaining = totalBytes;
                     
-                    // The offset (relative to the root blocks).
-                    long offset = 0L;
+                    // The offset from which data is retrieved.
+                    long offset = headerSize;
                     
                     long sequence = 0L;
                     
@@ -853,10 +853,16 @@ public class HAJournal extends Journal {
                             haLog.debug("Sending block: sequence=" + sequence
                                     + ", offset=" + offset + ", nbytes=" + nbytes);
 
-                        getBufferStrategy().sendRawBuffer(req, sequence,
+                        final Future<?> snd = getBufferStrategy().sendRawBuffer(req, sequence,
                                 quorumToken, fileExtent, offset, nbytes, b);
+                        
+                        if (snd != null) {
+                        	snd.get(); // wait for data sent!
+                        }
 
                         remaining -= nbytes;
+                        
+                        offset += nbytes;
 
                         sequence++;
                         
