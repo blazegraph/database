@@ -269,17 +269,24 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
     }
 
-	/**
-	 * Return the <code>flags</code> byte given the details from which its state
-	 * encodes.
-	 * 
-	 * @param vte
-	 * @param inline
-	 * @param extension
-	 * @param dte
-	 * 
-	 * @return The flags byte.
-	 */
+    /**
+     * Return the <code>flags</code> byte that encodes the provided metadata
+     * about an {@link IV internal value}.
+     * 
+     * @param vte
+     *            The value type
+     * @param inline
+     *            <code>true</code> iff the value is inline (no index access is
+     *            required to materialize the value).
+     * @param extension
+     *            <code>true</code> iff the value is an extension data type (a
+     *            user specific data type defined whose underlying data type is
+     *            specified by the {@link DTE}).
+     * @param dte
+     *            The basic data type.
+     * 
+     * @return The flags byte that encodes that information.
+     */
     public static byte toFlags(final VTE vte, final boolean inline,
             final boolean extension, final DTE dte) {
 
