@@ -26,14 +26,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -449,6 +453,770 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * the DROP ALL?
          */
         
+    }
+    
+    /**
+     * Tests that halog files are generated and identical
+     */
+    public void testStartAB_halog() {
+    	fail("write test");
+    }
+    
+    /**
+     * Tests that halog files are generated and identical and then
+     * removed following resync and fullymet quorum
+     */
+    public void testStartAB_C_halog() {
+    	fail("write test");
+    }
+    
+    /**
+     * Tests that halog files are generated and removed after each commit
+     */
+    public void testStartABC_halog() {
+    	fail("write test");
+    }
+    
+    /**
+     * Tests that halog files are removed after fully met on rebuild
+     */
+    public void testStartABC_rebuild_halog() {
+    	fail("write test");
+    }
+    
+    /**
+     * Test Resync of late starting C service
+     * @throws Exception 
+     */
+    public void testStartAB_C_Resync() throws Exception {
+
+        // Start 2 services.
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Verify KB exists.
+        awaitKBExists(serverA);
+        
+        /*
+         * Note: The quorum was not fully met at the last 2-phase commit.
+         * Instead, 2 services participated in the 2-phase commit and the third
+         * service resynchronized when it came up and then went through a local
+         * commit. Therefore, the HALog files should exist on all nodes.
+         */
+
+        // Current commit point.
+        final long lastCommitCounter = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There is ONE commit point.
+        assertEquals(1L, lastCommitCounter);
+
+        /*
+         * Verify that HALog files were generated and are available for commit
+         * point ONE (1) on the services joined with the met quorum.
+         */
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+        // Verify binary equality of (A,B) journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+        /*
+         * Now go through a commit point with a met quorum. The HALog
+         * files should be retained at that commit point.
+         */
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+
+        // Current commit point.
+        final long lastCommitCounter2 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There are TWO (2) commit points.
+        assertEquals(2L, lastCommitCounter2);
+
+        // Now Start 3rd service.
+        final HAGlue serverC = startC();
+
+        // Wait until the quorum is fully met.  After RESYNC
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // HALog files now exist on ALL services, on original commitCounter!
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, lastCommitCounter2,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Now force further commit when fully met to remove log files
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book2> dc:title \"Another book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+
+        // And again verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        
+        // Now verify no HALog files since fully met quorum @ commit.
+        final long lastCommitCounter3 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
+                new HAGlue[] { serverA, serverB, serverC });
+
+    }
+    
+    /**
+     * Similar to standard resync except that the resync occurs while a sequence of live transactions are in progress.
+     * @throws Exception 
+     */
+	public void testStartAB_C_MultiTransactionResync() throws Exception {
+
+		// Start 2 services.
+		final HAGlue serverA = startA();
+		final HAGlue serverB = startB();
+
+		// Wait for a quorum meet.
+		final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+				TimeUnit.MILLISECONDS);
+
+		// Verify KB exists.
+		awaitKBExists(serverA);
+
+		/*
+		 * Note: The quorum was not fully met at the last 2-phase commit.
+		 * Instead, 2 services participated in the 2-phase commit and the third
+		 * service resynchronized when it came up and then went through a local
+		 * commit. Therefore, the HALog files should exist on all nodes.
+		 */
+
+		// Current commit point.
+		final long lastCommitCounter = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+
+		// There is ONE commit point.
+		assertEquals(1L, lastCommitCounter);
+
+		/*
+		 * Verify that HALog files were generated and are available for commit
+		 * point ONE (1) on the services joined with the met quorum.
+		 */
+		assertHALogDigestsEquals(1L/* firstCommitCounter */,
+				lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+		// Verify binary equality of (A,B) journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+		/*
+		 * Now go through a commit point with a met quorum. The HALog files
+		 * should be retained at that commit point.
+		 */
+		{
+
+			final StringBuilder sb = new StringBuilder();
+			sb.append("DROP ALL;\n");
+			sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+			sb.append("INSERT DATA {\n");
+			sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+			sb.append("  dc:creator \"A.N.Other\" .\n");
+			sb.append("}\n");
+
+			final String updateStr = sb.toString();
+
+			final HAGlue leader = quorum.getClient().getLeader(token);
+
+			// Verify quorum is still valid.
+			quorum.assertQuorum(token);
+
+			getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+		}
+
+		// Current commit point.
+		final long lastCommitCounter2 = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+
+		// There are TWO (2) commit points.
+		assertEquals(2L, lastCommitCounter2);
+
+		// start concurrent task loads that continue until fully met
+		final AtomicBoolean spin = new AtomicBoolean(false);
+		final Thread loadThread = new Thread() {
+			public void run() {
+				int count = 0;
+				try {
+					while (!quorum.isQuorumFullyMet(token)) {
+
+						final StringBuilder sb = new StringBuilder();
+						sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+						sb.append("INSERT DATA {\n");
+						sb.append("  <http://example/book" + count++
+								+ "> dc:title \"A new book\" ;\n");
+						sb.append("  dc:creator \"A.N.Other\" .\n");
+						sb.append("}\n");
+
+						final String updateStr = sb.toString();
+
+						final HAGlue leader = quorum.getClient().getLeader(
+								token);
+
+						// Verify quorum is still valid.
+						quorum.assertQuorum(token);
+
+						try {
+							getRemoteRepository(leader)
+									.prepareUpdate(updateStr).evaluate();
+
+							Thread.sleep(1500);
+						} catch (Exception e) {
+							fail("Probably unexpected on run " + count, e);
+						}
+					}
+				} finally {
+					spin.set(true);
+				}
+			}
+		};
+		loadThread.start();
+
+		// Now Start 3rd service.
+		final HAGlue serverC = startC();
+
+		// Wait until the quorum is fully met. After RESYNC
+		assertEquals(token, awaitFullyMetQuorum(20));
+
+		System.err.println("FULLY MET");
+		
+		while (!spin.get()) {
+			Thread.sleep(50);
+		}
+
+		System.err.println("Should be safe to test digests now");
+		
+		// Cannot predict last commit counter or whether even logs will remain
+		// assertHALogDigestsEquals(1L/* firstCommitCounter */,
+		// lastCommitCounter2,
+		// new HAGlue[] { serverA, serverB, serverC });
+
+		// Verify binary equality of ALL journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+		// Now force further commit when fully met to remove log files
+		{
+
+			final StringBuilder sb = new StringBuilder();
+			sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+			sb.append("INSERT DATA {\n");
+			sb.append("  <http://example/bookFinal> dc:title \"Another book\" ;\n");
+			sb.append("  dc:creator \"A.N.Other\" .\n");
+			sb.append("}\n");
+
+			final String updateStr = sb.toString();
+
+			final HAGlue leader = quorum.getClient().getLeader(token);
+
+			// Verify quorum is still valid.
+			quorum.assertQuorum(token);
+
+			getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+		}
+
+		// And again verify binary equality of ALL journals.
+		// assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+		// Now verify no HALog files since fully met quorum @ commit.
+		final long lastCommitCounter3 = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+		assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
+				new HAGlue[] { serverA, serverB, serverC });
+
+		System.err.println("ALL GOOD!");
+	}
+    
+	   /**
+     * Similar to standard resync except that the resync occurs while a single long transaction is in progress.
+     * @throws Exception 
+     */
+	public void testStartAB_C_LiveResync() throws Exception {
+
+		// Start 2 services.
+		final HAGlue serverA = startA();
+		final HAGlue serverB = startB();
+
+		// Wait for a quorum meet.
+		final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+				TimeUnit.MILLISECONDS);
+
+		// Verify KB exists.
+		awaitKBExists(serverA);
+
+		/*
+		 * Note: The quorum was not fully met at the last 2-phase commit.
+		 * Instead, 2 services participated in the 2-phase commit and the third
+		 * service resynchronized when it came up and then went through a local
+		 * commit. Therefore, the HALog files should exist on all nodes.
+		 */
+
+		// Current commit point.
+		final long lastCommitCounter = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+
+		// There is ONE commit point.
+		assertEquals(1L, lastCommitCounter);
+
+		/*
+		 * Verify that HALog files were generated and are available for commit
+		 * point ONE (1) on the services joined with the met quorum.
+		 */
+		assertHALogDigestsEquals(1L/* firstCommitCounter */,
+				lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+		// Verify binary equality of (A,B) journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+		/*
+		 * Now go through a commit point with a met quorum. The HALog files
+		 * should be retained at that commit point.
+		 */
+		{
+
+			final StringBuilder sb = new StringBuilder();
+			sb.append("DROP ALL;\n");
+			sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+			sb.append("INSERT DATA {\n");
+			sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+			sb.append("  dc:creator \"A.N.Other\" .\n");
+			sb.append("}\n");
+			
+			final String updateStr = sb.toString();
+
+			final HAGlue leader = quorum.getClient().getLeader(token);
+
+			// Verify quorum is still valid.
+			quorum.assertQuorum(token);
+
+			getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+		}
+
+		// Current commit point.
+		final long lastCommitCounter2 = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+
+		// There are TWO (2) commit points.
+		assertEquals(2L, lastCommitCounter2);
+
+		// start concurrent task loads that continue until fully met
+		final AtomicBoolean spin = new AtomicBoolean(false);
+		final Thread loadThread = new Thread() {
+			public void run() {
+					final StringBuilder sb = new StringBuilder();
+					sb.append("DROP ALL;\n");
+					sb.append("LOAD <file:/bigdata/ha/data-0.nq>;\n");
+					sb.append("LOAD <file:/bigdata/ha/data-1.nq>;\n");
+					sb.append("LOAD <file:/bigdata/ha/data-2.nq>;\n");
+					sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+					sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+					sb.append("INSERT DATA\n");
+					sb.append("{\n");
+					sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+					sb.append("    dc:creator \"A.N.Other\" .\n");
+					sb.append("}\n");
+
+					final String updateStr = sb.toString();
+
+					final HAGlue leader = quorum.getClient().getLeader(token);
+
+					// Verify quorum is still valid.
+					quorum.assertQuorum(token);
+
+					try {
+						getRemoteRepository(leader).prepareUpdate(updateStr)
+								.evaluate();
+						System.err.println("Updated");
+					} catch (Exception e) {
+						e.printStackTrace();
+						
+						fail("Probably unexpected on run ", e);
+					} finally {				
+						spin.set(true);
+					}
+			}
+		};
+		loadThread.start();
+
+		// Now Start 3rd service.
+		final HAGlue serverC = startC();
+
+		// Wait until the quorum is fully met. After RESYNC
+		assertEquals(token, awaitFullyMetQuorum(20));
+
+		System.err.println("FULLY MET");
+		
+		while (!spin.get()) {
+			Thread.sleep(50);
+		}
+
+		System.err.println("Should be safe to test digests now");
+		
+		// Cannot predict last commit counter or whether even logs will remain
+		// assertHALogDigestsEquals(1L/* firstCommitCounter */,
+		// lastCommitCounter2,
+		// new HAGlue[] { serverA, serverB, serverC });
+
+		// Verify binary equality of ALL journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+		// Now force further commit when fully met to remove log files
+		{
+
+			final StringBuilder sb = new StringBuilder();
+			sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+			sb.append("INSERT DATA {\n");
+			sb.append("  <http://example/bookFinal> dc:title \"Another book\" ;\n");
+			sb.append("  dc:creator \"A.N.Other\" .\n");
+			sb.append("}\n");
+
+			final String updateStr = sb.toString();
+
+			final HAGlue leader = quorum.getClient().getLeader(token);
+
+			// Verify quorum is still valid.
+			quorum.assertQuorum(token);
+
+			getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+
+		}
+
+		// And again verify binary equality of ALL journals.
+		// assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+		// Now verify no HALog files since fully met quorum @ commit.
+		final long lastCommitCounter3 = serverA
+				.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+				.getRootBlock().getCommitCounter();
+		assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
+				new HAGlue[] { serverA, serverB, serverC });
+
+		System.err.println("ALL GOOD!");
+	}
+    
+    /**
+     * Test Rebuild of late starting C service - simulates scenario where a service is removed from a
+     * fully met quorum and a new service is added.
+     * 
+     * The test is similar to resync except that it forces the removal of the log files for the met quorum
+     * before joining the third service, therefore preventing the RESYNC and forcing a REBUILD
+     * 
+     * @throws Exception 
+     */
+    public void testStartAB_C_Rebuild() throws Exception {
+
+
+        // Start 2 services.
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Verify KB exists.
+        awaitKBExists(serverA);
+        
+        /*
+         * Note: The quorum was not fully met at the last 2-phase commit.
+         * Instead, 2 services participated in the 2-phase commit and the third
+         * service resynchronized when it came up and then went through a local
+         * commit. Therefore, the HALog files should exist on all nodes.
+         */
+
+        // Current commit point.
+        final long lastCommitCounter = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There is ONE commit point.
+        assertEquals(1L, lastCommitCounter);
+
+        /*
+         * Verify that HALog files were generated and are available for commit
+         * point ONE (1) on the services joined with the met quorum.
+         */
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+        // Verify binary equality of (A,B) journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+        /*
+         * Now go through a commit point with a met quorum. The HALog
+         * files should be retained at that commit point.
+         */
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+
+        // Current commit point.
+        final long lastCommitCounter2 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There are TWO (2) commit points.
+        assertEquals(2L, lastCommitCounter2);
+
+        // HALog files now exist for A & B, and original commitCounter!
+        assertHALogDigestsEquals(lastCommitCounter, lastCommitCounter2,
+                new HAGlue[] { serverA, serverB });
+        
+        // now remove the halog files ensuring a RESYNC is not possible
+        // but MUST leave currently open file!!
+        final String openLog = HALogWriter.getHALogFileName(lastCommitCounter2 + 1);
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        removeFiles(new File(serviceDir, "A/HALog"), openLog);
+        removeFiles(new File(serviceDir, "B/HALog"), openLog);
+
+        // Now Start 3rd service.
+        final HAGlue serverC = startC();
+
+        // Wait until the quorum is fully met.  After REBUILD
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // HALog files now exist on ALL services, current commit counter
+        final long currentCommitCounter = lastCommitCounter2 + 1;
+        assertHALogDigestsEquals(currentCommitCounter, currentCommitCounter,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        
+        // Now force further commit when fully met to remove log files
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book2> dc:title \"Another book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+
+        // And again verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        
+        // Now verify no HALog files since fully met quorum @ commit.
+        final long lastCommitCounter3 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter3,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        }
+
+    private void removeFiles(final File dir, final String openFile) {
+		final File[] files = dir.listFiles();
+		if (files != null)
+			for (File file: files) {
+				if (!file.getName().equals(openFile)) {
+					log.warn("removing file " + file.getName());
+					
+					file.delete();
+				}
+			}
+	}
+
+	/**
+     * Test Rebuild of early starting C service where service from previously fully met quorum is not
+     * started.
+     */
+    public void testStartABC_Rebuild() {
+    	fail("write test");
+    }
+    
+    /**
+     * Test quorum remains if C is failed when fully met
+     * @throws Exception 
+     */
+    public void testQuorumABC_failC() throws Exception {
+
+        // Start 2 services.
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Verify KB exists.
+        awaitKBExists(serverA);
+        
+        /*
+         * Note: The quorum was not fully met at the last 2-phase commit.
+         * Instead, 2 services participated in the 2-phase commit and the third
+         * service resynchronized when it came up and then went through a local
+         * commit. Therefore, the HALog files should exist on all nodes.
+         */
+
+        // Current commit point.
+        final long lastCommitCounter = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There is ONE commit point.
+        assertEquals(1L, lastCommitCounter);
+
+        /*
+         * Verify that HALog files were generated and are available for commit
+         * point ONE (1) on the services joined with the met quorum.
+         */
+        assertHALogDigestsEquals(1L/* firstCommitCounter */,
+                lastCommitCounter, new HAGlue[] { serverA, serverB });
+
+        // Verify binary equality of (A,B) journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB });
+
+        // Start 3rd service.
+        final HAGlue serverC = startC();
+
+        // Wait until the quorum is fully met. The token should not change.
+        assertEquals(token, awaitFullyMetQuorum());
+
+        // The commit counter has not changed.
+        assertEquals(
+                lastCommitCounter,
+                serverA.getRootBlock(
+                        new HARootBlockRequest(null/* storeUUID */))
+                        .getRootBlock().getCommitCounter());
+
+        // HALog files now exist on ALL services.
+        assertHALogDigestsEquals(1L/* firstCommitCounter */, lastCommitCounter,
+                new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        /*
+         * Now go through a commit point with a fully met quorum. The HALog
+         * files should be purged at that commit point.
+         */
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+
+        // Current commit point.
+        final long lastCommitCounter2 = serverA
+                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+                .getRootBlock().getCommitCounter();
+
+        // There are TWO (2) commit points.
+        assertEquals(2L, lastCommitCounter2);
+
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+        // Verify no HALog files since fully met quorum @ commit.
+        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter,
+                new HAGlue[] { serverA, serverB, serverC });
+        
+        // Now fail C
+        destroyC();        
+
+    }
+
+    /**
+     * Test quorum breaks and reforms when original leader fails
+     */
+    public void testQuorumBreaksABC_failA() {
+    	fail("write test");
     }
 
 }
