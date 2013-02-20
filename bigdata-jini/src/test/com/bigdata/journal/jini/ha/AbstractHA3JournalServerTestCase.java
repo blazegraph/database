@@ -199,8 +199,9 @@ public class AbstractHA3JournalServerTestCase extends
      * corresponding process starts and (most importantly) that it is really
      * dies once it has been shutdown or destroyed.
      */
-    private ServiceListener serviceListenerA = null, serviceListenerB = null,
-            serviceListenerC = null;
+    private ServiceListener serviceListenerA = null, serviceListenerB = null;
+
+	protected ServiceListener serviceListenerC = null;
     
     private LookupDiscoveryManager lookupDiscoveryManager = null;
 
@@ -419,7 +420,7 @@ public class AbstractHA3JournalServerTestCase extends
      * @param haGlue
      *            The service.
      */
-    private void safeDestroy(final HAGlue haGlue,
+    protected void safeDestroy(final HAGlue haGlue,
             final ServiceListener serviceListener) {
 
         if (haGlue == null)
@@ -451,6 +452,10 @@ public class AbstractHA3JournalServerTestCase extends
             
         }
 
+    }
+    
+    protected void destroyC() {
+    	safeDestroy(serverC, serviceListenerC);
     }
 
     private void safeShutdown(final HAGlue haGlue,
@@ -1489,30 +1494,37 @@ public class AbstractHA3JournalServerTestCase extends
      * @throws InterruptedException
      * @throws AsynchronousQuorumCloseException
      */
-    protected long awaitFullyMetQuorum() throws IOException,
-            AsynchronousQuorumCloseException, InterruptedException,
-            TimeoutException {
+	protected long awaitFullyMetQuorum(final int ticks) throws IOException,
+			AsynchronousQuorumCloseException, InterruptedException,
+			TimeoutException {
 
-        // Wait for a quorum met.
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout * 2,
-                TimeUnit.MILLISECONDS);
+		// Wait for a quorum met.
+		final long token = quorum.awaitQuorum(awaitQuorumTimeout * ticks,
+				TimeUnit.MILLISECONDS);
 
-        // Wait for a fully met quorum.
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    // Verify quorum is FULLY met for that token.
-                    assertTrue(quorum.isQuorumFullyMet(token));
-                } catch (Exception e) {
-                    // Quorum is not fully met.
-                    fail();
-                }
-            }
-        });
-        
-        return token;
+		// Wait for a fully met quorum.
+		assertCondition(new Runnable() {
+			public void run() {
+				try {
+					// Verify quorum is FULLY met for that token.
+					assertTrue(quorum.isQuorumFullyMet(token));
+				} catch (Exception e) {
+					// Quorum is not fully met.
+					fail("Not Met", e);
+				}
+			}
+		}, awaitQuorumTimeout * ticks,
+		TimeUnit.MILLISECONDS);
 
-    }
+		return token;
+
+	}
+
+	protected long awaitFullyMetQuorum() throws IOException,
+			AsynchronousQuorumCloseException, InterruptedException,
+			TimeoutException {
+		return awaitFullyMetQuorum(2); // default 2 ticks
+	}
 
     /**
      * Wait until the quorum meets at the successor of the given token.
