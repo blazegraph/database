@@ -53,16 +53,17 @@ public class HARebuildRequest implements IHARebuildRequest {
 
     public String toString() {
 
-        return getClass() + "{serviceId=" + getServiceId() + ", incremental="
-                + isIncremental() + "}";
+        return getClass() + "{serviceId=" + getServiceId()
+                // + ", incremental=" + isIncremental() 
+                + "}";
 
     }
 
-    @Override
-    final public boolean isIncremental() {
-
-        return false;
-        
-    }
+//    @Override
+//    final public boolean isIncremental() {
+//
+//        return false;
+//        
+//    }
     
 }

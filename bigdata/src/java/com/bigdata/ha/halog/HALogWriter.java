@@ -121,7 +121,7 @@ public class HALogWriter {
 	/** state lock **/
 	final private ReentrantReadWriteLock m_stateLock = new ReentrantReadWriteLock();
 
-	public static final String HA_LOG_EXT = ".ha-log";
+//	public static final String HA_LOG_EXT = ".ha-log";
 
 	/** current write point on the channel. */
 	private long m_position = headerSize0;
@@ -199,7 +199,7 @@ public class HALogWriter {
 
 			final Formatter f = new Formatter(sb);
 
-			f.format("%020d" + HA_LOG_EXT, commitCounter);
+			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
 			f.flush();
 			f.close();
 

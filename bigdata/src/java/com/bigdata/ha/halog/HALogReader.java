@@ -423,7 +423,7 @@ public class HALogReader implements IHALogReader {
 
 				}
 
-				return name.endsWith(HALogWriter.HA_LOG_EXT);
+				return name.endsWith(IHALogReader.HA_LOG_EXT);
 
 			}
 		});

@@ -35,7 +35,7 @@ import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.halog.HALogWriter;
+import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
@@ -147,7 +147,7 @@ public class HAStatusServletUtil {
                             @Override
                             public boolean accept(File dir, String name) {
                                 return name
-                                        .endsWith(HALogWriter.HA_LOG_EXT);
+                                        .endsWith(IHALogReader.HA_LOG_EXT);
                             }
                         });
                 int nfiles = 0;

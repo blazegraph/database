@@ -33,12 +33,12 @@ import java.util.UUID;
  */
 public interface IHASyncRequest extends IHAMessage {
 
-    /**
-     * When <code>true</code> the request is part of an incremental
-     * re-synchronization. When <code>false</code> the request is part of
-     * a total re-build.
-     */
-    boolean isIncremental();
+//    /**
+//     * When <code>true</code> the request is part of an incremental
+//     * re-synchronization. When <code>false</code> the request is part of
+//     * a total re-build.
+//     */
+//    boolean isIncremental();
     
     /**
      * The UUID of the service that issued this request.
