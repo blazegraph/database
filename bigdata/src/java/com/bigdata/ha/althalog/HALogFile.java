@@ -64,7 +64,7 @@ import com.bigdata.util.ChecksumUtility;
  */
 public class HALogFile {
 
-	public static final String HA_LOG_EXT = ".ha-log";
+//	public static final String HA_LOG_EXT = ".ha-log";
 
 	/**
 	 * Logger for HA events.
@@ -175,7 +175,7 @@ public class HALogFile {
 		m_callback = callback;
 		final File hadir = m_callback.getHALogDir();
 		m_haLogFile = new File(hadir, getHALogFileName(rbv.getCommitCounter())
-				+ HA_LOG_EXT);
+				+ IHALogReader.HA_LOG_EXT);
 
 		if (m_haLogFile.exists())
 			throw new IllegalStateException("File already exists: "
@@ -675,7 +675,7 @@ public class HALogFile {
 
 			final Formatter f = new Formatter(sb);
 
-			f.format("%020d" + HA_LOG_EXT, commitCounter);
+			f.format("%020d" + IHALogReader.HA_LOG_EXT, commitCounter);
 			f.flush();
 			f.close();
 
@@ -929,8 +929,6 @@ public class HALogFile {
 
 		/** Current write cache block sequence counter. */
 		private long m_nextSequence = 0;
-
-		public static final String HA_LOG_EXT = ".ha-log";
 
 		private void assertOpen() {
 

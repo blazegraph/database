@@ -187,4 +187,18 @@ public interface ZKQuorum<S extends Remote, C extends QuorumClient<S>> extends
      */
     String QUORUM_PIPELINE_PREFIX = "pipeline";
 
+    /**
+     * The name of the znode whose data reflects the commit counters associated
+     * with the most recent full and incremental backups of the logical service
+     * associated with this quorum.
+     * <p>
+     * Note: This znode does not exist unless backups are being performed. If it
+     * exists, then HALog files (each of which corresponds to a single commit
+     * point) will not be purged unless their commit point is LT the last
+     * incremental or full backup recorded in this znode.
+     * 
+     * @see QuorumBackupState
+     */
+    String QUORUM_BACKUP = "backup";
+
 }

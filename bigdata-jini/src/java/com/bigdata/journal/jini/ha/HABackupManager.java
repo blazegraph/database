@@ -29,6 +29,7 @@ import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
+import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -72,6 +73,7 @@ import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.AbstractQuorumMember;
@@ -79,6 +81,8 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumListener;
+import com.bigdata.quorum.zk.QuorumBackupState;
+import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
@@ -1046,6 +1050,33 @@ public class HABackupManager {
                 // Caught up on the backing store as of that copy.
                 // FIXME Install the root blocks (atomically or as dups of the current root block).
 //                installRootBlocks(resp.getRootBlock0(), resp.getRootBlock1());
+
+                /*
+                 * TODO After we run the backup utility, we need to ensure that
+                 * the znode exists against which the backup will be registered.
+                 * Then we need to write in the values of {inc,full} for the
+                 * most recent incremental and full backups (depending on which
+                 * one we just did).
+                 */
+                final long inc = -1; // TODO set this.
+                final long full = -1; // TODO set this.
+                final byte[] data = SerializerUtil
+                        .serialize(new QuorumBackupState(inc, full));
+                final String zpath = logicalServiceZPath + "/"
+                        + ZKQuorum.QUORUM + "/" + ZKQuorum.QUORUM_BACKUP;
+                // Ensure exists.
+                try {
+                    zka.getZookeeper().create(
+                            zpath, data,
+                            zkClientConfig.acl, CreateMode.PERSISTENT);
+                } catch (NodeExistsException ex) {
+
+                    /*
+                     * Since it already exists, we just update it's state now.
+                     */
+                    zka.getZookeeper().setData(zpath, data, -1/* version */);
+
+                }
 
                 // Done
                 return null;

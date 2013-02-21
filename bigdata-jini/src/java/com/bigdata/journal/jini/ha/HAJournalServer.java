@@ -56,6 +56,7 @@ import net.jini.core.lookup.ServiceRegistrar;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
@@ -83,6 +84,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
@@ -94,6 +96,8 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.QuorumListener;
+import com.bigdata.quorum.zk.QuorumBackupState;
+import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
@@ -531,9 +535,9 @@ public class HAJournalServer extends AbstractServer {
              * Ensure that the HAQuorumService will not attempt to cure any
              * serviceLeave or related actions.
              * 
-             * TODO If we properly enter a ShutdownTask run state then we would
-             * not have to do this since it will already be in the Shutdown
-             * runstate.
+             * TODO SHUTDOWN: If we properly enter a ShutdownTask run state then
+             * we would not have to do this since it will already be in the
+             * Shutdown runstate.
              */
             quorumService.runStateRef
                     .set(HAQuorumService.RunStateEnum.Shutdown);
@@ -674,7 +678,7 @@ public class HAJournalServer extends AbstractServer {
             RunMet,
             Resync,
             Rebuild, 
-            Shutdown; // TODO We are not using this systematically (no ShutdownTask for this run state).
+            Shutdown; // TODO SHUTDOWN: We are not using this systematically (no ShutdownTask for this run state).
         }
         
         private final AtomicReference<RunStateEnum> runStateRef = new AtomicReference<RunStateEnum>(
@@ -1039,7 +1043,33 @@ public class HAJournalServer extends AbstractServer {
                 return null;
             }
         }
-                
+        
+        /**
+         * If there is a fully met quorum, then we can purge all HA logs
+         * <em>EXCEPT</em> the current one.
+         */
+        @Override
+        public void serviceJoin() {
+
+            super.serviceJoin();
+
+            if (false) {
+                /*
+                 * TODO BACKUP: Purge of HALog files on a fully met quorum is
+                 * current disabled. Enable, but review implications in more
+                 * depth first.
+                 */
+                final long token = getQuorum().token();
+
+                if (getQuorum().isQuorumFullyMet(token)) {
+
+                    purgeHALogs(false/* includeCurrent */);
+
+                }
+            }
+
+        }
+
         /**
          * Task to handle a quorum break event.
          */
@@ -1233,16 +1263,16 @@ public class HAJournalServer extends AbstractServer {
             @Override
             protected Void doRun() throws Exception {
                 /*
-                 * FIXME Enable restore and test. There is a problem with
-                 * replication of the WORM HALog files and backup/restore. The
-                 * WORM HALog files currently do not have the actual data on the
-                 * leader. This makes some of the code messier and also means
-                 * that the HALog files can not be binary equals on the leader
-                 * and follower and could cause problems if people harvest them
-                 * from the file system directly rather than through
-                 * sendHALogFile() since they will be missing the necessary
-                 * state in the file system if they were put there by the
-                 * leader.
+                 * FIXME RESTORE: Enable restore and test. There is a problem
+                 * with replication of the WORM HALog files and backup/restore.
+                 * The WORM HALog files currently do not have the actual data on
+                 * the leader. This makes some of the code messier and also
+                 * means that the HALog files can not be binary equals on the
+                 * leader and follower and could cause problems if people
+                 * harvest them from the file system directly rather than
+                 * through sendHALogFile() since they will be missing the
+                 * necessary state in the file system if they were put there by
+                 * the leader.
                  */
                 if(false)
                 while (true) {
@@ -1625,7 +1655,7 @@ public class HAJournalServer extends AbstractServer {
                  * HALog files that we need. However, REBUILD is still
                  * semantically correct so long as we restart the procedure.
                  * 
-                 * TODO RESYNC : It is possible to go to another service in the
+                 * TODO RESYNC: It is possible to go to another service in the
                  * met quorum for the same log file, but it needs to be a
                  * service that is UPSTREAM of this service.
                  */
@@ -1742,8 +1772,9 @@ public class HAJournalServer extends AbstractServer {
 
                     ft = leader
                             .sendHALogForWriteSet(new HALogRequest(
-                                    server.serviceUUID, closingCommitCounter,
-                                    true/* incremental */));
+                                    server.serviceUUID, closingCommitCounter
+//                                    , true/* incremental */
+                                    ));
 
                     // Wait until all write cache blocks are received.
                     ft.get();
@@ -2070,12 +2101,7 @@ public class HAJournalServer extends AbstractServer {
                     
                 }
                 
-                // The current root block on this service.
-                final long commitCounter = journal.getRootBlockView()
-                        .getCommitCounter();
-
-                if (req != null && !req.isIncremental()
-                        && req instanceof IHARebuildRequest) {
+                if (req != null && req instanceof IHARebuildRequest) {
 
                     /*
                      * This message and payload are part of a ground up service
@@ -2135,17 +2161,22 @@ public class HAJournalServer extends AbstractServer {
 
                 final RunStateEnum runState = runStateRef.get();
 
-                if (RunStateEnum.Resync.equals(runState)
-                        || RunStateEnum.Rebuild.equals(runState)) {
+                if (RunStateEnum.Resync.equals(runState)) {
 
                     /*
                      * If we are resynchronizing, then pass ALL messages (both
                      * live and historical) into handleResyncMessage().
+                     * 
+                     * Note: This method handles the transition into the met
+                     * quorum when we observe a LIVE message that is the
+                     * successor of the last received HISTORICAL message. This
+                     * is the signal that we are caught up on the writes on the
+                     * met quorum and may join.
                      */
                     
                     handleResyncMessage((IHALogRequest) req, msg, data);
 
-                } else if (commitCounter == msg.getCommitCounter()
+                } else if (journal.getRootBlockView().getCommitCounter() == msg.getCommitCounter()
                         && isJoinedMember(msg.getQuorumToken())) {
 
                     /*
@@ -2242,17 +2273,14 @@ public class HAJournalServer extends AbstractServer {
 
                 final HALogWriter logWriter = journal.getHALogWriter();
 
-                final long journalCommitCounter = journal.getRootBlockView()
-                        .getCommitCounter();
-
                 if (req == null) {
                     
                     /*
                      * Live message.
                      */
 
-                    if (msg.getCommitCounter() == journalCommitCounter
-                            && msg.getSequence() + 1 == logWriter.getSequence()) {
+                    if ((msg.getCommitCounter() == journal.getRootBlockView().getCommitCounter())
+                    && ((msg.getSequence() + 1) == logWriter.getSequence())) {
 
                         /*
                          * We just received a live message that is the successor
@@ -2378,29 +2406,8 @@ public class HAJournalServer extends AbstractServer {
              */
             getActor().serviceJoin();
 
-            /*
-             * 
-             */
-            
+            // Transition to RunMet.
             enterRunState(new RunMetTask(token, leaderId));
-
-            // /*
-            // * TODO RESYNC : If there is a fully met quorum, then we can purge
-            // * all HA logs *EXCEPT* the current one. However, in order
-            // * to have the same state on each node, we really need to
-            // * make this decision when a service observes the
-            // * SERVICE_JOIN event that results in a fully met quorum.
-            // * That state change will be globally visible. If we do
-            // this
-            // * here, then only the service that was resynchronizing
-            // will
-            // * wind up purging its logs.
-            // */
-            // if (getQuorum().isQuorumFullyMet()) {
-            //
-            // purgeHALogs(false/* includeCurrent */);
-            //
-            // }
 
         }
         
@@ -2539,6 +2546,33 @@ public class HAJournalServer extends AbstractServer {
          * {@inheritDoc}
          * <p>
          * Destroys the HA log files in the HA log directory.
+         * 
+         * TODO BACKUP: This already parses the closing commit counter out of
+         * the HALog filename. To support backup, we MUST NOT delete an HALog
+         * file that is being retained by the backup retention policy. This will
+         * be coordinated through zookeeper.
+         * 
+         * <pre>
+         * logicalServiceZPath/backedUp {inc=CC;full=CC}
+         * </pre>
+         * 
+         * where
+         * <dl>
+         * <dt>inc</dt>
+         * <dd>The commitCounter of the last incremental backup that was
+         * captured</dd>
+         * <dt>full</dt>
+         * <dd>The commitCounter of the last full backup that was captured.</dd>
+         * </dl>
+         * 
+         * IF this znode exists, then backups are being captured. When backups
+         * are being captured, then HALog files may only be removed once they
+         * have been captured by a backup. The znode is automatically created by
+         * the backup utility. If you destroy the znode, it will no longer
+         * assume that backups are being captured until the next time you run
+         * the backup utility.
+         * 
+         * @see HABackupManager
          */
         @Override
         public void purgeHALogs(final boolean includeCurrent) {
@@ -2547,34 +2581,115 @@ public class HAJournalServer extends AbstractServer {
 
             try {
 
-                final File logDir = journal.getHALogDir();
-
-                final File[] files = logDir.listFiles(new FilenameFilter() {
-
-                    @Override
-                    public boolean accept(final File dir, final String name) {
-
-                        return name.endsWith(HALogWriter.HA_LOG_EXT);
-
+                final QuorumBackupState backupState;
+                {
+                    QuorumBackupState tmp = null;
+                    try {
+                        final String zpath = server.logicalServiceZPath + "/"
+                                + ZKQuorum.QUORUM + "/"
+                                + ZKQuorum.QUORUM_BACKUP;
+                        tmp = (QuorumBackupState) SerializerUtil
+                                .deserialize(server.zka
+                                        .getZookeeper()
+                                        .getData(zpath, false/* watch */, null/* stat */));
+                    } catch (KeeperException.NoNodeException ex) {
+                        // ignore.
+                    } catch (KeeperException e) {
+                        // log @ error and ignore.
+                        log.error(e);
+                    } catch (InterruptedException e) {
+                        // Propagate interrupt.
+                        Thread.currentThread().interrupt();
+                        return;
                     }
-                });
+                    backupState = tmp;
+                }
+                
+                /*
+                 * List the HALog files for this service.
+                 */
+                final File[] logFiles;
+                {
+
+                    final File currentLogFile = journal.getHALogWriter()
+                            .getFile();
+
+                    final String currentLogFileName = currentLogFile == null ? null
+                            : currentLogFile.getName();
+
+                    final File logDir = journal.getHALogDir();
+
+                    logFiles = logDir.listFiles(new FilenameFilter() {
+
+                        /**
+                         * Return <code>true</code> iff the file is an HALog
+                         * file that should be deleted.
+                         * 
+                         * @param name
+                         *            The name of that HALog file (encodes the
+                         *            commitCounter).
+                         */
+                        @Override
+                        public boolean accept(final File dir, final String name) {
+
+                            if (!name.endsWith(IHALogReader.HA_LOG_EXT)) {
+                                // Not an HALog file.
+                                return false;
+                            }
+
+                            if (!includeCurrent && currentLogFile != null
+                                    && name.equals(currentLogFileName)) {
+                                /*
+                                 * The caller requested that we NOT purge the
+                                 * current HALog, and this is it.
+                                 */
+                                return false;
+                            }
+
+                            // Strip off the filename extension.
+                            final String logFileBaseName = name.substring(0,
+                                    IHALogReader.HA_LOG_EXT.length());
+
+                            // Closing commitCounter for HALog file.
+                            final long logCommitCounter = Long
+                                    .parseLong(logFileBaseName);
+
+                            if (backupState != null) {
+                                /*
+                                 * Backups are being made.
+                                 * 
+                                 * When backups are being made, we DO NOT delete
+                                 * HALog files for commit points GT this
+                                 * commitCounter.
+                                 */
+                                if (logCommitCounter > backupState.inc()) {
+                                    /*
+                                     * Backups are being made and this HALog
+                                     * file has not been backed up yet.
+                                     */
+                                    return false;
+                                }
+                            }
+
+                            // This HALog file MAY be deleted.
+                            return true;
+                            
+                        }
+                    });
+                    
+                }
 
                 int ndeleted = 0;
                 long totalBytes = 0L;
 
-                final File currentFile = journal.getHALogWriter().getFile();
+                for (File logFile : logFiles) {
 
-                for (File file : files) {
+                    // #of bytes in that HALog file.
+                    final long len = logFile.length();
 
-                    final long len = file.length();
+                    if (!logFile.delete()) {
 
-                    final boolean delete = includeCurrent
-                            || currentFile != null
-                            && file.getName().equals(currentFile.getName());
-
-                    if (delete && !file.delete()) {
-
-                        haLog.warn("COULD NOT DELETE FILE: " + file);
+                        haLog.warn("COULD NOT DELETE FILE: " + logFile);
 
                         continue;
 

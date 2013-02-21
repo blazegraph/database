@@ -337,7 +337,7 @@ public class HALogManager {
 
 				}
 
-				return name.endsWith(HALogFile.HA_LOG_EXT);
+				return name.endsWith(IHALogReader.HA_LOG_EXT);
 
 			}
 		});

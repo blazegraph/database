@@ -1013,10 +1013,18 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         lock.lock();
 
         try {
-            
+
+            if (joined.size() != k) {
+
+                // Quorum is not fully met.
+                return false;
+
+            }
+
+            // Verify token.
             assertQuorum(token);
 
-            return joined.size() == k;
+            return true;
 
         } finally {
 

@@ -476,7 +476,7 @@ public class HAJournal extends Journal {
                 if (f.isDirectory())
                     return true;
                 
-                return f.getName().endsWith(HALogWriter.HA_LOG_EXT);
+                return f.getName().endsWith(IHALogReader.HA_LOG_EXT);
             }
 
         });

@@ -39,6 +39,11 @@ import com.bigdata.journal.WORMStrategy;
  */
 public interface IHALogReader {
 	
+    /**
+     * The filename extension used for the HALog files.
+     */
+    public static final String HA_LOG_EXT = ".ha-log";
+
 	/**
 	 * Closes the Reader.
 	 * 
