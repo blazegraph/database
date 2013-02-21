@@ -1704,6 +1704,7 @@ public class HAJournalServer extends AbstractServer {
             }
 
             // Make sure we have the correct HALogWriter open.
+            // TODO Replace with pipelineSetup()?
             logLock.lock();
             try {
                 final HALogWriter logWriter = journal.getHALogWriter();
@@ -1760,91 +1761,8 @@ public class HAJournalServer extends AbstractServer {
              * in the write pipeline. Replicating from the leader is simpler
              * conceptually and makes for simpler code.
              */
-            {
-                
-                Future<Void> ft = null;
-                boolean success = false;
-                try {
-
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("HALOG REPLICATION START: closingCommitCounter="
-                                + closingCommitCounter);
-
-                    ft = leader
-                            .sendHALogForWriteSet(new HALogRequest(
-                                    server.serviceUUID, closingCommitCounter
-//                                    , true/* incremental */
-                                    ));
-
-                    // Wait until all write cache blocks are received.
-                    ft.get();
-
-                    success = true;
-
-                    /*
-                     * Note: Uncaught exception will result in SeekConsensus.
-                     */
-                    
-                } finally {
-
-                    if (ft != null) {
-                        // ensure terminated.
-                        ft.cancel(true/* mayInterruptIfRunning */);
-                    }
-
-                    if (haLog.isDebugEnabled())
-                        haLog.debug("HALOG REPLICATION DONE : closingCommitCounter="
-                                + closingCommitCounter + ", success=" + success);
-
-                }
-                
-            }
-
-            /*
-             * Figure out the closing root block. If this HALog file was
-             * active when we started reading from it, then the open and
-             * close root blocks would have been identical in the [resp] and
-             * we will need to grab the root blocks again now that it has
-             * been closed.
-             */
-            final IRootBlockView closeRootBlock;
-            {
-
-                // root block when the quorum committed that write set.
-                IRootBlockView tmp = resp.getCloseRootBlock();
-
-                if (openRootBlock.getCommitCounter() == tmp
-                        .getCommitCounter()) {
-
-                    /*
-                     * The open and close commit counters were the same when
-                     * we first requested them, so we need to re-request the
-                     * close commit counter now that we are done reading on
-                     * the file.
-                     */
-                    
-                    // Re-request the root blocks for the write set.
-                    final IHALogRootBlocksResponse resp2 = leader
-                            .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
-                                    closingCommitCounter));
-                    
-                    tmp = resp2.getCloseRootBlock();
-
-                }
-
-                closeRootBlock = tmp;
-
-                if (closeRootBlock.getCommitCounter() != closingCommitCounter) {
-
-                    throw new AssertionError(
-                            "Wrong commitCounter for closing root block: expected commitCounter="
-                                    + closingCommitCounter
-                                    + ", but closeRootBlock="
-                                    + closeRootBlock);
-
-                }
-                
-            }
+            final IRootBlockView closeRootBlock = replicateAndApplyHALog(
+                    leader, closingCommitCounter, resp);
 
             // Local commit.
             doLocalCommit(closeRootBlock);
@@ -1864,6 +1782,101 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
+        private IRootBlockView replicateAndApplyHALog(final S leader,
+                final long closingCommitCounter,
+                final IHALogRootBlocksResponse resp) throws IOException,
+                InterruptedException, ExecutionException {
+
+            /*
+             * Request the HALog from the leader.
+             */
+            {
+
+                Future<Void> ft = null;
+                boolean success = false;
+                try {
+
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("HALOG REPLICATION START: closingCommitCounter="
+                                + closingCommitCounter);
+
+                    ft = leader.sendHALogForWriteSet(new HALogRequest(
+                            server.serviceUUID, closingCommitCounter
+                    // , true/* incremental */
+                            ));
+
+                    // Wait until all write cache blocks are received.
+                    ft.get();
+
+                    success = true;
+
+                    /*
+                     * Note: Uncaught exception will result in SeekConsensus.
+                     */
+
+                } finally {
+
+                    if (ft != null) {
+                        // ensure terminated.
+                        ft.cancel(true/* mayInterruptIfRunning */);
+                    }
+
+                    if (haLog.isDebugEnabled())
+                        haLog.debug("HALOG REPLICATION DONE : closingCommitCounter="
+                                + closingCommitCounter + ", success=" + success);
+
+                }
+
+            }
+
+            /*
+             * Figure out the closing root block. If this HALog file was active
+             * when we started reading from it, then the open and close root
+             * blocks would have been identical in the [resp] and we will need
+             * to grab the root blocks again now that it has been closed.
+             */
+            final IRootBlockView closeRootBlock;
+            {
+
+                final IRootBlockView openRootBlock = resp.getOpenRootBlock();
+
+                // root block when the quorum committed that write set.
+                IRootBlockView tmp = resp.getCloseRootBlock();
+
+                if (openRootBlock.getCommitCounter() == tmp.getCommitCounter()) {
+
+                    /*
+                     * The open and close commit counters were the same when we
+                     * first requested them, so we need to re-request the close
+                     * commit counter now that we are done reading on the file.
+                     */
+
+                    // Re-request the root blocks for the write set.
+                    final IHALogRootBlocksResponse resp2 = leader
+                            .getHALogRootBlocksForWriteSet(new HALogRootBlocksRequest(
+                                    closingCommitCounter));
+
+                    tmp = resp2.getCloseRootBlock();
+
+                }
+
+                closeRootBlock = tmp;
+
+                if (closeRootBlock.getCommitCounter() != closingCommitCounter) {
+
+                    throw new AssertionError(
+                            "Wrong commitCounter for closing root block: expected commitCounter="
+                                    + closingCommitCounter
+                                    + ", but closeRootBlock=" + closeRootBlock);
+
+                }
+
+            }
+
+            return closeRootBlock;
+
+        }
+        
         /**
          * Conditional join of a service attempting to synchronize with the met
          * quorum. If the current commit point that is being replicated (as
@@ -1883,7 +1896,7 @@ public class HAJournalServer extends AbstractServer {
          * @throws InterruptedException
          */
         private boolean conditionalJoinWithMetQuorum(final S leader,
-                final long quorumToken, final long openingCommitCounter)
+                final long token, final long openingCommitCounter)
                 throws IOException, InterruptedException {
 
 //            // Get the current root block from the quorum leader.
@@ -1987,19 +2000,19 @@ public class HAJournalServer extends AbstractServer {
                         .getCastVote(leaderId);
 
                 // Verify that the quorum is valid.
-                getQuorum().assertQuorum(quorumToken);
+                getQuorum().assertQuorum(token);
 
                 // Cast that vote.
                 getActor().castVote(lastCommitTimeOfQuorumLeader);
 
                 // Verify that the quorum is valid.
-                getQuorum().assertQuorum(quorumToken);
+                getQuorum().assertQuorum(token);
 
                 // Attempt to join the met quorum.
                 getActor().serviceJoin();
 
                 // Verify that the quorum is valid.
-                getQuorum().assertQuorum(quorumToken);
+                getQuorum().assertQuorum(token);
 
                 haLog.warn("Joined met quorum: runState=" + runStateRef
                         + ", commitCounter=" + openingCommitCounter
@@ -2008,9 +2021,9 @@ public class HAJournalServer extends AbstractServer {
                         + logWriter.getSequence());
 
                 // Verify that the quorum is valid.
-                getQuorum().assertQuorum(quorumToken);
+                getQuorum().assertQuorum(token);
 
-                enterRunState(new RunMetTask(quorumToken, leaderId));
+                enterRunState(new RunMetTask(token, leaderId));
                 
                 // Done with resync.
                 return true;
