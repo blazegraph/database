@@ -1033,7 +1033,13 @@ public class HAJournalServer extends AbstractServer {
 
         private class QuorumBreakTask implements Callable<Void> {
             public Void call() throws Exception {
-            	getQuorum().getActor().serviceLeave();
+                /*
+                 * Note: I have removed this line. It arrived without
+                 * documentation and I can not find any reason why we should
+                 * have to do a service leave here. The quorum will
+                 * automatically issue service leaves.
+                 */
+//            	getQuorum().getActor().serviceLeave();
             	
                 journal.setQuorumToken(Quorum.NO_QUORUM);
                 try {
@@ -1276,7 +1282,6 @@ public class HAJournalServer extends AbstractServer {
                  * necessary state in the file system if they were put there by
                  * the leader.
                  */
-                if(true)
                 while (true) {
 
                     long commitCounter = journal.getRootBlockView()

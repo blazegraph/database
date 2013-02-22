@@ -227,46 +227,50 @@ public class HALogManager {
 			m_currentLock.unlock();
 		}
 	}
-	
-	/**
-	 * Disables any current log file, then removes all log files
-	 * from the directory
-	 * 
-	 * @throws IOException
-	 */
-	public void removeAllLogFiles() {
-		m_currentLock.lock();
-		try {
-			// No longer disables the current log file
-			
-			removeAllLogFiles(m_halogdir, getCurrentFile());
-		} finally {
-			m_currentLock.unlock();
-		}
-	}
 
-	/**
-	 * Recursively removes all log files from the provided directory
-	 * @param dir
+	/*
+	 * This logic is handled by the HAJournalServer, which is also aware
+	 * of the backup integration through zookeeper.
 	 */
-	private void removeAllLogFiles(final File dir, final File preserve) {
-		final File[] files = logFiles(dir);
-		for (File f : files) {
-			try {
-				if (f.isDirectory()) {
-					removeAllLogFiles(f, preserve);
-					
-					// FIXME: should we remove the directory?
-					// Probably not
-					// f.delete();
-				} else if (f != preserve) {
-					f.delete();
-				}
-			} catch (final SecurityException se) {
-				haLog.warn("Unabel to delete file " + f.getAbsolutePath(), se);
-			}
-		}
-	}
+//	/**
+//	 * Disables any current log file, then removes all log files
+//	 * from the directory
+//	 * 
+//	 * @throws IOException
+//	 */
+//	public void removeAllLogFiles() {
+//		m_currentLock.lock();
+//		try {
+//			// No longer disables the current log file
+//			
+//			removeAllLogFiles(m_halogdir, getCurrentFile());
+//		} finally {
+//			m_currentLock.unlock();
+//		}
+//	}
+//
+//	/**
+//	 * Recursively removes all log files from the provided directory
+//	 * @param dir
+//	 */
+//	private void removeAllLogFiles(final File dir, final File preserve) {
+//		final File[] files = logFiles(dir);
+//		for (File f : files) {
+//			try {
+//				if (f.isDirectory()) {
+//					removeAllLogFiles(f, preserve);
+//					
+//					// FIXME: should we remove the directory?
+//					// Probably not
+//					// f.delete();
+//				} else if (f != preserve) {
+//					f.delete();
+//				}
+//			} catch (final SecurityException se) {
+//				haLog.warn("Unabel to delete file " + f.getAbsolutePath(), se);
+//			}
+//		}
+//	}
 	
 	/**
 	 * Utility program will dump log files (or directories containing log files)
