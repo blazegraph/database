@@ -160,7 +160,7 @@ public class HALogWriter {
 	}
 	
 	public boolean isOpen() {
-	    return m_state != null;
+	    return m_state != null && !m_state.isCommitted();
 	}
 
 	/**

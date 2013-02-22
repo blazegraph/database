@@ -164,10 +164,14 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
      * moment, we no longer require these log files to resynchronize any
      * service.
      * 
+     * NOTE: We should never remove the open log file
+     * 
+     * This parameter has been removed
+     * 
      * @param includeCurrent
      *            When <code>true</code>, the current HA Log file will also be
      *            purged.
      */
-    void purgeHALogs(boolean includeCurrent);
+    void purgeHALogs();
     
 }
