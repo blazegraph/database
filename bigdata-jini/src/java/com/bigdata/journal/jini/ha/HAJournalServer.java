@@ -1033,6 +1033,8 @@ public class HAJournalServer extends AbstractServer {
 
         private class QuorumBreakTask implements Callable<Void> {
             public Void call() throws Exception {
+            	getQuorum().getActor().serviceLeave();
+            	
                 journal.setQuorumToken(Quorum.NO_QUORUM);
                 try {
                     journal.getHALogWriter().disable();
@@ -1063,13 +1065,13 @@ public class HAJournalServer extends AbstractServer {
 
                 if (getQuorum().isQuorumFullyMet(token)) {
 
-                    purgeHALogs(false/* includeCurrent */);
+                    purgeHALogs();
 
                 }
             }
 
         }
-
+ 
         /**
          * Task to handle a quorum break event.
          */
@@ -1274,7 +1276,7 @@ public class HAJournalServer extends AbstractServer {
                  * necessary state in the file system if they were put there by
                  * the leader.
                  */
-                if(false)
+                if(true)
                 while (true) {
 
                     long commitCounter = journal.getRootBlockView()
@@ -2588,7 +2590,7 @@ public class HAJournalServer extends AbstractServer {
          * @see HABackupManager
          */
         @Override
-        public void purgeHALogs(final boolean includeCurrent) {
+        public void purgeHALogs() {
 
             logLock.lock();
 
@@ -2650,7 +2652,8 @@ public class HAJournalServer extends AbstractServer {
                                 return false;
                             }
 
-                            if (!includeCurrent && currentLogFile != null
+                            // filter out the current log file
+                            if (currentLogFile != null
                                     && name.equals(currentLogFileName)) {
                                 /*
                                  * The caller requested that we NOT purge the

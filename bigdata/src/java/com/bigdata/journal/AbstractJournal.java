@@ -5660,10 +5660,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                         /*
                          * The HA log files are purged on each node any time
                          * the quorum is fully met and goes through a commit
-                         * point.
+                         * point. Leaving only the current open log file.
                          */
 
-                        localService.purgeHALogs(true/* includeCurrent */);
+                        localService.purgeHALogs();
 
                     }
 

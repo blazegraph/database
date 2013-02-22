@@ -142,9 +142,9 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
 
             @Override
-            public void purgeHALogs(final boolean includeCurrent) {
+            public void purgeHALogs() {
 
-                QuorumServiceBase.this.purgeHALogs(includeCurrent);
+                QuorumServiceBase.this.purgeHALogs();
 
             }
 
@@ -266,7 +266,7 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Note: The default implementation is a NOP.
      */
     @Override
-    public void purgeHALogs(final boolean includeCurrent) {
+    public void purgeHALogs() {
         
         // NOP
         

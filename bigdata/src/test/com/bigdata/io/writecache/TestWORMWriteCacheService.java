@@ -371,9 +371,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
-                public void purgeHALogs(final boolean includeCurrent) {
+                public void purgeHALogs() {
                     
-                    MyMockQuorumMember.this.purgeHALogs(includeCurrent);
+                    MyMockQuorumMember.this.purgeHALogs();
                     
                 }
                 
@@ -465,7 +465,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public void purgeHALogs(final boolean includeCurrent) {
+        public void purgeHALogs() {
             
             // NOP
             

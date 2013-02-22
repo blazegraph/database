@@ -234,19 +234,12 @@ public class HALogManager {
 	 * 
 	 * @throws IOException
 	 */
-	public void removeAllLogFiles(boolean includeCurrent) {
+	public void removeAllLogFiles() {
 		m_currentLock.lock();
 		try {
-			if (includeCurrent && m_current != null)
-				try {
-					m_current.disable();
-				} catch (IOException e) {
-					throw new RuntimeException("Unable to disable current log file", e);
-				}
-
-			final File current = !includeCurrent ? getCurrentFile() : null;
+			// No longer disables the current log file
 			
-			removeAllLogFiles(m_halogdir, current);
+			removeAllLogFiles(m_halogdir, getCurrentFile());
 		} finally {
 			m_currentLock.unlock();
 		}

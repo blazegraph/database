@@ -458,8 +458,34 @@ public class AbstractHA3JournalServerTestCase extends
     	safeDestroy(serverC, serviceListenerC);
     }
 
+    protected void shutdownA() throws IOException {
+    	safeShutdown(serverA, serviceListenerA, true);
+    	
+    	serverA = null;
+    	serviceListenerA = null;
+    }
+    
+    protected void shutdownB() throws IOException {
+    	safeShutdown(serverB, serviceListenerB, true);
+    	
+    	serverB = null;
+    	serviceListenerB = null;
+    }
+    
+    protected void shutdownC() throws IOException {
+    	safeShutdown(serverC, serviceListenerC, true);
+    	
+    	serverC = null;
+    	serviceListenerC = null;
+    }
+
     private void safeShutdown(final HAGlue haGlue,
             final ServiceListener serviceListener) {
+    	safeShutdown(haGlue, serviceListener, false); // not shutdownNow by default
+    }
+    
+    private void safeShutdown(final HAGlue haGlue,
+                final ServiceListener serviceListener, final boolean now) {
 
         if (haGlue == null)
             return;
@@ -469,7 +495,10 @@ public class AbstractHA3JournalServerTestCase extends
             final UUID serviceId = haGlue.getServiceUUID();
             
             // Shutdown the remote service.
-            ((RemoteDestroyAdmin) haGlue).shutdown();
+            if (now)
+            ((RemoteDestroyAdmin) haGlue).shutdownNow();
+            else
+                ((RemoteDestroyAdmin) haGlue).shutdown();
             
             awaitServiceGone(serviceId, haGlue, serviceListener);
             

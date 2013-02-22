@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.jini.ha;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -39,6 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.journal.jini.ha.HAJournalServer.AdministrableHAGlueService;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -456,7 +460,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     /**
-     * Tests that halog files are generated and identical
+     * Tests that halog files are generated and identical, and that
+     * when a server is shutdown its logs remain
      */
     public void testStartAB_halog() {
     	fail("write test");
@@ -1097,6 +1102,30 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			}
 	}
 
+    private void copyFiles(File src, File dst) throws IOException {
+		final File[] files = src.listFiles();
+		log.warn("Copying " + src.getAbsolutePath() + " to " + dst.getAbsolutePath() + ", files: " + files.length);
+		if (files != null) {
+			for (File srcFile: files) {
+				final File dstFile = new File(dst, srcFile.getName());
+				log.info("Copying " + srcFile.getAbsolutePath() + " to " + dstFile.getAbsolutePath());
+				final FileInputStream instr = new FileInputStream(srcFile);
+				final FileOutputStream outstr = new FileOutputStream(dstFile);
+				
+				final byte[] buf = new byte[8192];
+				while (true) {
+					final int len = instr.read(buf);
+					if (len == -1)
+						break;
+					
+					outstr.write(buf, 0, len);
+				}
+				
+				outstr.close();
+				instr.close();
+			}
+		}
+	}
 	/**
      * Test Rebuild of early starting C service where service from previously fully met quorum is not
      * started.
@@ -1106,6 +1135,117 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     /**
+     * Test Restore by:
+     * 	starting ABC
+     * 	drop C
+     *  run transaction through AB
+     *  drop A
+     *  start C
+     *  Restore
+     *  Meet on BC
+     *  start A
+     *  Fully Meet
+     * @throws Exception 
+     */
+    public void testABC_Restore() throws Exception {
+        // Start 3 services, sleeps to ensure sequence.
+        final HAGlue serverA = startA();
+        //Thread.sleep(100);
+        final HAGlue serverB = startB();
+        //Thread.sleep(100);
+    	final HAGlue serverC = startC();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Verify KB exists.
+        awaitKBExists(serverA);
+
+    
+        /*
+         * Now go through a commit point with a met quorum. The HALog
+         * files should be retained at that commit point.
+         */
+        {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+        }
+        
+        // now shutdown C (not destroy)
+        shutdownC();
+        
+        log.warn("CHECK OPEN LOGS ON A B");
+
+        
+        /*
+         * Now go through a commit point with a met quorum. The HALog
+         * files should be retained at that commit point.
+         */
+        if (true/*new commit state*/) {
+
+            final StringBuilder sb = new StringBuilder();
+            sb.append("DROP ALL;\n");
+            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+            sb.append("INSERT DATA {\n");
+            sb.append("  <http://example/book1> dc:title \"Another new book\" ;\n");
+            sb.append("  dc:creator \"A.N.Other\" .\n");
+            sb.append("}\n");
+            
+            final String updateStr = sb.toString();
+            
+            final HAGlue leader = quorum.getClient().getLeader(token);
+            
+            // Verify quorum is still valid.
+            quorum.assertQuorum(token);
+
+            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+            // and a second one?
+            // getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+                       
+        }
+        log.warn("CHECK LOGS ON A B");
+        
+        // now shutdown A (not destroy)
+        shutdownA();
+        
+        // copy log files from A to C
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        copyFiles(new File(serviceDir, "A/HALog"), new File(serviceDir, "C/HALog"));
+                      
+        startC();
+        
+        log.warn("CHECK LOGS HAVE BEEN COPIED TO C");
+        
+    	// new C should Restore and Meet as Follower with B as leader
+    	this.awaitMetQuorum();
+    	
+    	startA();
+    	
+    	// A should join the Met Quorum which will then be Fully Met
+    	this.awaitFullyMetQuorum();
+       
+}
+    
+
+	/**
      * Test quorum remains if C is failed when fully met
      * @throws Exception 
      */
@@ -1207,8 +1347,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter,
                 new HAGlue[] { serverA, serverB, serverC });
         
-        // Now fail C
-        destroyC();        
+        // Now fail C - use destroy otherwise test does not tear down cleanly
+        //	leaving journal and log files
+        destroyC();   
+        
+        // assert quorum remains met       
+        assertTrue(quorum.isQuorumMet());
+        // but not FULLY
+        assertFalse(quorum.isQuorumFullyMet(token));
 
     }
 

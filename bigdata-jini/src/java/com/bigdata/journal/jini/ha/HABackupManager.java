@@ -702,7 +702,7 @@ public class HABackupManager {
             }
 
             @Override
-            public void purgeHALogs(boolean includeCurrent) {
+            public void purgeHALogs() {
                 // TODO Auto-generated method stub
                 
             }

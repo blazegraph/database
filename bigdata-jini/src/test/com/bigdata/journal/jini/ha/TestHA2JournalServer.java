@@ -29,6 +29,8 @@ package com.bigdata.journal.jini.ha;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
@@ -46,6 +48,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
+
+    protected static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
 
     public TestHA2JournalServer() {
     }
@@ -135,6 +139,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
      * for the follower and verify that the quorum meets again.
      */
     public void testStartAB_BounceFollower() throws Exception {
+    	
+    	haLog.warn("Starting AB_BounceFolloer test");
         
         HAGlue serverA = startA();
         HAGlue serverB = startB();
@@ -169,7 +175,12 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
                 serverA.bounceZookeeperConnection().get();
 
             }
-
+            
+            // Okay, is the problem that the quorum doesn't break?
+            // assertFalse(quorum.isQuorumMet());
+            
+            // Right so the Quorum is not met, but the follower deosn't seem to know it's broken
+            
             // Wait for the quorum to break and then meet again.
             final long token2 = awaitNextQuorumMeet(token1);
 
