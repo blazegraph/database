@@ -61,12 +61,13 @@ import org.openrdf.rio.helpers.StatementCollector;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sparql.ast.eval.service.TestSearch;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 
@@ -228,7 +229,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //
 //            final StatementPattern sp = new StatementPattern(//
 //                    new Var("X"),//
-//                    new Var("1", BD.SEARCH),//
+//                    new Var("1", BDS.SEARCH),//
 //                    new Var("2", new LiteralImpl("Yellow"))//
 //                    );
 //            final TupleExpr tupleExpr = 
@@ -334,8 +335,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 		" } " + "where { "+//
 		" ?s <" + RDF.TYPE + "> <" + ENTITY + "> ."+//
 		" ?s ?p ?lit ."+//
-		" ?lit <" + BD.SEARCH + "> \"systap\" ."+//
-		" ?lit <" + BD.MIN_RELEVANCE + "> \"0.0\"^^<http://www.w3.org/2001/XMLSchema#double> ."+//
+		" ?lit <" + BDS.SEARCH + "> \"systap\" ."+//
+		" ?lit <" + BDS.MIN_RELEVANCE + "> \"0.0\"^^<http://www.w3.org/2001/XMLSchema#double> ."+//
 		" }";
 
         // the ontology (nothing is indexed for full text search).
@@ -476,7 +477,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    final String query = "construct { ?s <" + RDF.TYPE + "> <"
 //                            + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
 //                            + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-//                            + BD.SEARCH + "> \"systap\" . }";
+//                            + BDS.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -572,7 +573,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    "from <"+graphA+"> " +
 //                    "where " +
 //                    "{ " +
-//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "    ?s <"+BDS.SEARCH+"> \"Alice\" . " +
 //                    "}";
 //                
 //                final TupleQuery tupleQuery = 
@@ -592,7 +593,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    "from <"+graphA+"> " +
 //                    "where " +
 //                    "{ " +
-//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "    ?s <"+BDS.SEARCH+"> \"Alice\" . " +
 //                    "}";
 //                
 //                final TupleQuery tupleQuery = 
@@ -612,7 +613,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    "from <"+graphB+"> " +
 //                    "where " +
 //                    "{ " +
-//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "    ?s <"+BDS.SEARCH+"> \"Alice\" . " +
 //                    "}";
 //                
 //                final TupleQuery tupleQuery = 
@@ -633,7 +634,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    "where " +
 //                    "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-//                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "    ?o <"+BDS.SEARCH+"> \"Alice\" . " +
 //                    "}";
 //                
 //                final TupleQuery tupleQuery = 
@@ -654,7 +655,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                    "where " +
 //                    "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o1 . " +
-//                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "    ?o <"+BDS.SEARCH+"> \"Alice\" . " +
 //                    "}";
 //                
 //                final TupleQuery tupleQuery = 
@@ -699,14 +700,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             final ValueFactory vf = sail.getValueFactory();
 
-        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
-        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
-        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
-        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
-        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
-        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
-        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
-        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final URI s1 = vf.createURI(BDS.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BDS.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BDS.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BDS.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BDS.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BDS.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BDS.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BDS.NAMESPACE+"s8");
         	final Literal l1 = vf.createLiteral("how");
         	final Literal l2 = vf.createLiteral("now");
         	final Literal l3 = vf.createLiteral("brown");
@@ -765,8 +766,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -791,19 +792,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false // matchExact
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -833,9 +829,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?o <"+BD.MAX_RANK+"> \""+maxHits+"\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.MAX_RANK+"> \""+maxHits+"\" . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -860,19 +856,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            maxHits, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            maxHits, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -903,11 +900,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-                    "    ?o <"+BD.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?o <"+BDS.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -932,19 +929,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -976,10 +974,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+//                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
                     "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
@@ -1008,19 +1006,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1054,10 +1053,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+//                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
 //                    "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
@@ -1086,19 +1085,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1123,17 +1123,17 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "to*";
             	final double minRelevance = 0.0d;
-            	final double maxRelevance = BD.DEFAULT_MAX_RELEVANCE;//1.0d;
+            	final double maxRelevance = BDS.DEFAULT_MAX_RELEVANCE;//1.0d;
             	
                 final String query = 
                     "select ?s ?o ?score " + 
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
 //                    "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
@@ -1162,19 +1162,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1206,8 +1207,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.MATCH_ALL_TERMS+"> \"true\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.MATCH_ALL_TERMS+"> \"true\" . " +
                     "}";
                 
                 if(log.isInfoEnabled())
@@ -1234,19 +1235,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
-                            minRelevance, // minCosine
-                            maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            null, // regex
                             true, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1275,10 +1277,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?o <"+BD.MIN_RANK+"> \""+minRank+"\" . " +
-                    "    ?o <"+BD.MAX_RANK+"> \""+maxRank+"\" . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.MIN_RANK+"> \""+minRank+"\" . " +
+                    "    ?o <"+BDS.MAX_RANK+"> \""+maxRank+"\" . " +
                     "}";
                 
                 if(log.isInfoEnabled())
@@ -1305,19 +1307,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
-                            minRank,//1
-                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            null, // regex
                             false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            minRank,//1
+                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1345,20 +1348,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final IValueCentricTextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 
-                final int i = search.count(
+                final int i = search.count(new FullTextQuery(
                 			searchQuery, 
                             null, // languageCode
-                            true, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
-                            BD.DEFAULT_MIN_RANK, // minRank
-                            BD.DEFAULT_MAX_RANK, // maxRank
-                            false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            true // prefixMatch
+                            ));
                 
                 if (log.isInfoEnabled()) {
                 	log.info(i + " search results.");
@@ -1393,14 +1387,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             final ValueFactory vf = sail.getValueFactory();
 
-        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
-        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
-        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
-        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
-        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
-        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
-        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
-        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final URI s1 = vf.createURI(BDS.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BDS.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BDS.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BDS.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BDS.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BDS.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BDS.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BDS.NAMESPACE+"s8");
         	final Literal l1 = vf.createLiteral("how");
         	final Literal l2 = vf.createLiteral("now");
         	final Literal l3 = vf.createLiteral("brown");
@@ -1460,9 +1454,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "select ?s ?score " + 
                     "where " +
                     "{ " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -1487,19 +1481,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1526,10 +1521,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "select ?s ?score " + 
                     "where " +
                     "{ " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.MAX_RANK+"> \""+maxHits+"\" . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.MAX_RANK+"> \""+maxHits+"\" . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -1554,19 +1549,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            maxHits, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            maxHits, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1597,12 +1593,12 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-                    "    ?s <"+BD.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?s <"+BDS.MAX_RELEVANCE+"> \""+maxRelevance+"\" . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -1627,19 +1623,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1671,11 +1668,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
                     "    ?s ?p ?o . " +
                     "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
@@ -1705,19 +1702,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1751,11 +1749,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
-//                    "    ?o <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
 //                    "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
@@ -1784,19 +1782,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1821,18 +1820,18 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             	
             	final String searchQuery = "to*";
             	final double minRelevance = 0.0d;
-            	final double maxRelevance = BD.DEFAULT_MAX_RELEVANCE;//1.0d;
+            	final double maxRelevance = BDS.DEFAULT_MAX_RELEVANCE;//1.0d;
             	
                 final String query = 
                     "select ?s ?score " + 
                     "where " +
                     "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
-//                    "    ?o <"+BD.MAX_HITS+"> \"5\" . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.MIN_RELEVANCE+"> \""+minRelevance+"\" . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
+//                    "    ?o <"+BDS.MAX_HITS+"> \"5\" . " +
 //                    "    filter regex(?o, \""+searchQuery+"\") " +
                     "} " +
                     "order by desc(?score)";
@@ -1861,19 +1860,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
+                            null, // regex
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            false, // matchExact
                             minRelevance, // minCosine
                             maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1905,9 +1905,9 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.MATCH_ALL_TERMS+"> \"true\" . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.MATCH_ALL_TERMS+"> \"true\" . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
                     "}";
                 
                 if(log.isInfoEnabled())
@@ -1934,19 +1934,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
-                            minRelevance, // minCosine
-                            maxRelevance, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            null,
                             true, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            minRelevance, // minCosine
+                            maxRelevance, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -1976,11 +1977,11 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
 //                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?s <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?s <"+BD.RELEVANCE+"> ?score . " +
-                    "    ?s <"+BD.MIN_RANK+"> \""+minRank+"\" . " +
-                    "    ?s <"+BD.MAX_RANK+"> \""+maxRank+"\" . " +
-                    "    ?s <"+BD.SUBJECT_SEARCH+"> true . " +
+                    "    ?s <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?s <"+BDS.RELEVANCE+"> ?score . " +
+                    "    ?s <"+BDS.MIN_RANK+"> \""+minRank+"\" . " +
+                    "    ?s <"+BDS.MAX_RANK+"> \""+maxRank+"\" . " +
+                    "    ?s <"+BDS.SUBJECT_SEARCH+"> true . " +
                     "}";
                 
                 if(log.isInfoEnabled())
@@ -2007,19 +2008,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
-                            minRank,//1
-                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            null,
                             false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE, // maxCosine
+                            minRank,//1
+                            maxRank,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -2047,20 +2049,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSubjectCentricSearchEngine();
                 
-                final int i = search.count(
+                final int i = search.count(new FullTextQuery(
                 			searchQuery, 
                             null, // languageCode
                             true, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE, // maxCosine
-                            BD.DEFAULT_MIN_RANK, // minRank
-                            BD.DEFAULT_MAX_RANK, // maxRank
+                            null, // regex
                             false, // matchAllTerms
-                            false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            false // matchExact
+                            ));
                 
                 if (log.isInfoEnabled()) {
                 	log.info(i + " search results.");
@@ -2101,14 +2097,14 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             final ValueFactory vf = sail.getValueFactory();
 
-        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
-        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
-        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
-        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
-        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
-        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
-        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
-        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final URI s1 = vf.createURI(BDS.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BDS.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BDS.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BDS.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BDS.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BDS.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BDS.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BDS.NAMESPACE+"s8");
         	final Literal l1 = vf.createLiteral("how");
         	final Literal l2 = vf.createLiteral("now");
         	final Literal l3 = vf.createLiteral("brown");
@@ -2167,8 +2163,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> ?searchQuery . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.SEARCH+"> ?searchQuery . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -2195,19 +2191,20 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null,
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             false, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();
@@ -2259,8 +2256,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //            final String snippetVar = "target";
 //            
 //            final String queryTemplate = 
-//                "prefix bd: <"+BD.NAMESPACE+"> " +
-//                "prefix bds: <"+BD.SEARCH_NAMESPACE+"> " +
+//                "prefix bd: <"+BDS.NAMESPACE+"> " +
+//                "prefix bds: <"+BDS.SEARCH_NAMESPACE+"> " +
 //                "prefix rdf: <"+RDF.NAMESPACE+"> " +
 //                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
 //                "select ?target ?o ?type ?score " + 
@@ -2287,7 +2284,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //                        0, // minRank
 //                        Integer.MAX_VALUE, // maxRank
 //                        false, // matchAllTerms
-//                        BD.DEFAULT_TIMEOUT, // timeout 
+//                        BDS.DEFAULT_TIMEOUT, // timeout 
 //                        TimeUnit.MILLISECONDS // unit
 //                        );
 //
@@ -2487,14 +2484,14 @@ LIMIT 10 OFFSET 0
 
             final ValueFactory vf = sail.getValueFactory();
 
-        	final URI s1 = vf.createURI(BD.NAMESPACE+"s1");
-        	final URI s2 = vf.createURI(BD.NAMESPACE+"s2");
-        	final URI s3 = vf.createURI(BD.NAMESPACE+"s3");
-        	final URI s4 = vf.createURI(BD.NAMESPACE+"s4");
-        	final URI s5 = vf.createURI(BD.NAMESPACE+"s5");
-        	final URI s6 = vf.createURI(BD.NAMESPACE+"s6");
-        	final URI s7 = vf.createURI(BD.NAMESPACE+"s7");
-        	final URI s8 = vf.createURI(BD.NAMESPACE+"s8");
+        	final URI s1 = vf.createURI(BDS.NAMESPACE+"s1");
+        	final URI s2 = vf.createURI(BDS.NAMESPACE+"s2");
+        	final URI s3 = vf.createURI(BDS.NAMESPACE+"s3");
+        	final URI s4 = vf.createURI(BDS.NAMESPACE+"s4");
+        	final URI s5 = vf.createURI(BDS.NAMESPACE+"s5");
+        	final URI s6 = vf.createURI(BDS.NAMESPACE+"s6");
+        	final URI s7 = vf.createURI(BDS.NAMESPACE+"s7");
+        	final URI s8 = vf.createURI(BDS.NAMESPACE+"s8");
         	final Literal l1 = vf.createLiteral("0");
         	final Literal l2 = vf.createLiteral("0 0");
         	final Literal l3 = vf.createLiteral("0 1 0");
@@ -2553,9 +2550,9 @@ LIMIT 10 OFFSET 0
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \""+searchQuery+"\" . " +
-                    "    ?o <"+BD.MATCH_EXACT+"> \"true\" . " +
-                    "    ?o <"+BD.RELEVANCE+"> ?score . " +
+                    "    ?o <"+BDS.SEARCH+"> \""+searchQuery+"\" . " +
+                    "    ?o <"+BDS.MATCH_EXACT+"> \"true\" . " +
+                    "    ?o <"+BDS.RELEVANCE+"> ?score . " +
                     "} " +
                     "order by desc(?score)";
                 
@@ -2578,19 +2575,20 @@ LIMIT 10 OFFSET 0
                 final ITextIndexer search = 
                 	sail.getDatabase().getLexiconRelation().getSearchEngine();
                 final Hiterator<IHit> hits = 
-                	search.search(searchQuery, 
+                	search.search(new FullTextQuery(
+                			searchQuery, 
                             null, // languageCode
-                            BD.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
-                            BD.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
-                            BD.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
-                            BD.DEFAULT_MIN_RANK,//1
-                            BD.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
-                            BD.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
+                            BDS.DEFAULT_PREFIX_MATCH,//false, // prefixMatch
+                            null,
+                            BDS.DEFAULT_MATCH_ALL_TERMS,//false, // matchAllTerms
                             true, // matchExact
-                            BD.DEFAULT_TIMEOUT,//1000L, // timeout 
-                            TimeUnit.MILLISECONDS, // unit
-                            null // regex
-                            );
+                            BDS.DEFAULT_MIN_RELEVANCE,//0d, // minCosine
+                            BDS.DEFAULT_MAX_RELEVANCE,//1.0d, // maxCosine
+                            BDS.DEFAULT_MIN_RANK,//1
+                            BDS.DEFAULT_MAX_RANK,//10000, // maxRank (=maxResults + 1)
+                            BDS.DEFAULT_TIMEOUT,//1000L, // timeout 
+                            TimeUnit.MILLISECONDS // unit
+                            ));
                 
                 while (hits.hasNext()) {
                 	final IHit hit = hits.next();

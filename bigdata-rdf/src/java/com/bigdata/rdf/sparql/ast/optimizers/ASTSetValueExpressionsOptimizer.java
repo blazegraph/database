@@ -75,6 +75,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
     public ASTSetValueExpressionsOptimizer() {
     }
 
+    @Override
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
