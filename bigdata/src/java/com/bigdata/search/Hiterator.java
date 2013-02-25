@@ -79,20 +79,20 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
         
     }
 
-    /**
-     * The #of hits (approximate).
-     * 
-     * @todo differentiate between the #of hits and the #of hits that satisfy
-     *       the minCosine and maxRank criteria
-     * 
-     * @todo this and other search engine metadata (elapsed time) might go on a
-     *       different object from which we can obtain the {@link Hiterator}.
-     */
-    public long size() {
-        
-        return hits.size();
-        
-    }
+//    /**
+//     * The #of hits (approximate).
+//     * 
+//     * @todo differentiate between the #of hits and the #of hits that satisfy
+//     *       the minCosine and maxRank criteria
+//     * 
+//     * @todo this and other search engine metadata (elapsed time) might go on a
+//     *       different object from which we can obtain the {@link Hiterator}.
+//     */
+//    public long size() {
+//        
+//        return hits.size();
+//        
+//    }
     
     public boolean hasNext() {
 
@@ -167,4 +167,9 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
                 + hits;
         
     }
+    
+    public int size() {
+    	return hits.size();
+    }
+    
 }

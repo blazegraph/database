@@ -48,10 +48,10 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Test suite for {@link ASTStaticJoinOptimizer}.
@@ -693,7 +693,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        final IV search = makeIV(BD.SEARCH);
+        final IV search = makeIV(BDS.SEARCH);
 
         final IV foo = makeIV(new LiteralImpl("foo"));
 
@@ -701,7 +701,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV b = makeIV(new URIImpl("http://example/b"));
         
-        final IV serviceRef = makeIV(BD.SEARCH);
+        final IV serviceRef = makeIV(BDS.SEARCH);
         
 //        @SuppressWarnings("rawtypes")
 //        final IV c = makeIV(new URIImpl("http://example/c"));
@@ -821,7 +821,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-        final IV search = makeIV(BD.SEARCH);
+        final IV search = makeIV(BDS.SEARCH);
 
         final IV foo = makeIV(new LiteralImpl("foo"));
 
@@ -839,7 +839,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
         final IV g = makeIV(new URIImpl("http://example/g"));
 
-        final IV serviceRef = makeIV(BD.SEARCH);
+        final IV serviceRef = makeIV(BDS.SEARCH);
 
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -1329,7 +1329,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
 
-//        final IV search = makeIV(BD.SEARCH);
+//        final IV search = makeIV(BDS.SEARCH);
 //
 //        final IV foo = makeIV(new LiteralImpl("foo"));
 

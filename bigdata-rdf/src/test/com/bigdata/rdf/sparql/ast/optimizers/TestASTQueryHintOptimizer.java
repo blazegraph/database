@@ -62,7 +62,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Test suite for the {@link ASTQueryHintOptimizer}.
@@ -975,9 +975,9 @@ public class TestASTQueryHintOptimizer extends
         final IBindingSet[] bsets = new IBindingSet[] {};
 
         @SuppressWarnings("rawtypes")
-        final IV search = makeIV(BD.SEARCH);
+        final IV search = makeIV(BDS.SEARCH);
         @SuppressWarnings("rawtypes")
-        final IV relevance = makeIV(BD.RELEVANCE);
+        final IV relevance = makeIV(BDS.RELEVANCE);
         @SuppressWarnings("rawtypes")
         final IV mike = makeIV(new LiteralImpl("mike"));
         @SuppressWarnings("rawtypes")

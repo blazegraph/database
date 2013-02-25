@@ -58,7 +58,7 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -113,7 +113,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
@@ -1063,7 +1063,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
@@ -1299,7 +1299,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
@@ -1395,7 +1395,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
@@ -1505,7 +1505,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
@@ -1606,7 +1606,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV bdSearchIV = TermId.mockIV(VTE.URI);
         bdSearchIV.setValue(store.getValueFactory().createURI(
-                BD.SEARCH.toString()));
+                BDS.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
         mikeIV.setValue(store.getValueFactory().createLiteral("mike"));

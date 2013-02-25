@@ -58,7 +58,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * A "simple optional" is an optional sub-group that contains only one statement
@@ -191,7 +191,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                 final BigdataURI serviceURI = ServiceCallUtility
                         .getConstantServiceURI(serviceRef);
 
-                if (!BD.SEARCH.equals(serviceURI)) {
+                if (!BDS.SEARCH.equals(serviceURI)) {
 
                     /*
                      * Do NOT translate SERVICE nodes (unless they are a well

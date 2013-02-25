@@ -58,6 +58,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Translate {@link BD#SEARCH} and related magic predicates into a
@@ -96,18 +97,18 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         
         final Set<URI> set = new LinkedHashSet<URI>();
     
-        set.add(BD.SEARCH);
-        set.add(BD.RELEVANCE);
-        set.add(BD.RANK);
-        set.add(BD.MAX_RANK);
-        set.add(BD.MIN_RANK);
-        set.add(BD.MAX_RELEVANCE);
-        set.add(BD.MIN_RELEVANCE);
-        set.add(BD.MATCH_ALL_TERMS);
-        set.add(BD.MATCH_EXACT);
-        set.add(BD.SUBJECT_SEARCH);
-        set.add(BD.SEARCH_TIMEOUT);
-        set.add(BD.MATCH_REGEX);
+        set.add(BDS.SEARCH);
+        set.add(BDS.RELEVANCE);
+        set.add(BDS.RANK);
+        set.add(BDS.MAX_RANK);
+        set.add(BDS.MIN_RANK);
+        set.add(BDS.MAX_RELEVANCE);
+        set.add(BDS.MIN_RELEVANCE);
+        set.add(BDS.MATCH_ALL_TERMS);
+        set.add(BDS.MATCH_EXACT);
+        set.add(BDS.SUBJECT_SEARCH);
+        set.add(BDS.SEARCH_TIMEOUT);
+        set.add(BDS.MATCH_REGEX);
         
         searchUris = Collections.unmodifiableSet(set);
         
@@ -188,7 +189,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
 //                    // Must be a Value known to the database.
 //
 //                    if (((ConstantNode) p).getValue().stringValue()
-//                            .startsWith(BD.SEARCH_NAMESPACE)) {
+//                            .startsWith(BDS.SEARCH_NAMESPACE)) {
 //
 //                        throw new RuntimeException(
 //                                "Search predicates are only allowed in named subqueries.");
@@ -260,7 +261,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
 
                         if (uri != null // Must be a known value.
                                 && uri.stringValue().startsWith(
-                                        BD.SEARCH_NAMESPACE)) {
+                                        BDS.NAMESPACE)) {
 
                             /*
                              * Some search predicate.
@@ -505,7 +506,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         final TermId<BigdataURI> iv = (TermId<BigdataURI>) TermId
                 .mockIV(VTE.URI);
 
-        iv.setValue(ctx.db.getValueFactory().asValue(BD.SEARCH));
+        iv.setValue(ctx.db.getValueFactory().asValue(BDS.SEARCH));
 
         return new ServiceNode(new ConstantNode(iv), groupNode);
 

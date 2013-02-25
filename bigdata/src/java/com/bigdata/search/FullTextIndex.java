@@ -69,6 +69,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -439,7 +440,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     /**
      * See {@link Options#HIT_CACHE_SIZE}.
      */
-    private final ConcurrentWeakValueCacheWithTimeout<FullTextSearchQuery, Hit<V>[]> cache;
+    private final ConcurrentWeakValueCacheWithTimeout<FullTextQuery, Hit<V>[]> cache;
 
 //    /**
 //     * @see Options#DOCID_FACTORY_CLASS
@@ -564,7 +565,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         }
 
         this.cache =
-               new ConcurrentWeakValueCacheWithTimeout<FullTextSearchQuery, Hit<V>[]>(
+               new ConcurrentWeakValueCacheWithTimeout<FullTextQuery, Hit<V>[]>(
                                hitCacheSize, hitCacheTimeoutMillis);
 
         {
@@ -946,15 +947,9 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      *       iterator that is sent to the data service such that the search
      *       terms are visited only when they occur in the matching field(s).
      */
-    public Hiterator<Hit<V>> search(final String query, final String languageCode,
-            final boolean prefixMatch, 
-            final double minCosine, final double maxCosine,
-            final int minRank, final int maxRank, 
-            final boolean matchAllTerms, final boolean matchExact,
-            long timeout, final TimeUnit unit, final String regex) {
+    public Hiterator<Hit<V>> search(final FullTextQuery query) {
         
-		final Hit<V>[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit, regex);
+		final Hit<V>[] a = _search(query);
     	
         return new Hiterator<Hit<V>>(//
                 Arrays.asList(a)// 
@@ -964,40 +959,28 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
     }
     
-    /**
-     * Used to support test cases.
-     */
-    public int count(final String query, final String languageCode,
-    		final boolean prefixMatch) {
+    public int count(final FullTextQuery query) {
     	
-    	return count(query, languageCode, prefixMatch, 0.0d, 1.0d, 1, 10000, 
-    			false, false, this.timeout,//
-                TimeUnit.MILLISECONDS, null);
-    	
-    }
-   
-    
-    public int count(final String query, final String languageCode,
-            final boolean prefixMatch, 
-            final double minCosine, final double maxCosine,
-            final int minRank, final int maxRank, 
-            final boolean matchAllTerms, final boolean matchExact,
-            long timeout, final TimeUnit unit, final String regex) {
-    	
-		final Hit[] a = _search(query, languageCode, prefixMatch, minCosine,
-				maxCosine, minRank, maxRank, matchAllTerms, matchExact, timeout, unit, regex);
+		final Hit[] a = _search(query);
 		
 		return a.length;
 		
     }
     
-    private Hit<V>[] _search(
-    		final String query, final String languageCode, 
-    		final boolean prefixMatch, 
-            final double minCosine, final double maxCosine,
-            final int minRank, final int maxRank, 
-            final boolean matchAllTerms, final boolean matchExact, 
-            long timeout, final TimeUnit unit, final String regex) {
+    public Hit<V>[] _search(final FullTextQuery q) {
+    	
+		final String query = q.getQuery();
+		final String languageCode = q.getLanguageCode(); 
+		final boolean prefixMatch = q.isPrefixMatch();
+        final double minCosine = q.getMinCosine();
+        final double maxCosine = q.getMaxCosine();
+        final int minRank = q.getMinRank();
+        final int maxRank = q.getMaxRank(); 
+        final boolean matchAllTerms = q.isMatchAllTerms();
+        final boolean matchExact = q.isMatchExact();
+        final String regex = q.getMatchRegex();
+        long timeout = q.getTimeout();
+        final TimeUnit unit = q.getTimeUnit(); 
 
         final long begin = System.currentTimeMillis();
         
@@ -1038,23 +1021,21 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             
         }
         
-        final FullTextSearchQuery cacheKey = new FullTextSearchQuery(
-        		query, matchAllTerms, matchExact, prefixMatch, timeout, unit, regex
-        		);
+        final FullTextQuery cacheKey = q;
         
         Hit<V>[] a;
         
         if (cache.containsKey(cacheKey)) {
         	
-        	if (log.isDebugEnabled())
-        		log.debug("found hits in cache");
+        	if (log.isInfoEnabled())
+        		log.info("found hits in cache");
         	
         	a = cache.get(cacheKey);
         	
         } else {
         	
-        	if (log.isDebugEnabled())
-        		log.debug("did not find hits in cache");
+        	if (log.isInfoEnabled())
+        		log.info("did not find hits in cache");
         	
 	        // tokenize the query.
 	        final TermFrequencyData<V> qdata;
@@ -1495,89 +1476,4 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
-    private static final class FullTextSearchQuery {
-    	
-		private final String search;
-    	private final boolean matchAllTerms;
-    	private final boolean matchExact;
-    	private final boolean prefixMatch;
-    	private final long timeout;
-    	private final TimeUnit unit;
-    	private final String regex;
-    	
-    	public FullTextSearchQuery(
-    	    	final String search,
-    	    	final boolean matchAllTerms,
-    	    	final boolean matchExact,
-    	    	final boolean prefixMatch,
-    	    	final long timeout,
-    	    	final TimeUnit unit,
-    	    	final String regex) {
-    		
-    		this.search = search;
-    		this.matchAllTerms = matchAllTerms;
-    		this.matchExact = matchExact;
-    		this.prefixMatch = prefixMatch;
-    		this.timeout = timeout;
-    		this.unit = unit;
-    		this.regex = regex;
-    		
-    	}
-    	
-    	/**
-    	 * Generated by Eclipse.
-    	 */
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + (matchAllTerms ? 1231 : 1237);
-			result = prime * result + (matchExact ? 1231 : 1237);
-			result = prime * result + (prefixMatch ? 1231 : 1237);
-			result = prime * result + ((regex == null) ? 0 : regex.hashCode());
-			result = prime * result
-					+ ((search == null) ? 0 : search.hashCode());
-			result = prime * result + (int) (timeout ^ (timeout >>> 32));
-			result = prime * result + ((unit == null) ? 0 : unit.hashCode());
-			return result;
-		}
-
-    	/**
-    	 * Generated by Eclipse.
-    	 */
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			FullTextSearchQuery other = (FullTextSearchQuery) obj;
-			if (matchAllTerms != other.matchAllTerms)
-				return false;
-			if (matchExact != other.matchExact)
-				return false;
-			if (prefixMatch != other.prefixMatch)
-				return false;
-			if (regex == null) {
-				if (other.regex != null)
-					return false;
-			} else if (!regex.equals(other.regex))
-				return false;
-			if (search == null) {
-				if (other.search != null)
-					return false;
-			} else if (!search.equals(other.search))
-				return false;
-			if (timeout != other.timeout)
-				return false;
-			if (unit != other.unit)
-				return false;
-			return true;
-		}
-
-    	
-    }
-    
 }

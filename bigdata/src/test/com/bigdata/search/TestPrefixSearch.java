@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
  * Unit test for prefix and exact match searches. Prefix search allows a query
@@ -111,16 +112,16 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             /* Search (exact match on one document, partial match on the other) */
             {
 
-                final Hiterator<?> itr = ndx.search("The quick brown dog",
+                final Hiterator<?> itr = ndx.search(new FullTextQuery("The quick brown dog",
                         languageCode, false/* prefixMatch */
-                        , minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        , regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
                 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
 
-                assertEquals(2, ndx.count("The quick brown dog",
-                        languageCode, false/* prefixMatch */));
+                assertEquals(2, ndx.count(new FullTextQuery("The quick brown dog",
+                        languageCode, false/* prefixMatch */)));
 
                 assertTrue(itr.hasNext());
 
@@ -142,14 +143,14 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx.search("The qui bro do",
-                        languageCode, true/*prefixMatch*/, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                final Hiterator<?> itr = ndx.search(new FullTextQuery("The qui bro do",
+                        languageCode, true/*prefixMatch*/, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                        minRank, maxRank, timeout, unit));
                 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
                 
-                assertEquals(2, ndx.count("The qui bro do",
-                        languageCode, true/*prefixMatch*/));
+                assertEquals(2, ndx.count(new FullTextQuery("The qui bro do",
+                        languageCode, true/*prefixMatch*/)));
 
                 assertTrue(itr.hasNext());
 
@@ -172,15 +173,15 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("brown", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("brown", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
                 assertEquals(2, ndx
-                        .count("brown", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
+                        .count(new FullTextQuery("brown", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit)));
 
             }
 
@@ -190,14 +191,14 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("brown", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("brown", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, ndx
-                        .count("brown", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
+                        .count(new FullTextQuery("brown", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit)));
 
             }
 
@@ -207,14 +208,14 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("bro", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("bro", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
                 assertEquals(2, ndx
-                        .count("bro", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                        minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex));
+                        .count(new FullTextQuery("bro", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                        minRank, maxRank, timeout, unit)));
 
             }
 
@@ -224,8 +225,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("bro", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("bro", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -240,8 +241,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("qui", languageCode, true/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("qui", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -256,8 +257,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("qui", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("qui", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
@@ -272,8 +273,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             {
 
                 final Hiterator<?> itr = ndx
-                        .search("quick", languageCode, false/* prefixMatch */, minCosine, maxCosine,
-                                minRank, maxRank, matchAllTerms, false/* matchExact*/, timeout, unit, regex);
+                        .search(new FullTextQuery("quick", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
+                                minRank, maxRank, timeout, unit));
 
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);

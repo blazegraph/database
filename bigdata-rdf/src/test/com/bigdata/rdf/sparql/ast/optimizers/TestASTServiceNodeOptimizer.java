@@ -47,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.store.BDS;
 
 /**
  * Test suite for {@link ASTServiceNodeOptimizer}.
@@ -121,10 +122,10 @@ public class TestASTServiceNodeOptimizer extends AbstractASTEvaluationTestCase {
          */
 
         @SuppressWarnings("rawtypes")
-        final IV searchIV = makeIV(BD.SEARCH);
+        final IV searchIV = makeIV(BDS.SEARCH);
         
         @SuppressWarnings("rawtypes")
-        final IV relevanceIV = makeIV(BD.RELEVANCE);
+        final IV relevanceIV = makeIV(BDS.RELEVANCE);
 
         @SuppressWarnings("rawtypes")
         final IV mikeIV = makeIV(store.getValueFactory().createLiteral("mike"));
