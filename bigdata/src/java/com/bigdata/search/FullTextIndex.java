@@ -951,11 +951,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         
 		final Hit<V>[] a = _search(query);
     	
-        return new Hiterator<Hit<V>>(//
-                Arrays.asList(a)// 
-//                ,minCosine,//0.0d,// minCosine
-//                Integer.MAX_VALUE // maxRank
-                ); 
+        return new Hiterator<Hit<V>>(a);
 
     }
     
