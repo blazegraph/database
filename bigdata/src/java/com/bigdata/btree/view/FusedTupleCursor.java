@@ -83,8 +83,8 @@ public class FusedTupleCursor<E> extends FusedTupleIterator<ITupleCursor<E>, E>
      *            on a fused view require that the tuple is overwritten by a
      *            delete marker in the 1st index of the view.
      */
-    public FusedTupleCursor(int flags, boolean deleted, ITupleCursor<E>[] srcs,
-            IIndex ndx) {
+    public FusedTupleCursor(final int flags, final boolean deleted,
+            final ITupleCursor<E>[] srcs, final IIndex ndx) {
 
         super(flags, deleted, srcs);
 
@@ -561,7 +561,7 @@ public class FusedTupleCursor<E> extends FusedTupleIterator<ITupleCursor<E>, E>
      * Note: You must specify {@link IRangeQuery#CURSOR} in order for
      * {@link #remove()} to be supported.
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     @Override
     public void remove() {
 
