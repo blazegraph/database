@@ -74,6 +74,7 @@ import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XsdStrBOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.store.BD;
 
@@ -1392,6 +1393,19 @@ public class FunctionRegistry {
      */
     public static class InFactory implements Factory {
 
+    	public static interface Annotations {
+    		
+    		/**
+    		 * Literals are not allowed in an IN clause in SPARQL, but sometimes
+    		 * this operator is used as part of an optimized re-write where
+    		 * literals should be allowed.
+    		 * 
+    		 * @see ASTSearchInSearchOptimizer
+    		 */
+    		String ALLOW_LITERALS = Annotations.class.getName() + ".allowLiterals";
+    		
+    	}
+
         private final boolean not;
 
         /**
@@ -1450,6 +1464,17 @@ public class FunctionRegistry {
 
             }
 
+            final boolean allowLiterals;
+            if (scalarValues != null && scalarValues.containsKey(Annotations.ALLOW_LITERALS)) {
+            	
+            	allowLiterals = (Boolean) scalarValues.get(Annotations.ALLOW_LITERALS);
+            	
+            } else {
+            	
+            	allowLiterals = false;
+            	
+            }
+            
             try {
 
                 /*
@@ -1471,7 +1496,7 @@ public class FunctionRegistry {
                 		
                 		final IV iv = set[i - 1].get();
                 		
-                		if (iv.isLiteral()) {
+                		if (!allowLiterals && iv.isLiteral()) {
                 			
                 			throw new IllegalArgumentException("must use CompareBOps for literals");
                 			
