@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
 /**
@@ -139,6 +140,24 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
     public DefaultOptimizerList() {
 
+    	/**
+    	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
+    	 * into an IN filter using the full text index to determine the IN
+    	 * set.
+    	 * 
+    	 * Convert:
+    	 * 
+    	 * filter(<BDS.SEARCH_IN_SEARCH>(?o,"foo")) .
+    	 * 
+    	 * To:
+    	 * 
+    	 * filter(?o IN ("foo", "foo bar", "hello foo", ...)) .
+    	 * 
+    	 * This is a way of using the full text index to filter instead of
+    	 * using regex.
+    	 */
+    	add(new ASTSearchInSearchOptimizer());
+    	
         /**
          * Many (most) property path expressions can be re-written as simple
          * joins and UNIONs and filters.  We need to do this before we set
