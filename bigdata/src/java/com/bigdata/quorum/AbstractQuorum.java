@@ -843,18 +843,26 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      *         <code>null</code> if the service is not participating in a
      *         consensus.
      */
-    private Long getLastCommitTimeConsensus(final UUID serviceId) {
+    private Long getCastVoteIfConsensus(final UUID serviceId) {
+        lock.lock();
+        try {
         final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
                 .entrySet().iterator();
         while (itr.hasNext()) {
             final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
             final Set<UUID> votes = entry.getValue();
             if (votes.contains(serviceId)) {
-                return entry.getKey().longValue();
+            	if (isQuorum(votes.size()))
+            		return entry.getKey().longValue();
+            	else 
+            		return null;
             }
         }
         // Service is not part of a consensus.
         return null;
+        } finally {
+            lock.unlock();
+        }
     }
 
 //    /**
@@ -1620,7 +1628,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             /*
              * Discover the lastCommitTime of the consensus.
              */
-            final Long lastCommitTime = getLastCommitTimeConsensus(serviceId);
+            final Long lastCommitTime = getCastVoteIfConsensus(serviceId);
             if (lastCommitTime == null) {
                 /*
                  * Either the service did not vote for the consensus or there is
@@ -2816,11 +2824,14 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     final UUID clientId = client.getServiceId();
                     // The current consensus -or- null if our client is not in a
                     // consensus.
-                    final Long lastCommitTime = getLastCommitTimeConsensus(clientId);
+                    final Long lastCommitTime = getCastVoteIfConsensus(clientId);
                     if (lastCommitTime != null) {
                         /*
                          * Our client is in the consensus.
                          */
+                        if (log.isInfoEnabled())
+                            log.info("This client is in consensus on commitTime: " + lastCommitTime);
+
                         // Get the vote order. This is also the target join
                         // order.
                         final UUID[] voteOrder = votes.get(lastCommitTime)

@@ -37,12 +37,14 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.halog.HALogWriter;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.jini.ha.HAJournalServer.AdministrableHAGlueService;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
@@ -257,11 +259,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Verify quorum is FULLY met.
         final long token = awaitFullyMetQuorum();
 
-        // Verify KB exists.
-        awaitKBExists(serverA);
+        // Verify KB exists on leader.
+        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        awaitKBExists(leader);
         
         // Current commit point.
-        final long lastCommitCounter = serverA
+        final long lastCommitCounter = leader
                 .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
                 .getRootBlock().getCommitCounter();
 
@@ -457,36 +461,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * the DROP ALL?
          */
         
-    }
-    
-    /**
-     * Tests that halog files are generated and identical, and that
-     * when a server is shutdown its logs remain
-     */
-    public void testStartAB_halog() {
-    	fail("write test");
-    }
-    
-    /**
-     * Tests that halog files are generated and identical and then
-     * removed following resync and fullymet quorum
-     */
-    public void testStartAB_C_halog() {
-    	fail("write test");
-    }
-    
-    /**
-     * Tests that halog files are generated and removed after each commit
-     */
-    public void testStartABC_halog() {
-    	fail("write test");
-    }
-    
-    /**
-     * Tests that halog files are removed after fully met on rebuild
-     */
-    public void testStartABC_rebuild_halog() {
-    	fail("write test");
     }
     
     /**
@@ -1126,12 +1100,84 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			}
 		}
 	}
-	/**
-     * Test Rebuild of early starting C service where service from previously fully met quorum is not
-     * started.
+
+    /**
+     * Test Rebuild of early starting C service where quorum was previously
+     * fully met.  This forces a pipeline re-organisation
+     * 
+	 * @throws Exception 
      */
-    public void testStartABC_Rebuild() {
-    	fail("write test");
+    public void testStartABC_RebuildWithPipelineReorganisation() throws Exception {
+    	startA();
+    	startB();
+    	startC();
+    	
+    	awaitFullyMetQuorum();
+    	 	
+        // Now run several transactions
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+        
+        // shutdown AB and destroy C
+        destroyC();
+        shutdownA();
+        shutdownB();
+        
+        // Now restart A, B & C
+    	final HAGlue serverC = startC();
+    	// Ensure that C starts first
+    	Thread.sleep(1000);
+    	
+    	final HAGlue serverA = startA();
+    	final HAGlue serverB = startB();
+    	
+    	// A & B should meet [FIXME: starting C early causes this to timeout]
+    	awaitMetQuorum();
+        
+    	// C will have  go through Rebuild before joining
+    	awaitFullyMetQuorum();
+        
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+    }
+    
+    /**
+     * Test Rebuild of C service where quorum was previously
+     * fully met and where a new quorum is met before C joins for rebuild.
+     * 
+	 * @throws Exception 
+     */
+    public void testStartABC_Rebuild() throws Exception {
+    	startA();
+    	startB();
+    	startC();
+    	
+    	awaitFullyMetQuorum();
+    	 	
+        // Now run several transactions
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+        
+        // shutdown AB and destroy C
+        destroyC();
+        shutdownA();
+        shutdownB();
+        
+        // Now restart A, B & C
+    	
+    	final HAGlue serverA = startA();
+    	final HAGlue serverB = startB();
+    	
+    	// A & B should meet [FIXME: starting C early causes this to timeout]
+    	awaitMetQuorum();
+        
+    	final HAGlue serverC = startC();
+
+    	// C will have go through Rebuild before joining
+    	awaitFullyMetQuorum();
+        
+        // Verify binary equality of ALL journals.
+        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
     }
     
     /**
@@ -1159,7 +1205,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
 
-        // Verify KB exists.
+        // Verify KB exists.es miserables oscar 2013
+        
         awaitKBExists(serverA);
 
     
@@ -1189,7 +1236,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         }
         
         // now shutdown C (not destroy)
-        shutdownC();
+        shutdown(serverC);
+        // shutdownC();
         
         log.warn("CHECK OPEN LOGS ON A B");
 
@@ -1360,9 +1408,255 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
     /**
      * Test quorum breaks and reforms when original leader fails
+     * 
+     * @throws Exception 
      */
-    public void testQuorumBreaksABC_failA() {
-    	fail("write test");
+    public void testQuorumBreaksABC_failLeader() throws Exception {
+    	
+        // Start 3 services
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
+    	final HAGlue serverC = startC();
+
+        // Wait for a quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Verify KB exists.
+        awaitKBExists(serverA);
+    	   	
+        // Now fail leader!
+        final HAGlue leader = quorum.getClient().getLeader(token);
+        
+        shutdown(leader);
+        
+        // Now check that quorum meets
+        
+        final long token2 = awaitMetQuorum();
+        
+        // with new  token
+        assertTrue(token != token2);
+        
+        // and new leader
+        assertFalse(leader.equals(quorum.getClient().getLeader(token2)));
     }
+    
+    /**
+     * Tests that halog files are generated and identical, and that
+     * when a server is shutdown its logs remain
+     * @throws Exception 
+     */
+    public void testStartAB_halog() throws Exception {
+        // Start 2 services
+        startA();
+        startB();
+        
+        // Run through transaction
+        simpleTransaction();
+        
+        // close both services
+        shutdownA();
+        shutdownB();
+        
+        // check that logfiles exist
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        
+        assertTrue(logsA.listFiles().length == 2);
+        assertTrue(logsB.listFiles().length == 2);
+        
+        // Test ends here!!
+        
+        // but we'll restart to help teardown
+        try {
+	        startA();
+	        startB();
+	        
+	        awaitMetQuorum();
+        } catch (Throwable t) {
+        	log.error("Problem on tidy up", t);
+        }
+    }
+    
+    /**
+     * Tests that halog files are generated and identical and then
+     * removed following resync and fullymet quorum
+     * 
+     * @throws Exception 
+     */
+    public void testStartAB_C_halog() throws Exception {
+        // Start 2 services
+        startA();
+        startB();
+        
+        // Run through transaction
+        simpleTransaction();
+        
+        // check that logfiles exist
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        
+        // There should be 3 halog files from 2 commit points and newly open
+        assertTrue(logsA.listFiles().length == 3);
+        assertTrue(logsB.listFiles().length == 3);
+        
+        // now just restart to help teardown
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // Run through another transaction
+        simpleTransaction();
+
+        // all committed logs should be removed with only open log remaining
+        final File logsC = new File(serviceDir, "C/HALog");
+        assertTrue(logsA.listFiles().length == 1);
+        assertTrue(logsB.listFiles().length == 1);
+        assertTrue(logsC.listFiles().length == 1);
+}
+    
+    /**
+     * Tests that halog files are generated and removed after each commit
+     * once fully met.
+     * 
+     * Note that committed log files are not purged on FullyMet, only after first
+     * FullyMet commit.
+     * 
+     * @throws Exception 
+     */
+    public void testStartABC_halog() throws Exception {
+        // Start 3 services
+        startA();
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // setup log directories
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        final File logsC = new File(serviceDir, "C/HALog");
+        
+        // committed log files not purged prior to fully met commit
+        assertLogCount(logsA, 2);
+        assertLogCount(logsB, 2);
+        assertLogCount(logsC, 2);
+
+        // Run through transaction
+        simpleTransaction();
+        
+        // again check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+
+        // Now run several transactions
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+        
+        // again check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+    }
+    
+    private void assertLogCount(final File logdir, final int count) {
+    	final int actual = logdir.listFiles().length;
+    	if (actual != count) {
+    		fail("Actual log files: " + actual + ", expected: " + count);
+    	}
+    }
+    
+    /**
+     * Tests that halog files are removed after fully met on rebuild
+     * face
+     * @throws Exception 
+     */
+    public void testStartABC_rebuild_halog() throws Exception {
+        // setup log directories
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        final File logsC = new File(serviceDir, "C/HALog");
+        
+        // Start 3 services
+        startA();
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // Now run several transactions
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+        
+        // Now destroy service C
+        destroyC();
+        
+        // Now run several more transactions on AB
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+
+        // 5 committed files + 1 open == 6
+        assertLogCount(logsA, 6);
+        assertLogCount(logsB, 6);
+
+        // and restart C with empty journal, forces Rebuild
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        assertLogCount(logsA, 6);
+        assertLogCount(logsB, 6);        
+        // Log count on C is 1 after quiescent rebuild
+        assertLogCount(logsC, 1);
+        
+        log.warn("CHECK: Committed log files not copied on Rebuild");
+        
+        // Now run several transactions
+        for (int i = 0; i < 5; i++)
+        	simpleTransaction();
+
+        // and check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+        
+    }
+    
+    
+    /**
+     * Commits update transaction after awaiting quorum
+     */
+    private void simpleTransaction() throws IOException, Exception {
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        /*
+         * Now go through a commit point with a fully met quorum. The HALog
+         * files should be purged at that commit point.
+         */
+
+        final StringBuilder sb = new StringBuilder();
+        sb.append("DROP ALL;\n");
+        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+        sb.append("INSERT DATA {\n");
+        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+        sb.append("  dc:creator \"A.N.Other\" .\n");
+        sb.append("}\n");
+        
+        final String updateStr = sb.toString();
+        
+        final HAGlue leader = quorum.getClient().getLeader(token);
+        
+        // Verify quorum is still valid.
+        quorum.assertQuorum(token);
+
+        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            
+     }
 
 }

@@ -479,6 +479,22 @@ public class AbstractHA3JournalServerTestCase extends
     	serviceListenerC = null;
     }
 
+    protected void shutdown(final HAGlue service) throws IOException {
+    	if (service == null) {
+    		throw new IllegalArgumentException();
+    	}
+    	
+    	if (service.equals(serverA)) {
+    		shutdownA();
+    	} else if (service.equals(serverB)) {
+    		shutdownB();
+    	} else if (service.equals(serverC)) {
+    		shutdownC();
+    	} else {
+    		throw new IllegalArgumentException("Unable to match service: " + service);
+    	}
+    }
+
     private void safeShutdown(final HAGlue haGlue,
             final ServiceListener serviceListener) {
     	safeShutdown(haGlue, serviceListener, false); // not shutdownNow by default
