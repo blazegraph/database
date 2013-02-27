@@ -846,20 +846,20 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     private Long getCastVoteIfConsensus(final UUID serviceId) {
         lock.lock();
         try {
-        final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
-                .entrySet().iterator();
-        while (itr.hasNext()) {
-            final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
-            final Set<UUID> votes = entry.getValue();
-            if (votes.contains(serviceId)) {
-            	if (isQuorum(votes.size()))
-            		return entry.getKey().longValue();
-            	else 
-            		return null;
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                    .entrySet().iterator();
+            while (itr.hasNext()) {
+                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
+                final Set<UUID> votes = entry.getValue();
+                if (votes.contains(serviceId)) {
+                    if (isQuorum(votes.size()))
+                        return entry.getKey().longValue();
+                    else
+                        return null;
+                }
             }
-        }
-        // Service is not part of a consensus.
-        return null;
+            // Service is not part of a consensus.
+            return null;
         } finally {
             lock.unlock();
         }
@@ -2237,7 +2237,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                  * Look for the service before/after the one being removed from
                  * the pipeline.
                  * 
-                 * If the service that was remove is out clinet, then we notify
+                 * If the service that was remove is out client, then we notify
                  * it that it was removed from the pipeline.
                  * 
                  * If the service *before* the one being removed is our client,
@@ -2318,6 +2318,60 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     // queue client event.
                     sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVE,
                             lastValidToken, token, serviceId));
+                    /*
+                     * If the service that left the pipeline was blocking the
+                     * service that is trying to become the leader and we are
+                     * that service trying to become the leader, then we need to
+                     * elect ourselves as the leader.
+                     * 
+                     * Note: In fact, we only need to check this for the case
+                     * when the service that was removed from the pipeline was
+                     * at the head of the pipeline. That is only only time that
+                     * a pipelineRemove() could unblock a leader election. We
+                     * test that condition by checking whether prior is null.
+                     */
+                    if (client != null && priorNext != null && priorNext[0] == null) {
+                        final UUID clientId = client.getServiceId();
+                        // The current consensus -or- null if our client is not in a
+                        // consensus.
+                        final Long lastCommitTime = getCastVoteIfConsensus(clientId);
+                        if (lastCommitTime != null) {
+                            /*
+                             * Our client is in the consensus.
+                             */
+                            if (log.isInfoEnabled())
+                                log.info("This client is in consensus on commitTime: "
+                                        + lastCommitTime);
+                            // Get the vote order. This is also the target join order.
+                            final UUID[] voteOrder = votes.get(lastCommitTime)
+                                    .toArray(new UUID[0]);
+                            // the serviceId of the leader.
+                            final UUID leaderId = voteOrder[0];
+                            // true iff our client is the leader (else it is a
+                            // follower since it is in the consensus).
+                            final boolean isLeader = leaderId.equals(clientId);
+                            if (isLeader) {
+                                final int njoined = joined.size();
+                                if (njoined >= kmeet && token == NO_QUORUM) {
+                                    /*
+                                     * Elect the leader.
+                                     */
+                                    final UUID[] pipeline = getPipeline();
+                                    if (pipeline[0].equals(clientId)) {
+                                        /*
+                                         * The pipeline is well organized, so
+                                         * elect ourselves as the leader now.
+                                         */
+                                        if (log.isInfoEnabled())
+                                            log.info("Electing leader: "
+                                                    + AbstractQuorum.this
+                                                            .toString());
+                                        actor.setToken(lastValidToken + 1);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
                 }
