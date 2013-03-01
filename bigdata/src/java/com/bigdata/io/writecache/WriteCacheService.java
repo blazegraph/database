@@ -1405,6 +1405,14 @@ abstract public class WriteCacheService implements IWriteCache {
                  * someone else in the write pipeline (for example, off-site
                  * replication).
                  */
+                /*
+                 * FIXME There may be a problem with doing the async IO first.
+                 * Track this down and document the nature of the problem,
+                 * then clean up the documentation here (see the commented
+                 * out version of this line below).
+                 */
+                quorumMember.logWriteCacheBlock(msg, b.duplicate()); 
+                
                 remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
                         b.duplicate());
                 
@@ -1415,7 +1423,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  * followers, the write cache blocks are currently logged by
                  * HAJournalServer.
                  */
-                quorumMember.logWriteCacheBlock(msg, b.duplicate());
+//                quorumMember.logWriteCacheBlock(msg, b.duplicate());
 
             }
 
