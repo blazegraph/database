@@ -85,8 +85,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
         final HAGlue serverA = startA();
         final HAGlue serverB = startB();
         
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
+        awaitMetQuorum();
 
         doNSSStatusRequest(serverA);
         doNSSStatusRequest(serverB);
@@ -140,10 +139,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testStartAB_BounceFollower() throws Exception {
     	
-    	haLog.warn("Starting AB_BounceFolloer test");
-        
-        HAGlue serverA = startA();
-        HAGlue serverB = startB();
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
         
         final long token1 = quorum.awaitQuorum(awaitQuorumTimeout, TimeUnit.MILLISECONDS);
 
@@ -168,7 +165,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
-            final UUID leaderId1 = leader.getServiceId();
+//            final UUID leaderId1 = leader.getServiceId();
             
             if (leader.equals(serverA)) {
 
@@ -233,8 +230,8 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
      */
     public void testStartAB_BounceLeader() throws Exception {
         
-        HAGlue serverA = startA();
-        HAGlue serverB = startB();
+        final HAGlue serverA = startA();
+        final HAGlue serverB = startB();
 
         final long token1 = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
@@ -260,7 +257,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
             
             final HAGlue leader = quorum.getClient().getLeader(token1);
 
-            final UUID leaderId1 = leader.getServiceId();
+//            final UUID leaderId1 = leader.getServiceId();
             
             leader.bounceZookeeperConnection().get();
 
