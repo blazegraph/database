@@ -44,6 +44,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -54,6 +55,8 @@ import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.ThreadGuard;
+import com.bigdata.util.concurrent.ThreadGuard.Guard;
 
 /**
  * Abstract base class handles much of the logic for the distribution of RMI
@@ -357,6 +360,24 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     private final boolean sendSynchronous = true;
 
     /**
+     * Used to guard critical regions where we await a {@link Condition}.
+     */
+    private final ThreadGuard threadGuard = new ThreadGuard();
+    
+    /**
+     * Execute a critical region which needs to be interrupted if we have to
+     * terminate the quorum.
+     * 
+     * @param r
+     *            The lambda.
+     *            
+     * @return The result (if any).
+     */
+    protected void guard(final Guard r) throws InterruptedException {
+        threadGuard.guard(r);
+    }
+
+    /**
      * Constructor, which MUST be followed by {@link #start()} to begin
      * operations.
      */
@@ -482,6 +503,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         boolean interrupted = false;
         lock.lock();
         try {
+            /*
+             * Ensure that any guarded regions are interrupted.
+             */
+            threadGuard.interruptAll();
             if (client == null) {
                 // No client is attached.
                 return;
@@ -493,9 +518,51 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                  * Update the distributed quorum state by removing our client
                  * from the set of member services. This will also cause a
                  * service leave, pipeline leave, and any vote to be withdrawn.
+                 * 
+                 * We have observed Condition spins during terminate() that
+                 * result in HAJournalServer hangs. This runs another Thread
+                 * that will interrupt this Thread if the quorum member is
+                 * unable to complete the memberRemove() within a timeout.
+                 * 
+                 * Note: Since we are holding the lock in the current thread, we
+                 * MUST execute memberRemove() in this thread (it requires the
+                 * lock). Therefore, I have used a 2nd thread that will
+                 * interrupt this thread if it does not succeed in a polite
+                 * removal from the quorum within a timeout.
                  */
-                actor.memberRemove();
+                {
+                    final long MEMBER_REMOVE_TIMEOUT = 5000;// ms.
+                    final AtomicBoolean didRemove = new AtomicBoolean(false);
+                    final Thread self = Thread.currentThread();
+                    final Thread t = new Thread() {
+                        public void run() {
+                            try {
+                                Thread.sleep(MEMBER_REMOVE_TIMEOUT);
+                            } catch (InterruptedException e) {
+                                // Expected. Ignored.
+                                return;
+                            }
+                            if (!didRemove.get()) {
+                                log.error("Timeout awaiting quorum member remove.");
+                                self.interrupt();
+                            }
+                        }
+                    };
+                    t.setDaemon(true);
+                    t.start();
+                    try {
+                        // Attempt memberRemove() (interruptably).
+                        actor.memberRemoveInterruptable();
+                        didRemove.set(true); // Success.
+                    } catch (InterruptedException e) {
+                        // Propagate the interrupt.
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        t.interrupt(); // Stop execution of [t].
+                    }
+                }
             }
+
             /*
              * Let the service know that it is no longer running w/ the quorum.
              */
@@ -1467,14 +1534,26 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         final public void memberRemove() {
             lock.lock();
             try {
-                conditionalServiceLeaveImpl();
-                conditionalPipelineRemoveImpl();
-                conditionalWithdrawVoteImpl();
-                conditionalMemberRemoveImpl();
+                memberRemoveInterruptable();
             } catch(InterruptedException e) {
                 // propagate the interrupt.
                 Thread.currentThread().interrupt();
                 return;
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        /**
+         * An interruptable version of {@link #memberRemove()}
+         */
+        protected void memberRemoveInterruptable() throws InterruptedException {
+            lock.lockInterruptibly();
+            try {
+                conditionalServiceLeaveImpl();
+                conditionalPipelineRemoveImpl();
+                conditionalWithdrawVoteImpl();
+                conditionalMemberRemoveImpl();
             } finally {
                 lock.unlock();
             }
@@ -1541,20 +1620,28 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
                 doMemberAdd();
-                while(!members.contains(serviceId)) {
-                    membersChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while (!members.contains(serviceId)) {
+                            membersChange.await();
+                        }
+                    }
+                });
             }
         }
-        
+
         private void conditionalMemberRemoveImpl() throws InterruptedException {
             if (members.contains(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
                 doMemberRemove();
-                while(members.contains(serviceId)) {
-                    membersChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while(members.contains(serviceId)) {
+                            membersChange.await();
+                        }
+                    }
+                });
             }
         }
 
@@ -1580,23 +1667,32 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             conditionalPipelineAddImpl();
             // Cast a vote.
             doCastVote(lastCommitTime);
-            Long t = null;
-            while ((t = getCastVote(serviceId)) == null
-                    || t.longValue() != lastCommitTime) {
-                votesChange.await();
-            }
+            guard(new Guard() {
+                public void run() throws InterruptedException {
+                    Long t = null;
+                    while ((t = getCastVote(serviceId)) == null
+                            || t.longValue() != lastCommitTime) {
+                        votesChange.await();
+                    }
+                }
+            });
         }
 
         private void conditionalWithdrawVoteImpl() throws InterruptedException {
             final Long lastCommitTime = getCastVote(serviceId);
             if (lastCommitTime != null) {
                 doWithdrawVote();
-                while (getCastVote(serviceId) != null) {
-                    votesChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while (getCastVote(serviceId) != null) {
+                            votesChange.await();
+                        }
+                    }
+                });
                 if (log.isDebugEnabled())
                     log.debug("withdrew vote: serviceId=" + serviceId
-                            + ",lastCommitTime=" + lastCommitTime);            }
+                            + ",lastCommitTime=" + lastCommitTime);
+            }
         }
 
         private void conditionalPipelineAddImpl() throws InterruptedException {
@@ -1604,9 +1700,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
                 doPipelineAdd();
-                while(!pipeline.contains(serviceId)) {
-                    pipelineChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while (!pipeline.contains(serviceId)) {
+                            pipelineChange.await();
+                        }
+                    }
+                });
             }
         }
 
@@ -1618,9 +1718,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                  * Remove the service from the pipeline.
                  */
                 doPipelineRemove();
-                while(pipeline.contains(serviceId)) {
-                    pipelineChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while (pipeline.contains(serviceId)) {
+                            pipelineChange.await();
+                        }
+                    }
+                });
             }
         }
 
@@ -1682,17 +1786,25 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 throw new AssertionError();
             }
             doServiceJoin();
-            while(!joined.contains(serviceId)) {
-                joinedChange.await();
-            }
+            guard(new Guard() {
+                public void run() throws InterruptedException {
+                    while (!joined.contains(serviceId)) {
+                        joinedChange.await();
+                    }
+                }
+            });
         }
 
         private void conditionalServiceLeaveImpl() throws InterruptedException {
             if (joined.contains(serviceId)) {
                 doServiceLeave();
-                while (joined.contains(serviceId)) {
-                    joinedChange.await();
-                }
+                guard(new Guard() {
+                    public void run() throws InterruptedException {
+                        while (joined.contains(serviceId)) {
+                            joinedChange.await();
+                        }
+                    }
+                });
             }
         }
 
@@ -1702,9 +1814,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 return;
             }
             doClearToken();
-            while (token == oldValue && client != null) {
-                quorumChange.await();
-            }
+            guard(new Guard() {
+                public void run() throws InterruptedException {
+                    while (token == oldValue && client != null) {
+                        quorumChange.await();
+                    }
+                }
+            });
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
             if (token != NO_QUORUM) {
@@ -1749,9 +1865,13 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
              */
             final long oldValue = lastValidToken;
             doSetToken(newValue);
-            while (lastValidToken == oldValue && client != null) {
-                quorumChange.await();
-            }
+            guard(new Guard() {
+                public void run() throws InterruptedException {
+                    while (lastValidToken == oldValue && client != null) {
+                        quorumChange.await();
+                    }
+                }
+            });
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
             if (lastValidToken != newValue) {
@@ -2329,6 +2449,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                      * at the head of the pipeline. That is only only time that
                      * a pipelineRemove() could unblock a leader election. We
                      * test that condition by checking whether prior is null.
+                     * 
+                     * @see TestHA3JournalServer#testStartABC_RebuildWithPipelineReorganization.
                      */
                     if (client != null && priorNext != null && priorNext[0] == null) {
                         final UUID clientId = client.getServiceId();
