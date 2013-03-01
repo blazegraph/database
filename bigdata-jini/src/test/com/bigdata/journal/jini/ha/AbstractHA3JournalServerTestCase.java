@@ -308,20 +308,8 @@ public class AbstractHA3JournalServerTestCase extends
             /*
              * Dump the final zookeeper state for the logical service.
              */
-            
-            final StringWriter sw = new StringWriter();
 
-            final PrintWriter w = new PrintWriter(sw);
-
-            new DumpZookeeper(zka.getZookeeper()).dump(w, true/* showData */,
-                    logicalServiceZPath, 0/* depth */);
-
-            w.flush();
-            w.close();
-            
-            sw.flush();
-
-            log.info("Zookeeper State for logical service: \n" + sw.toString());
+            log.info("Zookeeper State for logical service: \n" + dumpZoo());
 
         }
 
@@ -414,6 +402,27 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    /**
+     * Dump the zookeeper state for the logical service.
+     */
+    protected String dumpZoo() throws KeeperException, InterruptedException {
+
+        final StringWriter sw = new StringWriter();
+
+        final PrintWriter w = new PrintWriter(sw);
+
+        new DumpZookeeper(zka.getZookeeper()).dump(w, true/* showData */,
+                logicalServiceZPath, 0/* depth */);
+
+        w.flush();
+        w.close();
+
+        sw.flush();
+
+        return sw.toString();
+
+    }
+    
     /**
      * Safely destroy the service.
      * 
