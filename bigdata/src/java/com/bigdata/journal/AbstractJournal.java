@@ -5212,7 +5212,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         private final AtomicBoolean vote = new AtomicBoolean(false);
 
         @Override
-        public UUID getServiceId() {
+        final public UUID getServiceId() {
 
             return serviceId;
             
