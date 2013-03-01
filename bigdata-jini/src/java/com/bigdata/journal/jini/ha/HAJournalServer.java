@@ -2542,7 +2542,7 @@ public class HAJournalServer extends AbstractServer {
          * starting point for that log file.
          */
         @Override
-        public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
+	public void logRootBlock(final boolean isJoinedService, final IRootBlockView rootBlock) throws IOException {
 
             logLock.lock();
 

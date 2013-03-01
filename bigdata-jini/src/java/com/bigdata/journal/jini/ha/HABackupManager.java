@@ -695,7 +695,7 @@ public class HABackupManager {
             }
 
             @Override
-            public void logRootBlock(IRootBlockView rootBlock)
+            public void logRootBlock(boolean isJoinedService,IRootBlockView rootBlock)
                     throws IOException {
                 // TODO Auto-generated method stub
                 
