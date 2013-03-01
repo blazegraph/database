@@ -1397,21 +1397,25 @@ abstract public class WriteCacheService implements IWriteCache {
                         );
 
                 /*
-                 * The quorum leader logs the write cache block here. For the
-                 * followers, the write cache blocks are currently logged by
-                 * HAJournalServer.
+                 * Start the remote asynchronous IO before the local synchronous
+                 * IO.
                  * 
                  * Note: In HA with replicationFactor=1, this should still
                  * attempt to replicate the write cache block in case there is
                  * someone else in the write pipeline (for example, off-site
                  * replication).
                  */
-                quorumMember.logWriteCacheBlock(msg, b.duplicate());
-
                 remoteWriteFuture = quorumMember.replicate(null/* req */, msg,
-                        b);
-
+                        b.duplicate());
+                
                 counters.get().nsend++;
+
+                /*
+                 * The quorum leader logs the write cache block here. For the
+                 * followers, the write cache blocks are currently logged by
+                 * HAJournalServer.
+                 */
+                quorumMember.logWriteCacheBlock(msg, b.duplicate());
 
             }
 
