@@ -29,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 
+import org.apache.log4j.Logger;
+
 /**
  * Pattern used to guard critical regions that await {@link Condition}s when a
  * concurrent event may cause the {@link Condition} to become unsatisfiable.
@@ -37,6 +39,8 @@ import java.util.concurrent.locks.Condition;
  */
 public class ThreadGuard {
 
+    private static final transient Logger log = Logger.getLogger(ThreadGuard.class);
+    
     public static abstract class Guard {
 
         abstract public void run() throws InterruptedException;
@@ -111,6 +115,7 @@ public class ThreadGuard {
                 final Map.Entry<Thread,AtomicInteger> e = itr.next();
                 final Thread t = e.getKey();
                 t.interrupt();
+                log.warn("Interrupted: "+t.getName());
             }
             // Note: Will be cleared when we leave the finally{}.
 //            // clear everything!
