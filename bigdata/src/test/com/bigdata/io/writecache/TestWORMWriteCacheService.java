@@ -363,10 +363,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 }
 
                 @Override
-                public void logRootBlock(final IRootBlockView rootBlock)
-                        throws IOException {
+                public void logRootBlock(final boolean isJoinedService,
+                        final IRootBlockView rootBlock) throws IOException {
 
-                    MyMockQuorumMember.this.logRootBlock(rootBlock);
+                    MyMockQuorumMember.this.logRootBlock(isJoinedService,
+                            rootBlock);
 
                 }
 
@@ -457,8 +458,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
         }
 
         @Override
-        public void logRootBlock(final IRootBlockView rootBlock)
-                throws IOException {
+        public void logRootBlock(final boolean isJoinedService,
+                final IRootBlockView rootBlock) throws IOException {
 
             // NOP
 

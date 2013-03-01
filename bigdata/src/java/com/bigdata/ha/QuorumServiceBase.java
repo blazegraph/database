@@ -134,10 +134,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             }
             
             @Override
-            public void logRootBlock(final IRootBlockView rootBlock)
-                    throws IOException {
+            public void logRootBlock(final boolean isJoinedService,
+                    final IRootBlockView rootBlock) throws IOException {
 
-                QuorumServiceBase.this.logRootBlock(rootBlock);
+                QuorumServiceBase.this.logRootBlock(isJoinedService, rootBlock);
 
             }
 
@@ -278,7 +278,8 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      * Note: The default implementation is a NOP.
      */
     @Override
-    public void logRootBlock(final IRootBlockView rootBlock) throws IOException {
+    public void logRootBlock(final boolean isJoinedService,
+            final IRootBlockView rootBlock) throws IOException {
 
         // NOP
 

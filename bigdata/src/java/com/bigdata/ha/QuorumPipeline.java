@@ -152,11 +152,22 @@ public interface QuorumPipeline<S extends HAPipelineGlue> {
     /**
      * Log the root block for the commit point that closes the current write set
      * onto the {@link HALogWriter}.
+     * <p>
+     * Note: This method is ONLY invoked as part of the 2-phase commit protocol.
+     * Therefore, it ONLY applies to the live HALog file. A service is
+     * atomically either joined with the met quorum at a 2-phase commit point or
+     * not joined. This information is passed through from the 2-phase prepare
+     * in the <i>isJoinedService</i> argument. 
      * 
+     * @param isJoinedService
+     *            <code>true</code> iff the service was joined with the met
+     *            quorum at the atomic decision point in the 2-phase commit
+     *            protocol.
      * @param rootBlock
      *            The root block for the commit point that was just achieved.
      */
-    void logRootBlock(final IRootBlockView rootBlock) throws IOException;
+    void logRootBlock(final boolean isJoinedService,
+            final IRootBlockView rootBlock) throws IOException;
 
     /**
      * Purge the local HA log files. This should be invoked when the service
