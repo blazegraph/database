@@ -72,7 +72,7 @@ commands first!
       <!--                                                            -->
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.3.3</zookeeper.version>
-      <sesame.version>2.6.3</sesame.version>
+      <sesame.version>2.6.10</sesame.version>
       <slf4j.version>1.6.1</slf4j.version>
       <jetty.version>7.2.2.v20101205</jetty.version>
       <lucene.version>3.0.0</lucene.version>
