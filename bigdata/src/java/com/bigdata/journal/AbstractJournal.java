@@ -5636,8 +5636,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                          * out that file.
                          */
                         
-                        localService.logRootBlock(rootBlock);
-                        
+                        localService.logRootBlock(
+                                prepareMessage.isJoinedService(), rootBlock);
+
                     } catch (IOException e) {
                         /*
                          * We have already committed.
