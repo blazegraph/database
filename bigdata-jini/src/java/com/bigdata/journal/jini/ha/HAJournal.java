@@ -1255,9 +1255,13 @@ public class HAJournal extends Journal {
 
                 if (getQuorum() instanceof ZKQuorumImpl) {
 
+                    // Note: Local method call on AbstractJournal.
+                    final UUID serviceId = getServiceId();
+                    
                     try {
 
-                        haLog.warn("BOUNCING ZOOKEEPER CONNECTION.");
+                        haLog.warn("BOUNCING ZOOKEEPER CONNECTION: "
+                                + serviceId);
 
                         // Close the current connection (if any).
                         ((ZKQuorumImpl) getQuorum()).getZookeeper().close();
@@ -1265,7 +1269,7 @@ public class HAJournal extends Journal {
                         // Obtain a new connection.
                         ((ZKQuorumImpl) getQuorum()).getZookeeper();
 
-                        haLog.warn("RECONNECTED TO ZOOKEEPER.");
+                        haLog.warn("RECONNECTED TO ZOOKEEPER: " + serviceId);
 
                     } catch (InterruptedException e) {
 
