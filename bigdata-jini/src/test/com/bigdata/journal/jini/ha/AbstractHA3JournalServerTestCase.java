@@ -313,24 +313,56 @@ public class AbstractHA3JournalServerTestCase extends
 
         }
 
-        if (serverA != null) {
+        /**
+         * The most reliable tear down is in reverse pipeline order.
+         * 
+         * This may not be necessary long term but for now we want to avoid
+         * destroying the leader first since it can lead to problems as followers
+         * attempt to reform
+         */
+        final HAGlue leader;
+        final ServiceListener leaderListener;
+        if (quorum.isQuorumMet()) {
+        	final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+        	leader = quorum.getClient().getLeader(token);
+        	if (leader.equals(serverA))
+        		leaderListener = serviceListenerA;
+        	else if (leader.equals(serverB))
+        		leaderListener = serviceListenerA;
+        	else if (leader.equals(serverC))
+        		leaderListener = serviceListenerC;
+        	else 
+        		throw new IllegalStateException();
+        } else {
+        	leader = null;
+        	leaderListener = null;
+        }
+        
+        if (serverA != null && !serverA.equals(leader)) {
             safeDestroy(serverA, serviceListenerA);
-            serverA = null;
-            serviceListenerA = null;
         }
 
-        if (serverB != null) {
+        if (serverB != null && !serverB.equals(leader)) {
             safeDestroy(serverB, serviceListenerB);
-            serverB = null;
-            serviceListenerB = null;
         }
 
-        if (serverC != null) {
+        if (serverC != null && !serverC.equals(leader)) {
             safeDestroy(serverC, serviceListenerC);
-            serverC = null;
-            serviceListenerC = null;
+        }
+        
+        if (leader != null) {
+            safeDestroy(leader, leaderListener);
         }
 
+        serverA = null;
+        serviceListenerA = null;
+        serverB = null;
+        serviceListenerB = null;
+        serverC = null;
+        serviceListenerC = null;
+
+        
         if (serviceDiscoveryManager != null) {
             serviceDiscoveryManager.terminate();
             serviceDiscoveryManager = null;
@@ -463,6 +495,14 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
     
+    protected void destroyA() {
+    	safeDestroy(serverA, serviceListenerA);
+    }
+
+    protected void destroyB() {
+    	safeDestroy(serverB, serviceListenerB);
+    }
+
     protected void destroyC() {
     	safeDestroy(serverC, serviceListenerC);
     }
@@ -488,6 +528,10 @@ public class AbstractHA3JournalServerTestCase extends
     	serviceListenerC = null;
     }
 
+    /**
+     * NOTE: This relies on equals() being valid for Proxies which isn't
+     * necessarily something we should rely on
+     */
     protected void shutdown(final HAGlue service) throws IOException {
     	if (service == null) {
     		throw new IllegalArgumentException();
@@ -500,8 +544,16 @@ public class AbstractHA3JournalServerTestCase extends
     	} else if (service.equals(serverC)) {
     		shutdownC();
     	} else {
-    		throw new IllegalArgumentException("Unable to match service: " + service);
+    		throw new IllegalArgumentException("Unable to match service: " + service + " possible problem with equals() on Proxy");
     	}
+    }
+    
+    protected void shutdownLeader() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException, IOException {
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+       final HAGlue leader = quorum.getClient().getLeader(token);
+       
+       shutdown(leader);
     }
 
     private void safeShutdown(final HAGlue haGlue,

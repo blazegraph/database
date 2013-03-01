@@ -590,6 +590,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
 	public void testStartAB_C_MultiTransactionResync() throws Exception {
 
+		fail("TEST FAILS");
+		
 		// Start 2 services.
 		final HAGlue serverA = startA();
 		final HAGlue serverB = startB();
@@ -761,6 +763,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      */
 	public void testStartAB_C_LiveResync() throws Exception {
 
+		fail("TEST FAILS");
+		
 		// Start 2 services.
 		final HAGlue serverA = startA();
 		final HAGlue serverB = startB();
@@ -877,6 +881,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		log.info("FULLY MET");
 		
+		// Need to check if load is active, if not then test has not confirmed active load
+		assertFalse(spin.get());
+		
 		while (!spin.get()) {
 			Thread.sleep(50);
 		}
@@ -977,26 +984,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * Now go through a commit point with a met quorum. The HALog
          * files should be retained at that commit point.
          */
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+       simpleTransaction();
 
         // Current commit point.
         final long lastCommitCounter2 = serverA
@@ -1032,25 +1020,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
         
         // Now force further commit when fully met to remove log files
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book2> dc:title \"Another book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+        simpleTransaction();
 
         // And again verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -1126,16 +1096,21 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         // Now restart A, B & C
     	final HAGlue serverC = startC();
     	// Ensure that C starts first
-    	Thread.sleep(1000);
+    	Thread.sleep(100);
     	
     	final HAGlue serverA = startA();
     	final HAGlue serverB = startB();
     	
-    	// A & B should meet [FIXME: starting C early causes this to timeout]
+    	// A & B should meet
     	awaitMetQuorum();
-        
+    	
+    	// Check HALogs equal
+//        assertHALogDigestsEquals(7L/* firstCommitCounter */,
+//                7L, new HAGlue[] { serverA, serverB });
+    	log.warn("CHECK AB LOGS ON MET QUORUM");       
+    	
     	// C will have  go through Rebuild before joining
-    	awaitFullyMetQuorum();
+     	awaitFullyMetQuorum();
         
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -1168,13 +1143,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     	final HAGlue serverA = startA();
     	final HAGlue serverB = startB();
     	
-    	// A & B should meet [FIXME: starting C early causes this to timeout]
+    	// A & B should meet
     	awaitMetQuorum();
         
     	final HAGlue serverC = startC();
 
     	// C will have go through Rebuild before joining
-    	awaitFullyMetQuorum();
+     	awaitFullyMetQuorum();
         
         // Verify binary equality of ALL journals.
         assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
@@ -1182,7 +1157,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     
     /**
      * Test Restore by:
-     * 	starting ABC
+     * <pre>starting ABC
      * 	drop C
      *  run transaction through AB
      *  drop A
@@ -1190,7 +1165,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      *  Restore
      *  Meet on BC
      *  start A
-     *  Fully Meet
+     *  Fully Meet</pre>
      * @throws Exception 
      */
     public void testABC_Restore() throws Exception {
@@ -1214,33 +1189,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          * Now go through a commit point with a met quorum. The HALog
          * files should be retained at that commit point.
          */
-        {
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-        }
+        simpleTransaction();
         
         // now shutdown C (not destroy)
-        shutdown(serverC);
-        // shutdownC();
+        shutdownC();
         
         log.warn("CHECK OPEN LOGS ON A B");
-
         
         /*
          * Now go through a commit point with a met quorum. The HALog
@@ -1248,22 +1202,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
          */
         if (true/*new commit state*/) {
 
-            final StringBuilder sb = new StringBuilder();
-            sb.append("DROP ALL;\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA {\n");
-            sb.append("  <http://example/book1> dc:title \"Another new book\" ;\n");
-            sb.append("  dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
-            
-            final String updateStr = sb.toString();
-            
-            final HAGlue leader = quorum.getClient().getLeader(token);
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            simpleTransaction();
             
             // and a second one?
             // getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
@@ -1563,6 +1502,72 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
         assertLogCount(logsC, 1);
     }
     
+    /**
+     * Tests that new logs are established on restarting with
+     * transitions through Met and FullyMet
+     * 
+     * @throws Exception
+     */
+    public void testStartABC_halogRestart() throws Exception {
+        // Start 3 services, with delay to ensure clean starts
+        startA();
+        Thread.sleep(1000); // ensure A will be leader
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // setup log directories
+        final File serviceDir = new File("benchmark/CI-HAJournal-1");
+        final File logsA = new File(serviceDir, "A/HALog");
+        final File logsB = new File(serviceDir, "B/HALog");
+        final File logsC = new File(serviceDir, "C/HALog");
+        
+        // committed log files not purged prior to fully met commit
+        assertLogCount(logsA, 2);
+        assertLogCount(logsB, 2);
+        assertLogCount(logsC, 2);
+
+        // Run through transaction
+        simpleTransaction();
+        
+        // again check that only open log files remaining
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+        
+        // Now shutdown all servers
+        // FIXME: shutting down A first triggers other problems, see test_fullQuorumRestart
+        shutdownB();
+        shutdownC();
+        shutdownA();
+        
+        // and check that there are no logs
+        assertLogCount(logsA, 0);
+        assertLogCount(logsB, 0);
+        assertLogCount(logsC, 0);
+        
+        // startup AB
+        startA();
+        startB();
+        
+        awaitMetQuorum();
+        
+        // and check that there are open logs
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        
+        // add C
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // and check again for ABC
+        assertLogCount(logsA, 1);
+        assertLogCount(logsB, 1);
+        assertLogCount(logsC, 1);
+    }
+    
     private void assertLogCount(final File logdir, final int count) {
     	final int actual = logdir.listFiles().length;
     	if (actual != count) {
@@ -1628,6 +1633,109 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     }
     
     
+    /**
+     * Tests shutdown of met quorum, but leader first forces re-organisation concurrent 
+     * with service shutdown
+     * 
+     * @throws Exception
+     */
+    public void test_fullQuorumRestartWithForcedReorganisation() throws Exception {
+        // Start 3 services
+        startA();
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // Run through transaction
+        simpleTransaction();
+        
+        // Now shutdown all servers, leader first, then others
+        shutdownLeader();
+        shutdownA();
+        shutdownB();
+        shutdownC();
+        
+        if (false) { // DEBUG to check logs in shutdown process
+	        // startup AB
+	        startA();
+	        startB();  // need to see log of shutdown problem
+        }
+        
+        awaitMetQuorum();
+        
+        // add C
+        startC();
+        
+        awaitFullyMetQuorum();
+    }
+
+    /**
+     * Tests shutdown of met quorum, but shutting down leader last ensures no
+     *  re-organisation concurrent with service shutdown
+     * 
+     * @throws Exception
+     */
+    public void test_fullQuorumRestartWithNoReorganisation() throws Exception {
+        // Start 3 services
+        startA();
+        Thread.sleep(1000); // ensure A will be leader
+        
+        startB();
+        startC();
+        
+        awaitFullyMetQuorum();
+        
+        // Run through transaction
+        simpleTransaction();
+        
+        // Now shutdown all servers, leader last ensuring no reorganisation
+        shutdownB();
+        shutdownC();
+        shutdownA();
+       
+        // startup AB
+        startA();
+        startB();
+        
+        awaitMetQuorum();
+        
+        assertTrue(quorum.getJoined().length == 2);
+        assertTrue(quorum.getPipeline().length == 2);
+        assertTrue(quorum.getMembers().length == 2);
+        
+        // add C
+        startC();
+        
+        awaitFullyMetQuorum();
+    }
+    
+    /**
+     * We have experienced inconsistencies on test startups, this test just attempts
+     * to repeatedly start an initial ABC service.
+     * @throws Exception
+     */
+    public void testStressABC_Restart() throws Exception {
+    	for (int i = 1; i <= 20; i++) {
+    		try {
+        		startA();
+        		startB();
+        		startC();
+        		
+    			awaitFullyMetQuorum();
+    		} catch (Throwable e) {
+    			fail("Unable to meet on run " + i, e);
+    		}
+    		
+    		
+    		// FIXME: The order of the destroy IS significant since a reorganisation
+    		//	on shutdown is another specific problem right now
+    		destroyC();
+    		destroyA();
+    		destroyB();
+    	}
+    }
+
     /**
      * Commits update transaction after awaiting quorum
      */
