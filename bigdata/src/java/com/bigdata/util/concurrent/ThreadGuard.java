@@ -114,8 +114,9 @@ public class ThreadGuard {
             while(itr.hasNext()) {
                 final Map.Entry<Thread,AtomicInteger> e = itr.next();
                 final Thread t = e.getKey();
+                final int counter = e.getValue().get();
                 t.interrupt();
-                log.warn("Interrupted: "+t.getName());
+                log.warn("Interrupted: " + t.getName() + "@counter=" + counter);
             }
             // Note: Will be cleared when we leave the finally{}.
 //            // clear everything!
