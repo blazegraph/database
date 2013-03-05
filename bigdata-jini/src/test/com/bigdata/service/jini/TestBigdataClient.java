@@ -249,6 +249,10 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final IBigdataFederation<?> fed = helper.client.connect();
     
+        final String namespace = "testRelation";
+        
+        final Properties properties = new Properties();
+        
         /*
          * Verify behavior before any writes on the federation.
          */
@@ -299,10 +303,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
         final long lastCommitTime2;
         {
 
-            final String namespace = "testRelation";
-            
-            final Properties properties = new Properties();
-            
             final R rel = new R(fed, namespace, ITx.UNISOLATED, properties);
          
             // Verify nothing was registered yet.
@@ -319,6 +319,48 @@ public class TestBigdataClient extends AbstractServerTestCase {
             assertEquals(1, namespaces.size());
 
             assertEquals(namespace, namespaces.get(0));
+
+        }
+
+        /*
+         * Now destroy the locatable resource.
+         */
+        final long lastCommitTime3;
+        {
+
+            final R rel = (R) fed.getResourceLocator().locate(namespace,
+                    ITx.UNISOLATED);
+
+            assertNotNull(rel);
+            
+            rel.destroy();
+
+            lastCommitTime3 = fed.getLastCommitTime();
+
+            assertTrue(lastCommitTime3 > lastCommitTime2);
+            
+        }
+
+        /*
+         * Verify no longer locatable (for the unisolated view).
+         */
+        {
+
+            final R rel = (R) fed.getResourceLocator().locate(namespace,
+                    ITx.UNISOLATED);
+
+            assertNull(rel);
+
+        }
+
+        /*
+         * Now repeat the scan and verify that it is empty once again.
+         */
+        {
+
+            final List<String> namespaces = getNamespaces(fed, lastCommitTime3);
+
+            assertEquals(0, namespaces.size());
 
         }
 
