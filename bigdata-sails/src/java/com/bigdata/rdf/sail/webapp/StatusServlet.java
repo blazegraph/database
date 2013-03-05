@@ -432,8 +432,17 @@ public class StatusServlet extends BigdataRDFServlet {
 
             if (showNamespaces) {
 
+                long timestamp = getTimestamp(req);
+
+                if (timestamp == ITx.READ_COMMITTED) {
+                
+                    // Use the last commit point.
+                    timestamp = getIndexManager().getLastCommitTime();
+                    
+                }
+
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces(ITx.READ_COMMITTED);
+                        .getNamespaces(timestamp);
 
                 current.node("h3", "Namespaces: ");
 
