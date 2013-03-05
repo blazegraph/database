@@ -32,8 +32,7 @@ import junit.framework.TestCase2;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-
-import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
+import org.openrdf.model.vocabulary.RDF;
 
 /**
  * Test suite for utility class to encode and decode RDF Values for interchange
@@ -71,6 +70,11 @@ public class TestEncodeDecodeValue extends TestCase2 {
         
         doTest("<http://www.bigdata.com>",
                 new URIImpl("http://www.bigdata.com"));
+
+        doTest("<" + RDF.TYPE.stringValue() + ">", RDF.TYPE);
+
+        doTest("<http://xmlns.com/foaf/0.1/Person>", new URIImpl(
+                "http://xmlns.com/foaf/0.1/Person"));
         
     }
 
@@ -183,6 +187,11 @@ public class TestEncodeDecodeValue extends TestCase2 {
                 .decodeValue(expectedString);
         
         assertEquals(expectedValue, decodedValue);
+
+        if (log.isInfoEnabled()) {
+            log.info("expected=" + expectedString);
+            log.info("encoded =" + actualString);
+        }
 
     }
 
