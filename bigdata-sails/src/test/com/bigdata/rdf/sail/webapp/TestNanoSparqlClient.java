@@ -552,6 +552,11 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.ttl");
   
+        /*
+         * Note: In this case, it should work out that the exact size and the
+         * fast range count are the same. However, we want the FAST RANGE COUNT
+         * here since that is what we are testing.
+         */
         final long rangeCount = m_repo.size();
         
         assertEquals(7, rangeCount);
