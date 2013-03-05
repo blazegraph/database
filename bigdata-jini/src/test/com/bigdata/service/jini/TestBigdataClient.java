@@ -43,6 +43,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.DataService;
@@ -240,23 +241,13 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
     }
 
+    /**
+     * Unit test of ability to list out the registered locatable resources on a
+     * federation.
+     */
     public void test_listNamespaces() {
         
         final IBigdataFederation<?> fed = helper.client.connect();
-
-//        final String name = "index1";
-//
-//        final IndexMetadata metadata = new IndexMetadata(name, UUID
-//                .randomUUID());
-//
-//        metadata.setDeleteMarkers(true);
-//
-//        fed.registerIndex(metadata);
-//
-//        final IIndex ndx = fed.getIndex(name, ITx.UNISOLATED);
-//
-//        assertEquals("indexUUID", metadata.getIndexUUID(), ndx
-//                .getIndexMetadata().getIndexUUID());
     
         /*
          * Verify behavior before any writes on the federation.
@@ -389,6 +380,89 @@ public class TestBigdataClient extends AbstractServerTestCase {
         }
 
         return namespaces;
+
+    }
+
+    /**
+     * Test for correct throw of {@link NoSuchIndexException} if the index does
+     * not exist.
+     */
+    public void test_dropIndex_notFound() throws Exception {
+
+        final IBigdataFederation<?> fed = helper.client.connect();
+
+        try {
+            fed.dropIndex(getName());
+            fail("Expecting: "+NoSuchIndexException.class);
+        } catch (NoSuchIndexException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
+        
+    }
+
+    /**
+     * Test for correct drop of a registered index.
+     */
+    public void test_dropIndex_found() throws Exception {
+
+        final IBigdataFederation<?> fed = helper.client.connect();
+
+        final String name = "testIndex";
+
+        /*
+         * Register index.
+         */
+        final UUID uuid = UUID.randomUUID();
+        {
+            final IndexMetadata metadata = new IndexMetadata(name,
+                    uuid);
+
+            metadata.setDeleteMarkers(true);
+
+            fed.registerIndex(metadata);
+
+        }
+
+        /*
+         * Verify exists.
+         */
+        {
+
+            final IIndex ndx = fed.getIndex(name, ITx.UNISOLATED);
+
+            assertEquals("indexUUID", uuid, ndx.getIndexMetadata()
+                    .getIndexUUID());
+        }
+        
+        /*
+         * Drop index.
+         */
+        {
+            
+            fed.dropIndex(name);
+            
+        }
+
+        /*
+         * Verify gone.
+         */
+        {
+        
+            final IIndex ndx = fed.getIndex(name, ITx.UNISOLATED);
+
+            assertNull(ndx);
+
+        }
+
+        /*
+         * Verify 2nd drop throws expected exception.
+         */
+        try {
+            fed.dropIndex(getName());
+            fail("Expecting: " + NoSuchIndexException.class);
+        } catch (NoSuchIndexException ex) {
+            log.info("Ignoring expected exception: " + ex);
+        }
 
     }
 
