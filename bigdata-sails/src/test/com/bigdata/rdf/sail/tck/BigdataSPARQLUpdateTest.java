@@ -205,7 +205,7 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             InputStream dataset = SPARQLUpdateTest.class.getResourceAsStream(datasetFile);
             try {
                 con.setAutoCommit(false);
-                con.add(dataset, "", RDFFormat.TRIG);
+                con.add(dataset, "", RDFFormat.forFileName(datasetFile));//RDFFormat.TRIG);
                 con.commit();
             }
             finally {
