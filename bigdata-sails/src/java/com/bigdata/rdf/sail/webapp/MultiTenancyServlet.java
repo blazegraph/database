@@ -484,7 +484,14 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doDescribeNamespaces(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        final long timestamp = getTimestamp(req);
+        long timestamp = getTimestamp(req);
+
+        if (timestamp == ITx.READ_COMMITTED) {
+        
+            // Use the last commit point.
+            timestamp = getIndexManager().getLastCommitTime();
+            
+        }
         
         /*
          * The set of registered namespaces for KBs.
