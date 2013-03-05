@@ -105,6 +105,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
 
@@ -2185,10 +2186,23 @@ public class BigdataRDFContext extends BigdataBaseContext {
         // the triple store namespaces.
         final List<String> namespaces = new LinkedList<String>();
 
+        final SparseRowStore grs = getIndexManager().getGlobalRowStore(
+                timestamp);
+
+        if (grs == null) {
+
+            log.warn("No GRS @ timestamp="
+                    + TimestampUtility.toString(timestamp));
+
+            // Empty.
+            return namespaces;
+            
+        }
+
         // scan the relation schema in the global row store.
         @SuppressWarnings("unchecked")
-        final Iterator<ITPS> itr = (Iterator<ITPS>) getIndexManager()
-                .getGlobalRowStore(timestamp).rangeIterator(RelationSchema.INSTANCE);
+        final Iterator<ITPS> itr = (Iterator<ITPS>) grs
+                .rangeIterator(RelationSchema.INSTANCE);
 
         while (itr.hasNext()) {
 
