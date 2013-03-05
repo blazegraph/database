@@ -342,7 +342,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
                     final long nresults = countResults(result);
 
-                    log.error("namespace=" + ns + ", triples=" + nresults);
+                    if(log.isInfoEnabled())
+                    	log.info("namespace=" + ns + ", triples=" + nresults);
 
                 }
 
