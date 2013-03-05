@@ -197,7 +197,9 @@ public class DumpFederation {
                 formatter.writeHeaders();
                 
                 dumper.dumpIndices( namespace );
-
+                
+                formatter.flush();
+                
             } finally {
 
                 // discard read-only transaction.
@@ -358,6 +360,8 @@ public class DumpFederation {
                             formatter);
 
                     dumper.dumpIndices(namespace);
+                    
+                    formatter.flush();
 
                 } finally {
 
@@ -435,6 +439,11 @@ public class DumpFederation {
          */
         public void writeRecord(IndexPartitionRecord rec);
         
+        /**
+         * Flush any buffered output.
+         */
+        public void flush();
+        
     }
     
     /**
@@ -471,6 +480,7 @@ public class DumpFederation {
         /**
          * @todo document the columns.
          */
+        @Override
         public void writeHeaders() {
             
             final String s = "Timestamp"//
@@ -520,6 +530,7 @@ public class DumpFederation {
         }
 
         /** format row for table. */
+        @Override
         public void writeRecord(final IndexPartitionRecord rec) {
             
             final StringBuilder sb = new StringBuilder();
@@ -627,6 +638,11 @@ public class DumpFederation {
             
         }
 
+        @Override
+        public void flush() {
+            out.flush();
+        }
+        
     }
     
     /**
@@ -663,6 +679,7 @@ public class DumpFederation {
         /**
          * @todo document the columns.
          */
+        @Override
         public void writeHeaders() {
             
             final String s = "Timestamp"//
@@ -713,6 +730,7 @@ public class DumpFederation {
         }
 
         /** format row for table. */
+        @Override
         public void writeRecord(final IndexPartitionRecord rec) {
             
             final StringBuilder sb = new StringBuilder();
@@ -821,6 +839,11 @@ public class DumpFederation {
             
         }
 
+        @Override
+        public void flush() {
+            out.flush();
+        }
+        
     }
     
     /**
