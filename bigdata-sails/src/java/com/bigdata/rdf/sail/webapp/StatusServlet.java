@@ -56,6 +56,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -324,7 +325,7 @@ public class StatusServlet extends BigdataRDFServlet {
             }
             
             // open the body
-            current = current.node("body","");
+            current = current.node("body");
 
             // Dump Journal?
             final boolean dumpJournal = req.getParameter(DUMP_JOURNAL) != null;
@@ -432,7 +433,7 @@ public class StatusServlet extends BigdataRDFServlet {
             if (showNamespaces) {
 
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces();
+                        .getNamespaces(ITx.READ_COMMITTED);
 
                 current.node("h3", "Namespaces: ");
 

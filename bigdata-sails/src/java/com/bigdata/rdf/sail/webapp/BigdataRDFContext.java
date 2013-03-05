@@ -2180,7 +2180,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
      */
-    /*package*/ List<String> getNamespaces() {
+    /*package*/ List<String> getNamespaces(final long timestamp) {
     
         // the triple store namespaces.
         final List<String> namespaces = new LinkedList<String>();
@@ -2188,7 +2188,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         // scan the relation schema in the global row store.
         @SuppressWarnings("unchecked")
         final Iterator<ITPS> itr = (Iterator<ITPS>) getIndexManager()
-                .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
+                .getGlobalRowStore(timestamp).rangeIterator(RelationSchema.INSTANCE);
 
         while (itr.hasNext()) {
 
