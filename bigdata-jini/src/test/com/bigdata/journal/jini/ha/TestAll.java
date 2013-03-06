@@ -81,18 +81,21 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("HAJournalServer");
 
+        // FIXME I have disabled all HA related tests in the dev branch since
+        // this work is occuring in a different branch. */
+        
         // Basic tests for a single HAJournalServer (quorum does not meet)
-        suite.addTestSuite(TestHAJournalServer.class);
-
-        // HA2 test suite (k=3, but only 2 services are running).
-        // FIXME Enable TestHA2JournalServer in CI (debug bounce leader/follower first).
-//        suite.addTestSuite(TestHA2JournalServer.class);
-
-        // HA3 test suite.
-        suite.addTestSuite(TestHA3JournalServer.class);
-
-        // Test suite for the global write lock.
-        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
+//        suite.addTestSuite(TestHAJournalServer.class);
+//
+//        // HA2 test suite (k=3, but only 2 services are running).
+//        // FIXME Enable TestHA2JournalServer in CI (debug bounce leader/follower first).
+////        suite.addTestSuite(TestHA2JournalServer.class);
+//
+//        // HA3 test suite.
+//        suite.addTestSuite(TestHA3JournalServer.class);
+//
+//        // Test suite for the global write lock.
+//        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
 
         return suite;
 
