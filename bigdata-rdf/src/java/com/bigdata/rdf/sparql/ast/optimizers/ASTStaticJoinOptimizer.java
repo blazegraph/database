@@ -48,9 +48,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IReorderableNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -68,7 +70,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
@@ -282,7 +283,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      */
     private void optimize(final AST2BOpContext ctx,
             final IBindingSet exogenousBindings, final QueryRoot queryRoot,
-            IJoinNode[] ancestry, final GraphPatternGroup<?> op) {
+            IBindingProducerNode[] ancestry, final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {
     		
@@ -300,9 +301,9 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     		
     		if (serviceNodes.size() > 0 || namedSubqueryIncludes.size() > 0) {
     			
-    			final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+    			final List<IBindingProducerNode> tmp = new LinkedList<IBindingProducerNode>();
     			
-    			for (IJoinNode ancestor : ancestry) {
+    			for (IBindingProducerNode ancestor : ancestry) {
     				
     				tmp.add(ancestor);
     				
@@ -349,30 +350,49 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 //	            
 //	        }
 
-    		/*
-    		 * Let the optimizer handle the simple optionals too.
-    		 */
-    		final List<StatementPatternNode> spNodes = joinGroup.getStatementPatterns();
-    		
-	        if (!spNodes.isEmpty()) {
-	        
-	            // Always attach the range counts.
-	        	attachRangeCounts(ctx, spNodes, exogenousBindings);
-	        	
-                if (isStaticOptimizer(ctx, joinGroup)) {
+            if (isStaticOptimizer(ctx, joinGroup)) {
 
+	    		/*
+	    		 * Let the optimizer handle the simple optionals too.
+	    		 */
+//	    		final List<StatementPatternNode> spNodes = joinGroup.getStatementPatterns();
+	    		final List<IReorderableNode> nodes = joinGroup.getChildren(IReorderableNode.class);
+	    		
+	    		final Iterator<IReorderableNode> it = nodes.iterator();
+	    		
+	    		while (it.hasNext()) {
+	    		
+	    			final IReorderableNode node = it.next();
+	    			
+	    			// check each instance
+	    			if (!node.isReorderable()) {
+	    				
+	    				it.remove();
+	    				
+	    			}
+	    			
+	    		}
+	    		
+		        if (!nodes.isEmpty()) {
+
+		        	/*
+		        	 * Now done by the ASTRangeCountOptimizer.
+		        	 */
+//		            // Always attach the range counts.
+//		        	attachRangeCounts(ctx, spNodes, exogenousBindings);
+	        	
                     /*
-                     * Find the "slots" where the statement patterns currently
+                     * Find the "slots" where the reorderable nodes currently
                      * show up in the join group. We will later fill in these
-                     * slots with the same statement patterns, but in a
+                     * slots with the same nodes, but in a
                      * different (optimized) ordering.
                      */
-                    final int[] slots = new int[spNodes.size()];
+                    final int[] slots = new int[nodes.size()];
                     {
 	                    int j = 0;
-	                    for (int i = 0; i < joinGroup.arity(); i++) {
+	                    for (int i = 0; i < joinGroup.arity() && j < nodes.size(); i++) {
 	
-	                        if (joinGroup.get(i) instanceof StatementPatternNode) {
+	                        if (joinGroup.get(i) == nodes.get(j)) {
 	
 	                            slots[j++] = i;
 	
@@ -389,24 +409,24 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                             Annotations.OPTIMISTIC,
                             Annotations.DEFAULT_OPTIMISTIC);
                     
-                    final List<StatementPatternNode> required =
-                    	new LinkedList<StatementPatternNode>();
+                    final List<IReorderableNode> required =
+                    	new LinkedList<IReorderableNode>();
                     
-                    final List<StatementPatternNode> optional =
-                    	new LinkedList<StatementPatternNode>();
+//                    final List<IReorderableNode> optional =
+//                    	new LinkedList<IReorderableNode>();
                     
-                    StatementPatternNode runLast = null;
+                    IReorderableNode runLast = null;
                     
-                    for (StatementPatternNode sp : spNodes) {
+                    for (IReorderableNode sp : nodes) {
                     	
-                    	if (sp.getProperty(QueryHints.RUN_LAST, false)) {
+                    	if (runLast == null && sp.getProperty(QueryHints.RUN_LAST, false)) {
 
                     		runLast = sp;
                     		
-                    	} else if (sp.isOptional()) {
-                    		
-                    		optional.add(sp);
-                    		
+//                    	} else if (sp.isOptional()) {
+//                    		
+//                    		optional.add(sp);
+//                    		
                     	} else {
                     		
                     		required.add(sp);
@@ -431,29 +451,35 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     int i = 0;
                     for (int j = 0; j < required.size(); j++) {
 
-                        final StatementPatternNode sp = required.get(order[j]);
+                        final IReorderableNode sp = required.get(order[j]);
 
                         joinGroup.setArg(slots[i++], sp);
 
                     }
                     
-                    if (runLast != null && !runLast.isOptional()) {
+                    if (runLast != null) {
                     	
                     	joinGroup.setArg(slots[i++], runLast);
                     	
                     }
                     
-                    for (StatementPatternNode sp : optional) {
-
-                        joinGroup.setArg(slots[i++], sp);
-                        
-                    }
-
-                    if (runLast != null && runLast.isOptional()) {
-                    	
-                    	joinGroup.setArg(slots[i++], runLast);
-                    	
-                    }
+//                    if (runLast != null && !runLast.isOptional()) {
+//                    	
+//                    	joinGroup.setArg(slots[i++], runLast);
+//                    	
+//                    }
+//                    
+//                    for (StatementPatternNode sp : optional) {
+//
+//                        joinGroup.setArg(slots[i++], sp);
+//                        
+//                    }
+//
+//                    if (runLast != null && runLast.isOptional()) {
+//                    	
+//                    	joinGroup.setArg(slots[i++], runLast);
+//                    	
+//                    }
                     
 	        	} 
 	        	    
@@ -462,27 +488,27 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                  * non-optional statement pattern nodes - the ones that we
                  * can count on to bind their variables.
                  */
-                final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+                final List<IBindingProducerNode> tmp = new LinkedList<IBindingProducerNode>();
                 
-                for (IJoinNode ancestor : ancestry) {
+                for (IBindingProducerNode ancestor : ancestry) {
                     
                     tmp.add(ancestor);
                     
                 }
                 
-                for(StatementPatternNode sp : spNodes) {
+                for(IReorderableNode node : nodes) {
                     
-                    if (!sp.isOptional()) {
+//                    if (!sp.isOptional()) {
                         
-                        tmp.add(sp);
+                        tmp.add(node);
                         
-                    }
+//                    }
                     
                 }
                 
                 if (tmp.size() > ancestry.length) {
                     
-                    ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
+                    ancestry = tmp.toArray(new IBindingProducerNode[tmp.size()]);
                     
                 }
 	        
@@ -647,11 +673,11 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     	
         private final StaticAnalysis sa;
     	
-    	private final IJoinNode[] ancestry;
+    	private final IBindingProducerNode[] ancestry;
     	
     	private final Set<IVariable<?>> ancestryVars;
     	
-        private final List<StatementPatternNode> spNodes;
+        private final List<IReorderableNode> nodes;
 
         private final int arity;
         
@@ -735,8 +761,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          */
         public StaticOptimizer(final QueryRoot queryRoot,
                 final AST2BOpContext context,
-        		final IJoinNode[] ancestry, 
-        		final List<StatementPatternNode> spNodes,
+        		final IBindingProducerNode[] ancestry, 
+        		final List<IReorderableNode> nodes,
         		final double optimistic) {
 
             if (queryRoot == null)
@@ -748,7 +774,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             if (ancestry == null)
                 throw new IllegalArgumentException();
             
-            if (spNodes == null)
+            if (nodes == null)
                 throw new IllegalArgumentException();
             
             this.queryRoot = queryRoot;
@@ -761,9 +787,9 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             
             this.ancestryVars = new LinkedHashSet<IVariable<?>>();
             
-            this.spNodes = spNodes;
+            this.nodes = nodes;
             
-            this.arity = spNodes.size();
+            this.arity = nodes.size();
             
             if (log.isDebugEnabled()) {
             	log.debug("arity: " + arity);
@@ -850,7 +876,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
              * give preferential treatment to the predicates that can join
              * on those variables.
              */
-            for (IJoinNode join : ancestry) {
+            for (IBindingProducerNode join : ancestry) {
             	if (log.isDebugEnabled()) {
             		log.debug("considering join node from ancestry: " + join);
             	}
@@ -897,7 +923,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                  * We need the optimizer to play nice with the run first hint.
                  * Choose the first "run first" tail we see.
                  */
-                if (spNodes.get(i).getProperty(QueryHints.RUN_FIRST, false)) {
+                if (nodes.get(i).getProperty(QueryHints.RUN_FIRST, false)) {
                 	preferredFirstTail = i;
                 	break;
                 }
@@ -1199,8 +1225,10 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 //                final long rangeCount = rangeCountFactory
 //                        .rangeCount(spNodes.getTail(tailIndex));
 
-                final long rangeCount = (long) spNodes.get(tailIndex).getProperty(
-                			Annotations.ESTIMATED_CARDINALITY, -1l);
+//                final long rangeCount = (long) nodes.get(tailIndex).getProperty(
+//                			Annotations.ESTIMATED_CARDINALITY, -1l);
+                
+                final long rangeCount = (long) nodes.get(tailIndex).getEstimatedCardinality();
                 
                 this.rangeCount[tailIndex] = rangeCount;
 
@@ -1216,12 +1244,13 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          */
         public long cardinality(final int tailIndex) {
 //            IPredicate tail = spNodes.getTail(tailIndex);
-        	final StatementPatternNode tail = spNodes.get(tailIndex);
-            if (tail.isOptional()/* || tail instanceof IStarJoin */) {
-                return Long.MAX_VALUE;
-            } else {
-                return rangeCount(tailIndex);
-            }
+//        	final StatementPatternNode tail = nodes.get(tailIndex);
+//            if (tail.isOptional()/* || tail instanceof IStarJoin */) {
+//                return Long.MAX_VALUE;
+//            } else {
+//                return rangeCount(tailIndex);
+//            }
+        	return rangeCount(tailIndex);
         }
         
         public String toString() {
@@ -1232,7 +1261,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          * This is the secret sauce.  There are three possibilities for computing
          * the join cardinality, which we are defining as the upper-bound for
          * solutions for a particular join.  First, if there are no shared variables
-         * then the cardinality will just be the simple sum of the cardinality of
+         * then the cardinality will just be the simple product of the cardinality of
          * each join dimension.  If there are shared variables but no unshared
          * variables, then the cardinality will be the minimum cardinality from
          * the join dimensions.  If there are shared variables but also some
@@ -1250,13 +1279,13 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          *          the join cardinality
          */
         protected long computeJoinCardinality(IJoinDimension d1, IJoinDimension d2) {
-            // two optionals is worse than one
-            if (d1.isOptional() && d2.isOptional()) {
-                return BOTH_OPTIONAL;
-            }
-            if (d1.isOptional() || d2.isOptional()) {
-                return ONE_OPTIONAL;
-            }
+//            // two optionals is worse than one
+//            if (d1.isOptional() && d2.isOptional()) {
+//                return BOTH_OPTIONAL;
+//            }
+//            if (d1.isOptional() || d2.isOptional()) {
+//                return ONE_OPTIONAL;
+//            }
             final boolean sharedVars = hasSharedVars(d1, d2);
             final boolean unsharedVars = hasUnsharedVars(d1, d2);
             final long joinCardinality;
@@ -1345,7 +1374,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          *          the named variables
          */
         protected Set<String> getVars(int tail) {
-            final Set<String> vars = new HashSet<String>();
+//            final Set<String> vars = new HashSet<String>();
 //            IPredicate pred = spNodes.getTail(tail);
 //            for (int i = 0; i < pred.arity(); i++) {
 //                IVariableOrConstant term = pred.get(i);
@@ -1353,21 +1382,28 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 //                    vars.add(term.getName());
 //                }
 //            }
-            final StatementPatternNode sp = spNodes.get(tail);
+            final IReorderableNode node = nodes.get(tail);
             if (log.isDebugEnabled()) {
-            	log.debug(sp);
+            	log.debug(node);
             }
-            for (int i = 0; i < sp.arity(); i++) {
-            	final TermNode term = (TermNode) sp.get(i);
-                if (log.isDebugEnabled()) {
-                	log.debug(term);
-                }
-            	if (term != null && term.isVariable()) {
-            		vars.add(term.getValueExpression().getName());
-            	}
-            }
+//            for (int i = 0; i < sp.arity(); i++) {
+//            	final TermNode term = (TermNode) sp.get(i);
+//                if (log.isDebugEnabled()) {
+//                	log.debug(term);
+//                }
+//            	if (term != null && term.isVariable()) {
+//            		vars.add(term.getValueExpression().getName());
+//            	}
+//            }
             
-            return vars;
+            final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+            sa.getDefinitelyProducedBindings(node, vars, false);
+            
+            final Set<String> varNames = new LinkedHashSet<String>();
+            for (IVariable<?> v : vars)
+            	varNames.add(v.getName());
+            
+            return varNames;
         }
         
         /**
@@ -1396,7 +1432,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         protected boolean sharesVarsWithAncestry(final int tail) {
         	
             final Set<IVariable<?>> tailVars = sa.getDefinitelyProducedBindings(
-            		spNodes.get(tail), new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+            		nodes.get(tail), new LinkedHashSet<IVariable<?>>(), false/* recursive */);
 
             return !Collections.disjoint(ancestryVars, tailVars);
             
@@ -1422,13 +1458,13 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 }
                 
                 if (log.isDebugEnabled()) {
-                	log.debug("considering tail: " + spNodes.get(i));
+                	log.debug("considering tail: " + nodes.get(i));
                 }
                 
-                // only test the required joins
-                if (spNodes.get(i).isOptional()) {
-                	continue;
-                }
+//                // only test the required joins
+//                if (nodes.get(i).isOptional()) {
+//                	continue;
+//                }
                 
                 if (log.isDebugEnabled()) {
                 	log.debug("vars: " + Arrays.toString(getVars(i).toArray()));
@@ -1483,7 +1519,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             long getCardinality();
             Set<String> getVars();
             String toJoinString();
-            boolean isOptional();
+//            boolean isOptional();
         }
 
         /**
@@ -1558,9 +1594,9 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 return vars;
             }
             
-            public boolean isOptional() {
-                return spNodes.get(tail).isOptional();
-            }
+//            public boolean isOptional() {
+//                return nodes.get(tail).isOptional();
+//            }
             
             public String toJoinString() {
                 return String.valueOf(tail);

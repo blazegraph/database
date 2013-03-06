@@ -29,6 +29,9 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -49,6 +52,16 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
+	private final boolean childFirst;
+	
+	public AbstractJoinGroupOptimizer() {
+		this(false);
+	}
+	
+	protected AbstractJoinGroupOptimizer(final boolean childFirst) {
+		this.childFirst = childFirst;
+	}
+	
 	/**
 	 * Top-level optimize method.  Will locate the relevant top-level 
 	 * {@link GraphPatternGroup} nodes (where clause, named subqueries) and 
@@ -75,7 +88,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
             if (whereClause != null) {
 
-                optimize(context, sa, whereClause);
+                optimize(context, sa, bindingSets, whereClause);
                 
             }
 
@@ -99,7 +112,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
                 if (whereClause != null) {
 
-                    optimize(context, sa, whereClause);
+                    optimize(context, sa, bindingSets, whereClause);
 
                 }
 
@@ -126,14 +139,19 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
      * subclasses might want to override.  Maybe revisit.  -mp
      */
     private void optimize(final AST2BOpContext ctx, 
-    		final StaticAnalysis sa, final GraphPatternGroup<?> op) {
+    		final StaticAnalysis sa, final IBindingSet[] bSets, 
+    		final GraphPatternGroup<?> op) {
 
-    	if (op instanceof JoinGroupNode) {
-    		
-    		final JoinGroupNode joinGroup = (JoinGroupNode) op;
-
-    		optimizeJoinGroup(ctx, sa, joinGroup);
-    		
+    	if (!childFirst) {
+    	
+	    	if (op instanceof JoinGroupNode) {
+	    		
+	    		final JoinGroupNode joinGroup = (JoinGroupNode) op;
+	
+	    		optimizeJoinGroup(ctx, sa, bSets, joinGroup);
+	    		
+	    	}
+    	
     	}
     	
         /*
@@ -148,7 +166,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                optimize(ctx, sa, childGroup);
+                optimize(ctx, sa, bSets, childGroup);
                 
             } else if (child instanceof QueryBase) {
 
@@ -158,7 +176,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
-                optimize(ctx, sa, childGroup);
+                optimize(ctx, sa, bSets, childGroup);
 
             } else if (child instanceof FilterNode) {
             	
@@ -175,22 +193,79 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
                     if (graphPattern != null) {
 
-                    	optimize(ctx, sa, graphPattern);
+                    	optimize(ctx, sa, bSets, graphPattern);
                     	
                     }
                     
             	}
             	
+            } else if (child instanceof ArbitraryLengthPathNode) {
+            	
+            	final ArbitraryLengthPathNode alpNode = (ArbitraryLengthPathNode) child;
+            	
+            	final IBindingSet bs = new ListBindingSet();
+            	
+            	if (alpNode.left().isConstant()) {
+            		
+            		bs.set(alpNode.tVarLeft().getValueExpression(), 
+            				((ConstantNode) alpNode.left()).getValueExpression());
+            		
+            	}
+            	
+            	if (alpNode.right().isConstant()) {
+            		
+            		bs.set(alpNode.tVarRight().getValueExpression(), 
+            				((ConstantNode) alpNode.right()).getValueExpression());
+            		
+            	}
+            	
+            	/*
+            	 * The transitivity vars are unique to the alpNode, so we don't
+            	 * need to merge, simple addition will do fine.
+            	 */
+            	
+            	final IBindingSet[] bSets2;
+            	
+            	if (bSets == null || bSets.length == 0 || 
+            			(bSets.length == 1 && bSets[0].isEmpty())) {
+            		
+            		bSets2 = new IBindingSet[] { bs };
+            		
+            	} else {
+            		
+            		bSets2 = new IBindingSet[bSets.length+1];
+            		
+            		bSets2[0] = bs;
+            		
+            		System.arraycopy(bSets, 0, bSets2, 1, bSets.length);
+            		
+            	}
+            	
+            	optimize(ctx, sa, bSets2, alpNode.subgroup());
+            	
             }
             
         }
+        
+    	if (childFirst) {
+        	
+	    	if (op instanceof JoinGroupNode) {
+	    		
+	    		final JoinGroupNode joinGroup = (JoinGroupNode) op;
+	
+	    		optimizeJoinGroup(ctx, sa, bSets, joinGroup);
+	    		
+	    	}
+    	
+    	}
 
     }
     
     /**
      * Subclasses can do the work of optimizing a join group here.
      */
-    protected abstract void optimizeJoinGroup(final AST2BOpContext ctx, 
-    		final StaticAnalysis sa, final JoinGroupNode op);
+    protected abstract void optimizeJoinGroup(
+    		final AST2BOpContext ctx, final StaticAnalysis sa, 
+    		final IBindingSet[] bSets, final JoinGroupNode op);
     
 }

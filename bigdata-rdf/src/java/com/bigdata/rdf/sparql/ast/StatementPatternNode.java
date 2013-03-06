@@ -20,6 +20,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTRangeConstraintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.Annotations;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
@@ -43,7 +44,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
-        IJoinNode, IStatementContainer {
+        IJoinNode, IStatementContainer, IReorderableNode {
 
     private static final long serialVersionUID = 1L;
 
@@ -620,5 +621,27 @@ public class StatementPatternNode extends
 
         return sb.toString();
     }
+
+	/* (non-Javadoc)
+	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#isReorderable()
+	 */
+	@Override
+	public boolean isReorderable() {
+		
+		return !isOptional();
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.bigdata.rdf.sparql.ast.IReorderableNode#getEstimatedCardinality()
+	 */
+	@Override
+	public long getEstimatedCardinality() {
+        
+		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
+        
+	}
+	
+	
 
 }

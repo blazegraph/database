@@ -592,19 +592,19 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(d), new ConstantNode(d), 4l));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 1l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -856,14 +856,8 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             whereClause.addChild(serviceNode);
 
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(d), new ConstantNode(d), 3l));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("y"),
-                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(c), new ConstantNode(c), 2l));
@@ -876,6 +870,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
             whereClause.addChild(newStatementPatternNode(new VarNode("y"),
                     new ConstantNode(b), new ConstantNode(b), 1l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("y"),
+                    new ConstantNode(g), new ConstantNode(g), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -1624,9 +1624,6 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true));
-
             whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 100l)));
 
@@ -1638,6 +1635,9 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -1728,20 +1728,20 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(b), new ConstantNode(b), 2l));
 
-            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
-
             whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(a), new ConstantNode(a), 100l)));
-
-            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
-                    new ConstantNode(e), new ConstantNode(e), 1l, true));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(d), new ConstantNode(d), 4l));
 
             whereClause.addChild(newStatementPatternNode(new VarNode("x"),
                     new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l, true));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);

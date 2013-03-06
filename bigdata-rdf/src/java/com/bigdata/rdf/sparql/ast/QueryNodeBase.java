@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
+import java.util.Properties;
 
 import com.bigdata.bop.BOp;
 
@@ -40,6 +41,18 @@ public abstract class QueryNodeBase extends ASTBase implements
     public QueryNodeBase(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
+
+    }
+
+    /**
+     * Return the query hints for this AST node.
+     * 
+     * @return The query hints -or- <code>null</code> if none have been
+     *         declared.
+     */
+    public Properties getQueryHints() {
+
+        return (Properties) getProperty(Annotations.QUERY_HINTS);
 
     }
 
