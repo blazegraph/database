@@ -51,7 +51,7 @@ public class NamedSubqueryInclude extends
 
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryRoot.Annotations,
+    public interface Annotations extends IJoinNode.Annotations,
             INamedSolutionSet.Annotations {
 
         /**

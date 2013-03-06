@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
@@ -78,7 +79,7 @@ public class ASTSearchInSearchOptimizer extends AbstractJoinGroupOptimizer {
      * Optimize the join group.
      */
 	protected void optimizeJoinGroup(final AST2BOpContext ctx, 
-    		final StaticAnalysis sa, final JoinGroupNode group) {
+    		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode group) {
 
 		final long start = System.currentTimeMillis();
 		

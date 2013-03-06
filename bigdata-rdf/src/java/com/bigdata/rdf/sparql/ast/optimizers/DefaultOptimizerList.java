@@ -459,6 +459,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTRangeOptimizer());
         
         /**
+         * Add range counts to all statement patterns.
+         */
+        add(new ASTRangeCountOptimizer());
+        
+        /**
          * Run the static join order optimizer. This attaches the estimated
          * cardinality data (fast range counts) and uses fast algorithm to
          * reorder the joins in each required or optional join group.

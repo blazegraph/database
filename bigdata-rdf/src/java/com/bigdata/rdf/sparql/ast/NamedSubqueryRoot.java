@@ -42,8 +42,7 @@ public class NamedSubqueryRoot extends SubqueryBase implements
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryRoot.Annotations,
-            INamedSolutionSet.Annotations {
+    public interface Annotations extends INamedSolutionSet.Annotations {
 
         /**
          * The {@link String}[] of the named solution sets on which this named
