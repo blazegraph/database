@@ -1031,11 +1031,23 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     final public UUID getLeaderId() {
         lock.lock();
         try {
-            if (!isQuorumMet()) {
+            /*
+             * Note: [token] is VOLATILE so it can change while we are holding
+             * the lock. Therefore, we have to explicitly guard against this.
+             */
+            final long tmp = token();
+            if (token == NO_QUORUM) {
                 return null;
             }
-            // Should always exist if the quorum is met.
-            return joined.iterator().next();
+            final UUID[] joined = getJoined();
+            assertQuorum(tmp); // ensure quorum still met.
+            if (joined == null)
+                throw new AssertionError();
+            final UUID leaderId = joined[0];
+            assertQuorum(tmp); // ensure quorum still met.
+            if (leaderId == null)
+                throw new AssertionError();
+            return leaderId;
         } finally {
             lock.unlock();
         }
@@ -1329,7 +1341,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         protected final String logicalServiceId;
         protected final UUID serviceId;
 
-        private final QuorumMember<S> client;
+//        private final QuorumMember<S> client;
 
         /**
          * 
@@ -1351,12 +1363,12 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             
             this.serviceId = serviceId;
 
-            this.client = getClientAsMember();
+//            this.client = getClientAsMember();
 
         }
 
         final public QuorumMember<S> getQuorumMember() {
-            return client;
+            return (QuorumMember<S>) client;
         }
 
         final public Quorum<S, C> getQuourm() {
@@ -1837,6 +1849,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         
         private void conditionalSetToken(final long newValue)
                 throws InterruptedException {
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
             if (lastValidToken == newValue) {
                 return;
             }

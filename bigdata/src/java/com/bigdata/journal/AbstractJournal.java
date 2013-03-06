@@ -2453,14 +2453,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                                     + t, t);
 
                     // Low-level abort.
-                    _abort();
+                    doLocalAbort();
                     
                 }
 
             } else {
 
                 // Non-HA mode.
-                _abort();
+                doLocalAbort();
                 
             }
 
@@ -2495,7 +2495,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * store transparently so that we can continue operations after the commit
 	 * group was aborted. This is done automatically when we re-load the current
 	 * {@link ICommitRecord} from the root blocks of the store.
-	 */
+	 */// TODO Could merge with doLocalAbort().
 	private void _abort() {
 
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
@@ -5068,7 +5068,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * immediately. There is basically a data race here.
          */
 
-        _abort();
+        doLocalAbort();
     
     }
 
@@ -5729,20 +5729,43 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             public void run() {
 
-                final long token = abortMessage.getQuorumToken();
+                try {
 
-                if (haLog.isInfoEnabled())
-                    haLog.info("token=" + token);
+                    // Discard the prepare request.
+                    prepareRequest.set(null/* discard */);
 
-                quorum.assertQuorum(token);
+                    // Discard the vote.
+                    vote.set(false);
 
-                // Discard the prepare request.
-                prepareRequest.set(null/* discard */);
+                    final long token = abortMessage.getQuorumToken();
 
-                // Discard the vote.
-                vote.set(false);
+                    if (haLog.isInfoEnabled())
+                        haLog.info("token=" + token);
 
-                _abort();
+                    /*
+                     * Note: even if the quorum breaks, we still need to discard
+                     * our local state. Forcing doLocalAbort() here is MUCH
+                     * safer than failing to invoke it because the quorum
+                     * broken. If we do not invoke doLocalAbort() then we could
+                     * have an old write set laying around on the journal and it
+                     * might accidentally get flushed through with a local
+                     * commit. if we always force the local abort here, then the
+                     * worst circumstance would be if a 2-phase abort message
+                     * for a historical quorum state were somehow delayed and
+                     * arrived after we entered a new quorum state. Forcing an
+                     * abort under that weird (perhaps impossible) circumstance
+                     * will just cause this service to drop out of the quorum if
+                     * it later observes a write with the wrote block sequence
+                     * or commit counter. This seems like a safe decision.
+                     */
+                    //quorum.assertQuorum(token); // REMOVED per comment above.
+
+                } finally {
+                    
+                    // ALWAYS go through the local abort.
+                    doLocalAbort();
+                    
+                }
 
             }
 
