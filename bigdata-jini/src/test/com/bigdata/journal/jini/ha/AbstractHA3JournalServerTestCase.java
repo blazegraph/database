@@ -34,10 +34,13 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.rmi.Remote;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -548,21 +551,95 @@ public class AbstractHA3JournalServerTestCase extends
     	}
     }
     
-    protected void shutdownLeader() throws AsynchronousQuorumCloseException, InterruptedException, TimeoutException, IOException {
+    protected void shutdownLeader() throws AsynchronousQuorumCloseException,
+            InterruptedException, TimeoutException, IOException {
+
         final long token = quorum.awaitQuorum(awaitQuorumTimeout,
                 TimeUnit.MILLISECONDS);
-       final HAGlue leader = quorum.getClient().getLeader(token);
-       
-       shutdown(leader);
+        
+        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        shutdown(leader);
+        
+    }
+
+    protected class SafeShutdownTask implements Callable<Void> {
+
+        private final HAGlue haGlue;
+        private final ServiceListener serviceListener;
+        private final boolean now;
+
+        public SafeShutdownTask(final HAGlue haGlue,
+                final ServiceListener serviceListener) {
+
+            this(haGlue, serviceListener, false/* now */);
+            
+        }
+
+        public SafeShutdownTask(final HAGlue haGlue,
+                final ServiceListener serviceListener, final boolean now) {
+
+            this.haGlue = haGlue;
+            this.serviceListener = serviceListener;
+            this.now = now;
+            
+        }
+        
+        public Void call() {
+            
+            safeShutdown(haGlue, serviceListener, now);
+            
+            return null;
+            
+        }
+        
+    }
+    
+    protected class SafeShutdownATask extends SafeShutdownTask {
+
+        public SafeShutdownATask() {
+            this(false/* now */);
+        }
+
+        public SafeShutdownATask(final boolean now) {
+            super(serverA, serviceListenerA, now);
+        }
+
+    }
+
+    protected class SafeShutdownBTask extends SafeShutdownTask {
+
+        public SafeShutdownBTask() {
+            this(false/* now */);
+        }
+
+        public SafeShutdownBTask(final boolean now) {
+            super(serverB, serviceListenerB, now);
+        }
+
+    }
+
+    protected class SafeShutdownCTask extends SafeShutdownTask {
+
+        public SafeShutdownCTask() {
+            this(false/* now */);
+        }
+
+        public SafeShutdownCTask(final boolean now) {
+            super(serverC, serviceListenerC, now);
+        }
+
     }
 
     private void safeShutdown(final HAGlue haGlue,
             final ServiceListener serviceListener) {
-    	safeShutdown(haGlue, serviceListener, false); // not shutdownNow by default
+
+        safeShutdown(haGlue, serviceListener, false/* now */);
+
     }
     
     private void safeShutdown(final HAGlue haGlue,
-                final ServiceListener serviceListener, final boolean now) {
+            final ServiceListener serviceListener, final boolean now) {
 
         if (haGlue == null)
             return;
@@ -1711,5 +1788,57 @@ public class AbstractHA3JournalServerTestCase extends
         assertEquals(joined.length, votesForLastCommitTime.length);
 
     }
-    
+
+    protected class ABC {
+        
+        final HAGlue serverA, serverB, serverC;
+
+        public ABC() throws InterruptedException, ExecutionException {
+
+            final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
+
+            tasks.add(new StartATask(false/* restart */));
+            tasks.add(new StartBTask(false/* restart */));
+            tasks.add(new StartCTask(false/* restart */));
+
+            // Start all servers in parallel. Wait up to a timeout.
+            final List<Future<HAGlue>> futures = executorService.invokeAll(
+                    tasks, 30/* timeout */, TimeUnit.SECONDS);
+
+            serverA = futures.get(0).get();
+
+            serverB = futures.get(1).get();
+
+            serverC = futures.get(2).get();
+
+        }
+
+        public void shutdownAll() throws InterruptedException,
+                ExecutionException {
+
+            shutdownAll(false/* now */);
+            
+        }
+
+        public void shutdownAll(final boolean now) throws InterruptedException,
+                ExecutionException {
+            
+            final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+
+            tasks.add(new SafeShutdownATask());
+            tasks.add(new SafeShutdownBTask());
+            tasks.add(new SafeShutdownCTask());
+
+            // Start all servers in parallel. Wait up to a timeout.
+            final List<Future<Void>> futures = executorService.invokeAll(
+                    tasks, 30/* timeout */, TimeUnit.SECONDS);
+
+            futures.get(0).get();
+            futures.get(1).get();
+            futures.get(2).get();
+
+        }
+
+    }
+
 }

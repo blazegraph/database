@@ -376,8 +376,12 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/617" >
      *      Concurrent KB create fails with "No axioms defined?" </a>
-     *      
+     * 
      * @see TestConcurrentKBCreate
+     * 
+     *      FIXME This method sometimes deadlocks in the repo.size() call on the
+     *      leader (HTTP end point). We need to chase this down with a thread
+     *      dump of the leader when it happens.
      */
     protected void awaitKBExists(final HAGlue haGlue) throws IOException {
       
