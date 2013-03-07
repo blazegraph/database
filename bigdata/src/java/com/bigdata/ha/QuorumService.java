@@ -84,6 +84,11 @@ public interface QuorumService<S extends HAGlue> extends QuorumMember<S>,
      * Return the directory in which we are logging the write blocks.
      */
     File getHALogDir();
+
+    /**
+     * Return the best guess at the process identifier for this process.
+     */
+    int getPID();
     
     /**
      * Return the configured timeout in milliseconds that the leader will await

@@ -220,7 +220,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     private File serviceIdFile;
 
     /**
+     * The PID (best guess).
+     * 
+     * @see PIDUtil#getPID()
+     */
+    private final int pid;
+
+    /**
      * The file on which the PID was written.
+     * @see #writePIDFile(File)
      */
     private File pidFile;
 
@@ -352,6 +360,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     public File getServiceDir() {
         
         return serviceDir;
+        
+    }
+    
+    /**
+     * The best guess at the process identifier for this process.
+     */
+    final protected int getPID() {
+        
+        return pid;
         
     }
     
@@ -573,6 +590,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //                    }
 //                });
 
+        // Note the process id (best guess).
+        this.pid = PIDUtil.getPID();
+        
         /*
          * Read jini configuration & service properties 
          */
@@ -1121,7 +1141,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         try {
 
             // best guess at the PID of the JVM.
-            final String pid = Integer.toString(PIDUtil.getPID());
+            final String pidStr = Integer.toString(this.pid);
 
             // open the file.
             final FileOutputStream os = new FileOutputStream(file);
@@ -1132,7 +1152,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 os.getChannel().truncate(0L);
                 
                 // write on the PID using ASCII characters.
-                os.write(pid.getBytes("ASCII"));
+                os.write(pidStr.getBytes("ASCII"));
 
                 // flush buffers.
                 os.flush();

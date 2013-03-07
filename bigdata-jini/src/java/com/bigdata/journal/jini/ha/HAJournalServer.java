@@ -962,6 +962,13 @@ public class HAJournalServer extends AbstractServer {
 
         }
 
+        @Override
+        public int getPID() {
+
+            return server.getPID();
+            
+        }
+        
         /**
          * Resolve an {@link HAGlue} object from its Service UUID.
          */
@@ -2912,6 +2919,14 @@ public class HAJournalServer extends AbstractServer {
              * use any high latency or RMI calls unless we need to wait for the
              * root blocks. That condition is detected below without any high
              * latency operations.
+             * 
+             * FIXME A deadlock has been observed when the leader is attempting
+             * to commit the initial KB create, the 3rd service is attempting
+             * to synchronize with the met quorum (and is in this code block)
+             * and client is attempting to discover whether or not the KB has
+             * been created (awaitKBCreate()).  
+             * 
+             * @see TestHA3JournalServer#testABCStartSimultaneous
              */
             S leader = null;
             IRootBlockView rbLeader = null;
