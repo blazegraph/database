@@ -379,9 +379,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @see TestConcurrentKBCreate
      * 
-     *      FIXME This method sometimes deadlocks in the repo.size() call on the
-     *      leader (HTTP end point). We need to chase this down with a thread
-     *      dump of the leader when it happens.
+     *      Note: This method sometimes deadlocked in the repo.size() call on
+     *      the leader (HTTP end point). This was tracked down to an attempt
+     *      by the 3rd node to setup the pipeline in handleReplicatedWrite()
+     *      when it was not yet aware that a quorum existed and had not setup
+     *      its local root blocks.
      */
     protected void awaitKBExists(final HAGlue haGlue) throws IOException {
       

@@ -2234,7 +2234,26 @@ public class HAJournalServer extends AbstractServer {
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
-
+            if (journal.getQuorumToken() == Quorum.NO_QUORUM && req == null) {
+                /*
+                 * This is a live write (part of the current write set).
+                 * However, we do not yet have the quorum token yet and hence do
+                 * not even recognize that a quorum is met so there is
+                 * absolutely nothing that we can do with this write at this
+                 * time.
+                 * 
+                 * Note: Deadlocks had been observed before this fast path was
+                 * added. This occurred when the leader was attempting to commit
+                 * the initial KB create, the 3rd service is attempting to
+                 * synchronize with the met quorum and was stuck in
+                 * pipelineSetup() where it was waiting for the quorum token to
+                 * be set on the journal, and an HTTP client is attempting to
+                 * discover whether or not the KB has been created.
+                 * 
+                 * @see TestHA3JournalServer#testABCStartSimultaneous
+                 */
+                return;
+            }
             pipelineSetup();
             
             logLock.lock();
@@ -2919,14 +2938,6 @@ public class HAJournalServer extends AbstractServer {
              * use any high latency or RMI calls unless we need to wait for the
              * root blocks. That condition is detected below without any high
              * latency operations.
-             * 
-             * FIXME A deadlock has been observed when the leader is attempting
-             * to commit the initial KB create, the 3rd service is attempting
-             * to synchronize with the met quorum (and is in this code block)
-             * and client is attempting to discover whether or not the KB has
-             * been created (awaitKBCreate()).  
-             * 
-             * @see TestHA3JournalServer#testABCStartSimultaneous
              */
             S leader = null;
             IRootBlockView rbLeader = null;
