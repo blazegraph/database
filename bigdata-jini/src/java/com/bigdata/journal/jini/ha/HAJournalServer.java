@@ -45,7 +45,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -565,23 +564,20 @@ public class HAJournalServer extends AbstractServer {
             try {
 
                 /*
-                 * Terminate the watchers and threads that are monitoring and
+                 * Terminate the quorum watcher threads that are monitoring and
                  * maintaining our reflection of the global quorum state.
                  * 
-                 * FIXME SHUTDOWN: This can deadlock if there is a concurrent
-                 * attempt to addMember(), addPipeline(), castVote(),
-                 * serviceJoin(), etc. The deadlock arises because we are
-                 * undoing all of those things in this thread and then waiting
-                 * until the Condition is satisified. With a concurrent action
-                 * to do the opposite thing, we can wind up with the end state
-                 * that we are not expecting and just waiting forever inside of
+                 * Note: A deadlock can arise if there is a concurrent attempt
+                 * to addMember(), addPipeline(), castVote(), serviceJoin(),
+                 * etc. The deadlock arises because we are undoing all of those
+                 * things in this thread and then waiting until the Condition is
+                 * satisified. With a concurrent action to do the opposite
+                 * thing, we can wind up with the end state that we are not
+                 * expecting and just waiting forever inside of
                  * AbstractQuorum.doConditionXXXX() for our condition variable
-                 * to reach the desired state.
-                 * 
-                 * One possibility is to simply kill the zk connection first.
-                 * 
-                 * Otherwise, we need to make sure that we do not tell the
-                 * quorum actor to do things that are contradictory.
+                 * to reach the desired state. [This has been addressed with a
+                 * timeout on the quorum.terminate() that is imposed from within
+                 * that method.]
                  */
                 quorum.terminate();
 
@@ -660,7 +656,7 @@ public class HAJournalServer extends AbstractServer {
         /**
          * Lock to guard the HALogWriter.
          */
-        private final Lock logLock = new ReentrantLock();
+        private final Lock logLock;
         
         /**
          * Future for task responsible for resynchronizing a node with
@@ -673,11 +669,12 @@ public class HAJournalServer extends AbstractServer {
          * state.
          */
         private enum RunStateEnum {
-            Restore,
-            SeekConsensus,
-            RunMet,
-            Resync,
-            Rebuild, 
+            Restore, // apply local HALog files GT current commit point.
+            SeekConsensus, // seek consensus.
+            RunMet, // run while joined with met quorum.
+            Resync, // only resynchronization
+            Rebuild, // online disaster recovery
+            Error, // error state.
             Shutdown; // TODO SHUTDOWN: We are not using this systematically (no ShutdownTask for this run state).
         }
         
@@ -733,6 +730,10 @@ public class HAJournalServer extends AbstractServer {
 
             final public T call() throws Exception {
 
+                /*
+                 * Note: Will throw IllegalStateException if this service is
+                 * already shutting down.
+                 */
                 setRunState(runState);
 
                 try {
@@ -746,22 +747,43 @@ public class HAJournalServer extends AbstractServer {
                         // Note: This is a normal exit condition.
                         log.info("Interrupted.");
 
+                        // Done.
+                        return null;
+                        
                     } else {
 
                         log.error(t, t);
 
                         /*
-                         * Unhandled error. Transition to SeekConsensus!
+                         * Unhandled error.
                          */
+                        
+                        /*
+                         * Sleep for a moment to avoid tight error handling
+                         * loops that can generate huge log files.
+                         */
+                        Thread.sleep(250/*ms*/);
 
-                        enterRunState(new SeekConsensusTask());
+                        if (runState != RunStateEnum.Error) {
+                        
+                            /*
+                             * Transition to the Error task (but do not allow
+                             * the error task to interrupt itself).
+                             */
+
+                            enterRunState(new ErrorTask());
+                            
+                        }
+
+                        // Done.
+                        return null;
 
                     }
 
-                    if (t instanceof Exception)
-                        throw (Exception) t;
-
-                    throw new RuntimeException(t);
+//                    if (t instanceof Exception)
+//                        throw (Exception) t;
+//
+//                    throw new RuntimeException(t);
 
                 } finally {
 
@@ -935,7 +957,7 @@ public class HAJournalServer extends AbstractServer {
             super(logicalServiceZPath, serviceId, remoteServiceImpl, store);
 
             this.journal = store;
-            
+            this.logLock = store.logLock;
             this.server = server;
 
         }
@@ -1016,6 +1038,26 @@ public class HAJournalServer extends AbstractServer {
             }
             public Void call() throws Exception {
                 journal.setQuorumToken(token);
+                if (isJoinedMember(token)) {
+                    /*
+                     * When a quorum meets, the write replication pipeline will
+                     * cause the HALog to be opened for live writes. However, we
+                     * also need to cause the log to be opened if there are no
+                     * replicated writes so a service can resync with the
+                     * leader, including with the live log (which will be empty
+                     * if there are no writes on the leader during the resync).
+                     */
+                    logLock.lock();
+                    try {
+                        final HALogWriter logWriter = journal.getHALogWriter();
+                        if (!logWriter.isOpen()) {
+                            logWriter.disable();
+                            logWriter.createLog(journal.getRootBlockView());
+                        }
+                    } finally {
+                        logLock.unlock();
+                    }
+                }
                 return null;
             }
         }
@@ -1053,6 +1095,8 @@ public class HAJournalServer extends AbstractServer {
         }
         
         /**
+         * {@inheritDoc}
+         * <p>
          * If there is a fully met quorum, then we can purge all HA logs
          * <em>EXCEPT</em> the current one.
          */
@@ -1061,12 +1105,18 @@ public class HAJournalServer extends AbstractServer {
 
             super.serviceJoin();
 
-            if (false) {
-                /*
-                 * TODO BACKUP: Purge of HALog files on a fully met quorum is
-                 * current disabled. Enable, but review implications in more
-                 * depth first.
-                 */
+            // FIXME serviceJoin() - restore event handler.
+//            // Submit task to handle this event.
+//            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+//                    new ServiceJoinTask()));
+        }
+
+        /**
+         * Purge HALog files on a fully met quorum.
+         */
+        private class ServiceJoinTask implements Callable<Void> {
+            public Void call() throws Exception {
+
                 final long token = getQuorum().token();
 
                 if (getQuorum().isQuorumFullyMet(token)) {
@@ -1074,10 +1124,72 @@ public class HAJournalServer extends AbstractServer {
                     purgeHALogs();
 
                 }
+                
+                return null;
+                
             }
+        }
+
+        @Override
+        public void memberRemove() {
+
+            super.memberRemove();
+
+            // FIXME memberRemove() - restore event handler. Do NOT transition to seek consensus directly from error state. Instead, cause a memberRemove() that will trigger this event handler.
+//            // Submit task to handle this event.
+//            server.singleThreadExecutor.execute(new MonitoredFutureTask<Void>(
+//                    new MemberRemoveTask()));
 
         }
- 
+
+        /**
+         * If this service is no longer a member, and the service is still
+         * running, then enter the SeekConsensus run state.
+         */
+        private class MemberRemoveTask implements Callable<Void> {
+            public Void call() throws Exception {
+                enterRunState(new SeekConsensusTask());
+                return null;
+            }
+        }
+
+        private class ErrorTask extends RunStateCallable<Void> {
+            
+            protected ErrorTask() {
+
+                super(RunStateEnum.Error);
+                
+            }
+            
+            @Override
+            public Void doRun() throws Exception {
+                /*
+                 * Note: Bouncing the ZK connection here appears to cause
+                 * problems within the test suite. We have not tracked down why
+                 * yet.
+                 */
+//                server.haGlueService.bounceZookeeperConnection();
+                logLock.lock();
+                try {
+                    if (journal.getHALogWriter().isOpen()) {
+                        /*
+                         * Note: Closing the HALog is necessary for us to be
+                         * able to re-enter SeekConsensus without violating a
+                         * pre-condition for that run state.
+                         */
+                        journal.getHALogWriter().disable();
+                    }
+                } finally {
+                    logLock.unlock();
+                }
+                enterRunState(new SeekConsensusTask());
+
+                return null;
+                
+            }
+            
+        }
+        
         /**
          * Task to handle a quorum break event.
          */
@@ -1100,15 +1212,15 @@ public class HAJournalServer extends AbstractServer {
                     final long token = getQuorum().token();
 
                     if (isJoinedMember(token)) // not joined.
-                        throw new IllegalStateException();
+                        throw new IllegalStateException("Service not joined.");
 
                     if (getQuorum().getCastVote(getServiceId()) != null) {
                         // no vote cast.
-                        throw new IllegalStateException();
+                        throw new IllegalStateException("No cast vote.");
                     }
 
                     if (journal.getHALogWriter().isOpen())
-                        throw new IllegalStateException();
+                        throw new IllegalStateException("HALogWriter is open.");
 
                 }
 
@@ -1175,12 +1287,14 @@ public class HAJournalServer extends AbstractServer {
                     // Resync with the quorum.
                     enterRunState(new ResyncTask(token));
 
+                } else {
+
+                    final UUID leaderId = getQuorum().getLeaderId();
+
+                    // Transition to RunMet.
+                    enterRunState(new RunMetTask(token, leaderId));
+
                 }
-
-                final UUID leaderId = getQuorum().getLeaderId();
-
-                // Transition to RunMet.
-                enterRunState(new RunMetTask(token, leaderId));
 
                 // Done.
                 return null;
@@ -1271,16 +1385,15 @@ public class HAJournalServer extends AbstractServer {
             @Override
             protected Void doRun() throws Exception {
                 /*
-                 * FIXME RESTORE: Enable restore and test. There is a problem
-                 * with replication of the WORM HALog files and backup/restore.
-                 * The WORM HALog files currently do not have the actual data on
-                 * the leader. This makes some of the code messier and also
-                 * means that the HALog files can not be binary equals on the
-                 * leader and follower and could cause problems if people
-                 * harvest them from the file system directly rather than
-                 * through sendHALogFile() since they will be missing the
-                 * necessary state in the file system if they were put there by
-                 * the leader.
+                 * FIXME WORM RESTORE: There is a problem with replication of
+                 * the WORM HALog files and backup/restore. The WORM HALog files
+                 * currently do not have the actual data on the leader. This
+                 * makes some of the code messier and also means that the HALog
+                 * files can not be binary equals on the leader and follower and
+                 * could cause problems if people harvest them from the file
+                 * system directly rather than through sendHALogFile() since
+                 * they will be missing the necessary state in the file system
+                 * if they were put there by the leader.
                  */
                 while (true) {
 
@@ -1404,20 +1517,12 @@ public class HAJournalServer extends AbstractServer {
              */
             private final long token;
 
-            /**
-             * The quorum leader. This is fixed until the quorum breaks.
-             */
-            private final S leader;
-            
             public RebuildTask(final long token) {
 
                 super(RunStateEnum.Rebuild);
                 
                 // run while quorum is met.
                 this.token = token;
-
-                // The leader for that met quorum (RMI interface).
-                leader = getLeader(token);
 
             }
 
@@ -1430,10 +1535,23 @@ public class HAJournalServer extends AbstractServer {
                 getQuorum().assertQuorum(token);
                 
                 /*
+                 * The quorum leader (RMI interface). This is fixed until the
+                 * quorum breaks.
+                 */
+                final S leader = getLeader(token);
+
+                /*
                  * Rebuild needs to throw away anything that is buffered on the
                  * local backing file to prevent any attempts to interpret the
                  * data on the backing file in light of its current root blocks.
                  * To do this, we overwrite the root blocks.
+                 * 
+                 * FIXME Do not wipe out our root block until we have positive
+                 * information from the leader that it is *running* as the
+                 * leader. In particular, it needs to have the quorum token set
+                 * on the journal and a few other things in place. This does not
+                 * exactly correspond to the pre-conditions on RunMet. It is
+                 * more like the post-conditions on pipelineSetup().
                  */
                 {
 
@@ -1476,6 +1594,8 @@ public class HAJournalServer extends AbstractServer {
                     // Wait for the raw store to be replicated.
                     resp = remoteFuture.get();
                     
+                    log.warn("REBUILD: Copied backing store from leader.");
+                    
                 } finally {
 
                     // Ensure remoteFuture is cancelled.
@@ -1486,6 +1606,11 @@ public class HAJournalServer extends AbstractServer {
                 // Caught up on the backing store as of that copy.
                 installRootBlocks(resp.getRootBlock0(), resp.getRootBlock1());
 
+                log.warn("REBUILD: installed root blocks @ commitCounter="
+                        + journal.getRootBlockView().getCommitCounter()
+                        + ": rb0=" + resp.getRootBlock0() + ", rb1="
+                        + resp.getRootBlock1());
+                
                 // Resync.
                 enterRunState(new ResyncTask(token));
 
@@ -1523,20 +1648,12 @@ public class HAJournalServer extends AbstractServer {
              */
             private final long token;
 
-            /**
-             * The quorum leader. This is fixed until the quorum breaks.
-             */
-            private final S leader;
-            
             public ResyncTask(final long token) {
                 
                 super(RunStateEnum.Resync);
 
                 // run while quorum is met.
                 this.token = token;
-
-                // The leader for that met quorum (RMI interface).
-                leader = getLeader(token);
 
             }
 
@@ -1580,6 +1697,12 @@ public class HAJournalServer extends AbstractServer {
                  * that is replicated. This let's us catch up incrementally with
                  * the quorum.
                  */
+
+                /*
+                 * The quorum leader (RMI interface). This is fixed until the
+                 * quorum breaks.
+                 */
+                final S leader = getLeader(token);
 
                 // Until joined with the met quorum.
                 while (!getQuorum().getMember().isJoinedMember(token)) {
@@ -2042,7 +2165,6 @@ public class HAJournalServer extends AbstractServer {
             }
             
         }
-
         
         /**
          * Make sure the pipeline is setup properly.
@@ -2542,24 +2664,42 @@ public class HAJournalServer extends AbstractServer {
          * starting point for that log file.
          */
         @Override
-	public void logRootBlock(final boolean isJoinedService, final IRootBlockView rootBlock) throws IOException {
+        public void logRootBlock(final boolean isJoinedService,
+                final IRootBlockView rootBlock) throws IOException {
 
             logLock.lock();
 
             try {
 
+                final HALogWriter logWriter = journal.getHALogWriter();
+
+                if (false && !isJoinedService) {//FIXME logRootBlock()
+
+                    /*
+                     * NOTE: Unless we are joined with the met quorum we will be
+                     * in RESYCNC (at best). RESYNC will put down the closing
+                     * root block on the HALog when it is done receiving the
+                     * HALog from the leader. Therefore, there is no condition
+                     * under which a service that is not participating in the
+                     * 2-phase commit should lay down the closing root block on
+                     * the HALog here.
+                     */
+                    return;
+                    
+                }
+
                 // Close off the old log file with the root block.
-                journal.getHALogWriter().closeLog(rootBlock);
-                
+                logWriter.closeLog(rootBlock);
+
                 // Open up a new log file with this root block.
-                journal.getHALogWriter().createLog(rootBlock);
-                
+                logWriter.createLog(rootBlock);
+
             } finally {
-                
+
                 logLock.unlock();
-                
+
             }
-            
+
         }
 
         /**
@@ -2776,7 +2916,9 @@ public class HAJournalServer extends AbstractServer {
             S leader = null;
             IRootBlockView rbLeader = null;
             final long sleepMillis = 10;
+            int ntimes = 0;
             while (true) {
+                ntimes++;
                 // while token is valid.
                 getQuorum().assertQuorum(token);
                 final long journalToken = journal.getQuorumToken();
@@ -2810,10 +2952,10 @@ public class HAJournalServer extends AbstractServer {
                 /*
                  * Good to go.
                  */
-                if (haLog.isInfoEnabled())
-                    haLog.info("Journal quorumToken is set.");
                 break;
             }
+            if (ntimes > 1 && haLog.isInfoEnabled())
+                haLog.info("Journal quorumToken is set.");
         }
         
     } // class HAQuorumService

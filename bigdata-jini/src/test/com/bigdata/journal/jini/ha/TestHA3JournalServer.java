@@ -1103,7 +1103,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     	
     	// A & B should meet
     	awaitMetQuorum();
-    	
     	// Check HALogs equal
 //        assertHALogDigestsEquals(7L/* firstCommitCounter */,
 //                7L, new HAGlue[] { serverA, serverB });
@@ -1734,6 +1733,27 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     		destroyA();
     		destroyB();
     	}
+    }
+
+    /**
+     * We have experienced inconsistencies on test startups, this test just attempts
+     * to repeatedly start an initial ABC service.
+     */
+    public void testStressABCStartSimultaneous() throws Exception {
+        for (int i = 1; i <= 20; i++) {
+            ABC tmp = null;
+            try {
+                tmp = new ABC();
+                awaitFullyMetQuorum();
+                tmp.shutdownAll();
+            } catch (Throwable e) {
+                fail("Unable to meet on run " + i, e);
+            } finally {
+                if (tmp != null) {
+                    tmp.shutdownAll();
+                }
+            }
+        }
     }
 
     /**

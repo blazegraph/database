@@ -45,6 +45,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.export.Exporter;
@@ -243,7 +245,12 @@ public class HAJournal extends Journal {
      * @see HALogWriter
      */
     private final HALogWriter haLogWriter;
-
+    
+    /**
+     * Lock to guard the HALogWriter.
+     */// FIXME logLock: Refactor visibility and initialization in HAQuorumService.
+    final Lock logLock = new ReentrantLock(); 
+    
     /**
      * The most recently observed *live* {@link IHAWriteMessage}.
      * <p>
@@ -618,28 +625,42 @@ public class HAJournal extends Journal {
         public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
                 final IHALogRootBlocksRequest msg) throws IOException {
 
-            // The commit counter of the desired closing root block.
-            final long commitCounter = msg.getCommitCounter();
+            /*
+             * Note: This makes the reporting of the open and close root blocks
+             * for the HALog file atomic with respect to other operations on the
+             * HALog. This lock is shared by the HAQuorumService.
+             */
+            logLock.lock();
+            try {
+            
+                // The commit counter of the desired closing root block.
+                final long commitCounter = msg.getCommitCounter();
 
-            final File logFile = new File(haLogDir,
-                    HALogWriter.getHALogFileName(commitCounter));
+                final File logFile = new File(haLogDir,
+                        HALogWriter.getHALogFileName(commitCounter));
 
-            if (!logFile.exists()) {
+                if (!logFile.exists()) {
 
-                // No log for that commit point.
-                throw new FileNotFoundException(logFile.getName());
+                    // No log for that commit point.
+                    throw new FileNotFoundException(logFile.getName());
 
+                }
+
+                final HALogReader r = new HALogReader(logFile);
+
+                final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
+                        r.getOpeningRootBlock(), r.getClosingRootBlock());
+
+                if (haLog.isDebugEnabled())
+                    haLog.debug("msg=" + msg + ", resp=" + resp);
+
+                return resp;
+
+            } finally {
+            
+                logLock.unlock();
+                
             }
-
-            final HALogReader r = new HALogReader(logFile);
-
-            final HALogRootBlocksResponse resp = new HALogRootBlocksResponse(
-                    r.getOpeningRootBlock(), r.getClosingRootBlock());
-
-            if (haLog.isDebugEnabled())
-                haLog.debug("msg=" + msg + ", resp=" + resp);
-
-            return resp;
 
         }
 
@@ -786,8 +807,18 @@ public class HAJournal extends Journal {
                 
                 // Grab a read lock.
                 final long txId = newTx(ITx.READ_COMMITTED);
-                
-                // Get both root blocks (atomically).
+
+                /*
+                 * Get both root blocks (atomically).
+                 * 
+                 * Note: This is done AFTER we take the read-lock and BEFORE we
+                 * copy the data from the backing store. These root blocks MUST
+                 * be consistent for the leader's backing store because we are
+                 * not recycling allocations (since the read lock has pinned
+                 * them). The journal MIGHT go through a concurrent commit
+                 * before we obtain these root blocks, but they are still valid
+                 * for the data on the disk because of the read-lock.
+                 */
                 final IRootBlockView[] rootBlocks = getRootBlocks();
                 
                 IBufferAccess buf = null;
