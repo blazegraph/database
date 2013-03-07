@@ -122,7 +122,8 @@ public class HAStatusServletUtil {
              */
             {
                 final File serviceDir = quorumService.getServiceDir();
-                p.text("ServiceDir: path=" + serviceDir).node("br")
+                p.text("Service: path=" + serviceDir).node("br").close();
+                p.text("Service: pid=" + quorumService.getPID()).node("br")
                         .close();
             }
             
