@@ -114,17 +114,19 @@ public class HAStatusServletUtil {
             p.text("quorumToken=" + quorumToken + ", lastValidToken="
                     + lastValidToken).node("br").close();
 
-            p.text("logicalServiceId="                    + quorumService.getLogicalServiceId()).node("br")
-                    .close();
+            p.text("logicalServiceId=" + quorumService.getLogicalServiceId())
+                    .node("br").close();
 
             /*
              * Report on the Service.
              */
             {
-                final File serviceDir = quorumService.getServiceDir();
-                p.text("Service: path=" + serviceDir).node("br").close();
+                p.text("Service: serviceId=" + quorumService.getServiceId())
+                        .node("br").close();
                 p.text("Service: pid=" + quorumService.getPID()).node("br")
                         .close();
+                p.text("Service: path=" + quorumService.getServiceDir())
+                        .node("br").close();
             }
             
             /*
@@ -212,6 +214,9 @@ public class HAStatusServletUtil {
 
                 final boolean isFollower = indexOf(serviceId, joined) > 0;
 
+                final boolean isSelf = serviceId.equals(quorumService
+                        .getServiceId());
+
                 final int pipelineIndex = indexOf(serviceId, pipeline);
                 
                 final String nssUrl = "http://" + hostname + ":" + nssPort;
@@ -220,13 +225,13 @@ public class HAStatusServletUtil {
                 p.node("a").attr("href", nssUrl).text(nssUrl).close();
 
                 // plus the other metadata.
-                p.text(" : "
-                        + (isLeader ? "leader"
-                                : (isFollower ? "follower"
-                                        : " is not joined"))
+                p.text(" : "//
+                        + (isLeader ? "leader" : (isFollower ? "follower"
+                                : " is not joined"))//
                         + ", pipelineOrder="
-                        + (pipelineIndex == -1 ? "N/A"
-                                : pipelineIndex)).node("br").close();
+                        + (pipelineIndex == -1 ? "N/A" : pipelineIndex)//
+                        + (isSelf ? " (this service)" : "")//
+                ).node("br").close();
 
             }
 
