@@ -1670,6 +1670,11 @@ public class AbstractHA3JournalServerTestCase extends
     /**
      * Wait until we have a fully met quorum.
      * 
+     * @param ticks
+     *            A multiplier of the {@link #awaitQuorumTimeout}. This timeout
+     *            is used first to await a quorum meet and then to await the
+     *            quorum becoming fully met. (Additive, rather than total.)
+     * 
      * @return The quorum token for that fully met quorum.
      * 
      * @throws IOException
@@ -1789,10 +1794,22 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
+    /**
+     * Helper class for simultaneous start of 3 HA services.
+     */
     protected class ABC {
         
+        /**
+         * The services.
+         */
         final HAGlue serverA, serverB, serverC;
 
+        /**
+         * Simultaneous start of 3 HA services (this happens in the ctor).
+         * 
+         * @throws InterruptedException
+         * @throws ExecutionException
+         */
         public ABC() throws InterruptedException, ExecutionException {
 
             final List<Callable<HAGlue>> tasks = new LinkedList<Callable<HAGlue>>();
