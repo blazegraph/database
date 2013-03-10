@@ -221,6 +221,11 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 
     /**
      * The initial version.
+     * 
+     * Note: We have never done a release with this version number. It should
+     * only exist for HALog files an HAJournal files for the branch in which we
+     * were doing development on the HAJournalServer. In all released versions,
+     * the {@link #uuid} field should always be non-<code>null</code>.
      */
     private static final byte VERSION0 = 0x0;
 
